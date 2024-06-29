@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package fricon;
+
+service DataStorage {
+  rpc Create (CreateRequest) returns (CreateResponse) {}
+  rpc UpdateMetadata (UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
+}
+
+message CreateRequest {
+  Metadata metadata = 1;
+}
+
+message CreateResponse {
+  int64 id = 1;
+}
+
+message UpdateMetadataRequest {
+  int64 id = 1;
+  Metadata metadata = 2;
+}
+
+message UpdateMetadataResponse {}
+
+message Metadata {
+  optional string name = 1;
+  optional string description = 2;
+  repeated string tags = 3;
+}
