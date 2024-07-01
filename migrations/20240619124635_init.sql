@@ -8,7 +8,7 @@ CREATE TABLE data_indices (
 
 CREATE TABLE tags (
     id INTEGER NOT NULL PRIMARY KEY,
-    name TEXT NOT NULL
+    name TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE data_index_tag (
@@ -18,5 +18,3 @@ CREATE TABLE data_index_tag (
     FOREIGN KEY (data_index_id) REFERENCES data_indices (id) ON DELETE CASCADE,
     FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
 );
-
-CREATE UNIQUE INDEX ix_tags_name ON tags (name);
