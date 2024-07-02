@@ -6,24 +6,22 @@ use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 pub struct Cli {
-    /// Path to the configuration file. If not provided, load from default location.
-    #[arg(short, long)]
-    pub config: Option<PathBuf>,
-    /// The port to listen on. Overrides configuration file.
-    #[arg(short, long)]
-    pub port: Option<u16>,
-    /// The data directory. Overrides configuration file.
-    #[arg(short, long)]
-    pub data_dir: Option<PathBuf>,
-
     #[command(subcommand)]
-    pub command: Option<Commands>,
+    pub command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Show default file location.
-    Config,
+    /// Initialize working directory
+    Init {
+        /// Path to working directory
+        path: PathBuf,
+    },
+    /// Start server
+    Serve {
+        /// Path to working directory
+        path: PathBuf,
+    },
 }
 
 #[cfg(test)]
