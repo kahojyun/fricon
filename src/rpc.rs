@@ -1,17 +1,14 @@
-mod db;
 mod proto;
 
 use log::{error, trace};
 use sqlx::SqlitePool;
 use tonic::{Request, Response, Result};
 
-use self::{
-    db::{create, update},
-    proto::{
-        data_storage_server::DataStorage, CreateRequest, CreateResponse, UpdateMetadataRequest,
-        UpdateMetadataResponse,
-    },
+use self::proto::{
+    data_storage_server::DataStorage, CreateRequest, CreateResponse, UpdateMetadataRequest,
+    UpdateMetadataResponse,
 };
+use crate::db::{create, update};
 
 pub use self::proto::data_storage_server::DataStorageServer;
 

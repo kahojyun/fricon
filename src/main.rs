@@ -1,13 +1,14 @@
 mod cli;
 mod config;
+mod db;
 mod dir;
-mod storage;
+mod rpc;
 
 use clap::Parser as _;
 use cli::Commands;
 use log::info;
+use rpc::{DataStorageServer, Storage};
 use sqlx::sqlite::SqlitePoolOptions;
-use storage::{DataStorageServer, Storage};
 use tokio::signal;
 use tonic::transport::Server;
 
