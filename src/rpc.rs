@@ -21,7 +21,8 @@ pub struct Storage {
 impl DataStorage for Storage {
     async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
-        let metadata = request.into_inner().metadata;
+        let msg = request.into_inner();
+        let metadata = msg.metadata;
         let name = metadata.as_ref().and_then(|x| x.name.as_deref());
         let description = metadata.as_ref().and_then(|x| x.description.as_deref());
         let tags = metadata.as_ref().map(|x| x.tags.as_slice());
