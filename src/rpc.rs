@@ -2,11 +2,12 @@ mod proto;
 
 use log::{error, trace};
 use sqlx::SqlitePool;
-use tonic::{Request, Response, Result};
+use tonic::{Request, Response, Result, Streaming};
+use uuid::Uuid;
 
 use self::proto::{
     data_storage_server::DataStorage, CreateRequest, CreateResponse, UpdateMetadataRequest,
-    UpdateMetadataResponse,
+    UpdateMetadataResponse, WriteRequest, WriteResponse,
 };
 use crate::db::{create, update};
 
@@ -32,7 +33,9 @@ impl DataStorage for Storage {
                 error!("create failed: {:?}", e);
                 tonic::Status::internal(e.to_string())
             })?;
-        Ok(Response::new(CreateResponse { id }))
+        let (msb, lsb) = Uuid::new_v4().as_u64_pair();
+        let write_token = Some(proto::Uuid { msb, lsb });
+        Ok(Response::new(CreateResponse { id, write_token }))
     }
 
     async fn update_metadata(
@@ -53,5 +56,12 @@ impl DataStorage for Storage {
                 tonic::Status::internal(e.to_string())
             })?;
         Ok(Response::new(UpdateMetadataResponse {}))
+    }
+
+    async fn write(
+        &self,
+        _request: Request<Streaming<WriteRequest>>,
+    ) -> Result<Response<WriteResponse>> {
+        unimplemented!()
     }
 }
