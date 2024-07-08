@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod dataset;
 mod db;
 mod dir;
 mod rpc;
