@@ -1,9 +1,8 @@
+# Rust artifacts
 /target
 
+# Development environment variables
 .env
 
-test.sqlite3
-test.sqlite3-shm
-test.sqlite3-wal
-
+# Lazy.nvim local config
 .lazy.lua
