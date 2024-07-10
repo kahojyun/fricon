@@ -13,7 +13,7 @@ env_logger = "0.11.3"
 log = "0.4.21"
 prost = "0.12.6"
 serde = { version = "1.0.203", features = ["derive"] }
-sqlx = { version = "0.7.4", features = ["runtime-tokio", "sqlite"] }
+sqlx = { version = "0.7.4", features = ["runtime-tokio", "sqlite", "uuid"] }
 thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["full"] }
 toml = "0.8.14"
