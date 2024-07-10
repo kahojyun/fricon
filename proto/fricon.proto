@@ -4,6 +4,7 @@ package fricon;
 
 service DataStorage {
   rpc Create (CreateRequest) returns (CreateResponse) {}
+  // Requires a write token from Create
   rpc Write (stream WriteRequest) returns (WriteResponse) {}
   rpc UpdateMetadata (UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
 }
@@ -13,12 +14,19 @@ message CreateRequest {
 }
 
 message CreateResponse {
-  int64 id = 1;
-  Uuid write_token = 2;
+  bytes write_token = 1;
+}
+
+message WriteRequest {
+  bytes record_batch = 1;
+}
+
+message WriteResponse {
+  string id = 1;
 }
 
 message UpdateMetadataRequest {
-  int64 id = 1;
+  string id = 1;
   Metadata metadata = 2;
 }
 
@@ -30,13 +38,3 @@ message Metadata {
   repeated string tags = 3;
 }
 
-message Uuid {
-  fixed64 msb = 1;
-  fixed64 lsb = 2;
-}
-
-message WriteRequest {
-  bytes record_batch = 1;
-}
-
-message WriteResponse {}
