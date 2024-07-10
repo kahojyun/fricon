@@ -16,12 +16,12 @@ pub async fn create(
     uid: Uuid,
     name: &str,
     description: Option<&str>,
-    tags: Option<&[String]>,
+    tags: &[String],
     pool: &sqlx::SqlitePool,
 ) -> Result<i64> {
     let mut tx = pool.begin().await?;
     let dataset_id = tx.insert_dataset(uid, name, description).await?;
-    for tag in tags.into_iter().flatten() {
+    for tag in tags {
         let tag_id = tx.get_or_insert_tag(tag).await?;
         tx.add_tag_to_dataset(dataset_id, tag_id).await?;
     }
