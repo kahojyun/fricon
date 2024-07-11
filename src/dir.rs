@@ -1,11 +1,17 @@
-use std::{fs, path::PathBuf, str::FromStr};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
+use chrono::NaiveDate;
 use log::info;
 use sqlx::{
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
     ConnectOptions,
 };
+use uuid::Uuid;
 
 use crate::config::Config;
 
@@ -139,5 +145,32 @@ impl Workspace {
 
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    pub fn get_dataset_path(&self, date: NaiveDate, uid: Uuid) -> PathBuf {
+        get_dataset_path(&self.root.data_dir(), date, uid)
+    }
+}
+
+fn get_dataset_path(data_dir: &Path, date: NaiveDate, uid: Uuid) -> PathBuf {
+    data_dir.join(format!("{}/{}", date, uid))
+}
+
+#[cfg(test)]
+mod tests {
+    use uuid::uuid;
+
+    use super::*;
+
+    #[test]
+    fn test_get_data_set_path() {
+        let data_dir = PathBuf::from("/tmp/data");
+        let date = NaiveDate::from_ymd_opt(2021, 1, 1).unwrap();
+        let uid = uuid!("6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
+        let path = get_dataset_path(&data_dir, date, uid);
+        assert_eq!(
+            path,
+            PathBuf::from("/tmp/data/2021-01-01/6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0")
+        );
     }
 }
