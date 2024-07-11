@@ -3,8 +3,12 @@ mod proto;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use arrow::array::RecordBatchWriter;
+use arrow::ipc::reader::StreamReader;
+use chrono::NaiveDate;
 use log::{error, trace};
 use sqlx::SqlitePool;
+use tokio::fs;
 use tonic::{Request, Response, Result, Status, Streaming};
 use uuid::Uuid;
 
@@ -12,12 +16,15 @@ use self::proto::{
     data_storage_server::DataStorage, CreateRequest, CreateResponse, UpdateMetadataRequest,
     UpdateMetadataResponse, WriteRequest, WriteResponse,
 };
+use crate::dataset::create_dataset;
 use crate::db::{create, find_by_uid, update, Error as DbError};
+use crate::dir::Workspace;
 
 pub use self::proto::data_storage_server::DataStorageServer;
 
 #[derive(Debug)]
 pub struct Storage {
+    workspace: Workspace,
     pool: SqlitePool,
     creating: Creating,
 }
@@ -33,8 +40,9 @@ struct Metadata {
 struct Creating(Mutex<HashMap<Uuid, Metadata>>);
 
 impl Storage {
-    pub fn new(pool: SqlitePool) -> Self {
+    pub fn new(workspace: Workspace, pool: SqlitePool) -> Self {
         Self {
+            workspace,
             pool,
             creating: Creating::default(),
         }
@@ -120,22 +128,44 @@ impl DataStorage for Storage {
         let name = metadata.name.as_str();
         let description = metadata.description.as_deref();
         let tags = metadata.tags.as_slice();
+        let date = chrono::Local::now().date_naive();
         let uid = Uuid::new_v4();
-        let _id = create(uid, name, description, tags, &self.pool)
+        let path = format_dataset_path(date, uid);
+        let _id = create(uid, name, description, &path, tags, &self.pool)
             .await
             .map_err(|e| {
                 error!("create failed: {:?}", e);
                 Status::internal(e.to_string())
             })?;
+        let dataset_path = self.workspace.root().data_dir().join(path);
+        fs::create_dir_all(&dataset_path).await.map_err(|e| {
+            error!("create directory failed: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
         let mut in_stream = request.into_inner();
         tokio::spawn(async move {
+            let mut writer = None;
             loop {
                 let result = in_stream.message().await;
                 match result {
-                    Ok(Some(_)) => todo!(),
+                    Ok(Some(msg)) => {
+                        let batch_data = msg.record_batch;
+                        let reader =
+                            StreamReader::try_new_unbuffered(batch_data.as_slice(), None).unwrap();
+                        for batch in reader {
+                            let batch = batch.unwrap();
+                            if writer.is_none() {
+                                writer = Some(create_dataset(&dataset_path, &batch.schema()));
+                            }
+                            writer.as_mut().unwrap().write(&batch).unwrap();
+                        }
+                    }
                     Ok(None) => break,
                     Err(e) => error!("write failed: {:?}", e),
                 }
+            }
+            if let Some(writer) = writer {
+                writer.close().unwrap();
             }
         })
         .await
@@ -145,5 +175,24 @@ impl DataStorage for Storage {
         })?;
         let uid = uid.to_string();
         Ok(Response::new(WriteResponse { uid }))
+    }
+}
+
+fn format_dataset_path(date: NaiveDate, uid: Uuid) -> String {
+    format!("{}/{}", date, uid)
+}
+
+#[cfg(test)]
+mod tests {
+    use uuid::uuid;
+
+    use super::*;
+
+    #[test]
+    fn test_format_dataset_path() {
+        let date = NaiveDate::from_ymd_opt(2021, 1, 1).unwrap();
+        let uid = uuid!("6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
+        let path = format_dataset_path(date, uid);
+        assert_eq!(path, "2021-01-01/6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
     }
 }

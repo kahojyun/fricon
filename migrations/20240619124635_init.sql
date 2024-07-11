@@ -3,6 +3,8 @@ CREATE TABLE datasets (
     uid TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
+    -- Path to the dataset relative to data_dir
+    path TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

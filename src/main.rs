@@ -26,9 +26,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let db_url = format!("sqlite://{}", workspace.root().database_path().display());
             let pool = SqlitePoolOptions::new().connect(&db_url).await?;
             dir::MIGRATOR.run(&pool).await?;
-            let storage = Storage::new(pool);
-            let service = DataStorageServer::new(storage);
             let port = workspace.config().port();
+            let storage = Storage::new(workspace, pool);
+            let service = DataStorageServer::new(storage);
             let addr = format!("[::1]:{}", port).parse()?;
             info!("Listen on {}", addr);
             Server::builder()

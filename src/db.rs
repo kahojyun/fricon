@@ -16,11 +16,12 @@ pub async fn create(
     uid: Uuid,
     name: &str,
     description: Option<&str>,
+    path: &str,
     tags: &[String],
     pool: &sqlx::SqlitePool,
 ) -> Result<i64> {
     let mut tx = pool.begin().await?;
-    let dataset_id = tx.insert_dataset(uid, name, description).await?;
+    let dataset_id = tx.insert_dataset(uid, name, description, path).await?;
     for tag in tags {
         let tag_id = tx.get_or_insert_tag(tag).await?;
         tx.add_tag_to_dataset(dataset_id, tag_id).await?;
@@ -61,6 +62,7 @@ trait StorageDbExt {
         uid: Uuid,
         name: &str,
         description: Option<&str>,
+        path: &str,
     ) -> Result<i64>;
     async fn find_dataset_by_uid(&mut self, uid: Uuid) -> Result<i64>;
     async fn add_tag_to_dataset(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
@@ -93,12 +95,14 @@ impl StorageDbExt for SqliteConnection {
         uid: Uuid,
         name: &str,
         description: Option<&str>,
+        path: &str,
     ) -> Result<i64> {
         let id = sqlx::query!(
-            "INSERT INTO datasets (uid, name, description) VALUES (?, ?, ?) RETURNING id",
+            "INSERT INTO datasets (uid, name, description, path) VALUES (?, ?, ?, ?) RETURNING id",
             uid,
             name,
-            description
+            description,
+            path
         )
         .fetch_one(&mut *self)
         .await?
