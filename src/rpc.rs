@@ -1,10 +1,8 @@
 mod proto;
 
-use std::collections::HashMap;
-use std::sync::Mutex;
+use std::{collections::HashMap, sync::Mutex};
 
-use arrow::array::RecordBatchWriter;
-use arrow::ipc::reader::StreamReader;
+use arrow::{array::RecordBatchWriter, ipc::reader::StreamReader};
 use chrono::NaiveDate;
 use log::{error, trace};
 use sqlx::SqlitePool;
@@ -16,9 +14,11 @@ use self::proto::{
     data_storage_server::DataStorage, CreateRequest, CreateResponse, UpdateMetadataRequest,
     UpdateMetadataResponse, WriteRequest, WriteResponse,
 };
-use crate::dataset::create_dataset;
-use crate::db::{create, find_by_uid, update, Error as DbError};
-use crate::dir::Workspace;
+use crate::{
+    dataset::create_dataset,
+    db::{create, find_by_uid, update, Error as DbError},
+    dir::Workspace,
+};
 
 pub use self::proto::data_storage_server::DataStorageServer;
 
