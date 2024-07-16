@@ -77,6 +77,7 @@ impl DataStorage for Storage {
             tags: metadata.tags,
         };
         let uuid = Uuid::new_v4();
+        trace!("generated uuid: {:?}", uuid);
         self.creating.insert(uuid, metadata);
         let write_token = uuid.into();
         Ok(Response::new(CreateResponse { write_token }))
@@ -118,15 +119,16 @@ impl DataStorage for Storage {
             .metadata()
             .get_bin("fricon-token-bin")
             .ok_or(Status::unauthenticated("write token is required"))?
-            .as_encoded_bytes();
-        let token =
-            Uuid::from_slice(token).map_err(|_| Status::invalid_argument("invalid write token"))?;
+            .to_bytes()
+            .map_err(|_| Status::invalid_argument("invalid write token"))?;
+        let token = Uuid::from_slice(&token)
+            .map_err(|_| Status::invalid_argument("invalid write token"))?;
         let metadata = self
             .creating
             .remove(&token)
             .ok_or(Status::invalid_argument("invalid write token"))?;
         let name = metadata.name.as_str();
-        let description = metadata.description.as_deref();
+        let description = metadata.description.as_deref().unwrap_or("");
         let tags = metadata.tags.as_slice();
         let date = chrono::Local::now().date_naive();
         let uid = Uuid::new_v4();

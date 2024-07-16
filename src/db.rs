@@ -15,7 +15,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub async fn create(
     uid: Uuid,
     name: &str,
-    description: Option<&str>,
+    description: &str,
     path: &str,
     tags: &[String],
     pool: &sqlx::SqlitePool,
@@ -61,7 +61,7 @@ trait StorageDbExt {
         &mut self,
         uid: Uuid,
         name: &str,
-        description: Option<&str>,
+        description: &str,
         path: &str,
     ) -> Result<i64>;
     async fn find_dataset_by_uid(&mut self, uid: Uuid) -> Result<i64>;
@@ -94,7 +94,7 @@ impl StorageDbExt for SqliteConnection {
         &mut self,
         uid: Uuid,
         name: &str,
-        description: Option<&str>,
+        description: &str,
         path: &str,
     ) -> Result<i64> {
         let id = sqlx::query!(
