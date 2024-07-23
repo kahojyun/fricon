@@ -1,6 +1,6 @@
 CREATE TABLE datasets (
     id INTEGER NOT NULL PRIMARY KEY,
-    uid TEXT NOT NULL UNIQUE,
+    uid BLOB NOT NULL UNIQUE,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     path TEXT NOT NULL,

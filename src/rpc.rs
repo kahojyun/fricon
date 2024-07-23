@@ -11,12 +11,12 @@ use tonic::{Request, Response, Result, Status, Streaming};
 use uuid::Uuid;
 
 use self::proto::{
-    data_storage_server::DataStorage, CreateRequest, CreateResponse, UpdateMetadataRequest,
-    UpdateMetadataResponse, WriteRequest, WriteResponse,
+    data_storage_server::DataStorage, CreateRequest, CreateResponse, GetRequest, GetResponse,
+    WriteRequest, WriteResponse,
 };
 use crate::{
     dataset::create_dataset,
-    db::{create, find_by_uid, update, Error as DbError},
+    db::{create, fetch_by_uid, Error as DbError},
     dir::Workspace,
 };
 
@@ -81,34 +81,6 @@ impl DataStorage for Storage {
         self.creating.insert(uuid, metadata);
         let write_token = uuid.into();
         Ok(Response::new(CreateResponse { write_token }))
-    }
-
-    async fn update_metadata(
-        &self,
-        request: Request<UpdateMetadataRequest>,
-    ) -> Result<Response<UpdateMetadataResponse>> {
-        trace!("update_metadata: {:?}", request);
-        let msg = request.into_inner();
-        let uid = msg.uid;
-        let uid = Uuid::try_parse(&uid).map_err(|_| Status::invalid_argument("invalid uid"))?;
-        let id = find_by_uid(uid, &self.pool).await.map_err(|e| match e {
-            DbError::NotFound => Status::not_found("not found"),
-            DbError::Other(e) => {
-                error!("find_by_uid failed: {:?}", e);
-                Status::internal(e.to_string())
-            }
-        })?;
-        let metadata = msg.metadata;
-        let name = metadata.as_ref().and_then(|x| x.name.as_deref());
-        let description = metadata.as_ref().and_then(|x| x.description.as_deref());
-        let tags = metadata.as_ref().map(|x| x.tags.as_slice());
-        update(id, name, description, tags, &self.pool)
-            .await
-            .map_err(|e| {
-                error!("update failed: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
-        Ok(Response::new(UpdateMetadataResponse {}))
     }
 
     async fn write(
@@ -177,6 +149,33 @@ impl DataStorage for Storage {
         })?;
         let uid = uid.to_string();
         Ok(Response::new(WriteResponse { uid }))
+    }
+
+    async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>> {
+        let uid = request.into_inner().uid;
+        let uid = Uuid::parse_str(&uid).map_err(|_| Status::invalid_argument("invalid uid"))?;
+        let dataset_record = fetch_by_uid(uid, &self.pool).await.map_err(|e| match e {
+            DbError::NotFound => Status::not_found("dataset not found"),
+            DbError::Other(e) => {
+                error!("get failed: {:?}", e);
+                Status::internal(e.to_string())
+            }
+        })?;
+        let metadata = proto::Metadata {
+            name: Some(dataset_record.name),
+            description: Some(dataset_record.description),
+            tags: dataset_record.tags,
+        };
+        let created_at = prost_types::Timestamp {
+            seconds: dataset_record.created_at.and_utc().timestamp(),
+            nanos: 0,
+        };
+        let response = GetResponse {
+            metadata: Some(metadata),
+            created_at: Some(created_at),
+            path: dataset_record.path,
+        };
+        Ok(Response::new(response))
     }
 }
 

@@ -2,15 +2,34 @@ syntax = "proto3";
 
 package fricon;
 
+import "google/protobuf/timestamp.proto";
+
+/*
+ * Manage datasets.
+ */
 service DataStorage {
+  /*
+   * Create a new dataset.
+   */
   rpc Create (CreateRequest) returns (CreateResponse) {}
-  // Requires a write token from Create in metadata 'fricon-token-bin'
+  /* 
+   * Requires a write token from Create in metadata 'fricon-token-bin'.
+   */
   rpc Write (stream WriteRequest) returns (WriteResponse) {}
-  rpc UpdateMetadata (UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
+  /*
+   * Get a dataset.
+   */
+  rpc Get (GetRequest) returns (GetResponse) {}
 }
 
 message CreateRequest {
   Metadata metadata = 1;
+}
+
+message Metadata {
+  optional string name = 1;
+  optional string description = 2;
+  repeated string tags = 3;
 }
 
 message CreateResponse {
@@ -25,16 +44,12 @@ message WriteResponse {
   string uid = 1;
 }
 
-message UpdateMetadataRequest {
+message GetRequest {
   string uid = 1;
-  Metadata metadata = 2;
 }
 
-message UpdateMetadataResponse {}
-
-message Metadata {
-  optional string name = 1;
-  optional string description = 2;
-  repeated string tags = 3;
+message GetResponse {
+  Metadata metadata = 1;
+  string path = 2;
+  google.protobuf.Timestamp created_at = 3;
 }
-
