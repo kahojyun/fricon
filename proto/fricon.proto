@@ -53,3 +53,18 @@ message GetResponse {
   string path = 2;
   google.protobuf.Timestamp created_at = 3;
 }
+
+/*
+ * Manage jobs.
+ */
+service JobScheduler {
+  /*
+   * Submit a job.
+   */
+  rpc Submit(SubmitRequest) returns (SubmitResponse) {}
+}
+
+// TODO: define job metadata
+message SubmitRequest {}
+
+message SubmitResponse {}
