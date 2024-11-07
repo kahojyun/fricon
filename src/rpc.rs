@@ -124,8 +124,7 @@ impl DataStorage for Storage {
                 match result {
                     Ok(Some(msg)) => {
                         let batch_data = msg.record_batch;
-                        let reader =
-                            StreamReader::try_new_unbuffered(batch_data.as_slice(), None).unwrap();
+                        let reader = StreamReader::try_new(batch_data.as_slice(), None).unwrap();
                         for batch in reader {
                             let batch = batch.unwrap();
                             if writer.is_none() {

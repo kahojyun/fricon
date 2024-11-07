@@ -7,6 +7,7 @@ mod rpc;
 
 use clap::Parser as _;
 use cli::Commands;
+use env_logger::Env;
 use log::info;
 use rpc::{DataStorageServer, Storage};
 use sqlx::sqlite::SqlitePoolOptions;
@@ -15,7 +16,7 @@ use tonic::transport::Server;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    env_logger::init_from_env(Env::new().default_filter_or("info"));
     let cli = cli::Cli::parse();
     match cli.command {
         Commands::Init { path } => {
