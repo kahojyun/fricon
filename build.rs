@@ -1,4 +1,9 @@
-fn main() {
+use std::error::Error;
+
+fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rerun-if-changed=migrations");
-    tonic_build::compile_protos("proto/fricon.proto").expect("Failed to compile proto file");
+    tonic_build::configure()
+        .build_client(false)
+        .compile_protos(&["proto/fricon/v1/fricon.proto"], &["proto"])?;
+    Ok(())
 }

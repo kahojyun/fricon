@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package fricon;
+package fricon.v1;
 
 import "google/protobuf/timestamp.proto";
 
 /*
  * Manage datasets.
  */
-service DataStorage {
+service DataStorageService {
   /*
    * Create a new dataset.
    */
@@ -57,7 +57,7 @@ message GetResponse {
 /*
  * Manage jobs.
  */
-service JobScheduler {
+service JobSchedulerService {
   /*
    * Submit a job.
    */

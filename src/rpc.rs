@@ -11,8 +11,8 @@ use tonic::{Request, Response, Result, Status, Streaming};
 use uuid::Uuid;
 
 use self::proto::{
-    data_storage_server::DataStorage, CreateRequest, CreateResponse, GetRequest, GetResponse,
-    WriteRequest, WriteResponse,
+    data_storage_service_server::DataStorageService, CreateRequest, CreateResponse, GetRequest,
+    GetResponse, WriteRequest, WriteResponse,
 };
 use crate::{
     dataset::create_dataset,
@@ -20,7 +20,7 @@ use crate::{
     dir::Workspace,
 };
 
-pub use self::proto::data_storage_server::DataStorageServer;
+pub use self::proto::data_storage_service_server::DataStorageServiceServer;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -62,7 +62,7 @@ impl Creating {
 }
 
 #[tonic::async_trait]
-impl DataStorage for Storage {
+impl DataStorageService for Storage {
     async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
         let msg = request.into_inner();

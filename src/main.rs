@@ -6,13 +6,16 @@ mod dir;
 mod rpc;
 
 use clap::Parser as _;
-use cli::Commands;
 use env_logger::Env;
 use log::info;
-use rpc::{DataStorageServer, Storage};
 use sqlx::sqlite::SqlitePoolOptions;
 use tokio::signal;
 use tonic::transport::Server;
+
+use self::{
+    cli::Commands,
+    rpc::{DataStorageServiceServer, Storage},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dir::MIGRATOR.run(&pool).await?;
             let port = workspace.config().port();
             let storage = Storage::new(workspace, pool);
-            let service = DataStorageServer::new(storage);
+            let service = DataStorageServiceServer::new(storage);
             let addr = format!("[::1]:{}", port).parse()?;
             info!("Listen on {}", addr);
             Server::builder()
