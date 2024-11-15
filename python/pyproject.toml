@@ -37,40 +37,29 @@ path = "hatch_build.py"
 "../LICENSE-APACHE" = "LICENSE-APACHE"
 
 
-[tool.uv]
-dev-dependencies = [
-  "grpc-stubs>=1.53.0.5",
-  "grpcio-tools==1.66.2",
-  "hatchling>=1.25.0",
+[dependency-groups]
+dev = [
   "ipython>=8.18.1",
-  "mypy>=1.11.2",
+  { include-group = "lint" },
+  { include-group = "test" },
+  { include-group = "build" },
+]
+build = ["grpcio-tools==1.66.2", "hatchling>=1.25.0"]
+lint = ["mypy>=1.11.2", "ruff>=0.6.6", { include-group = "types" }]
+test = ["pytest>=8.3.3"]
+types = [
+  "grpc-stubs>=1.53.0.5",
   "pyarrow-stubs>=17.6",
-  "pytest>=8.3.3",
-  "ruff>=0.6.6",
-  "taskipy>=1.13.0",
   "types-protobuf>=5.27.0.20240920",
 ]
+
+
+[tool.uv]
 cache-keys = [
   { file = "proto/**/*.proto" },
   { file = "hatch_build.py" },
   { file = "pyproject.toml" },
 ]
-
-[tool.taskipy.tasks]
-check = "mypy --install-types --non-interactive src/fricon tests"
-
-[tool.coverage.run]
-source_pkgs = ["fricon", "tests"]
-branch = true
-parallel = true
-omit = ["src/fricon/__about__.py"]
-
-[tool.coverage.paths]
-fricon = ["src/fricon", "*/python/src/fricon"]
-tests = ["tests", "*/python/tests"]
-
-[tool.coverage.report]
-exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
 
 [tool.ruff]
 extend-exclude = ["src/fricon/_proto/*"]
