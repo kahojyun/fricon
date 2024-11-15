@@ -12,9 +12,20 @@
 
 ## Installation
 
+Not published yet.
+
+## Development
+
+This project use `uv` for python development.
+
 ```console
-pip install fricon
+uv sync
+uv run examples/dataset.py # Assuming the server is running
 ```
+
+Grpc binding files are generated automatically during the build process. When
+protos are changed, `uv run` or `uv sync` will automatically regenerate the
+bindings.
 
 ## License
 
