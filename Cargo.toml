@@ -28,3 +28,10 @@ uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
 
 [build-dependencies]
 tonic-build = "0.12.3"
+
+[lints.rust]
+rust-2018-idioms = "warn"
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
