@@ -32,7 +32,7 @@ impl Config {
         toml::to_string(self).expect("Cannot serialize configuration")
     }
 
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.port
     }
 }

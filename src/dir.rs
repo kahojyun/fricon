@@ -13,7 +13,7 @@ use crate::config::Config;
 pub struct WorkDirectory(PathBuf);
 
 impl WorkDirectory {
-    pub fn new(path: PathBuf) -> Self {
+    pub const fn new(path: PathBuf) -> Self {
         Self(path)
     }
 
@@ -46,37 +46,43 @@ impl WorkDirectory {
     }
 
     pub fn check(&self) {
-        if !self.0.is_dir() {
-            panic!("Not a directory: {:?}", self.0);
-        }
-        if !self.config_path().is_file() {
-            panic!("Missing configuration: {:?}", self.config_path());
-        }
-        if !self.database_path().is_file() {
-            panic!("Missing database: {:?}", self.database_path());
-        }
-        if !self.data_dir().is_dir() {
-            panic!("Missing data directory: {:?}", self.data_dir());
-        }
-        if !self.log_dir().is_dir() {
-            panic!("Missing log directory: {:?}", self.log_dir());
-        }
-        if !self.backup_dir().is_dir() {
-            panic!("Missing backup directory: {:?}", self.backup_dir());
-        }
+        assert!(self.0.is_dir(), "Not a directory: {:?}", self.0);
+        assert!(
+            self.config_path().is_file(),
+            "Missing configuration: {:?}",
+            self.config_path()
+        );
+        assert!(
+            self.database_path().is_file(),
+            "Missing database: {:?}",
+            self.database_path()
+        );
+        assert!(
+            self.data_dir().is_dir(),
+            "Missing data directory: {:?}",
+            self.data_dir()
+        );
+        assert!(
+            self.log_dir().is_dir(),
+            "Missing log directory: {:?}",
+            self.log_dir()
+        );
+        assert!(
+            self.backup_dir().is_dir(),
+            "Missing backup directory: {:?}",
+            self.backup_dir()
+        );
     }
 
     fn ensure_empty_dir(&self) {
         let path = &self.0;
         if path.is_dir() {
-            if path
+            let dir_is_empty = path
                 .read_dir()
                 .expect("Cannot open directory")
                 .next()
-                .is_some()
-            {
-                panic!("Directory is not empty: {:?}", path);
-            }
+                .is_none();
+            assert!(dir_is_empty, "Directory is not empty: {path:?}");
             return;
         }
         info!("Create directory: {:?}", path);
@@ -133,11 +139,11 @@ impl Workspace {
         Self { root, config }
     }
 
-    pub fn root(&self) -> &WorkDirectory {
+    pub const fn root(&self) -> &WorkDirectory {
         &self.root
     }
 
-    pub fn config(&self) -> &Config {
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 }

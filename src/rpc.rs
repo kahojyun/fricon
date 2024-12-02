@@ -15,7 +15,7 @@ use self::proto::{
     GetResponse, WriteRequest, WriteResponse,
 };
 use crate::{
-    dataset::create_dataset,
+    dataset::create as create_dataset,
     db::{create, fetch_by_uid, Error as DbError},
     dir::Workspace,
 };
@@ -68,11 +68,11 @@ impl DataStorageService for Storage {
         let msg = request.into_inner();
         let metadata = msg
             .metadata
-            .ok_or(Status::invalid_argument("metadata is required"))?;
+            .ok_or_else(|| Status::invalid_argument("metadata is required"))?;
         let metadata = Metadata {
             name: metadata
                 .name
-                .ok_or(Status::invalid_argument("name is required"))?,
+                .ok_or_else(|| Status::invalid_argument("name is required"))?,
             description: metadata.description,
             tags: metadata.tags,
         };
@@ -90,7 +90,7 @@ impl DataStorageService for Storage {
         let token = request
             .metadata()
             .get_bin("fricon-token-bin")
-            .ok_or(Status::unauthenticated("write token is required"))?
+            .ok_or_else(|| Status::unauthenticated("write token is required"))?
             .to_bytes()
             .map_err(|_| Status::invalid_argument("invalid write token"))?;
         let token = Uuid::from_slice(&token)
@@ -98,7 +98,7 @@ impl DataStorageService for Storage {
         let metadata = self
             .creating
             .remove(&token)
-            .ok_or(Status::invalid_argument("invalid write token"))?;
+            .ok_or_else(|| Status::invalid_argument("invalid write token"))?;
         let name = metadata.name.as_str();
         let description = metadata.description.as_deref().unwrap_or("");
         let tags = metadata.tags.as_slice();
@@ -179,7 +179,7 @@ impl DataStorageService for Storage {
 }
 
 fn format_dataset_path(date: NaiveDate, uid: Uuid) -> String {
-    format!("{}/{}", date, uid)
+    format!("{date}/{uid}")
 }
 
 #[cfg(test)]

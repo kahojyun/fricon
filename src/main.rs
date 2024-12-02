@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let port = workspace.config().port();
             let storage = Storage::new(workspace, pool);
             let service = DataStorageServiceServer::new(storage);
-            let addr = format!("[::1]:{}", port).parse()?;
+            let addr = format!("[::1]:{port}").parse()?;
             info!("Listen on {}", addr);
             Server::builder()
                 .add_service(service)
