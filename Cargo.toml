@@ -2,7 +2,21 @@
 name = "fricon"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+[workspace]
+members = ["fricon-py"]
+
+[workspace.package]
 license = "MIT OR Apache-2.0"
+description = "Fridge controller."
+authors = ["Jiahao Yuan <kahojyun@icloud.com>"]
+repository = "https://github.com/kahojyun/fricon"
+keywords = ["experimental"]
 
 [dependencies]
 arrow = "53.2.0"
@@ -29,9 +43,12 @@ uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
 [build-dependencies]
 tonic-build = "0.12.3"
 
-[lints.rust]
+[workspace.lints.rust]
 rust-2018-idioms = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = "warn"
 nursery = "warn"
+
+[lints]
+workspace = true

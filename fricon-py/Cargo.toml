@@ -1,0 +1,20 @@
+[package]
+name = "fricon-py"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+fricon = { path = ".." }
+pyo3 = "0.23.2"
+
+[lints]
+workspace = true

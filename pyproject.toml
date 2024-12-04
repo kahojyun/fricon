@@ -1,0 +1,80 @@
+[project]
+name = "fricon"
+dynamic = ["version", "description", "license", "keywords", "authors"]
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python",
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
+]
+dependencies = ["pyarrow>=17.0.0"]
+
+[build-system]
+requires = ["maturin>=1.7.0"]
+build-backend = "maturin"
+
+[project.urls]
+Documentation = "https://github.com/kahojyun/fricon#readme"
+Issues = "https://github.com/kahojyun/fricon/issues"
+Source = "https://github.com/kahojyun/fricon"
+
+[tool.maturin]
+python-source = "python/src"
+module-name = "fricon._core"
+manifest-path = "fricon-py/Cargo.toml"
+features = ["pyo3/extension-module"]
+
+
+[dependency-groups]
+dev = [
+  "ipython>=8.18.1",
+  { include-group = "lint" },
+  { include-group = "test" },
+]
+lint = ["mypy>=1.11.2", "ruff>=0.6.6", { include-group = "types" }]
+test = ["pytest>=8.3.3"]
+types = ["pyarrow-stubs>=17.6"]
+
+
+[tool.uv]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "fricon-py/**/*.rs" },
+  { file = "src/**/*.rs" },
+  { file = "Cargo.toml" },
+  { file = "Cargo.lock" },
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+  "COM812", # Missing trailing comma
+  "ISC001", # implicit string concatenation
+]
+[tool.ruff.lint.per-file-ignores]
+"python/examples/*.py" = [
+  "T201", # Use of print
+]
+"python/tests/*.py" = [
+  "S101", # Use of assert
+]
+"!python/src/*.py" = [
+  "I002",   # Missing required imports
+  "D",      # Dosctring
+  "INP001", # Implicit namespace package
+]
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+[tool.ruff.lint.isort]
+known-first-party = ["fricon"]
+required-imports = ["from __future__ import annotations"]
+
+[tool.basedpyright]
+include = ["python"]
+exclude = ["**/node_modules", "**/__pycache__", "docs/_build"]
