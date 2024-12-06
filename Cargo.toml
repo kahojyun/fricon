@@ -19,20 +19,20 @@ repository = "https://github.com/kahojyun/fricon"
 keywords = ["experimental"]
 
 [workspace.dependencies]
-arrow = "53.2.0"
+arrow = "53.3.0"
 chrono = "0.4.38"
-clap = { version = "4.5.20", features = ["derive"] }
+clap = { version = "4.5.23", features = ["derive"] }
 env_logger = "0.11.5"
 log = "0.4.22"
-serde = { version = "1.0.214", features = ["derive"] }
+serde = { version = "1.0.215", features = ["derive"] }
 sqlx = { version = "0.8.2", features = [
   "chrono",
   "runtime-tokio",
   "sqlite",
   "uuid",
 ] }
-thiserror = "2.0.0"
-tokio = { version = "1.41.1", features = ["full"] }
+thiserror = "2.0.4"
+tokio = { version = "1.42.0", features = ["full"] }
 tokio-stream = "0.1.16"
 toml = "0.8.19"
 uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
