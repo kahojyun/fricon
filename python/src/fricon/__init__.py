@@ -2,4 +2,6 @@
 
 from __future__ import annotations
 
-from ._core import add
+from ._core import connect
+
+__all__ = ["connect"]

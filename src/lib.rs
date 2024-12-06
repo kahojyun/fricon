@@ -16,6 +16,7 @@ use self::{
     cli::Commands,
     rpc::{DataStorageServiceServer, Storage},
 };
+pub use rpc::proto;
 
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init_from_env(Env::new().default_filter_or("info"));

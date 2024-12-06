@@ -1,4 +1,4 @@
-mod proto;
+pub mod proto;
 
 use std::{collections::HashMap, sync::Mutex};
 
