@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import type_check_only
 
+import pyarrow as pa
+
 __all__ = ["connect", "lib_main"]
 
 async def connect(addr: str) -> Client: ...
@@ -14,7 +16,7 @@ class Client:
 
 @type_check_only
 class DatasetWriter:
-    def write(self, data: bytes) -> None: ...
+    def write(self, data: pa.RecordBatch) -> None: ...
     async def aclose(self) -> None: ...
     @property
     def uid(self) -> str: ...

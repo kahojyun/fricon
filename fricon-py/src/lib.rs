@@ -1,5 +1,6 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
+use arrow::{array::RecordBatch, ipc::writer::StreamWriter, pyarrow::PyArrowType};
 use clap::Parser;
 use fricon::{
     cli::Cli,
@@ -11,7 +12,7 @@ use fricon::{
 use pyo3::{
     exceptions::PyRuntimeError,
     prelude::*,
-    types::{timezone_utc, PyDateTime},
+    types::{timezone_utc_bound, PyDateTime},
 };
 use pyo3_async_runtimes::tokio::future_into_py;
 use tokio::sync::{mpsc, oneshot};
@@ -34,7 +35,7 @@ pub fn lib_main(py: Python<'_>) -> i32 {
             .block_on(async { fricon::main(cli).await })
     }
     fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
-        let signal = py.import("signal")?;
+        let signal = py.import_bound("signal")?;
         let sigint = signal.getattr("SIGINT")?;
         let default_handler = signal.getattr("SIG_DFL")?;
         _ = signal.call_method1("signal", (sigint, default_handler))?;
@@ -167,8 +168,12 @@ impl Client {
 
             let created_at = Python::with_gil(|py| {
                 #[allow(clippy::cast_precision_loss)]
-                PyDateTime::from_timestamp(py, created_at.seconds as f64, Some(&timezone_utc(py)))
-                    .map(Bound::unbind)
+                PyDateTime::from_timestamp_bound(
+                    py,
+                    created_at.seconds as f64,
+                    Some(&timezone_utc_bound(py)),
+                )
+                .map(Bound::unbind)
             })?;
             let info = DatasetInfo {
                 name,
@@ -200,12 +205,23 @@ impl DatasetWriter {
     ///
     /// Raises:
     ///     RuntimeError: If the dataset writer is closed or connection is lost.
-    pub fn write(&self, data: Vec<u8>) -> PyResult<()> {
+    #[expect(clippy::needless_pass_by_value)]
+    pub fn write(&self, data: PyArrowType<RecordBatch>) -> PyResult<()> {
         self.tx.as_ref().map_or_else(
             || Err(PyRuntimeError::new_err("DatasetWriter is closed")),
             |tx| {
-                tx.blocking_send(WriteRequest { record_batch: data })
-                    .map_err(|e| PyRuntimeError::new_err(format!("Failed to write data: {e}")))
+                let mut writer = StreamWriter::try_new(
+                    Vec::with_capacity(data.0.get_array_memory_size()),
+                    &data.0.schema(),
+                )
+                .expect("Failed to create writer");
+                writer.write(&data.0).expect("Failed to write data");
+                let buffer = writer.into_inner().expect("Failed to get inner buffer");
+
+                tx.blocking_send(WriteRequest {
+                    record_batch: buffer,
+                })
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to write data: {e}")))
             },
         )
     }

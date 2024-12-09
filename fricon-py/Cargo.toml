@@ -21,6 +21,7 @@ pyo3-async-runtimes.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tonic.workspace = true
+arrow = { workspace = true, features = ["pyarrow"] }
 
 [lints]
 workspace = true

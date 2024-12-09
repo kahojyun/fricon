@@ -13,17 +13,14 @@ async def main() -> None:
     t0 = perf_counter()
 
     writer = await client.create_dataset("test", tags=["aaa", "bb"])
-    for i in range(10):
+    for i in range(1000):
         data = {
             "i": [i],
             "s": [f"{i}"],
             "b": [i % 2 == 0],
         }
         batch = pa.record_batch(data)  # pyright: ignore[reportUnknownMemberType]
-        sink = pa.BufferOutputStream()
-        with pa.ipc.new_stream(sink, batch.schema) as batch_writer:
-            batch_writer.write_batch(batch)  # pyright: ignore[reportUnknownMemberType]
-        writer.write(sink.getvalue().to_pybytes())
+        writer.write(batch)
     await writer.aclose()
 
     t1 = perf_counter()
