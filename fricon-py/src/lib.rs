@@ -1,8 +1,12 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
-use fricon::proto::{
-    data_storage_service_client::DataStorageServiceClient, CreateRequest, GetRequest, GetResponse,
-    Metadata, WriteRequest, WriteResponse,
+use clap::Parser;
+use fricon::{
+    cli::Cli,
+    proto::{
+        data_storage_service_client::DataStorageServiceClient, CreateRequest, GetRequest,
+        GetResponse, Metadata, WriteRequest, WriteResponse,
+    },
 };
 use pyo3::{
     exceptions::PyRuntimeError,
@@ -17,7 +21,47 @@ use tonic::{metadata::MetadataValue, transport::Channel};
 #[pymodule]
 pub mod _core {
     #[pymodule_export]
-    pub use super::connect;
+    pub use super::{connect, lib_main};
+}
+
+#[pyfunction]
+#[must_use]
+pub fn lib_main(py: Python<'_>) -> i32 {
+    fn inner(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?
+            .block_on(async { fricon::main(cli).await })
+    }
+    fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
+        let signal = py.import("signal")?;
+        let sigint = signal.getattr("SIGINT")?;
+        let default_handler = signal.getattr("SIG_DFL")?;
+        _ = signal.call_method1("signal", (sigint, default_handler))?;
+        Ok(())
+    }
+
+    if ignore_python_sigint(py).is_err() {
+        eprintln!("Failed to reset python SIGINT handler.");
+        return 1;
+    }
+
+    // Skip python executable
+    let argv = std::env::args_os().skip(1);
+    let cli = match Cli::try_parse_from(argv) {
+        Ok(cli) => cli,
+        Err(e) => {
+            let _ = e.print();
+            return e.exit_code();
+        }
+    };
+    match inner(cli) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("{e}");
+            1
+        }
+    }
 }
 
 type TonicClient = DataStorageServiceClient<Channel>;

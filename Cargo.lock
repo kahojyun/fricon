@@ -875,6 +875,7 @@ dependencies = [
 name = "fricon-py"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "fricon",
  "pyo3",
  "pyo3-async-runtimes",

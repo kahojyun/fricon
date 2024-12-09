@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import type_check_only
 
-__all__ = ["connect"]
+__all__ = ["connect", "lib_main"]
 
 async def connect(addr: str) -> Client: ...
+def lib_main() -> int: ...
 @type_check_only
 class Client:
     async def create_dataset(

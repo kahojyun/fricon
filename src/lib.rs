@@ -1,11 +1,10 @@
-mod cli;
+pub mod cli;
 mod config;
 mod dataset;
 mod db;
 mod dir;
 mod rpc;
 
-use clap::Parser as _;
 use env_logger::Env;
 use log::info;
 use sqlx::sqlite::SqlitePoolOptions;
@@ -13,14 +12,13 @@ use tokio::signal;
 use tonic::transport::Server;
 
 use self::{
-    cli::Commands,
+    cli::{Cli, Commands},
     rpc::{DataStorageServiceServer, Storage},
 };
 pub use rpc::proto;
 
-pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn main(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init_from_env(Env::new().default_filter_or("info"));
-    let cli = cli::Cli::parse();
     match cli.command {
         Commands::Init { path } => {
             dir::WorkDirectory::new(path).init().await;
@@ -37,7 +35,11 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("Listen on {}", addr);
             Server::builder()
                 .add_service(service)
-                .serve_with_shutdown(addr, async { signal::ctrl_c().await.unwrap() })
+                .serve_with_shutdown(addr, async {
+                    signal::ctrl_c()
+                        .await
+                        .expect("Failed to install ctrl-c handler.");
+                })
                 .await?;
             info!("Shutdown");
         }

@@ -23,6 +23,9 @@ Documentation = "https://github.com/kahojyun/fricon#readme"
 Issues = "https://github.com/kahojyun/fricon/issues"
 Source = "https://github.com/kahojyun/fricon"
 
+[project.scripts]
+fricon = "fricon._core:lib_main"
+
 [tool.maturin]
 python-source = "python/src"
 module-name = "fricon._core"

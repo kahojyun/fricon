@@ -1,6 +1,8 @@
-use fricon::main as lib_main;
+use clap::Parser as _;
+use fricon::cli::Cli;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    lib_main().await
+    let cli = Cli::parse();
+    fricon::main(cli).await
 }
