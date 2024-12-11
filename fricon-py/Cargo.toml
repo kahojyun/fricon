@@ -16,12 +16,13 @@ doctest = false
 fricon = { path = ".." }
 
 clap.workspace = true
-pyo3.workspace = true
+pyo3 = { workspace = true, features = ["anyhow"] }
 pyo3-async-runtimes.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tonic.workspace = true
 arrow = { workspace = true, features = ["pyarrow"] }
+anyhow.workspace = true
 
 [lints]
 workspace = true

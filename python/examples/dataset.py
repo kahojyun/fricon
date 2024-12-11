@@ -13,7 +13,7 @@ async def main() -> None:
     t0 = perf_counter()
 
     writer = await client.create_dataset("test", tags=["aaa", "bb"])
-    for i in range(1000):
+    for i in range(10):
         data = {
             "i": [i],
             "s": [f"{i}"],

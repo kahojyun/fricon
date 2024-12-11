@@ -1,12 +1,14 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
+use anyhow::{bail, Context, Result};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter, pyarrow::PyArrowType};
 use clap::Parser;
 use fricon::{
     cli::Cli,
     proto::{
-        data_storage_service_client::DataStorageServiceClient, CreateRequest, GetRequest,
-        GetResponse, Metadata, WriteRequest, WriteResponse,
+        data_storage_service_client::DataStorageServiceClient,
+        fricon_service_client::FriconServiceClient, CreateRequest, GetRequest, GetResponse,
+        Metadata, VersionRequest, WriteRequest, WriteResponse,
     },
 };
 use pyo3::{
@@ -65,21 +67,32 @@ pub fn lib_main(py: Python<'_>) -> i32 {
     }
 }
 
-type TonicClient = DataStorageServiceClient<Channel>;
-
 #[pyfunction]
 pub fn connect(py: Python<'_>, addr: String) -> PyResult<Bound<'_, PyAny>> {
-    future_into_py(py, async move {
-        let client = DataStorageServiceClient::connect(addr)
-            .await
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to connect: {e}")))?;
-        Ok(Client { inner: client })
-    })
+    future_into_py(py, async move { Ok(Client::connect(addr).await?) })
 }
 
 #[pyclass(frozen)]
 pub struct Client {
-    inner: TonicClient,
+    inner: DataStorageServiceClient<Channel>,
+}
+
+impl Client {
+    async fn connect(addr: String) -> Result<Self> {
+        let channel = Channel::from_shared(addr)?.connect().await?;
+        let mut fricon_client = FriconServiceClient::new(channel.clone());
+        let server_version = fricon_client
+            .version(VersionRequest {})
+            .await?
+            .into_inner()
+            .version;
+        let client_version = env!("CARGO_PKG_VERSION");
+        if server_version != client_version {
+            bail!("Server version mismatch: client={client_version}, server={server_version}");
+        }
+        let inner = DataStorageServiceClient::new(channel);
+        Ok(Self { inner })
+    }
 }
 
 #[pymethods]
@@ -102,8 +115,12 @@ impl Client {
         description: Option<String>,
         tags: Option<Vec<String>>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let mut inner = slf.get().inner.clone();
-        future_into_py(slf.py(), async move {
+        async fn create(
+            mut client: DataStorageServiceClient<Channel>,
+            name: String,
+            description: Option<String>,
+            tags: Option<Vec<String>>,
+        ) -> Result<DatasetWriter> {
             let metadata = Metadata {
                 name: Some(name),
                 description,
@@ -112,10 +129,10 @@ impl Client {
             let request = CreateRequest {
                 metadata: Some(metadata),
             };
-            let response = inner
+            let response = client
                 .create(request)
                 .await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to create dataset: {e}")))?;
+                .context("Failed to create dataset.")?;
             let response = response.into_inner();
             let write_token = response.write_token;
             let (tx, rx) = mpsc::channel(128);
@@ -126,11 +143,11 @@ impl Client {
                 .insert_bin("fricon-token-bin", MetadataValue::from_bytes(&write_token));
             let (result_tx, result_rx) = oneshot::channel();
             tokio::spawn(async move {
-                let result = inner
+                let result = client
                     .write(write_stream_request)
                     .await
                     .map(tonic::Response::into_inner)
-                    .map_err(|e| PyRuntimeError::new_err(format!("Failed to write data: {e}")));
+                    .context("Failed to write data.");
                 let _ = result_tx.send(result);
             });
             let writer = DatasetWriter {
@@ -139,19 +156,22 @@ impl Client {
                 uid: None,
             };
             Ok(writer)
+        }
+
+        let inner = slf.get().inner.clone();
+        future_into_py(slf.py(), async move {
+            Ok(create(inner, name, description, tags).await?)
         })
     }
 
     /// Get a dataset by its UID.
     fn get_dataset<'py>(slf: &Bound<'py, Self>, uid: String) -> PyResult<Bound<'py, PyAny>> {
-        let py = slf.py();
-        let mut inner = slf.get().inner.clone();
-        future_into_py(py, async move {
+        async fn get_dataset_info(
+            mut inner: DataStorageServiceClient<Channel>,
+            uid: String,
+        ) -> PyResult<DatasetInfo> {
             let request = GetRequest { uid };
-            let response = inner
-                .get(request)
-                .await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to get dataset: {e}")))?;
+            let response = inner.get(request).await.context("Failed to get dataset.")?;
             let GetResponse {
                 path,
                 metadata:
@@ -183,14 +203,18 @@ impl Client {
                 created_at,
             };
             Ok(info)
-        })
+        }
+
+        let py = slf.py();
+        let inner = slf.get().inner.clone();
+        future_into_py(py, async move { get_dataset_info(inner, uid).await })
     }
 }
 
 #[pyclass]
 pub struct DatasetWriter {
     tx: Option<mpsc::Sender<WriteRequest>>,
-    result_rx: Option<oneshot::Receiver<PyResult<WriteResponse>>>,
+    result_rx: Option<oneshot::Receiver<Result<WriteResponse>>>,
     uid: Option<String>,
 }
 
@@ -241,8 +265,7 @@ impl DatasetWriter {
         let slf = slf.unbind();
         future_into_py(py, async move {
             let result = result_rx.await.unwrap();
-            let response = result
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to close writer: {e}")))?;
+            let response = result.context("Failed to close writer.")?;
             Python::with_gil(|py| slf.bind(py).borrow_mut().uid = Some(response.uid));
             Ok(())
         })

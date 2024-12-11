@@ -4,6 +4,19 @@ package fricon.v1;
 
 import "google/protobuf/timestamp.proto";
 
+service FriconService {
+  /*
+   * Get the version of the Fricon service.
+   */
+  rpc Version(VersionRequest) returns (VersionResponse) {}
+}
+
+message VersionRequest {}
+
+message VersionResponse {
+  string version = 1;
+}
+
 /*
  * Manage datasets.
  */

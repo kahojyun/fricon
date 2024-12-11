@@ -7,12 +7,13 @@ use chrono::NaiveDate;
 use log::{error, trace};
 use sqlx::SqlitePool;
 use tokio::fs;
-use tonic::{Request, Response, Result, Status, Streaming};
+use tonic::{async_trait, Request, Response, Result, Status, Streaming};
 use uuid::Uuid;
 
 use self::proto::{
-    data_storage_service_server::DataStorageService, CreateRequest, CreateResponse, GetRequest,
-    GetResponse, WriteRequest, WriteResponse,
+    data_storage_service_server::DataStorageService, fricon_service_server::FriconService,
+    CreateRequest, CreateResponse, GetRequest, GetResponse, VersionRequest, VersionResponse,
+    WriteRequest, WriteResponse,
 };
 use crate::{
     dataset::create as create_dataset,
@@ -175,6 +176,19 @@ impl DataStorageService for Storage {
             path: dataset_record.path,
         };
         Ok(Response::new(response))
+    }
+}
+
+pub struct Fricon;
+
+#[async_trait]
+impl FriconService for Fricon {
+    async fn version(
+        &self,
+        _request: Request<VersionRequest>,
+    ) -> Result<tonic::Response<VersionResponse>> {
+        let version = env!("CARGO_PKG_VERSION").into();
+        Ok(Response::new(VersionResponse { version }))
     }
 }
 

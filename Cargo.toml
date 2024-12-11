@@ -32,6 +32,7 @@ sqlx = { version = "0.8.2", features = [
   "uuid",
 ] }
 thiserror = "2.0.4"
+anyhow = "1.0.94"
 tokio = { version = "1.42.0", features = ["full"] }
 tokio-stream = "0.1.16"
 toml = "0.8.19"
