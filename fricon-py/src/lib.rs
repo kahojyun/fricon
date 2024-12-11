@@ -2,6 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter, pyarrow::PyArrowType};
+use chrono::{DateTime, TimeZone, Utc};
 use clap::Parser;
 use fricon::{
     cli::Cli,
@@ -11,11 +12,7 @@ use fricon::{
         Metadata, VersionRequest, WriteRequest, WriteResponse,
     },
 };
-use pyo3::{
-    exceptions::PyRuntimeError,
-    prelude::*,
-    types::{timezone_utc_bound, PyDateTime},
-};
+use pyo3::{exceptions::PyRuntimeError, prelude::*};
 use pyo3_async_runtimes::tokio::future_into_py;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
@@ -110,7 +107,8 @@ impl Client {
     ///     DatasetWriter: The dataset writer.
     #[pyo3(signature = (name, description=None, tags=None))]
     pub fn create_dataset<'py>(
-        slf: &Bound<'py, Self>,
+        &self,
+        py: Python<'py>,
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
@@ -158,18 +156,18 @@ impl Client {
             Ok(writer)
         }
 
-        let inner = slf.get().inner.clone();
-        future_into_py(slf.py(), async move {
+        let inner = self.inner.clone();
+        future_into_py(py, async move {
             Ok(create(inner, name, description, tags).await?)
         })
     }
 
     /// Get a dataset by its UID.
-    fn get_dataset<'py>(slf: &Bound<'py, Self>, uid: String) -> PyResult<Bound<'py, PyAny>> {
+    fn get_dataset<'py>(&self, py: Python<'py>, uid: String) -> PyResult<Bound<'py, PyAny>> {
         async fn get_dataset_info(
             mut inner: DataStorageServiceClient<Channel>,
             uid: String,
-        ) -> PyResult<DatasetInfo> {
+        ) -> Result<DatasetInfo> {
             let request = GetRequest { uid };
             let response = inner.get(request).await.context("Failed to get dataset.")?;
             let GetResponse {
@@ -183,18 +181,11 @@ impl Client {
                 created_at: Some(created_at),
             } = response.into_inner()
             else {
-                return Err(PyRuntimeError::new_err("Failed to get dataset"));
+                bail!("Invalid dataset.");
             };
 
-            let created_at = Python::with_gil(|py| {
-                #[allow(clippy::cast_precision_loss)]
-                PyDateTime::from_timestamp_bound(
-                    py,
-                    created_at.seconds as f64,
-                    Some(&timezone_utc_bound(py)),
-                )
-                .map(Bound::unbind)
-            })?;
+            let created_at = Utc.timestamp_opt(created_at.seconds, 0).unwrap();
+
             let info = DatasetInfo {
                 name,
                 description,
@@ -205,9 +196,8 @@ impl Client {
             Ok(info)
         }
 
-        let py = slf.py();
-        let inner = slf.get().inner.clone();
-        future_into_py(py, async move { get_dataset_info(inner, uid).await })
+        let inner = self.inner.clone();
+        future_into_py(py, async move { Ok(get_dataset_info(inner, uid).await?) })
     }
 }
 
@@ -292,5 +282,5 @@ struct DatasetInfo {
     description: Option<String>,
     tags: Vec<String>,
     path: String,
-    created_at: Py<PyDateTime>,
+    created_at: DateTime<Utc>,
 }
