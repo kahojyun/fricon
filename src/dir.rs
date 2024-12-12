@@ -1,11 +1,11 @@
 use std::{fs, path::PathBuf, str::FromStr};
 
-use log::info;
 use sqlx::{
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
     ConnectOptions,
 };
+use tracing::info;
 
 use crate::config::Config;
 

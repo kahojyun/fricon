@@ -27,7 +27,7 @@ pub mod _core {
 #[pyfunction]
 #[must_use]
 pub fn lib_main(py: Python<'_>) -> i32 {
-    fn inner(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    fn inner(cli: Cli) -> Result<()> {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?

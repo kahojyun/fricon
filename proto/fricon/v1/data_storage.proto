@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package fricon.v1;
+
+import "google/protobuf/timestamp.proto";
+
+/*
+ * Manage datasets.
+ */
+service DataStorageService {
+  /*
+   * Create a new dataset.
+   */
+  rpc Create(CreateRequest) returns (CreateResponse) {}
+  /*
+   * Requires a write token from Create in metadata 'fricon-token-bin'.
+   */
+  rpc Write(stream WriteRequest) returns (WriteResponse) {}
+  /*
+   * Get a dataset.
+   */
+  rpc Get(GetRequest) returns (GetResponse) {}
+}
+
+message CreateRequest {
+  Metadata metadata = 1;
+}
+
+message Metadata {
+  optional string name = 1;
+  optional string description = 2;
+  repeated string tags = 3;
+}
+
+message CreateResponse {
+  bytes write_token = 1;
+}
+
+message WriteRequest {
+  bytes record_batch = 1;
+}
+
+message WriteResponse {
+  string uid = 1;
+}
+
+message GetRequest {
+  string uid = 1;
+}
+
+message GetResponse {
+  Metadata metadata = 1;
+  string path = 2;
+  google.protobuf.Timestamp created_at = 3;
+}

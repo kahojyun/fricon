@@ -1,27 +1,23 @@
-pub mod proto;
-
 use std::{collections::HashMap, sync::Mutex};
 
-use arrow::{array::RecordBatchWriter, ipc::reader::StreamReader};
-use chrono::NaiveDate;
-use log::{error, trace};
+use arrow::{array::RecordBatchWriter as _, ipc::reader::StreamReader};
 use sqlx::SqlitePool;
 use tokio::fs;
-use tonic::{async_trait, Request, Response, Result, Status, Streaming};
+use tonic::{Request, Response, Result, Status, Streaming};
+use tracing::{error, trace};
 use uuid::Uuid;
 
-use self::proto::{
-    data_storage_service_server::DataStorageService, fricon_service_server::FriconService,
-    CreateRequest, CreateResponse, GetRequest, GetResponse, VersionRequest, VersionResponse,
-    WriteRequest, WriteResponse,
-};
 use crate::{
-    dataset::create as create_dataset,
-    db::{create, fetch_by_uid, Error as DbError},
+    dataset,
+    db::{self, create, fetch_by_uid},
     dir::Workspace,
+    proto::{
+        self, data_storage_service_server::DataStorageService, CreateRequest, CreateResponse,
+        GetRequest, GetResponse, WriteRequest, WriteResponse,
+    },
 };
 
-pub use self::proto::data_storage_service_server::DataStorageServiceServer;
+use super::format_dataset_path;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -129,7 +125,7 @@ impl DataStorageService for Storage {
                         for batch in reader {
                             let batch = batch.unwrap();
                             if writer.is_none() {
-                                writer = Some(create_dataset(&dataset_path, &batch.schema()));
+                                writer = Some(dataset::create(&dataset_path, &batch.schema()));
                             }
                             writer.as_mut().unwrap().write(&batch).unwrap();
                         }
@@ -155,8 +151,8 @@ impl DataStorageService for Storage {
         let uid = request.into_inner().uid;
         let uid = Uuid::parse_str(&uid).map_err(|_| Status::invalid_argument("invalid uid"))?;
         let dataset_record = fetch_by_uid(uid, &self.pool).await.map_err(|e| match e {
-            DbError::NotFound => Status::not_found("dataset not found"),
-            DbError::Other(e) => {
+            db::Error::NotFound => Status::not_found("dataset not found"),
+            db::Error::Other(e) => {
                 error!("get failed: {:?}", e);
                 Status::internal(e.to_string())
             }
@@ -176,37 +172,5 @@ impl DataStorageService for Storage {
             path: dataset_record.path,
         };
         Ok(Response::new(response))
-    }
-}
-
-pub struct Fricon;
-
-#[async_trait]
-impl FriconService for Fricon {
-    async fn version(
-        &self,
-        _request: Request<VersionRequest>,
-    ) -> Result<tonic::Response<VersionResponse>> {
-        let version = env!("CARGO_PKG_VERSION").into();
-        Ok(Response::new(VersionResponse { version }))
-    }
-}
-
-fn format_dataset_path(date: NaiveDate, uid: Uuid) -> String {
-    format!("{date}/{uid}")
-}
-
-#[cfg(test)]
-mod tests {
-    use uuid::uuid;
-
-    use super::*;
-
-    #[test]
-    fn test_format_dataset_path() {
-        let date = NaiveDate::from_ymd_opt(2021, 1, 1).unwrap();
-        let uid = uuid!("6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
-        let path = format_dataset_path(date, uid);
-        assert_eq!(path, "2021-01-01/6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
     }
 }

@@ -1,7 +1,7 @@
 use std::{fs::File, path::Path};
 
 use arrow::{array::RecordBatchWriter, datatypes::Schema, ipc::writer::FileWriter};
-use log::info;
+use tracing::info;
 
 pub fn create(path: &Path, schema: &Schema) -> impl RecordBatchWriter {
     let filename = path.join("dataset.arrow");

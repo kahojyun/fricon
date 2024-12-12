@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package fricon.v1;
+
+/*
+ * Manage jobs.
+ */
+service JobSchedulerService {
+  /*
+   * Submit a job.
+   */
+  rpc Submit(SubmitRequest) returns (SubmitResponse) {}
+}
+
+// TODO: define job metadata
+message SubmitRequest {}
+
+message SubmitResponse {}
