@@ -15,7 +15,7 @@ use fricon::{
 use pyo3::{exceptions::PyRuntimeError, prelude::*};
 use pyo3_async_runtimes::tokio::future_into_py;
 use tokio::sync::{mpsc, oneshot};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 use tonic::{metadata::MetadataValue, transport::Channel};
 
 #[pymodule]
@@ -134,7 +134,18 @@ impl Client {
             let response = response.into_inner();
             let write_token = response.write_token;
             let (tx, rx) = mpsc::channel(128);
-            let rx = ReceiverStream::new(rx);
+            let rx = ReceiverStream::new(rx).map(|b: RecordBatch| {
+                let mut writer = StreamWriter::try_new(
+                    Vec::with_capacity(b.get_array_memory_size()),
+                    &b.schema(),
+                )
+                .expect("Failed to create writer");
+                writer.write(&b).expect("Failed to write data");
+                let buffer = writer.into_inner().expect("Failed to get inner buffer");
+                WriteRequest {
+                    record_batch: buffer,
+                }
+            });
             let mut write_stream_request = tonic::Request::new(rx);
             write_stream_request
                 .metadata_mut()
@@ -203,7 +214,7 @@ impl Client {
 
 #[pyclass]
 pub struct DatasetWriter {
-    tx: Option<mpsc::Sender<WriteRequest>>,
+    tx: Option<mpsc::Sender<RecordBatch>>,
     result_rx: Option<oneshot::Receiver<Result<WriteResponse>>>,
     uid: Option<String>,
 }
@@ -219,25 +230,11 @@ impl DatasetWriter {
     ///
     /// Raises:
     ///     RuntimeError: If the dataset writer is closed or connection is lost.
-    #[expect(clippy::needless_pass_by_value)]
-    pub fn write(&self, data: PyArrowType<RecordBatch>) -> PyResult<()> {
-        self.tx.as_ref().map_or_else(
-            || Err(PyRuntimeError::new_err("DatasetWriter is closed")),
-            |tx| {
-                let mut writer = StreamWriter::try_new(
-                    Vec::with_capacity(data.0.get_array_memory_size()),
-                    &data.0.schema(),
-                )
-                .expect("Failed to create writer");
-                writer.write(&data.0).expect("Failed to write data");
-                let buffer = writer.into_inner().expect("Failed to get inner buffer");
-
-                tx.blocking_send(WriteRequest {
-                    record_batch: buffer,
-                })
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to write data: {e}")))
-            },
-        )
+    pub fn write(&self, data: PyArrowType<RecordBatch>) -> Result<()> {
+        let Some(tx) = &self.tx else {
+            bail!("DatasetWriter is closed.")
+        };
+        tx.blocking_send(data.0).context("Failed to write data.")
     }
 
     /// Close the dataset writer.

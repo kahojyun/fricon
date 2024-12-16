@@ -1,8 +1,9 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use arrow::{array::RecordBatchWriter as _, ipc::reader::StreamReader};
+use arrow::ipc::reader::StreamReader;
 use sqlx::SqlitePool;
-use tokio::fs;
+use tokio::{fs, sync::mpsc};
+use tokio_util::task::TaskTracker;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
 use uuid::Uuid;
@@ -24,6 +25,7 @@ pub struct Storage {
     workspace: Workspace,
     pool: SqlitePool,
     creating: Creating,
+    tracker: TaskTracker,
 }
 
 #[derive(Debug)]
@@ -37,11 +39,12 @@ struct Metadata {
 struct Creating(Mutex<HashMap<Uuid, Metadata>>);
 
 impl Storage {
-    pub fn new(workspace: Workspace, pool: SqlitePool) -> Self {
+    pub fn new(workspace: Workspace, pool: SqlitePool, tracker: TaskTracker) -> Self {
         Self {
             workspace,
             pool,
             creating: Creating::default(),
+            tracker,
         }
     }
 }
@@ -114,35 +117,60 @@ impl DataStorageService for Storage {
             Status::internal(e.to_string())
         })?;
         let mut in_stream = request.into_inner();
-        tokio::spawn(async move {
+        let (tx, mut rx) = mpsc::channel::<Vec<_>>(128);
+        let writer_task = self.tracker.spawn_blocking(move || {
             let mut writer = None;
+            while let Some(batch_data) = rx.blocking_recv() {
+                let reader = StreamReader::try_new(batch_data.as_slice(), None)?;
+                for batch in reader {
+                    let batch = batch?;
+                    if writer.is_none() {
+                        writer = Some(dataset::Writer::new(&dataset_path, &batch.schema())?);
+                        // Some(dataset::ParquetWriter::new(&dataset_path, batch.schema())?);
+                    }
+                    writer.as_mut().unwrap().write(batch)?;
+                    // writer.as_mut().unwrap().write(&batch)?;
+                }
+            }
+            if let Some(writer) = writer {
+                writer.finish()?;
+            }
+            anyhow::Ok(())
+        });
+        let connection_task = self.tracker.spawn(async move {
             loop {
                 let result = in_stream.message().await;
                 match result {
                     Ok(Some(msg)) => {
                         let batch_data = msg.record_batch;
-                        let reader = StreamReader::try_new(batch_data.as_slice(), None).unwrap();
-                        for batch in reader {
-                            let batch = batch.unwrap();
-                            if writer.is_none() {
-                                writer = Some(dataset::create(&dataset_path, &batch.schema()));
-                            }
-                            writer.as_mut().unwrap().write(&batch).unwrap();
-                        }
+                        tx.send(batch_data).await?;
                     }
                     Ok(None) => break,
                     Err(e) => error!("write failed: {:?}", e),
                 }
             }
-            if let Some(writer) = writer {
-                writer.close().unwrap();
-            }
-        })
-        .await
-        .map_err(|e| {
-            error!("write failed: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
+            anyhow::Ok(())
+        });
+        writer_task
+            .await
+            .map_err(|e| {
+                error!("write failed: {:?}", e);
+                Status::internal(e.to_string())
+            })?
+            .map_err(|e| {
+                error!("write failed: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        connection_task
+            .await
+            .map_err(|e| {
+                error!("write failed: {:?}", e);
+                Status::internal(e.to_string())
+            })?
+            .map_err(|e| {
+                error!("write failed: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
         let uid = uid.to_string();
         Ok(Response::new(WriteResponse { uid }))
     }

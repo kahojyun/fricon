@@ -13,17 +13,31 @@ keywords.workspace = true
 doctest = false
 
 [dependencies]
+# Project dependencies
 fricon = { path = ".." }
 
+# Error handling
+anyhow.workspace = true
+
+# Date and time
+chrono.workspace = true
+
+# Command-line argument parsing
 clap.workspace = true
+
+# Python bindings
 pyo3 = { workspace = true, features = ["anyhow", "chrono"] }
 pyo3-async-runtimes.workspace = true
+
+# Asynchronous runtime
 tokio.workspace = true
 tokio-stream.workspace = true
+
+# gRPC
 tonic.workspace = true
+
+# Arrow
 arrow = { workspace = true, features = ["pyarrow"] }
-anyhow.workspace = true
-chrono.workspace = true
 
 [lints]
 workspace = true

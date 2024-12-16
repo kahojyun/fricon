@@ -38,6 +38,7 @@ dev = [
   "ipython>=8.18.1",
   { include-group = "lint" },
   { include-group = "test" },
+  "numpy>=2.0.2",
 ]
 lint = ["mypy>=1.11.2", "ruff>=0.6.6", { include-group = "types" }]
 test = ["pytest>=8.3.3"]
@@ -79,5 +80,7 @@ known-first-party = ["fricon"]
 required-imports = ["from __future__ import annotations"]
 
 [tool.basedpyright]
+venvPath = "."
+venv = ".venv"
 include = ["python"]
 exclude = ["**/node_modules", "**/__pycache__", "docs/_build"]

@@ -19,26 +19,45 @@ repository = "https://github.com/kahojyun/fricon"
 keywords = ["experimental"]
 
 [workspace.dependencies]
+# Arrow
 arrow = "53.3.0"
+parquet = "53.3.0"
+
+# Date and time
 chrono = "0.4.38"
+
+# Command-line argument parsing
 clap = { version = "4.5.23", features = ["derive"] }
+
+# Serialization and deserialization
 serde = { version = "1.0.215", features = ["derive"] }
+toml = "0.8.19"
+
+# Database
 sqlx = { version = "0.8.2", features = [
   "chrono",
   "runtime-tokio",
   "sqlite",
   "uuid",
 ] }
+
+# Error handling
 thiserror = "2.0.4"
 anyhow = "1.0.94"
+
+# Asynchronous runtime
 tokio = { version = "1.42.0", features = ["full"] }
+tokio-util = { version = "0.7.13", features = ["full"] }
 tokio-stream = "0.1.16"
-toml = "0.8.19"
+
+# UUID generation
 uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
+
+# Tracing
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 
-# Grpc
+# gRPC
 prost = "0.13.3"
 prost-types = "0.13.3"
 tonic = "0.12.3"
@@ -56,19 +75,39 @@ pedantic = "warn"
 nursery = "warn"
 
 [dependencies]
+# Error handling
 anyhow.workspace = true
-arrow.workspace = true
+thiserror.workspace = true
+
+# Date and time
 chrono.workspace = true
+
+# Command-line argument parsing
 clap.workspace = true
+
+# Serialization and deserialization
+serde.workspace = true
+toml.workspace = true
+arrow = { workspace = true, features = ["ipc_compression"] }
+parquet.workspace = true
+
+# Database
+sqlx.workspace = true
+
+# Asynchronous runtime
+tokio.workspace = true
+tokio-util.workspace = true
+
+# gRPC
 prost.workspace = true
 prost-types.workspace = true
-serde.workspace = true
-sqlx.workspace = true
-thiserror.workspace = true
-tokio.workspace = true
-toml.workspace = true
 tonic.workspace = true
+
+# UUID generation
 uuid.workspace = true
+
+
+# Tracing
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

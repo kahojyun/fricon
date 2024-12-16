@@ -5,6 +5,7 @@ use anyhow::Result;
 use chrono::NaiveDate;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use tokio::signal;
+use tokio_util::task::TaskTracker;
 use tonic::transport::Server;
 use tracing::info;
 use uuid::Uuid;
@@ -26,7 +27,8 @@ pub async fn run(path: std::path::PathBuf) -> Result<()> {
         .await?;
     dir::MIGRATOR.run(&pool).await?;
     let port = workspace.config().port();
-    let storage = Storage::new(workspace, pool);
+    let tracker = TaskTracker::new();
+    let storage = Storage::new(workspace, pool, tracker.clone());
     let service = DataStorageServiceServer::new(storage);
     let addr = format!("[::1]:{port}").parse()?;
     info!("Listen on {}", addr);
@@ -40,6 +42,8 @@ pub async fn run(path: std::path::PathBuf) -> Result<()> {
         })
         .await?;
     info!("Shutdown");
+    tracker.close();
+    tracker.wait().await;
     Ok(())
 }
 
