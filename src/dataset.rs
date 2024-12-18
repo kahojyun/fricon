@@ -1,16 +1,7 @@
-use std::{fs::File, io::BufWriter, path::Path, sync::Arc};
+use std::{fs::File, io::BufWriter, path::Path};
 
 use anyhow::{ensure, Context, Result};
-use arrow::{
-    array::RecordBatch,
-    datatypes::Schema,
-    ipc::writer::{FileWriter, IpcWriteOptions},
-};
-use parquet::{
-    arrow::ArrowWriter,
-    basic::{Compression, ZstdLevel},
-    file::properties::WriterProperties,
-};
+use arrow::{array::RecordBatch, datatypes::Schema, ipc::writer::FileWriter};
 use tracing::info;
 
 pub struct Writer {
@@ -20,16 +11,12 @@ pub struct Writer {
 }
 
 impl Writer {
-    // 64 MiB
-    const MEM_THRESHOLD: usize = 1 << 26;
+    const MEM_THRESHOLD: usize = 32 * 1024 * 1024;
     pub fn new(path: &Path, schema: &Schema) -> Result<Self> {
         let filename = path.join("dataset.arrow");
         info!("Create dataset at {:?}", filename);
         let file = File::create_new(filename).context("Failed to create new dataset file.")?;
-        let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
-            .unwrap();
-        let inner = FileWriter::try_new_with_options(BufWriter::new(file), schema, options)
+        let inner = FileWriter::try_new_buffered(file, schema)
             .context("Failed to create arrow ipc file writer")?;
         Ok(Self {
             inner,
@@ -46,18 +33,17 @@ impl Writer {
         if self.mem_count > Self::MEM_THRESHOLD {
             self.flush()?;
         }
-        // self.inner
-        //     .write(batch)
-        //     .context("Failed to write record batch.")
         Ok(())
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        let batches = arrow::compute::concat_batches(self.inner.schema(), self.buffer.iter())?;
-        self.inner.write(&batches)?;
+        let batches = arrow::compute::concat_batches(self.inner.schema(), self.buffer.iter())
+            .expect("Should be ensured that all batches have the same schema.");
         self.buffer.clear();
         self.mem_count = 0;
-        Ok(())
+        self.inner
+            .write(&batches)
+            .context("Failed to write record batch to dataset file.")
     }
 
     pub fn finish(mut self) -> Result<()> {
@@ -65,38 +51,5 @@ impl Writer {
         self.inner
             .finish()
             .context("Failed to finish dataset writing.")
-    }
-}
-
-pub struct ParquetWriter {
-    inner: ArrowWriter<File>,
-}
-
-impl ParquetWriter {
-    pub fn new(path: &Path, schema: Arc<Schema>) -> Result<Self> {
-        let filename = path.join("dataset.parquet");
-        info!("Create dataset at {:?}", filename);
-        let file = File::create_new(filename).context("Failed to create new dataset file.")?;
-        let props = WriterProperties::builder()
-            .set_compression(Compression::ZSTD(
-                ZstdLevel::try_new(3).expect("Should between 1 and 22."),
-            ))
-            .build();
-        let inner = ArrowWriter::try_new(file, schema, Some(props))
-            .context("Failed to create parquet file writer")?;
-        Ok(Self { inner })
-    }
-
-    pub fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.inner
-            .write(batch)
-            .context("Failed to write record batch.")
-    }
-
-    pub fn finish(self) -> Result<()> {
-        self.inner
-            .close()
-            .context("Failed to finish dataset writing.")?;
-        Ok(())
     }
 }

@@ -21,7 +21,6 @@ keywords = ["experimental"]
 [workspace.dependencies]
 # Arrow
 arrow = "53.3.0"
-parquet = "53.3.0"
 
 # Date and time
 chrono = "0.4.38"
@@ -88,8 +87,7 @@ clap.workspace = true
 # Serialization and deserialization
 serde.workspace = true
 toml.workspace = true
-arrow = { workspace = true, features = ["ipc_compression"] }
-parquet.workspace = true
+arrow.workspace = true
 
 # Database
 sqlx.workspace = true

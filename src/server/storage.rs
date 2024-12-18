@@ -126,10 +126,8 @@ impl DataStorageService for Storage {
                     let batch = batch?;
                     if writer.is_none() {
                         writer = Some(dataset::Writer::new(&dataset_path, &batch.schema())?);
-                        // Some(dataset::ParquetWriter::new(&dataset_path, batch.schema())?);
                     }
                     writer.as_mut().unwrap().write(batch)?;
-                    // writer.as_mut().unwrap().write(&batch)?;
                 }
             }
             if let Some(writer) = writer {
@@ -146,7 +144,10 @@ impl DataStorageService for Storage {
                         tx.send(batch_data).await?;
                     }
                     Ok(None) => break,
-                    Err(e) => error!("write failed: {:?}", e),
+                    Err(e) => {
+                        error!("write failed: {:?}", e);
+                        break;
+                    }
                 }
             }
             anyhow::Ok(())
