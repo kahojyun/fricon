@@ -11,6 +11,7 @@ use fricon::{
         fricon_service_client::FriconServiceClient, CreateRequest, GetRequest, GetResponse,
         Metadata, VersionRequest, WriteRequest, WriteResponse,
     },
+    VERSION,
 };
 use pyo3::{exceptions::PyRuntimeError, prelude::*};
 use pyo3_async_runtimes::tokio::future_into_py;
@@ -58,7 +59,7 @@ pub fn lib_main(py: Python<'_>) -> i32 {
     match inner(cli) {
         Ok(()) => 0,
         Err(e) => {
-            eprintln!("{e}");
+            eprintln!("Error: {e:?}");
             1
         }
     }
@@ -83,7 +84,7 @@ impl Client {
             .await?
             .into_inner()
             .version;
-        let client_version = env!("CARGO_PKG_VERSION");
+        let client_version = VERSION;
         if server_version != client_version {
             bail!("Server version mismatch: client={client_version}, server={server_version}");
         }

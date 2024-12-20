@@ -1,7 +1,7 @@
 [package]
 name = "fricon"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 license.workspace = true
 description.workspace = true
 authors.workspace = true
@@ -12,6 +12,8 @@ keywords.workspace = true
 members = ["fricon-py"]
 
 [workspace.package]
+edition = "2021"
+version = "0.1.0"
 license = "MIT OR Apache-2.0"
 description = "Fridge controller."
 authors = ["Jiahao Yuan <kahojyun@icloud.com>"]
@@ -22,14 +24,17 @@ keywords = ["experimental"]
 # Arrow
 arrow = "53.3.0"
 
-# Date and time
+# Useful types
 chrono = "0.4.38"
+uuid = { version = "1.11.0", features = ["v4", "fast-rng", "serde"] }
+semver = "1.0.24"
 
 # Command-line argument parsing
 clap = { version = "4.5.23", features = ["derive"] }
 
 # Serialization and deserialization
 serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
 toml = "0.8.19"
 
 # Database
@@ -49,10 +54,7 @@ tokio = { version = "1.42.0", features = ["full"] }
 tokio-util = { version = "0.7.13", features = ["full"] }
 tokio-stream = "0.1.16"
 
-# UUID generation
-uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }
-
-# Tracing
+# Logging
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 
@@ -63,7 +65,7 @@ tonic = "0.12.3"
 tonic-build = "0.12.3"
 
 # Python bindings
-pyo3 = "0.22.6"
+pyo3 = { version = "0.22.6", features = ["anyhow", "chrono"] }
 pyo3-async-runtimes = { version = "0.22.0", features = ["tokio-runtime"] }
 
 [workspace.lints.rust]
@@ -74,20 +76,25 @@ pedantic = "warn"
 nursery = "warn"
 
 [dependencies]
+# Arrow
+arrow.workspace = true
+
 # Error handling
 anyhow.workspace = true
 thiserror.workspace = true
 
-# Date and time
+# Usefol types
 chrono.workspace = true
+semver.workspace = true
+uuid.workspace = true
 
 # Command-line argument parsing
 clap.workspace = true
 
 # Serialization and deserialization
 serde.workspace = true
+serde_json.workspace = true
 toml.workspace = true
-arrow.workspace = true
 
 # Database
 sqlx.workspace = true
@@ -101,11 +108,7 @@ prost.workspace = true
 prost-types.workspace = true
 tonic.workspace = true
 
-# UUID generation
-uuid.workspace = true
-
-
-# Tracing
+# Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

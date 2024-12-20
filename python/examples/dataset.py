@@ -11,6 +11,9 @@ from fricon import connect
 
 
 async def main() -> None:
+    n_q = 64
+    n_shots = 20000
+    n_entries = 10
     addr = "http://[::1]:22777"
     client = await connect(addr)
     rng = np.random.default_rng()
@@ -19,12 +22,13 @@ async def main() -> None:
 
     writer = await client.create_dataset("test", tags=["aaa", "bb"])
     schema = pa.schema(
-        {"i": pa.int32()} | {f"q{j}": pa.list_(pa.float32(), 1024) for j in range(64)}
+        {"i": pa.int32()}
+        | {f"q{j}": pa.list_(pa.float64(), n_shots) for j in range(n_q)}
     )
-    for i in range(1000):
+    for i in range(n_entries):
         data = {
             "i": [i],
-        } | {f"q{j}": [rng.random(1024, dtype=np.float32)] for j in range(64)}
+        } | {f"q{j}": [rng.random(n_shots, dtype=np.float64)] for j in range(n_q)}
         batch = pa.record_batch(data, schema=schema)
         writer.write(batch)
     await writer.aclose()

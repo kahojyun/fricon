@@ -1,8 +1,8 @@
 [package]
 name = "fricon-py"
-version = "0.1.0"
-edition = "2021"
 publish = false
+version.workspace = true
+edition.workspace = true
 license.workspace = true
 description.workspace = true
 authors.workspace = true
@@ -26,7 +26,7 @@ chrono.workspace = true
 clap.workspace = true
 
 # Python bindings
-pyo3 = { workspace = true, features = ["anyhow", "chrono"] }
+pyo3.workspace = true
 pyo3-async-runtimes.workspace = true
 
 # Asynchronous runtime

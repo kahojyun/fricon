@@ -2,23 +2,21 @@ use std::{collections::HashMap, sync::Mutex};
 
 use arrow::ipc::reader::StreamReader;
 use sqlx::SqlitePool;
-use tokio::{fs, sync::mpsc};
+use tokio::sync::mpsc;
 use tokio_util::task::TaskTracker;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
-    dataset,
     db::{self, create, fetch_by_uid},
-    dir::Workspace,
+    fs::{dataset, DatasetPath},
     proto::{
         self, data_storage_service_server::DataStorageService, CreateRequest, CreateResponse,
         GetRequest, GetResponse, WriteRequest, WriteResponse,
     },
+    workspace::Workspace,
 };
-
-use super::format_dataset_path;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -83,6 +81,7 @@ impl DataStorageService for Storage {
         Ok(Response::new(CreateResponse { write_token }))
     }
 
+    #[expect(clippy::too_many_lines)]
     async fn write(
         &self,
         request: Request<Streaming<WriteRequest>>,
@@ -104,18 +103,29 @@ impl DataStorageService for Storage {
         let tags = metadata.tags.as_slice();
         let date = chrono::Local::now().date_naive();
         let uid = Uuid::new_v4();
-        let path = format_dataset_path(date, uid);
-        let _id = create(uid, name, description, &path, tags, &self.pool)
-            .await
-            .map_err(|e| {
-                error!("create failed: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
-        let dataset_path = self.workspace.root().data_dir().join(path);
-        fs::create_dir_all(&dataset_path).await.map_err(|e| {
-            error!("create directory failed: {:?}", e);
+        let path = DatasetPath::new(date, uid);
+        let _id = create(
+            uid,
+            name,
+            description,
+            path.0.to_str().unwrap(),
+            tags,
+            &self.pool,
+        )
+        .await
+        .map_err(|e| {
+            error!("create failed: {:?}", e);
             Status::internal(e.to_string())
         })?;
+        let dataset_metadata = dataset::Metadata {
+            uid,
+            info: dataset::Info {
+                name: name.to_string(),
+                description: description.to_string(),
+                tags: tags.iter().map(std::string::ToString::to_string).collect(),
+            },
+        };
+        let dataset_path = self.workspace.root().data_dir().join(&path);
         let mut in_stream = request.into_inner();
         let (tx, mut rx) = mpsc::channel::<Vec<_>>(128);
         let writer_task = self.tracker.spawn_blocking(move || {
@@ -125,7 +135,11 @@ impl DataStorageService for Storage {
                 for batch in reader {
                     let batch = batch?;
                     if writer.is_none() {
-                        writer = Some(dataset::Writer::new(&dataset_path, &batch.schema())?);
+                        writer = Some(dataset::create_new(
+                            &dataset_path,
+                            &dataset_metadata,
+                            &batch.schema(),
+                        )?);
                     }
                     writer.as_mut().unwrap().write(batch)?;
                 }

@@ -1,6 +1,9 @@
 use tonic::{Request, Response, Result};
 
-use crate::proto::{fricon_service_server::FriconService, VersionRequest, VersionResponse};
+use crate::{
+    proto::{fricon_service_server::FriconService, VersionRequest, VersionResponse},
+    VERSION,
+};
 
 pub struct Fricon;
 
@@ -10,7 +13,7 @@ impl FriconService for Fricon {
         &self,
         _request: Request<VersionRequest>,
     ) -> Result<tonic::Response<VersionResponse>> {
-        let version = env!("CARGO_PKG_VERSION").into();
+        let version = VERSION.into();
         Ok(Response::new(VersionResponse { version }))
     }
 }

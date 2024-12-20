@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use sqlx::SqliteConnection;
+use sqlx::{migrate::Migrator, SqliteConnection};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -12,6 +12,8 @@ pub enum Error {
 }
 
 type Result<T> = std::result::Result<T, Error>;
+
+pub static MIGRATOR: Migrator = sqlx::migrate!();
 
 #[derive(Debug)]
 pub struct DatasetRecord {
