@@ -9,8 +9,9 @@ use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
+    dataset,
     db::{self, create, fetch_by_uid},
-    fs::{dataset, DatasetPath},
+    paths::DatasetPath,
     proto::{
         self, data_storage_service_server::DataStorageService, CreateRequest, CreateResponse,
         GetRequest, GetResponse, WriteRequest, WriteResponse,

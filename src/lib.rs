@@ -1,7 +1,8 @@
 pub mod cli;
 mod config;
+mod dataset;
 mod db;
-mod fs;
+mod paths;
 pub mod proto;
 mod server;
 mod workspace;

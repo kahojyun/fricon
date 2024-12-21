@@ -1,6 +1,4 @@
 //! Manage storage of fricon data.
-pub mod dataset;
-
 use std::path::PathBuf;
 
 use chrono::NaiveDate;

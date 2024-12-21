@@ -14,7 +14,7 @@ use tracing::info;
 use crate::{
     config::Config,
     db::MIGRATOR,
-    fs::{ConfigFile, DatabaseFile, VersionFile, WorkDirectory},
+    paths::{ConfigFile, DatabaseFile, VersionFile, WorkDirectory},
     VERSION,
 };
 
