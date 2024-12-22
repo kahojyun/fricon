@@ -839,6 +839,7 @@ dependencies = [
  "arrow",
  "chrono",
  "clap",
+ "futures",
  "prost",
  "prost-types",
  "semver",

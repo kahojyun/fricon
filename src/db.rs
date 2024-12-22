@@ -1,7 +1,15 @@
+use anyhow::{ensure, Context};
 use chrono::NaiveDateTime;
-use sqlx::{migrate::Migrator, SqliteConnection};
+use sqlx::{
+    migrate::Migrator,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+    SqliteConnection, SqlitePool,
+};
 use thiserror::Error;
+use tracing::info;
 use uuid::Uuid;
+
+use crate::paths::{DatabaseFile, DatasetPath};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -15,6 +23,35 @@ type Result<T> = std::result::Result<T, Error>;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!();
 
+pub async fn connect(path: &DatabaseFile) -> anyhow::Result<SqlitePool> {
+    let path = &path.0;
+    info!("Connect to database at {}", path.display());
+    let pool = SqlitePoolOptions::new()
+        .connect_with(SqliteConnectOptions::new().filename(path))
+        .await?;
+    MIGRATOR.run(&pool).await?;
+    Ok(pool)
+}
+
+pub async fn init(path: &DatabaseFile) -> anyhow::Result<SqlitePool> {
+    let path = &path.0;
+    ensure!(!path.exists(), "Database already exists.");
+    info!("Initialize database at {}", path.display());
+    let options = SqliteConnectOptions::new()
+        .filename(path)
+        .journal_mode(SqliteJournalMode::Wal)
+        .create_if_missing(true);
+    let pool = SqlitePoolOptions::new()
+        .connect_with(options)
+        .await
+        .context("Failed to create database.")?;
+    MIGRATOR
+        .run(&pool)
+        .await
+        .context("Failed to initialize database schema.")?;
+    Ok(pool)
+}
+
 #[derive(Debug)]
 pub struct DatasetRecord {
     pub name: String,
@@ -24,28 +61,36 @@ pub struct DatasetRecord {
     pub created_at: NaiveDateTime,
 }
 
-pub async fn create(
-    uid: Uuid,
-    name: &str,
-    description: &str,
-    path: &str,
-    tags: &[String],
-    pool: &sqlx::SqlitePool,
-) -> Result<i64> {
-    let mut tx = pool.begin().await?;
-    let dataset_id = tx.insert_dataset(uid, name, description, path).await?;
-    for tag in tags {
-        let tag_id = tx.get_or_insert_tag(tag).await?;
-        tx.add_tag_to_dataset(dataset_id, tag_id).await?;
-    }
-    tx.commit().await?;
-    Ok(dataset_id)
+pub struct DatasetIndex {
+    pub pool: SqlitePool,
 }
 
-pub async fn fetch_by_uid(uid: Uuid, pool: &sqlx::SqlitePool) -> Result<DatasetRecord> {
-    let mut tx = pool.begin().await?;
-    let id = tx.find_dataset_by_uid(uid).await?;
-    tx.fetch_dataset_by_id(id).await
+impl DatasetIndex {
+    pub async fn create(
+        &self,
+        uid: Uuid,
+        name: &str,
+        description: &str,
+        path: &DatasetPath,
+        tags: &[String],
+    ) -> Result<i64> {
+        let mut tx = self.pool.begin().await?;
+        let dataset_id = tx
+            .insert_dataset(uid, name, description, path.as_str())
+            .await?;
+        for tag in tags {
+            let tag_id = tx.get_or_insert_tag(tag).await?;
+            tx.add_tag_to_dataset(dataset_id, tag_id).await?;
+        }
+        tx.commit().await?;
+        Ok(dataset_id)
+    }
+
+    pub async fn fetch_by_uid(&self, uid: Uuid) -> Result<DatasetRecord> {
+        let mut tx = self.pool.begin().await?;
+        let id = tx.find_dataset_by_uid(uid).await?;
+        tx.fetch_dataset_by_id(id).await
+    }
 }
 
 trait StorageDbExt {

@@ -1,20 +1,18 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{collections::HashMap, io::Cursor, sync::Mutex};
 
-use arrow::ipc::reader::StreamReader;
-use sqlx::SqlitePool;
-use tokio::sync::mpsc;
+use anyhow::bail;
+use arrow::{array::RecordBatch, ipc::reader::StreamReader};
+use futures::prelude::*;
+use tokio::{runtime::Handle, sync::mpsc};
 use tokio_util::task::TaskTracker;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
-    dataset,
-    db::{self, create, fetch_by_uid},
-    paths::DatasetPath,
     proto::{
-        self, data_storage_service_server::DataStorageService, CreateRequest, CreateResponse,
-        GetRequest, GetResponse, WriteRequest, WriteResponse,
+        data_storage_service_server::DataStorageService, CreateRequest, CreateResponse, GetRequest,
+        GetResponse, WriteRequest, WriteResponse,
     },
     workspace::Workspace,
 };
@@ -22,7 +20,6 @@ use crate::{
 #[derive(Debug)]
 pub struct Storage {
     workspace: Workspace,
-    pool: SqlitePool,
     creating: Creating,
     tracker: TaskTracker,
 }
@@ -38,10 +35,9 @@ struct Metadata {
 struct Creating(Mutex<HashMap<Uuid, Metadata>>);
 
 impl Storage {
-    pub fn new(workspace: Workspace, pool: SqlitePool, tracker: TaskTracker) -> Self {
+    pub fn new(workspace: Workspace, tracker: TaskTracker) -> Self {
         Self {
             workspace,
-            pool,
             creating: Creating::default(),
             tracker,
         }
@@ -82,7 +78,6 @@ impl DataStorageService for Storage {
         Ok(Response::new(CreateResponse { write_token }))
     }
 
-    #[expect(clippy::too_many_lines)]
     async fn write(
         &self,
         request: Request<Streaming<WriteRequest>>,
@@ -99,75 +94,51 @@ impl DataStorageService for Storage {
             .creating
             .remove(&token)
             .ok_or_else(|| Status::invalid_argument("invalid write token"))?;
-        let name = metadata.name.as_str();
-        let description = metadata.description.as_deref().unwrap_or("");
-        let tags = metadata.tags.as_slice();
-        let date = chrono::Local::now().date_naive();
-        let uid = Uuid::new_v4();
-        let path = DatasetPath::new(date, uid);
-        let _id = create(
-            uid,
-            name,
-            description,
-            path.0.to_str().unwrap(),
-            tags,
-            &self.pool,
-        )
-        .await
-        .map_err(|e| {
-            error!("create failed: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
-        let dataset_metadata = dataset::Metadata {
-            uid,
-            info: dataset::Info {
-                name: name.to_string(),
-                description: description.to_string(),
-                tags: tags.iter().map(std::string::ToString::to_string).collect(),
-            },
-        };
-        let dataset_path = self.workspace.root().data_dir().join(&path);
-        let mut in_stream = request.into_inner();
-        let (tx, mut rx) = mpsc::channel::<Vec<_>>(128);
+        let name = metadata.name;
+        let description = metadata.description.unwrap_or_default();
+        let tags = metadata.tags;
+        let in_stream = request.into_inner();
+        let (tx, mut rx) = mpsc::channel::<RecordBatch>(128);
+        let workspace = self.workspace.clone();
         let writer_task = self.tracker.spawn_blocking(move || {
-            let mut writer = None;
-            while let Some(batch_data) = rx.blocking_recv() {
-                let reader = StreamReader::try_new(batch_data.as_slice(), None)?;
-                for batch in reader {
-                    let batch = batch?;
-                    if writer.is_none() {
-                        writer = Some(dataset::create_new(
-                            &dataset_path,
-                            &dataset_metadata,
-                            &batch.schema(),
-                        )?);
-                    }
-                    writer.as_mut().unwrap().write(batch)?;
-                }
+            let Some(batch) = rx.blocking_recv() else {
+                bail!("No data received.");
+            };
+            let handle = Handle::current();
+            let mut writer = handle.block_on(workspace.create_dataset(
+                name,
+                description,
+                tags,
+                &batch.schema(),
+            ))?;
+            writer.write(batch)?;
+            while let Some(batch) = rx.blocking_recv() {
+                writer.write(batch)?;
             }
-            if let Some(writer) = writer {
-                writer.finish()?;
-            }
-            anyhow::Ok(())
+            writer.finish()
         });
-        let connection_task = self.tracker.spawn(async move {
-            loop {
-                let result = in_stream.message().await;
-                match result {
-                    Ok(Some(msg)) => {
-                        let batch_data = msg.record_batch;
-                        tx.send(batch_data).await?;
-                    }
-                    Ok(None) => break,
-                    Err(e) => {
-                        error!("write failed: {:?}", e);
-                        break;
-                    }
-                }
-            }
-            anyhow::Ok(())
-        });
-        writer_task
+        in_stream
+            .map_ok(|WriteRequest { record_batch }| {
+                let reader = StreamReader::try_new(Cursor::new(record_batch), None).unwrap();
+                stream::iter(reader).map_err(|e| {
+                    error!("Failed to decode data: {:?}", e);
+                    Status::internal(e.to_string())
+                })
+            })
+            .map_err(|e| {
+                error!("Client connection error: {:?}", e);
+                Status::internal(e.to_string())
+            })
+            .try_flatten()
+            .try_for_each(|b| async {
+                tx.send(b).await.map_err(|_| {
+                    error!("Writer closed.");
+                    Status::internal("Writer closed.")
+                })
+            })
+            .await?;
+        drop(tx);
+        let dataset = writer_task
             .await
             .map_err(|e| {
                 error!("write failed: {:?}", e);
@@ -177,44 +148,39 @@ impl DataStorageService for Storage {
                 error!("write failed: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        connection_task
-            .await
-            .map_err(|e| {
-                error!("write failed: {:?}", e);
-                Status::internal(e.to_string())
-            })?
-            .map_err(|e| {
-                error!("write failed: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
-        let uid = uid.to_string();
+        let uid = dataset.uid().to_string();
         Ok(Response::new(WriteResponse { uid }))
     }
 
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>> {
         let uid = request.into_inner().uid;
         let uid = Uuid::parse_str(&uid).map_err(|_| Status::invalid_argument("invalid uid"))?;
-        let dataset_record = fetch_by_uid(uid, &self.pool).await.map_err(|e| match e {
-            db::Error::NotFound => Status::not_found("dataset not found"),
-            db::Error::Other(e) => {
-                error!("get failed: {:?}", e);
-                Status::internal(e.to_string())
-            }
+        let dataset = self.workspace.open_dataset(uid).await.map_err(|e| {
+            error!("get failed: {:?}", e);
+            Status::internal(e.to_string())
         })?;
-        let metadata = proto::Metadata {
-            name: Some(dataset_record.name),
-            description: Some(dataset_record.description),
-            tags: dataset_record.tags,
-        };
-        let created_at = prost_types::Timestamp {
-            seconds: dataset_record.created_at.and_utc().timestamp(),
-            nanos: 0,
-        };
-        let response = GetResponse {
-            metadata: Some(metadata),
-            created_at: Some(created_at),
-            path: dataset_record.path,
-        };
-        Ok(Response::new(response))
+        todo!();
+        // let dataset_record = fetch_by_uid(uid, &self.pool).await.map_err(|e| match e {
+        //     db::Error::NotFound => Status::not_found("dataset not found"),
+        //     db::Error::Other(e) => {
+        //         error!("get failed: {:?}", e);
+        //         Status::internal(e.to_string())
+        //     }
+        // })?;
+        // let metadata = proto::Metadata {
+        //     name: Some(dataset_record.name),
+        //     description: Some(dataset_record.description),
+        //     tags: dataset_record.tags,
+        // };
+        // let created_at = prost_types::Timestamp {
+        //     seconds: dataset_record.created_at.and_utc().timestamp(),
+        //     nanos: 0,
+        // };
+        // let response = GetResponse {
+        //     metadata: Some(metadata),
+        //     created_at: Some(created_at),
+        //     path: dataset_record.path,
+        // };
+        // Ok(Response::new(response))
     }
 }

@@ -5,7 +5,7 @@
 use std::{
     fs::{self, File},
     io::BufWriter,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{ensure, Context, Result};
@@ -16,22 +16,6 @@ use uuid::Uuid;
 
 const DATASET_NAME: &str = "dataset.arrow";
 const METADATA_NAME: &str = "metadata.json";
-
-pub fn create_new(path: &Path, metadata: &Metadata, schema: &Schema) -> Result<Writer> {
-    ensure!(
-        !path.exists(),
-        "Cannot create new dataset at already existing path {:?}",
-        path
-    );
-    info!("Create dataset at {:?}", path);
-    fs::create_dir_all(path).with_context(|| format!("Failed to create dataset at {path:?}"))?;
-    let metadata_path = path.join(METADATA_NAME);
-    metadata.write_to(&metadata_path)?;
-    let dataset_path = path.join(DATASET_NAME);
-    let dataset_file = File::create_new(&dataset_path)
-        .with_context(|| format!("Failed to create new dataset file at {dataset_path:?}"))?;
-    Writer::new(dataset_file, schema)
-}
 
 #[expect(dead_code)]
 pub fn metadata(path: &Path) -> Result<Metadata> {
@@ -52,6 +36,34 @@ pub fn update_info(path: &Path, info: &Info) -> Result<()> {
     serde_json::to_writer(metadata_file, info)
         .with_context(|| format!("Failed to serialize metadata file at {metadata_path:?}"))?;
     Ok(())
+}
+
+pub struct Dataset {
+    path: PathBuf,
+    metadata: Metadata,
+}
+
+impl Dataset {
+    pub fn create(path: PathBuf, metadata: Metadata, schema: &Schema) -> Result<Writer> {
+        ensure!(
+            !path.exists(),
+            "Cannot create new dataset at already existing path {:?}",
+            path
+        );
+        info!("Create dataset at {:?}", path);
+        fs::create_dir_all(&path)
+            .with_context(|| format!("Failed to create dataset at {path:?}"))?;
+        let metadata_path = path.join(METADATA_NAME);
+        metadata.write_to(&metadata_path)?;
+        let dataset_path = path.join(DATASET_NAME);
+        let dataset_file = File::create_new(&dataset_path)
+            .with_context(|| format!("Failed to create new dataset file at {dataset_path:?}"))?;
+        Writer::new(dataset_file, schema, Self { path, metadata })
+    }
+
+    pub fn uid(&self) -> Uuid {
+        self.metadata.uid
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,17 +100,19 @@ pub struct Writer {
     inner: FileWriter<BufWriter<File>>,
     buffer: Vec<RecordBatch>,
     mem_count: usize,
+    dataset: Dataset,
 }
 
 impl Writer {
     const MEM_THRESHOLD: usize = 32 * 1024 * 1024;
-    fn new(file: File, schema: &Schema) -> Result<Self> {
+    fn new(file: File, schema: &Schema, dataset: Dataset) -> Result<Self> {
         let inner = FileWriter::try_new_buffered(file, schema)
             .context("Failed to create arrow ipc file writer")?;
         Ok(Self {
             inner,
             buffer: vec![],
             mem_count: 0,
+            dataset,
         })
     }
 
@@ -126,10 +140,11 @@ impl Writer {
             .context("Failed to write record batch to dataset file.")
     }
 
-    pub fn finish(mut self) -> Result<()> {
+    pub fn finish(mut self) -> Result<Dataset> {
         self.flush()?;
         self.inner
             .finish()
-            .context("Failed to finish dataset writing.")
+            .context("Failed to finish dataset writing.")?;
+        Ok(self.dataset)
     }
 }

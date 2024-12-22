@@ -4,32 +4,38 @@ use std::{
 };
 
 use anyhow::{ensure, Context, Result};
+use arrow::datatypes::Schema;
 use semver::{Version, VersionReq};
-use sqlx::{
-    sqlite::{SqliteConnectOptions, SqliteJournalMode},
-    ConnectOptions,
-};
+use sqlx::SqlitePool;
 use tracing::info;
+use uuid::Uuid;
 
 use crate::{
     config::Config,
-    db::MIGRATOR,
-    paths::{ConfigFile, DatabaseFile, VersionFile, WorkDirectory},
+    dataset::{self, Dataset},
+    db,
+    paths::{ConfigFile, DatasetPath, VersionFile, WorkDirectory},
     VERSION,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Workspace {
     root: WorkDirectory,
     config: Config,
+    database: SqlitePool,
 }
 
 impl Workspace {
-    pub fn open(path: PathBuf) -> Result<Self> {
+    pub async fn open(path: PathBuf) -> Result<Self> {
         let root = WorkDirectory(path);
         check_version_file(&root.version_file())?;
         let config = load_config(&root.config_file())?;
-        Ok(Self { root, config })
+        let database = db::connect(&root.database_file()).await?;
+        Ok(Self {
+            root,
+            config,
+            database,
+        })
     }
 
     pub const fn root(&self) -> &WorkDirectory {
@@ -40,16 +46,58 @@ impl Workspace {
         &self.config
     }
 
+    pub const fn database(&self) -> &SqlitePool {
+        &self.database
+    }
+
     pub async fn init(path: PathBuf) -> Result<Self> {
         info!("Initalize workspace: {:?}", path);
         create_empty_dir(&path)?;
         let root = WorkDirectory(path);
         let config = Config::default();
         init_config(&root.config_file(), &config)?;
-        init_database(&root.database_file()).await?;
+        let database = db::init(&root.database_file()).await?;
         init_dir(&root)?;
         write_version_file(&root.version_file())?;
-        Ok(Self { root, config })
+        Ok(Self {
+            root,
+            config,
+            database,
+        })
+    }
+
+    pub async fn create_dataset(
+        &self,
+        name: String,
+        description: String,
+        tags: Vec<String>,
+        schema: &Schema,
+    ) -> Result<dataset::Writer> {
+        let index = db::DatasetIndex {
+            pool: self.database.clone(),
+        };
+        let date = chrono::Local::now().date_naive();
+        let uid = Uuid::new_v4();
+        let path = DatasetPath::new(date, uid);
+        let _id = index
+            .create(uid, &name, &description, &path, &tags)
+            .await
+            .context("Failed to add dataset entry to index database.")?;
+        let metadata = dataset::Metadata {
+            uid,
+            info: dataset::Info {
+                name,
+                description,
+                tags,
+            },
+        };
+        let writer = Dataset::create(self.root.data_dir().join(&path), metadata, schema)
+            .context("Failed to create dataset.")?;
+        Ok(writer)
+    }
+
+    pub async fn open_dataset(&self, uid: Uuid) -> Result<Dataset> {
+        todo!()
     }
 }
 
@@ -73,23 +121,6 @@ fn init_config(path: &ConfigFile, config: &Config) -> Result<()> {
     let config_str = config.to_toml();
     info!("Initialize configuration at {}", path.display());
     fs::write(path, config_str).context("Failed to write configuration.")?;
-    Ok(())
-}
-
-async fn init_database(path: &DatabaseFile) -> Result<()> {
-    let path = &path.0;
-    info!("Initialize database at {}", path.display());
-    let mut conn = SqliteConnectOptions::new()
-        .filename(path)
-        .journal_mode(SqliteJournalMode::Wal)
-        .create_if_missing(true)
-        .connect()
-        .await
-        .context("Failed to create database.")?;
-    MIGRATOR
-        .run(&mut conn)
-        .await
-        .context("Failed to initialize database schema.")?;
     Ok(())
 }
 

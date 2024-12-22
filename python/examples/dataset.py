@@ -11,8 +11,8 @@ from fricon import connect
 
 
 async def main() -> None:
-    n_q = 64
-    n_shots = 20000
+    n_q = 4
+    n_shots = 2000
     n_entries = 10
     addr = "http://[::1]:22777"
     client = await connect(addr)
@@ -38,11 +38,11 @@ async def main() -> None:
 
     print(writer.uid)
 
-    info = await client.get_dataset(writer.uid)
-    print(info.name)
-    print(info.tags)
-    print(info.path)
-    print(info.created_at.astimezone(ZoneInfo("Asia/Shanghai")))
+    # info = await client.get_dataset(writer.uid)
+    # print(info.name)
+    # print(info.tags)
+    # print(info.path)
+    # print(info.created_at.astimezone(ZoneInfo("Asia/Shanghai")))
 
 
 if __name__ == "__main__":

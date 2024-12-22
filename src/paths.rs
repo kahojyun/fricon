@@ -1,5 +1,5 @@
 //! Manage storage of fricon data.
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 use uuid::Uuid;
@@ -7,7 +7,7 @@ use uuid::Uuid;
 /// Path to the workspace root directory.
 ///
 /// Provide methods to construct paths to various components of the workspace.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WorkDirectory(pub PathBuf);
 
 impl WorkDirectory {
@@ -53,18 +53,17 @@ impl DataDirectory {
 ///
 /// If the workspace root is `/workspace`, the data storage root is `/workspace/data`,
 /// then the absolute path to the dataset is `/workspace/data/<DatasetPath>`.
-pub struct DatasetPath(pub PathBuf);
+pub struct DatasetPath(String);
 
 impl DatasetPath {
     /// Create a new dataset path based on the date and UUID.
     pub fn new(date: NaiveDate, uid: Uuid) -> Self {
-        let path = format_dataset_path(date, uid);
-        Self(PathBuf::from(path))
+        Self(format!("{date}/{uid}"))
     }
-}
 
-fn format_dataset_path(date: NaiveDate, uid: Uuid) -> String {
-    format!("{date}/{uid}")
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 #[cfg(test)]
@@ -77,7 +76,10 @@ mod tests {
     fn test_format_dataset_path() {
         let date = NaiveDate::from_ymd_opt(2021, 1, 1).unwrap();
         let uid = uuid!("6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
-        let path = format_dataset_path(date, uid);
-        assert_eq!(path, "2021-01-01/6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
+        let path = DatasetPath::new(date, uid);
+        assert_eq!(
+            path.as_str(),
+            "2021-01-01/6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0"
+        );
     }
 }

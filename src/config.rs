@@ -11,7 +11,7 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(default)]
 pub struct Config {
     port: u16,
