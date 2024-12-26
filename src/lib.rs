@@ -1,4 +1,5 @@
 pub mod cli;
+mod client;
 mod config;
 mod dataset;
 mod db;
@@ -24,7 +25,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ///
 /// Returns a boxed error if server initialization or operation fails
 pub async fn main(cli: Cli) -> Result<()> {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt::init();
     match cli.command {
         Commands::Init { path } => {
             Workspace::init(path).await?;

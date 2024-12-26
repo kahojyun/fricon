@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pyarrow as pa
 
-from fricon import DatasetManager, Workspace, complex128
+from fricon import DatasetManager, Workspace, complex128, trace_
 
 
-def simple(manager: DatasetManager):
+def simple(manager: DatasetManager) -> None:
     """When no schema is provided, the schema is inferred from the first write."""
     with manager.create("example", description="test", tags=["tagA", "tagB"]) as writer:
         for i in range(10):
@@ -21,7 +21,7 @@ def simple(manager: DatasetManager):
     assert d.uid is not None
 
 
-def with_schema(manager: DatasetManager):
+def with_schema(manager: DatasetManager) -> None:
     """When a schema is provided, the schema is used.
 
     .. note::
@@ -31,10 +31,17 @@ def with_schema(manager: DatasetManager):
     """
     # Arrow doesn't have complex128, so we need to import it from fricon.
     # complex128 is a struct with two float64 fields named "real" and "imag".
-    schema = pa.schema([("a", pa.int64()), ("b", pa.int64()), ("c", complex128())])
+    schema = pa.schema(  # pyright: ignore[reportUnknownMemberType]
+        [
+            ("a", pa.int64()),
+            ("b", pa.int64()),
+            ("c", complex128()),
+            ("d", trace_(pa.int64())),
+        ]
+    )
     with manager.create("example", schema=schema) as writer:
         for i in range(10):
-            writer.write(a=i, b=i * 2, c=1j)
+            writer.write(a=i, b=i * 2, c=1j, d=[1, 2])
 
 
 if __name__ == "__main__":

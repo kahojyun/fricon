@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["maturin>=1.7.0"]
+requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project.urls]
@@ -29,14 +29,7 @@ Issues = "https://github.com/kahojyun/fricon/issues"
 Source = "https://github.com/kahojyun/fricon"
 
 [project.scripts]
-fricon = "fricon._core:lib_main"
-
-[tool.maturin]
-python-source = "python/src"
-module-name = "fricon._core"
-manifest-path = "fricon-py/Cargo.toml"
-features = ["pyo3/extension-module"]
-
+fricon = "fricon._core:main"
 
 [dependency-groups]
 dev = [
@@ -46,8 +39,13 @@ dev = [
 ]
 lint = ["mypy>=1.11.2", "ruff>=0.6.6", { include-group = "types" }]
 test = ["pytest>=8.3.3"]
-types = ["pyarrow-stubs>=17.6"]
+types = ["pandas-stubs>=2.2.2.240807", "pyarrow-stubs>=17.6"]
 
+[tool.maturin]
+python-source = "python/src"
+module-name = "fricon._core"
+manifest-path = "fricon-py/Cargo.toml"
+features = ["pyo3/extension-module"]
 
 [tool.uv]
 cache-keys = [
@@ -58,33 +56,8 @@ cache-keys = [
   { file = "Cargo.lock" },
 ]
 
-[tool.ruff.lint]
-select = ["ALL"]
-ignore = [
-  # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-  "COM812", # Missing trailing comma
-  "ISC001", # implicit string concatenation
-]
-[tool.ruff.lint.per-file-ignores]
-"python/examples/*.py" = [
-  "T201", # Use of print
-]
-"python/tests/*.py" = [
-  "S101", # Use of assert
-]
-"!python/src/*.py" = [
-  "I002",   # Missing required imports
-  "D",      # Dosctring
-  "INP001", # Implicit namespace package
-]
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-[tool.ruff.lint.isort]
-known-first-party = ["fricon"]
-required-imports = ["from __future__ import annotations"]
-
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
 include = ["python"]
-exclude = ["**/node_modules", "**/__pycache__", "docs/_build"]
+exclude = ["**/node_modules", "**/__pycache__", "**/docs/_build"]

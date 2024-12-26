@@ -4,8 +4,6 @@
 
 ## Development
 
-Following instructions are for server project. For client project, see `python/README.md`.
-
 ### Requirements
 
 * Stable Rust toolchain

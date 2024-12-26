@@ -1,5 +1,7 @@
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 
+mod workspace;
+
 use anyhow::{bail, Context, Result};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter, pyarrow::PyArrowType};
 use chrono::{DateTime, TimeZone, Utc};
@@ -22,12 +24,31 @@ use tonic::{metadata::MetadataValue, transport::Channel};
 #[pymodule]
 pub mod _core {
     #[pymodule_export]
-    pub use super::{connect, lib_main};
+    pub use super::{
+        complex128, main, trace_, Dataset, DatasetManager, DatasetWriter, Trace, Workspace,
+    };
+}
+
+#[pyclass]
+pub struct Dataset;
+#[pyclass]
+pub struct DatasetManager;
+#[pyclass]
+pub struct Workspace;
+#[pyclass]
+pub struct Trace;
+#[pyfunction]
+pub fn complex128() {
+    todo!();
+}
+#[pyfunction]
+pub fn trace_() {
+    todo!();
 }
 
 #[pyfunction]
 #[must_use]
-pub fn lib_main(py: Python<'_>) -> i32 {
+pub fn main(py: Python<'_>) -> i32 {
     fn inner(cli: Cli) -> Result<()> {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
