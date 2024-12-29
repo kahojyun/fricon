@@ -18,7 +18,7 @@ def simple(manager: DatasetManager) -> None:
     assert d.name == "example"
     assert d.description == "test"
     assert set(d.tags) == {"tagA", "tagB"}
-    assert d.uid is not None
+    assert d.id is not None
 
 
 def with_schema(manager: DatasetManager) -> None:
@@ -45,7 +45,7 @@ def with_schema(manager: DatasetManager) -> None:
 
 
 if __name__ == "__main__":
-    ws = Workspace.open(".dev/ws")
+    ws = Workspace.connect(".dev/ws")
     manager = ws.dataset_manager
     simple(manager)
     with_schema(manager)

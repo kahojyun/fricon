@@ -2,6 +2,8 @@
 
 mod workspace;
 
+use std::path::PathBuf;
+
 use anyhow::{bail, Context, Result};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter, pyarrow::PyArrowType};
 use chrono::{DateTime, TimeZone, Utc};
@@ -29,8 +31,36 @@ pub mod _core {
     };
 }
 
-#[pyclass]
+/// Dataset.
+#[pyclass(module = "fricon._core")]
 pub struct Dataset;
+
+#[pymethods]
+impl Dataset {
+    /// Open a dataset.
+    ///
+    /// Parameters:
+    ///     path: Path to the dataset.
+    ///
+    /// Returns:
+    ///     Opened dataset.
+    #[staticmethod]
+    pub fn open(path: PathBuf) -> Self {
+        todo!();
+    }
+
+    /// Id of the dataset.
+    #[getter]
+    pub fn id(&self) -> usize {
+        todo!();
+    }
+
+    /// Creation date of the dataset.
+    #[getter]
+    pub fn created_at(&self) -> DateTime<Utc> {
+        todo!();
+    }
+}
 #[pyclass]
 pub struct DatasetManager;
 #[pyclass]

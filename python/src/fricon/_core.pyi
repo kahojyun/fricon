@@ -1,12 +1,12 @@
 from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import Generic, TypeVar, final, overload
+from typing import TypeVar, final, overload
 
 import pandas as pd
 import polars as pl
 import pyarrow as pa
 from _typeshed import StrPath
-from typing_extensions import Self
+from typing_extensions import Self, TypeAlias
 
 __all__ = [
     "Dataset",
@@ -25,7 +25,7 @@ def trace_(item: pa.DataType) -> pa.DataType: ...
 @final
 class Workspace:
     @staticmethod
-    def open(path: StrPath) -> Workspace: ...
+    def connect(path: StrPath) -> Workspace: ...
     @property
     def dataset_manager(self) -> DatasetManager: ...
 
@@ -41,30 +41,29 @@ class DatasetManager:
     ) -> DatasetWriter: ...
     def open(
         self,
-        uid: str,
+        dataset_id: str | int,
     ) -> Dataset: ...
     def list_all(self) -> pd.DataFrame: ...
 
-_ScalarT_co = TypeVar("_ScalarT_co", int, float, str, bool, complex, covariant=True)
+_ScalarT_co = TypeVar("_ScalarT_co", str, bool, complex, covariant=True)
 
-class Trace(Generic[_ScalarT_co]):
+class Trace(Sequence[_ScalarT_co]):
     @overload
     def __new__(cls, ys: Sequence[_ScalarT_co]) -> Self: ...
     @overload
-    def __new__(cls, xs: Sequence[float], ys: Sequence[_ScalarT_co]) -> Self: ...
+    def __new__(cls, ys: Sequence[_ScalarT_co], *, xs: Sequence[float]) -> Self: ...
     @overload
-    def __new__(cls, x0: float, dx: float, ys: Sequence[_ScalarT_co]) -> Self: ...
+    def __new__(cls, ys: Sequence[_ScalarT_co], *, x0: float, dx: float) -> Self: ...
+
+_ColumnType: TypeAlias = (
+    str | bool | complex | Sequence[str] | Sequence[bool] | Sequence[complex]
+)
 
 class DatasetWriter:
     @overload
-    def write(
-        self, **kwargs: _ScalarT_co | Trace[_ScalarT_co] | Sequence[_ScalarT_co]
-    ) -> None: ...
+    def write(self, **kwargs: _ColumnType) -> None: ...
     @overload
-    def write(
-        self,
-        kwargs: dict[str, _ScalarT_co | Trace[_ScalarT_co] | Sequence[_ScalarT_co]],
-    ) -> None: ...
+    def write(self, kwargs: dict[str, _ColumnType]) -> None: ...
     def to_dataset(self) -> Dataset: ...
     def __enter__(self) -> Self: ...
     def __exit__(

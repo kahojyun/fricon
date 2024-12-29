@@ -36,10 +36,16 @@ dev = [
   "ipython>=8.18.1",
   { include-group = "lint" },
   { include-group = "test" },
+  { include-group = "docs" },
 ]
 lint = ["mypy>=1.11.2", "ruff>=0.6.6", { include-group = "types" }]
 test = ["pytest>=8.3.3"]
 types = ["pandas-stubs>=2.2.2.240807", "pyarrow-stubs>=17.6"]
+docs = [
+  "markdown-exec[ansi]>=1.10.0",
+  "mkdocs-material>=9.5.49",
+  "mkdocstrings-python>=1.12.2",
+]
 
 [tool.maturin]
 python-source = "python/src"
