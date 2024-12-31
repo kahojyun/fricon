@@ -29,6 +29,14 @@ plugins:
           import:
             - url: https://docs.python.org/3/objects.inv
               domains: [std, py]
+            - url: https://arrow.apache.org/docs/objects.inv
+              domains: [std, py]
+            - url: https://pandas.pydata.org/docs/objects.inv
+              domains: [std, py]
+            - url: https://docs.pola.rs/api/python/stable/objects.inv
+              domains: [std, py]
+            - url: https://numpy.org/doc/stable/objects.inv
+              domains: [std, py]
           options:
             filters:
               - "!^_"

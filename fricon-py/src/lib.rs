@@ -1,27 +1,16 @@
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
 
-mod workspace;
+use std::path::{Path, PathBuf};
 
-use std::path::PathBuf;
-
-use anyhow::{bail, Context, Result};
-use arrow::{array::RecordBatch, ipc::writer::StreamWriter, pyarrow::PyArrowType};
-use chrono::{DateTime, TimeZone, Utc};
+use anyhow::Result;
+use chrono::{DateTime, Utc};
 use clap::Parser;
-use fricon::{
-    cli::Cli,
-    proto::{
-        data_storage_service_client::DataStorageServiceClient,
-        fricon_service_client::FriconServiceClient, CreateRequest, GetRequest, GetResponse,
-        Metadata, VersionRequest, WriteRequest, WriteResponse,
-    },
-    VERSION,
-};
-use pyo3::{exceptions::PyRuntimeError, prelude::*};
-use pyo3_async_runtimes::tokio::future_into_py;
-use tokio::sync::{mpsc, oneshot};
-use tokio_stream::{wrappers::ReceiverStream, StreamExt};
-use tonic::{metadata::MetadataValue, transport::Channel};
+use fricon::cli::Cli;
+use pyo3::prelude::*;
 
 #[pymodule]
 pub mod _core {
@@ -31,12 +20,226 @@ pub mod _core {
     };
 }
 
-/// Dataset.
+/// A client of fricon workspace server.
+#[pyclass(module = "fricon._core")]
+pub struct Workspace;
+
+#[pymethods]
+impl Workspace {
+    /// Connect to a fricon server.
+    ///
+    /// Parameters:
+    ///     path: The path to the workspace.
+    ///
+    /// Returns:
+    ///     A workspace client.
+    #[staticmethod]
+    pub fn connect(path: PathBuf) -> Self {
+        todo!()
+    }
+
+    /// A dataset manager for this workspace.
+    #[getter]
+    pub fn dataset_manager(&self) -> DatasetManager {
+        todo!()
+    }
+
+    /// Close connection to server.
+    pub fn close(&self) {
+        todo!()
+    }
+
+    /// Enter context manager.
+    pub fn __enter__(&self) -> PyObject {
+        todo!()
+    }
+
+    /// Exit context manager and close connection.
+    ///
+    /// Will call [`close`][fricon.Workspace.close] method.
+    pub fn __exit__(&self, _exc_type: PyObject, _exc_value: PyObject, _traceback: PyObject) {
+        todo!()
+    }
+}
+
+/// Manager of datasets in workspace.
+#[pyclass(module = "fricon._core")]
+pub struct DatasetManager;
+
+#[pymethods]
+impl DatasetManager {
+    /// Create a new dataset.
+    ///
+    /// Parameters:
+    ///     name: Name of the dataset.
+    ///     description: Description of the dataset.
+    ///     tags: Tags of the dataset. Duplicate tags will be add only once.
+    ///     schema: Schema of the underlying arrow table. Can be only a subset of all columns,
+    ///         other fields will be inferred from first row.
+    ///     index: Names of index columns.
+    ///
+    /// Returns:
+    ///     A writer of the newly created dataset.
+    #[pyo3(signature = (name, *, description=None, tags=None, schema=None, index=None))]
+    pub fn create(
+        &self,
+        name: String,
+        description: Option<String>,
+        tags: Option<Vec<String>>,
+        schema: Option<PyObject>,
+        index: Option<PyObject>,
+    ) -> DatasetWriter {
+        todo!()
+    }
+
+    /// Open a dataset by id.
+    ///
+    /// Parameters:
+    ///     dataset_id: An integer `id` or UUID `uid`
+    ///
+    /// Returns:
+    ///     The requested dataset.
+    ///
+    /// Raises:
+    ///     RuntimeError: Dataset not found.
+    pub fn open(&self, dataset_id: PyObject) -> PyResult<Dataset> {
+        todo!()
+    }
+
+    /// List all datasets in the workspace.
+    ///
+    /// Returns:
+    ///     A pandas dataframe containing information of all datasets.
+    pub fn list_all(&self) -> PyObject {
+        todo!()
+    }
+}
+
+/// 1-D list of values with optional x-axis values.
+#[pyclass(module = "fricon._core")]
+pub struct Trace;
+
+#[pymethods]
+impl Trace {
+    /// Create a new trace with variable x steps.
+    ///
+    /// Parameters:
+    ///     xs: List of x-axis values.
+    ///     ys: List of y-axis values.
+    ///
+    /// Returns:
+    ///     A variable-step trace.
+    #[staticmethod]
+    pub fn variable_step(xs: PyObject, ys: PyObject) -> Self {
+        todo!();
+    }
+
+    /// Create a new trace with fixed x steps.
+    ///
+    /// Parameters:
+    ///     x0: Starting x-axis value.
+    ///     dx: Step size of x-axis values.
+    ///     ys: List of y-axis values.
+    ///
+    /// Returns:
+    ///     A fixed-step trace.
+    #[staticmethod]
+    pub fn fixed_step(x0: f64, dx: f64, ys: PyObject) -> Self {
+        todo!();
+    }
+}
+
+/// A dataset.
+///
+/// Datasets can be created and opened using the [`DatasetManager`][fricon.DatasetManager].
 #[pyclass(module = "fricon._core")]
 pub struct Dataset;
 
 #[pymethods]
 impl Dataset {
+    /// Name of the dataset.
+    #[getter]
+    pub fn name(&self) -> &str {
+        todo!();
+    }
+
+    #[setter]
+    pub fn set_name(&mut self, name: &str) {
+        todo!();
+    }
+
+    /// Description of the dataset.
+    #[getter]
+    pub fn description(&self) -> &str {
+        todo!();
+    }
+
+    #[setter]
+    pub fn set_description(&mut self, description: &str) {
+        todo!();
+    }
+
+    /// Tags of the dataset.
+    #[getter]
+    pub fn tags(&self) -> Vec<String> {
+        todo!();
+    }
+
+    #[setter]
+    pub fn set_tags(&mut self, tags: Vec<String>) {
+        todo!();
+    }
+
+    /// Favorite status of the dataset.
+    #[getter]
+    pub fn favorite(&self) -> bool {
+        todo!();
+    }
+
+    #[setter]
+    pub fn set_favorite(&mut self, favorite: bool) {
+        todo!();
+    }
+
+    /// Load the dataset as a pandas DataFrame.
+    ///
+    /// Arrow data types cannot be directly converted to pandas data types, so in some cases the
+    /// conversion may be slow or fail. Consider using `to_polars` or `to_arrow` for better
+    /// performance.
+    ///
+    /// See Also:
+    ///     [`to_polars`][fricon.Dataset.to_polars], [`to_arrow`][fricon.Dataset.to_arrow]
+    ///
+    /// Returns:
+    ///     A pandas DataFrame.
+    pub fn to_pandas(&self) -> PyObject {
+        todo!();
+    }
+
+    /// Load the dataset as a polars DataFrame.
+    ///
+    /// `polars` supports memory mapping, so it is faster than `pandas` for large datasets.
+    ///
+    /// See Also:
+    ///     [`to_pandas`][fricon.Dataset.to_pandas], [`to_arrow`][fricon.Dataset.to_arrow]
+    ///
+    /// Returns:
+    ///     A polars DataFrame.
+    pub fn to_polars(&self) -> PyObject {
+        todo!();
+    }
+
+    /// Load the dataset as an Arrow Table.
+    ///
+    /// See Also:
+    ///     [`to_pandas`][fricon.Dataset.to_pandas], [`to_polars`][fricon.Dataset.to_polars]
+    ///
+    /// Returns:
+    ///     An Arrow Table.
+    pub fn to_arrow(&self) -> PyObject {
+        todo!();
+    }
+
     /// Open a dataset.
     ///
     /// Parameters:
@@ -55,24 +258,126 @@ impl Dataset {
         todo!();
     }
 
+    /// UUID of the dataset.
+    #[getter]
+    pub fn uid(&self) -> String {
+        todo!();
+    }
+
+    /// Path of the dataset.
+    #[getter]
+    pub fn path(&self) -> &Path {
+        todo!();
+    }
+
     /// Creation date of the dataset.
     #[getter]
     pub fn created_at(&self) -> DateTime<Utc> {
         todo!();
     }
+
+    /// Arrow schema of the dataset.
+    #[getter]
+    pub fn schema(&self) -> PyObject {
+        todo!();
+    }
+
+    /// Index columns of the dataset.
+    #[getter]
+    pub fn index(&self) -> Vec<String> {
+        todo!();
+    }
+
+    /// Close the dataset.
+    pub fn close(&self) {
+        todo!()
+    }
+
+    /// Enter context manager.
+    pub fn __enter__(&self) -> PyObject {
+        todo!()
+    }
+
+    /// Exit context manager and close the dataset.
+    ///
+    /// Will call [`close`][fricon.Dataset.close] method.
+    pub fn __exit__(&self, _exc_type: PyObject, _exc_value: PyObject, _traceback: PyObject) {
+        todo!()
+    }
 }
-#[pyclass]
-pub struct DatasetManager;
-#[pyclass]
-pub struct Workspace;
-#[pyclass]
-pub struct Trace;
+
+/// Writer for newly created dataset.
+///
+/// Writers are constructed by calling [`DatasetManager.create`][fricon.DatasetManager.create].
+#[pyclass(module = "fricon._core")]
+pub struct DatasetWriter;
+
+#[pymethods]
+impl DatasetWriter {
+    /// Write a row of values to the dataset.
+    ///
+    /// Parameters:
+    ///     kwargs: Names and values in the row.
+    #[pyo3(signature = (**kwargs))]
+    pub fn write(&self, kwargs: Option<PyObject>) {
+        todo!()
+    }
+
+    /// Write a row of values to the dataset.
+    ///
+    /// Parameters:
+    ///     values: A dictionary of names and values in the row.
+    pub fn write_dict(&self, values: PyObject) {
+        todo!()
+    }
+
+    /// Get the newly created dataset.
+    ///
+    /// Returns:
+    ///     Dataset.
+    ///
+    /// Raises:
+    ///     RuntimeError: Writer is not closed yet.
+    pub fn to_dataset(&self) -> Dataset {
+        todo!()
+    }
+
+    /// Finish writing to dataset.
+    pub fn close(&self) {
+        todo!()
+    }
+
+    /// Enter context manager.
+    pub fn __enter__(&self) -> PyObject {
+        todo!()
+    }
+
+    /// Exit context manager and close the writer.
+    ///
+    /// Will call [`close`][fricon.DatasetWriter.close] method.
+    pub fn __exit__(&self, _exc_type: PyObject, _exc_value: PyObject, _traceback: PyObject) {
+        todo!()
+    }
+}
+
+/// Get a pyarrow data type representing 128 bit compelex number.
+///
+/// Returns:
+///     A pyarrow data type.
 #[pyfunction]
-pub fn complex128() {
+pub fn complex128() -> PyObject {
     todo!();
 }
+
+/// Get a pyarrow data type representing [`Trace`][fricon.Trace].
+///
+/// Parameters:
+///     item: Data type of the y values.
+///
+/// Returns:
+///     A pyarrow data type.
 #[pyfunction]
-pub fn trace_() {
+pub fn trace_(item: PyObject) -> PyObject {
     todo!();
 }
 
@@ -114,222 +419,4 @@ pub fn main(py: Python<'_>) -> i32 {
             1
         }
     }
-}
-
-#[pyfunction]
-pub fn connect(py: Python<'_>, addr: String) -> PyResult<Bound<'_, PyAny>> {
-    future_into_py(py, async move { Ok(Client::connect(addr).await?) })
-}
-
-#[pyclass(frozen)]
-pub struct Client {
-    inner: DataStorageServiceClient<Channel>,
-}
-
-impl Client {
-    async fn connect(addr: String) -> Result<Self> {
-        let channel = Channel::from_shared(addr)?.connect().await?;
-        let mut fricon_client = FriconServiceClient::new(channel.clone());
-        let server_version = fricon_client
-            .version(VersionRequest {})
-            .await?
-            .into_inner()
-            .version;
-        let client_version = VERSION;
-        if server_version != client_version {
-            bail!("Server version mismatch: client={client_version}, server={server_version}");
-        }
-        let inner = DataStorageServiceClient::new(channel);
-        Ok(Self { inner })
-    }
-}
-
-#[pymethods]
-impl Client {
-    /// Create a new dataset.
-    ///
-    /// A background task is spawned to write data to the dataset.
-    ///
-    /// Args:
-    ///     name (str): The name of the dataset.
-    ///     description (str | None): The description of the dataset.
-    ///     tags (List[str] | None): The tags of the dataset.
-    ///
-    /// Returns:
-    ///     DatasetWriter: The dataset writer.
-    #[pyo3(signature = (name, description=None, tags=None))]
-    pub fn create_dataset<'py>(
-        &self,
-        py: Python<'py>,
-        name: String,
-        description: Option<String>,
-        tags: Option<Vec<String>>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        async fn create(
-            mut client: DataStorageServiceClient<Channel>,
-            name: String,
-            description: Option<String>,
-            tags: Option<Vec<String>>,
-        ) -> Result<DatasetWriter> {
-            let metadata = Metadata {
-                name: Some(name),
-                description,
-                tags: tags.unwrap_or_default(),
-            };
-            let request = CreateRequest {
-                metadata: Some(metadata),
-            };
-            let response = client
-                .create(request)
-                .await
-                .context("Failed to create dataset.")?;
-            let response = response.into_inner();
-            let write_token = response.write_token;
-            let (tx, rx) = mpsc::channel(128);
-            let rx = ReceiverStream::new(rx).map(|b: RecordBatch| {
-                let mut writer = StreamWriter::try_new(
-                    Vec::with_capacity(b.get_array_memory_size()),
-                    &b.schema(),
-                )
-                .expect("Failed to create writer");
-                writer.write(&b).expect("Failed to write data");
-                let buffer = writer.into_inner().expect("Failed to get inner buffer");
-                WriteRequest {
-                    record_batch: buffer,
-                }
-            });
-            let mut write_stream_request = tonic::Request::new(rx);
-            write_stream_request
-                .metadata_mut()
-                .insert_bin("fricon-token-bin", MetadataValue::from_bytes(&write_token));
-            let (result_tx, result_rx) = oneshot::channel();
-            tokio::spawn(async move {
-                let result = client
-                    .write(write_stream_request)
-                    .await
-                    .map(tonic::Response::into_inner)
-                    .context("Failed to write data.");
-                let _ = result_tx.send(result);
-            });
-            let writer = DatasetWriter {
-                tx: Some(tx),
-                result_rx: Some(result_rx),
-                uid: None,
-            };
-            Ok(writer)
-        }
-
-        let inner = self.inner.clone();
-        future_into_py(py, async move {
-            Ok(create(inner, name, description, tags).await?)
-        })
-    }
-
-    /// Get a dataset by its UID.
-    fn get_dataset<'py>(&self, py: Python<'py>, uid: String) -> PyResult<Bound<'py, PyAny>> {
-        async fn get_dataset_info(
-            mut inner: DataStorageServiceClient<Channel>,
-            uid: String,
-        ) -> Result<DatasetInfo> {
-            let request = GetRequest { uid };
-            let response = inner.get(request).await.context("Failed to get dataset.")?;
-            let GetResponse {
-                path,
-                metadata:
-                    Some(Metadata {
-                        name: Some(name),
-                        description,
-                        tags,
-                    }),
-                created_at: Some(created_at),
-            } = response.into_inner()
-            else {
-                bail!("Invalid dataset.");
-            };
-
-            let created_at = Utc.timestamp_opt(created_at.seconds, 0).unwrap();
-
-            let info = DatasetInfo {
-                name,
-                description,
-                tags,
-                path,
-                created_at,
-            };
-            Ok(info)
-        }
-
-        let inner = self.inner.clone();
-        future_into_py(py, async move { Ok(get_dataset_info(inner, uid).await?) })
-    }
-}
-
-#[pyclass]
-pub struct DatasetWriter {
-    tx: Option<mpsc::Sender<RecordBatch>>,
-    result_rx: Option<oneshot::Receiver<Result<WriteResponse>>>,
-    uid: Option<String>,
-}
-
-#[pymethods]
-impl DatasetWriter {
-    /// Write data to the dataset.
-    ///
-    /// Will block if the internal buffer is full.
-    ///
-    /// Args:
-    ///     data (bytes): The data to write.
-    ///
-    /// Raises:
-    ///     RuntimeError: If the dataset writer is closed or connection is lost.
-    pub fn write(&self, data: PyArrowType<RecordBatch>) -> Result<()> {
-        let Some(tx) = &self.tx else {
-            bail!("DatasetWriter is closed.")
-        };
-        tx.blocking_send(data.0).context("Failed to write data.")
-    }
-
-    /// Close the dataset writer.
-    ///
-    /// Raises:
-    ///     RuntimeError: If the dataset writer is closed or connection is lost.
-    pub fn aclose(slf: Bound<'_, Self>) -> PyResult<Bound<'_, PyAny>> {
-        let py = slf.py();
-        let result_rx = {
-            let mut slf = slf.borrow_mut();
-            slf.tx = None;
-            slf.result_rx.take()
-        }
-        .ok_or_else(|| PyRuntimeError::new_err("DatasetWriter is closed"))?;
-        let slf = slf.unbind();
-        future_into_py(py, async move {
-            let result = result_rx.await.unwrap();
-            let response = result.context("Failed to close writer.")?;
-            Python::with_gil(|py| slf.bind(py).borrow_mut().uid = Some(response.uid));
-            Ok(())
-        })
-    }
-
-    /// Get the UID of the dataset.
-    ///
-    /// Returns:
-    ///     str: The UID of the dataset.
-    ///
-    /// Raises:
-    ///     RuntimeError: If the dataset writer is not closed yet.
-    #[getter]
-    pub fn uid(&self) -> PyResult<String> {
-        self.uid
-            .clone()
-            .ok_or_else(|| PyRuntimeError::new_err("DatasetWriter is not closed"))
-    }
-}
-
-#[pyclass(frozen, get_all)]
-struct DatasetInfo {
-    name: String,
-    description: Option<String>,
-    tags: Vec<String>,
-    path: String,
-    created_at: DateTime<Utc>,
 }
