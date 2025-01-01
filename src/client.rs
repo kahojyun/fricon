@@ -9,14 +9,16 @@ use tokio_util::io::{ReaderStream, SyncIoBridge};
 use tonic::{metadata::MetadataValue, transport::Channel, Request};
 use tower::service_fn;
 use tracing::error;
+use uuid::Uuid;
 
 use crate::{
+    dataset::Dataset,
     ipc::IpcConnect,
     paths::IpcFile,
     proto::{
         data_storage_service_client::DataStorageServiceClient,
-        fricon_service_client::FriconServiceClient, CreateRequest, Metadata, VersionRequest,
-        WriteRequest, WriteResponse, WRITE_TOKEN,
+        fricon_service_client::FriconServiceClient, CreateRequest, VersionRequest, WriteRequest,
+        WriteResponse, WRITE_TOKEN,
     },
     VERSION,
 };
@@ -38,18 +40,26 @@ impl Client {
         name: String,
         description: String,
         tags: Vec<String>,
+        index: Vec<String>,
     ) -> Result<DatasetWriter> {
         let request = CreateRequest {
-            metadata: Some(Metadata {
-                name: Some(name),
-                description: Some(description),
-                tags,
-            }),
+            name: Some(name),
+            description: Some(description),
+            tags,
+            index,
         };
         let mut client = DataStorageServiceClient::new(self.channel.clone());
         let response = client.create(request).await?;
         let write_token = response.into_inner().write_token;
         Ok(DatasetWriter::new(client, write_token))
+    }
+
+    pub async fn get_dataset_by_id(&self, id: i64) -> Dataset {
+        todo!()
+    }
+
+    pub async fn get_dataset_by_uid(&self, uid: String) -> Dataset {
+        todo!()
     }
 }
 
@@ -99,6 +109,11 @@ impl DatasetWriter {
     pub fn blocking_write(&self, data: RecordBatch) -> Result<()> {
         self.tx.blocking_send(data)?;
         Ok(())
+    }
+
+    pub async fn finish(self) -> Result<i64> {
+        let response = self.handle.await??;
+        Ok(response.id)
     }
 }
 

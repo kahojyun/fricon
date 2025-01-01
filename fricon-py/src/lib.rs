@@ -4,13 +4,34 @@
     clippy::must_use_candidate
 )]
 
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{Arc, LazyLock, OnceLock},
+};
 
-use anyhow::Result;
+use anyhow::{anyhow, bail, ensure, Context, Result};
+use arrow::{
+    array::{
+        make_array, Array, ArrayData, BooleanArray, Float64Array, Int64Array, RecordBatch,
+        StringArray, StructArray,
+    },
+    datatypes::{DataType, Field, Fields, Schema},
+    pyarrow::PyArrowType,
+};
 use chrono::{DateTime, Utc};
 use clap::Parser;
-use fricon::cli::Cli;
-use pyo3::prelude::*;
+use fricon::{
+    cli::Cli,
+    client::{self, Client},
+    paths::WorkDirectory,
+};
+use num::complex::Complex64;
+use pyo3::{
+    prelude::*,
+    types::{PyBool, PyComplex, PyDict, PyFloat, PyInt, PyString},
+};
+use pyo3_async_runtimes::tokio::get_runtime;
 
 #[pymodule]
 pub mod _core {
@@ -22,7 +43,11 @@ pub mod _core {
 
 /// A client of fricon workspace server.
 #[pyclass(module = "fricon._core")]
-pub struct Workspace;
+#[derive(Clone)]
+pub struct Workspace {
+    root: WorkDirectory,
+    client: Client,
+}
 
 #[pymethods]
 impl Workspace {
@@ -34,37 +59,29 @@ impl Workspace {
     /// Returns:
     ///     A workspace client.
     #[staticmethod]
-    pub fn connect(path: PathBuf) -> Self {
-        todo!()
+    #[expect(clippy::needless_pass_by_value)]
+    pub fn connect(path: PathBuf) -> Result<Self> {
+        let root = WorkDirectory::new(&path)?;
+        let ipc_file = root.ipc_file();
+        let client = get_runtime().block_on(Client::connect(ipc_file))?;
+        Ok(Self { root, client })
     }
 
     /// A dataset manager for this workspace.
     #[getter]
     pub fn dataset_manager(&self) -> DatasetManager {
-        todo!()
-    }
-
-    /// Close connection to server.
-    pub fn close(&self) {
-        todo!()
-    }
-
-    /// Enter context manager.
-    pub fn __enter__(&self) -> PyObject {
-        todo!()
-    }
-
-    /// Exit context manager and close connection.
-    ///
-    /// Will call [`close`][fricon.Workspace.close] method.
-    pub fn __exit__(&self, _exc_type: PyObject, _exc_value: PyObject, _traceback: PyObject) {
-        todo!()
+        DatasetManager {
+            workspace: self.clone(),
+        }
     }
 }
 
 /// Manager of datasets in workspace.
 #[pyclass(module = "fricon._core")]
-pub struct DatasetManager;
+#[derive(Clone)]
+pub struct DatasetManager {
+    workspace: Workspace,
+}
 
 #[pymethods]
 impl DatasetManager {
@@ -86,10 +103,20 @@ impl DatasetManager {
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
-        schema: Option<PyObject>,
-        index: Option<PyObject>,
-    ) -> DatasetWriter {
-        todo!()
+        schema: Option<PyArrowType<Schema>>,
+        index: Option<Vec<String>>,
+    ) -> Result<DatasetWriter> {
+        let description = description.unwrap_or_default();
+        let tags = tags.unwrap_or_default();
+        let schema = schema.map(|s| s.0).unwrap_or_else(|| Schema::empty());
+        let index = index.unwrap_or_default();
+        let writer = get_runtime().block_on(self.workspace.client.create_dataset(
+            name,
+            description,
+            tags,
+            index,
+        ))?;
+        Ok(DatasetWriter::new(writer, Arc::new(schema)))
     }
 
     /// Open a dataset by id.
@@ -102,7 +129,7 @@ impl DatasetManager {
     ///
     /// Raises:
     ///     RuntimeError: Dataset not found.
-    pub fn open(&self, dataset_id: PyObject) -> PyResult<Dataset> {
+    pub fn open(&self, dataset_id: &Bound<'_, PyAny>) -> PyResult<Dataset> {
         todo!()
     }
 
@@ -145,6 +172,20 @@ impl Trace {
     ///     A fixed-step trace.
     #[staticmethod]
     pub fn fixed_step(x0: f64, dx: f64, ys: PyObject) -> Self {
+        todo!();
+    }
+
+    /// Arrow data type of the trace.
+    #[getter]
+    pub fn data_type(&self) -> PyArrowType<DataType> {
+        todo!();
+    }
+
+    /// Convert to an arrow array.
+    ///
+    /// Returns:
+    ///     Arrow array.
+    pub fn to_arrow_array(&self) -> PyArrowType<ArrayData> {
         todo!();
     }
 }
@@ -310,7 +351,158 @@ impl Dataset {
 ///
 /// Writers are constructed by calling [`DatasetManager.create`][fricon.DatasetManager.create].
 #[pyclass(module = "fricon._core")]
-pub struct DatasetWriter;
+pub struct DatasetWriter {
+    writer: Option<client::DatasetWriter>,
+    id: Option<i64>,
+    first_row: bool,
+    schema: Arc<Schema>,
+}
+
+impl DatasetWriter {
+    const fn new(writer: client::DatasetWriter, schema: Arc<Schema>) -> Self {
+        Self {
+            writer: Some(writer),
+            id: None,
+            first_row: true,
+            schema,
+        }
+    }
+}
+
+fn infer_datatype(value: &Bound<'_, PyAny>) -> Result<DataType> {
+    // Check bool first because bool is a subclass of int.
+    if value.is_instance_of::<PyBool>() {
+        Ok(DataType::Boolean)
+    } else if value.is_instance_of::<PyInt>() {
+        Ok(DataType::Int64)
+    } else if value.is_instance_of::<PyFloat>() {
+        Ok(DataType::Float64)
+    } else if value.is_instance_of::<PyComplex>() {
+        Ok(get_complex_type())
+    } else if value.is_instance_of::<PyString>() {
+        Ok(DataType::Utf8)
+    } else if let Ok(trace) = value.downcast_exact::<Trace>() {
+        Ok(trace.borrow().data_type().0)
+    } else {
+        bail!("Unsupported data type.");
+    }
+}
+
+fn infer_schema(
+    py: Python<'_>,
+    initial_schema: &Schema,
+    values: &HashMap<String, PyObject>,
+) -> Result<Schema> {
+    for field in initial_schema.fields() {
+        if !values.contains_key(field.name()) {
+            bail!("Missing field: {}", field.name());
+        }
+    }
+    let mut new_fields = vec![];
+    for (name, value) in values {
+        if initial_schema.field_with_name(name).is_ok() {
+            continue;
+        }
+        let value = value.bind(py);
+        let datatype = infer_datatype(value)
+            .with_context(|| format!("Failed to infer data type for '{name}'."))?;
+        let field = Field::new(name, datatype, false);
+        new_fields.push(field);
+    }
+    let new_schema = Schema::new(new_fields);
+    let merged = Schema::try_merge([initial_schema.clone(), new_schema])?;
+    Ok(merged)
+}
+
+fn build_list(field: &Arc<Field>, value: &Bound<'_, PyAny>) -> Result<Arc<dyn Array>> {
+    todo!();
+}
+
+fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<Arc<dyn Array>> {
+    if let Ok(PyArrowType(data)) = value.extract::<PyArrowType<ArrayData>>() {
+        ensure!(
+            data.data_type() == data_type,
+            "Different data type: schema: {data_type}, value: {}",
+            data.data_type()
+        );
+        return Ok(make_array(data));
+    }
+    match data_type {
+        DataType::Boolean => {
+            let Ok(value) = value.extract::<bool>() else {
+                bail!("Not a boolean value.")
+            };
+            let array = BooleanArray::new_scalar(value).into_inner();
+            Ok(Arc::new(array))
+        }
+        DataType::Int64 => {
+            let Ok(value) = value.extract::<i64>() else {
+                bail!("Failed to extract int64 value.")
+            };
+            let array = Int64Array::new_scalar(value).into_inner();
+            Ok(Arc::new(array))
+        }
+        DataType::Float64 => {
+            let Ok(value) = value.extract::<f64>() else {
+                bail!("Failed to extract float64 value.")
+            };
+            let array = Float64Array::new_scalar(value).into_inner();
+            Ok(Arc::new(array))
+        }
+        DataType::Utf8 => {
+            let Ok(value) = value.extract::<String>() else {
+                bail!("Failed to extract float64 value.")
+            };
+            let array = StringArray::new_scalar(value).into_inner();
+            Ok(Arc::new(array))
+        }
+        t @ DataType::Struct(fields) if *t == get_complex_type() => {
+            let Ok(value) = value.extract::<Complex64>() else {
+                bail!("Failed to extract complex value.")
+            };
+            let real = Float64Array::new_scalar(value.re).into_inner();
+            let imag = Float64Array::new_scalar(value.im).into_inner();
+            let array =
+                StructArray::new(fields.clone(), vec![Arc::new(real), Arc::new(imag)], None);
+            Ok(Arc::new(array))
+        }
+        t @ DataType::Struct(fields) => {
+            let Ok(value) = value.downcast_exact::<Trace>() else {
+                bail!("Failed to extract `Trace` value.")
+            };
+            let value = value.borrow();
+            if *t != value.data_type().0 {
+                bail!("Incompatible data type.")
+            }
+            let array = value.to_arrow_array().0;
+            Ok(make_array(array))
+        }
+        DataType::List(field) => build_list(field, value),
+        _ => {
+            bail!("Unsupported data type {data_type}, please manually construct a `pyarrow.Array`.")
+        }
+    }
+}
+
+fn build_record_batch(
+    py: Python<'_>,
+    schema: Arc<Schema>,
+    values: &HashMap<String, PyObject>,
+) -> Result<RecordBatch> {
+    ensure!(
+        schema.fields().len() == values.len(),
+        "Values not compatible with schema."
+    );
+    let mut columns = vec![];
+    for field in schema.fields() {
+        let name = field.name();
+        let Some(value) = values.get(name) else {
+            bail!("Missing value {name}")
+        };
+        columns.push(build_array(value.bind(py), field.data_type())?);
+    }
+    Ok(RecordBatch::try_new(schema, columns)?)
+}
 
 #[pymethods]
 impl DatasetWriter {
@@ -319,44 +511,99 @@ impl DatasetWriter {
     /// Parameters:
     ///     kwargs: Names and values in the row.
     #[pyo3(signature = (**kwargs))]
-    pub fn write(&self, kwargs: Option<PyObject>) {
-        todo!()
+    pub fn write(
+        &mut self,
+        py: Python<'_>,
+        kwargs: Option<HashMap<String, PyObject>>,
+    ) -> Result<()> {
+        let Some(values) = kwargs else {
+            bail!("No data to write.")
+        };
+        self.write_dict(py, values)
     }
 
     /// Write a row of values to the dataset.
     ///
     /// Parameters:
     ///     values: A dictionary of names and values in the row.
-    pub fn write_dict(&self, values: PyObject) {
-        todo!()
+    #[expect(clippy::needless_pass_by_value)]
+    pub fn write_dict(&mut self, py: Python<'_>, values: HashMap<String, PyObject>) -> Result<()> {
+        if values.is_empty() {
+            bail!("No data to write.")
+        }
+        let Some(writer) = &mut self.writer else {
+            bail!("Writer closed.");
+        };
+        if self.first_row {
+            self.schema = Arc::new(infer_schema(py, &self.schema, &values)?);
+            self.first_row = false;
+        }
+        let batch = build_record_batch(py, self.schema.clone(), &values)?;
+        writer.blocking_write(batch)?;
+        Ok(())
     }
 
-    /// Get the newly created dataset.
-    ///
-    /// Returns:
-    ///     Dataset.
+    /// Id of the dataset.
     ///
     /// Raises:
     ///     RuntimeError: Writer is not closed yet.
-    pub fn to_dataset(&self) -> Dataset {
-        todo!()
+    #[getter]
+    pub fn id(&self) -> Result<i64> {
+        self.id.ok_or_else(|| anyhow!("Writer not closed."))
     }
 
     /// Finish writing to dataset.
-    pub fn close(&self) {
-        todo!()
+    pub fn close(&mut self) -> Result<()> {
+        let writer = self.writer.take();
+        if let Some(writer) = writer {
+            let id = get_runtime().block_on(writer.finish())?;
+            self.id = Some(id);
+        }
+        Ok(())
     }
 
     /// Enter context manager.
-    pub fn __enter__(&self) -> PyObject {
-        todo!()
+    pub const fn __enter__(slf: Py<Self>) -> Py<Self> {
+        slf
     }
 
     /// Exit context manager and close the writer.
     ///
     /// Will call [`close`][fricon.DatasetWriter.close] method.
-    pub fn __exit__(&self, _exc_type: PyObject, _exc_value: PyObject, _traceback: PyObject) {
-        todo!()
+    pub fn __exit__(
+        &mut self,
+        _exc_type: PyObject,
+        _exc_value: PyObject,
+        _traceback: PyObject,
+    ) -> Result<()> {
+        self.close()
+    }
+}
+
+fn get_complex_type() -> DataType {
+    static COMPLEX: LazyLock<DataType> = LazyLock::new(|| {
+        let fields = vec![
+            Field::new("real", DataType::Float64, false),
+            Field::new("imag", DataType::Float64, false),
+        ];
+        DataType::Struct(Fields::from(fields))
+    });
+    COMPLEX.clone()
+}
+
+fn get_trace_type(item: DataType, fixed_step: bool) -> DataType {
+    let y_field = Field::new("ys", DataType::new_list(item, false), false);
+    if fixed_step {
+        let fields = vec![
+            Field::new("x0", DataType::Float64, false),
+            Field::new("dx", DataType::Float64, false),
+            y_field,
+        ];
+        DataType::Struct(Fields::from(fields))
+    } else {
+        let x_field = Field::new("xs", DataType::new_list(DataType::Float64, false), false);
+        let fields = vec![x_field, y_field];
+        DataType::Struct(Fields::from(fields))
     }
 }
 
@@ -365,20 +612,21 @@ impl DatasetWriter {
 /// Returns:
 ///     A pyarrow data type.
 #[pyfunction]
-pub fn complex128() -> PyObject {
-    todo!();
+pub fn complex128() -> PyArrowType<DataType> {
+    PyArrowType(get_complex_type())
 }
 
 /// Get a pyarrow data type representing [`Trace`][fricon.Trace].
 ///
 /// Parameters:
 ///     item: Data type of the y values.
+///     fixed_step: Whether the trace has fixed x steps.
 ///
 /// Returns:
 ///     A pyarrow data type.
 #[pyfunction]
-pub fn trace_(item: PyObject) -> PyObject {
-    todo!();
+pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<DataType> {
+    PyArrowType(get_trace_type(item.0, fixed_step))
 }
 
 #[pyfunction]

@@ -68,15 +68,16 @@ impl Workspace {
         name: String,
         description: String,
         tags: Vec<String>,
+        index: Vec<String>,
         schema: &Schema,
     ) -> Result<dataset::Writer> {
-        let index = db::DatasetIndex {
+        let db = db::DatasetIndex {
             pool: self.database.clone(),
         };
         let date = chrono::Local::now().date_naive();
         let uid = Uuid::new_v4();
         let path = DatasetPath::new(date, uid);
-        let _id = index
+        let id = db
             .create(uid, &name, &description, &path, &tags)
             .await
             .context("Failed to add dataset entry to index database.")?;
@@ -86,15 +87,12 @@ impl Workspace {
                 name,
                 description,
                 tags,
+                index,
             },
         };
-        let writer = Dataset::create(self.root.data_dir().join(&path), metadata, schema)
+        let writer = Dataset::create(self.root.data_dir().join(&path), id, metadata, schema)
             .context("Failed to create dataset.")?;
         Ok(writer)
-    }
-
-    pub async fn open_dataset(&self, uid: Uuid) -> Result<Dataset> {
-        todo!()
     }
 }
 

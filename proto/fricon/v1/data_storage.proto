@@ -16,20 +16,13 @@ service DataStorageService {
    * Requires a write token from Create in metadata 'fricon-token-bin'.
    */
   rpc Write(stream WriteRequest) returns (WriteResponse) {}
-  /*
-   * Get a dataset.
-   */
-  rpc Get(GetRequest) returns (GetResponse) {}
 }
 
 message CreateRequest {
-  Metadata metadata = 1;
-}
-
-message Metadata {
   optional string name = 1;
   optional string description = 2;
   repeated string tags = 3;
+  repeated string index = 4;
 }
 
 message CreateResponse {
@@ -41,15 +34,6 @@ message WriteRequest {
 }
 
 message WriteResponse {
-  string uid = 1;
+  int64 id = 1;
 }
 
-message GetRequest {
-  string uid = 1;
-}
-
-message GetResponse {
-  Metadata metadata = 1;
-  string path = 2;
-  google.protobuf.Timestamp created_at = 3;
-}

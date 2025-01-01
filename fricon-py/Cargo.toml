@@ -19,8 +19,9 @@ fricon = { path = ".." }
 # Error handling
 anyhow.workspace = true
 
-# Date and time
+# Useful types
 chrono.workspace = true
+num.workspace = true
 
 # Command-line argument parsing
 clap.workspace = true

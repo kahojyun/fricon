@@ -17,34 +17,14 @@ use uuid::Uuid;
 const DATASET_NAME: &str = "dataset.arrow";
 const METADATA_NAME: &str = "metadata.json";
 
-#[expect(dead_code)]
-pub fn metadata(path: &Path) -> Result<Metadata> {
-    let metadata_path = path.join(METADATA_NAME);
-    let metadata_file = File::open(&metadata_path)
-        .with_context(|| format!("Failed to open metadata file at {metadata_path:?}"))?;
-    let metadata = serde_json::from_reader(metadata_file)
-        .with_context(|| format!("Failed to deserialize metadata file at {metadata_path:?}"))?;
-    Ok(metadata)
-}
-
-#[expect(dead_code)]
-pub fn update_info(path: &Path, info: &Info) -> Result<()> {
-    let metadata_path = path.join(METADATA_NAME);
-    let metadata_file = File::create(&metadata_path).with_context(|| {
-        format!("Failed to create or update metadata file at {metadata_path:?}")
-    })?;
-    serde_json::to_writer(metadata_file, info)
-        .with_context(|| format!("Failed to serialize metadata file at {metadata_path:?}"))?;
-    Ok(())
-}
-
 pub struct Dataset {
     path: PathBuf,
+    id: i64,
     metadata: Metadata,
 }
 
 impl Dataset {
-    pub fn create(path: PathBuf, metadata: Metadata, schema: &Schema) -> Result<Writer> {
+    pub fn create(path: PathBuf, id: i64, metadata: Metadata, schema: &Schema) -> Result<Writer> {
         ensure!(
             !path.exists(),
             "Cannot create new dataset at already existing path {:?}",
@@ -58,11 +38,11 @@ impl Dataset {
         let dataset_path = path.join(DATASET_NAME);
         let dataset_file = File::create_new(&dataset_path)
             .with_context(|| format!("Failed to create new dataset file at {dataset_path:?}"))?;
-        Writer::new(dataset_file, schema, Self { path, metadata })
+        Writer::new(dataset_file, schema, Self { path, id, metadata })
     }
 
-    pub fn uid(&self) -> Uuid {
-        self.metadata.uid
+    pub fn id(&self) -> i64 {
+        self.id
     }
 }
 
@@ -94,6 +74,7 @@ pub struct Info {
     pub name: String,
     pub description: String,
     pub tags: Vec<String>,
+    pub index: Vec<String>,
 }
 
 pub struct Writer {

@@ -12,8 +12,8 @@ use uuid::Uuid;
 
 use crate::{
     proto::{
-        data_storage_service_server::DataStorageService, CreateRequest, CreateResponse, GetRequest,
-        GetResponse, WriteRequest, WriteResponse, WRITE_TOKEN,
+        data_storage_service_server::DataStorageService, CreateRequest, CreateResponse,
+        WriteRequest, WriteResponse, WRITE_TOKEN,
     },
     workspace::Workspace,
 };
@@ -30,6 +30,7 @@ struct Metadata {
     name: String,
     description: Option<String>,
     tags: Vec<String>,
+    index: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -62,15 +63,13 @@ impl DataStorageService for Storage {
     async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
         let msg = request.into_inner();
-        let metadata = msg
-            .metadata
-            .ok_or_else(|| Status::invalid_argument("metadata is required"))?;
         let metadata = Metadata {
-            name: metadata
+            name: msg
                 .name
                 .ok_or_else(|| Status::invalid_argument("name is required"))?,
-            description: metadata.description,
-            tags: metadata.tags,
+            description: msg.description,
+            tags: msg.tags,
+            index: msg.index,
         };
         let uuid = Uuid::new_v4();
         trace!("generated uuid: {:?}", uuid);
@@ -98,6 +97,7 @@ impl DataStorageService for Storage {
         let name = metadata.name;
         let description = metadata.description.unwrap_or_default();
         let tags = metadata.tags;
+        let index = metadata.index;
         let in_stream = request.into_inner();
         let workspace = self.workspace.clone();
         // TODO: Check error handling
@@ -118,6 +118,7 @@ impl DataStorageService for Storage {
                 name,
                 description,
                 tags,
+                index,
                 &batch.schema(),
             ))?;
             writer.write(batch)?;
@@ -146,39 +147,7 @@ impl DataStorageService for Storage {
                 error!("write failed: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        let uid = dataset.uid().to_string();
-        Ok(Response::new(WriteResponse { uid }))
-    }
-
-    async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>> {
-        let uid = request.into_inner().uid;
-        let uid = Uuid::parse_str(&uid).map_err(|_| Status::invalid_argument("invalid uid"))?;
-        let dataset = self.workspace.open_dataset(uid).await.map_err(|e| {
-            error!("get failed: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
-        todo!();
-        // let dataset_record = fetch_by_uid(uid, &self.pool).await.map_err(|e| match e {
-        //     db::Error::NotFound => Status::not_found("dataset not found"),
-        //     db::Error::Other(e) => {
-        //         error!("get failed: {:?}", e);
-        //         Status::internal(e.to_string())
-        //     }
-        // })?;
-        // let metadata = proto::Metadata {
-        //     name: Some(dataset_record.name),
-        //     description: Some(dataset_record.description),
-        //     tags: dataset_record.tags,
-        // };
-        // let created_at = prost_types::Timestamp {
-        //     seconds: dataset_record.created_at.and_utc().timestamp(),
-        //     nanos: 0,
-        // };
-        // let response = GetResponse {
-        //     metadata: Some(metadata),
-        //     created_at: Some(created_at),
-        //     path: dataset_record.path,
-        // };
-        // Ok(Response::new(response))
+        let id = dataset.id();
+        Ok(Response::new(WriteResponse { id }))
     }
 }
