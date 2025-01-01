@@ -1,6 +1,8 @@
 mod fricon;
 mod storage;
 
+use std::path::Path;
+
 use anyhow::Result;
 use tokio::signal;
 use tokio_util::task::TaskTracker;
@@ -8,6 +10,7 @@ use tonic::transport::Server;
 use tracing::info;
 
 use crate::{
+    ipc::IpcConnect,
     proto::{
         data_storage_service_server::DataStorageServiceServer,
         fricon_service_server::FriconServiceServer,
@@ -17,24 +20,24 @@ use crate::{
 
 use self::{fricon::Fricon, storage::Storage};
 
-pub async fn run(path: std::path::PathBuf) -> Result<()> {
+pub async fn run(path: &Path) -> Result<()> {
     let workspace = workspace::Workspace::open(path).await?;
-    let port = workspace.config().port();
+    let ipc_file = workspace.root().ipc_file();
     let tracker = TaskTracker::new();
     let storage = Storage::new(workspace, tracker.clone());
-    let service = DataStorageServiceServer::new(storage).max_decoding_message_size(usize::MAX);
-    let addr = format!("[::1]:{port}").parse()?;
-    info!("Listen on {}", addr);
+    let service = DataStorageServiceServer::new(storage);
+    let listener = ipc_file.listen().await?;
     Server::builder()
         .add_service(service)
         .add_service(FriconServiceServer::new(Fricon))
-        .serve_with_shutdown(addr, async {
+        .serve_with_incoming_shutdown(listener, async {
             signal::ctrl_c()
                 .await
                 .expect("Failed to install ctrl-c handler.");
         })
         .await?;
     info!("Shutdown");
+    ipc_file.cleanup();
     tracker.close();
     tracker.wait().await;
     Ok(())

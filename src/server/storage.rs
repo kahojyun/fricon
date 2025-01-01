@@ -1,10 +1,11 @@
-use std::{collections::HashMap, io::Cursor, sync::Mutex};
+use std::{collections::HashMap, sync::Mutex};
 
 use anyhow::bail;
-use arrow::{array::RecordBatch, ipc::reader::StreamReader};
+use arrow::ipc::reader::StreamReader;
+use bytes::Bytes;
 use futures::prelude::*;
-use tokio::{runtime::Handle, sync::mpsc};
-use tokio_util::task::TaskTracker;
+use tokio::runtime::Handle;
+use tokio_util::{io::SyncIoBridge, task::TaskTracker};
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
 use uuid::Uuid;
@@ -12,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     proto::{
         data_storage_service_server::DataStorageService, CreateRequest, CreateResponse, GetRequest,
-        GetResponse, WriteRequest, WriteResponse,
+        GetResponse, WriteRequest, WriteResponse, WRITE_TOKEN,
     },
     workspace::Workspace,
 };
@@ -74,7 +75,7 @@ impl DataStorageService for Storage {
         let uuid = Uuid::new_v4();
         trace!("generated uuid: {:?}", uuid);
         self.creating.insert(uuid, metadata);
-        let write_token = uuid.into();
+        let write_token = Bytes::copy_from_slice(uuid.as_bytes());
         Ok(Response::new(CreateResponse { write_token }))
     }
 
@@ -84,7 +85,7 @@ impl DataStorageService for Storage {
     ) -> Result<Response<WriteResponse>> {
         let token = request
             .metadata()
-            .get_bin("fricon-token-bin")
+            .get_bin(WRITE_TOKEN)
             .ok_or_else(|| Status::unauthenticated("write token is required"))?
             .to_bytes()
             .map_err(|_| Status::invalid_argument("invalid write token"))?;
@@ -98,10 +99,18 @@ impl DataStorageService for Storage {
         let description = metadata.description.unwrap_or_default();
         let tags = metadata.tags;
         let in_stream = request.into_inner();
-        let (tx, mut rx) = mpsc::channel::<RecordBatch>(128);
         let workspace = self.workspace.clone();
+        // TODO: Check error handling
         let writer_task = self.tracker.spawn_blocking(move || {
-            let Some(batch) = rx.blocking_recv() else {
+            let bytes_stream = in_stream
+                .map_ok(|WriteRequest { chunk }| chunk)
+                .map_err(|e| {
+                    error!("Client connection error: {:?}", e);
+                    std::io::Error::new(std::io::ErrorKind::Other, e)
+                });
+            let reader = SyncIoBridge::new(tokio_util::io::StreamReader::new(bytes_stream));
+            let mut reader = StreamReader::try_new(reader, None)?;
+            let Some(batch) = reader.next().transpose()? else {
                 bail!("No data received.");
             };
             let handle = Handle::current();
@@ -112,36 +121,25 @@ impl DataStorageService for Storage {
                 &batch.schema(),
             ))?;
             writer.write(batch)?;
-            while let Some(batch) = rx.blocking_recv() {
+            for batch in reader {
+                let batch = match batch {
+                    Ok(batch) => batch,
+                    Err(e) => {
+                        error!("Failed to read ipc stream from client: {:?}", e);
+                        if let Err(e) = writer.finish() {
+                            error!("Failed to finish writing ipc file: {:?}", e);
+                        }
+                        return Err(e.into());
+                    }
+                };
                 writer.write(batch)?;
             }
             writer.finish()
         });
-        in_stream
-            .map_ok(|WriteRequest { record_batch }| {
-                let reader = StreamReader::try_new(Cursor::new(record_batch), None).unwrap();
-                stream::iter(reader).map_err(|e| {
-                    error!("Failed to decode data: {:?}", e);
-                    Status::internal(e.to_string())
-                })
-            })
-            .map_err(|e| {
-                error!("Client connection error: {:?}", e);
-                Status::internal(e.to_string())
-            })
-            .try_flatten()
-            .try_for_each(|b| async {
-                tx.send(b).await.map_err(|_| {
-                    error!("Writer closed.");
-                    Status::internal("Writer closed.")
-                })
-            })
-            .await?;
-        drop(tx);
         let dataset = writer_task
             .await
             .map_err(|e| {
-                error!("write failed: {:?}", e);
+                error!("writer task panicked: {:?}", e);
                 Status::internal(e.to_string())
             })?
             .map_err(|e| {

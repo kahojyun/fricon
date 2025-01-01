@@ -37,7 +37,7 @@ message CreateResponse {
 }
 
 message WriteRequest {
-  bytes record_batch = 1;
+  bytes chunk = 1;
 }
 
 message WriteResponse {

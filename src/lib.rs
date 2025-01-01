@@ -1,9 +1,10 @@
 pub mod cli;
-mod client;
+pub mod client;
 mod config;
 mod dataset;
 mod db;
-mod paths;
+mod ipc;
+pub mod paths;
 pub mod proto;
 mod server;
 mod workspace;
@@ -17,7 +18,7 @@ use self::{
 };
 
 /// Version of fricon crate.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Main entry point for the application
 ///
@@ -28,10 +29,10 @@ pub async fn main(cli: Cli) -> Result<()> {
     tracing_subscriber::fmt::init();
     match cli.command {
         Commands::Init { path } => {
-            Workspace::init(path).await?;
+            Workspace::init(&path).await?;
         }
         Commands::Serve { path } => {
-            run(path).await?;
+            run(&path).await?;
         }
     }
     Ok(())

@@ -6,6 +6,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     for p in fs::read_dir("proto/fricon/v1")? {
         protos.push(p?.path());
     }
-    tonic_build::configure().compile_protos(&protos, &["proto"])?;
+    tonic_build::configure()
+        .bytes(["."])
+        .compile_protos(&protos, &["proto"])?;
     Ok(())
 }

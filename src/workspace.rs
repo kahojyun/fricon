@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use anyhow::{ensure, Context, Result};
 use arrow::datatypes::Schema;
@@ -26,8 +23,8 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub async fn open(path: PathBuf) -> Result<Self> {
-        let root = WorkDirectory(path);
+    pub async fn open(path: &Path) -> Result<Self> {
+        let root = WorkDirectory::new(path)?;
         check_version_file(&root.version_file())?;
         let config = load_config(&root.config_file())?;
         let database = db::connect(&root.database_file()).await?;
@@ -50,10 +47,10 @@ impl Workspace {
         &self.database
     }
 
-    pub async fn init(path: PathBuf) -> Result<Self> {
+    pub async fn init(path: &Path) -> Result<Self> {
         info!("Initalize workspace: {:?}", path);
-        create_empty_dir(&path)?;
-        let root = WorkDirectory(path);
+        create_empty_dir(path)?;
+        let root = WorkDirectory::new(path)?;
         let config = Config::default();
         init_config(&root.config_file(), &config)?;
         let database = db::init(&root.database_file()).await?;

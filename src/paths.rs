@@ -1,6 +1,7 @@
 //! Manage storage of fricon data.
-use std::path::{Path, PathBuf};
+use std::path::{self, Path, PathBuf};
 
+use anyhow::Result;
 use chrono::NaiveDate;
 use uuid::Uuid;
 
@@ -8,9 +9,13 @@ use uuid::Uuid;
 ///
 /// Provide methods to construct paths to various components of the workspace.
 #[derive(Debug, Clone)]
-pub struct WorkDirectory(pub PathBuf);
+pub struct WorkDirectory(PathBuf);
 
 impl WorkDirectory {
+    pub fn new(path: &Path) -> Result<Self> {
+        let path = path::absolute(path)?;
+        Ok(Self(path))
+    }
     pub fn data_dir(&self) -> DataDirectory {
         DataDirectory(self.0.join("data"))
     }
@@ -21,6 +26,10 @@ impl WorkDirectory {
 
     pub fn backup_dir(&self) -> BackupDirectory {
         BackupDirectory(self.0.join("backup"))
+    }
+
+    pub fn ipc_file(&self) -> IpcFile {
+        IpcFile(self.0.join("fricon.socket"))
     }
 
     pub fn config_file(&self) -> ConfigFile {
@@ -39,6 +48,8 @@ impl WorkDirectory {
 pub struct DataDirectory(pub PathBuf);
 pub struct LogDirectory(pub PathBuf);
 pub struct BackupDirectory(pub PathBuf);
+#[derive(Debug, Clone)]
+pub struct IpcFile(pub PathBuf);
 pub struct ConfigFile(pub PathBuf);
 pub struct DatabaseFile(pub PathBuf);
 pub struct VersionFile(pub PathBuf);

@@ -28,6 +28,7 @@ arrow = "53.3.0"
 chrono = "0.4.39"
 uuid = { version = "1.11.0", features = ["v4", "fast-rng", "serde"] }
 semver = "1.0.24"
+bytes = "1.9.0"
 
 # Command-line argument parsing
 clap = { version = "4.5.23", features = ["derive"] }
@@ -54,6 +55,7 @@ tokio = { version = "1.42.0", features = ["full"] }
 tokio-util = { version = "0.7.13", features = ["full"] }
 tokio-stream = "0.1.17"
 futures = "0.3.31"
+async-stream = "0.3.6"
 
 # Logging
 tracing = "0.1.41"
@@ -64,6 +66,8 @@ prost = "0.13.4"
 prost-types = "0.13.4"
 tonic = "0.12.3"
 tonic-build = "0.12.3"
+tower = "0.5.2"
+hyper-util = "0.1.10"
 
 # Python bindings
 pyo3 = { version = "0.22.6", features = ["anyhow", "chrono"] }
@@ -88,6 +92,7 @@ thiserror.workspace = true
 chrono.workspace = true
 semver.workspace = true
 uuid.workspace = true
+bytes.workspace = true
 
 # Command-line argument parsing
 clap.workspace = true
@@ -104,6 +109,7 @@ sqlx.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 futures.workspace = true
+async-stream.workspace = true
 
 # gRPC
 prost.workspace = true
@@ -113,6 +119,9 @@ tonic.workspace = true
 # Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true
+tower.workspace = true
+hyper-util.workspace = true
+tokio-stream.workspace = true
 
 [build-dependencies]
 tonic-build.workspace = true
