@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter};
 use bytes::Bytes;
 use futures::prelude::*;
@@ -9,11 +9,10 @@ use tokio_util::io::{ReaderStream, SyncIoBridge};
 use tonic::{metadata::MetadataValue, transport::Channel, Request};
 use tower::service_fn;
 use tracing::error;
-use uuid::Uuid;
 
 use crate::{
     dataset::Dataset,
-    ipc::IpcConnect,
+    ipc::Ipc,
     paths::IpcFile,
     proto::{
         data_storage_service_client::DataStorageServiceClient,
@@ -29,12 +28,19 @@ pub struct Client {
 }
 
 impl Client {
+    /// # Errors
+    ///
+    /// 1. Cannot connect to the IPC socket.
+    /// 2. Server version mismatch.
     pub async fn connect(path: IpcFile) -> Result<Self> {
         let channel = connect_ipc_channel(path).await?;
         check_server_version(channel.clone()).await?;
         Ok(Self { channel })
     }
 
+    /// # Errors
+    ///
+    /// Server Errors
     pub async fn create_dataset(
         &self,
         name: String,
@@ -50,7 +56,10 @@ impl Client {
         };
         let mut client = DataStorageServiceClient::new(self.channel.clone());
         let response = client.create(request).await?;
-        let write_token = response.into_inner().write_token;
+        let write_token = response
+            .into_inner()
+            .write_token
+            .ok_or_else(|| anyhow!("No write token returned."))?;
         Ok(DatasetWriter::new(client, write_token))
     }
 
@@ -65,14 +74,15 @@ impl Client {
 
 pub struct DatasetWriter {
     tx: mpsc::Sender<RecordBatch>,
-    handle: JoinHandle<Result<WriteResponse>>,
+    writer_handle: Option<JoinHandle<Result<()>>>,
+    connection_handle: JoinHandle<Result<WriteResponse>>,
 }
 
 impl DatasetWriter {
     fn new(mut client: DataStorageServiceClient<Channel>, token: Bytes) -> Self {
         let (tx, mut rx) = mpsc::channel::<RecordBatch>(16);
         let (dtx, drx) = io::duplex(1024 * 1024);
-        tokio::task::spawn_blocking(move || {
+        let writer_handle = tokio::task::spawn_blocking(move || {
             let Some(batch) = rx.blocking_recv() else {
                 bail!("No record batch received.")
             };
@@ -85,7 +95,7 @@ impl DatasetWriter {
             writer.finish()?;
             Ok(())
         });
-        let handle = tokio::spawn(async move {
+        let connection_handle = tokio::spawn(async move {
             let request_stream = ReaderStream::new(drx).map(|chunk| {
                 let chunk = match chunk {
                     Ok(chunk) => chunk,
@@ -94,7 +104,7 @@ impl DatasetWriter {
                         Bytes::new()
                     }
                 };
-                WriteRequest { chunk }
+                WriteRequest { chunk: Some(chunk) }
             });
             let mut request = Request::new(request_stream);
             request
@@ -103,17 +113,44 @@ impl DatasetWriter {
             let response = client.write(request).await?;
             Ok(response.into_inner())
         });
-        Self { tx, handle }
+        Self {
+            tx,
+            writer_handle: Some(writer_handle),
+            connection_handle,
+        }
     }
 
-    pub fn blocking_write(&self, data: RecordBatch) -> Result<()> {
-        self.tx.blocking_send(data)?;
-        Ok(())
+    /// # Errors
+    ///
+    /// Writer failed because:
+    ///
+    /// 1. Record batch schema mismatch.
+    /// 2. Connection error.
+    pub async fn write(&mut self, data: RecordBatch) -> Result<()> {
+        if self.tx.send(data).await == Ok(()) {
+            Ok(())
+        } else {
+            let Some(writer_handle) = self.writer_handle.take() else {
+                bail!("Writer already finished.");
+            };
+            let writer_result = writer_handle.await.context("Writer panicked.")?;
+            writer_result.context("Writer failed.")
+        }
     }
 
+    /// # Errors
+    ///
+    /// Writer failed because:
+    ///
+    /// 1. Record batch schema mismatch.
+    /// 2. Connection error.
     pub async fn finish(self) -> Result<i64> {
-        let response = self.handle.await??;
-        Ok(response.id)
+        let id = self
+            .connection_handle
+            .await??
+            .id
+            .ok_or_else(|| anyhow!("No dataset id returned."))?;
+        Ok(id)
     }
 }
 

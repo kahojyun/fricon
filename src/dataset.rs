@@ -5,26 +5,27 @@
 use std::{
     fs::{self, File},
     io::BufWriter,
-    path::{Path, PathBuf},
 };
 
 use anyhow::{ensure, Context, Result};
 use arrow::{array::RecordBatch, datatypes::Schema, ipc::writer::FileWriter};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 use tracing::info;
 use uuid::Uuid;
 
+use crate::{paths::DatasetPath, workspace::Workspace};
+
 const DATASET_NAME: &str = "dataset.arrow";
-const METADATA_NAME: &str = "metadata.json";
 
 pub struct Dataset {
-    path: PathBuf,
+    workspace: Workspace,
     id: i64,
-    metadata: Metadata,
+    info: Info,
 }
 
 impl Dataset {
-    pub fn create(path: PathBuf, id: i64, metadata: Metadata, schema: &Schema) -> Result<Writer> {
+    pub fn create(workspace: Workspace, id: i64, info: Info, schema: &Schema) -> Result<Writer> {
+        let path = workspace.root().data_dir().join(&info.path);
         ensure!(
             !path.exists(),
             "Cannot create new dataset at already existing path {:?}",
@@ -33,48 +34,35 @@ impl Dataset {
         info!("Create dataset at {:?}", path);
         fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create dataset at {path:?}"))?;
-        let metadata_path = path.join(METADATA_NAME);
-        metadata.write_to(&metadata_path)?;
         let dataset_path = path.join(DATASET_NAME);
         let dataset_file = File::create_new(&dataset_path)
             .with_context(|| format!("Failed to create new dataset file at {dataset_path:?}"))?;
-        Writer::new(dataset_file, schema, Self { path, id, metadata })
+        Writer::new(
+            dataset_file,
+            schema,
+            Self {
+                workspace,
+                id,
+                info,
+            },
+        )
     }
 
-    pub fn id(&self) -> i64 {
+    pub const fn id(&self) -> i64 {
         self.id
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Metadata {
-    pub uid: Uuid,
-    pub info: Info,
-}
-
-impl Metadata {
-    fn write_to(&self, path: &Path) -> Result<()> {
-        let metadata_file = File::create(path)
-            .with_context(|| format!("Failed to create metadata file at {path:?}"))?;
-        serde_json::to_writer(metadata_file, self)
-            .with_context(|| format!("Failed to serialize metadata file at {path:?}"))
-    }
-
-    #[expect(dead_code)]
-    fn read_from(path: &Path) -> Result<Self> {
-        let metadata_file = File::open(path)
-            .with_context(|| format!("Failed to open metadata file at {path:?}"))?;
-        serde_json::from_reader(metadata_file)
-            .with_context(|| format!("Failed to deserialize metadata file at {path:?}"))
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Info {
+    pub uid: Uuid,
     pub name: String,
     pub description: String,
+    pub favorite: bool,
+    pub index_columns: Vec<String>,
+    pub path: DatasetPath,
+    pub created_at: DateTime<Utc>,
     pub tags: Vec<String>,
-    pub index: Vec<String>,
 }
 
 pub struct Writer {

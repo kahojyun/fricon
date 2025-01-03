@@ -2,23 +2,22 @@ use std::{fs, path::Path};
 
 use anyhow::{ensure, Context, Result};
 use arrow::datatypes::Schema;
+use chrono::Utc;
 use semver::{Version, VersionReq};
 use sqlx::SqlitePool;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    config::Config,
     dataset::{self, Dataset},
     db,
-    paths::{ConfigFile, DatasetPath, VersionFile, WorkDirectory},
+    paths::{DatasetPath, VersionFile, WorkDirectory},
     VERSION,
 };
 
 #[derive(Debug, Clone)]
 pub struct Workspace {
     root: WorkDirectory,
-    config: Config,
     database: SqlitePool,
 }
 
@@ -26,41 +25,32 @@ impl Workspace {
     pub async fn open(path: &Path) -> Result<Self> {
         let root = WorkDirectory::new(path)?;
         check_version_file(&root.version_file())?;
-        let config = load_config(&root.config_file())?;
         let database = db::connect(&root.database_file()).await?;
-        Ok(Self {
-            root,
-            config,
-            database,
-        })
+        Ok(Self { root, database })
     }
 
     pub const fn root(&self) -> &WorkDirectory {
         &self.root
     }
 
-    pub const fn config(&self) -> &Config {
-        &self.config
-    }
-
     pub const fn database(&self) -> &SqlitePool {
         &self.database
+    }
+
+    pub fn dataset_index(&self) -> db::DatasetIndex {
+        db::DatasetIndex {
+            pool: self.database.clone(),
+        }
     }
 
     pub async fn init(path: &Path) -> Result<Self> {
         info!("Initalize workspace: {:?}", path);
         create_empty_dir(path)?;
         let root = WorkDirectory::new(path)?;
-        let config = Config::default();
-        init_config(&root.config_file(), &config)?;
         let database = db::init(&root.database_file()).await?;
         init_dir(&root)?;
         write_version_file(&root.version_file())?;
-        Ok(Self {
-            root,
-            config,
-            database,
-        })
+        Ok(Self { root, database })
     }
 
     pub async fn create_dataset(
@@ -68,30 +58,30 @@ impl Workspace {
         name: String,
         description: String,
         tags: Vec<String>,
-        index: Vec<String>,
+        index_columns: Vec<String>,
         schema: &Schema,
     ) -> Result<dataset::Writer> {
-        let db = db::DatasetIndex {
-            pool: self.database.clone(),
-        };
-        let date = chrono::Local::now().date_naive();
+        let created_at = Utc::now();
+        let date = created_at.naive_local().date();
         let uid = Uuid::new_v4();
         let path = DatasetPath::new(date, uid);
-        let id = db
-            .create(uid, &name, &description, &path, &tags)
+        let info = dataset::Info {
+            uid,
+            name,
+            description,
+            favorite: false,
+            index_columns,
+            path,
+            created_at,
+            tags,
+        };
+        let id = self
+            .dataset_index()
+            .create(&info)
             .await
             .context("Failed to add dataset entry to index database.")?;
-        let metadata = dataset::Metadata {
-            uid,
-            info: dataset::Info {
-                name,
-                description,
-                tags,
-                index,
-            },
-        };
-        let writer = Dataset::create(self.root.data_dir().join(&path), id, metadata, schema)
-            .context("Failed to create dataset.")?;
+        let writer =
+            Dataset::create(self.clone(), id, info, schema).context("Failed to create dataset.")?;
         Ok(writer)
     }
 }
@@ -108,14 +98,6 @@ fn create_empty_dir(path: &Path) -> Result<()> {
         "Directory is not empty: {:?}",
         path
     );
-    Ok(())
-}
-
-fn init_config(path: &ConfigFile, config: &Config) -> Result<()> {
-    let path = &path.0;
-    let config_str = config.to_toml();
-    info!("Initialize configuration at {}", path.display());
-    fs::write(path, config_str).context("Failed to write configuration.")?;
     Ok(())
 }
 
@@ -146,10 +128,4 @@ fn check_version_file(path: &VersionFile) -> Result<()> {
         workspace_version
     );
     Ok(())
-}
-
-fn load_config(path: &ConfigFile) -> Result<Config> {
-    let path = &path.0;
-    let config_str = fs::read_to_string(path).context("Failed to read configuration.")?;
-    Config::from_toml(&config_str).context("Failed to parse configuration.")
 }

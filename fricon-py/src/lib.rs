@@ -7,7 +7,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock, OnceLock},
+    sync::{Arc, LazyLock},
 };
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
@@ -29,7 +29,7 @@ use fricon::{
 use num::complex::Complex64;
 use pyo3::{
     prelude::*,
-    types::{PyBool, PyComplex, PyDict, PyFloat, PyInt, PyString},
+    types::{PyBool, PyComplex, PyFloat, PyInt, PyString},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
 
@@ -384,7 +384,8 @@ fn infer_datatype(value: &Bound<'_, PyAny>) -> Result<DataType> {
     } else if let Ok(trace) = value.downcast_exact::<Trace>() {
         Ok(trace.borrow().data_type().0)
     } else {
-        bail!("Unsupported data type.");
+        let py_type = value.get_type();
+        bail!("Cannot infer arrow data type for python type '{py_type}'.");
     }
 }
 
@@ -395,7 +396,10 @@ fn infer_schema(
 ) -> Result<Schema> {
     for field in initial_schema.fields() {
         if !values.contains_key(field.name()) {
-            bail!("Missing field: {}", field.name());
+            bail!(
+                "Field '{}' present in initial schema but not in values.",
+                field.name()
+            );
         }
     }
     let mut new_fields = vec![];
@@ -405,7 +409,7 @@ fn infer_schema(
         }
         let value = value.bind(py);
         let datatype = infer_datatype(value)
-            .with_context(|| format!("Failed to infer data type for '{name}'."))?;
+            .with_context(|| format!("Inferring data type for column '{name}'."))?;
         let field = Field::new(name, datatype, false);
         new_fields.push(field);
     }
@@ -539,7 +543,7 @@ impl DatasetWriter {
             self.first_row = false;
         }
         let batch = build_record_batch(py, self.schema.clone(), &values)?;
-        writer.blocking_write(batch)?;
+        get_runtime().block_on(writer.write(batch))?;
         Ok(())
     }
 

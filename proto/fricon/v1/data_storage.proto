@@ -4,18 +4,16 @@ package fricon.v1;
 
 import "google/protobuf/timestamp.proto";
 
-/*
- * Manage datasets.
- */
+// Manage datasets.
 service DataStorageService {
-  /*
-   * Create a new dataset.
-   */
+  // Create a new dataset.
   rpc Create(CreateRequest) returns (CreateResponse) {}
-  /*
-   * Requires a write token from Create in metadata 'fricon-token-bin'.
-   */
+  // Requires a write token from Create in metadata 'fricon-token-bin'.
   rpc Write(stream WriteRequest) returns (WriteResponse) {}
+  // List datasets in the workspace.
+  rpc List(ListRequest) returns (ListResponse) {}
+  // Get a dataset in the workspace.
+  rpc Get(GetRequest) returns (GetResponse) {}
 }
 
 message CreateRequest {
@@ -26,14 +24,40 @@ message CreateRequest {
 }
 
 message CreateResponse {
-  bytes write_token = 1;
+  optional bytes write_token = 1;
 }
 
 message WriteRequest {
-  bytes chunk = 1;
+  optional bytes chunk = 1;
 }
 
 message WriteResponse {
-  int64 id = 1;
+  optional int64 id = 1;
 }
 
+message ListRequest {}
+
+message ListResponse {
+  repeated Dataset datasets = 1;
+}
+
+message GetRequest {
+  oneof id_enum {
+    int64 id = 1;
+    string uid = 2;
+  }
+}
+
+message GetResponse {
+  optional Dataset dataset = 1;
+}
+
+message Dataset {
+  optional int64 id = 1;
+  optional string uid = 2;
+  optional string name = 3;
+  optional string description = 4;
+  repeated string tags = 5;
+  repeated string index = 6;
+  optional google.protobuf.Timestamp created_at = 7;
+}

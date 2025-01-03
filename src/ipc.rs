@@ -5,7 +5,7 @@ mod win;
 
 use anyhow::Result;
 
-pub trait IpcConnect {
+pub trait Ipc {
     type ClientStream;
     type ListenerStream;
 

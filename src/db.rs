@@ -1,15 +1,16 @@
 use anyhow::{ensure, Context};
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use sqlx::{
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+    types::Json,
     SqliteConnection, SqlitePool,
 };
 use thiserror::Error;
 use tracing::info;
-use uuid::Uuid;
+use uuid::fmt::Simple;
 
-use crate::paths::{DatabaseFile, DatasetPath};
+use crate::{dataset, paths::DatabaseFile};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -52,33 +53,15 @@ pub async fn init(path: &DatabaseFile) -> anyhow::Result<SqlitePool> {
     Ok(pool)
 }
 
-#[derive(Debug)]
-pub struct DatasetRecord {
-    pub name: String,
-    pub description: String,
-    pub path: String,
-    pub tags: Vec<String>,
-    pub created_at: NaiveDateTime,
-}
-
 pub struct DatasetIndex {
     pub pool: SqlitePool,
 }
 
 impl DatasetIndex {
-    pub async fn create(
-        &self,
-        uid: Uuid,
-        name: &str,
-        description: &str,
-        path: &DatasetPath,
-        tags: &[String],
-    ) -> Result<i64> {
+    pub async fn create(&self, info: &dataset::Info) -> Result<i64> {
         let mut tx = self.pool.begin().await?;
-        let dataset_id = tx
-            .insert_dataset(uid, name, description, path.as_str())
-            .await?;
-        for tag in tags {
+        let dataset_id = tx.insert_dataset(info).await?;
+        for tag in &info.tags {
             let tag_id = tx.get_or_insert_tag(tag).await?;
             tx.add_tag_to_dataset(dataset_id, tag_id).await?;
         }
@@ -86,7 +69,7 @@ impl DatasetIndex {
         Ok(dataset_id)
     }
 
-    pub async fn fetch_by_uid(&self, uid: Uuid) -> Result<DatasetRecord> {
+    pub async fn fetch_by_uid(&self, uid: Simple) -> Result<dataset::Info> {
         let mut tx = self.pool.begin().await?;
         let id = tx.find_dataset_by_uid(uid).await?;
         tx.fetch_dataset_by_id(id).await
@@ -95,16 +78,10 @@ impl DatasetIndex {
 
 trait StorageDbExt {
     async fn get_or_insert_tag(&mut self, tag: &str) -> Result<i64>;
-    async fn insert_dataset(
-        &mut self,
-        uid: Uuid,
-        name: &str,
-        description: &str,
-        path: &str,
-    ) -> Result<i64>;
-    async fn find_dataset_by_uid(&mut self, uid: Uuid) -> Result<i64>;
+    async fn insert_dataset(&mut self, info: &dataset::Info) -> Result<i64>;
+    async fn find_dataset_by_uid(&mut self, uid: Simple) -> Result<i64>;
     async fn add_tag_to_dataset(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
-    async fn fetch_dataset_by_id(&mut self, id: i64) -> Result<DatasetRecord>;
+    async fn fetch_dataset_by_id(&mut self, id: i64) -> Result<dataset::Info>;
 }
 
 impl StorageDbExt for SqliteConnection {
@@ -122,19 +99,25 @@ impl StorageDbExt for SqliteConnection {
         Ok(tag_id)
     }
 
-    async fn insert_dataset(
-        &mut self,
-        uid: Uuid,
-        name: &str,
-        description: &str,
-        path: &str,
-    ) -> Result<i64> {
+    async fn insert_dataset(&mut self, info: &dataset::Info) -> Result<i64> {
+        let index_columns = Json(&info.index_columns);
+        let uid = info.uid.simple();
+        let path = &info.path.0;
         let id = sqlx::query!(
-            "INSERT INTO datasets (uid, name, description, path) VALUES (?, ?, ?, ?) RETURNING id",
+            r#"
+            INSERT INTO datasets
+            (uid, name, description, favorite, index_columns, path, created_at)
+            VALUES
+            (?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+            "#,
             uid,
-            name,
-            description,
-            path
+            info.name,
+            info.description,
+            info.favorite,
+            index_columns,
+            path,
+            info.created_at,
         )
         .fetch_one(&mut *self)
         .await?
@@ -153,7 +136,7 @@ impl StorageDbExt for SqliteConnection {
         Ok(())
     }
 
-    async fn find_dataset_by_uid(&mut self, uid: Uuid) -> Result<i64> {
+    async fn find_dataset_by_uid(&mut self, uid: Simple) -> Result<i64> {
         sqlx::query!("SELECT id FROM datasets WHERE uid = ?", uid)
             .fetch_optional(&mut *self)
             .await?
@@ -161,38 +144,47 @@ impl StorageDbExt for SqliteConnection {
             .ok_or(Error::NotFound)
     }
 
-    async fn fetch_dataset_by_id(&mut self, id: i64) -> Result<DatasetRecord> {
-        let res = sqlx::query!(
+    async fn fetch_dataset_by_id(&mut self, id: i64) -> Result<dataset::Info> {
+        #[derive(Debug)]
+        pub struct DatasetRow {
+            pub uid: Simple,
+            pub name: String,
+            pub description: String,
+            pub favorite: bool,
+            pub index_columns: Json<Vec<String>>,
+            pub path: String,
+            pub created_at: DateTime<Utc>,
+        }
+        let res = sqlx::query_as!(
+            DatasetRow,
             r#"
             SELECT
-            name, description, path, created_at
-            FROM
-            datasets
-            WHERE
-            id = ?
+            uid as "uid: _", name, description, favorite, index_columns as "index_columns: _",
+            path, created_at as "created_at: _"
+            FROM datasets WHERE id = ?
             "#,
             id
         )
-        .fetch_one(&mut *self)
-        .await?;
+        .fetch_optional(&mut *self)
+        .await?
+        .ok_or(Error::NotFound)?;
         let tags = sqlx::query_scalar!(
             r#"
-            SELECT
-            t.name
-            FROM
-            tags t
+            SELECT t.name FROM tags t
             JOIN dataset_tag dt ON t.id = dt.tag_id
-            WHERE
-            dt.dataset_id = ?
+            WHERE dt.dataset_id = ?
             "#,
             id
         )
         .fetch_all(&mut *self)
         .await?;
-        Ok(DatasetRecord {
+        Ok(dataset::Info {
+            uid: res.uid.into_uuid(),
             name: res.name,
             description: res.description,
-            path: res.path,
+            favorite: res.favorite,
+            index_columns: res.index_columns.0,
+            path: res.path.into(),
             tags,
             created_at: res.created_at,
         })

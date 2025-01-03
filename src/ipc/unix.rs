@@ -7,9 +7,9 @@ use tracing::debug;
 
 use crate::paths::IpcFile;
 
-use super::IpcConnect;
+use super::Ipc;
 
-impl IpcConnect for &IpcFile {
+impl Ipc for &IpcFile {
     type ClientStream = UnixStream;
     type ListenerStream = UnixListenerStream;
 

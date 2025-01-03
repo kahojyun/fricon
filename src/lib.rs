@@ -1,6 +1,5 @@
 pub mod cli;
 pub mod client;
-mod config;
 mod dataset;
 mod db;
 mod ipc;

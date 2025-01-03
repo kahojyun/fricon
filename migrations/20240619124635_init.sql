@@ -1,10 +1,12 @@
 CREATE TABLE datasets (
     id INTEGER NOT NULL PRIMARY KEY,
-    uid BLOB NOT NULL UNIQUE,
+    uid TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    path TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    description TEXT NOT NULL,
+    favorite BOOLEAN NOT NULL,
+    index_columns TEXT NOT NULL, -- JSON: Vec<String>
+    path TEXT NOT NULL, -- Relative to the data directory
+    created_at TEXT NOT NULL -- chrono::DateTime<Utc>
 );
 
 CREATE TABLE tags (

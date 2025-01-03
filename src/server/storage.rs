@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
 use futures::prelude::*;
@@ -12,8 +12,8 @@ use uuid::Uuid;
 
 use crate::{
     proto::{
-        data_storage_service_server::DataStorageService, CreateRequest, CreateResponse,
-        WriteRequest, WriteResponse, WRITE_TOKEN,
+        data_storage_service_server::DataStorageService, CreateRequest, CreateResponse, GetRequest,
+        GetResponse, ListRequest, ListResponse, WriteRequest, WriteResponse, WRITE_TOKEN,
     },
     workspace::Workspace,
 };
@@ -74,7 +74,7 @@ impl DataStorageService for Storage {
         let uuid = Uuid::new_v4();
         trace!("generated uuid: {:?}", uuid);
         self.creating.insert(uuid, metadata);
-        let write_token = Bytes::copy_from_slice(uuid.as_bytes());
+        let write_token = Some(Bytes::copy_from_slice(uuid.as_bytes()));
         Ok(Response::new(CreateResponse { write_token }))
     }
 
@@ -103,7 +103,11 @@ impl DataStorageService for Storage {
         // TODO: Check error handling
         let writer_task = self.tracker.spawn_blocking(move || {
             let bytes_stream = in_stream
-                .map_ok(|WriteRequest { chunk }| chunk)
+                .map(|msg| match msg {
+                    Ok(WriteRequest { chunk: Some(chunk) }) => Ok(chunk),
+                    Ok(WriteRequest { chunk: None }) => Err(anyhow!("Invalid chunk")),
+                    Err(e) => Err(e.into()),
+                })
                 .map_err(|e| {
                     error!("Client connection error: {:?}", e);
                     std::io::Error::new(std::io::ErrorKind::Other, e)
@@ -147,7 +151,21 @@ impl DataStorageService for Storage {
                 error!("write failed: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        let id = dataset.id();
+        let id = Some(dataset.id());
         Ok(Response::new(WriteResponse { id }))
+    }
+
+    async fn list(
+        &self,
+        request: tonic::Request<ListRequest>,
+    ) -> Result<tonic::Response<ListResponse>, tonic::Status> {
+        todo!()
+    }
+
+    async fn get(
+        &self,
+        request: tonic::Request<GetRequest>,
+    ) -> Result<tonic::Response<GetResponse>, tonic::Status> {
+        todo!()
     }
 }

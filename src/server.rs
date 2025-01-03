@@ -10,7 +10,7 @@ use tonic::transport::Server;
 use tracing::info;
 
 use crate::{
-    ipc::IpcConnect,
+    ipc::Ipc,
     proto::{
         data_storage_service_server::DataStorageServiceServer,
         fricon_service_server::FriconServiceServer,

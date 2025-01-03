@@ -19,7 +19,7 @@ use tracing::{error, info};
 
 use crate::paths::IpcFile;
 
-use super::IpcConnect;
+use super::Ipc;
 
 impl IpcConnect for &IpcFile {
     type ClientStream = NamedPipeClient;

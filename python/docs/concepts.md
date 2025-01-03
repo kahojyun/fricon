@@ -14,13 +14,11 @@ Currently a workspace contains the following files:
 ```tree
 workspace/
   .fricon_version
-  config.toml
   fricon.sqlite3
   data/
     <date>/
       <uuid>/
         dataset.arrow
-        metadata.json
   backup/
   log/
 ```
@@ -64,7 +62,7 @@ Users can open a dataset by either `uid` or `id`.
 
 For simplicity, fricon only handle a subset of data types in Arrow format:
 
-* Numbers
+* Numbers: int, float, complex
 * Strings
 * Boolean
 * 1-D List of previous types
