@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use anyhow::{ensure, Context};
 use chrono::{DateTime, Utc};
+use futures::prelude::*;
 use sqlx::{
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
@@ -68,7 +71,7 @@ impl DatasetIndex {
         let dataset_id = tx.insert_dataset(info).await?;
         for tag in &info.tags {
             let tag_id = tx.get_or_insert_tag(tag).await?;
-            tx.add_tag_to_dataset(dataset_id, tag_id).await?;
+            tx.add_dataset_tag(dataset_id, tag_id).await?;
         }
         tx.commit().await?;
         Ok(dataset_id)
@@ -97,17 +100,115 @@ impl DatasetIndex {
         }
         Ok(datasets)
     }
+
+    pub async fn add_dataset_tags(&self, id: i64, tags: &[String]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        tx.ensure_exist(id).await?;
+        for tag in tags {
+            let tag_id = tx.get_or_insert_tag(tag).await?;
+            tx.add_dataset_tag(id, tag_id).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn remove_dataset_tags(&self, id: i64, tags: &[String]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        tx.ensure_exist(id).await?;
+        for tag in tags {
+            sqlx::query!(
+                r#"
+                DELETE FROM dataset_tag
+                WHERE dataset_id = ? AND tag_id = (SELECT id FROM tags WHERE name = ?)
+                "#,
+                id,
+                tag
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn replace_dataset_tags(&self, id: i64, tags: &[String]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        tx.ensure_exist(id).await?;
+        let current_tag_ids =
+            sqlx::query_scalar!("SELECT tag_id FROM dataset_tag WHERE dataset_id = ?", id)
+                .fetch(&mut *tx)
+                .try_collect::<HashSet<_>>()
+                .await?;
+        let mut new_tag_ids = HashSet::with_capacity(tags.len());
+        for tag in tags {
+            let tag_id = tx.get_or_insert_tag(tag).await?;
+            new_tag_ids.insert(tag_id);
+        }
+        for &tag_id in current_tag_ids.difference(&new_tag_ids) {
+            tx.remove_dataset_tag(id, tag_id).await?;
+        }
+        for &tag_id in new_tag_ids.difference(&current_tag_ids) {
+            tx.add_dataset_tag(id, tag_id).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn update_dataset_name(&self, id: i64, name: &str) -> Result<()> {
+        sqlx::query!("UPDATE datasets SET name = ? WHERE id = ?", name, id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_dataset_description(&self, id: i64, description: &str) -> Result<()> {
+        sqlx::query!(
+            "UPDATE datasets SET description = ? WHERE id = ?",
+            description,
+            id
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_dataset_favorite(&self, id: i64, favorite: bool) -> Result<()> {
+        sqlx::query!(
+            "UPDATE datasets SET favorite = ? WHERE id = ?",
+            favorite,
+            id
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 trait StorageDbExt {
+    async fn ensure_exist(&mut self, id: i64) -> Result<()>;
     async fn get_or_insert_tag(&mut self, tag: &str) -> Result<i64>;
     async fn insert_dataset(&mut self, info: &Info) -> Result<i64>;
     async fn find_dataset_by_uid(&mut self, uid: Simple) -> Result<i64>;
-    async fn add_tag_to_dataset(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
+    async fn add_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
+    async fn remove_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
     async fn get_dataset_by_id(&mut self, id: i64) -> Result<DatasetRecord>;
 }
 
 impl StorageDbExt for SqliteConnection {
+    async fn ensure_exist(&mut self, id: i64) -> Result<()> {
+        let exist = sqlx::query_scalar!(
+            r#"SELECT EXISTS(SELECT 1 FROM datasets WHERE id = ?) as "exist: bool""#,
+            id
+        )
+        .fetch_one(&mut *self)
+        .await?;
+        if exist {
+            Ok(())
+        } else {
+            Err(Error::NotFound)
+        }
+    }
+
     async fn get_or_insert_tag(&mut self, tag: &str) -> Result<i64> {
         let res = sqlx::query!("SELECT id FROM tags WHERE name = ?", tag)
             .fetch_optional(&mut *self)
@@ -148,9 +249,20 @@ impl StorageDbExt for SqliteConnection {
         Ok(id)
     }
 
-    async fn add_tag_to_dataset(&mut self, dataset_id: i64, tag_id: i64) -> Result<()> {
+    async fn add_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()> {
         sqlx::query!(
             "INSERT INTO dataset_tag (dataset_id, tag_id) VALUES (?, ?)",
+            dataset_id,
+            tag_id
+        )
+        .execute(&mut *self)
+        .await?;
+        Ok(())
+    }
+
+    async fn remove_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()> {
+        sqlx::query!(
+            "DELETE FROM dataset_tag WHERE dataset_id = ? AND tag_id = ?",
             dataset_id,
             tag_id
         )

@@ -194,7 +194,19 @@ impl Trace {
 ///
 /// Datasets can be created and opened using the [`DatasetManager`][fricon.DatasetManager].
 #[pyclass(module = "fricon._core")]
-pub struct Dataset;
+pub struct Dataset {
+    workspace: Option<Workspace>,
+    id: i64,
+}
+
+impl Dataset {
+    fn client(&self) -> Result<&Client> {
+        self.workspace
+            .as_ref()
+            .context("No workspace.")
+            .map(|w| &w.client)
+    }
+}
 
 #[pymethods]
 impl Dataset {
@@ -205,8 +217,8 @@ impl Dataset {
     }
 
     #[setter]
-    pub fn set_name(&mut self, name: &str) {
-        todo!();
+    pub fn set_name(&mut self, name: String) -> Result<()> {
+        get_runtime().block_on(self.client()?.update_dataset_name(self.id, name))
     }
 
     /// Description of the dataset.
@@ -216,8 +228,8 @@ impl Dataset {
     }
 
     #[setter]
-    pub fn set_description(&mut self, description: &str) {
-        todo!();
+    pub fn set_description(&mut self, description: String) -> Result<()> {
+        get_runtime().block_on(self.client()?.update_dataset_name(self.id, description))
     }
 
     /// Tags of the dataset.
@@ -227,8 +239,8 @@ impl Dataset {
     }
 
     #[setter]
-    pub fn set_tags(&mut self, tags: Vec<String>) {
-        todo!();
+    pub fn set_tags(&mut self, tags: Vec<String>) -> Result<()> {
+        get_runtime().block_on(self.client()?.replace_dataset_tags(self.id, tags))
     }
 
     /// Favorite status of the dataset.
@@ -238,8 +250,8 @@ impl Dataset {
     }
 
     #[setter]
-    pub fn set_favorite(&mut self, favorite: bool) {
-        todo!();
+    pub fn set_favorite(&mut self, favorite: bool) -> Result<()> {
+        get_runtime().block_on(self.client()?.update_dataset_favorite(self.id, favorite))
     }
 
     /// Load the dataset as a pandas DataFrame.
@@ -278,18 +290,6 @@ impl Dataset {
     /// Returns:
     ///     An Arrow Table.
     pub fn to_arrow(&self) -> PyObject {
-        todo!();
-    }
-
-    /// Open a dataset.
-    ///
-    /// Parameters:
-    ///     path: Path to the dataset.
-    ///
-    /// Returns:
-    ///     Opened dataset.
-    #[staticmethod]
-    pub fn open(path: PathBuf) -> Self {
         todo!();
     }
 

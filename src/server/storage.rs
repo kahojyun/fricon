@@ -16,9 +16,12 @@ use crate::{
     dataset::Info,
     db::{self, DatasetRecord},
     proto::{
-        self, data_storage_service_server::DataStorageService, get_request::IdEnum, CreateRequest,
-        CreateResponse, GetRequest, GetResponse, ListRequest, ListResponse, WriteRequest,
-        WriteResponse, WRITE_TOKEN,
+        self, data_storage_service_server::DataStorageService, get_request::IdEnum, AddTagsRequest,
+        AddTagsResponse, CreateRequest, CreateResponse, GetRequest, GetResponse, ListRequest,
+        ListResponse, RemoveTagsRequest, RemoveTagsResponse, ReplaceTagsRequest,
+        ReplaceTagsResponse, UpdateDescriptionRequest, UpdateDescriptionResponse,
+        UpdateFavoriteRequest, UpdateFavoriteResponse, UpdateNameRequest, UpdateNameResponse,
+        WriteRequest, WriteResponse, WRITE_TOKEN,
     },
     workspace::Workspace,
 };
@@ -279,5 +282,125 @@ impl DataStorageService for Storage {
         })?;
         let dataset = Some(record.into());
         Ok(Response::new(GetResponse { dataset }))
+    }
+
+    async fn replace_tags(
+        &self,
+        request: Request<ReplaceTagsRequest>,
+    ) -> Result<Response<ReplaceTagsResponse>> {
+        let ReplaceTagsRequest { id: Some(id), tags } = request.into_inner() else {
+            return Err(Status::invalid_argument("id is required"));
+        };
+        self.workspace
+            .dataset_index()
+            .replace_dataset_tags(id, &tags)
+            .await
+            .map_err(|e| {
+                error!("Failed to replace tags: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        Ok(Response::new(ReplaceTagsResponse {}))
+    }
+
+    async fn add_tags(
+        &self,
+        request: Request<AddTagsRequest>,
+    ) -> Result<Response<AddTagsResponse>> {
+        let AddTagsRequest { id: Some(id), tags } = request.into_inner() else {
+            return Err(Status::invalid_argument("id is required"));
+        };
+        self.workspace
+            .dataset_index()
+            .add_dataset_tags(id, &tags)
+            .await
+            .map_err(|e| {
+                error!("Failed to add tags: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        Ok(Response::new(AddTagsResponse {}))
+    }
+
+    async fn remove_tags(
+        &self,
+        request: Request<RemoveTagsRequest>,
+    ) -> Result<Response<RemoveTagsResponse>> {
+        let RemoveTagsRequest { id: Some(id), tags } = request.into_inner() else {
+            return Err(Status::invalid_argument("id is required"));
+        };
+        self.workspace
+            .dataset_index()
+            .remove_dataset_tags(id, &tags)
+            .await
+            .map_err(|e| {
+                error!("Failed to remove tags: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        Ok(Response::new(RemoveTagsResponse {}))
+    }
+
+    async fn update_name(
+        &self,
+        request: Request<UpdateNameRequest>,
+    ) -> Result<Response<UpdateNameResponse>> {
+        let UpdateNameRequest {
+            id: Some(id),
+            name: Some(name),
+        } = request.into_inner()
+        else {
+            return Err(Status::invalid_argument("id and name are required"));
+        };
+        self.workspace
+            .dataset_index()
+            .update_dataset_name(id, &name)
+            .await
+            .map_err(|e| {
+                error!("Failed to update name: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        Ok(Response::new(UpdateNameResponse {}))
+    }
+
+    async fn update_description(
+        &self,
+        request: Request<UpdateDescriptionRequest>,
+    ) -> Result<Response<UpdateDescriptionResponse>> {
+        let UpdateDescriptionRequest {
+            id: Some(id),
+            description: Some(description),
+        } = request.into_inner()
+        else {
+            return Err(Status::invalid_argument("id and description are required"));
+        };
+        self.workspace
+            .dataset_index()
+            .update_dataset_description(id, &description)
+            .await
+            .map_err(|e| {
+                error!("Failed to update description: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        Ok(Response::new(UpdateDescriptionResponse {}))
+    }
+
+    async fn update_favorite(
+        &self,
+        request: Request<UpdateFavoriteRequest>,
+    ) -> Result<Response<UpdateFavoriteResponse>> {
+        let UpdateFavoriteRequest {
+            id: Some(id),
+            favorite: Some(favorite),
+        } = request.into_inner()
+        else {
+            return Err(Status::invalid_argument("id and favorite are required"));
+        };
+        self.workspace
+            .dataset_index()
+            .update_dataset_favorite(id, favorite)
+            .await
+            .map_err(|e| {
+                error!("Failed to update favorite: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        Ok(Response::new(UpdateFavoriteResponse {}))
     }
 }

@@ -16,8 +16,10 @@ use crate::{
     paths::IpcFile,
     proto::{
         data_storage_service_client::DataStorageServiceClient,
-        fricon_service_client::FriconServiceClient, get_request::IdEnum, CreateRequest, GetRequest,
-        VersionRequest, WriteRequest, WriteResponse, WRITE_TOKEN,
+        fricon_service_client::FriconServiceClient, get_request::IdEnum, AddTagsRequest,
+        CreateRequest, GetRequest, RemoveTagsRequest, ReplaceTagsRequest, UpdateDescriptionRequest,
+        UpdateFavoriteRequest, UpdateNameRequest, VersionRequest, WriteRequest, WriteResponse,
+        WRITE_TOKEN,
     },
     VERSION,
 };
@@ -54,7 +56,7 @@ impl Client {
             tags,
             index,
         };
-        let mut client = DataStorageServiceClient::new(self.channel.clone());
+        let mut client = self.data_storage_service_client();
         let response = client.create(request).await?;
         let write_token = response
             .into_inner()
@@ -79,16 +81,78 @@ impl Client {
         self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
     }
 
-    async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<DatasetRecord> {
+    pub async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<DatasetRecord> {
         let request = GetRequest { id_enum: Some(id) };
-        let response = DataStorageServiceClient::new(self.channel.clone())
-            .get(request)
-            .await?;
+        let response = self.data_storage_service_client().get(request).await?;
         let record = response
             .into_inner()
             .dataset
             .context("No dataset returned.")?;
         record.try_into().context("Invalid dataset record.")
+    }
+
+    pub async fn replace_dataset_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
+        let request = ReplaceTagsRequest { id: Some(id), tags };
+        let _response = self
+            .data_storage_service_client()
+            .replace_tags(request)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn add_dataset_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
+        let request = AddTagsRequest { id: Some(id), tags };
+        let _response = self.data_storage_service_client().add_tags(request).await?;
+        Ok(())
+    }
+
+    pub async fn remove_dataset_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
+        let request = RemoveTagsRequest { id: Some(id), tags };
+        let _response = self
+            .data_storage_service_client()
+            .remove_tags(request)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_dataset_name(&self, id: i64, name: String) -> Result<()> {
+        let request = UpdateNameRequest {
+            id: Some(id),
+            name: Some(name),
+        };
+        let _response = self
+            .data_storage_service_client()
+            .update_name(request)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_dataset_description(&self, id: i64, description: String) -> Result<()> {
+        let request = UpdateDescriptionRequest {
+            id: Some(id),
+            description: Some(description),
+        };
+        let _response = self
+            .data_storage_service_client()
+            .update_description(request)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_dataset_favorite(&self, id: i64, favorite: bool) -> Result<()> {
+        let request = UpdateFavoriteRequest {
+            id: Some(id),
+            favorite: Some(favorite),
+        };
+        let _response = self
+            .data_storage_service_client()
+            .update_favorite(request)
+            .await?;
+        Ok(())
+    }
+
+    fn data_storage_service_client(&self) -> DataStorageServiceClient<Channel> {
+        DataStorageServiceClient::new(self.channel.clone())
     }
 }
 

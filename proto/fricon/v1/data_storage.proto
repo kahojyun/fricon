@@ -14,6 +14,18 @@ service DataStorageService {
   rpc List(ListRequest) returns (ListResponse) {}
   // Get a dataset in the workspace.
   rpc Get(GetRequest) returns (GetResponse) {}
+  // Replace tags of a dataset.
+  rpc ReplaceTags(ReplaceTagsRequest) returns (ReplaceTagsResponse) {}
+  // Add tags to a dataset.
+  rpc AddTags(AddTagsRequest) returns (AddTagsResponse) {}
+  // Remove tags from a dataset.
+  rpc RemoveTags(RemoveTagsRequest) returns (RemoveTagsResponse) {}
+  // Update name of a dataset.
+  rpc UpdateName(UpdateNameRequest) returns (UpdateNameResponse) {}
+  // Update description of a dataset.
+  rpc UpdateDescription(UpdateDescriptionRequest) returns (UpdateDescriptionResponse) {}
+  // Update favorite flag of a dataset.
+  rpc UpdateFavorite(UpdateFavoriteRequest) returns (UpdateFavoriteResponse) {}
 }
 
 message CreateRequest {
@@ -63,3 +75,45 @@ message Dataset {
   optional google.protobuf.Timestamp created_at = 8;
   repeated string tags = 9;
 }
+
+message ReplaceTagsRequest {
+  optional int64 id = 1;
+  repeated string tags = 2;
+}
+
+message ReplaceTagsResponse {}
+
+message AddTagsRequest {
+  optional int64 id = 1;
+  repeated string tags = 2;
+}
+
+message AddTagsResponse {}
+
+message RemoveTagsRequest {
+  optional int64 id = 1;
+  repeated string tags = 2;
+}
+
+message RemoveTagsResponse {}
+
+message UpdateNameRequest {
+  optional int64 id = 1;
+  optional string name = 2;
+}
+
+message UpdateNameResponse {}
+
+message UpdateDescriptionRequest {
+  optional int64 id = 1;
+  optional string description = 2;
+}
+
+message UpdateDescriptionResponse {}
+
+message UpdateFavoriteRequest {
+  optional int64 id = 1;
+  optional bool favorite = 2;
+}
+
+message UpdateFavoriteResponse {}
