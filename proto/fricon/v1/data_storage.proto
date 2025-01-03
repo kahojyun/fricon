@@ -57,7 +57,9 @@ message Dataset {
   optional string uid = 2;
   optional string name = 3;
   optional string description = 4;
-  repeated string tags = 5;
-  repeated string index = 6;
-  optional google.protobuf.Timestamp created_at = 7;
+  optional bool favorite = 5;
+  repeated string index_columns = 6;
+  optional string path = 7;
+  optional google.protobuf.Timestamp created_at = 8;
+  repeated string tags = 9;
 }

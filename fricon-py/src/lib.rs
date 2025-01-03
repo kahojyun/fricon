@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use arrow::{
     array::{
         make_array, Array, ArrayData, BooleanArray, Float64Array, Int64Array, RecordBatch,
@@ -108,7 +108,7 @@ impl DatasetManager {
     ) -> Result<DatasetWriter> {
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
-        let schema = schema.map(|s| s.0).unwrap_or_else(|| Schema::empty());
+        let schema = schema.map_or_else(Schema::empty, |s| s.0);
         let index = index.unwrap_or_default();
         let writer = get_runtime().block_on(self.workspace.client.create_dataset(
             name,
@@ -553,7 +553,7 @@ impl DatasetWriter {
     ///     RuntimeError: Writer is not closed yet.
     #[getter]
     pub fn id(&self) -> Result<i64> {
-        self.id.ok_or_else(|| anyhow!("Writer not closed."))
+        self.id.context("Writer not closed.")
     }
 
     /// Finish writing to dataset.

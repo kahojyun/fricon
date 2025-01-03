@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter};
 use bytes::Bytes;
 use futures::prelude::*;
@@ -11,13 +11,13 @@ use tower::service_fn;
 use tracing::error;
 
 use crate::{
-    dataset::Dataset,
+    db::DatasetRecord,
     ipc::Ipc,
     paths::IpcFile,
     proto::{
         data_storage_service_client::DataStorageServiceClient,
-        fricon_service_client::FriconServiceClient, CreateRequest, VersionRequest, WriteRequest,
-        WriteResponse, WRITE_TOKEN,
+        fricon_service_client::FriconServiceClient, get_request::IdEnum, CreateRequest, GetRequest,
+        VersionRequest, WriteRequest, WriteResponse, WRITE_TOKEN,
     },
     VERSION,
 };
@@ -40,7 +40,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Server Errors
+    /// Server errors
     pub async fn create_dataset(
         &self,
         name: String,
@@ -59,16 +59,36 @@ impl Client {
         let write_token = response
             .into_inner()
             .write_token
-            .ok_or_else(|| anyhow!("No write token returned."))?;
+            .context("No write token returned.")?;
         Ok(DatasetWriter::new(client, write_token))
     }
 
-    pub async fn get_dataset_by_id(&self, id: i64) -> Dataset {
-        todo!()
+    /// # Errors
+    ///
+    /// 1. Not found.
+    /// 2. Server errors
+    pub async fn get_dataset_by_id(&self, id: i64) -> Result<DatasetRecord> {
+        self.get_dataset_by_id_enum(IdEnum::Id(id)).await
     }
 
-    pub async fn get_dataset_by_uid(&self, uid: String) -> Dataset {
-        todo!()
+    /// # Errors
+    ///
+    /// 1. Not found.
+    /// 2. Server errors
+    pub async fn get_dataset_by_uid(&self, uid: String) -> Result<DatasetRecord> {
+        self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
+    }
+
+    async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<DatasetRecord> {
+        let request = GetRequest { id_enum: Some(id) };
+        let response = DataStorageServiceClient::new(self.channel.clone())
+            .get(request)
+            .await?;
+        let record = response
+            .into_inner()
+            .dataset
+            .context("No dataset returned.")?;
+        record.try_into().context("Invalid dataset record.")
     }
 }
 
@@ -149,7 +169,7 @@ impl DatasetWriter {
             .connection_handle
             .await??
             .id
-            .ok_or_else(|| anyhow!("No dataset id returned."))?;
+            .context("No dataset id returned.")?;
         Ok(id)
     }
 }

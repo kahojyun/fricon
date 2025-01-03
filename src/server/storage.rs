@@ -1,9 +1,11 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
+use chrono::DateTime;
 use futures::prelude::*;
+use prost_types::Timestamp;
 use tokio::runtime::Handle;
 use tokio_util::{io::SyncIoBridge, task::TaskTracker};
 use tonic::{Request, Response, Result, Status, Streaming};
@@ -11,9 +13,12 @@ use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
+    dataset::Info,
+    db::{self, DatasetRecord},
     proto::{
-        data_storage_service_server::DataStorageService, CreateRequest, CreateResponse, GetRequest,
-        GetResponse, ListRequest, ListResponse, WriteRequest, WriteResponse, WRITE_TOKEN,
+        self, data_storage_service_server::DataStorageService, get_request::IdEnum, CreateRequest,
+        CreateResponse, GetRequest, GetResponse, ListRequest, ListResponse, WriteRequest,
+        WriteResponse, WRITE_TOKEN,
     },
     workspace::Workspace,
 };
@@ -55,6 +60,83 @@ impl Creating {
     fn remove(&self, token: &Uuid) -> Option<Metadata> {
         let mut inner = self.0.lock().unwrap();
         inner.remove(token)
+    }
+}
+
+impl From<DatasetRecord> for proto::Dataset {
+    fn from(
+        DatasetRecord {
+            id,
+            info:
+                Info {
+                    uid,
+                    name,
+                    description,
+                    favorite,
+                    index_columns,
+                    path,
+                    created_at,
+                    tags,
+                },
+        }: DatasetRecord,
+    ) -> Self {
+        Self {
+            id: Some(id),
+            uid: Some(uid.simple().to_string()),
+            name: Some(name),
+            description: Some(description),
+            favorite: Some(favorite),
+            index_columns,
+            path: Some(path.0),
+            created_at: {
+                Some(Timestamp {
+                    seconds: created_at.timestamp(),
+                    #[expect(
+                        clippy::cast_possible_wrap,
+                        reason = "Nanos are always less than 2e9."
+                    )]
+                    nanos: created_at.timestamp_subsec_nanos() as i32,
+                })
+            },
+            tags,
+        }
+    }
+}
+
+impl TryFrom<proto::Dataset> for DatasetRecord {
+    type Error = anyhow::Error;
+
+    fn try_from(value: proto::Dataset) -> Result<Self, Self::Error> {
+        let id = value.id.context("id is required")?;
+        let uid = value.uid.context("uid is required")?.parse()?;
+        let name = value.name.context("name is required")?;
+        let description = value.description.context("description is required")?;
+        let favorite = value.favorite.context("favorite is required")?;
+        let index_columns = value.index_columns;
+        let path = value.path.context("path is required")?;
+        let created_at = value.created_at.context("created_at is required")?;
+        let seconds = created_at.seconds;
+        #[expect(clippy::cast_sign_loss)]
+        let nanos = if created_at.nanos < 0 {
+            bail!("invalid created_at")
+        } else {
+            created_at.nanos as u32
+        };
+        let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
+        let tags = value.tags;
+        Ok(Self {
+            id,
+            info: Info {
+                uid,
+                name,
+                description,
+                favorite,
+                index_columns,
+                path: path.into(),
+                created_at,
+                tags,
+            },
+        })
     }
 }
 
@@ -157,15 +239,45 @@ impl DataStorageService for Storage {
 
     async fn list(
         &self,
-        request: tonic::Request<ListRequest>,
+        _request: tonic::Request<ListRequest>,
     ) -> Result<tonic::Response<ListResponse>, tonic::Status> {
-        todo!()
+        let dataset_index = self.workspace.dataset_index();
+        let records = dataset_index.list_all().await.map_err(|e| {
+            error!("Failed to list datasets: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+        let datasets = records.into_iter().map(Into::into).collect();
+        Ok(Response::new(ListResponse { datasets }))
     }
 
     async fn get(
         &self,
         request: tonic::Request<GetRequest>,
     ) -> Result<tonic::Response<GetResponse>, tonic::Status> {
-        todo!()
+        let dataset_index = self.workspace.dataset_index();
+        let id = request.into_inner().id_enum.ok_or_else(|| {
+            error!("id_enum is required");
+            Status::invalid_argument("id_enum is required")
+        })?;
+        let record = match id {
+            IdEnum::Id(id) => dataset_index.get_by_id(id).await,
+            IdEnum::Uid(uid) => {
+                let uid: Uuid = uid.parse().map_err(|e| {
+                    error!("Failed to parse uid: {:?}", e);
+                    Status::invalid_argument("invalid uid")
+                })?;
+                dataset_index.get_by_uid(uid).await
+            }
+        }
+        .map_err(|e| {
+            if matches!(e, db::Error::NotFound) {
+                Status::not_found("dataset not found")
+            } else {
+                error!("Failed to get dataset: {:?}", e);
+                Status::internal(e.to_string())
+            }
+        })?;
+        let dataset = Some(record.into());
+        Ok(Response::new(GetResponse { dataset }))
     }
 }

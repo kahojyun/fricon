@@ -8,9 +8,9 @@ use sqlx::{
 };
 use thiserror::Error;
 use tracing::info;
-use uuid::fmt::Simple;
+use uuid::{fmt::Simple, Uuid};
 
-use crate::{dataset, paths::DatabaseFile};
+use crate::{dataset::Info, paths::DatabaseFile};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -57,8 +57,13 @@ pub struct DatasetIndex {
     pub pool: SqlitePool,
 }
 
+pub struct DatasetRecord {
+    pub id: i64,
+    pub info: Info,
+}
+
 impl DatasetIndex {
-    pub async fn create(&self, info: &dataset::Info) -> Result<i64> {
+    pub async fn create(&self, info: &Info) -> Result<i64> {
         let mut tx = self.pool.begin().await?;
         let dataset_id = tx.insert_dataset(info).await?;
         for tag in &info.tags {
@@ -69,19 +74,37 @@ impl DatasetIndex {
         Ok(dataset_id)
     }
 
-    pub async fn fetch_by_uid(&self, uid: Simple) -> Result<dataset::Info> {
+    pub async fn get_by_uid(&self, uid: Uuid) -> Result<DatasetRecord> {
         let mut tx = self.pool.begin().await?;
-        let id = tx.find_dataset_by_uid(uid).await?;
-        tx.fetch_dataset_by_id(id).await
+        let id = tx.find_dataset_by_uid(uid.simple()).await?;
+        tx.get_dataset_by_id(id).await
+    }
+
+    pub async fn get_by_id(&self, id: i64) -> Result<DatasetRecord> {
+        let mut tx = self.pool.begin().await?;
+        tx.get_dataset_by_id(id).await
+    }
+
+    pub async fn list_all(&self) -> Result<Vec<DatasetRecord>> {
+        let mut tx = self.pool.begin().await?;
+        let ids = sqlx::query_scalar!("SELECT id FROM datasets")
+            .fetch_all(&mut *tx)
+            .await?;
+        let mut datasets = Vec::with_capacity(ids.len());
+        for id in ids {
+            let record = tx.get_dataset_by_id(id).await?;
+            datasets.push(record);
+        }
+        Ok(datasets)
     }
 }
 
 trait StorageDbExt {
     async fn get_or_insert_tag(&mut self, tag: &str) -> Result<i64>;
-    async fn insert_dataset(&mut self, info: &dataset::Info) -> Result<i64>;
+    async fn insert_dataset(&mut self, info: &Info) -> Result<i64>;
     async fn find_dataset_by_uid(&mut self, uid: Simple) -> Result<i64>;
     async fn add_tag_to_dataset(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
-    async fn fetch_dataset_by_id(&mut self, id: i64) -> Result<dataset::Info>;
+    async fn get_dataset_by_id(&mut self, id: i64) -> Result<DatasetRecord>;
 }
 
 impl StorageDbExt for SqliteConnection {
@@ -99,7 +122,7 @@ impl StorageDbExt for SqliteConnection {
         Ok(tag_id)
     }
 
-    async fn insert_dataset(&mut self, info: &dataset::Info) -> Result<i64> {
+    async fn insert_dataset(&mut self, info: &Info) -> Result<i64> {
         let index_columns = Json(&info.index_columns);
         let uid = info.uid.simple();
         let path = &info.path.0;
@@ -144,7 +167,7 @@ impl StorageDbExt for SqliteConnection {
             .ok_or(Error::NotFound)
     }
 
-    async fn fetch_dataset_by_id(&mut self, id: i64) -> Result<dataset::Info> {
+    async fn get_dataset_by_id(&mut self, id: i64) -> Result<DatasetRecord> {
         #[derive(Debug)]
         pub struct DatasetRow {
             pub uid: Simple,
@@ -178,7 +201,7 @@ impl StorageDbExt for SqliteConnection {
         )
         .fetch_all(&mut *self)
         .await?;
-        Ok(dataset::Info {
+        let info = Info {
             uid: res.uid.into_uuid(),
             name: res.name,
             description: res.description,
@@ -187,6 +210,7 @@ impl StorageDbExt for SqliteConnection {
             path: res.path.into(),
             tags,
             created_at: res.created_at,
-        })
+        };
+        Ok(DatasetRecord { id, info })
     }
 }
