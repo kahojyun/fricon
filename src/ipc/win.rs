@@ -7,23 +7,21 @@ use std::{
 
 use anyhow::Result;
 use async_stream::try_stream;
-use futures::Stream;
-use hyper_util::rt::TokioIo;
+use futures::{prelude::*, stream::BoxStream};
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::windows::named_pipe::{ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions},
 };
-use tonic::transport::{server::Connected, Channel, Endpoint};
-use tower::service_fn;
-use tracing::{error, info};
+use tonic::transport::server::Connected;
+use tracing::error;
 
 use crate::paths::IpcFile;
 
 use super::Ipc;
 
-impl IpcConnect for &IpcFile {
+impl Ipc for &IpcFile {
     type ClientStream = NamedPipeClient;
-    type ListenerStream = impl Stream<Item = Result<NamedPipeConnector>>;
+    type ListenerStream = BoxStream<'static, Result<NamedPipeConnector>>;
 
     async fn connect(self) -> Result<Self::ClientStream> {
         let pipe_name = get_pipe_name(&self.0)?;
@@ -33,9 +31,9 @@ impl IpcConnect for &IpcFile {
     async fn listen(self) -> Result<Self::ListenerStream> {
         let pipe_name = get_pipe_name(&self.0)?;
         Ok(try_stream! {
-            let mut server = {ServerOptions::new()
+            let mut server = ServerOptions::new()
                 .first_pipe_instance(true)
-                .create(&pipe_name)}
+                .create(&pipe_name)
                 .inspect_err(|e| error!("Failed to create server: {e}"))?;
             loop {
                 server.connect().await?;
@@ -43,7 +41,8 @@ impl IpcConnect for &IpcFile {
                 server = ServerOptions::new().create(&pipe_name)?;
                 yield connector;
             }
-        })
+        }
+        .boxed())
     }
 
     fn cleanup(self) {}
@@ -54,7 +53,7 @@ fn get_pipe_name(path: &Path) -> Result<String> {
     Ok(format!(r"\\.\pipe\{}", abspath.display()))
 }
 
-struct NamedPipeConnector(NamedPipeServer);
+pub struct NamedPipeConnector(NamedPipeServer);
 
 impl Connected for NamedPipeConnector {
     type ConnectInfo = ();
