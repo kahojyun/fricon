@@ -241,19 +241,37 @@ fn extract_float_array(values: &Bound<'_, PyAny>) -> Result<Float64Array> {
 }
 
 fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
-    // if let Ok(PyArrowType(data)) = values.extract() {
-    //     let arr = make_array(data);
-    //     if *arr.data_type() == DataType::Float64 {
-    //         return Ok(downcast_array(&arr));
-    //     }
-    //     bail!("The data type of the given arrow array is not float64.");
-    // }
-    todo!()
+    if let Ok(PyArrowType(data)) = values.extract() {
+        let arr = make_array(data);
+        return match arr.data_type() {
+            DataType::Boolean | DataType::Int64 | DataType::Float64 | DataType::Utf8 => Ok(arr),
+            t @ DataType::Struct(_) if *t == get_complex_type() => Ok(arr),
+            _ => bail!("The data type of the given arrow array is not float64."),
+        };
+    }
+    if let Ok(sequence) = values.downcast::<PySequence>() {
+        let data_type =
+            infer_sequence_item_type(sequence).context("Inferring sequence item data type.")?;
+        return build_array_from_sequence(&data_type, sequence);
+    }
+    let py_type = values.get_type();
+    bail!("Cannot convert {py_type} to scalar array.");
+}
+
+fn wrap_as_list_array(array: ArrayRef) -> ListArray {
+    ListArray::new(
+        Arc::new(Field::new_list_field(array.data_type().clone(), false)),
+        OffsetBuffer::from_lengths([array.len()]),
+        array,
+        None,
+    )
 }
 
 /// 1-D list of values with optional x-axis values.
 #[pyclass(module = "fricon._core")]
-pub struct Trace;
+pub struct Trace {
+    array: StructArray,
+}
 
 #[pymethods]
 impl Trace {
@@ -266,8 +284,25 @@ impl Trace {
     /// Returns:
     ///     A variable-step trace.
     #[staticmethod]
-    pub fn variable_step(xs: PyObject, ys: PyObject) -> Self {
-        todo!();
+    pub fn variable_step(xs: &Bound<'_, PyAny>, ys: &Bound<'_, PyAny>) -> Result<Self> {
+        let xs = extract_float_array(xs)?;
+        let ys = extract_scalar_array(ys)?;
+        ensure!(
+            xs.len() == ys.len(),
+            "Length of `xs` and `ys` should be equal."
+        );
+        let xs_list = wrap_as_list_array(Arc::new(xs));
+        let ys_list = wrap_as_list_array(ys);
+        let fields = vec![
+            Field::new("xs", xs_list.data_type().clone(), false),
+            Field::new("ys", ys_list.data_type().clone(), false),
+        ];
+        let array = StructArray::new(
+            fields.into(),
+            vec![Arc::new(xs_list), Arc::new(ys_list)],
+            None,
+        );
+        Ok(Self { array })
     }
 
     /// Create a new trace with fixed x steps.
@@ -280,14 +315,28 @@ impl Trace {
     /// Returns:
     ///     A fixed-step trace.
     #[staticmethod]
-    pub fn fixed_step(x0: f64, dx: f64, ys: PyObject) -> Self {
-        todo!();
+    pub fn fixed_step(x0: f64, dx: f64, ys: &Bound<'_, PyAny>) -> Result<Self> {
+        let x0 = Float64Array::new_scalar(x0).into_inner();
+        let dx = Float64Array::new_scalar(dx).into_inner();
+        let ys = extract_scalar_array(ys)?;
+        let ys_list = wrap_as_list_array(ys);
+        let fields = vec![
+            Field::new("x0", DataType::Float64, false),
+            Field::new("dx", DataType::Float64, false),
+            Field::new("ys", ys_list.data_type().clone(), false),
+        ];
+        let array = StructArray::new(
+            fields.into(),
+            vec![Arc::new(x0), Arc::new(dx), Arc::new(ys_list)],
+            None,
+        );
+        Ok(Self { array })
     }
 
     /// Arrow data type of the trace.
     #[getter]
     pub fn data_type(&self) -> PyArrowType<DataType> {
-        todo!();
+        PyArrowType(self.array.data_type().clone())
     }
 
     /// Convert to an arrow array.
@@ -295,7 +344,7 @@ impl Trace {
     /// Returns:
     ///     Arrow array.
     pub fn to_arrow_array(&self) -> PyArrowType<ArrayData> {
-        todo!();
+        PyArrowType(self.array.to_data())
     }
 }
 
@@ -315,6 +364,11 @@ impl Dataset {
             .context("No workspace.")
             .map(|w| &w.client)
     }
+}
+
+fn io_helper(py: Python<'_>) -> PyResult<&PyObject> {
+    static IO_MODULE: GILOnceCell<PyObject> = GILOnceCell::new();
+    IO_MODULE.get_or_try_init(py, || py.import("fricon._io").map(Into::into))
 }
 
 #[pymethods]
@@ -387,8 +441,8 @@ impl Dataset {
     ///
     /// Returns:
     ///     A polars DataFrame.
-    pub fn to_polars(&self) -> PyObject {
-        todo!();
+    pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
+        io_helper(py)?.call_method1(py, "read_polars", (self.path()?,))
     }
 
     /// Load the dataset as an Arrow Table.
@@ -398,8 +452,8 @@ impl Dataset {
     ///
     /// Returns:
     ///     An Arrow Table.
-    pub fn to_arrow(&self) -> PyObject {
-        todo!();
+    pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
+        io_helper(py)?.call_method1(py, "read_arrow", (self.path()?,))
     }
 
     /// Id of the dataset.
@@ -433,33 +487,10 @@ impl Dataset {
         self.record.info.created_at
     }
 
-    /// Arrow schema of the dataset.
-    #[getter]
-    pub fn schema(&self) -> PyObject {
-        todo!();
-    }
-
     /// Index columns of the dataset.
     #[getter]
     pub fn index(&self) -> &[String] {
         &self.record.info.index_columns
-    }
-
-    /// Close the dataset.
-    pub fn close(&self) {
-        todo!()
-    }
-
-    /// Enter context manager.
-    pub fn __enter__(&self) -> PyObject {
-        todo!()
-    }
-
-    /// Exit context manager and close the dataset.
-    ///
-    /// Will call [`close`][fricon.Dataset.close] method.
-    pub fn __exit__(&self, _exc_type: PyObject, _exc_value: PyObject, _traceback: PyObject) {
-        todo!()
     }
 }
 
@@ -503,6 +534,21 @@ fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
     }
 }
 
+fn infer_sequence_item_type(sequence: &Bound<'_, PySequence>) -> Result<DataType> {
+    ensure!(
+        sequence.len()? > 0,
+        "Cannot infer data type for empty sequence."
+    );
+    let first_item = sequence.get_item(0)?;
+    infer_scalar_type(&first_item)
+}
+
+fn infer_sequence_type(sequence: &Bound<'_, PySequence>) -> Result<DataType> {
+    let item_type = infer_sequence_item_type(sequence)?;
+    let data_type = DataType::new_list(item_type, false);
+    Ok(data_type)
+}
+
 /// Infer [`arrow::datatypes::DataType`] from value in row.
 ///
 /// Currently supports:
@@ -521,15 +567,8 @@ fn infer_data_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
     } else if let Ok(PyArrowType(data)) = value.extract() {
         let arr = make_array(data);
         Ok(arr.data_type().clone())
-    } else if let Ok(value) = value.downcast::<PySequence>() {
-        ensure!(
-            value.len()? > 0,
-            "Cannot infer data type for empty sequence."
-        );
-        let first_item = value.get_item(0)?;
-        let item_type = infer_scalar_type(&first_item)?;
-        let data_type = DataType::new_list(item_type, false);
-        Ok(data_type)
+    } else if let Ok(sequence) = value.downcast::<PySequence>() {
+        infer_sequence_type(sequence)
     } else {
         let py_type = value.get_type();
         bail!("Cannot infer arrow data type for python type '{py_type}'.");
@@ -554,17 +593,18 @@ fn infer_schema(
         .context("Failed to merge initial schema with inferred schema.")
 }
 
-fn build_list(field: Arc<Field>, sequence: &Bound<'_, PySequence>) -> Result<ListArray> {
-    let list = match field.data_type() {
+fn build_array_from_sequence(
+    data_type: &DataType,
+    sequence: &Bound<'_, PySequence>,
+) -> Result<ArrayRef> {
+    match data_type {
         DataType::Boolean => {
             let mut builder = BooleanArray::builder(sequence.len()?);
             for v in sequence.try_iter()? {
                 let v = v?.extract()?;
                 builder.append_value(v);
             }
-            let values = Arc::new(builder.finish());
-            let offsets = OffsetBuffer::from_lengths([values.len()]);
-            ListArray::try_new(field, offsets, values, None)?
+            Ok(Arc::new(builder.finish()))
         }
         DataType::Int64 => {
             let mut builder = Int64Array::builder(sequence.len()?);
@@ -572,9 +612,7 @@ fn build_list(field: Arc<Field>, sequence: &Bound<'_, PySequence>) -> Result<Lis
                 let v = v?.extract()?;
                 builder.append_value(v);
             }
-            let values = Arc::new(builder.finish());
-            let offsets = OffsetBuffer::from_lengths([values.len()]);
-            ListArray::try_new(field, offsets, values, None)?
+            Ok(Arc::new(builder.finish()))
         }
         DataType::Float64 => {
             let mut builder = Float64Array::builder(sequence.len()?);
@@ -582,9 +620,7 @@ fn build_list(field: Arc<Field>, sequence: &Bound<'_, PySequence>) -> Result<Lis
                 let v = v?.extract()?;
                 builder.append_value(v);
             }
-            let values = Arc::new(builder.finish());
-            let offsets = OffsetBuffer::from_lengths([values.len()]);
-            ListArray::try_new(field, offsets, values, None)?
+            Ok(Arc::new(builder.finish()))
         }
         DataType::Utf8 => {
             let mut builder = StringBuilder::new();
@@ -592,13 +628,16 @@ fn build_list(field: Arc<Field>, sequence: &Bound<'_, PySequence>) -> Result<Lis
                 let v = v?.extract::<String>()?;
                 builder.append_value(v);
             }
-            let values = Arc::new(builder.finish());
-            let offsets = OffsetBuffer::from_lengths([values.len()]);
-            ListArray::try_new(field, offsets, values, None)?
+            Ok(Arc::new(builder.finish()))
         }
-        _ => bail!("Unsupported data type. Please manually build `pyarrow.Array`."),
-    };
-    Ok(list)
+        _ => bail!("Unsupported data type."),
+    }
+}
+
+fn build_list(field: Arc<Field>, sequence: &Bound<'_, PySequence>) -> Result<ListArray> {
+    let values = build_array_from_sequence(field.data_type(), sequence)?;
+    let offsets = OffsetBuffer::from_lengths([values.len()]);
+    Ok(ListArray::try_new(field, offsets, values, None)?)
 }
 
 fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRef> {
