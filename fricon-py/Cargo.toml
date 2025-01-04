@@ -17,25 +17,28 @@ doctest = false
 fricon = { path = ".." }
 
 # Error handling
-anyhow.workspace = true
+anyhow = { workspace = true }
 
 # Useful types
-chrono.workspace = true
-num.workspace = true
+chrono = { workspace = true }
+num = { workspace = true }
+ndarray = { workspace = true }
+itertools = { workspace = true }
 
 # Command-line argument parsing
-clap.workspace = true
+clap = { workspace = true }
 
 # Python bindings
-pyo3.workspace = true
-pyo3-async-runtimes.workspace = true
+pyo3 = { workspace = true }
+pyo3-async-runtimes = { workspace = true }
+numpy = { workspace = true }
 
 # Asynchronous runtime
-tokio.workspace = true
-tokio-stream.workspace = true
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
 
 # gRPC
-tonic.workspace = true
+tonic = { workspace = true }
 
 # Arrow
 arrow = { workspace = true, features = ["pyarrow"] }

@@ -30,6 +30,8 @@ uuid = { version = "1.11.0", features = ["v4", "fast-rng", "serde"] }
 semver = "1.0.24"
 bytes = "1.9.0"
 num = "0.4.3"
+ndarray = "0.16.1"
+itertools = "0.14.0"
 
 # Command-line argument parsing
 clap = { version = "4.5.23", features = ["derive"] }
@@ -73,6 +75,7 @@ hyper-util = "0.1.10"
 # Python bindings
 pyo3 = { version = "0.23.3", features = ["anyhow", "chrono", "num-complex"] }
 pyo3-async-runtimes = { version = "0.23.0", features = ["tokio-runtime"] }
+numpy = "0.23.0"
 
 [workspace.lints.rust]
 rust-2018-idioms = "warn"
@@ -83,49 +86,49 @@ nursery = "warn"
 
 [dependencies]
 # Arrow
-arrow.workspace = true
+arrow = { workspace = true }
 
 # Error handling
-anyhow.workspace = true
-thiserror.workspace = true
+anyhow = { workspace = true }
+thiserror = { workspace = true }
 
 # Usefol types
-chrono.workspace = true
-semver.workspace = true
-uuid.workspace = true
-bytes.workspace = true
+chrono = { workspace = true }
+semver = { workspace = true }
+uuid = { workspace = true }
+bytes = { workspace = true }
 
 # Command-line argument parsing
-clap.workspace = true
+clap = { workspace = true }
 
 # Serialization and deserialization
-serde.workspace = true
-serde_json.workspace = true
-toml.workspace = true
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
 
 # Database
-sqlx.workspace = true
+sqlx = { workspace = true }
 
 # Asynchronous runtime
-tokio.workspace = true
-tokio-util.workspace = true
-futures.workspace = true
-async-stream.workspace = true
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+async-stream = { workspace = true }
 
 # gRPC
-prost.workspace = true
-prost-types.workspace = true
-tonic.workspace = true
+prost = { workspace = true }
+prost-types = { workspace = true }
+tonic = { workspace = true }
 
 # Logging
-tracing.workspace = true
-tracing-subscriber.workspace = true
-tower.workspace = true
-hyper-util.workspace = true
-tokio-stream.workspace = true
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tower = { workspace = true }
+hyper-util = { workspace = true }
+tokio-stream = { workspace = true }
 
 [build-dependencies]
-tonic-build.workspace = true
+tonic-build = { workspace = true }
 
 [lints]
 workspace = true

@@ -11,18 +11,19 @@ use tower::service_fn;
 use tracing::error;
 
 use crate::{
-    db::DatasetRecord,
     ipc::Ipc,
     paths::IpcFile,
     proto::{
         data_storage_service_client::DataStorageServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum, AddTagsRequest,
-        CreateRequest, GetRequest, RemoveTagsRequest, ReplaceTagsRequest, UpdateDescriptionRequest,
-        UpdateFavoriteRequest, UpdateNameRequest, VersionRequest, WriteRequest, WriteResponse,
-        WRITE_TOKEN,
+        CreateRequest, GetRequest, ListRequest, RemoveTagsRequest, ReplaceTagsRequest,
+        UpdateDescriptionRequest, UpdateFavoriteRequest, UpdateNameRequest, VersionRequest,
+        WriteRequest, WriteResponse, WRITE_TOKEN,
     },
     VERSION,
 };
+
+pub use crate::{dataset::Info, db::DatasetRecord};
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -79,6 +80,13 @@ impl Client {
     /// 2. Server errors
     pub async fn get_dataset_by_uid(&self, uid: String) -> Result<DatasetRecord> {
         self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
+    }
+
+    pub async fn list_all_datasets(&self) -> Result<Vec<DatasetRecord>> {
+        let request = ListRequest {};
+        let response = self.data_storage_service_client().list(request).await?;
+        let records = response.into_inner().datasets;
+        records.into_iter().map(TryInto::try_into).collect()
     }
 
     pub async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<DatasetRecord> {

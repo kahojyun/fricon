@@ -1,21 +1,23 @@
 #![allow(
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
-    clippy::must_use_candidate
+    clippy::must_use_candidate,
+    clippy::significant_drop_tightening
 )]
 
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, LazyLock},
 };
 
 use anyhow::{bail, ensure, Context, Result};
 use arrow::{
     array::{
-        make_array, Array, ArrayData, BooleanArray, Float64Array, Int64Array, RecordBatch,
-        StringArray, StructArray,
+        downcast_array, make_array, Array, ArrayData, ArrayRef, BooleanArray, Float64Array,
+        Int64Array, ListArray, RecordBatch, StringArray, StringBuilder, StructArray,
     },
+    buffer::OffsetBuffer,
     datatypes::{DataType, Field, Fields, Schema},
     pyarrow::PyArrowType,
 };
@@ -23,13 +25,16 @@ use chrono::{DateTime, Utc};
 use clap::Parser;
 use fricon::{
     cli::Cli,
-    client::{self, Client},
+    client::{self, Client, DatasetRecord, Info},
     paths::WorkDirectory,
 };
+use itertools::Itertools;
 use num::complex::Complex64;
+use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
 use pyo3::{
     prelude::*,
-    types::{PyBool, PyComplex, PyFloat, PyInt, PyString},
+    sync::GILOnceCell,
+    types::{PyBool, PyComplex, PyDict, PyFloat, PyInt, PyList, PySequence, PyString},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
 
@@ -129,17 +134,121 @@ impl DatasetManager {
     ///
     /// Raises:
     ///     RuntimeError: Dataset not found.
-    pub fn open(&self, dataset_id: &Bound<'_, PyAny>) -> PyResult<Dataset> {
-        todo!()
+    pub fn open(&self, dataset_id: &Bound<'_, PyAny>) -> Result<Dataset> {
+        if let Ok(id) = dataset_id.extract::<i64>() {
+            let record = get_runtime().block_on(self.workspace.client.get_dataset_by_id(id))?;
+            Ok(Dataset {
+                workspace: Some(self.workspace.clone()),
+                record,
+            })
+        } else if let Ok(uid) = dataset_id.extract::<String>() {
+            let record = get_runtime().block_on(self.workspace.client.get_dataset_by_uid(uid))?;
+            Ok(Dataset {
+                workspace: Some(self.workspace.clone()),
+                record,
+            })
+        } else {
+            bail!("Invalid dataset id.")
+        }
     }
 
     /// List all datasets in the workspace.
     ///
     /// Returns:
     ///     A pandas dataframe containing information of all datasets.
-    pub fn list_all(&self) -> PyObject {
-        todo!()
+    pub fn list_all(&self, py: Python<'_>) -> PyResult<PyObject> {
+        static FROM_RECORDS: GILOnceCell<PyObject> = GILOnceCell::new();
+
+        let records = get_runtime().block_on(self.workspace.client.list_all_datasets())?;
+        let py_records = records.into_iter().map(
+            |DatasetRecord {
+                 id,
+                 info:
+                     Info {
+                         uid,
+                         name,
+                         description,
+                         favorite,
+                         index_columns,
+                         path,
+                         created_at,
+                         tags,
+                     },
+             }| {
+                let uid = uid.simple().to_string();
+                let path = self.workspace.root.data_dir().join(&path);
+                (
+                    id,
+                    uid,
+                    name,
+                    description,
+                    favorite,
+                    index_columns,
+                    path,
+                    created_at,
+                    tags,
+                )
+            },
+        );
+        let py_records = PyList::new(py, py_records)?;
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("index", "id")?;
+        kwargs.set_item(
+            "columns",
+            [
+                "id",
+                "uid",
+                "name",
+                "description",
+                "favorite",
+                "index",
+                "path",
+                "created_at",
+                "tags",
+            ],
+        )?;
+        let dataframe = FROM_RECORDS
+            .get_or_try_init(py, || {
+                Ok::<_, PyErr>(
+                    py.import("pandas")?
+                        .getattr("DataFrame")?
+                        .getattr("from_records")?
+                        .unbind(),
+                )
+            })?
+            .bind(py)
+            .call((py_records,), Some(&kwargs))?;
+        Ok(dataframe.unbind())
     }
+}
+
+fn extract_float_array(values: &Bound<'_, PyAny>) -> Result<Float64Array> {
+    if let Ok(PyArrowType(data)) = values.extract() {
+        let arr = make_array(data);
+        if *arr.data_type() == DataType::Float64 {
+            return Ok(downcast_array(&arr));
+        }
+        bail!("The data type of the given arrow array is not float64.");
+    }
+    if let Ok(arr) = values.extract::<PyArrayLike1<'_, f64, AllowTypeChange>>() {
+        let arr = arr.readonly();
+        let arr = arr.as_array().into_iter().copied();
+        let arr = Float64Array::from_iter_values(arr);
+        return Ok(arr);
+    }
+    let py_type = values.get_type();
+    bail!("Cannot convert values with type {py_type} to float64 array.");
+}
+
+fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
+    // if let Ok(PyArrowType(data)) = values.extract() {
+    //     let arr = make_array(data);
+    //     if *arr.data_type() == DataType::Float64 {
+    //         return Ok(downcast_array(&arr));
+    //     }
+    //     bail!("The data type of the given arrow array is not float64.");
+    // }
+    todo!()
 }
 
 /// 1-D list of values with optional x-axis values.
@@ -196,7 +305,7 @@ impl Trace {
 #[pyclass(module = "fricon._core")]
 pub struct Dataset {
     workspace: Option<Workspace>,
-    id: i64,
+    record: DatasetRecord,
 }
 
 impl Dataset {
@@ -213,45 +322,45 @@ impl Dataset {
     /// Name of the dataset.
     #[getter]
     pub fn name(&self) -> &str {
-        todo!();
+        &self.record.info.name
     }
 
     #[setter]
     pub fn set_name(&mut self, name: String) -> Result<()> {
-        get_runtime().block_on(self.client()?.update_dataset_name(self.id, name))
+        get_runtime().block_on(self.client()?.update_dataset_name(self.id(), name))
     }
 
     /// Description of the dataset.
     #[getter]
     pub fn description(&self) -> &str {
-        todo!();
+        &self.record.info.description
     }
 
     #[setter]
     pub fn set_description(&mut self, description: String) -> Result<()> {
-        get_runtime().block_on(self.client()?.update_dataset_name(self.id, description))
+        get_runtime().block_on(self.client()?.update_dataset_name(self.id(), description))
     }
 
     /// Tags of the dataset.
     #[getter]
-    pub fn tags(&self) -> Vec<String> {
-        todo!();
+    pub fn tags(&self) -> &[String] {
+        &self.record.info.tags
     }
 
     #[setter]
     pub fn set_tags(&mut self, tags: Vec<String>) -> Result<()> {
-        get_runtime().block_on(self.client()?.replace_dataset_tags(self.id, tags))
+        get_runtime().block_on(self.client()?.replace_dataset_tags(self.id(), tags))
     }
 
     /// Favorite status of the dataset.
     #[getter]
-    pub fn favorite(&self) -> bool {
-        todo!();
+    pub const fn favorite(&self) -> bool {
+        self.record.info.favorite
     }
 
     #[setter]
     pub fn set_favorite(&mut self, favorite: bool) -> Result<()> {
-        get_runtime().block_on(self.client()?.update_dataset_favorite(self.id, favorite))
+        get_runtime().block_on(self.client()?.update_dataset_favorite(self.id(), favorite))
     }
 
     /// Load the dataset as a pandas DataFrame.
@@ -295,26 +404,33 @@ impl Dataset {
 
     /// Id of the dataset.
     #[getter]
-    pub fn id(&self) -> usize {
-        todo!();
+    pub const fn id(&self) -> i64 {
+        self.record.id
     }
 
     /// UUID of the dataset.
     #[getter]
     pub fn uid(&self) -> String {
-        todo!();
+        self.record.info.uid.simple().to_string()
     }
 
     /// Path of the dataset.
     #[getter]
-    pub fn path(&self) -> &Path {
-        todo!();
+    pub fn path(&self) -> Result<PathBuf> {
+        // TODO: Non-workspace dataset
+        Ok(self
+            .workspace
+            .as_ref()
+            .context("No workspace.")?
+            .root
+            .data_dir()
+            .join(&self.record.info.path))
     }
 
     /// Creation date of the dataset.
     #[getter]
-    pub fn created_at(&self) -> DateTime<Utc> {
-        todo!();
+    pub const fn created_at(&self) -> DateTime<Utc> {
+        self.record.info.created_at
     }
 
     /// Arrow schema of the dataset.
@@ -325,8 +441,8 @@ impl Dataset {
 
     /// Index columns of the dataset.
     #[getter]
-    pub fn index(&self) -> Vec<String> {
-        todo!();
+    pub fn index(&self) -> &[String] {
+        &self.record.info.index_columns
     }
 
     /// Close the dataset.
@@ -369,7 +485,7 @@ impl DatasetWriter {
     }
 }
 
-fn infer_datatype(value: &Bound<'_, PyAny>) -> Result<DataType> {
+fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
     // Check bool first because bool is a subclass of int.
     if value.is_instance_of::<PyBool>() {
         Ok(DataType::Boolean)
@@ -381,8 +497,39 @@ fn infer_datatype(value: &Bound<'_, PyAny>) -> Result<DataType> {
         Ok(get_complex_type())
     } else if value.is_instance_of::<PyString>() {
         Ok(DataType::Utf8)
+    } else {
+        let py_type = value.get_type();
+        bail!("Cannot infer scalar arrow data type for python type '{py_type}'.");
+    }
+}
+
+/// Infer [`arrow::datatypes::DataType`] from value in row.
+///
+/// Currently supports:
+///
+/// 1. Scalar types: bool, int, float, complex, str
+/// 2. [`Trace`]
+/// 3. [`arrow::array::Array`]
+/// 4. Python Sequence protocol
+///
+/// TODO: support numpy array
+fn infer_data_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
+    if let Ok(data_type) = infer_scalar_type(value) {
+        Ok(data_type)
     } else if let Ok(trace) = value.downcast_exact::<Trace>() {
         Ok(trace.borrow().data_type().0)
+    } else if let Ok(PyArrowType(data)) = value.extract() {
+        let arr = make_array(data);
+        Ok(arr.data_type().clone())
+    } else if let Ok(value) = value.downcast::<PySequence>() {
+        ensure!(
+            value.len()? > 0,
+            "Cannot infer data type for empty sequence."
+        );
+        let first_item = value.get_item(0)?;
+        let item_type = infer_scalar_type(&first_item)?;
+        let data_type = DataType::new_list(item_type, false);
+        Ok(data_type)
     } else {
         let py_type = value.get_type();
         bail!("Cannot infer arrow data type for python type '{py_type}'.");
@@ -394,35 +541,67 @@ fn infer_schema(
     initial_schema: &Schema,
     values: &HashMap<String, PyObject>,
 ) -> Result<Schema> {
-    for field in initial_schema.fields() {
-        if !values.contains_key(field.name()) {
-            bail!(
-                "Field '{}' present in initial schema but not in values.",
-                field.name()
-            );
-        }
-    }
-    let mut new_fields = vec![];
-    for (name, value) in values {
-        if initial_schema.field_with_name(name).is_ok() {
-            continue;
-        }
-        let value = value.bind(py);
-        let datatype = infer_datatype(value)
-            .with_context(|| format!("Inferring data type for column '{name}'."))?;
-        let field = Field::new(name, datatype, false);
-        new_fields.push(field);
-    }
-    let new_schema = Schema::new(new_fields);
-    let merged = Schema::try_merge([initial_schema.clone(), new_schema])?;
-    Ok(merged)
+    let new_fields: Vec<Field> = values
+        .iter()
+        .filter(|(name, _)| initial_schema.field_with_name(name).is_err())
+        .map(|(name, value)| {
+            let datatype = infer_data_type(value.bind(py))
+                .with_context(|| format!("Inferring data type for column '{name}'."))?;
+            anyhow::Ok(Field::new(name, datatype, false))
+        })
+        .try_collect()?;
+    Schema::try_merge([initial_schema.clone(), Schema::new(new_fields)])
+        .context("Failed to merge initial schema with inferred schema.")
 }
 
-fn build_list(field: &Arc<Field>, value: &Bound<'_, PyAny>) -> Result<Arc<dyn Array>> {
-    todo!();
+fn build_list(field: Arc<Field>, sequence: &Bound<'_, PySequence>) -> Result<ListArray> {
+    let list = match field.data_type() {
+        DataType::Boolean => {
+            let mut builder = BooleanArray::builder(sequence.len()?);
+            for v in sequence.try_iter()? {
+                let v = v?.extract()?;
+                builder.append_value(v);
+            }
+            let values = Arc::new(builder.finish());
+            let offsets = OffsetBuffer::from_lengths([values.len()]);
+            ListArray::try_new(field, offsets, values, None)?
+        }
+        DataType::Int64 => {
+            let mut builder = Int64Array::builder(sequence.len()?);
+            for v in sequence.try_iter()? {
+                let v = v?.extract()?;
+                builder.append_value(v);
+            }
+            let values = Arc::new(builder.finish());
+            let offsets = OffsetBuffer::from_lengths([values.len()]);
+            ListArray::try_new(field, offsets, values, None)?
+        }
+        DataType::Float64 => {
+            let mut builder = Float64Array::builder(sequence.len()?);
+            for v in sequence.try_iter()? {
+                let v = v?.extract()?;
+                builder.append_value(v);
+            }
+            let values = Arc::new(builder.finish());
+            let offsets = OffsetBuffer::from_lengths([values.len()]);
+            ListArray::try_new(field, offsets, values, None)?
+        }
+        DataType::Utf8 => {
+            let mut builder = StringBuilder::new();
+            for v in sequence.try_iter()? {
+                let v = v?.extract::<String>()?;
+                builder.append_value(v);
+            }
+            let values = Arc::new(builder.finish());
+            let offsets = OffsetBuffer::from_lengths([values.len()]);
+            ListArray::try_new(field, offsets, values, None)?
+        }
+        _ => bail!("Unsupported data type. Please manually build `pyarrow.Array`."),
+    };
+    Ok(list)
 }
 
-fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<Arc<dyn Array>> {
+fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRef> {
     if let Ok(PyArrowType(data)) = value.extract::<PyArrowType<ArrayData>>() {
         ensure!(
             data.data_type() == data_type,
@@ -460,6 +639,7 @@ fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<Arc<dyn
             let array = StringArray::new_scalar(value).into_inner();
             Ok(Arc::new(array))
         }
+        // complex scalar
         t @ DataType::Struct(fields) if *t == get_complex_type() => {
             let Ok(value) = value.extract::<Complex64>() else {
                 bail!("Failed to extract complex value.")
@@ -470,7 +650,8 @@ fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<Arc<dyn
                 StructArray::new(fields.clone(), vec![Arc::new(real), Arc::new(imag)], None);
             Ok(Arc::new(array))
         }
-        t @ DataType::Struct(fields) => {
+        // Trace
+        t @ DataType::Struct(_fields) => {
             let Ok(value) = value.downcast_exact::<Trace>() else {
                 bail!("Failed to extract `Trace` value.")
             };
@@ -481,7 +662,14 @@ fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<Arc<dyn
             let array = value.to_arrow_array().0;
             Ok(make_array(array))
         }
-        DataType::List(field) => build_list(field, value),
+        // Sequence
+        DataType::List(field) => {
+            let Ok(value) = value.downcast() else {
+                bail!("Value is not a python `Sequence`");
+            };
+            let list = build_list(field.clone(), value)?;
+            Ok(Arc::new(list))
+        }
         _ => {
             bail!("Unsupported data type {data_type}, please manually construct a `pyarrow.Array`.")
         }
@@ -497,14 +685,19 @@ fn build_record_batch(
         schema.fields().len() == values.len(),
         "Values not compatible with schema."
     );
-    let mut columns = vec![];
-    for field in schema.fields() {
-        let name = field.name();
-        let Some(value) = values.get(name) else {
-            bail!("Missing value {name}")
-        };
-        columns.push(build_array(value.bind(py), field.data_type())?);
-    }
+    let columns = schema
+        .fields()
+        .into_iter()
+        .map(|field| {
+            let name = field.name();
+            let value = values
+                .get(name)
+                .with_context(|| format!("Missing value {name}"))?
+                .bind(py);
+            build_array(value, field.data_type())
+                .with_context(|| format!("Building array for column {name}"))
+        })
+        .try_collect()?;
     Ok(RecordBatch::try_new(schema, columns)?)
 }
 
@@ -643,7 +836,7 @@ pub fn main(py: Python<'_>) -> i32 {
             .block_on(async { fricon::main(cli).await })
     }
     fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
-        let signal = py.import_bound("signal")?;
+        let signal = py.import("signal")?;
         let sigint = signal.getattr("SIGINT")?;
         let default_handler = signal.getattr("SIG_DFL")?;
         _ = signal.call_method1("signal", (sigint, default_handler))?;

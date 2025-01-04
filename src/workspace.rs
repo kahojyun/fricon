@@ -33,10 +33,6 @@ impl Workspace {
         &self.root
     }
 
-    pub const fn database(&self) -> &SqlitePool {
-        &self.database
-    }
-
     pub fn dataset_index(&self) -> db::DatasetIndex {
         db::DatasetIndex {
             pool: self.database.clone(),
