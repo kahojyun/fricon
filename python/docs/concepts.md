@@ -57,16 +57,3 @@ more human-readable and can be used to reference a dataset in a given
 workspace.
 
 Users can open a dataset by either `uid` or `id`.
-
-### Data Types
-
-For simplicity, fricon only handle a subset of data types in Arrow format:
-
-* Numbers: int, float, complex
-* Strings
-* Boolean
-* 1-D List of previous types
-
-However, users can store any data by giving manually constructed arrow array,
-although fricon won't be able to provide any extra features like visualization
-for these columns. More data types can be supported in the future if appropriate.

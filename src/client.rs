@@ -231,7 +231,7 @@ impl DatasetWriter {
     /// # Panics
     pub async fn write(&mut self, data: RecordBatch) -> Result<()> {
         let Some(WriterHandle { tx, .. }) = self.handle.as_mut() else {
-            bail!("Writer already finished.");
+            bail!("Writer closed.");
         };
         if tx.send(data).await == Ok(()) {
             Ok(())

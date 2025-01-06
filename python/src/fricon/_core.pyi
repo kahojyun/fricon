@@ -65,6 +65,7 @@ class Trace:
     ) -> Trace: ...
     @property
     def data_type(self) -> pa.DataType: ...
+    def to_arrow_array(self) -> pa.Array[Any]: ...  # pyright: ignore[reportExplicitAny]
 
 _ColumnType: TypeAlias = (
     str

@@ -785,7 +785,7 @@ impl DatasetWriter {
     ///     RuntimeError: Writer is not closed yet.
     #[getter]
     pub fn id(&self) -> Result<i64> {
-        self.id.context("Writer not closed.")
+        self.id.context("Writer is not closed yet.")
     }
 
     /// Finish writing to dataset.
