@@ -25,7 +25,7 @@ use chrono::{DateTime, Utc};
 use clap::Parser;
 use fricon::{
     cli::Cli,
-    client::{self, Client, DatasetRecord, Info},
+    client::{self, Client, DatasetRecord, Info, DATASET_NAME},
     paths::WorkDirectory,
 };
 use itertools::Itertools;
@@ -442,7 +442,7 @@ impl Dataset {
     /// Returns:
     ///     A polars DataFrame.
     pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
-        io_helper(py)?.call_method1(py, "read_polars", (self.path()?,))
+        io_helper(py)?.call_method1(py, "read_polars", (self.path()?.join(DATASET_NAME),))
     }
 
     /// Load the dataset as an Arrow Table.
@@ -453,7 +453,7 @@ impl Dataset {
     /// Returns:
     ///     An Arrow Table.
     pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
-        io_helper(py)?.call_method1(py, "read_arrow", (self.path()?,))
+        io_helper(py)?.call_method1(py, "read_arrow", (self.path()?.join(DATASET_NAME),))
     }
 
     /// Id of the dataset.

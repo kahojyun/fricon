@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::{paths::DatasetPath, workspace::Workspace};
 
-const DATASET_NAME: &str = "dataset.arrow";
+pub const DATASET_NAME: &str = "dataset.arrow";
 
 pub struct Dataset {
     workspace: Workspace,

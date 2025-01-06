@@ -23,7 +23,10 @@ use crate::{
     VERSION,
 };
 
-pub use crate::{dataset::Info, db::DatasetRecord};
+pub use crate::{
+    dataset::{Info, DATASET_NAME},
+    db::DatasetRecord,
+};
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -164,9 +167,13 @@ impl Client {
     }
 }
 
-pub struct DatasetWriter {
+pub struct WriterHandle {
     tx: mpsc::Sender<RecordBatch>,
-    writer_handle: Option<JoinHandle<Result<()>>>,
+    handle: JoinHandle<Result<()>>,
+}
+
+pub struct DatasetWriter {
+    handle: Option<WriterHandle>,
     connection_handle: JoinHandle<Result<WriteResponse>>,
 }
 
@@ -206,8 +213,10 @@ impl DatasetWriter {
             Ok(response.into_inner())
         });
         Self {
-            tx,
-            writer_handle: Some(writer_handle),
+            handle: Some(WriterHandle {
+                tx,
+                handle: writer_handle,
+            }),
             connection_handle,
         }
     }
@@ -218,14 +227,17 @@ impl DatasetWriter {
     ///
     /// 1. Record batch schema mismatch.
     /// 2. Connection error.
+    ///
+    /// # Panics
     pub async fn write(&mut self, data: RecordBatch) -> Result<()> {
-        if self.tx.send(data).await == Ok(()) {
+        let Some(WriterHandle { tx, .. }) = self.handle.as_mut() else {
+            bail!("Writer already finished.");
+        };
+        if tx.send(data).await == Ok(()) {
             Ok(())
         } else {
-            let Some(writer_handle) = self.writer_handle.take() else {
-                bail!("Writer already finished.");
-            };
-            let writer_result = writer_handle.await.context("Writer panicked.")?;
+            let WriterHandle { handle, .. } = self.handle.take().expect("Not none here.");
+            let writer_result = handle.await.context("Writer panicked.")?;
             writer_result.context("Writer failed.")
         }
     }
@@ -236,10 +248,18 @@ impl DatasetWriter {
     ///
     /// 1. Record batch schema mismatch.
     /// 2. Connection error.
-    pub async fn finish(self) -> Result<i64> {
+    pub async fn finish(mut self) -> Result<i64> {
+        let WriterHandle { tx, handle } = self.handle.take().context("Already finished.")?;
+        drop(tx);
+        handle
+            .await
+            .context("Writer panicked.")?
+            .context("Writer failed.")?;
         let id = self
             .connection_handle
-            .await??
+            .await
+            .context("Connector panicked.")?
+            .context("Connection failed.")?
             .id
             .context("No dataset id returned.")?;
         Ok(id)
