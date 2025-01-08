@@ -170,13 +170,12 @@ impl DatasetManager {
                          description,
                          favorite,
                          index_columns,
-                         path,
                          created_at,
                          tags,
+                         ..
                      },
              }| {
                 let uid = uid.simple().to_string();
-                let path = self.workspace.root.data_dir().join(&path);
                 (
                     id,
                     uid,
@@ -184,7 +183,6 @@ impl DatasetManager {
                     description,
                     favorite,
                     index_columns,
-                    path,
                     created_at,
                     tags,
                 )
@@ -202,12 +200,11 @@ impl DatasetManager {
                 "description",
                 "favorite",
                 "index",
-                "path",
                 "created_at",
                 "tags",
             ],
         )?;
-        let dataframe = FROM_RECORDS
+        FROM_RECORDS
             .get_or_try_init(py, || {
                 Ok::<_, PyErr>(
                     py.import("pandas")?
@@ -216,9 +213,7 @@ impl DatasetManager {
                         .unbind(),
                 )
             })?
-            .bind(py)
-            .call((py_records,), Some(&kwargs))?;
-        Ok(dataframe.unbind())
+            .call(py, (py_records,), Some(&kwargs))
     }
 }
 
@@ -417,27 +412,7 @@ impl Dataset {
         get_runtime().block_on(self.client()?.update_dataset_favorite(self.id(), favorite))
     }
 
-    /// Load the dataset as a pandas DataFrame.
-    ///
-    /// Arrow data types cannot be directly converted to pandas data types, so in some cases the
-    /// conversion may be slow or fail. Consider using `to_polars` or `to_arrow` for better
-    /// performance.
-    ///
-    /// See Also:
-    ///     [`to_polars`][fricon.Dataset.to_polars], [`to_arrow`][fricon.Dataset.to_arrow]
-    ///
-    /// Returns:
-    ///     A pandas DataFrame.
-    pub fn to_pandas(&self) -> PyObject {
-        todo!()
-    }
-
     /// Load the dataset as a polars DataFrame.
-    ///
-    /// `polars` supports memory mapping, so it is faster than `pandas` for large datasets.
-    ///
-    /// See Also:
-    ///     [`to_pandas`][fricon.Dataset.to_pandas], [`to_arrow`][fricon.Dataset.to_arrow]
     ///
     /// Returns:
     ///     A polars DataFrame.
@@ -446,9 +421,6 @@ impl Dataset {
     }
 
     /// Load the dataset as an Arrow Table.
-    ///
-    /// See Also:
-    ///     [`to_pandas`][fricon.Dataset.to_pandas], [`to_polars`][fricon.Dataset.to_polars]
     ///
     /// Returns:
     ///     An Arrow Table.
