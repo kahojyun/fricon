@@ -11,6 +11,7 @@ from ._core import (
     complex128,
     trace_,
 )
+from ._helper import arrow_to_numpy
 
 __all__ = [
     "Dataset",
@@ -18,6 +19,7 @@ __all__ = [
     "DatasetWriter",
     "Trace",
     "Workspace",
+    "arrow_to_numpy",
     "complex128",
     "trace_",
 ]

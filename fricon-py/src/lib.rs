@@ -366,9 +366,9 @@ impl Dataset {
     }
 }
 
-fn io_helper(py: Python<'_>) -> PyResult<&PyObject> {
+fn helper_module(py: Python<'_>) -> PyResult<&PyObject> {
     static IO_MODULE: GILOnceCell<PyObject> = GILOnceCell::new();
-    IO_MODULE.get_or_try_init(py, || py.import("fricon._io").map(Into::into))
+    IO_MODULE.get_or_try_init(py, || py.import("fricon._helper").map(Into::into))
 }
 
 #[pymethods]
@@ -429,7 +429,7 @@ impl Dataset {
     /// Returns:
     ///     A pandas DataFrame.
     pub fn to_pandas(&self) -> PyObject {
-        todo!();
+        todo!()
     }
 
     /// Load the dataset as a polars DataFrame.
@@ -442,7 +442,7 @@ impl Dataset {
     /// Returns:
     ///     A polars DataFrame.
     pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
-        io_helper(py)?.call_method1(py, "read_polars", (self.path()?.join(DATASET_NAME),))
+        helper_module(py)?.call_method1(py, "read_polars", (self.path()?.join(DATASET_NAME),))
     }
 
     /// Load the dataset as an Arrow Table.
@@ -453,7 +453,7 @@ impl Dataset {
     /// Returns:
     ///     An Arrow Table.
     pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
-        io_helper(py)?.call_method1(py, "read_arrow", (self.path()?.join(DATASET_NAME),))
+        helper_module(py)?.call_method1(py, "read_arrow", (self.path()?.join(DATASET_NAME),))
     }
 
     /// Id of the dataset.
