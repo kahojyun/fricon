@@ -90,7 +90,7 @@ impl DatasetIndex {
 
     pub async fn list_all(&self) -> Result<Vec<DatasetRecord>> {
         let mut tx = self.pool.begin().await?;
-        let ids = sqlx::query_scalar!("SELECT id FROM datasets")
+        let ids = sqlx::query_scalar!("SELECT id FROM datasets ORDER BY id DESC")
             .fetch_all(&mut *tx)
             .await?;
         let mut datasets = Vec::with_capacity(ids.len());
