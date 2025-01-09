@@ -207,40 +207,23 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+ci = [
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
 dev = [
-    { name = "black" },
     { name = "ipython", version = "8.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "ipython", version = "8.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "markdown-exec", extra = ["ansi"] },
-    { name = "mkdocs-material" },
-    { name = "mkdocstrings-python" },
-    { name = "mypy" },
     { name = "pandas-stubs", version = "2.2.2.240807", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pandas-stubs", version = "2.2.3.241126", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pyarrow-stubs" },
-    { name = "pytest" },
-    { name = "ruff" },
 ]
 docs = [
     { name = "black" },
     { name = "markdown-exec", extra = ["ansi"] },
     { name = "mkdocs-material" },
     { name = "mkdocstrings-python" },
-]
-lint = [
-    { name = "mypy" },
-    { name = "pandas-stubs", version = "2.2.2.240807", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pandas-stubs", version = "2.2.3.241126", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "pyarrow-stubs" },
-    { name = "ruff" },
-]
-test = [
-    { name = "pytest" },
-]
-types = [
-    { name = "pandas-stubs", version = "2.2.2.240807", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pandas-stubs", version = "2.2.3.241126", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "pyarrow-stubs" },
 ]
 
 [package.metadata]
@@ -252,34 +235,21 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "black", specifier = ">=24.10.0" },
-    { name = "ipython", specifier = ">=8.18.1" },
-    { name = "markdown-exec", extras = ["ansi"], specifier = ">=1.10.0" },
-    { name = "mkdocs-material", specifier = ">=9.5.49" },
-    { name = "mkdocstrings-python", specifier = ">=1.12.2" },
+ci = [
     { name = "mypy", specifier = ">=1.11.2" },
-    { name = "pandas-stubs", specifier = ">=2.2.2.240807" },
-    { name = "pyarrow-stubs", specifier = ">=17.6" },
     { name = "pytest", specifier = ">=8.3.3" },
     { name = "ruff", specifier = ">=0.6.6" },
+]
+dev = [
+    { name = "ipython", specifier = ">=8.18.1" },
+    { name = "pandas-stubs", specifier = ">=2.2.2.240807" },
+    { name = "pyarrow-stubs", specifier = ">=17.6" },
 ]
 docs = [
     { name = "black", specifier = ">=24.10.0" },
     { name = "markdown-exec", extras = ["ansi"], specifier = ">=1.10.0" },
     { name = "mkdocs-material", specifier = ">=9.5.49" },
     { name = "mkdocstrings-python", specifier = ">=1.12.2" },
-]
-lint = [
-    { name = "mypy", specifier = ">=1.11.2" },
-    { name = "pandas-stubs", specifier = ">=2.2.2.240807" },
-    { name = "pyarrow-stubs", specifier = ">=17.6" },
-    { name = "ruff", specifier = ">=0.6.6" },
-]
-test = [{ name = "pytest", specifier = ">=8.3.3" }]
-types = [
-    { name = "pandas-stubs", specifier = ">=2.2.2.240807" },
-    { name = "pyarrow-stubs", specifier = ">=17.6" },
 ]
 
 [[package]]

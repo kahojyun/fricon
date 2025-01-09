@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pyarrow as pa
 
-from fricon import DatasetManager, Workspace, complex128, trace_
+from fricon import DatasetManager, Workspace, complex128
 
 
 def simple(manager: DatasetManager) -> None:
@@ -14,7 +14,7 @@ def simple(manager: DatasetManager) -> None:
             # supports primitive types and 1d arrays
             writer.write(a=i, b=i * 2, c=[1, 2, 3])
 
-    d = writer.to_dataset()
+    d = manager.open(writer.id)
     assert d.name == "example"
     assert d.description == "test"
     assert set(d.tags) == {"tagA", "tagB"}
@@ -36,7 +36,7 @@ def with_schema(manager: DatasetManager) -> None:
             ("a", pa.int64()),
             ("b", pa.int64()),
             ("c", complex128()),
-            ("d", trace_(pa.int64())),
+            ("d", pa.list_(pa.int64())),
         ]
     )
     with manager.create("example", schema=schema) as writer:

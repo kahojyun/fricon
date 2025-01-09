@@ -1,3 +1,7 @@
+# pyright: reportExplicitAny=false
+# pyright: reportAny=false
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -20,7 +24,7 @@ def read_polars(path: str) -> pl.DataFrame:
     return pl.read_ipc(path)
 
 
-def arrow_to_numpy(arr: pa.Array[Any]) -> npt.NDArray[Any]:
+def arrow_to_numpy(arr: pa.Array[Any] | pa.ChunkedArray[Any]) -> npt.NDArray[Any]:
     """Convert Arrow array to numpy array.
 
     If the Arrow array is of custom `complex128` type, it will be converted to
@@ -33,7 +37,12 @@ def arrow_to_numpy(arr: pa.Array[Any]) -> npt.NDArray[Any]:
     Returns:
         Numpy array.
     """
+    if isinstance(arr, pa.ChunkedArray):
+        arr = arr.combine_chunks()
     if arr.type == complex128():
+        if not isinstance(arr, pa.StructArray):
+            msg = "arr must be a StructArray of complex128 type"
+            raise AssertionError(msg)
         re = arr.field("real").to_numpy()
         im = arr.field("imag").to_numpy()
         return re + 1j * im

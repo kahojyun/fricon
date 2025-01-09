@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "**"
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Should run on every push and PR
+  test:
+    name: Test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargo build
+        run: cargo build --workspace --verbose --locked
+      - name: Cargo test
+        run: cargo test --workspace --verbose
+      - name: Cargo fmt
+        run: cargo fmt --all --check
+      - name: Cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Sync project
+        run: uv sync --locked --group ci
+      - name: Pytest
+        run: uv run pytest
+      - name: Ruff format
+        run: uv run ruff format --check
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github
+      - name: Basedpyright
+        run: uv run basedpyright
+      - name: Stubtest
+        run: uv run stubtest fricon
+      - name: Check cargo dependencies
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+  build:
+    runs-on: ${{ matrix.os.runner }}
+    needs: release
+    strategy:
+      matrix:
+        os:
+          - runner: ubuntu-22.04
+            name: linux
+          - runner: windows-2022
+            name: windows
+          - runner: macos-14
+            name: macos
+        target: [x86_64, aarch64]
+        command: [build]
+        include:
+          - args: --release --out dist --find-interpreter
+            sccache: true
+          - command: sdist
+            os:
+              runner: ubuntu-22.04
+            args: --out dist
+            sccache: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: ${{ env.CI_MATURIN_VERSION }}
+          command: ${{ matrix.command }}
+          target: ${{ matrix.target }}
+          args: ${{ matrix.args }}
+          sccache: ${{ matrix.sccache }}
+          manylinux: auto
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.command == 'sdist' && 'sdist' || format('{0}-{1}', matrix.os.name, matrix.target) }}
+          path: dist
+
+  # For branch protection rules
+  check:
+    if: always()
+    needs:
+      - build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+
+  # Should run only on push
+  publish:
+    name: Publish to PyPI
+    needs:
+      - check
+    if: needs.release.outputs.published == 'true' && github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    environment: pypi
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "wheels-*/*"
+      - name: Publish to PyPI
+        uses: PyO3/maturin-action@v1
+        with:
+          command: upload
+          args: --non-interactive --skip-existing wheels-*/*
