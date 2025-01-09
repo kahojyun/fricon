@@ -71,20 +71,23 @@ impl Client {
 
     /// # Errors
     ///
-    /// 1. Not found.
-    /// 2. Server errors
+    /// * Not found.
+    /// * Server errors.
     pub async fn get_dataset_by_id(&self, id: i64) -> Result<DatasetRecord> {
         self.get_dataset_by_id_enum(IdEnum::Id(id)).await
     }
 
     /// # Errors
     ///
-    /// 1. Not found.
-    /// 2. Server errors
+    /// * Not found.
+    /// * Server errors.
     pub async fn get_dataset_by_uid(&self, uid: String) -> Result<DatasetRecord> {
         self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
     }
 
+    /// # Errors
+    ///
+    /// * Server errors.
     pub async fn list_all_datasets(&self) -> Result<Vec<DatasetRecord>> {
         let request = ListRequest {};
         let response = self.data_storage_service_client().list(request).await?;
@@ -92,6 +95,10 @@ impl Client {
         records.into_iter().map(TryInto::try_into).collect()
     }
 
+    /// # Errors
+    ///
+    /// * Not found.
+    /// * Server errors.
     pub async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<DatasetRecord> {
         let request = GetRequest { id_enum: Some(id) };
         let response = self.data_storage_service_client().get(request).await?;
@@ -102,6 +109,10 @@ impl Client {
         record.try_into().context("Invalid dataset record.")
     }
 
+    /// # Errors
+    ///
+    /// * Not found.
+    /// * Server errors.
     pub async fn replace_dataset_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
         let request = ReplaceTagsRequest { id: Some(id), tags };
         let _response = self
@@ -111,12 +122,20 @@ impl Client {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// * Not found.
+    /// * Server errors.
     pub async fn add_dataset_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
         let request = AddTagsRequest { id: Some(id), tags };
         let _response = self.data_storage_service_client().add_tags(request).await?;
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// * Not found.
+    /// * Server errors.
     pub async fn remove_dataset_tags(&self, id: i64, tags: Vec<String>) -> Result<()> {
         let request = RemoveTagsRequest { id: Some(id), tags };
         let _response = self
@@ -126,6 +145,10 @@ impl Client {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// * Not found.
+    /// * Server errors.
     pub async fn update_dataset_name(&self, id: i64, name: String) -> Result<()> {
         let request = UpdateNameRequest {
             id: Some(id),
@@ -138,6 +161,10 @@ impl Client {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// * Not found.
+    /// * Server errors.
     pub async fn update_dataset_description(&self, id: i64, description: String) -> Result<()> {
         let request = UpdateDescriptionRequest {
             id: Some(id),
@@ -150,6 +177,10 @@ impl Client {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// * Not found.
+    /// * Server errors.
     pub async fn update_dataset_favorite(&self, id: i64, favorite: bool) -> Result<()> {
         let request = UpdateFavoriteRequest {
             id: Some(id),

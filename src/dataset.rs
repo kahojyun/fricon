@@ -17,10 +17,11 @@ use crate::{paths::DatasetPath, workspace::Workspace};
 
 pub const DATASET_NAME: &str = "dataset.arrow";
 
+// TODO: check dead code
 pub struct Dataset {
-    workspace: Workspace,
+    _workspace: Workspace,
     id: i64,
-    info: Info,
+    _info: Info,
 }
 
 impl Dataset {
@@ -41,9 +42,9 @@ impl Dataset {
             dataset_file,
             schema,
             Self {
-                workspace,
+                _workspace: workspace,
                 id,
-                info,
+                _info: info,
             },
         )
     }
