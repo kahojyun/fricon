@@ -40,7 +40,7 @@ impl Workspace {
     }
 
     pub async fn init(path: &Path) -> Result<Self> {
-        info!("Initalize workspace: {:?}", path);
+        info!("Initialize workspace: {:?}", path);
         create_empty_dir(path)?;
         let root = WorkDirectory::new(path)?;
         let database = db::init(&root.database_file()).await?;

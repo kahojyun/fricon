@@ -32,7 +32,7 @@ users can specify a partial schema in
 [`DatasetManager.create`][fricon.DatasetManager.create], and unspecified
 columns will be inferred from the first row of the dataset.
 
-## Type inferrence
+## Type inference
 
 `fricon` only tries to infer a subset of Arrow data types. The following table
 lists the mapping between Python types and Arrow data types:
@@ -51,7 +51,7 @@ Notice that `fricon` defines custom data types for complex numbers and traces.
 Users can use utility functions to convert these custom data types back to
 Python types, or process them directly with `pyarrow` or `polars`.
 
-If users want to store other data types, they need to consturct [`pyarrow.Scalar`][] values
+If users want to store other data types, they need to construct [`pyarrow.Scalar`][] values
 by themselves. `fricon` will store these values as is.
 
 <!-- TODO: `pyarrow` and `polars` tips -->

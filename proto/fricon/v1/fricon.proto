@@ -14,4 +14,3 @@ message VersionRequest {}
 message VersionResponse {
   string version = 1;
 }
-
