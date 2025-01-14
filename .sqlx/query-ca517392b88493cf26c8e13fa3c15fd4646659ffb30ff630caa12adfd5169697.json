@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "INSERT INTO datasets (uid, name, description, path) VALUES (?, ?, ?, ?) RETURNING id",
+  "query": "SELECT id FROM datasets ORDER BY id DESC",
   "describe": {
     "columns": [
       {
@@ -10,11 +10,11 @@
       }
     ],
     "parameters": {
-      "Right": 4
+      "Right": 0
     },
     "nullable": [
       false
     ]
   },
-  "hash": "dd8ce2b92379d1e0c485769875f1abd89ebd6add9f9543d7fd472ca28fa841e8"
+  "hash": "ca517392b88493cf26c8e13fa3c15fd4646659ffb30ff630caa12adfd5169697"
 }

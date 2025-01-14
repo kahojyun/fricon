@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM dataset_tag WHERE dataset_id = ? AND tag_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "23b7e92a207b6e00e16d986eef235c368a8461d2d015b0ae5927a6acecf93dfa"
+}
