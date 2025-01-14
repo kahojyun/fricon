@@ -19,8 +19,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test
+  test-python:
+    name: Test Python
     runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -32,14 +32,6 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc
-      - name: Cargo build
-        run: cargo build --workspace --verbose --locked
-      - name: Cargo test
-        run: cargo test --workspace --verbose
-      - name: Cargo fmt
-        run: cargo fmt --all --check
-      - name: Cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - name: Sync project
@@ -54,12 +46,34 @@ jobs:
         run: uv run basedpyright
       - name: Stubtest
         run: uv run stubtest fricon
+
+  test-rust:
+    name: Test Rust
+    runs-on: ubuntu-24.04
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: protoc,cargo-deny
+      - name: Cargo build
+        run: cargo build --workspace --verbose --locked
+      - name: Cargo test
+        run: cargo test --workspace --verbose
+      - name: Cargo fmt
+        run: cargo fmt --all --check
+      - name: Cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Check cargo dependencies
-        uses: EmbarkStudios/cargo-deny-action@v2
+        run: cargo deny --workspace --all-features check
 
   build:
     runs-on: ${{ matrix.os.runner }}
-    needs: test
+    needs: [test-python, test-rust]
     strategy:
       matrix:
         os:
@@ -81,6 +95,9 @@ jobs:
             sccache: false
     steps:
       - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: protoc
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
