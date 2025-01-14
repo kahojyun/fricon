@@ -1,0 +1,68 @@
+[project]
+name = "fricon"
+dynamic = ["version", "description", "license", "keywords", "authors"]
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python",
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
+]
+dependencies = [
+  "numpy>=1.19.3",
+  "pandas>=2.2.3",
+  "polars>=1.17.1",
+  "pyarrow>=17.0.0",
+]
+
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project.urls]
+Documentation = "https://github.com/kahojyun/fricon#readme"
+Issues = "https://github.com/kahojyun/fricon/issues"
+Source = "https://github.com/kahojyun/fricon"
+
+[project.scripts]
+fricon = "fricon._core:main"
+
+[dependency-groups]
+dev = ["ipython>=8.18.1", "pandas-stubs>=2.2.2.240807", "pyarrow-stubs>=17.6"]
+fmt = ["ruff>=0.6.6"]
+ci = ["mypy>=1.11.2", "pytest>=8.3.3", "basedpyright>=1.23.2"]
+docs = [
+  "black>=24.10.0",
+  "markdown-exec[ansi]>=1.10.0",
+  "mkdocs-material>=9.5.49",
+  "mkdocstrings-python>=1.12.2",
+]
+
+[tool.maturin]
+python-source = "python/src"
+module-name = "fricon._core"
+manifest-path = "fricon-py/Cargo.toml"
+features = ["pyo3/extension-module"]
+
+[tool.uv]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "fricon-py/**/*.rs" },
+  { file = "src/**/*.rs" },
+  { file = "Cargo.toml" },
+  { file = "Cargo.lock" },
+]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+addopts = "--import-mode=importlib"
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
+include = ["python"]
+exclude = ["**/node_modules", "**/__pycache__", "**/docs/_build"]

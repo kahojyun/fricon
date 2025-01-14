@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT tag_id FROM dataset_tag WHERE dataset_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "tag_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "04f404cecb1f75d43e7a9913d26ae27257cace706ce518c6cf1bc5345db28f5c"
+}

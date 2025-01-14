@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT t.name FROM tags t\n            JOIN dataset_tag dt ON t.id = dt.tag_id\n            WHERE dt.dataset_id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "name",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b58e773f89b13f05fb5631f13c74818ac86f39be1e089bf7a84f488cfe0181f4"
+}

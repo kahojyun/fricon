@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "**"
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Ruff format
+        run: uv run --only-group fmt ruff format --check
+      - name: Ruff lint
+        run: uv run --only-group fmt ruff check --output-format=github
+      - name: Cargo fmt
+        run: cargo fmt --all --check
+
+  test-python:
+    name: Test Python
+    needs: [fmt]
+    runs-on: ubuntu-24.04
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: protoc
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Sync project
+        run: uv sync --locked --group ci
+      - name: Pytest
+        run: uv run pytest
+      - name: Basedpyright
+        run: uv run basedpyright
+      - name: Stubtest
+        run: uv run stubtest fricon
+
+  test-rust:
+    name: Test Rust
+    needs: [fmt]
+    runs-on: ubuntu-24.04
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: protoc,cargo-deny
+      - name: Cargo build
+        run: cargo build --workspace --verbose --locked
+      - name: Cargo test
+        run: cargo test --workspace --verbose
+      - name: Cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Check cargo dependencies
+        run: cargo deny --workspace --all-features check
+
+  build:
+    runs-on: ${{ matrix.os.runner }}
+    needs: [fmt]
+    strategy:
+      matrix:
+        os:
+          - runner: ubuntu-24.04
+            name: linux
+          - runner: windows-2022
+            name: windows
+          - runner: macos-14
+            name: macos
+        target: [x86_64, aarch64]
+        include:
+          - args: --release --out dist
+          - args: --release --out dist --zig
+            os:
+              name: linux
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: protoc
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: ${{ matrix.args }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          manylinux: auto
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os.name }}-${{ matrix.target }}
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-24.04
+    needs: [fmt]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: dist
+
+  # For branch protection rules
+  check:
+    if: always()
+    needs: [test-python, test-rust, build, sdist]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+
+  publish:
+    name: Publish to PyPI
+    needs:
+      - check
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/fricon
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/*"
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

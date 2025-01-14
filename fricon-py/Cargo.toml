@@ -1,0 +1,47 @@
+[package]
+name = "fricon-py"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+# Project dependencies
+fricon = { path = ".." }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Useful types
+chrono = { workspace = true }
+num = { workspace = true }
+ndarray = { workspace = true }
+itertools = { workspace = true }
+
+# Command-line argument parsing
+clap = { workspace = true }
+
+# Python bindings
+pyo3 = { workspace = true }
+pyo3-async-runtimes = { workspace = true }
+numpy = { workspace = true }
+
+# Asynchronous runtime
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+
+# gRPC
+tonic = { workspace = true }
+
+# Arrow
+arrow = { workspace = true, features = ["pyarrow"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package fricon.v1;
+
+service FriconService {
+  /*
+   * Get the version of the Fricon service.
+   */
+  rpc Version(VersionRequest) returns (VersionResponse) {}
+}
+
+message VersionRequest {}
+
+message VersionResponse {
+  string version = 1;
+}

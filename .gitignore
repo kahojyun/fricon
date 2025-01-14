@@ -1,1 +1,14 @@
+# Rust artifacts
 /target
+
+# Development environment variables
+.env
+
+# Lazy.nvim local config
+.lazy.lua
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so

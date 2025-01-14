@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE datasets SET description = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "83b5f1f53fdc3eb00e5fdd635dcc007cc1ef00723d1570835ef3937943f541c4"
+}
