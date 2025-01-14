@@ -33,7 +33,8 @@ fricon = "fricon._core:main"
 
 [dependency-groups]
 dev = ["ipython>=8.18.1", "pandas-stubs>=2.2.2.240807", "pyarrow-stubs>=17.6"]
-ci = ["mypy>=1.11.2", "ruff>=0.6.6", "pytest>=8.3.3", "basedpyright>=1.23.2"]
+fmt = ["ruff>=0.6.6"]
+ci = ["mypy>=1.11.2", "pytest>=8.3.3", "basedpyright>=1.23.2"]
 docs = [
   "black>=24.10.0",
   "markdown-exec[ansi]>=1.10.0",

@@ -19,8 +19,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  fmt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Ruff format
+        run: uv run --only-group fmt ruff format --check
+      - name: Ruff lint
+        run: uv run --only-group fmt ruff check --output-format=github
+      - name: Cargo fmt
+        run: cargo fmt --all --check
+
   test-python:
     name: Test Python
+    needs: [fmt]
     runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -38,10 +52,6 @@ jobs:
         run: uv sync --locked --group ci
       - name: Pytest
         run: uv run pytest
-      - name: Ruff format
-        run: uv run ruff format --check
-      - name: Ruff lint
-        run: uv run ruff check --output-format=github
       - name: Basedpyright
         run: uv run basedpyright
       - name: Stubtest
@@ -49,6 +59,7 @@ jobs:
 
   test-rust:
     name: Test Rust
+    needs: [fmt]
     runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -64,8 +75,6 @@ jobs:
         run: cargo build --workspace --verbose --locked
       - name: Cargo test
         run: cargo test --workspace --verbose
-      - name: Cargo fmt
-        run: cargo fmt --all --check
       - name: Cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Check cargo dependencies
@@ -73,7 +82,7 @@ jobs:
 
   build:
     runs-on: ${{ matrix.os.runner }}
-    needs: [test-python, test-rust]
+    needs: [fmt]
     strategy:
       matrix:
         os:
@@ -84,18 +93,11 @@ jobs:
           - runner: macos-14
             name: macos
         target: [x86_64, aarch64]
-        command: [build]
         include:
           - args: --release --out dist
-            sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           - args: --release --out dist --zig
             os:
               name: linux
-          - command: sdist
-            os:
-              runner: ubuntu-24.04
-            args: --out dist
-            sccache: false
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@v2
@@ -104,22 +106,36 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          command: ${{ matrix.command }}
           target: ${{ matrix.target }}
           args: ${{ matrix.args }}
-          sccache: ${{ matrix.sccache }}
+          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.command == 'sdist' && 'sdist' || format('{0}-{1}', matrix.os.name, matrix.target) }}
+          name: wheels-${{ matrix.os.name }}-${{ matrix.target }}
+          path: dist
+
+  sdist:
+    runs-on: ubuntu-24.04
+    needs: [fmt]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
           path: dist
 
   # For branch protection rules
   check:
     if: always()
-    needs:
-      - build
+    needs: [test-python, test-rust, build, sdist]
     runs-on: ubuntu-24.04
     steps:
       - name: Decide whether the needed jobs succeeded or failed
@@ -127,25 +143,26 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
-  # Should run only on push
   publish:
     name: Publish to PyPI
     needs:
       - check
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-24.04
-    environment: pypi
+    environment:
+      name: pypi
+      url: https://pypi.org/p/fricon
     permissions:
       id-token: write
       attestations: write
     steps:
       - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: "wheels-*/*"
+          subject-path: "dist/*"
       - name: Publish to PyPI
-        uses: PyO3/maturin-action@v1
-        with:
-          command: upload
-          args: --non-interactive --skip-existing wheels-*/*
+        uses: pypa/gh-action-pypi-publish@release/v1
