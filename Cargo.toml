@@ -13,7 +13,7 @@ members = ["fricon-py"]
 
 [workspace.package]
 edition = "2021"
-version = "0.1.0"
+version = "0.1.0-alpha"
 license = "MIT OR Apache-2.0"
 description = "Fridge controller."
 authors = ["Jiahao Yuan <kahojyun@icloud.com>"]
