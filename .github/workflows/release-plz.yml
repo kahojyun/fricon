@@ -28,6 +28,10 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Install build dependencies
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc
       - name: Run release-plz
         uses: release-plz/action@v0.5
         with:
