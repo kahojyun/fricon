@@ -4,6 +4,9 @@ ci:
   skip:
     - buf-lint
     - buf-format
+    - uv-lock
+    - cargo-fmt
+    - cargo-deny
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v5.0.0
@@ -17,6 +20,10 @@ repos:
   rev: v2.3.0
   hooks:
   - id: codespell
+- repo: https://github.com/astral-sh/uv-pre-commit
+  rev: 0.5.18
+  hooks:
+    - id: uv-lock
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.9.1
   hooks:
@@ -33,3 +40,17 @@ repos:
   hooks:
     - id: buf-lint
     - id: buf-format
+# Copied from maturin repo
+- repo: local
+  hooks:
+    - id: cargo-fmt  # rustup component add rustfmt
+      name: cargo fmt
+      entry: cargo fmt --all --
+      language: system
+      types: [rust]
+      pass_filenames: false
+    - id: cargo-deny  # cargo install --locked cargo-deny
+      name: cargo deny
+      entry: cargo deny --all-features check --
+      language: system
+      pass_filenames: false
