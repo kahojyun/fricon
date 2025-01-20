@@ -2,6 +2,10 @@
 
 10 mK fridge controller.
 
+## Documentation
+
+[Github Pages](https://kahojyun.github.io/fricon/)
+
 ## Development
 
 ### Requirements
