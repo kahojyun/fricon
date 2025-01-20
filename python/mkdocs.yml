@@ -1,4 +1,5 @@
 site_name: Fricon
+repo_url: https://github.com/kahojyun/fricon
 theme:
   name: material
   palette:
@@ -20,6 +21,7 @@ theme:
         icon: material/brightness-4
         name: Switch to system preference
 plugins:
+  - mike:
   - search
   - markdown-exec
   - mkdocstrings:
@@ -49,5 +51,9 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      check_paths: true
   - pymdownx.superfences
+extra:
+  version:
+    provider: mike
