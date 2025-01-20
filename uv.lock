@@ -226,6 +226,7 @@ ci = [
 dev = [
     { name = "ipython", version = "8.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "ipython", version = "8.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "packaging" },
     { name = "pandas-stubs", version = "2.2.2.240807", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pandas-stubs", version = "2.2.3.241126", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pyarrow-stubs" },
@@ -257,6 +258,7 @@ ci = [
 ]
 dev = [
     { name = "ipython", specifier = ">=8.18.1" },
+    { name = "packaging", specifier = ">=24.2" },
     { name = "pandas-stubs", specifier = ">=2.2.2.240807" },
     { name = "pyarrow-stubs", specifier = ">=17.6" },
 ]
