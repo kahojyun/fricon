@@ -27,7 +27,7 @@ arrow = "54.0.0"
 # Useful types
 chrono = "0.4.39"
 uuid = { version = "1.12.0", features = ["v4", "fast-rng", "serde"] }
-semver = "1.0.24"
+semver = "1.0.25"
 bytes = "1.9.0"
 num = "0.4.3"
 ndarray = "0.16.1"
