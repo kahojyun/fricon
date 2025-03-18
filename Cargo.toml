@@ -12,7 +12,7 @@ keywords.workspace = true
 members = ["fricon-py"]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 version = "0.1.0-alpha"
 license = "MIT OR Apache-2.0"
 description = "Fridge controller."
@@ -22,27 +22,27 @@ keywords = ["experimental"]
 
 [workspace.dependencies]
 # Arrow
-arrow = "54.0.0"
+arrow = "54"
 
 # Useful types
-chrono = "0.4.39"
-uuid = { version = "1.12.0", features = ["v4", "fast-rng", "serde"] }
-semver = "1.0.25"
-bytes = "1.9.0"
-num = "0.4.3"
-ndarray = "0.16.1"
-itertools = "0.14.0"
+chrono = "0.4"
+uuid = { version = "1", features = ["v4", "fast-rng", "serde"] }
+semver = "1"
+bytes = "1"
+num = "0.4"
+ndarray = "0.16"
+itertools = "0.14"
 
 # Command-line argument parsing
-clap = { version = "4.5.26", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
 
 # Serialization and deserialization
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.137"
-toml = "0.8.19"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
 
 # Database
-sqlx = { version = "0.8.3", features = [
+sqlx = { version = "0.8", features = [
   "chrono",
   "runtime-tokio",
   "sqlite",
@@ -50,38 +50,38 @@ sqlx = { version = "0.8.3", features = [
 ] }
 
 # Error handling
-thiserror = "2.0.11"
-anyhow = "1.0.95"
+thiserror = "2"
+anyhow = "1"
 
 # Asynchronous runtime
-tokio = { version = "1.43.0", features = ["full"] }
-tokio-util = { version = "0.7.13", features = ["full"] }
-tokio-stream = "0.1.17"
-futures = "0.3.31"
-async-stream = "0.3.6"
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+async-stream = "0.3"
 
 # Logging
-tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # gRPC
-prost = "0.13.4"
-prost-types = "0.13.4"
-tonic = "0.12.3"
-tonic-build = "0.12.3"
-tower = "0.5.2"
-hyper-util = "0.1.10"
+prost = "0.13"
+prost-types = "0.13"
+tonic = "0.12"
+tonic-build = "0.12"
+tower = "0.5"
+hyper-util = "0.1"
 
 # Python bindings
-pyo3 = { version = "0.23.4", features = [
+pyo3 = { version = "0.23", features = [
   "anyhow",
   "chrono",
   "num-complex",
   "abi3-py39",
   "generate-import-lib",
 ] }
-pyo3-async-runtimes = { version = "0.23.0", features = ["tokio-runtime"] }
-numpy = "0.23.0"
+pyo3-async-runtimes = { version = "0.23", features = ["tokio-runtime"] }
+numpy = "0.23"
 
 [workspace.lints.rust]
 rust-2018-idioms = "warn"
