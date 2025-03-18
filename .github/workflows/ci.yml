@@ -22,21 +22,17 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
-        target: [x86_64]
-        include:
-          - args: --release --out dist
+        target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: protoc,cargo-bundle-licenses
-      - name: Bundle licenses
-        run: cargo bundle-licenses --format toml --output ../LICENSES-THIRDPARTY.toml
-        working-directory: fricon-py
+          tool: protoc
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: ${{ matrix.args }}
+          args: --release --out dist --zig -vv
           manylinux: auto
