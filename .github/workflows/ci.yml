@@ -20,19 +20,19 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: protoc
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --zig -vv
+          args: --release --out dist -vv
           manylinux: auto
+          before-script-linux: |
+            yum update -y
+            yum install -y protobuf-compiler
