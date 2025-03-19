@@ -33,6 +33,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.13
-      - run: python -m pip install maturin[zig]
+      - run: python -m pip install maturin ziglang
       - run: rustup target add ${{ matrix.target }}-unknown-linux-gnu
-      - run: maturin build --release --out dist --zig -vv
+      - run: maturin build --target ${{ matrix.target }}-unknown-linux-gnu --release --out dist --zig -vv
