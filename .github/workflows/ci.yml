@@ -20,19 +20,20 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: protoc
+      - run: python3 -m pip install "ziglang<0.14"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist -vv
+          args: --release --out dist --zig -vv
           manylinux: auto
-          before-script-linux: |
-            yum update -y
-            yum install -y protobuf-compiler
