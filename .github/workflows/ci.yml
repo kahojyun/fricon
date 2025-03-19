@@ -109,6 +109,9 @@ jobs:
       - name: Bundle licenses
         run: cargo bundle-licenses --format toml --output ../LICENSES-THIRDPARTY.toml
         working-directory: fricon-py
+      - name: Install zig
+        if: matrix.os.name == 'linux'
+        run: python -m pip install "ziglang<0.14"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
