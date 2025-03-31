@@ -17,15 +17,15 @@ repos:
   - id: check-toml
   - id: check-added-large-files
 - repo: https://github.com/crate-ci/typos
-  rev: 2300ad1b6b5c37da54bcafb1a06211196503eac9  # frozen: v1
+  rev: a6d2f47d4902ee6df75b9392dd3f7a120fdf3619  # frozen: v1
   hooks:
     - id: typos
 - repo: https://github.com/astral-sh/uv-pre-commit
-  rev: 4e8678ad8d0ad016cd411e9ab8f6b2d7def68cf4  # frozen: 0.6.6
+  rev: 4b4f19e679c52e9537d1c43a6690e4c0ae457ec5  # frozen: 0.6.11
   hooks:
     - id: uv-lock
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: 41d2daf392fbf43341a77f24a9c6481a4b66af98  # frozen: v0.9.10
+  rev: 25a8c8da6c24a3b9a1a536e2674683dd0eead5d6  # frozen: v0.11.2
   hooks:
     - id: ruff
       args: [ --fix ]
@@ -36,7 +36,7 @@ repos:
     - id: sqlfluff-lint
     - id: sqlfluff-fix
 - repo: https://github.com/bufbuild/buf
-  rev: a22713027d857a807b8bf97e7932ca2e38e284db  # frozen: v1.50.1
+  rev: 3905aaefcbef156244357819fe1da46ec1af448f  # frozen: v1.51.0
   hooks:
     - id: buf-lint
     - id: buf-format
