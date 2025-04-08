@@ -87,8 +87,9 @@ numpy = "0.23.0"
 rust-2018-idioms = "warn"
 
 [workspace.lints.clippy]
-pedantic = "warn"
-nursery = "warn"
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+missing_const_for_fn = "allow"               # NOTE: https://github.com/rust-lang/rust-clippy/issues/14091
 
 [dependencies]
 # Arrow
