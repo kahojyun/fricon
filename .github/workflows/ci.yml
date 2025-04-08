@@ -73,13 +73,23 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
       - uses: taiki-e/install-action@v2
         with:
-          tool: protoc,cargo-deny
+          tool: protoc
       - name: Cargo build
         run: cargo build --workspace --verbose --locked
       - name: Cargo test
         run: cargo test --workspace --verbose
       - name: Cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+  cargo-deny:
+    name: Check cargo dependencies
+    needs: [fmt]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
       - name: Check cargo dependencies
         run: cargo deny --workspace --all-features check
 
