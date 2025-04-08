@@ -1,17 +1,17 @@
 use std::collections::HashSet;
 
-use anyhow::{ensure, Context};
+use anyhow::{Context, ensure};
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use sqlx::{
+    SqliteConnection, SqlitePool,
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
     types::Json,
-    SqliteConnection, SqlitePool,
 };
 use thiserror::Error;
 use tracing::info;
-use uuid::{fmt::Simple, Uuid};
+use uuid::{Uuid, fmt::Simple};
 
 use crate::{dataset::Info, paths::DatabaseFile};
 
@@ -202,11 +202,7 @@ impl StorageDbExt for SqliteConnection {
         )
         .fetch_one(&mut *self)
         .await?;
-        if exist {
-            Ok(())
-        } else {
-            Err(Error::NotFound)
-        }
+        if exist { Ok(()) } else { Err(Error::NotFound) }
     }
 
     async fn get_or_insert_tag(&mut self, tag: &str) -> Result<i64> {

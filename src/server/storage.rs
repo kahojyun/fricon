@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
 use chrono::DateTime;
@@ -16,12 +16,12 @@ use crate::{
     dataset::Info,
     db::{self, DatasetRecord},
     proto::{
-        self, data_storage_service_server::DataStorageService, get_request::IdEnum, AddTagsRequest,
-        AddTagsResponse, CreateRequest, CreateResponse, GetRequest, GetResponse, ListRequest,
-        ListResponse, RemoveTagsRequest, RemoveTagsResponse, ReplaceTagsRequest,
-        ReplaceTagsResponse, UpdateDescriptionRequest, UpdateDescriptionResponse,
-        UpdateFavoriteRequest, UpdateFavoriteResponse, UpdateNameRequest, UpdateNameResponse,
-        WriteRequest, WriteResponse, WRITE_TOKEN,
+        self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, GetRequest,
+        GetResponse, ListRequest, ListResponse, RemoveTagsRequest, RemoveTagsResponse,
+        ReplaceTagsRequest, ReplaceTagsResponse, UpdateDescriptionRequest,
+        UpdateDescriptionResponse, UpdateFavoriteRequest, UpdateFavoriteResponse,
+        UpdateNameRequest, UpdateNameResponse, WRITE_TOKEN, WriteRequest, WriteResponse,
+        data_storage_service_server::DataStorageService, get_request::IdEnum,
     },
     workspace::Workspace,
 };

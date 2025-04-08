@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{Context, Result, bail, ensure};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter};
 use bytes::Bytes;
 use futures::prelude::*;
@@ -6,25 +6,25 @@ use hyper_util::rt::TokioIo;
 use semver::Version;
 use tokio::{io, sync::mpsc, task::JoinHandle};
 use tokio_util::io::{ReaderStream, SyncIoBridge};
-use tonic::{metadata::MetadataValue, transport::Channel, Request};
+use tonic::{Request, metadata::MetadataValue, transport::Channel};
 use tower::service_fn;
 use tracing::error;
 
 use crate::{
+    VERSION,
     ipc::Ipc,
     paths::IpcFile,
     proto::{
+        AddTagsRequest, CreateRequest, GetRequest, ListRequest, RemoveTagsRequest,
+        ReplaceTagsRequest, UpdateDescriptionRequest, UpdateFavoriteRequest, UpdateNameRequest,
+        VersionRequest, WRITE_TOKEN, WriteRequest, WriteResponse,
         data_storage_service_client::DataStorageServiceClient,
-        fricon_service_client::FriconServiceClient, get_request::IdEnum, AddTagsRequest,
-        CreateRequest, GetRequest, ListRequest, RemoveTagsRequest, ReplaceTagsRequest,
-        UpdateDescriptionRequest, UpdateFavoriteRequest, UpdateNameRequest, VersionRequest,
-        WriteRequest, WriteResponse, WRITE_TOKEN,
+        fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
-    VERSION,
 };
 
 pub use crate::{
-    dataset::{Info, DATASET_NAME},
+    dataset::{DATASET_NAME, Info},
     db::DatasetRecord,
 };
 

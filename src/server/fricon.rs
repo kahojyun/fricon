@@ -1,8 +1,8 @@
 use tonic::{Request, Response, Result};
 
 use crate::{
-    proto::{fricon_service_server::FriconService, VersionRequest, VersionResponse},
     VERSION,
+    proto::{VersionRequest, VersionResponse, fricon_service_server::FriconService},
 };
 
 pub struct Fricon;
