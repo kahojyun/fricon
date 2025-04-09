@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeDevCommand": {
+      "script": "pnpm dev",
+      "cwd": "frontend"
+    },
+    "beforeBuildCommand": {
+      "script": "pnpm build",
+      "cwd": "frontend"
+    },
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "frontend/dist"
+  },
+  "productName": "fricon-viewer",
+  "version": "0.1.0",
+  "identifier": "com.tauri.dev",
+  "app": {
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "title": "fricon-viewer",
+        "width": 800,
+        "height": 600
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

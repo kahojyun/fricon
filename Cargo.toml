@@ -9,7 +9,7 @@ repository.workspace = true
 keywords.workspace = true
 
 [workspace]
-members = ["fricon-py"]
+members = ["fricon-py", "fricon-viewer"]
 
 [workspace.package]
 edition = "2024"

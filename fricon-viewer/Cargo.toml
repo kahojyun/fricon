@@ -1,0 +1,21 @@
+[package]
+name = "fricon-viewer"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tauri = { version = "2.4.1", features = [] }
+tauri-plugin-opener = "2.2.6"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.1.1", features = [] }
