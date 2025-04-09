@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use arrow::datatypes::Schema;
 use chrono::Utc;
 use semver::{Version, VersionReq};
@@ -9,10 +9,10 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
+    VERSION,
     dataset::{self, Dataset},
     db,
     paths::{DatasetPath, VersionFile, WorkDirectory},
-    VERSION,
 };
 
 #[derive(Debug, Clone)]

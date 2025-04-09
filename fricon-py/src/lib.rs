@@ -11,11 +11,11 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{Context, Result, bail, ensure};
 use arrow::{
     array::{
-        downcast_array, make_array, Array, ArrayData, ArrayRef, BooleanArray, Float64Array,
-        Int64Array, ListArray, RecordBatch, StringArray, StringBuilder, StructArray,
+        Array, ArrayData, ArrayRef, BooleanArray, Float64Array, Int64Array, ListArray, RecordBatch,
+        StringArray, StringBuilder, StructArray, downcast_array, make_array,
     },
     buffer::OffsetBuffer,
     datatypes::{DataType, Field, Fields, Schema},
@@ -25,7 +25,7 @@ use chrono::{DateTime, Utc};
 use clap::Parser;
 use fricon::{
     cli::Cli,
-    client::{self, Client, DatasetRecord, Info, DATASET_NAME},
+    client::{self, Client, DATASET_NAME, DatasetRecord, Info},
     paths::WorkDirectory,
 };
 use itertools::Itertools;
@@ -42,7 +42,7 @@ use pyo3_async_runtimes::tokio::get_runtime;
 pub mod _core {
     #[pymodule_export]
     pub use super::{
-        complex128, main, trace_, Dataset, DatasetManager, DatasetWriter, Trace, Workspace,
+        Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, main, trace_,
     };
 }
 

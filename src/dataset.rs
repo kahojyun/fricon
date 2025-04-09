@@ -7,7 +7,7 @@ use std::{
     io::BufWriter,
 };
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use arrow::{array::RecordBatch, datatypes::Schema, ipc::writer::FileWriter};
 use chrono::{DateTime, Utc};
 use tracing::info;

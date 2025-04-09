@@ -12,7 +12,7 @@ keywords.workspace = true
 members = ["fricon-py"]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 version = "0.1.0-alpha"
 license = "MIT OR Apache-2.0"
 description = "Fridge controller."
@@ -67,8 +67,8 @@ tracing-subscriber = "0.3.19"
 # gRPC
 prost = "0.13.4"
 prost-types = "0.13.4"
-tonic = "0.12.3"
-tonic-build = "0.12.3"
+tonic = "0.13.0"
+tonic-build = "0.13.0"
 tower = "0.5.2"
 hyper-util = "0.1.10"
 
@@ -87,8 +87,9 @@ numpy = "0.23.0"
 rust-2018-idioms = "warn"
 
 [workspace.lints.clippy]
-pedantic = "warn"
-nursery = "warn"
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+missing_const_for_fn = "allow"               # NOTE: https://github.com/rust-lang/rust-clippy/issues/14091
 
 [dependencies]
 # Arrow

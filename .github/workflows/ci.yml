@@ -73,13 +73,23 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
       - uses: taiki-e/install-action@v2
         with:
-          tool: protoc,cargo-deny
+          tool: protoc
       - name: Cargo build
         run: cargo build --workspace --verbose --locked
       - name: Cargo test
         run: cargo test --workspace --verbose
       - name: Cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+  cargo-deny:
+    name: Check cargo dependencies
+    needs: [fmt]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
       - name: Check cargo dependencies
         run: cargo deny --workspace --all-features check
 
@@ -109,9 +119,6 @@ jobs:
       - name: Bundle licenses
         run: cargo bundle-licenses --format toml --output ../LICENSES-THIRDPARTY.toml
         working-directory: fricon-py
-      - name: Install zig
-        if: matrix.os.name == 'linux'
-        run: python -m pip install "ziglang<0.14"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
