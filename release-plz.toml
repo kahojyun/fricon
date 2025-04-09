@@ -1,0 +1,10 @@
+# https://release-plz.dev/docs/extra/single-tag
+[workspace]
+git_release_enable = false
+git_tag_enable = false
+
+[[package]]
+name = "fricon"
+git_tag_name = "v{{ version }}"
+git_tag_enable = true
+git_release_enable = true
