@@ -157,7 +157,7 @@ jobs:
   # For branch protection rules
   check:
     if: always()
-    needs: [test-python, test-rust, build, sdist]
+    needs: [test-python, test-rust, cargo-deny, build, sdist]
     runs-on: ubuntu-24.04
     steps:
       - name: Decide whether the needed jobs succeeded or failed
