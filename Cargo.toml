@@ -22,7 +22,7 @@ keywords = ["experimental"]
 
 [workspace.dependencies]
 # Arrow
-arrow = "54.0.0"
+arrow = "55.0.0"
 
 # Useful types
 chrono = "0.4.39"
@@ -73,15 +73,15 @@ tower = "0.5.2"
 hyper-util = "0.1.10"
 
 # Python bindings
-pyo3 = { version = "0.23.4", features = [
+pyo3 = { version = "0.24.0", features = [
   "anyhow",
   "chrono",
   "num-complex",
   "abi3-py39",
   "generate-import-lib",
 ] }
-pyo3-async-runtimes = { version = "0.23.0", features = ["tokio-runtime"] }
-numpy = "0.23.0"
+pyo3-async-runtimes = { version = "0.24.0", features = ["tokio-runtime"] }
+numpy = "0.24.0"
 
 [workspace.lints.rust]
 rust-2018-idioms = "warn"
