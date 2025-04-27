@@ -12,23 +12,23 @@
     "devUrl": "http://localhost:5173",
     "frontendDist": "frontend/dist"
   },
-  "productName": "fricon-viewer",
+  "productName": "fricon-ui",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.fricon.dev",
   "app": {
     "security": {
       "csp": null
     },
     "windows": [
       {
-        "title": "fricon-viewer",
+        "title": "fricon-ui",
         "width": 800,
         "height": 600
       }
     ]
   },
   "bundle": {
-    "active": true,
+    "active": false,
     "targets": "all",
     "icon": [
       "icons/32x32.png",

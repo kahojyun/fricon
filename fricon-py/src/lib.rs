@@ -5,6 +5,8 @@
     clippy::significant_drop_tightening
 )]
 
+mod cli;
+
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -24,7 +26,6 @@ use arrow::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use fricon::{
-    cli::Cli,
     client::{self, Client, DATASET_NAME, DatasetRecord, Info},
     paths::WorkDirectory,
 };
@@ -37,6 +38,8 @@ use pyo3::{
     types::{PyBool, PyComplex, PyDict, PyFloat, PyInt, PyList, PySequence, PyString},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
+
+use self::cli::Cli;
 
 #[pymodule]
 pub mod _core {
@@ -844,7 +847,7 @@ pub fn main(py: Python<'_>) -> i32 {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?
-            .block_on(async { fricon::main(cli).await })
+            .block_on(async { cli::main(cli).await })
     }
     fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
         let signal = py.import("signal")?;

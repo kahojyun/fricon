@@ -33,6 +33,7 @@ fricon = "fricon._core:main"
 
 [dependency-groups]
 dev = [
+  "ipykernel>=6.29.5",
   "ipython>=8.18.1",
   "packaging>=24.2",
   "pandas-stubs>=2.2.2.240807",
@@ -57,8 +58,7 @@ features = ["pyo3/extension-module"]
 [tool.uv]
 cache-keys = [
   { file = "pyproject.toml" },
-  { file = "fricon-py/**/*.rs" },
-  { file = "src/**/*.rs" },
+  { file = "{src,fricon-*}/**/*.rs" },
   { file = "Cargo.toml" },
   { file = "Cargo.lock" },
 ]

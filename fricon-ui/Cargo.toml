@@ -1,5 +1,6 @@
 [package]
-name = "fricon-viewer"
+name = "fricon-ui"
+publish = false
 edition.workspace = true
 version.workspace = true
 license.workspace = true
@@ -14,8 +15,15 @@ serde_json.workspace = true
 tauri = { version = "2.4.1", features = [] }
 tauri-plugin-opener = "2.2.6"
 
+fricon = { path = ".." }
+rand = "0.9.0"
+tauri-plugin-log = "2"
+
 [lints]
 workspace = true
 
 [build-dependencies]
 tauri-build = { version = "2.1.1", features = [] }
+
+[features]
+gui = ["tauri/custom-protocol"]

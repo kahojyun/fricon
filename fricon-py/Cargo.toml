@@ -15,6 +15,7 @@ doctest = false
 [dependencies]
 # Project dependencies
 fricon = { path = ".." }
+fricon-ui = { path = "../fricon-ui" }
 
 # Error handling
 anyhow = { workspace = true }
@@ -42,6 +43,7 @@ tonic = { workspace = true }
 
 # Arrow
 arrow = { workspace = true, features = ["pyarrow"] }
+tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true

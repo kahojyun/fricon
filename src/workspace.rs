@@ -29,10 +29,12 @@ impl Workspace {
         Ok(Self { root, database })
     }
 
+    #[must_use]
     pub const fn root(&self) -> &WorkDirectory {
         &self.root
     }
 
+    #[must_use]
     pub fn dataset_index(&self) -> db::DatasetIndex {
         db::DatasetIndex {
             pool: self.database.clone(),
