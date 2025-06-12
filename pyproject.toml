@@ -55,14 +55,6 @@ module-name = "fricon._core"
 manifest-path = "fricon-py/Cargo.toml"
 features = ["pyo3/extension-module"]
 
-[tool.uv]
-cache-keys = [
-  { file = "pyproject.toml" },
-  { file = "{src,fricon-*}/**/*.rs" },
-  { file = "Cargo.toml" },
-  { file = "Cargo.lock" },
-]
-
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
 addopts = "--import-mode=importlib"

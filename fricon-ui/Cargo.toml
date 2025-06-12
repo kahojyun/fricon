@@ -12,18 +12,16 @@ keywords.workspace = true
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-tauri = { version = "2.4.1", features = [] }
-tauri-plugin-opener = "2.2.6"
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
 
 fricon = { path = ".." }
-rand = "0.9.0"
-tauri-plugin-log = "2"
 
 [lints]
 workspace = true
 
 [build-dependencies]
-tauri-build = { version = "2.1.1", features = [] }
+tauri-build = { version = "2", features = [] }
 
 [features]
 gui = ["tauri/custom-protocol"]
