@@ -22,7 +22,7 @@ keywords = ["experimental"]
 
 [workspace.dependencies]
 # Arrow
-arrow = "55.0.0"
+arrow = "55.2.0"
 
 # Useful types
 chrono = "0.4.39"
