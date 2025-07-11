@@ -117,7 +117,7 @@ jobs:
         with:
           tool: protoc,cargo-bundle-licenses
       - name: Bundle licenses
-        run: cargo bundle-licenses --format toml --output ../../LICENSES-THIRDPARTY.toml
+        run: cargo bundle-licenses --format toml --output ${{ github.workspace }}/LICENSES-THIRDPARTY.toml
         working-directory: crates/fricon-py
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -141,7 +141,7 @@ jobs:
         with:
           tool: cargo-bundle-licenses
       - name: Bundle licenses
-        run: cargo bundle-licenses --format toml --output ../../LICENSES-THIRDPARTY.toml
+        run: cargo bundle-licenses --format toml --output ${{ github.workspace }}/LICENSES-THIRDPARTY.toml
         working-directory: crates/fricon-py
       - name: Build sdist
         uses: PyO3/maturin-action@v1
