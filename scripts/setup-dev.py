@@ -1,9 +1,9 @@
-from pathlib import Path
 import subprocess
-
+from pathlib import Path
 
 DEV_FOLDER = ".dev"
 TEST_DB = "testdb.sqlite3"
+MIGRATIONS_PATH = "crates/fricon/migrations"
 
 
 def get_project_root():
@@ -30,7 +30,11 @@ def create_dev_folder():
 
 def sqlx_setup():
     try:
-        _ = subprocess.run(["sqlx", "db", "setup"], cwd=get_project_root(), check=True)
+        _ = subprocess.run(
+            ["sqlx", "db", "setup", "--source", MIGRATIONS_PATH],
+            cwd=get_project_root(),
+            check=True,
+        )
     except FileNotFoundError:
         print(
             "`sqlx` not found in $PATH. Please check development requirements in "
