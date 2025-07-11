@@ -14,7 +14,7 @@ doctest = false
 
 [dependencies]
 # Project dependencies
-fricon = { path = ".." }
+fricon = { path = "../fricon" }
 fricon-ui = { path = "../fricon-ui" }
 
 # Error handling

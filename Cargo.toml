@@ -1,15 +1,6 @@
-[package]
-name = "fricon"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-description.workspace = true
-authors.workspace = true
-repository.workspace = true
-keywords.workspace = true
-
 [workspace]
-members = ["fricon-py", "fricon-ui"]
+members = ["crates/fricon", "crates/fricon-py", "crates/fricon-ui"]
+resolver = "3"
 
 [workspace.package]
 edition = "2024"
@@ -43,10 +34,10 @@ toml = "0.8.19"
 
 # Database
 sqlx = { version = "0.8.3", features = [
-  "chrono",
-  "runtime-tokio",
-  "sqlite",
-  "uuid",
+    "chrono",
+    "runtime-tokio",
+    "sqlite",
+    "uuid",
 ] }
 
 # Error handling
@@ -74,11 +65,11 @@ hyper-util = "0.1.10"
 
 # Python bindings
 pyo3 = { version = "0.24.0", features = [
-  "anyhow",
-  "chrono",
-  "num-complex",
-  "abi3-py39",
-  "generate-import-lib",
+    "anyhow",
+    "chrono",
+    "num-complex",
+    "abi3-py39",
+    "generate-import-lib",
 ] }
 pyo3-async-runtimes = { version = "0.24.0", features = ["tokio-runtime"] }
 numpy = "0.24.0"
@@ -88,56 +79,5 @@ rust-2018-idioms = "warn"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
-nursery = { level = "warn", priority = -1 }
-missing_const_for_fn = "allow"               # NOTE: https://github.com/rust-lang/rust-clippy/issues/14091
 missing_panics_doc = "allow"
 missing_errors_doc = "allow"
-
-[dependencies]
-# Arrow
-arrow = { workspace = true }
-
-# Error handling
-anyhow = { workspace = true }
-thiserror = { workspace = true }
-
-# Usefol types
-chrono = { workspace = true }
-semver = { workspace = true }
-uuid = { workspace = true }
-bytes = { workspace = true }
-
-# Command-line argument parsing
-clap = { workspace = true }
-
-# Serialization and deserialization
-serde = { workspace = true }
-serde_json = { workspace = true }
-toml = { workspace = true }
-
-# Database
-sqlx = { workspace = true }
-
-# Asynchronous runtime
-tokio = { workspace = true }
-tokio-util = { workspace = true }
-futures = { workspace = true }
-async-stream = { workspace = true }
-
-# gRPC
-prost = { workspace = true }
-prost-types = { workspace = true }
-tonic = { workspace = true }
-
-# Logging
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-tower = { workspace = true }
-hyper-util = { workspace = true }
-tokio-stream = { workspace = true }
-
-[build-dependencies]
-tonic-build = { workspace = true }
-
-[lints]
-workspace = true

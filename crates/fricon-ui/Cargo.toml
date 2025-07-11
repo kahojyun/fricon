@@ -15,7 +15,7 @@ serde_json.workspace = true
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 
-fricon = { path = ".." }
+fricon = { path = "../fricon" }
 tauri-plugin-dialog = "2.3.0"
 
 [lints]

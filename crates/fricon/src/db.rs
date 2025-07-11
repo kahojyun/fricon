@@ -25,7 +25,7 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub static MIGRATOR: Migrator = sqlx::migrate!();
+pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
 
 pub async fn connect(path: &DatabaseFile) -> anyhow::Result<SqlitePool> {
     let path = &path.0;

@@ -1,6 +1,7 @@
+#![allow(clippy::needless_pass_by_value)]
 use std::sync::Mutex;
 
-use tauri::{Manager, State};
+use tauri::State;
 
 #[derive(Default)]
 struct AppState {
