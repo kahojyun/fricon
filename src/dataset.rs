@@ -34,10 +34,14 @@ impl Dataset {
         );
         info!("Create dataset at {:?}", path);
         fs::create_dir_all(&path)
-            .with_context(|| format!("Failed to create dataset at {path:?}"))?;
+            .with_context(|| format!("Failed to create dataset at {}", path.display()))?;
         let dataset_path = path.join(DATASET_NAME);
-        let dataset_file = File::create_new(&dataset_path)
-            .with_context(|| format!("Failed to create new dataset file at {dataset_path:?}"))?;
+        let dataset_file = File::create_new(&dataset_path).with_context(|| {
+            format!(
+                "Failed to create new dataset file at {}",
+                dataset_path.display()
+            )
+        })?;
         Writer::new(
             dataset_file,
             schema,

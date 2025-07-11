@@ -195,7 +195,7 @@ impl DataStorageService for Storage {
                 })
                 .map_err(|e| {
                     error!("Client connection error: {:?}", e);
-                    std::io::Error::new(std::io::ErrorKind::Other, e)
+                    std::io::Error::other(e)
                 });
             let reader = SyncIoBridge::new(tokio_util::io::StreamReader::new(bytes_stream));
             let mut reader = StreamReader::try_new(reader, None)?;
