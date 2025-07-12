@@ -1,6 +1,6 @@
 # fricon
 
-10 mK fridge controller.
+Fridge controller.
 
 ## Documentation
 
@@ -45,7 +45,7 @@
 * Setup development database
 
   ```console
-  sqlx db setup
+  sqlx db setup --source crates/fricon/migrations
   ```
 
 ## License
