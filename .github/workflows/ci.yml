@@ -23,6 +23,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Ruff format
@@ -31,6 +42,8 @@ jobs:
         run: uv run --only-group fmt ruff check --output-format=github
       - name: Cargo fmt
         run: cargo fmt --all --check
+      - name: Frontend check
+        run: pnpm run check
 
   test-python:
     name: Test Python
@@ -46,6 +59,15 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Sync project
@@ -73,6 +95,15 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
       - name: Cargo build
         run: cargo build --workspace --verbose --locked
       - name: Cargo test
@@ -115,6 +146,15 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc,cargo-bundle-licenses
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
       - name: Bundle licenses
         run: cargo bundle-licenses --format toml --output ${{ github.workspace }}/LICENSES-THIRDPARTY.toml
         working-directory: crates/fricon-py
