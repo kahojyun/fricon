@@ -2,7 +2,7 @@
 
 ## Workspace
 
-Fricon stores data in a *workspace*. A workspace is a directory that contains all
+Fricon stores data in a _workspace_. A workspace is a directory that contains all
 the data files and metadata. You can create a workspace using the CLI:
 
 ```shell
@@ -25,7 +25,7 @@ workspace/
 
 ## Fricon Server
 
-Fricon needs a *server process* to manage the workspace. You can start the server
+Fricon needs a _server process_ to manage the workspace. You can start the server
 using the CLI:
 
 ```shell
@@ -50,10 +50,10 @@ one data table based on the Arrow format with additional metadata.
 
 Each dataset will be given two unique identifiers:
 
-* `uid`: A UUID that is practically unique across all workspaces. This is
-useful when users want to export a dataset to other places.
-* `id`: A self-incremental ID that is unique in the current workspace. This is
-more human-readable and can be used to reference a dataset in a given
-workspace.
+- `uid`: A UUID that is practically unique across all workspaces. This is
+  useful when users want to export a dataset to other places.
+- `id`: A self-incremental ID that is unique in the current workspace. This is
+  more human-readable and can be used to reference a dataset in a given
+  workspace.
 
 Users can open a dataset by either `uid` or `id`.

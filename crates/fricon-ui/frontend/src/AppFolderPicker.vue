@@ -21,8 +21,8 @@ function inputChanged() {
   <InputGroup>
     <InputText
       v-model="folderName"
-      @input="() => {}"
       placeholder="Enter folder name"
+      @input="() => {}"
       @keyup.enter="inputChanged"
       @blur="inputChanged"
     />

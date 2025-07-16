@@ -4,7 +4,7 @@ Python client for the fridge control system.
 
 ## Current features
 
-* Data storage.
+- Data storage.
 
 ## Usage
 

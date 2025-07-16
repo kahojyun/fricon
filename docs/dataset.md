@@ -12,17 +12,17 @@ but with much stricter data types requirements. Each Arrow table comes with a
 schema that specifies the data types of each column. Following are some key
 classes in the python binding of Arrow:
 
-* [`pyarrow.RecordBatch`][]: A record batch is a collection of arrays with the
-same length. Each record batch is associated with a schema.
-* [`pyarrow.Array`][]: An array is a sequence of values with the same data
-type.
-* [`pyarrow.Scalar`][]: A scalar is a single value with a data type.
-* [`pyarrow.Schema`][]: A schema is a collection of fields. Each field
-corresponds to a column in a table.
-* [`pyarrow.Field`][]: A field is a data type with a name.
-* [`pyarrow.DataType`][]
-* [`pyarrow.Table`][]: A helper type to unify representations of single and
-collection of record batches with the same schema.
+- [`pyarrow.RecordBatch`][]: A record batch is a collection of arrays with the
+  same length. Each record batch is associated with a schema.
+- [`pyarrow.Array`][]: An array is a sequence of values with the same data
+  type.
+- [`pyarrow.Scalar`][]: A scalar is a single value with a data type.
+- [`pyarrow.Schema`][]: A schema is a collection of fields. Each field
+  corresponds to a column in a table.
+- [`pyarrow.Field`][]: A field is a data type with a name.
+- [`pyarrow.DataType`][]
+- [`pyarrow.Table`][]: A helper type to unify representations of single and
+  collection of record batches with the same schema.
 
 ## How are datasets stored?
 
@@ -37,15 +37,15 @@ columns will be inferred from the first row of the dataset.
 `fricon` only tries to infer a subset of Arrow data types. The following table
 lists the mapping between Python types and Arrow data types:
 
-| Python type                                | Arrow data type          |
-|--------------------------------------------|--------------------------|
-| [`bool`][]                                 | [`pyarrow.bool_`][]      |
-| [`int`][]                                  | [`pyarrow.int64`][]      |
-| [`float`][]                                | [`pyarrow.float64`][]    |
-| [`complex`][]                              | [`fricon.complex128`][]  |
-| [`str`][]                                  | [`pyarrow.string`][]     |
-| [`Sequence`][collections.abc.Sequence]     | [`pyarrow.list_`][]      |
-| [`fricon.Trace`][]                         | [`fricon.trace_`][]      |
+| Python type                            | Arrow data type         |
+| -------------------------------------- | ----------------------- |
+| [`bool`][]                             | [`pyarrow.bool_`][]     |
+| [`int`][]                              | [`pyarrow.int64`][]     |
+| [`float`][]                            | [`pyarrow.float64`][]   |
+| [`complex`][]                          | [`fricon.complex128`][] |
+| [`str`][]                              | [`pyarrow.string`][]    |
+| [`Sequence`][collections.abc.Sequence] | [`pyarrow.list_`][]     |
+| [`fricon.Trace`][]                     | [`fricon.trace_`][]     |
 
 Notice that `fricon` defines custom data types for complex numbers and traces.
 Users can use utility functions to convert these custom data types back to
