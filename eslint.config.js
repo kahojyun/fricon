@@ -10,7 +10,8 @@ export default typescriptEslint.config(
   {
     extends: [
       eslint.configs.recommended,
-      ...typescriptEslint.configs.recommended,
+      ...typescriptEslint.configs.recommendedTypeChecked,
+      ...typescriptEslint.configs.stylisticTypeChecked,
       ...eslintPluginVue.configs["flat/recommended"],
     ],
     files: ["**/*.{ts,vue}"],
@@ -19,6 +20,8 @@ export default typescriptEslint.config(
       sourceType: "module",
       globals: globals.browser,
       parserOptions: {
+        extraFileExtensions: [".vue"],
+        projectService: true,
         parser: typescriptEslint.parser,
       },
     },

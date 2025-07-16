@@ -6,7 +6,7 @@ import { fileURLToPath, URL } from "node:url";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   plugins: [tailwindcss(), vue()],
   resolve: {
     alias: {
@@ -21,7 +21,7 @@ export default defineConfig(async () => ({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    host: host ?? false,
     hmr: host
       ? {
           protocol: "ws",
