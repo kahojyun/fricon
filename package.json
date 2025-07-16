@@ -1,0 +1,7 @@
+{
+  "name": "fricon",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {},
+  "packageManager": "pnpm@10.13.1"
+}

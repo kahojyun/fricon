@@ -57,7 +57,6 @@ jobs:
       - name: Stubtest
         run: uv run stubtest fricon
       - name: Build docs
-        working-directory: python
         run: uv run --group docs mkdocs build -s -v
 
   test-rust:

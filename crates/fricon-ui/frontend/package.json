@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },

@@ -50,17 +50,14 @@ docs = [
 ]
 
 [tool.maturin]
-python-source = "python/src"
 module-name = "fricon._core"
+python-source = "crates/fricon-py/python"
 manifest-path = "crates/fricon-py/Cargo.toml"
-features = ["pyo3/extension-module"]
+features = ["pyo3/extension-module", "fricon-ui/prod"]
 
 [tool.pytest.ini_options]
-testpaths = ["python/tests"]
+testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 
 [tool.basedpyright]
-venvPath = "."
-venv = ".venv"
-include = ["python"]
-exclude = ["**/node_modules", "**/__pycache__", "**/docs/_build"]
+include = ["crates/fricon-py/python", "examples", "tests", "scripts"]

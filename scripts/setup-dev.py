@@ -6,13 +6,13 @@ TEST_DB = "testdb.sqlite3"
 MIGRATIONS_PATH = "crates/fricon/migrations"
 
 
-def get_project_root():
+def get_project_root() -> Path:
     """Find project root with __file__."""
     this_file = Path(__file__)  # <project-root>/scripts/setup-dev.py
     return this_file.parent.parent
 
 
-def write_dotenv():
+def write_dotenv() -> None:
     dotenv_path = get_project_root() / ".env"
     if dotenv_path.exists():
         raise RuntimeError("A .env file already exists.")
@@ -20,7 +20,7 @@ def write_dotenv():
         _ = f.write(f"DATABASE_URL=sqlite://{DEV_FOLDER}/{TEST_DB}\n")
 
 
-def create_dev_folder():
+def create_dev_folder() -> None:
     dev_folder = get_project_root() / DEV_FOLDER
     dev_folder.mkdir()  # Raises FileExistsError if already exists.
     gitignore = dev_folder / ".gitignore"
@@ -28,7 +28,7 @@ def create_dev_folder():
         _ = f.write("*\n")
 
 
-def sqlx_setup():
+def sqlx_setup() -> None:
     try:
         _ = subprocess.run(
             ["sqlx", "db", "setup", "--source", MIGRATIONS_PATH],
@@ -43,7 +43,7 @@ def sqlx_setup():
         raise
 
 
-def main():
+def main() -> None:
     write_dotenv()
     create_dev_folder()
     sqlx_setup()

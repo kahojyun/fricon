@@ -23,6 +23,7 @@ workspace = true
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+tauri-utils = { version = "2" }
 
 [features]
-gui = ["tauri/custom-protocol"]
+prod = ["tauri/custom-protocol"]

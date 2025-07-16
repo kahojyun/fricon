@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pyarrow as pa
-
 from fricon import DatasetManager, Workspace, complex128
 
 
@@ -31,7 +30,7 @@ def with_schema(manager: DatasetManager) -> None:
     """
     # Arrow doesn't have complex128, so we need to import it from fricon.
     # complex128 is a struct with two float64 fields named "real" and "imag".
-    schema = pa.schema(  # pyright: ignore[reportUnknownMemberType]
+    schema = pa.schema(
         [
             ("a", pa.int64()),
             ("b", pa.int64()),
