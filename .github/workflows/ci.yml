@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
       - name: Ruff format
         run: uv run --only-group fmt ruff format --check
       - name: Ruff lint
@@ -47,7 +47,7 @@ jobs:
         with:
           tool: protoc
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
       - name: Sync project
         run: uv sync --locked --group ci
       - name: Pytest
