@@ -1,35 +1,45 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import Splitter from "primevue/splitter";
-import SplitterPanel from "primevue/splitterpanel";
-import ToggleSwitch from "primevue/toggleswitch";
-import ChartViewer from "./ChartViewer.vue";
-import AppCredits from "./AppCredits.vue";
-import DatasetTable from "./DatasetTable.vue";
-import AppFolderPicker from "./AppFolderPicker.vue";
+import { onMounted, ref } from "vue";
+import DataViewer from "./DataViewer.vue";
+import {
+  getConnectionStatus,
+  selectWorkspace as selectWorkspaceFromBackend,
+} from "./backend";
+import { Button } from "primevue";
 
-const showChart = ref(true);
-const folderName = ref("");
-watch(folderName, (newVal) => {
-  console.log("Folder name changed:", newVal);
+enum WorkspaceStatus {
+  LOADING,
+  NO_SELECTION,
+  SELECTED,
+}
+
+const workspaceStatus = ref(WorkspaceStatus.LOADING);
+
+onMounted(async () => {
+  const status = await getConnectionStatus();
+  workspaceStatus.value =
+    status === "connected"
+      ? WorkspaceStatus.SELECTED
+      : WorkspaceStatus.NO_SELECTION;
 });
+
+async function selectWorkspace() {
+  try {
+    await selectWorkspaceFromBackend();
+    workspaceStatus.value = WorkspaceStatus.SELECTED;
+  } catch (error) {
+    console.error("Error selecting workspace:", error);
+  }
+}
 </script>
 
 <template>
-  <Splitter class="w-full h-full">
-    <SplitterPanel>
-      <DatasetTable />
-    </SplitterPanel>
-    <SplitterPanel class="flex flex-col items-center">
-      <AppFolderPicker v-model="folderName" class="flex-none p-4" />
-      <AppCredits class="flex-none" />
-      <label class="flex-none flex items-center gap-4 p-4">
-        Toggle Chart 开关
-        <ToggleSwitch v-model="showChart" />
-      </label>
-      <ChartViewer v-if="showChart" class="flex-auto" />
-    </SplitterPanel>
-  </Splitter>
+  <div v-if="workspaceStatus === WorkspaceStatus.LOADING">Loading...</div>
+  <div
+    v-else-if="workspaceStatus === WorkspaceStatus.NO_SELECTION"
+    class="flex flex-col gap-4 justify-center items-center h-full"
+  >
+    <Button label="Select workspace folder" @click="selectWorkspace" />
+  </div>
+  <DataViewer v-else-if="workspaceStatus === WorkspaceStatus.SELECTED" />
 </template>
-
-<style scoped></style>

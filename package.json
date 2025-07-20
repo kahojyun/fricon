@@ -13,6 +13,7 @@
   "type": "module",
   "devDependencies": {
     "@eslint/js": "9.31.0",
+    "@tauri-apps/cli": "^2.6.2",
     "eslint": "9.31.0",
     "eslint-config-prettier": "10.1.5",
     "eslint-plugin-vue": "10.3.0",
