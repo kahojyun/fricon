@@ -1,0 +1,50 @@
+# Fricon project overview
+
+## Tooling
+
+`cargo`, `uv` and `pnpm` are used for project management and dependency resolution.
+
+## Project Architecture Overview
+
+Relative to the project root:
+
+- `/crates/`: Contains core project components
+    - `/crates/fricon/`: Core Rust functionality
+    - `/crates/fricon-py/`: PyO3 bindings
+    - `/crates/fricon-ui/`: Tauri application
+        - `/crates/fricon-ui/frontend/`: Vue3 application
+- `/scripts/`: Project helper scripts
+- `/examples/`: Example python scripts
+- `/docs/`: Python API documentation
+    - `/docs/development/`: Development documentation
+- `/tests/`: Python test suite
+
+## Code Guidelines
+
+### General Principles
+
+- Follow existing code conventions and patterns
+- Maintain type safety where possible
+- Use proper error handling throughout
+- Add docstrings/comments for all public APIs
+- Include unit tests for new functionality
+
+### Rust
+
+- Use `cargo fmt` for code formatting
+- Use `cargo clippy` for linting and static analysis
+- Use `cargo test` for running unit tests
+- Never create files with `mod.rs` paths - prefer `src/some_module.rs` instead of `src/some_module/mod.rs`.
+
+### Tauri
+
+- Define tauri commands in `src/commands.rs`
+
+### Vue3
+
+- Use Composition API and Typescript with `<script setup lang="ts">` syntax
+- Organize components in logical directories
+- Use Pinia for state management
+- Implement proper reactivity patterns
+- Follow Vue's single-file component best practices
+- Use tailwindcss for styling
