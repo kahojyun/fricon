@@ -25,10 +25,7 @@ use arrow::{
 };
 use chrono::{DateTime, Utc};
 use clap::Parser;
-use fricon::{
-    client::{self, Client, DATASET_NAME, DatasetRecord, Info},
-    paths::WorkDirectory,
-};
+use fricon::client::{self, Client, DATASET_NAME, DatasetRecord, Info};
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
@@ -53,7 +50,7 @@ pub mod _core {
 #[pyclass(module = "fricon._core")]
 #[derive(Clone)]
 pub struct Workspace {
-    root: WorkDirectory,
+    root: PathBuf,
     client: Client,
 }
 
@@ -69,9 +66,8 @@ impl Workspace {
     #[staticmethod]
     #[expect(clippy::needless_pass_by_value)]
     pub fn connect(path: PathBuf) -> Result<Self> {
-        let root = WorkDirectory::new(&path)?;
-        let ipc_file = root.ipc_file();
-        let client = get_runtime().block_on(Client::connect(ipc_file))?;
+        let root = path;
+        let client = get_runtime().block_on(Client::connect(&root))?;
         Ok(Self { root, client })
     }
 

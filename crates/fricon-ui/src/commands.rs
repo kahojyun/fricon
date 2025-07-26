@@ -3,7 +3,7 @@ use super::AppState;
 use tauri::{AppHandle, State, ipc::Invoke};
 use tauri_plugin_dialog::DialogExt;
 
-use fricon::{client::Client, paths::WorkDirectory};
+use fricon::client::Client;
 
 #[tauri::command]
 async fn select_workspace(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
@@ -18,10 +18,7 @@ async fn select_workspace(app: AppHandle, state: State<'_, AppState>) -> Result<
         .ok_or("No folder selected")?
         .into_path()
         .unwrap();
-    let work_directory = WorkDirectory::new(&path).unwrap();
-    let client = Client::connect(work_directory.ipc_file())
-        .await
-        .map_err(|e| e.to_string())?;
+    let client = Client::connect(&path).await.map_err(|e| e.to_string())?;
     client_state.replace(client);
     Ok(())
 }

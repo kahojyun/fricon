@@ -27,33 +27,35 @@ type Result<T> = std::result::Result<T, Error>;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!();
 
-pub async fn connect(path: &DatabaseFile) -> anyhow::Result<SqlitePool> {
-    let path = &path.0;
-    info!("Connect to database at {}", path.display());
-    let pool = SqlitePoolOptions::new()
-        .connect_with(SqliteConnectOptions::new().filename(path))
-        .await?;
-    MIGRATOR.run(&pool).await?;
-    Ok(pool)
-}
+impl DatabaseFile {
+    pub async fn connect(&self) -> anyhow::Result<SqlitePool> {
+        let path = &self.0;
+        info!("Connect to database at {}", path.display());
+        let pool = SqlitePoolOptions::new()
+            .connect_with(SqliteConnectOptions::new().filename(path))
+            .await?;
+        MIGRATOR.run(&pool).await?;
+        Ok(pool)
+    }
 
-pub async fn init(path: &DatabaseFile) -> anyhow::Result<SqlitePool> {
-    let path = &path.0;
-    ensure!(!path.exists(), "Database already exists.");
-    info!("Initialize database at {}", path.display());
-    let options = SqliteConnectOptions::new()
-        .filename(path)
-        .journal_mode(SqliteJournalMode::Wal)
-        .create_if_missing(true);
-    let pool = SqlitePoolOptions::new()
-        .connect_with(options)
-        .await
-        .context("Failed to create database.")?;
-    MIGRATOR
-        .run(&pool)
-        .await
-        .context("Failed to initialize database schema.")?;
-    Ok(pool)
+    pub async fn init(&self) -> anyhow::Result<SqlitePool> {
+        let path = &self.0;
+        ensure!(!path.exists(), "Database already exists.");
+        info!("Initialize database at {}", path.display());
+        let options = SqliteConnectOptions::new()
+            .filename(path)
+            .journal_mode(SqliteJournalMode::Wal)
+            .create_if_missing(true);
+        let pool = SqlitePoolOptions::new()
+            .connect_with(options)
+            .await
+            .context("Failed to create database.")?;
+        MIGRATOR
+            .run(&pool)
+            .await
+            .context("Failed to initialize database schema.")?;
+        Ok(pool)
+    }
 }
 
 pub struct DatasetIndex {

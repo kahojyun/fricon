@@ -13,8 +13,8 @@ use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
+    database::{self, DatasetRecord},
     dataset::Info,
-    db::{self, DatasetRecord},
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, GetRequest,
         GetResponse, ListRequest, ListResponse, RemoveTagsRequest, RemoveTagsResponse,
@@ -273,7 +273,7 @@ impl DataStorageService for Storage {
             }
         }
         .map_err(|e| {
-            if matches!(e, db::Error::NotFound) {
+            if matches!(e, database::Error::NotFound) {
                 Status::not_found("dataset not found")
             } else {
                 error!("Failed to get dataset: {:?}", e);

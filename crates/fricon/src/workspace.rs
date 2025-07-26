@@ -9,34 +9,33 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    VERSION,
+    VERSION, database,
     dataset::{self, Dataset},
-    db,
-    paths::{DatasetPath, VersionFile, WorkDirectory},
+    paths::{DatasetPath, VersionFile, WorkspacePath},
 };
 
 #[derive(Debug, Clone)]
 pub struct Workspace {
-    root: WorkDirectory,
+    root: WorkspacePath,
     database: SqlitePool,
 }
 
 impl Workspace {
     pub async fn open(path: &Path) -> Result<Self> {
-        let root = WorkDirectory::new(path)?;
+        let root = WorkspacePath::new(path)?;
         check_version_file(&root.version_file())?;
-        let database = db::connect(&root.database_file()).await?;
+        let database = root.database_file().connect().await?;
         Ok(Self { root, database })
     }
 
     #[must_use]
-    pub const fn root(&self) -> &WorkDirectory {
+    pub const fn root(&self) -> &WorkspacePath {
         &self.root
     }
 
     #[must_use]
-    pub fn dataset_index(&self) -> db::DatasetIndex {
-        db::DatasetIndex {
+    pub fn dataset_index(&self) -> database::DatasetIndex {
+        database::DatasetIndex {
             pool: self.database.clone(),
         }
     }
@@ -44,8 +43,8 @@ impl Workspace {
     pub async fn init(path: &Path) -> Result<Self> {
         info!("Initialize workspace: {:?}", path);
         create_empty_dir(path)?;
-        let root = WorkDirectory::new(path)?;
-        let database = db::init(&root.database_file()).await?;
+        let root = WorkspacePath::new(path)?;
+        let database = root.database_file().init().await?;
         init_dir(&root)?;
         write_version_file(&root.version_file())?;
         Ok(Self { root, database })
@@ -99,7 +98,7 @@ fn create_empty_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn init_dir(root: &WorkDirectory) -> Result<()> {
+fn init_dir(root: &WorkspacePath) -> Result<()> {
     fs::create_dir(root.data_dir().0).context("Failed to create data directory.")?;
     fs::create_dir(root.log_dir().0).context("Failed to create log directory.")?;
     fs::create_dir(root.backup_dir().0).context("Failed to create backup directory.")?;

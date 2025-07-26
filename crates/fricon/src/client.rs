@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter};
 use bytes::Bytes;
@@ -12,8 +14,9 @@ use tracing::error;
 
 use crate::{
     VERSION,
+    database::DatasetRecord,
     ipc::Ipc,
-    paths::IpcFile,
+    paths::{IpcFile, WorkspacePath},
     proto::{
         AddTagsRequest, CreateRequest, GetRequest, ListRequest, RemoveTagsRequest,
         ReplaceTagsRequest, UpdateDescriptionRequest, UpdateFavoriteRequest, UpdateNameRequest,
@@ -21,11 +24,6 @@ use crate::{
         data_storage_service_client::DataStorageServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
-};
-
-pub use crate::{
-    dataset::{DATASET_NAME, Info},
-    db::DatasetRecord,
 };
 
 #[derive(Debug, Clone)]
@@ -38,8 +36,9 @@ impl Client {
     ///
     /// 1. Cannot connect to the IPC socket.
     /// 2. Server version mismatch.
-    pub async fn connect(path: IpcFile) -> Result<Self> {
-        let channel = connect_ipc_channel(path).await?;
+    pub async fn connect(workspace: &Path) -> Result<Self> {
+        let workspace_root = WorkspacePath::new(workspace).context("Invalid workspace path.")?;
+        let channel = connect_ipc_channel(workspace_root.ipc_file()).await?;
         check_server_version(channel.clone()).await?;
         Ok(Self { channel })
     }

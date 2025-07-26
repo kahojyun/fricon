@@ -9,9 +9,9 @@ use uuid::Uuid;
 ///
 /// Provide methods to construct paths to various components of the workspace.
 #[derive(Debug, Clone)]
-pub struct WorkDirectory(PathBuf);
+pub struct WorkspacePath(PathBuf);
 
-impl WorkDirectory {
+impl WorkspacePath {
     /// # Errors
     ///
     /// If the path cannot be converted to an absolute path.
