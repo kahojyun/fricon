@@ -20,7 +20,7 @@ pub enum ConnectError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::StreamExt;
+    use futures::{StreamExt, pin_mut};
     use tempfile::tempdir;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -29,10 +29,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("fricon.sock");
         {
-            let mut server = listen(&path).unwrap();
+            let server = listen(&path).unwrap();
             let mut client = connect(&path).await.unwrap();
 
             let server_task = tokio::spawn(async move {
+                pin_mut!(server);
                 let mut stream = server.next().await.unwrap().unwrap();
                 let mut buf = [0; 11];
                 stream.read_exact(&mut buf).await.unwrap();

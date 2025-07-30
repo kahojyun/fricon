@@ -6,7 +6,7 @@ use std::{
 };
 
 use async_stream::try_stream;
-use futures::{prelude::*, stream::BoxStream};
+use futures::prelude::*;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::windows::named_pipe::{ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions},
@@ -28,7 +28,7 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectE
 
 pub fn listen(
     path: impl AsRef<Path>,
-) -> io::Result<BoxStream<'static, io::Result<NamedPipeConnector>>> {
+) -> io::Result<impl Stream<Item = io::Result<NamedPipeConnector>> + 'static> {
     let pipe_name = get_pipe_name(path)?;
     let mut server = ServerOptions::new()
         .first_pipe_instance(true)
@@ -41,8 +41,7 @@ pub fn listen(
             server = ServerOptions::new().create(&pipe_name)?;
             yield connector;
         }
-    }
-    .boxed())
+    })
 }
 
 fn get_pipe_name(path: impl AsRef<Path>) -> io::Result<String> {
