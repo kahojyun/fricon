@@ -5,9 +5,8 @@ use std::{
     task::{Context, Poll},
 };
 
-use anyhow::Result;
 use async_stream::try_stream;
-use futures::{prelude::*, stream::BoxStream};
+use futures::prelude::*;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::windows::named_pipe::{ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions},
@@ -15,40 +14,37 @@ use tokio::{
 use tonic::transport::server::Connected;
 use tracing::error;
 
-use crate::paths::IpcFile;
+use super::ConnectError;
 
-use super::Ipc;
-
-impl Ipc for &IpcFile {
-    type ClientStream = NamedPipeClient;
-    type ListenerStream = BoxStream<'static, Result<NamedPipeConnector>>;
-
-    async fn connect(self) -> Result<Self::ClientStream> {
-        let pipe_name = get_pipe_name(&self.0)?;
-        Ok(ClientOptions::new().open(pipe_name)?)
-    }
-
-    async fn listen(self) -> Result<Self::ListenerStream> {
-        let pipe_name = get_pipe_name(&self.0)?;
-        Ok(try_stream! {
-            let mut server = ServerOptions::new()
-                .first_pipe_instance(true)
-                .create(&pipe_name)
-                .inspect_err(|e| error!("Failed to create server: {e}"))?;
-            loop {
-                server.connect().await?;
-                let connector = NamedPipeConnector(server);
-                server = ServerOptions::new().create(&pipe_name)?;
-                yield connector;
-            }
-        }
-        .boxed())
-    }
-
-    fn cleanup(self) {}
+pub async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectError> {
+    let pipe_name = get_pipe_name(path)?;
+    ClientOptions::new()
+        .open(pipe_name)
+        .map_err(|e| match e.kind() {
+            io::ErrorKind::NotFound => ConnectError::NotFound(e),
+            _ => ConnectError::Io(e),
+        })
 }
 
-fn get_pipe_name(path: &Path) -> Result<String> {
+pub fn listen(
+    path: impl AsRef<Path>,
+) -> io::Result<impl Stream<Item = io::Result<NamedPipeConnector>>> {
+    let pipe_name = get_pipe_name(path)?;
+    Ok(try_stream! {
+        let mut server = ServerOptions::new()
+            .first_pipe_instance(true)
+            .create(&pipe_name)
+            .inspect_err(|e| error!("Failed to create named pipe server: {e}"))?;
+        loop {
+            server.connect().await?;
+            let connector = NamedPipeConnector(server);
+            server = ServerOptions::new().create(&pipe_name)?;
+            yield connector;
+        }
+    })
+}
+
+fn get_pipe_name(path: impl AsRef<Path>) -> io::Result<String> {
     let abspath = path::absolute(path)?;
     Ok(format!(r"\\.\pipe\{}", abspath.display()))
 }

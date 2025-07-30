@@ -15,7 +15,7 @@ use tracing::error;
 use crate::{
     VERSION,
     database::DatasetRecord,
-    ipc::Ipc,
+    ipc,
     paths::{IpcFile, WorkspacePath},
     proto::{
         AddTagsRequest, CreateRequest, GetRequest, ListRequest, RemoveTagsRequest,
@@ -301,7 +301,7 @@ async fn connect_ipc_channel(path: IpcFile) -> Result<Channel> {
         .connect_with_connector(service_fn(move |_| {
             let path = path.clone();
             async move {
-                let stream = path.connect().await?;
+                let stream = ipc::connect(path.0).await?;
                 anyhow::Ok(TokioIo::new(stream))
             }
         }))

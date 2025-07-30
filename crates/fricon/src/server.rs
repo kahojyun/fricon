@@ -10,7 +10,7 @@ use tonic::transport::Server;
 use tracing::info;
 
 use crate::{
-    ipc::Ipc,
+    ipc,
     proto::{
         data_storage_service_server::DataStorageServiceServer,
         fricon_service_server::FriconServiceServer,
@@ -26,7 +26,7 @@ pub async fn run(path: &Path) -> Result<()> {
     let tracker = TaskTracker::new();
     let storage = Storage::new(workspace, tracker.clone());
     let service = DataStorageServiceServer::new(storage);
-    let listener = ipc_file.listen().await?;
+    let listener = ipc::listen(ipc_file.0)?;
     Server::builder()
         .add_service(service)
         .add_service(FriconServiceServer::new(Fricon))
@@ -37,7 +37,6 @@ pub async fn run(path: &Path) -> Result<()> {
         })
         .await?;
     info!("Shutdown");
-    ipc_file.cleanup();
     tracker.close();
     tracker.wait().await;
     Ok(())

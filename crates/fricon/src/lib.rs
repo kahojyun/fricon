@@ -7,11 +7,11 @@
 //! - **Client-Server Architecture**: gRPC-based communication
 
 pub mod client;
+pub mod dataset;
 pub mod server;
 pub mod workspace;
 
 mod database;
-mod dataset;
 mod ipc;
 mod paths;
 mod proto;

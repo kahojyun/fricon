@@ -25,7 +25,10 @@ use arrow::{
 };
 use chrono::{DateTime, Utc};
 use clap::Parser;
-use fricon::client::{self, Client, DATASET_NAME, DatasetRecord, Info};
+use fricon::{
+    client::{self, Client},
+    dataset::Info,
+};
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};

@@ -1,28 +1,49 @@
-use std::fs;
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use anyhow::Result;
+use futures::{Stream, StreamExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_stream::wrappers::UnixListenerStream;
 use tracing::debug;
 
-use crate::paths::IpcFile;
+use super::ConnectError;
 
-use super::Ipc;
+pub async fn connect(path: impl AsRef<Path>) -> Result<UnixStream, ConnectError> {
+    UnixStream::connect(path).await.map_err(|e| match e.kind() {
+        io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused => ConnectError::NotFound(e),
+        _ => ConnectError::Io(e),
+    })
+}
 
-impl Ipc for &IpcFile {
-    type ClientStream = UnixStream;
-    type ListenerStream = UnixListenerStream;
+pub fn listen(path: impl Into<PathBuf>) -> io::Result<IpcListenerStream> {
+    let path = path.into();
+    let listener = UnixListener::bind(&path)?;
+    Ok(IpcListenerStream {
+        path,
+        listener: UnixListenerStream::new(listener),
+    })
+}
 
-    async fn connect(self) -> Result<Self::ClientStream> {
-        Ok(UnixStream::connect(&self.0).await?)
+pub struct IpcListenerStream {
+    path: PathBuf,
+    listener: UnixListenerStream,
+}
+
+impl Stream for IpcListenerStream {
+    type Item = io::Result<UnixStream>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.listener.poll_next_unpin(cx)
     }
+}
 
-    async fn listen(self) -> Result<Self::ListenerStream> {
-        Ok(UnixListenerStream::new(UnixListener::bind(&self.0)?))
-    }
-
-    fn cleanup(self) {
-        debug!("Remove socket file: {}", self.0.display());
-        fs::remove_file(&self.0).ok();
+impl Drop for IpcListenerStream {
+    fn drop(&mut self) {
+        debug!("Removing IPC socket at {}", self.path.display());
+        fs::remove_file(&self.path).ok();
     }
 }
