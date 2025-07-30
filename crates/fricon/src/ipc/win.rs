@@ -6,7 +6,7 @@ use std::{
 };
 
 use async_stream::try_stream;
-use futures::prelude::*;
+use futures::{prelude::*, stream::BoxStream};
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::windows::named_pipe::{ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions},
@@ -28,20 +28,21 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectE
 
 pub fn listen(
     path: impl AsRef<Path>,
-) -> io::Result<impl Stream<Item = io::Result<NamedPipeConnector>>> {
+) -> io::Result<BoxStream<'static, io::Result<NamedPipeConnector>>> {
     let pipe_name = get_pipe_name(path)?;
+    let mut server = ServerOptions::new()
+        .first_pipe_instance(true)
+        .create(&pipe_name)
+        .inspect_err(|e| error!("Failed to create named pipe server: {e}"))?;
     Ok(try_stream! {
-        let mut server = ServerOptions::new()
-            .first_pipe_instance(true)
-            .create(&pipe_name)
-            .inspect_err(|e| error!("Failed to create named pipe server: {e}"))?;
         loop {
             server.connect().await?;
             let connector = NamedPipeConnector(server);
             server = ServerOptions::new().create(&pipe_name)?;
             yield connector;
         }
-    })
+    }
+    .boxed())
 }
 
 fn get_pipe_name(path: impl AsRef<Path>) -> io::Result<String> {
