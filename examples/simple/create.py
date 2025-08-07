@@ -10,4 +10,4 @@ with manager.create("example_dataset") as writer:
         c=["A", "B"],
         d=Trace.fixed_step(0.1, 1.1, [1, 2, 3]),
     )
-print(f"Id of the dataset: {writer.id}")
+print(f"Id of the dataset: {writer.dataset.id}")

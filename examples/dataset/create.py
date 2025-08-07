@@ -13,7 +13,7 @@ def simple(manager: DatasetManager) -> None:
             # supports primitive types and 1d arrays
             writer.write(a=i, b=i * 2, c=[1, 2, 3])
 
-    d = manager.open(writer.id)
+    d = writer.dataset
     assert d.name == "example"
     assert d.description == "test"
     assert set(d.tags) == {"tagA", "tagB"}

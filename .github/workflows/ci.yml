@@ -77,7 +77,7 @@ jobs:
       - name: Basedpyright
         run: uv run basedpyright
       - name: Stubtest
-        run: uv run stubtest fricon
+        run: uv run stubtest fricon._core
       - name: Build docs
         run: uv run --group docs mkdocs build -s -v
 
