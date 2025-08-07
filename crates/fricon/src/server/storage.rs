@@ -1,12 +1,11 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use anyhow::{Context, anyhow, bail};
+use anyhow::{Context, bail};
 use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
 use chrono::DateTime;
 use futures::prelude::*;
 use prost_types::Timestamp;
-use tokio::runtime::Handle;
 use tokio_util::{io::SyncIoBridge, task::TaskTracker};
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
@@ -14,14 +13,14 @@ use uuid::Uuid;
 
 use crate::{
     database::{self, DatasetRecord},
-    dataset::Info,
+    dataset,
+    paths::DatasetPath,
     proto::{
-        self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, GetRequest,
-        GetResponse, ListRequest, ListResponse, RemoveTagsRequest, RemoveTagsResponse,
-        ReplaceTagsRequest, ReplaceTagsResponse, UpdateDescriptionRequest,
-        UpdateDescriptionResponse, UpdateFavoriteRequest, UpdateFavoriteResponse,
-        UpdateNameRequest, UpdateNameResponse, WRITE_TOKEN, WriteRequest, WriteResponse,
-        data_storage_service_server::DataStorageService, get_request::IdEnum,
+        self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DatasetMetadata,
+        DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
+        RemoveTagsResponse, SearchRequest, SearchResponse, UpdateRequest, UpdateResponse,
+        WriteRequest, WriteResponse, data_storage_service_server::DataStorageService,
+        get_request::IdEnum,
     },
     workspace::Workspace,
 };
@@ -29,95 +28,80 @@ use crate::{
 #[derive(Debug)]
 pub struct Storage {
     workspace: Workspace,
-    creating: Creating,
+    pending_create: PendingCreate,
     tracker: TaskTracker,
 }
 
-#[derive(Debug)]
-struct Metadata {
-    name: String,
-    description: Option<String>,
-    tags: Vec<String>,
-    index: Vec<String>,
-}
-
 #[derive(Debug, Default)]
-struct Creating(Mutex<HashMap<Uuid, Metadata>>);
+struct PendingCreate(Mutex<HashMap<Uuid, CreateRequest>>);
 
 impl Storage {
     pub fn new(workspace: Workspace, tracker: TaskTracker) -> Self {
         Self {
             workspace,
-            creating: Creating::default(),
+            pending_create: PendingCreate::default(),
             tracker,
         }
     }
 }
 
-impl Creating {
-    fn insert(&self, token: Uuid, metadata: Metadata) {
+impl PendingCreate {
+    fn insert(&self, token: Uuid, request: CreateRequest) {
         let mut inner = self.0.lock().unwrap();
-        inner.insert(token, metadata);
+        inner.insert(token, request);
     }
 
-    fn remove(&self, token: &Uuid) -> Option<Metadata> {
+    fn remove(&self, token: &Uuid) -> Option<CreateRequest> {
         let mut inner = self.0.lock().unwrap();
         inner.remove(token)
     }
 }
 
-impl From<DatasetRecord> for proto::Dataset {
+impl From<dataset::Metadata> for proto::DatasetMetadata {
     fn from(
-        DatasetRecord {
-            id,
-            info:
-                Info {
-                    uid,
-                    name,
-                    description,
-                    favorite,
-                    index_columns,
-                    path,
-                    created_at,
-                    tags,
-                },
-        }: DatasetRecord,
-    ) -> Self {
-        Self {
-            id: Some(id),
-            uid: Some(uid.simple().to_string()),
-            name: Some(name),
-            description: Some(description),
-            favorite: Some(favorite),
+        dataset::Metadata {
+            uid,
+            name,
+            description,
+            favorite,
             index_columns,
-            path: Some(path.0),
-            created_at: {
-                Some(Timestamp {
-                    seconds: created_at.timestamp(),
-                    #[expect(
-                        clippy::cast_possible_wrap,
-                        reason = "Nanos are always less than 2e9."
-                    )]
-                    nanos: created_at.timestamp_subsec_nanos() as i32,
-                })
-            },
+            created_at,
+            tags,
+        }: dataset::Metadata,
+    ) -> Self {
+        let created_at = Timestamp {
+            seconds: created_at.timestamp(),
+            #[expect(clippy::cast_possible_wrap, reason = "Nanos are always less than 2e9.")]
+            nanos: created_at.timestamp_subsec_nanos() as i32,
+        };
+        Self {
+            uid: uid.simple().to_string(),
+            name,
+            description,
+            favorite,
+            index_columns,
+            created_at: Some(created_at),
             tags,
         }
     }
 }
 
-impl TryFrom<proto::Dataset> for DatasetRecord {
+impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
     type Error = anyhow::Error;
 
-    fn try_from(value: proto::Dataset) -> Result<Self, Self::Error> {
-        let id = value.id.context("id is required")?;
-        let uid = value.uid.context("uid is required")?.parse()?;
-        let name = value.name.context("name is required")?;
-        let description = value.description.context("description is required")?;
-        let favorite = value.favorite.context("favorite is required")?;
-        let index_columns = value.index_columns;
-        let path = value.path.context("path is required")?;
-        let created_at = value.created_at.context("created_at is required")?;
+    fn try_from(
+        DatasetMetadata {
+            uid,
+            name,
+            description,
+            favorite,
+            index_columns,
+            created_at,
+            tags,
+        }: proto::DatasetMetadata,
+    ) -> Result<Self, Self::Error> {
+        let uid = uid.parse()?;
+        let created_at = created_at.context("created_at is required")?;
         let seconds = created_at.seconds;
         #[expect(clippy::cast_sign_loss)]
         let nanos = if created_at.nanos < 0 {
@@ -126,40 +110,54 @@ impl TryFrom<proto::Dataset> for DatasetRecord {
             created_at.nanos as u32
         };
         let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
-        let tags = value.tags;
         Ok(Self {
-            id,
-            info: Info {
-                uid,
-                name,
-                description,
-                favorite,
-                index_columns,
-                path: path.into(),
-                created_at,
-                tags,
-            },
+            uid,
+            name,
+            description,
+            favorite,
+            index_columns,
+            created_at,
+            tags,
         })
     }
 }
 
+impl From<DatasetRecord> for proto::Dataset {
+    fn from(DatasetRecord { id, path, metadata }: DatasetRecord) -> Self {
+        Self {
+            id,
+            path: path.0,
+            metadata: Some(metadata.into()),
+        }
+    }
+}
+
+impl TryFrom<proto::Dataset> for DatasetRecord {
+    type Error = anyhow::Error;
+
+    fn try_from(
+        proto::Dataset { id, path, metadata }: proto::Dataset,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id,
+            path: DatasetPath(path),
+            metadata: metadata
+                .context("metadata field is required.")?
+                .try_into()?,
+        })
+    }
+}
+
+// TODO: Use workspace methods
 #[tonic::async_trait]
 impl DataStorageService for Storage {
     async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
-        let msg = request.into_inner();
-        let metadata = Metadata {
-            name: msg
-                .name
-                .ok_or_else(|| Status::invalid_argument("name is required"))?,
-            description: msg.description,
-            tags: msg.tags,
-            index: msg.index,
-        };
+        let request = request.into_inner();
         let uuid = Uuid::new_v4();
         trace!("generated uuid: {:?}", uuid);
-        self.creating.insert(uuid, metadata);
-        let write_token = Some(Bytes::copy_from_slice(uuid.as_bytes()));
+        self.pending_create.insert(uuid, request);
+        let write_token = Bytes::copy_from_slice(uuid.as_bytes());
         Ok(Response::new(CreateResponse { write_token }))
     }
 
@@ -169,48 +167,41 @@ impl DataStorageService for Storage {
     ) -> Result<Response<WriteResponse>> {
         let token = request
             .metadata()
-            .get_bin(WRITE_TOKEN)
+            .get_bin(proto::WRITE_TOKEN_KEY)
             .ok_or_else(|| Status::unauthenticated("write token is required"))?
             .to_bytes()
             .map_err(|_| Status::invalid_argument("invalid write token"))?;
         let token = Uuid::from_slice(&token)
             .map_err(|_| Status::invalid_argument("invalid write token"))?;
-        let metadata = self
-            .creating
+        let CreateRequest {
+            name,
+            description,
+            tags,
+            index_columns,
+        } = self
+            .pending_create
             .remove(&token)
             .ok_or_else(|| Status::invalid_argument("invalid write token"))?;
-        let name = metadata.name;
-        let description = metadata.description.unwrap_or_default();
-        let tags = metadata.tags;
-        let index = metadata.index;
-        let in_stream = request.into_inner();
-        let workspace = self.workspace.clone();
+        let request_stream = request.into_inner();
+        let bytes_stream = request_stream.map(|request| {
+            request.map(|x| x.chunk).map_err(|e| {
+                error!("Client connection error: {e:?}");
+                std::io::Error::other(e)
+            })
+        });
+        let async_reader = tokio_util::io::StreamReader::new(bytes_stream);
+        let sync_reader = SyncIoBridge::new(async_reader);
+        let mut writer = self
+            .workspace
+            .create_dataset(name, description, tags, index_columns)
+            .await
+            .map_err(|e| {
+                error!("Failed to create dataset: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
         // TODO: Check error handling
         let writer_task = self.tracker.spawn_blocking(move || {
-            let bytes_stream = in_stream
-                .map(|msg| match msg {
-                    Ok(WriteRequest { chunk: Some(chunk) }) => Ok(chunk),
-                    Ok(WriteRequest { chunk: None }) => Err(anyhow!("Invalid chunk")),
-                    Err(e) => Err(e.into()),
-                })
-                .map_err(|e| {
-                    error!("Client connection error: {:?}", e);
-                    std::io::Error::other(e)
-                });
-            let reader = SyncIoBridge::new(tokio_util::io::StreamReader::new(bytes_stream));
-            let mut reader = StreamReader::try_new(reader, None)?;
-            let Some(batch) = reader.next().transpose()? else {
-                bail!("No data received.");
-            };
-            let handle = Handle::current();
-            let mut writer = handle.block_on(workspace.create_dataset(
-                name,
-                description,
-                tags,
-                index,
-                &batch.schema(),
-            ))?;
-            writer.write(batch)?;
+            let reader = StreamReader::try_new(sync_reader, None)?;
             for batch in reader {
                 let batch = match batch {
                     Ok(batch) => batch,
@@ -236,28 +227,38 @@ impl DataStorageService for Storage {
                 error!("write failed: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        let id = Some(dataset.id());
-        Ok(Response::new(WriteResponse { id }))
+        let id = dataset.id().expect("dataset id should be present");
+        let dataset = self.workspace.database().get_by_id(id).await.map_err(|e| {
+            error!("Failed to get dataset by id: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+        Ok(Response::new(WriteResponse {
+            dataset: Some(dataset.into()),
+        }))
     }
 
-    async fn list(
+    // TODO: Add search implementation
+    async fn search(
         &self,
-        _request: tonic::Request<ListRequest>,
-    ) -> Result<tonic::Response<ListResponse>, tonic::Status> {
-        let dataset_index = self.workspace.dataset_index();
+        _request: tonic::Request<SearchRequest>,
+    ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
+        let dataset_index = self.workspace.database();
         let records = dataset_index.list_all().await.map_err(|e| {
             error!("Failed to list datasets: {:?}", e);
             Status::internal(e.to_string())
         })?;
         let datasets = records.into_iter().map(Into::into).collect();
-        Ok(Response::new(ListResponse { datasets }))
+        Ok(Response::new(SearchResponse {
+            datasets,
+            ..Default::default()
+        }))
     }
 
     async fn get(
         &self,
         request: tonic::Request<GetRequest>,
     ) -> Result<tonic::Response<GetResponse>, tonic::Status> {
-        let dataset_index = self.workspace.dataset_index();
+        let dataset_index = self.workspace.database();
         let id = request.into_inner().id_enum.ok_or_else(|| {
             error!("id_enum is required");
             Status::invalid_argument("id_enum is required")
@@ -284,33 +285,13 @@ impl DataStorageService for Storage {
         Ok(Response::new(GetResponse { dataset }))
     }
 
-    async fn replace_tags(
-        &self,
-        request: Request<ReplaceTagsRequest>,
-    ) -> Result<Response<ReplaceTagsResponse>> {
-        let ReplaceTagsRequest { id: Some(id), tags } = request.into_inner() else {
-            return Err(Status::invalid_argument("id is required"));
-        };
-        self.workspace
-            .dataset_index()
-            .replace_dataset_tags(id, &tags)
-            .await
-            .map_err(|e| {
-                error!("Failed to replace tags: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
-        Ok(Response::new(ReplaceTagsResponse {}))
-    }
-
     async fn add_tags(
         &self,
         request: Request<AddTagsRequest>,
     ) -> Result<Response<AddTagsResponse>> {
-        let AddTagsRequest { id: Some(id), tags } = request.into_inner() else {
-            return Err(Status::invalid_argument("id is required"));
-        };
+        let AddTagsRequest { id, tags } = request.into_inner();
         self.workspace
-            .dataset_index()
+            .database()
             .add_dataset_tags(id, &tags)
             .await
             .map_err(|e| {
@@ -324,11 +305,9 @@ impl DataStorageService for Storage {
         &self,
         request: Request<RemoveTagsRequest>,
     ) -> Result<Response<RemoveTagsResponse>> {
-        let RemoveTagsRequest { id: Some(id), tags } = request.into_inner() else {
-            return Err(Status::invalid_argument("id is required"));
-        };
+        let RemoveTagsRequest { id, tags } = request.into_inner();
         self.workspace
-            .dataset_index()
+            .database()
             .remove_dataset_tags(id, &tags)
             .await
             .map_err(|e| {
@@ -338,69 +317,34 @@ impl DataStorageService for Storage {
         Ok(Response::new(RemoveTagsResponse {}))
     }
 
-    async fn update_name(
-        &self,
-        request: Request<UpdateNameRequest>,
-    ) -> Result<Response<UpdateNameResponse>> {
-        let UpdateNameRequest {
-            id: Some(id),
-            name: Some(name),
-        } = request.into_inner()
-        else {
-            return Err(Status::invalid_argument("id and name are required"));
-        };
+    async fn update(&self, request: Request<UpdateRequest>) -> Result<Response<UpdateResponse>> {
+        let UpdateRequest {
+            id,
+            name,
+            description,
+            favorite,
+        } = request.into_inner();
         self.workspace
-            .dataset_index()
-            .update_dataset_name(id, &name)
+            .database()
+            .update_dataset(id, name.as_deref(), description.as_deref(), favorite)
             .await
             .map_err(|e| {
-                error!("Failed to update name: {:?}", e);
+                error!("Failed to update dataset: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        Ok(Response::new(UpdateNameResponse {}))
+        Ok(Response::new(UpdateResponse {}))
     }
 
-    async fn update_description(
-        &self,
-        request: Request<UpdateDescriptionRequest>,
-    ) -> Result<Response<UpdateDescriptionResponse>> {
-        let UpdateDescriptionRequest {
-            id: Some(id),
-            description: Some(description),
-        } = request.into_inner()
-        else {
-            return Err(Status::invalid_argument("id and description are required"));
-        };
+    async fn delete(&self, request: Request<DeleteRequest>) -> Result<Response<DeleteResponse>> {
+        let DeleteRequest { id } = request.into_inner();
         self.workspace
-            .dataset_index()
-            .update_dataset_description(id, &description)
+            .database()
+            .delete_dataset(id)
             .await
             .map_err(|e| {
-                error!("Failed to update description: {:?}", e);
+                error!("Failed to delete dataset: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        Ok(Response::new(UpdateDescriptionResponse {}))
-    }
-
-    async fn update_favorite(
-        &self,
-        request: Request<UpdateFavoriteRequest>,
-    ) -> Result<Response<UpdateFavoriteResponse>> {
-        let UpdateFavoriteRequest {
-            id: Some(id),
-            favorite: Some(favorite),
-        } = request.into_inner()
-        else {
-            return Err(Status::invalid_argument("id and favorite are required"));
-        };
-        self.workspace
-            .dataset_index()
-            .update_dataset_favorite(id, favorite)
-            .await
-            .map_err(|e| {
-                error!("Failed to update favorite: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
-        Ok(Response::new(UpdateFavoriteResponse {}))
+        Ok(Response::new(DeleteResponse {}))
     }
 }

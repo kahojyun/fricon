@@ -1,5 +1,7 @@
 # Fricon project overview
 
+This project is in pre-alpha stage. Breaking changes are expected.
+
 ## Tooling
 
 `cargo`, `uv` and `pnpm` are used for project management and dependency resolution.
@@ -35,6 +37,7 @@ Relative to the project root:
 - Use `cargo clippy` for linting and static analysis
 - Use `cargo test` for running unit tests
 - Never create files with `mod.rs` paths - prefer `src/some_module.rs` instead of `src/some_module/mod.rs`.
+- Prefer inlined format args like `format!("{var}")`
 
 ### Tauri
 

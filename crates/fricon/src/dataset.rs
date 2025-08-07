@@ -1,32 +1,47 @@
-//! Manage dataset.
+//! Working with datasets.
 //!
-//! A dataset is a folder containing a single [arrow] file and a JSON file for metadata. The
-//! metadata can be updated, but the arrow file can be written only once.
+//! A dataset is a folder containing a single [arrow] file and a JSON file for
+//! metadata. The metadata can be updated, but the arrow file can be written
+//! only once.
+mod batch_writer;
+
 use std::{
     fs::{self, File},
     io::BufWriter,
+    mem,
+    path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, ensure};
-use arrow::{array::RecordBatch, datatypes::Schema, ipc::writer::FileWriter};
+use anyhow::{Context, Result, bail, ensure};
+use arrow::{array::RecordBatch, error::ArrowError};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{paths::DatasetPath, workspace::Workspace};
+use crate::workspace::Workspace;
 
-pub const DATASET_NAME: &str = "dataset.arrow";
+use self::batch_writer::BatchWriter;
+
+pub(crate) const DATASET_NAME: &str = "dataset.arrow";
+pub(crate) const METADATA_NAME: &str = "metadata.json";
 
 // TODO: check dead code
 pub struct Dataset {
     _workspace: Workspace,
     id: i64,
-    _info: Info,
+    _metadata: Metadata,
+    path: PathBuf,
 }
 
 impl Dataset {
-    pub fn create(workspace: Workspace, id: i64, info: Info, schema: &Schema) -> Result<Writer> {
-        let path = workspace.root().data_dir().join(&info.path);
+    pub fn create(
+        path: impl Into<PathBuf>,
+        metadata: Metadata,
+        workspace: Workspace,
+        id: i64,
+    ) -> Result<Writer> {
+        let path = path.into();
         ensure!(
             !path.exists(),
             "Cannot create new dataset at already existing path {:?}",
@@ -35,90 +50,108 @@ impl Dataset {
         info!("Create dataset at {:?}", path);
         fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create dataset at {}", path.display()))?;
-        let dataset_path = path.join(DATASET_NAME);
+        let dataset = Self {
+            _workspace: workspace,
+            id,
+            _metadata: metadata,
+            path,
+        };
+        let dataset_path = dataset.arrow_file();
         let dataset_file = File::create_new(&dataset_path).with_context(|| {
             format!(
                 "Failed to create new dataset file at {}",
                 dataset_path.display()
             )
         })?;
-        Writer::new(
-            dataset_file,
-            schema,
-            Self {
-                _workspace: workspace,
-                id,
-                _info: info,
-            },
-        )
+        Ok(Writer::new(dataset_file, dataset))
     }
 
-    pub const fn id(&self) -> i64 {
-        self.id
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    #[must_use]
+    pub fn arrow_file(&self) -> PathBuf {
+        self.path.join(DATASET_NAME)
+    }
+
+    #[must_use]
+    pub fn metadata_file(&self) -> PathBuf {
+        self.path.join(METADATA_NAME)
+    }
+
+    #[must_use]
+    pub const fn id(&self) -> Option<i64> {
+        Some(self.id)
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Info {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Metadata {
     pub uid: Uuid,
     pub name: String,
     pub description: String,
     pub favorite: bool,
     pub index_columns: Vec<String>,
-    pub path: DatasetPath,
     pub created_at: DateTime<Utc>,
     pub tags: Vec<String>,
 }
 
 pub struct Writer {
-    inner: FileWriter<BufWriter<File>>,
-    buffer: Vec<RecordBatch>,
-    mem_count: usize,
+    inner: WriterState,
     dataset: Dataset,
 }
 
 impl Writer {
-    const MEM_THRESHOLD: usize = 32 * 1024 * 1024;
-    fn new(file: File, schema: &Schema, dataset: Dataset) -> Result<Self> {
-        let inner = FileWriter::try_new_buffered(file, schema)
-            .context("Failed to create arrow ipc file writer")?;
-        Ok(Self {
-            inner,
-            buffer: vec![],
-            mem_count: 0,
+    fn new(file: File, dataset: Dataset) -> Self {
+        Self {
+            inner: WriterState::NotStarted(file),
             dataset,
-        })
+        }
     }
 
     pub fn write(&mut self, batch: RecordBatch) -> Result<()> {
-        ensure!(
-            &batch.schema() == self.inner.schema(),
-            "Record batch schema mismatch."
-        );
-        batch.get_array_memory_size();
-        self.mem_count += batch.get_array_memory_size();
-        self.buffer.push(batch);
-        if self.mem_count > Self::MEM_THRESHOLD {
-            self.flush()?;
+        match mem::replace(&mut self.inner, WriterState::Failed) {
+            WriterState::NotStarted(file) => {
+                let mut writer = BatchWriter::new(BufWriter::new(file), &batch.schema())?;
+                writer.write(batch)?;
+                self.inner = WriterState::InProgress(writer);
+            }
+            WriterState::InProgress(mut writer) => {
+                let result = writer.write(batch);
+                if matches!(result, Err(ArrowError::SchemaError(_))) {
+                    // Allow recovery from schema errors
+                    self.inner = WriterState::InProgress(writer);
+                }
+                result?;
+            }
+            WriterState::Failed => {
+                bail!("Writer is in a failed state.");
+            }
         }
         Ok(())
     }
 
-    fn flush(&mut self) -> Result<()> {
-        let batches = arrow::compute::concat_batches(self.inner.schema(), self.buffer.iter())
-            .expect("Should be ensured that all batches have the same schema.");
-        self.buffer.clear();
-        self.mem_count = 0;
-        self.inner
-            .write(&batches)
-            .context("Failed to write record batch to dataset file.")
+    pub fn finish(self) -> Result<Dataset> {
+        match self.inner {
+            WriterState::InProgress(writer) => {
+                writer.finish()?;
+                Ok(self.dataset)
+            }
+            WriterState::NotStarted(_) => {
+                bail!("No data written to the writer.");
+            }
+            WriterState::Failed => {
+                bail!("Writer is in a failed state.");
+            }
+        }
     }
+}
 
-    pub fn finish(mut self) -> Result<Dataset> {
-        self.flush()?;
-        self.inner
-            .finish()
-            .context("Failed to finish dataset writing.")?;
-        Ok(self.dataset)
-    }
+#[allow(clippy::large_enum_variant)]
+enum WriterState {
+    NotStarted(File),
+    InProgress(BatchWriter<BufWriter<File>>),
+    Failed,
 }

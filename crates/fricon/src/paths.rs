@@ -1,4 +1,3 @@
-//! Manage storage of fricon data.
 use std::path::{self, Path, PathBuf};
 
 use anyhow::Result;
@@ -88,12 +87,6 @@ impl DatasetPath {
     #[must_use]
     pub fn new(date: NaiveDate, uid: Uuid) -> Self {
         Self(format!("{date}/{uid}"))
-    }
-}
-
-impl From<String> for DatasetPath {
-    fn from(path: String) -> Self {
-        Self(path)
     }
 }
 

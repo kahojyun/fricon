@@ -1,15 +1,14 @@
 use std::{fs, path::Path};
 
 use anyhow::{Context, Result, ensure};
-use arrow::datatypes::Schema;
 use chrono::Utc;
 use semver::{Version, VersionReq};
-use sqlx::SqlitePool;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    VERSION, database,
+    VERSION,
+    database::Database,
     dataset::{self, Dataset},
     paths::{DatasetPath, VersionFile, WorkspacePath},
 };
@@ -17,14 +16,14 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Workspace {
     root: WorkspacePath,
-    database: SqlitePool,
+    database: Database,
 }
 
 impl Workspace {
     pub async fn open(path: &Path) -> Result<Self> {
         let root = WorkspacePath::new(path)?;
         check_version_file(&root.version_file())?;
-        let database = root.database_file().connect().await?;
+        let database = Database::connect(root.database_file().0).await?;
         Ok(Self { root, database })
     }
 
@@ -34,17 +33,15 @@ impl Workspace {
     }
 
     #[must_use]
-    pub fn dataset_index(&self) -> database::DatasetIndex {
-        database::DatasetIndex {
-            pool: self.database.clone(),
-        }
+    pub fn database(&self) -> &Database {
+        &self.database
     }
 
     pub async fn init(path: &Path) -> Result<Self> {
         info!("Initialize workspace: {:?}", path);
         create_empty_dir(path)?;
         let root = WorkspacePath::new(path)?;
-        let database = root.database_file().init().await?;
+        let database = Database::init(root.database_file().0).await?;
         init_dir(&root)?;
         write_version_file(&root.version_file())?;
         Ok(Self { root, database })
@@ -56,29 +53,28 @@ impl Workspace {
         description: String,
         tags: Vec<String>,
         index_columns: Vec<String>,
-        schema: &Schema,
     ) -> Result<dataset::Writer> {
         let created_at = Utc::now();
         let date = created_at.naive_local().date();
         let uid = Uuid::new_v4();
         let path = DatasetPath::new(date, uid);
-        let info = dataset::Info {
+        let full_path = self.root.data_dir().join(&path);
+        let metadata = dataset::Metadata {
             uid,
             name,
             description,
             favorite: false,
             index_columns,
-            path,
             created_at,
             tags,
         };
         let id = self
-            .dataset_index()
-            .create(&info)
+            .database()
+            .create(&metadata, &path)
             .await
             .context("Failed to add dataset entry to index database.")?;
-        let writer =
-            Dataset::create(self.clone(), id, info, schema).context("Failed to create dataset.")?;
+        let writer = Dataset::create(full_path, metadata, self.clone(), id)
+            .context("Failed to create dataset.")?;
         Ok(writer)
     }
 }

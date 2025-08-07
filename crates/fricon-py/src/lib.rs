@@ -26,8 +26,8 @@ use arrow::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use fricon::{
-    client::{self, Client},
-    dataset::Info,
+    client::{self, Client, DatasetRecord},
+    dataset::Metadata,
 };
 use itertools::Itertools;
 use num::complex::Complex64;
@@ -53,7 +53,6 @@ pub mod _core {
 #[pyclass(module = "fricon._core")]
 #[derive(Clone)]
 pub struct Workspace {
-    root: PathBuf,
     client: Client,
 }
 
@@ -69,9 +68,8 @@ impl Workspace {
     #[staticmethod]
     #[expect(clippy::needless_pass_by_value)]
     pub fn connect(path: PathBuf) -> Result<Self> {
-        let root = path;
-        let client = get_runtime().block_on(Client::connect(&root))?;
-        Ok(Self { root, client })
+        let client = get_runtime().block_on(Client::connect(&path))?;
+        Ok(Self { client })
     }
 
     /// A dataset manager for this workspace.
@@ -138,17 +136,11 @@ impl DatasetManager {
     ///     RuntimeError: Dataset not found.
     pub fn open(&self, dataset_id: &Bound<'_, PyAny>) -> Result<Dataset> {
         if let Ok(id) = dataset_id.extract::<i64>() {
-            let record = get_runtime().block_on(self.workspace.client.get_dataset_by_id(id))?;
-            Ok(Dataset {
-                workspace: Some(self.workspace.clone()),
-                record,
-            })
+            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_id(id))?;
+            Ok(Dataset { inner })
         } else if let Ok(uid) = dataset_id.extract::<String>() {
-            let record = get_runtime().block_on(self.workspace.client.get_dataset_by_uid(uid))?;
-            Ok(Dataset {
-                workspace: Some(self.workspace.clone()),
-                record,
-            })
+            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_uid(uid))?;
+            Ok(Dataset { inner })
         } else {
             bail!("Invalid dataset id.")
         }
@@ -165,8 +157,8 @@ impl DatasetManager {
         let py_records = records.into_iter().map(
             |DatasetRecord {
                  id,
-                 info:
-                     Info {
+                 metadata:
+                     Metadata {
                          uid,
                          name,
                          description,
@@ -176,6 +168,7 @@ impl DatasetManager {
                          tags,
                          ..
                      },
+                 ..
              }| {
                 let uid = uid.simple().to_string();
                 (
@@ -350,17 +343,7 @@ impl Trace {
 /// Datasets can be created and opened using the [`DatasetManager`][fricon.DatasetManager].
 #[pyclass(module = "fricon._core")]
 pub struct Dataset {
-    workspace: Option<Workspace>,
-    record: DatasetRecord,
-}
-
-impl Dataset {
-    fn client(&self) -> Result<&Client> {
-        self.workspace
-            .as_ref()
-            .context("No workspace.")
-            .map(|w| &w.client)
-    }
+    inner: client::Dataset,
 }
 
 fn helper_module(py: Python<'_>) -> PyResult<&PyObject> {
@@ -373,45 +356,50 @@ impl Dataset {
     /// Name of the dataset.
     #[getter]
     pub fn name(&self) -> &str {
-        &self.record.info.name
+        self.inner.name()
     }
 
     #[setter]
     pub fn set_name(&mut self, name: String) -> Result<()> {
-        get_runtime().block_on(self.client()?.update_dataset_name(self.id(), name))
+        get_runtime().block_on(self.inner.update_metadata(Some(name), None, None))
     }
 
     /// Description of the dataset.
     #[getter]
     pub fn description(&self) -> &str {
-        &self.record.info.description
+        self.inner.description()
     }
 
     #[setter]
     pub fn set_description(&mut self, description: String) -> Result<()> {
-        get_runtime().block_on(self.client()?.update_dataset_name(self.id(), description))
+        get_runtime().block_on(self.inner.update_metadata(None, Some(description), None))
     }
 
     /// Tags of the dataset.
     #[getter]
     pub fn tags(&self) -> &[String] {
-        &self.record.info.tags
+        self.inner.tags()
     }
 
-    #[setter]
-    pub fn set_tags(&mut self, tags: Vec<String>) -> Result<()> {
-        get_runtime().block_on(self.client()?.replace_dataset_tags(self.id(), tags))
+    #[pyo3(signature = (*tag))]
+    pub fn add_tags(&mut self, tag: Vec<String>) -> Result<()> {
+        get_runtime().block_on(self.inner.add_tags(tag))
+    }
+
+    #[pyo3(signature = (*tag))]
+    pub fn remove_tags(&mut self, tag: Vec<String>) -> Result<()> {
+        get_runtime().block_on(self.inner.remove_tags(tag))
     }
 
     /// Favorite status of the dataset.
     #[getter]
     pub const fn favorite(&self) -> bool {
-        self.record.info.favorite
+        self.inner.favorite()
     }
 
     #[setter]
     pub fn set_favorite(&mut self, favorite: bool) -> Result<()> {
-        get_runtime().block_on(self.client()?.update_dataset_favorite(self.id(), favorite))
+        get_runtime().block_on(self.inner.update_metadata(None, None, Some(favorite)))
     }
 
     /// Load the dataset as a polars DataFrame.
@@ -419,7 +407,7 @@ impl Dataset {
     /// Returns:
     ///     A polars DataFrame.
     pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
-        helper_module(py)?.call_method1(py, "read_polars", (self.path()?.join(DATASET_NAME),))
+        helper_module(py)?.call_method1(py, "read_polars", (self.inner.arrow_file(),))
     }
 
     /// Load the dataset as an Arrow Table.
@@ -427,44 +415,37 @@ impl Dataset {
     /// Returns:
     ///     An Arrow Table.
     pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
-        helper_module(py)?.call_method1(py, "read_arrow", (self.path()?.join(DATASET_NAME),))
+        helper_module(py)?.call_method1(py, "read_arrow", (self.inner.arrow_file(),))
     }
 
     /// Id of the dataset.
     #[getter]
     pub const fn id(&self) -> i64 {
-        self.record.id
+        self.inner.id()
     }
 
     /// UUID of the dataset.
     #[getter]
     pub fn uid(&self) -> String {
-        self.record.info.uid.simple().to_string()
+        self.inner.uid().simple().to_string()
     }
 
     /// Path of the dataset.
     #[getter]
-    pub fn path(&self) -> Result<PathBuf> {
-        // TODO: Non-workspace dataset
-        Ok(self
-            .workspace
-            .as_ref()
-            .context("No workspace.")?
-            .root
-            .data_dir()
-            .join(&self.record.info.path))
+    pub fn path(&self) -> PathBuf {
+        self.inner.path()
     }
 
     /// Creation date of the dataset.
     #[getter]
     pub const fn created_at(&self) -> DateTime<Utc> {
-        self.record.info.created_at
+        self.inner.created_at()
     }
 
     /// Index columns of the dataset.
     #[getter]
-    pub fn index(&self) -> &[String] {
-        &self.record.info.index_columns
+    pub fn index_columns(&self) -> &[String] {
+        self.inner.index_columns()
     }
 }
 
@@ -474,7 +455,7 @@ impl Dataset {
 #[pyclass(module = "fricon._core")]
 pub struct DatasetWriter {
     writer: Option<client::DatasetWriter>,
-    id: Option<i64>,
+    dataset: Option<Py<Dataset>>,
     first_row: bool,
     schema: Arc<Schema>,
 }
@@ -483,7 +464,7 @@ impl DatasetWriter {
     const fn new(writer: client::DatasetWriter, schema: Arc<Schema>) -> Self {
         Self {
             writer: Some(writer),
-            id: None,
+            dataset: None,
             first_row: true,
             schema,
         }
@@ -758,16 +739,21 @@ impl DatasetWriter {
     /// Raises:
     ///     RuntimeError: Writer is not closed yet.
     #[getter]
-    pub fn id(&self) -> Result<i64> {
-        self.id.context("Writer is not closed yet.")
+    pub fn dataset(&self, py: Python<'_>) -> Result<Py<Dataset>> {
+        let dataset = self
+            .dataset
+            .as_ref()
+            .context("Writer is not closed yet.")?
+            .clone_ref(py);
+        Ok(dataset)
     }
 
     /// Finish writing to dataset.
-    pub fn close(&mut self) -> Result<()> {
+    pub fn close(&mut self, py: Python<'_>) -> Result<()> {
         let writer = self.writer.take();
         if let Some(writer) = writer {
-            let id = get_runtime().block_on(writer.finish())?;
-            self.id = Some(id);
+            let inner = get_runtime().block_on(writer.finish())?;
+            self.dataset = Some(Py::new(py, Dataset { inner })?);
         }
         Ok(())
     }
@@ -782,11 +768,12 @@ impl DatasetWriter {
     /// Will call [`close`][fricon.DatasetWriter.close] method.
     pub fn __exit__(
         &mut self,
+        py: Python<'_>,
         _exc_type: PyObject,
         _exc_value: PyObject,
         _traceback: PyObject,
     ) -> Result<()> {
-        self.close()
+        self.close(py)
     }
 }
 

@@ -1,10 +1,9 @@
-use std::collections::HashSet;
+use std::path::Path;
 
 use anyhow::{Context, ensure};
 use chrono::{DateTime, Utc};
-use futures::prelude::*;
 use sqlx::{
-    SqliteConnection, SqlitePool,
+    QueryBuilder, SqliteConnection, SqlitePool,
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
     types::Json,
@@ -13,7 +12,7 @@ use thiserror::Error;
 use tracing::info;
 use uuid::{Uuid, fmt::Simple};
 
-use crate::{dataset::Info, paths::DatabaseFile};
+use crate::{dataset::Metadata, paths::DatasetPath};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -23,23 +22,28 @@ pub enum Error {
     Other(#[from] sqlx::Error),
 }
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!();
 
-impl DatabaseFile {
-    pub async fn connect(&self) -> anyhow::Result<SqlitePool> {
-        let path = &self.0;
+#[derive(Debug, Clone)]
+pub struct Database {
+    pool: SqlitePool,
+}
+
+impl Database {
+    pub async fn connect(path: impl AsRef<Path>) -> anyhow::Result<Database> {
+        let path = path.as_ref();
         info!("Connect to database at {}", path.display());
         let pool = SqlitePoolOptions::new()
             .connect_with(SqliteConnectOptions::new().filename(path))
             .await?;
         MIGRATOR.run(&pool).await?;
-        Ok(pool)
+        Ok(Database { pool })
     }
 
-    pub async fn init(&self) -> anyhow::Result<SqlitePool> {
-        let path = &self.0;
+    pub async fn init(path: impl AsRef<Path>) -> anyhow::Result<Database> {
+        let path = path.as_ref();
         ensure!(!path.exists(), "Database already exists.");
         info!("Initialize database at {}", path.display());
         let options = SqliteConnectOptions::new()
@@ -54,24 +58,21 @@ impl DatabaseFile {
             .run(&pool)
             .await
             .context("Failed to initialize database schema.")?;
-        Ok(pool)
+        Ok(Database { pool })
     }
-}
-
-pub struct DatasetIndex {
-    pub pool: SqlitePool,
 }
 
 pub struct DatasetRecord {
     pub id: i64,
-    pub info: Info,
+    pub path: DatasetPath,
+    pub metadata: Metadata,
 }
 
-impl DatasetIndex {
-    pub async fn create(&self, info: &Info) -> Result<i64> {
+impl Database {
+    pub async fn create(&self, metadata: &Metadata, path: &DatasetPath) -> Result<i64> {
         let mut tx = self.pool.begin().await?;
-        let dataset_id = tx.insert_dataset(info).await?;
-        for tag in &info.tags {
+        let dataset_id = tx.insert_dataset(metadata, path).await?;
+        for tag in &metadata.tags {
             let tag_id = tx.get_or_insert_tag(tag).await?;
             tx.add_dataset_tag(dataset_id, tag_id).await?;
         }
@@ -133,55 +134,48 @@ impl DatasetIndex {
         Ok(())
     }
 
-    pub async fn replace_dataset_tags(&self, id: i64, tags: &[String]) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
-        tx.ensure_exist(id).await?;
-        let current_tag_ids =
-            sqlx::query_scalar!("SELECT tag_id FROM dataset_tag WHERE dataset_id = ?", id)
-                .fetch(&mut *tx)
-                .try_collect::<HashSet<_>>()
-                .await?;
-        let mut new_tag_ids = HashSet::with_capacity(tags.len());
-        for tag in tags {
-            let tag_id = tx.get_or_insert_tag(tag).await?;
-            new_tag_ids.insert(tag_id);
+    pub async fn update_dataset(
+        &self,
+        id: i64,
+        name: Option<&str>,
+        description: Option<&str>,
+        favorite: Option<bool>,
+    ) -> Result<()> {
+        let mut set_flag = false;
+        let mut query = QueryBuilder::new("UPDATE datasets SET ");
+        if let Some(name) = name {
+            query.push("name = ");
+            query.push_bind(name);
+            set_flag = true;
         }
-        for &tag_id in current_tag_ids.difference(&new_tag_ids) {
-            tx.remove_dataset_tag(id, tag_id).await?;
+        if let Some(description) = description {
+            if set_flag {
+                query.push(", ");
+            }
+            query.push("description = ");
+            query.push_bind(description);
+            set_flag = true;
         }
-        for &tag_id in new_tag_ids.difference(&current_tag_ids) {
-            tx.add_dataset_tag(id, tag_id).await?;
+        if let Some(favorite) = favorite {
+            if set_flag {
+                query.push(", ");
+            }
+            query.push("favorite = ");
+            query.push_bind(favorite);
+            set_flag = true;
         }
-        tx.commit().await?;
+        if set_flag {
+            query.push(" WHERE id = ?");
+            query.push_bind(id);
+            query.build().execute(&self.pool).await?;
+        }
         Ok(())
     }
 
-    pub async fn update_dataset_name(&self, id: i64, name: &str) -> Result<()> {
-        sqlx::query!("UPDATE datasets SET name = ? WHERE id = ?", name, id)
+    pub async fn delete_dataset(&self, id: i64) -> Result<()> {
+        sqlx::query!("DELETE FROM datasets WHERE id = ?", id)
             .execute(&self.pool)
             .await?;
-        Ok(())
-    }
-
-    pub async fn update_dataset_description(&self, id: i64, description: &str) -> Result<()> {
-        sqlx::query!(
-            "UPDATE datasets SET description = ? WHERE id = ?",
-            description,
-            id
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn update_dataset_favorite(&self, id: i64, favorite: bool) -> Result<()> {
-        sqlx::query!(
-            "UPDATE datasets SET favorite = ? WHERE id = ?",
-            favorite,
-            id
-        )
-        .execute(&self.pool)
-        .await?;
         Ok(())
     }
 }
@@ -189,10 +183,9 @@ impl DatasetIndex {
 trait StorageDbExt {
     async fn ensure_exist(&mut self, id: i64) -> Result<()>;
     async fn get_or_insert_tag(&mut self, tag: &str) -> Result<i64>;
-    async fn insert_dataset(&mut self, info: &Info) -> Result<i64>;
+    async fn insert_dataset(&mut self, metadata: &Metadata, path: &DatasetPath) -> Result<i64>;
     async fn find_dataset_by_uid(&mut self, uid: Simple) -> Result<i64>;
     async fn add_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
-    async fn remove_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()>;
     async fn get_dataset_by_id(&mut self, id: i64) -> Result<DatasetRecord>;
 }
 
@@ -221,10 +214,9 @@ impl StorageDbExt for SqliteConnection {
         Ok(tag_id)
     }
 
-    async fn insert_dataset(&mut self, info: &Info) -> Result<i64> {
-        let index_columns = Json(&info.index_columns);
-        let uid = info.uid.simple();
-        let path = &info.path.0;
+    async fn insert_dataset(&mut self, metadata: &Metadata, path: &DatasetPath) -> Result<i64> {
+        let index_columns = Json(&metadata.index_columns);
+        let uid = metadata.uid.simple();
         let id = sqlx::query!(
             r#"
             INSERT INTO datasets
@@ -234,12 +226,12 @@ impl StorageDbExt for SqliteConnection {
             RETURNING id
             "#,
             uid,
-            info.name,
-            info.description,
-            info.favorite,
+            metadata.name,
+            metadata.description,
+            metadata.favorite,
             index_columns,
-            path,
-            info.created_at,
+            path.0,
+            metadata.created_at,
         )
         .fetch_one(&mut *self)
         .await?
@@ -250,17 +242,6 @@ impl StorageDbExt for SqliteConnection {
     async fn add_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()> {
         sqlx::query!(
             "INSERT INTO dataset_tag (dataset_id, tag_id) VALUES (?, ?)",
-            dataset_id,
-            tag_id
-        )
-        .execute(&mut *self)
-        .await?;
-        Ok(())
-    }
-
-    async fn remove_dataset_tag(&mut self, dataset_id: i64, tag_id: i64) -> Result<()> {
-        sqlx::query!(
-            "DELETE FROM dataset_tag WHERE dataset_id = ? AND tag_id = ?",
             dataset_id,
             tag_id
         )
@@ -311,16 +292,16 @@ impl StorageDbExt for SqliteConnection {
         )
         .fetch_all(&mut *self)
         .await?;
-        let info = Info {
+        let path = DatasetPath(res.path);
+        let metadata = Metadata {
             uid: res.uid.into_uuid(),
             name: res.name,
             description: res.description,
             favorite: res.favorite,
             index_columns: res.index_columns.0,
-            path: res.path.into(),
             tags,
             created_at: res.created_at,
         };
-        Ok(DatasetRecord { id, info })
+        Ok(DatasetRecord { id, path, metadata })
     }
 }

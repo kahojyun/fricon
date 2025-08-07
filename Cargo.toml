@@ -16,7 +16,7 @@ keywords = ["experimental"]
 arrow = "55.0.0"
 
 # Useful types
-chrono = "0.4.39"
+chrono = { version = "0.4.39", features = ["serde"] }
 uuid = { version = "1.12.0", features = ["v4", "fast-rng", "serde"] }
 semver = "1.0.25"
 bytes = "1.9.0"
@@ -79,5 +79,6 @@ rust-2018-idioms = "warn"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "warn"
 missing_panics_doc = "allow"
 missing_errors_doc = "allow"

@@ -1,3 +1,4 @@
+//! Provides cross-platform inter-process communication (IPC) functionality.
 #[cfg(unix)]
 mod unix;
 #[cfg(unix)]
@@ -19,8 +20,10 @@ pub enum ConnectError {
 
 #[cfg(test)]
 mod tests {
+    use std::pin::pin;
+
     use super::*;
-    use futures::{StreamExt, pin_mut};
+    use futures::StreamExt;
     use tempfile::tempdir;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -33,8 +36,7 @@ mod tests {
             let mut client = connect(&path).await.unwrap();
 
             let server_task = tokio::spawn(async move {
-                pin_mut!(server);
-                let mut stream = server.next().await.unwrap().unwrap();
+                let mut stream = pin!(server).next().await.unwrap().unwrap();
                 let mut buf = [0; 11];
                 stream.read_exact(&mut buf).await.unwrap();
                 assert_eq!(&buf, b"hello world");
