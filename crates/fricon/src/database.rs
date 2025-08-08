@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Context, ensure};
 use chrono::{DateTime, Utc};
 use sqlx::{
-    QueryBuilder, SqliteConnection, SqlitePool,
+    SqliteConnection, SqlitePool,
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
     types::Json,
@@ -141,34 +141,21 @@ impl Database {
         description: Option<&str>,
         favorite: Option<bool>,
     ) -> Result<()> {
-        let mut set_flag = false;
-        let mut query = QueryBuilder::new("UPDATE datasets SET ");
-        if let Some(name) = name {
-            query.push("name = ");
-            query.push_bind(name);
-            set_flag = true;
-        }
-        if let Some(description) = description {
-            if set_flag {
-                query.push(", ");
-            }
-            query.push("description = ");
-            query.push_bind(description);
-            set_flag = true;
-        }
-        if let Some(favorite) = favorite {
-            if set_flag {
-                query.push(", ");
-            }
-            query.push("favorite = ");
-            query.push_bind(favorite);
-            set_flag = true;
-        }
-        if set_flag {
-            query.push(" WHERE id = ?");
-            query.push_bind(id);
-            query.build().execute(&self.pool).await?;
-        }
+        sqlx::query!(
+            r#"
+            UPDATE datasets SET
+                name = COALESCE(?, name),
+                description = COALESCE(?, description),
+                favorite = COALESCE(?, favorite)
+            WHERE id = ?
+            "#,
+            name,
+            description,
+            favorite,
+            id
+        )
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 
