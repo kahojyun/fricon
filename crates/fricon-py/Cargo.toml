@@ -13,36 +13,28 @@ keywords.workspace = true
 doctest = false
 
 [dependencies]
-# Project dependencies
 fricon = { path = "../fricon" }
 fricon-ui = { path = "../fricon-ui" }
 
-# Error handling
 anyhow = { workspace = true }
-
-# Useful types
-chrono = { workspace = true }
-num = { workspace = true }
-ndarray = { workspace = true }
-itertools = { workspace = true }
-
-# Command-line argument parsing
-clap = { workspace = true }
-
-# Python bindings
-pyo3 = { workspace = true }
-pyo3-async-runtimes = { workspace = true }
-numpy = { workspace = true }
-
-# Asynchronous runtime
-tokio = { workspace = true }
-tokio-stream = { workspace = true }
-
-# gRPC
-tonic = { workspace = true }
-
-# Arrow
 arrow = { workspace = true, features = ["pyarrow"] }
+chrono = { workspace = true, features = ["serde"] }
+clap = { workspace = true, features = ["derive"] }
+itertools = { workspace = true }
+ndarray = { workspace = true }
+num = { workspace = true }
+numpy = { workspace = true }
+pyo3 = { workspace = true, features = [
+    "anyhow",
+    "chrono",
+    "num-complex",
+    "abi3-py39",
+    "generate-import-lib",
+] }
+pyo3-async-runtimes = { workspace = true, features = ["tokio-runtime"] }
+tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [lints]

@@ -12,67 +12,37 @@ repository = "https://github.com/kahojyun/fricon"
 keywords = ["experimental"]
 
 [workspace.dependencies]
-# Arrow
-arrow = "55.0.0"
-
-# Useful types
-chrono = { version = "0.4.39", features = ["serde"] }
-uuid = { version = "1.12.0", features = ["v4", "fast-rng", "serde"] }
-semver = "1.0.25"
-bytes = "1.9.0"
-num = "0.4.3"
-ndarray = "0.16.1"
-itertools = "0.14.0"
-
-# Command-line argument parsing
-clap = { version = "4.5.26", features = ["derive"] }
-
-# Serialization and deserialization
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.137"
-toml = "0.8.19"
-
-# Database
-sqlx = { version = "0.8.3", features = [
-    "chrono",
-    "runtime-tokio",
-    "sqlite",
-    "uuid",
-] }
-
-# Error handling
-thiserror = "2.0.11"
 anyhow = "1.0.95"
-
-# Asynchronous runtime
-tokio = { version = "1.43.0", features = ["full"] }
-tokio-util = { version = "0.7.13", features = ["full"] }
-tokio-stream = "0.1.17"
-futures = "0.3.31"
+arrow = "55.0.0"
 async-stream = "0.3.6"
-
-# Logging
-tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
-
-# gRPC
+bytes = "1.9.0"
+chrono = "0.4.39"
+clap = "4.5.26"
+futures = "0.3.31"
+hyper-util = "0.1.10"
+itertools = "0.14.0"
+ndarray = "0.16.1"
+num = "0.4.3"
+numpy = "0.24.0"
 prost = "0.13.4"
 prost-types = "0.13.4"
+pyo3 = "0.24.0"
+pyo3-async-runtimes = "0.24.0"
+semver = "1.0.25"
+serde = "1.0.217"
+serde_json = "1.0.137"
+sqlx = "0.8.3"
+thiserror = "2.0.11"
+tokio = "1.43.0"
+tokio-stream = "0.1.17"
+tokio-util = "0.7.13"
+toml = "0.8.19"
 tonic = "0.13.0"
 tonic-build = "0.13.0"
 tower = "0.5.2"
-hyper-util = "0.1.10"
-
-# Python bindings
-pyo3 = { version = "0.24.0", features = [
-    "anyhow",
-    "chrono",
-    "num-complex",
-    "abi3-py39",
-    "generate-import-lib",
-] }
-pyo3-async-runtimes = { version = "0.24.0", features = ["tokio-runtime"] }
-numpy = "0.24.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+uuid = "1.12.0"
 
 [workspace.lints.rust]
 rust-2018-idioms = "warn"

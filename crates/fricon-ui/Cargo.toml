@@ -10,13 +10,13 @@ repository.workspace = true
 keywords.workspace = true
 
 [dependencies]
+fricon = { path = "../fricon" }
+
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2.3.0"
-
-fricon = { path = "../fricon" }
 
 [lints]
 workspace = true
