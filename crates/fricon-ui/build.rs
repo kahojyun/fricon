@@ -18,7 +18,6 @@ fn main() {
             "src",
             "index.html",
             "package.json",
-            "pnpm-lock.yaml",
             "tsconfig.json",
             "tsconfig.app.json",
             "vite.config.ts",
