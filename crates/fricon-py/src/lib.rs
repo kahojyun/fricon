@@ -1,6 +1,7 @@
 #![allow(
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
+    clippy::doc_markdown,
     clippy::must_use_candidate,
     clippy::significant_drop_tightening
 )]
