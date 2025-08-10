@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE datasets SET\n                name = COALESCE(?, name),\n                description = COALESCE(?, description),\n                favorite = COALESCE(?, favorite)\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8e93447d2b97ead4fec70c9cb3f17169107a26d798a2d8bf30ffd3616385277c"
+}
