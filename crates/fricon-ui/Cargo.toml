@@ -13,17 +13,17 @@ keywords.workspace = true
 fricon = { path = "../fricon" }
 
 serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-tauri-plugin-dialog = "2.3.0"
+serde_json = { workspace = true }
+tauri = { workspace = true, features = [] }
+tauri-plugin-opener = { workspace = true }
+tauri-plugin-dialog = { workspace = true }
 
 [lints]
 workspace = true
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
-tauri-utils = { version = "2" }
+tauri-build = { workspace = true }
+tauri-utils = { workspace = true }
 
 [features]
 prod = ["tauri/custom-protocol"]
