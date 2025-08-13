@@ -22,10 +22,11 @@ pub enum ConnectError {
 mod tests {
     use std::pin::pin;
 
-    use super::*;
     use futures::StreamExt;
     use tempfile::tempdir;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_connect() {

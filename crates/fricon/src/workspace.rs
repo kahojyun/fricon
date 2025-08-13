@@ -1,9 +1,13 @@
-use std::{fs, path::Path};
+use std::{
+    fs::{self, File},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result, ensure};
 use chrono::Utc;
 use semver::{Version, VersionReq};
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -17,14 +21,20 @@ use crate::{
 pub struct Workspace {
     root: WorkspacePath,
     database: Database,
+    _lock: Arc<FileLock>,
 }
 
 impl Workspace {
     pub async fn open(path: &Path) -> Result<Self> {
         let root = WorkspacePath::new(path)?;
+        let lock = FileLock::new(root.lock_file())?;
         check_version_file(&root.version_file())?;
         let database = Database::connect(root.database_file().0).await?;
-        Ok(Self { root, database })
+        Ok(Self {
+            root,
+            database,
+            _lock: Arc::new(lock),
+        })
     }
 
     #[must_use]
@@ -44,7 +54,12 @@ impl Workspace {
         let database = Database::init(root.database_file().0).await?;
         init_dir(&root)?;
         write_version_file(&root.version_file())?;
-        Ok(Self { root, database })
+        let lock = FileLock::new(root.lock_file())?;
+        Ok(Self {
+            root,
+            database,
+            _lock: Arc::new(lock),
+        })
     }
 
     pub async fn create_dataset(
@@ -121,4 +136,36 @@ fn check_version_file(path: &VersionFile) -> Result<()> {
         workspace_version
     );
     Ok(())
+}
+
+#[derive(Debug)]
+struct FileLock {
+    file: File,
+    path: PathBuf,
+}
+
+impl FileLock {
+    fn new(path: impl Into<PathBuf>) -> Result<Self> {
+        let path = path.into();
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&path)
+            .context("Failed to open file for locking.")?;
+        file.try_lock().context("Failed to acquire file lock.")?;
+        Ok(Self { file, path })
+    }
+}
+
+impl Drop for FileLock {
+    fn drop(&mut self) {
+        if let Err(e) = self.file.unlock() {
+            warn!("Failed to release file lock: {e}");
+        }
+        if let Err(e) = fs::remove_file(&self.path) {
+            warn!("Failed to remove locked file: {e}");
+        }
+    }
 }

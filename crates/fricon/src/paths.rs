@@ -48,6 +48,11 @@ impl WorkspacePath {
     pub fn version_file(&self) -> VersionFile {
         VersionFile(self.0.join(".fricon_version"))
     }
+
+    #[must_use]
+    pub fn lock_file(&self) -> PathBuf {
+        self.0.join(".fricon.lock")
+    }
 }
 
 #[derive(Debug, Clone)]
