@@ -18,13 +18,51 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Workspace {
-    root: WorkspacePath,
-    database: Database,
-    _lock: Arc<FileLock>,
-}
+pub struct Workspace(Arc<Shared>);
 
 impl Workspace {
+    pub async fn open(path: &Path) -> Result<Self> {
+        let shared = Shared::open(path).await?;
+        Ok(Self(Arc::new(shared)))
+    }
+
+    #[must_use]
+    pub fn root(&self) -> &WorkspacePath {
+        self.0.root()
+    }
+
+    #[must_use]
+    pub fn database(&self) -> &Database {
+        self.0.database()
+    }
+
+    pub async fn init(path: &Path) -> Result<Self> {
+        let shared = Shared::init(path).await?;
+        Ok(Self(Arc::new(shared)))
+    }
+
+    pub async fn create_dataset(
+        &self,
+        name: String,
+        description: String,
+        tags: Vec<String>,
+        index_columns: Vec<String>,
+    ) -> Result<dataset::Writer> {
+        self.0
+            .clone()
+            .create_dataset(name, description, tags, index_columns)
+            .await
+    }
+}
+
+#[derive(Debug)]
+struct Shared {
+    root: WorkspacePath,
+    database: Database,
+    _lock: FileLock,
+}
+
+impl Shared {
     pub async fn open(path: &Path) -> Result<Self> {
         let root = WorkspacePath::new(path)?;
         let lock = FileLock::new(root.lock_file())?;
@@ -33,18 +71,8 @@ impl Workspace {
         Ok(Self {
             root,
             database,
-            _lock: Arc::new(lock),
+            _lock: lock,
         })
-    }
-
-    #[must_use]
-    pub const fn root(&self) -> &WorkspacePath {
-        &self.root
-    }
-
-    #[must_use]
-    pub fn database(&self) -> &Database {
-        &self.database
     }
 
     pub async fn init(path: &Path) -> Result<Self> {
@@ -58,12 +86,22 @@ impl Workspace {
         Ok(Self {
             root,
             database,
-            _lock: Arc::new(lock),
+            _lock: lock,
         })
     }
 
+    #[must_use]
+    pub const fn root(&self) -> &WorkspacePath {
+        &self.root
+    }
+
+    #[must_use]
+    pub fn database(&self) -> &Database {
+        &self.database
+    }
+
     pub async fn create_dataset(
-        &self,
+        self: Arc<Self>,
         name: String,
         description: String,
         tags: Vec<String>,
@@ -88,7 +126,7 @@ impl Workspace {
             .create(&metadata, &path)
             .await
             .context("Failed to add dataset entry to index database.")?;
-        let writer = Dataset::create(full_path, metadata, self.clone(), id)
+        let writer = Dataset::create(full_path, metadata, Workspace(self), id)
             .context("Failed to create dataset.")?;
         Ok(writer)
     }
