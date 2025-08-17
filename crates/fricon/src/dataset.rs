@@ -186,7 +186,7 @@ impl Dataset {
             .workspace
             .database()
             .interact(move |conn| {
-                use database::schema::datasets::dsl::*;
+                use database::schema::datasets::dsl::datasets;
 
                 let updated_dataset = diesel::update(datasets.find(dataset_id))
                     .set(&update)
@@ -194,8 +194,10 @@ impl Dataset {
                     .context("Failed to update dataset in database")?;
 
                 // Update the in-memory metadata struct and save it to file
-                current_metadata.name = updated_dataset.name.clone();
-                current_metadata.description = updated_dataset.description.clone();
+                current_metadata.name.clone_from(&updated_dataset.name);
+                current_metadata
+                    .description
+                    .clone_from(&updated_dataset.description);
                 current_metadata.favorite = updated_dataset.favorite;
 
                 current_metadata.save(&metadata_path)?;
@@ -212,7 +214,7 @@ impl Dataset {
         self.workspace
             .database()
             .interact(move |conn| {
-                use database::schema::datasets::dsl::*;
+                use database::schema::datasets::dsl::datasets;
 
                 diesel::delete(datasets.find(dataset_id))
                     .execute(conn)
@@ -242,6 +244,7 @@ impl Dataset {
         self.path.join(METADATA_NAME)
     }
 
+    #[must_use]
     pub fn metadata(&self) -> Metadata {
         Metadata::from_database_models(&self.db_row, &self.tags)
     }
@@ -264,6 +267,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[must_use]
     pub fn from_database_models(dataset: &database::Dataset, tags: &[database::Tag]) -> Self {
         let tag_names = tags.iter().map(|tag| tag.name.clone()).collect();
         Self {
