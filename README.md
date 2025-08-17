@@ -14,7 +14,7 @@ Data collection automation framework.
 - Node.js 22+
 - Protobuf compiler
 - Sqlite3
-- sqlx-cli
+- diesel_cli
 - `uv` and `pnpm`
 
 ### Local setup

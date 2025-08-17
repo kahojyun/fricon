@@ -28,16 +28,21 @@ def create_dev_folder() -> None:
         _ = f.write("*\n")
 
 
-def sqlx_setup() -> None:
+def diesel_setup() -> None:
     try:
         _ = subprocess.run(
-            ["sqlx", "db", "setup", "--source", MIGRATIONS_PATH],
-            cwd=get_project_root(),
+            ["diesel", "setup"],
+            cwd=get_project_root() / "crates" / "fricon",
+            check=True,
+        )
+        _ = subprocess.run(
+            ["diesel", "migration", "run"],
+            cwd=get_project_root() / "crates" / "fricon",
             check=True,
         )
     except FileNotFoundError:
         print(
-            "`sqlx` not found in $PATH. Please check development requirements in "
+            "`diesel` not found in $PATH. Please check development requirements in "
             + "README.md."
         )
         raise
@@ -46,7 +51,7 @@ def sqlx_setup() -> None:
 def main() -> None:
     write_dotenv()
     create_dev_folder()
-    sqlx_setup()
+    diesel_setup()
 
 
 if __name__ == "__main__":

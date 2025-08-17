@@ -2,7 +2,6 @@
 .mypy_cache
 .ruff_cache
 .pytest_cache
-.sqlx
 dist
 target
 pnpm-lock.yaml
