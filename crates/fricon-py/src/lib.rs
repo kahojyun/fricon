@@ -128,7 +128,7 @@ impl DatasetManager {
     /// Open a dataset by id.
     ///
     /// Parameters:
-    ///     dataset_id: An integer `id` or UUID `uid`
+    ///     dataset_id: An integer `id` or UUID `uuid`
     ///
     /// Returns:
     ///     The requested dataset.
@@ -136,11 +136,11 @@ impl DatasetManager {
     /// Raises:
     ///     RuntimeError: Dataset not found.
     pub fn open(&self, dataset_id: &Bound<'_, PyAny>) -> Result<Dataset> {
-        if let Ok(id) = dataset_id.extract::<i64>() {
+        if let Ok(id) = dataset_id.extract::<i32>() {
             let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_id(id))?;
             Ok(Dataset { inner })
-        } else if let Ok(uid) = dataset_id.extract::<String>() {
-            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_uid(uid))?;
+        } else if let Ok(uuid) = dataset_id.extract::<String>() {
+            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_uuid(uuid))?;
             Ok(Dataset { inner })
         } else {
             bail!("Invalid dataset id.")
@@ -160,7 +160,7 @@ impl DatasetManager {
                  id,
                  metadata:
                      Metadata {
-                         uid,
+                         uuid,
                          name,
                          description,
                          favorite,
@@ -171,10 +171,10 @@ impl DatasetManager {
                      },
                  ..
              }| {
-                let uid = uid.simple().to_string();
+                let uuid = uuid.simple().to_string();
                 (
                     id,
-                    uid,
+                    uuid,
                     name,
                     description,
                     favorite,
@@ -191,7 +191,7 @@ impl DatasetManager {
             "columns",
             [
                 "id",
-                "uid",
+                "uuid",
                 "name",
                 "description",
                 "favorite",
@@ -421,14 +421,14 @@ impl Dataset {
 
     /// Id of the dataset.
     #[getter]
-    pub const fn id(&self) -> i64 {
+    pub const fn id(&self) -> i32 {
         self.inner.id()
     }
 
     /// UUID of the dataset.
     #[getter]
-    pub fn uid(&self) -> String {
-        self.inner.uid().simple().to_string()
+    pub fn uuid(&self) -> String {
+        self.inner.uuid().simple().to_string()
     }
 
     /// Path of the dataset.

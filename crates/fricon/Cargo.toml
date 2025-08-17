@@ -16,19 +16,23 @@ async-stream = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 clap = { workspace = true, features = ["derive"] }
+deadpool-diesel = { workspace = true, features = ["sqlite", "tracing"] }
+diesel = { workspace = true, features = [
+    "sqlite",
+    "returning_clauses_for_sqlite_3_35",
+    "uuid",
+    "chrono",
+    "serde_json",
+] }
+diesel_migrations = { workspace = true }
 futures = { workspace = true }
 hyper-util = { workspace = true }
+libsqlite3-sys = { workspace = true, features = ["bundled"] }
 prost = { workspace = true }
 prost-types = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-sqlx = { workspace = true, features = [
-    "chrono",
-    "runtime-tokio",
-    "sqlite",
-    "uuid",
-] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
@@ -38,7 +42,6 @@ tonic = { workspace = true }
 tonic-prost = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng", "serde"] }
 
 [build-dependencies]

@@ -1,3 +1,5 @@
+pub use crate::server::DatasetRecord;
+
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail, ensure};
@@ -16,7 +18,7 @@ use uuid::Uuid;
 
 use crate::{
     VERSION, dataset, ipc,
-    paths::{IpcFile, WorkspacePath},
+    paths::{WorkspacePath, dataset_path_from_uuid},
     proto::{
         self, AddTagsRequest, CreateRequest, GetRequest, RemoveTagsRequest, SearchRequest,
         UpdateRequest, VersionRequest, WriteRequest, WriteResponse,
@@ -24,8 +26,6 @@ use crate::{
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
 };
-
-pub use crate::database::DatasetRecord;
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -73,7 +73,7 @@ impl Client {
     ///
     /// * Not found.
     /// * Server errors.
-    pub async fn get_dataset_by_id(&self, id: i64) -> Result<Dataset> {
+    pub async fn get_dataset_by_id(&self, id: i32) -> Result<Dataset> {
         self.get_dataset_by_id_enum(IdEnum::Id(id)).await
     }
 
@@ -81,8 +81,8 @@ impl Client {
     ///
     /// * Not found.
     /// * Server errors.
-    pub async fn get_dataset_by_uid(&self, uid: String) -> Result<Dataset> {
-        self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
+    pub async fn get_dataset_by_uuid(&self, uuid: String) -> Result<Dataset> {
+        self.get_dataset_by_id_enum(IdEnum::Uuid(uuid)).await
     }
 
     /// # Errors
@@ -223,12 +223,12 @@ impl DatasetWriter {
     }
 }
 
-async fn connect_ipc_channel(path: IpcFile) -> Result<Channel> {
+async fn connect_ipc_channel(path: PathBuf) -> Result<Channel> {
     let channel = Channel::from_static("http://ignored.com:50051")
         .connect_with_connector(service_fn(move |_| {
             let path = path.clone();
             async move {
-                let stream = ipc::connect(path.0).await?;
+                let stream = ipc::connect(path).await?;
                 anyhow::Ok(TokioIo::new(stream))
             }
         }))
@@ -244,7 +244,8 @@ pub struct Dataset {
 impl Dataset {
     #[must_use]
     pub fn path(&self) -> PathBuf {
-        self.client.root.data_dir().join(&self.record.path)
+        let dataset_path = dataset_path_from_uuid(self.record.metadata.uuid);
+        self.client.root.data_dir().join(dataset_path)
     }
 
     #[must_use]
@@ -253,13 +254,13 @@ impl Dataset {
     }
 
     #[must_use]
-    pub const fn id(&self) -> i64 {
+    pub const fn id(&self) -> i32 {
         self.record.id
     }
 
     #[must_use]
-    pub fn uid(&self) -> Uuid {
-        self.record.metadata.uid
+    pub fn uuid(&self) -> Uuid {
+        self.record.metadata.uuid
     }
 
     #[must_use]

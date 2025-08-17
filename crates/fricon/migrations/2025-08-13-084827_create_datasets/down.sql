@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS datasets_tags;
+DROP TABLE IF EXISTS datasets;
+DROP TABLE IF EXISTS tags;

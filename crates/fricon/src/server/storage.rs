@@ -12,9 +12,8 @@ use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
-    database::{self, DatasetRecord},
+    database::{self, DatasetUpdate},
     dataset,
-    paths::DatasetPath,
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DatasetMetadata,
         DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
@@ -25,7 +24,6 @@ use crate::{
     workspace::Workspace,
 };
 
-#[derive(Debug)]
 pub struct Storage {
     workspace: Workspace,
     pending_create: PendingCreate,
@@ -60,7 +58,7 @@ impl PendingCreate {
 impl From<dataset::Metadata> for proto::DatasetMetadata {
     fn from(
         dataset::Metadata {
-            uid,
+            uuid,
             name,
             description,
             favorite,
@@ -75,7 +73,7 @@ impl From<dataset::Metadata> for proto::DatasetMetadata {
             nanos: created_at.timestamp_subsec_nanos() as i32,
         };
         Self {
-            uid: uid.simple().to_string(),
+            uuid: uuid.simple().to_string(),
             name,
             description,
             favorite,
@@ -91,7 +89,7 @@ impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
 
     fn try_from(
         DatasetMetadata {
-            uid,
+            uuid,
             name,
             description,
             favorite,
@@ -100,7 +98,7 @@ impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
             tags,
         }: proto::DatasetMetadata,
     ) -> Result<Self, Self::Error> {
-        let uid = uid.parse()?;
+        let uuid = uuid.parse()?;
         let created_at = created_at.context("created_at is required")?;
         let seconds = created_at.seconds;
         #[expect(clippy::cast_sign_loss)]
@@ -111,7 +109,7 @@ impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
         };
         let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
         Ok(Self {
-            uid,
+            uuid,
             name,
             description,
             favorite,
@@ -122,11 +120,55 @@ impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
     }
 }
 
-impl From<DatasetRecord> for proto::Dataset {
-    fn from(DatasetRecord { id, path, metadata }: DatasetRecord) -> Self {
+#[derive(Debug, Clone)]
+pub struct DatasetRecord {
+    pub id: i32,
+    pub metadata: dataset::Metadata,
+}
+
+impl From<(database::Dataset, Vec<database::Tag>)> for DatasetRecord {
+    fn from(
+        (
+            database::Dataset {
+                id,
+                uuid,
+                name,
+                description,
+                favorite,
+                index_columns,
+                created_at,
+            },
+            tags,
+        ): (database::Dataset, Vec<database::Tag>),
+    ) -> Self {
         Self {
             id,
-            path: path.0,
+            metadata: dataset::Metadata {
+                uuid: uuid.0,
+                name,
+                description,
+                favorite,
+                index_columns: index_columns.0,
+                created_at: created_at.and_utc(),
+                tags: tags.into_iter().map(|tag| tag.name).collect(),
+            },
+        }
+    }
+}
+
+impl From<dataset::Dataset> for DatasetRecord {
+    fn from(dataset: dataset::Dataset) -> Self {
+        Self {
+            id: dataset.id(),
+            metadata: dataset.metadata(),
+        }
+    }
+}
+
+impl From<DatasetRecord> for proto::Dataset {
+    fn from(DatasetRecord { id, metadata }: DatasetRecord) -> Self {
+        Self {
+            id,
             metadata: Some(metadata.into()),
         }
     }
@@ -135,12 +177,9 @@ impl From<DatasetRecord> for proto::Dataset {
 impl TryFrom<proto::Dataset> for DatasetRecord {
     type Error = anyhow::Error;
 
-    fn try_from(
-        proto::Dataset { id, path, metadata }: proto::Dataset,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(proto::Dataset { id, metadata }: proto::Dataset) -> Result<Self, Self::Error> {
         Ok(Self {
             id,
-            path: DatasetPath(path),
             metadata: metadata
                 .context("metadata field is required.")?
                 .try_into()?,
@@ -227,13 +266,9 @@ impl DataStorageService for Storage {
                 error!("write failed: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        let id = dataset.id().expect("dataset id should be present");
-        let dataset = self.workspace.database().get_by_id(id).await.map_err(|e| {
-            error!("Failed to get dataset by id: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
+        let record = DatasetRecord::from(dataset);
         Ok(Response::new(WriteResponse {
-            dataset: Some(dataset.into()),
+            dataset: Some(record.into()),
         }))
     }
 
@@ -242,12 +277,15 @@ impl DataStorageService for Storage {
         &self,
         _request: tonic::Request<SearchRequest>,
     ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
-        let dataset_index = self.workspace.database();
-        let records = dataset_index.list_all().await.map_err(|e| {
+        let records = self.workspace.list_datasets().await.map_err(|e| {
             error!("Failed to list datasets: {:?}", e);
             Status::internal(e.to_string())
         })?;
-        let datasets = records.into_iter().map(Into::into).collect();
+        let datasets = records
+            .into_iter()
+            .map(Into::<DatasetRecord>::into)
+            .map(Into::<proto::Dataset>::into)
+            .collect();
         Ok(Response::new(SearchResponse {
             datasets,
             ..Default::default()
@@ -258,31 +296,32 @@ impl DataStorageService for Storage {
         &self,
         request: tonic::Request<GetRequest>,
     ) -> Result<tonic::Response<GetResponse>, tonic::Status> {
-        let dataset_index = self.workspace.database();
         let id = request.into_inner().id_enum.ok_or_else(|| {
             error!("id_enum is required");
             Status::invalid_argument("id_enum is required")
         })?;
-        let record = match id {
-            IdEnum::Id(id) => dataset_index.get_by_id(id).await,
-            IdEnum::Uid(uid) => {
-                let uid: Uuid = uid.parse().map_err(|e| {
-                    error!("Failed to parse uid: {:?}", e);
-                    Status::invalid_argument("invalid uid")
+        let dataset = match id {
+            IdEnum::Id(id) => self.workspace.get_dataset(id).await,
+            IdEnum::Uuid(uuid) => {
+                let uuid: Uuid = uuid.parse().map_err(|e| {
+                    error!("Failed to parse uuid: {:?}", e);
+                    Status::invalid_argument("invalid uuid")
                 })?;
-                dataset_index.get_by_uid(uid).await
+                self.workspace.get_dataset_by_uuid(uuid).await
             }
         }
         .map_err(|e| {
-            if matches!(e, database::Error::NotFound) {
+            if let Some(diesel::result::Error::NotFound) = e.downcast_ref() {
                 Status::not_found("dataset not found")
             } else {
                 error!("Failed to get dataset: {:?}", e);
                 Status::internal(e.to_string())
             }
         })?;
-        let dataset = Some(record.into());
-        Ok(Response::new(GetResponse { dataset }))
+        let record = DatasetRecord::from(dataset);
+        Ok(Response::new(GetResponse {
+            dataset: Some(record.into()),
+        }))
     }
 
     async fn add_tags(
@@ -290,14 +329,14 @@ impl DataStorageService for Storage {
         request: Request<AddTagsRequest>,
     ) -> Result<Response<AddTagsResponse>> {
         let AddTagsRequest { id, tags } = request.into_inner();
-        self.workspace
-            .database()
-            .add_dataset_tags(id, &tags)
-            .await
-            .map_err(|e| {
-                error!("Failed to add tags: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
+        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+            error!("Failed to get dataset: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+        dataset.add_tags(tags).await.map_err(|e| {
+            error!("Failed to add tags: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
         Ok(Response::new(AddTagsResponse {}))
     }
 
@@ -306,14 +345,14 @@ impl DataStorageService for Storage {
         request: Request<RemoveTagsRequest>,
     ) -> Result<Response<RemoveTagsResponse>> {
         let RemoveTagsRequest { id, tags } = request.into_inner();
-        self.workspace
-            .database()
-            .remove_dataset_tags(id, &tags)
-            .await
-            .map_err(|e| {
-                error!("Failed to remove tags: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
+        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+            error!("Failed to get dataset: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+        dataset.remove_tags(tags).await.map_err(|e| {
+            error!("Failed to remove tags: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
         Ok(Response::new(RemoveTagsResponse {}))
     }
 
@@ -324,9 +363,16 @@ impl DataStorageService for Storage {
             description,
             favorite,
         } = request.into_inner();
-        self.workspace
-            .database()
-            .update_dataset(id, name.as_deref(), description.as_deref(), favorite)
+        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+            error!("Failed to get dataset: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+        dataset
+            .update_info(DatasetUpdate {
+                name,
+                description,
+                favorite,
+            })
             .await
             .map_err(|e| {
                 error!("Failed to update dataset: {:?}", e);
@@ -337,14 +383,14 @@ impl DataStorageService for Storage {
 
     async fn delete(&self, request: Request<DeleteRequest>) -> Result<Response<DeleteResponse>> {
         let DeleteRequest { id } = request.into_inner();
-        self.workspace
-            .database()
-            .delete_dataset(id)
-            .await
-            .map_err(|e| {
-                error!("Failed to delete dataset: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
+        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+            error!("Failed to get dataset: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+        dataset.delete().await.map_err(|e| {
+            error!("Failed to delete dataset: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
         Ok(Response::new(DeleteResponse {}))
     }
 }

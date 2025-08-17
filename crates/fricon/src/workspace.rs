@@ -5,19 +5,22 @@ use std::{
 };
 
 use anyhow::{Context, Result, ensure};
-use chrono::Utc;
+use deadpool_diesel::sqlite::Pool;
+use diesel::prelude::*;
 use semver::{Version, VersionReq};
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
     VERSION,
-    database::Database,
+    database::{
+        self, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid, Tag, schema,
+    },
     dataset::{self, Dataset},
-    paths::{DatasetPath, VersionFile, WorkspacePath},
+    paths::WorkspacePath,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Workspace(Arc<Shared>);
 
 impl Workspace {
@@ -32,7 +35,7 @@ impl Workspace {
     }
 
     #[must_use]
-    pub fn database(&self) -> &Database {
+    pub fn database(&self) -> &Pool {
         self.0.database()
     }
 
@@ -53,12 +56,23 @@ impl Workspace {
             .create_dataset(name, description, tags, index_columns)
             .await
     }
+
+    pub async fn get_dataset(&self, id: i32) -> Result<Dataset> {
+        self.0.clone().get_dataset(id).await
+    }
+
+    pub async fn get_dataset_by_uuid(&self, uuid: Uuid) -> Result<Dataset> {
+        self.0.clone().get_dataset_by_uuid(uuid).await
+    }
+
+    pub async fn list_datasets(&self) -> Result<Vec<(database::Dataset, Vec<database::Tag>)>> {
+        self.0.list_datasets().await
+    }
 }
 
-#[derive(Debug)]
 struct Shared {
     root: WorkspacePath,
-    database: Database,
+    database: Pool,
     _lock: FileLock,
 }
 
@@ -67,7 +81,7 @@ impl Shared {
         let root = WorkspacePath::new(path)?;
         let lock = FileLock::new(root.lock_file())?;
         check_version_file(&root.version_file())?;
-        let database = Database::connect(root.database_file().0).await?;
+        let database = database::connect(root.database_file()).await?;
         Ok(Self {
             root,
             database,
@@ -79,7 +93,7 @@ impl Shared {
         info!("Initialize workspace: {:?}", path);
         create_empty_dir(path)?;
         let root = WorkspacePath::new(path)?;
-        let database = Database::init(root.database_file().0).await?;
+        let database = database::connect(root.database_file()).await?;
         init_dir(&root)?;
         write_version_file(&root.version_file())?;
         let lock = FileLock::new(root.lock_file())?;
@@ -96,7 +110,7 @@ impl Shared {
     }
 
     #[must_use]
-    pub fn database(&self) -> &Database {
+    pub fn database(&self) -> &Pool {
         &self.database
     }
 
@@ -107,28 +121,111 @@ impl Shared {
         tags: Vec<String>,
         index_columns: Vec<String>,
     ) -> Result<dataset::Writer> {
-        let created_at = Utc::now();
-        let date = created_at.naive_local().date();
-        let uid = Uuid::new_v4();
-        let path = DatasetPath::new(date, uid);
-        let full_path = self.root.data_dir().join(&path);
-        let metadata = dataset::Metadata {
-            uid,
-            name,
-            description,
-            favorite: false,
-            index_columns,
-            created_at,
-            tags,
-        };
-        let id = self
-            .database()
-            .create(&metadata, &path)
-            .await
-            .context("Failed to add dataset entry to index database.")?;
-        let writer = Dataset::create(full_path, metadata, Workspace(self), id)
-            .context("Failed to create dataset.")?;
+        let uuid = Uuid::new_v4();
+        let (dataset, tags) = self
+            .database
+            .interact(move |conn| {
+                conn.immediate_transaction(|conn| {
+                    let new_dataset = NewDataset {
+                        uuid: SimpleUuid(uuid),
+                        name: &name,
+                        description: &description,
+                        index_columns: JsonValue(&index_columns),
+                    };
+                    let dataset = diesel::insert_into(schema::datasets::table)
+                        .values(new_dataset)
+                        .returning(database::Dataset::as_returning())
+                        .get_result(conn)?;
+                    let new_tags = tags
+                        .iter()
+                        .map(|tag| NewTag { name: tag })
+                        .collect::<Vec<_>>();
+                    diesel::insert_or_ignore_into(schema::tags::table)
+                        .values(new_tags)
+                        .execute(conn)?;
+                    let tags = schema::tags::table
+                        .filter(schema::tags::name.eq_any(&tags))
+                        .load::<Tag>(conn)?;
+                    let dataset_tags: Vec<_> = tags
+                        .iter()
+                        .map(|tag| DatasetTag {
+                            dataset_id: dataset.id,
+                            tag_id: tag.id,
+                        })
+                        .collect();
+                    diesel::insert_into(schema::datasets_tags::table)
+                        .values(dataset_tags)
+                        .execute(conn)?;
+                    Ok((dataset, tags))
+                })
+            })
+            .await?;
+        let writer =
+            Dataset::create(Workspace(self), dataset, tags).context("Failed to create dataset.")?;
         Ok(writer)
+    }
+
+    pub async fn list_datasets(&self) -> Result<Vec<(database::Dataset, Vec<database::Tag>)>> {
+        self.database
+            .interact(|conn| {
+                let all_datasets = schema::datasets::table
+                    .select(database::Dataset::as_select())
+                    .load(conn)?;
+
+                let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
+                    .inner_join(schema::tags::table)
+                    .select((
+                        database::DatasetTag::as_select(),
+                        database::Tag::as_select(),
+                    ))
+                    .load::<(database::DatasetTag, database::Tag)>(conn)?;
+
+                let datasets_with_tags: Vec<(database::Dataset, Vec<database::Tag>)> = dataset_tags
+                    .grouped_by(&all_datasets)
+                    .into_iter()
+                    .zip(all_datasets)
+                    .map(|(dt, dataset)| (dataset, dt.into_iter().map(|(_, tag)| tag).collect()))
+                    .collect();
+
+                Ok(datasets_with_tags)
+            })
+            .await
+    }
+
+    pub async fn get_dataset(self: Arc<Self>, id: i32) -> Result<Dataset> {
+        let (dataset, tags) = self
+            .database
+            .interact(move |conn| {
+                let dataset = schema::datasets::table
+                    .find(id)
+                    .select(database::Dataset::as_select())
+                    .first(conn)?;
+                let tags = database::DatasetTag::belonging_to(&dataset)
+                    .inner_join(schema::tags::table)
+                    .select(database::Tag::as_select())
+                    .load(conn)?;
+                Ok((dataset, tags))
+            })
+            .await?;
+        Ok(Dataset::new(Workspace(self), dataset, tags))
+    }
+
+    pub async fn get_dataset_by_uuid(self: Arc<Self>, uuid: Uuid) -> Result<Dataset> {
+        let (dataset, tags) = self
+            .database
+            .interact(move |conn| {
+                let dataset = schema::datasets::table
+                    .filter(schema::datasets::uuid.eq(uuid.as_simple().to_string()))
+                    .select(database::Dataset::as_select())
+                    .first(conn)?;
+                let tags = database::DatasetTag::belonging_to(&dataset)
+                    .inner_join(schema::tags::table)
+                    .select(database::Tag::as_select())
+                    .load(conn)?;
+                Ok((dataset, tags))
+            })
+            .await?;
+        Ok(Dataset::new(Workspace(self), dataset, tags))
     }
 }
 
@@ -148,20 +245,18 @@ fn create_empty_dir(path: &Path) -> Result<()> {
 }
 
 fn init_dir(root: &WorkspacePath) -> Result<()> {
-    fs::create_dir(root.data_dir().0).context("Failed to create data directory.")?;
-    fs::create_dir(root.log_dir().0).context("Failed to create log directory.")?;
-    fs::create_dir(root.backup_dir().0).context("Failed to create backup directory.")?;
+    fs::create_dir(root.data_dir()).context("Failed to create data directory.")?;
+    fs::create_dir(root.log_dir()).context("Failed to create log directory.")?;
+    fs::create_dir(root.backup_dir()).context("Failed to create backup directory.")?;
     Ok(())
 }
 
-fn write_version_file(path: &VersionFile) -> Result<()> {
-    let path = &path.0;
+fn write_version_file(path: &Path) -> Result<()> {
     fs::write(path, format!("{VERSION}\n")).context("Failed to write version file.")?;
     Ok(())
 }
 
-fn check_version_file(path: &VersionFile) -> Result<()> {
-    let path = &path.0;
+fn check_version_file(path: &Path) -> Result<()> {
     let version_str = fs::read_to_string(path).context("Failed to read workspace version file.")?;
     let workspace_version =
         Version::parse(version_str.trim()).context("Failed to parse version.")?;

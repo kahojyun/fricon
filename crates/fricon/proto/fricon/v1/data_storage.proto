@@ -45,8 +45,8 @@ message WriteResponse {
 
 message GetRequest {
   oneof id_enum {
-    int64 id = 1;
-    string uid = 2;
+    int32 id = 1;
+    string uuid = 2;
   }
 }
 
@@ -55,21 +55,21 @@ message GetResponse {
 }
 
 message AddTagsRequest {
-  int64 id = 1;
+  int32 id = 1;
   repeated string tags = 2;
 }
 
 message AddTagsResponse {}
 
 message RemoveTagsRequest {
-  int64 id = 1;
+  int32 id = 1;
   repeated string tags = 2;
 }
 
 message RemoveTagsResponse {}
 
 message UpdateRequest {
-  int64 id = 1;
+  int32 id = 1;
   optional string name = 2;
   optional string description = 3;
   optional bool favorite = 4;
@@ -78,7 +78,7 @@ message UpdateRequest {
 message UpdateResponse {}
 
 message DeleteRequest {
-  int64 id = 1;
+  int32 id = 1;
 }
 
 message DeleteResponse {}
@@ -94,13 +94,12 @@ message SearchResponse {
 }
 
 message Dataset {
-  int64 id = 1;
-  string path = 2;
-  DatasetMetadata metadata = 3;
+  int32 id = 1;
+  DatasetMetadata metadata = 2;
 }
 
 message DatasetMetadata {
-  string uid = 1;
+  string uuid = 1;
   string name = 2;
   string description = 3;
   bool favorite = 4;
