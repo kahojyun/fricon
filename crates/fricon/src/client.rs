@@ -34,10 +34,6 @@ pub struct Client {
 }
 
 impl Client {
-    /// # Errors
-    ///
-    /// 1. Cannot connect to the IPC socket.
-    /// 2. Server version mismatch.
     pub async fn connect(workspace: &Path) -> Result<Self> {
         let workspace_root = WorkspacePath::new(workspace).context("Invalid workspace path.")?;
         let channel = connect_ipc_channel(workspace_root.ipc_file()).await?;
@@ -48,9 +44,6 @@ impl Client {
         })
     }
 
-    /// # Errors
-    ///
-    /// Server errors
     pub async fn create_dataset(
         &self,
         name: String,
@@ -69,25 +62,14 @@ impl Client {
         Ok(DatasetWriter::new(self.clone(), write_token))
     }
 
-    /// # Errors
-    ///
-    /// * Not found.
-    /// * Server errors.
     pub async fn get_dataset_by_id(&self, id: i32) -> Result<Dataset> {
         self.get_dataset_by_id_enum(IdEnum::Id(id)).await
     }
 
-    /// # Errors
-    ///
-    /// * Not found.
-    /// * Server errors.
     pub async fn get_dataset_by_uuid(&self, uuid: String) -> Result<Dataset> {
         self.get_dataset_by_id_enum(IdEnum::Uuid(uuid)).await
     }
 
-    /// # Errors
-    ///
-    /// * Server errors.
     pub async fn list_all_datasets(&self) -> Result<Vec<DatasetRecord>> {
         // TODO: Implement pagination
         let request = SearchRequest::default();
@@ -173,14 +155,6 @@ impl DatasetWriter {
         }
     }
 
-    /// # Errors
-    ///
-    /// Writer failed because:
-    ///
-    /// 1. Record batch schema mismatch.
-    /// 2. Connection error.
-    ///
-    /// # Panics
     pub async fn write(&mut self, data: RecordBatch) -> Result<()> {
         let Some(WriterHandle { tx, .. }) = self.handle.as_mut() else {
             bail!("Writer closed.");
@@ -194,12 +168,6 @@ impl DatasetWriter {
         }
     }
 
-    /// # Errors
-    ///
-    /// Writer failed because:
-    ///
-    /// 1. Record batch schema mismatch.
-    /// 2. Connection error.
     pub async fn finish(mut self) -> Result<Dataset> {
         let WriterHandle { tx, handle } = self.handle.take().context("Already finished.")?;
         drop(tx);
@@ -293,10 +261,6 @@ impl Dataset {
         &self.record.metadata.index_columns
     }
 
-    /// # Errors
-    ///
-    /// * Not found.
-    /// * Server errors.
     pub async fn add_tags(&self, tags: Vec<String>) -> Result<()> {
         let request = AddTagsRequest {
             id: self.record.id,
@@ -306,10 +270,6 @@ impl Dataset {
         Ok(())
     }
 
-    /// # Errors
-    ///
-    /// * Not found.
-    /// * Server errors.
     pub async fn remove_tags(&self, tags: Vec<String>) -> Result<()> {
         let request = RemoveTagsRequest {
             id: self.record.id,
@@ -319,10 +279,6 @@ impl Dataset {
         Ok(())
     }
 
-    /// # Errors
-    ///
-    /// * Not found.
-    /// * Server errors.
     pub async fn update_metadata(
         &self,
         name: Option<String>,

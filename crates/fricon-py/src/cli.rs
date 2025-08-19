@@ -27,19 +27,14 @@ pub enum Commands {
     Gui,
 }
 
-/// Main entry point for the application
-///
-/// # Errors
-///
-/// Returns a boxed error if server initialization or operation fails
 pub async fn main(cli: Cli) -> Result<()> {
     tracing_subscriber::fmt::init();
     match cli.command {
         Commands::Init { path } => {
-            fricon::workspace::Workspace::init(&path).await?;
+            fricon::init_workspace(&path).await?;
         }
         Commands::Serve { path } => {
-            fricon::server::run(&path).await?;
+            fricon::run_server(&path).await?;
         }
         Commands::Gui => {
             fricon_ui::run();

@@ -6,7 +6,7 @@ mod commands;
 
 #[derive(Default)]
 struct AppState {
-    client: Mutex<Option<fricon::client::Client>>,
+    client: Mutex<Option<fricon::Client>>,
 }
 
 impl AppState {

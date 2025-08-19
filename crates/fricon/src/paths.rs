@@ -10,9 +10,6 @@ use uuid::Uuid;
 pub struct WorkspacePath(PathBuf);
 
 impl WorkspacePath {
-    /// # Errors
-    ///
-    /// If the path cannot be converted to an absolute path.
     pub fn new(path: &Path) -> Result<Self> {
         let path = path::absolute(path)?;
         Ok(Self(path))

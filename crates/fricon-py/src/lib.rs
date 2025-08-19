@@ -26,10 +26,7 @@ use arrow::{
 };
 use chrono::{DateTime, Utc};
 use clap::Parser;
-use fricon::{
-    client::{self, Client, DatasetRecord},
-    dataset::Metadata,
-};
+use fricon::{Client, DatasetMetadata, DatasetRecord};
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
@@ -159,7 +156,7 @@ impl DatasetManager {
             |DatasetRecord {
                  id,
                  metadata:
-                     Metadata {
+                     DatasetMetadata {
                          uuid,
                          name,
                          description,
@@ -344,7 +341,7 @@ impl Trace {
 /// Datasets can be created and opened using the [`DatasetManager`][fricon.DatasetManager].
 #[pyclass(module = "fricon._core")]
 pub struct Dataset {
-    inner: client::Dataset,
+    inner: fricon::Dataset,
 }
 
 fn helper_module(py: Python<'_>) -> PyResult<&PyObject> {
@@ -450,14 +447,14 @@ impl Dataset {
 /// Writers are constructed by calling [`DatasetManager.create`][fricon.DatasetManager.create].
 #[pyclass(module = "fricon._core")]
 pub struct DatasetWriter {
-    writer: Option<client::DatasetWriter>,
+    writer: Option<fricon::DatasetWriter>,
     dataset: Option<Py<Dataset>>,
     first_row: bool,
     schema: Arc<Schema>,
 }
 
 impl DatasetWriter {
-    const fn new(writer: client::DatasetWriter, schema: Arc<Schema>) -> Self {
+    const fn new(writer: fricon::DatasetWriter, schema: Arc<Schema>) -> Self {
         Self {
             writer: Some(writer),
             dataset: None,

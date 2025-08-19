@@ -20,6 +20,16 @@ use crate::{
     paths::WorkspacePath,
 };
 
+pub async fn init(path: &Path) -> Result<()> {
+    info!("Initialize workspace: {:?}", path);
+    create_empty_dir(path)?;
+    let root = WorkspacePath::new(path)?;
+    database::connect(root.database_file()).await?;
+    init_dir(&root)?;
+    write_version_file(&root.version_file())?;
+    Ok(())
+}
+
 #[derive(Clone)]
 pub struct Workspace(Arc<Shared>);
 
@@ -37,11 +47,6 @@ impl Workspace {
     #[must_use]
     pub fn database(&self) -> &Pool {
         self.0.database()
-    }
-
-    pub async fn init(path: &Path) -> Result<Self> {
-        let shared = Shared::init(path).await?;
-        Ok(Self(Arc::new(shared)))
     }
 
     pub async fn create_dataset(
@@ -82,21 +87,6 @@ impl Shared {
         let lock = FileLock::new(root.lock_file())?;
         check_version_file(&root.version_file())?;
         let database = database::connect(root.database_file()).await?;
-        Ok(Self {
-            root,
-            database,
-            _lock: lock,
-        })
-    }
-
-    pub async fn init(path: &Path) -> Result<Self> {
-        info!("Initialize workspace: {:?}", path);
-        create_empty_dir(path)?;
-        let root = WorkspacePath::new(path)?;
-        let database = database::connect(root.database_file()).await?;
-        init_dir(&root)?;
-        write_version_file(&root.version_file())?;
-        let lock = FileLock::new(root.lock_file())?;
         Ok(Self {
             root,
             database,
