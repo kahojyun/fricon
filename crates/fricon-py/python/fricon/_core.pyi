@@ -49,23 +49,24 @@ class DatasetManager:
     def list_all(self) -> pd.DataFrame: ...
 
 _ScalarT_co = TypeVar("_ScalarT_co", str, bool, complex, covariant=True)
+ArrowAnyArray: TypeAlias = pa.Array[Any]  # pyright: ignore[reportExplicitAny]
 
 @final
 class Trace:
     @staticmethod
     def variable_step(
         xs: Sequence[float] | npt.NDArray[float64],
-        ys: Sequence[_ScalarT_co] | pa.Array[Any],  # pyright: ignore[reportExplicitAny]
+        ys: Sequence[_ScalarT_co] | ArrowAnyArray,
     ) -> Trace: ...
     @staticmethod
     def fixed_step(
         x0: float,
         dx: float,
-        ys: Sequence[_ScalarT_co] | pa.Array[Any],  # pyright: ignore[reportExplicitAny]
+        ys: Sequence[_ScalarT_co] | ArrowAnyArray,
     ) -> Trace: ...
     @property
     def data_type(self) -> pa.DataType: ...
-    def to_arrow_array(self) -> pa.Array[Any]: ...  # pyright: ignore[reportExplicitAny]
+    def to_arrow_array(self) -> ArrowAnyArray: ...
 
 _ColumnType: TypeAlias = (
     str
@@ -75,7 +76,7 @@ _ColumnType: TypeAlias = (
     | Sequence[bool]
     | Sequence[complex]
     | Trace
-    | pa.Array[Any]  # pyright: ignore[reportExplicitAny]
+    | ArrowAnyArray
 )
 
 @final
@@ -96,10 +97,19 @@ class Dataset:
     def to_arrow(self) -> pa.Table: ...
     def add_tags(self, *tag: str) -> None: ...
     def remove_tags(self, *tag: str) -> None: ...
-    # TODO: Use a verbose update method
-    name: str
-    description: str
-    favorite: bool
+    def update_metadata(
+        self,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        favorite: bool | None = None,
+    ) -> None: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def description(self) -> str: ...
+    @property
+    def favorite(self) -> bool: ...
     @property
     def tags(self) -> list[str]: ...
     @property

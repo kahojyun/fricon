@@ -1,8 +1,7 @@
 # Dataset
 
-`fricon` uses [Arrow IPC format]
-to store datasets. A basic knowledge of Arrow data structures can be helpful to
-understand how `fricon` works.
+`fricon` uses [Arrow IPC format] to store datasets. A basic knowledge of Arrow
+data structures can be helpful to understand how `fricon` works.
 
 ## [Apache Arrow](https://arrow.apache.org/docs/index.html)
 

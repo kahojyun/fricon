@@ -16,7 +16,7 @@ workspace/
   .fricon_version
   fricon.sqlite3
   data/
-    <date>/
+    <uuid[0:2]>/
       <uuid>/
         dataset.arrow
   backup/

@@ -354,55 +354,6 @@ fn helper_module(py: Python<'_>) -> PyResult<&PyObject> {
 
 #[pymethods]
 impl Dataset {
-    /// Name of the dataset.
-    #[getter]
-    pub fn name(&self) -> &str {
-        self.inner.name()
-    }
-
-    #[setter]
-    pub fn set_name(&mut self, name: String) -> Result<()> {
-        get_runtime().block_on(self.inner.update_metadata(Some(name), None, None))
-    }
-
-    /// Description of the dataset.
-    #[getter]
-    pub fn description(&self) -> &str {
-        self.inner.description()
-    }
-
-    #[setter]
-    pub fn set_description(&mut self, description: String) -> Result<()> {
-        get_runtime().block_on(self.inner.update_metadata(None, Some(description), None))
-    }
-
-    /// Tags of the dataset.
-    #[getter]
-    pub fn tags(&self) -> &[String] {
-        self.inner.tags()
-    }
-
-    #[pyo3(signature = (*tag))]
-    pub fn add_tags(&mut self, tag: Vec<String>) -> Result<()> {
-        get_runtime().block_on(self.inner.add_tags(tag))
-    }
-
-    #[pyo3(signature = (*tag))]
-    pub fn remove_tags(&mut self, tag: Vec<String>) -> Result<()> {
-        get_runtime().block_on(self.inner.remove_tags(tag))
-    }
-
-    /// Favorite status of the dataset.
-    #[getter]
-    pub const fn favorite(&self) -> bool {
-        self.inner.favorite()
-    }
-
-    #[setter]
-    pub fn set_favorite(&mut self, favorite: bool) -> Result<()> {
-        get_runtime().block_on(self.inner.update_metadata(None, None, Some(favorite)))
-    }
-
     /// Load the dataset as a polars DataFrame.
     ///
     /// Returns:
@@ -417,6 +368,50 @@ impl Dataset {
     ///     An Arrow Table.
     pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
         helper_module(py)?.call_method1(py, "read_arrow", (self.inner.arrow_file(),))
+    }
+
+    #[pyo3(signature = (*tag))]
+    pub fn add_tags(&mut self, tag: Vec<String>) -> Result<()> {
+        get_runtime().block_on(self.inner.add_tags(tag))
+    }
+
+    #[pyo3(signature = (*tag))]
+    pub fn remove_tags(&mut self, tag: Vec<String>) -> Result<()> {
+        get_runtime().block_on(self.inner.remove_tags(tag))
+    }
+
+    #[pyo3(signature = (*, name = None, description = None, favorite = None))]
+    pub fn update_metadata(
+        &mut self,
+        name: Option<String>,
+        description: Option<String>,
+        favorite: Option<bool>,
+    ) -> Result<()> {
+        get_runtime().block_on(self.inner.update_metadata(name, description, favorite))
+    }
+
+    /// Name of the dataset.
+    #[getter]
+    pub fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    /// Description of the dataset.
+    #[getter]
+    pub fn description(&self) -> &str {
+        self.inner.description()
+    }
+
+    /// Favorite status of the dataset.
+    #[getter]
+    pub const fn favorite(&self) -> bool {
+        self.inner.favorite()
+    }
+
+    /// Tags of the dataset.
+    #[getter]
+    pub fn tags(&self) -> &[String] {
+        self.inner.tags()
     }
 
     /// Id of the dataset.

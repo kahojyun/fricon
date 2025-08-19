@@ -1,6 +1,6 @@
 # Fricon
 
-Python client for the fridge control system.
+Fricon is a framework for data collection automation.
 
 ## Current features
 
