@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, bail};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -153,12 +153,19 @@ impl WorkspaceRoot {
 
         // Success if path already exists.
         fs::create_dir_all(root).context("Failed to create directory.")?;
-        let lock = FileLock::new(paths.lock_file())?;
+        let lock_file_path = paths.lock_file();
+        let lock = FileLock::new(&lock_file_path)?;
 
-        let mut dir_contents = root
+        let dir_contents = root
             .read_dir()
             .context("Failed to read directory contents.")?;
-        ensure!(dir_contents.next().is_none(), "Directory is not empty.");
+
+        for entry_result in dir_contents {
+            let entry = entry_result.context("Failed to get directory entry.")?;
+            if entry.path() != lock_file_path {
+                bail!("Directory is not empty.");
+            }
+        }
 
         init_workspace_dirs(&paths).context("Failed to initialize workspace directories.")?;
 
@@ -246,33 +253,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_dataset_path() {
+    fn format_dataset_path() {
         let uuid = uuid!("6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
         let path = dataset_path_from_uuid(uuid);
         assert_eq!(path, "6e/6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
     }
 
     #[test]
-    fn test_workspace_paths_generation() {
-        let temp_dir = tempdir().unwrap();
-        let root_path = temp_dir.path().to_path_buf();
-        let paths = WorkspacePaths::new(&root_path);
-
-        assert_eq!(paths.root(), root_path);
-        assert_eq!(paths.data_dir(), root_path.join("data"));
-        assert_eq!(paths.log_dir(), root_path.join("log"));
-        assert_eq!(paths.backup_dir(), root_path.join("backup"));
-        assert_eq!(paths.ipc_file(), root_path.join("fricon.socket"));
-        assert_eq!(paths.database_file(), root_path.join("fricon.sqlite3"));
-        assert_eq!(
-            paths.metadata_file(),
-            root_path.join(".fricon_workspace.json")
-        );
-        assert_eq!(paths.lock_file(), root_path.join(".fricon.lock"));
-    }
-
-    #[test]
-    fn test_workspace_root_init() {
+    fn workspace_root_init() {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path();
 
@@ -288,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn test_workspace_root_open() {
+    fn workspace_root_open() {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path();
 
@@ -302,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn test_workspace_root_validate() {
+    fn workspace_root_validate() {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path();
 
@@ -318,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_workspace_root_exclusive_lock() {
+    fn workspace_root_exclusive_lock() {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path();
 

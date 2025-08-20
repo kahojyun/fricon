@@ -105,7 +105,7 @@ mod tests {
     }
 
     #[test]
-    fn test_batch_writer_basic_flow() -> ArrowResult<()> {
+    fn batch_writer_basic_flow() -> ArrowResult<()> {
         let schema = create_test_schema();
         let mut buffer = Cursor::new(Vec::new());
         let mut writer = BatchWriter::new(&mut buffer, &schema)?;
@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn test_batch_writer_schema_mismatch() -> ArrowResult<()> {
+    fn batch_writer_schema_mismatch() -> ArrowResult<()> {
         let schema1 = create_test_schema();
         // Create a different schema
         let schema2 = Schema::new(vec![Field::new("other_id", DataType::Int64, false)]);
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn test_batch_writer_drop_finishes() -> ArrowResult<()> {
+    fn batch_writer_drop_finishes() -> ArrowResult<()> {
         let schema = create_test_schema();
         let mut buffer = Cursor::new(Vec::new());
 
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn test_batch_writer_empty_finish() -> ArrowResult<()> {
+    fn batch_writer_empty_finish() -> ArrowResult<()> {
         let schema = create_test_schema();
         let mut buffer = Cursor::new(Vec::new());
         let writer = BatchWriter::new(&mut buffer, &schema)?;

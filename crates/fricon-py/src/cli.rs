@@ -52,7 +52,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cli() {
+    fn cli() {
         Cli::command().debug_assert();
     }
 }

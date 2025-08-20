@@ -29,7 +29,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_connect() {
+    async fn connect_succeed() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("fricon.sock");
         {
@@ -54,7 +54,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_not_found() {
+    async fn not_found() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("fricon.sock");
 
