@@ -24,17 +24,17 @@ Relative to the project root:
 
 ### General Principles
 
-- Follow existing code conventions and patterns
-- Maintain type safety where possible
+- Prioritize code correctness and clarity. Speed and efficiency are secondary priorities unless otherwise specified.
+- Do not write organizational or comments that summarize the code. Comments should only be written in order to explain "why" the code is written in some way in the case there is a reason that is tricky / non-obvious.
 - Use proper error handling throughout
-- Add docstrings/comments for all public APIs
-- Include unit tests for new functionality
 
 ### Rust
 
 - Never create files with `mod.rs` paths - prefer `src/some_module.rs` instead of `src/some_module/mod.rs`.
 - Prefer inlined format args like `format!("{var}")`
 - Prefer stabilized `async fn` in traits.
+- Prefer implementing functionality in existing files unless it is a new logical component. Avoid creating many small files.
+- Avoid using functions that panic like `unwrap()`, instead use mechanisms like `?` to propagate errors.
 
 ### Tauri
 
