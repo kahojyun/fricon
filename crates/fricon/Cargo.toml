@@ -30,7 +30,7 @@ hyper-util = { workspace = true }
 libsqlite3-sys = { workspace = true, features = ["bundled"] }
 prost = { workspace = true }
 prost-types = { workspace = true }
-semver = { workspace = true }
+semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

@@ -4,15 +4,15 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use deadpool_diesel::sqlite::Pool;
 use diesel::prelude::*;
-use semver::{Version, VersionReq};
+use semver::Version;
+use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    VERSION,
     database::{
         self, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid, Tag, schema,
     },
@@ -26,8 +26,48 @@ pub async fn init(path: &Path) -> Result<()> {
     let root = WorkspacePath::new(path)?;
     database::connect(root.database_file()).await?;
     init_dir(&root)?;
-    write_version_file(&root.version_file())?;
+    let metadata = Metadata {
+        version: WORKSPACE_VERSION,
+    };
+    metadata.write_json(root.metadata_file())?;
     Ok(())
+}
+
+const WORKSPACE_VERSION: Version = Version::new(0, 1, 0);
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Metadata {
+    version: Version,
+}
+
+impl Metadata {
+    fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
+        let path = path.as_ref();
+        let file = File::create(path)
+            .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
+        serde_json::to_writer_pretty(file, self)
+            .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
+        Ok(())
+    }
+
+    fn read_json(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let file = File::open(path).with_context(|| {
+            format!("Failed to read workspace metadata from {}", path.display())
+        })?;
+        let metadata = serde_json::from_reader(file).with_context(|| {
+            format!("Failed to read workspace metadata from {}", path.display())
+        })?;
+        Ok(metadata)
+    }
+
+    fn check_version(&self) -> Result<()> {
+        // TODO: Implement version checking logic and handle version mismatch
+        if self.version != WORKSPACE_VERSION {
+            bail!("Workspace version mismatch.");
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -85,7 +125,8 @@ impl Shared {
     pub async fn open(path: &Path) -> Result<Self> {
         let root = WorkspacePath::new(path)?;
         let lock = FileLock::new(root.lock_file())?;
-        check_version_file(&root.version_file())?;
+        let metadata = Metadata::read_json(root.metadata_file())?;
+        metadata.check_version()?;
         let database = database::connect(root.database_file()).await?;
         Ok(Self {
             root,
@@ -238,26 +279,6 @@ fn init_dir(root: &WorkspacePath) -> Result<()> {
     fs::create_dir(root.data_dir()).context("Failed to create data directory.")?;
     fs::create_dir(root.log_dir()).context("Failed to create log directory.")?;
     fs::create_dir(root.backup_dir()).context("Failed to create backup directory.")?;
-    Ok(())
-}
-
-fn write_version_file(path: &Path) -> Result<()> {
-    fs::write(path, format!("{VERSION}\n")).context("Failed to write version file.")?;
-    Ok(())
-}
-
-fn check_version_file(path: &Path) -> Result<()> {
-    let version_str = fs::read_to_string(path).context("Failed to read workspace version file.")?;
-    let workspace_version =
-        Version::parse(version_str.trim()).context("Failed to parse version.")?;
-    let req =
-        VersionReq::parse(&format!("={VERSION}")).expect("Failed to parse version requirement.");
-    ensure!(
-        req.matches(&workspace_version),
-        "Version mismatch: {} != {}",
-        VERSION,
-        workspace_version
-    );
     Ok(())
 }
 

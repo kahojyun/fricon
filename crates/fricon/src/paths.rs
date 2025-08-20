@@ -41,8 +41,8 @@ impl WorkspacePath {
     }
 
     #[must_use]
-    pub fn version_file(&self) -> PathBuf {
-        self.0.join(".fricon_version")
+    pub fn metadata_file(&self) -> PathBuf {
+        self.0.join(".fricon_workspace.json")
     }
 
     #[must_use]
