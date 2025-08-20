@@ -3,7 +3,7 @@ mod storage;
 
 pub use self::storage::DatasetRecord;
 
-use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use tokio::signal;
@@ -22,9 +22,9 @@ use crate::{
 
 use self::{fricon::Fricon, storage::Storage};
 
-pub async fn run(path: &Path) -> Result<()> {
+pub async fn run(path: impl Into<PathBuf>) -> Result<()> {
     let workspace = workspace::Workspace::open(path).await?;
-    let ipc_file = workspace.root().ipc_file();
+    let ipc_file = workspace.root().paths().ipc_file();
     let tracker = TaskTracker::new();
     let storage = Storage::new(workspace, tracker.clone());
     let service = DataStorageServiceServer::new(storage);

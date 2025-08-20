@@ -1,6 +1,6 @@
 //! Command line interface
 
-use std::path::PathBuf;
+use std::path::{self, PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -31,9 +31,11 @@ pub async fn main(cli: Cli) -> Result<()> {
     tracing_subscriber::fmt::init();
     match cli.command {
         Commands::Init { path } => {
-            fricon::init_workspace(&path).await?;
+            let path = path::absolute(path)?;
+            fricon::init_workspace(path).await?;
         }
         Commands::Serve { path } => {
+            let path = path::absolute(path)?;
             fricon::run_server(&path).await?;
         }
         Commands::Gui => {

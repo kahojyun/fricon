@@ -1,6 +1,6 @@
 pub use crate::server::DatasetRecord;
 
-use std::path::{Path, PathBuf};
+use std::path::{self, Path, PathBuf};
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter};
@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::{
     VERSION, dataset, ipc,
-    paths::{WorkspacePath, dataset_path_from_uuid},
+    paths::WorkspacePaths,
     proto::{
         self, AddTagsRequest, CreateRequest, GetRequest, RemoveTagsRequest, SearchRequest,
         UpdateRequest, VersionRequest, WriteRequest, WriteResponse,
@@ -30,17 +30,18 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Client {
     channel: Channel,
-    root: WorkspacePath,
+    workspace_paths: WorkspacePaths,
 }
 
 impl Client {
-    pub async fn connect(workspace: &Path) -> Result<Self> {
-        let workspace_root = WorkspacePath::new(workspace).context("Invalid workspace path.")?;
-        let channel = connect_ipc_channel(workspace_root.ipc_file()).await?;
+    pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path::absolute(path)?;
+        let workspace_paths = WorkspacePaths::new(path);
+        let channel = connect_ipc_channel(workspace_paths.ipc_file()).await?;
         check_server_version(channel.clone()).await?;
         Ok(Self {
             channel,
-            root: workspace_root,
+            workspace_paths,
         })
     }
 
@@ -212,8 +213,9 @@ pub struct Dataset {
 impl Dataset {
     #[must_use]
     pub fn path(&self) -> PathBuf {
-        let dataset_path = dataset_path_from_uuid(self.record.metadata.uuid);
-        self.client.root.data_dir().join(dataset_path)
+        self.client
+            .workspace_paths
+            .dataset_path_from_uuid(self.record.metadata.uuid)
     }
 
     #[must_use]

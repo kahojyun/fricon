@@ -20,10 +20,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{
-    database::{self, NewTag, Tag},
-    paths::dataset_path_from_uuid,
-};
+use crate::database::{self, NewTag, Tag};
 use crate::{
     database::{DatasetTag, PoolExt},
     workspace::Workspace,
@@ -47,8 +44,10 @@ impl Dataset {
         dataset: database::Dataset,
         tags: Vec<database::Tag>,
     ) -> Result<Writer> {
-        let dataset_path = dataset_path_from_uuid(dataset.uuid.0);
-        let path = workspace.root().data_dir().join(dataset_path);
+        let path = workspace
+            .root()
+            .paths()
+            .dataset_path_from_uuid(dataset.uuid.0);
         ensure!(
             !path.exists(),
             "Cannot create new dataset at already existing path {:?}",
@@ -81,8 +80,10 @@ impl Dataset {
         dataset: database::Dataset,
         tags: Vec<database::Tag>,
     ) -> Self {
-        let dataset_path = dataset_path_from_uuid(dataset.uuid.0);
-        let path = workspace.root().data_dir().join(dataset_path);
+        let path = workspace
+            .root()
+            .paths()
+            .dataset_path_from_uuid(dataset.uuid.0);
         Self {
             workspace,
             db_row: dataset,

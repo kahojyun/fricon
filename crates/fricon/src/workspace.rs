@@ -1,15 +1,9 @@
-use std::{
-    fs::{self, File},
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result};
 use deadpool_diesel::sqlite::Pool;
 use diesel::prelude::*;
-use semver::Version;
-use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -17,70 +11,28 @@ use crate::{
         self, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid, Tag, schema,
     },
     dataset::{self, Dataset},
-    paths::WorkspacePath,
+    paths::WorkspaceRoot,
 };
 
-pub async fn init(path: &Path) -> Result<()> {
-    info!("Initialize workspace: {:?}", path);
-    create_empty_dir(path)?;
-    let root = WorkspacePath::new(path)?;
-    database::connect(root.database_file()).await?;
-    init_dir(&root)?;
-    let metadata = Metadata {
-        version: WORKSPACE_VERSION,
-    };
-    metadata.write_json(root.metadata_file())?;
+pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
+    let path = path.into();
+    info!("Initialize workspace: {}", path.display());
+    let root = WorkspaceRoot::init(path)?;
+    database::connect(root.paths().database_file()).await?;
     Ok(())
-}
-
-const WORKSPACE_VERSION: Version = Version::new(0, 1, 0);
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Metadata {
-    version: Version,
-}
-
-impl Metadata {
-    fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
-        let path = path.as_ref();
-        let file = File::create(path)
-            .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
-        serde_json::to_writer_pretty(file, self)
-            .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
-        Ok(())
-    }
-
-    fn read_json(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref();
-        let file = File::open(path).with_context(|| {
-            format!("Failed to read workspace metadata from {}", path.display())
-        })?;
-        let metadata = serde_json::from_reader(file).with_context(|| {
-            format!("Failed to read workspace metadata from {}", path.display())
-        })?;
-        Ok(metadata)
-    }
-
-    fn check_version(&self) -> Result<()> {
-        // TODO: Implement version checking logic and handle version mismatch
-        if self.version != WORKSPACE_VERSION {
-            bail!("Workspace version mismatch.");
-        }
-        Ok(())
-    }
 }
 
 #[derive(Clone)]
 pub struct Workspace(Arc<Shared>);
 
 impl Workspace {
-    pub async fn open(path: &Path) -> Result<Self> {
+    pub async fn open(path: impl Into<PathBuf>) -> Result<Self> {
         let shared = Shared::open(path).await?;
         Ok(Self(Arc::new(shared)))
     }
 
     #[must_use]
-    pub fn root(&self) -> &WorkspacePath {
+    pub fn root(&self) -> &WorkspaceRoot {
         self.0.root()
     }
 
@@ -116,27 +68,19 @@ impl Workspace {
 }
 
 struct Shared {
-    root: WorkspacePath,
+    root: WorkspaceRoot,
     database: Pool,
-    _lock: FileLock,
 }
 
 impl Shared {
-    pub async fn open(path: &Path) -> Result<Self> {
-        let root = WorkspacePath::new(path)?;
-        let lock = FileLock::new(root.lock_file())?;
-        let metadata = Metadata::read_json(root.metadata_file())?;
-        metadata.check_version()?;
-        let database = database::connect(root.database_file()).await?;
-        Ok(Self {
-            root,
-            database,
-            _lock: lock,
-        })
+    pub async fn open(path: impl Into<PathBuf>) -> Result<Self> {
+        let root = WorkspaceRoot::open(path)?;
+        let database = database::connect(root.paths().database_file()).await?;
+        Ok(Self { root, database })
     }
 
     #[must_use]
-    pub const fn root(&self) -> &WorkspacePath {
+    pub fn root(&self) -> &WorkspaceRoot {
         &self.root
     }
 
@@ -257,59 +201,5 @@ impl Shared {
             })
             .await?;
         Ok(Dataset::new(Workspace(self), dataset, tags))
-    }
-}
-
-fn create_empty_dir(path: &Path) -> Result<()> {
-    // Success if path already exists.
-    fs::create_dir_all(path)
-        .with_context(|| format!("Failed to create directory: {}", path.display()))?;
-    let mut dir_contents = path
-        .read_dir()
-        .with_context(|| format!("Failed to read directory contents: {}", path.display()))?;
-    ensure!(
-        dir_contents.next().is_none(),
-        "Directory is not empty: {:?}",
-        path
-    );
-    Ok(())
-}
-
-fn init_dir(root: &WorkspacePath) -> Result<()> {
-    fs::create_dir(root.data_dir()).context("Failed to create data directory.")?;
-    fs::create_dir(root.log_dir()).context("Failed to create log directory.")?;
-    fs::create_dir(root.backup_dir()).context("Failed to create backup directory.")?;
-    Ok(())
-}
-
-#[derive(Debug)]
-struct FileLock {
-    file: File,
-    path: PathBuf,
-}
-
-impl FileLock {
-    fn new(path: impl Into<PathBuf>) -> Result<Self> {
-        let path = path.into();
-        let file = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&path)
-            .context("Failed to open file for locking.")?;
-        file.try_lock().context("Failed to acquire file lock.")?;
-        Ok(Self { file, path })
-    }
-}
-
-impl Drop for FileLock {
-    fn drop(&mut self) {
-        if let Err(e) = self.file.unlock() {
-            warn!("Failed to release file lock: {e}");
-        }
-        if let Err(e) = fs::remove_file(&self.path) {
-            warn!("Failed to remove locked file: {e}");
-        }
     }
 }
