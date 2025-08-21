@@ -2,24 +2,6 @@
 
 This project is in pre-alpha stage. Breaking changes are expected.
 
-## Tooling
-
-`cargo`, `uv` and `pnpm` are used for project management and dependency resolution.
-
-## Project Architecture Overview
-
-Relative to the project root:
-
-- `/crates/`: Contains core project components
-    - `/crates/fricon/`: Core Rust functionality
-    - `/crates/fricon-py/`: PyO3 bindings
-    - `/crates/fricon-ui/`: Tauri application
-        - `/crates/fricon-ui/frontend/`: Vue3 application
-- `/scripts/`: Project helper scripts
-- `/examples/`: Example python scripts
-- `/docs/`: Python API documentation
-- `/tests/`: Python test suite
-
 ## Code Guidelines
 
 ### General Principles
@@ -27,6 +9,7 @@ Relative to the project root:
 - Prioritize code correctness and clarity. Speed and efficiency are secondary priorities unless otherwise specified.
 - Do not write organizational or comments that summarize the code. Comments should only be written in order to explain "why" the code is written in some way in the case there is a reason that is tricky / non-obvious.
 - Use proper error handling throughout
+- KISS
 
 ### Rust
 
@@ -46,3 +29,21 @@ Relative to the project root:
 - Use Pinia for state management
 - Follow Vue's single-file component best practices
 - Use tailwindcss for styling
+
+## Tooling
+
+`cargo`, `uv` and `pnpm` are used for project management and dependency resolution.
+
+## Project Architecture Overview
+
+Relative to the project root:
+
+- `/crates/`: Contains core project components
+    - `/crates/fricon/`: Core Rust functionality
+    - `/crates/fricon-py/`: PyO3 bindings
+    - `/crates/fricon-ui/`: Tauri application
+        - `/crates/fricon-ui/frontend/`: Vue3 application
+- `/scripts/`: Project helper scripts
+- `/examples/`: Example python scripts
+- `/docs/`: Python API documentation
+- `/tests/`: Python test suite
