@@ -21,13 +21,13 @@ use uuid::Uuid;
 
 use crate::{
     VERSION, dataset, ipc,
-    paths::WorkspacePaths,
     proto::{
         self, AddTagsRequest, CreateRequest, GetRequest, RemoveTagsRequest, SearchRequest,
         UpdateRequest, VersionRequest, WriteRequest, WriteResponse,
         data_storage_service_client::DataStorageServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
+    workspace::{WorkspacePaths, WorkspaceRoot},
 };
 
 #[derive(Debug, Clone)]
@@ -39,6 +39,7 @@ pub struct Client {
 impl Client {
     pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
         let path = fs::canonicalize(path)?;
+        WorkspaceRoot::validate(path.clone())?;
         let workspace_paths = WorkspacePaths::new(path);
         let channel = connect_ipc_channel(workspace_paths.ipc_file()).await?;
         check_server_version(channel.clone()).await?;

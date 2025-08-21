@@ -12,21 +12,25 @@ use tonic::transport::Server;
 use tracing::info;
 
 use crate::{
+    app::App,
     ipc,
     proto::{
         data_storage_service_server::DataStorageServiceServer,
         fricon_service_server::FriconServiceServer,
     },
-    workspace,
 };
 
 use self::{fricon::Fricon, storage::Storage};
 
 pub async fn run(path: impl Into<PathBuf>) -> Result<()> {
-    let workspace = workspace::Workspace::open(path).await?;
-    let ipc_file = workspace.root().paths().ipc_file();
+    let app = App::open(path).await?;
+    run_with_app(app).await
+}
+
+pub async fn run_with_app(app: App) -> Result<()> {
+    let ipc_file = app.root().paths().ipc_file();
     let tracker = TaskTracker::new();
-    let storage = Storage::new(workspace, tracker.clone());
+    let storage = Storage::new(app, tracker.clone());
     let service = DataStorageServiceServer::new(storage);
     let listener = ipc::listen(ipc_file)?;
     Server::builder()

@@ -22,8 +22,8 @@ use uuid::Uuid;
 
 use crate::database::{self, NewTag, Tag};
 use crate::{
+    app::App,
     database::{DatasetTag, PoolExt},
-    workspace::Workspace,
 };
 
 use self::batch_writer::BatchWriter;
@@ -32,7 +32,7 @@ pub(crate) const DATASET_NAME: &str = "dataset.arrow";
 pub(crate) const METADATA_NAME: &str = "metadata.json";
 
 pub struct Dataset {
-    workspace: Workspace,
+    app: App,
     db_row: database::Dataset,
     tags: Vec<database::Tag>,
     path: PathBuf,
@@ -40,14 +40,11 @@ pub struct Dataset {
 
 impl Dataset {
     pub fn create(
-        workspace: Workspace,
+        app: App,
         dataset: database::Dataset,
         tags: Vec<database::Tag>,
     ) -> Result<Writer> {
-        let path = workspace
-            .root()
-            .paths()
-            .dataset_path_from_uuid(dataset.uuid.0);
+        let path = app.root().paths().dataset_path_from_uuid(dataset.uuid.0);
         ensure!(
             !path.exists(),
             "Cannot create new dataset at already existing path {:?}",
@@ -58,7 +55,7 @@ impl Dataset {
             .with_context(|| format!("Failed to create dataset at {}", path.display()))?;
         let metadata = Metadata::from_database_models(&dataset, &tags);
         let dataset = Self {
-            workspace,
+            app,
             db_row: dataset,
             tags,
             path,
@@ -75,17 +72,10 @@ impl Dataset {
         Ok(Writer::new(dataset_file, dataset))
     }
 
-    pub(crate) fn new(
-        workspace: Workspace,
-        dataset: database::Dataset,
-        tags: Vec<database::Tag>,
-    ) -> Self {
-        let path = workspace
-            .root()
-            .paths()
-            .dataset_path_from_uuid(dataset.uuid.0);
+    pub(crate) fn new(app: App, dataset: database::Dataset, tags: Vec<database::Tag>) -> Self {
+        let path = app.root().paths().dataset_path_from_uuid(dataset.uuid.0);
         Self {
-            workspace,
+            app,
             db_row: dataset,
             tags,
             path,
@@ -97,7 +87,7 @@ impl Dataset {
         let metadata_path = self.metadata_file();
         let mut metadata = self.metadata();
         self.tags = self
-            .workspace
+            .app
             .database()
             .interact(move |conn| {
                 use database::schema;
@@ -142,7 +132,7 @@ impl Dataset {
         let metadata_path = self.metadata_file();
         let mut metadata = self.metadata();
         self.tags = self
-            .workspace
+            .app
             .database()
             .interact(move |conn| {
                 use database::schema;
@@ -184,7 +174,7 @@ impl Dataset {
         let mut current_metadata = self.metadata();
 
         self.db_row = self
-            .workspace
+            .app
             .database()
             .interact(move |conn| {
                 use database::schema::datasets::dsl::datasets;
@@ -212,7 +202,7 @@ impl Dataset {
     pub async fn delete(&mut self) -> Result<()> {
         let dataset_id = self.db_row.id;
 
-        self.workspace
+        self.app
             .database()
             .interact(move |conn| {
                 use database::schema::datasets::dsl::datasets;

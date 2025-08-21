@@ -12,6 +12,7 @@ use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
+    app::App,
     database::{self, DatasetUpdate},
     dataset,
     proto::{
@@ -21,11 +22,10 @@ use crate::{
         WriteRequest, WriteResponse, data_storage_service_server::DataStorageService,
         get_request::IdEnum,
     },
-    workspace::Workspace,
 };
 
 pub struct Storage {
-    workspace: Workspace,
+    app: App,
     pending_create: PendingCreate,
     tracker: TaskTracker,
 }
@@ -34,9 +34,9 @@ pub struct Storage {
 struct PendingCreate(Mutex<HashMap<Uuid, CreateRequest>>);
 
 impl Storage {
-    pub fn new(workspace: Workspace, tracker: TaskTracker) -> Self {
+    pub fn new(app: App, tracker: TaskTracker) -> Self {
         Self {
-            workspace,
+            app,
             pending_create: PendingCreate::default(),
             tracker,
         }
@@ -231,7 +231,7 @@ impl DataStorageService for Storage {
         let async_reader = tokio_util::io::StreamReader::new(bytes_stream);
         let sync_reader = SyncIoBridge::new(async_reader);
         let mut writer = self
-            .workspace
+            .app
             .create_dataset(name, description, tags, index_columns)
             .await
             .map_err(|e| {
@@ -277,7 +277,7 @@ impl DataStorageService for Storage {
         &self,
         _request: tonic::Request<SearchRequest>,
     ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
-        let records = self.workspace.list_datasets().await.map_err(|e| {
+        let records = self.app.list_datasets().await.map_err(|e| {
             error!("Failed to list datasets: {:?}", e);
             Status::internal(e.to_string())
         })?;
@@ -301,13 +301,13 @@ impl DataStorageService for Storage {
             Status::invalid_argument("id_enum is required")
         })?;
         let dataset = match id {
-            IdEnum::Id(id) => self.workspace.get_dataset(id).await,
+            IdEnum::Id(id) => self.app.get_dataset(id).await,
             IdEnum::Uuid(uuid) => {
                 let uuid: Uuid = uuid.parse().map_err(|e| {
                     error!("Failed to parse uuid: {:?}", e);
                     Status::invalid_argument("invalid uuid")
                 })?;
-                self.workspace.get_dataset_by_uuid(uuid).await
+                self.app.get_dataset_by_uuid(uuid).await
             }
         }
         .map_err(|e| {
@@ -329,7 +329,7 @@ impl DataStorageService for Storage {
         request: Request<AddTagsRequest>,
     ) -> Result<Response<AddTagsResponse>> {
         let AddTagsRequest { id, tags } = request.into_inner();
-        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
             error!("Failed to get dataset: {:?}", e);
             Status::internal(e.to_string())
         })?;
@@ -345,7 +345,7 @@ impl DataStorageService for Storage {
         request: Request<RemoveTagsRequest>,
     ) -> Result<Response<RemoveTagsResponse>> {
         let RemoveTagsRequest { id, tags } = request.into_inner();
-        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
             error!("Failed to get dataset: {:?}", e);
             Status::internal(e.to_string())
         })?;
@@ -363,7 +363,7 @@ impl DataStorageService for Storage {
             description,
             favorite,
         } = request.into_inner();
-        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
             error!("Failed to get dataset: {:?}", e);
             Status::internal(e.to_string())
         })?;
@@ -383,7 +383,7 @@ impl DataStorageService for Storage {
 
     async fn delete(&self, request: Request<DeleteRequest>) -> Result<Response<DeleteResponse>> {
         let DeleteRequest { id } = request.into_inner();
-        let mut dataset = self.workspace.get_dataset(id).await.map_err(|e| {
+        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
             error!("Failed to get dataset: {:?}", e);
             Status::internal(e.to_string())
         })?;
