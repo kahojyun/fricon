@@ -1,6 +1,9 @@
 pub use crate::server::DatasetRecord;
 
-use std::path::{self, Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{array::RecordBatch, ipc::writer::StreamWriter};
@@ -35,7 +38,7 @@ pub struct Client {
 
 impl Client {
     pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path::absolute(path)?;
+        let path = fs::canonicalize(path)?;
         let workspace_paths = WorkspacePaths::new(path);
         let channel = connect_ipc_channel(workspace_paths.ipc_file()).await?;
         check_server_version(channel.clone()).await?;

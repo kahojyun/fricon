@@ -1,6 +1,9 @@
 //! Command line interface
 
-use std::path::{self, PathBuf};
+use std::{
+    fs,
+    path::{self, PathBuf},
+};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -35,7 +38,7 @@ pub async fn main(cli: Cli) -> Result<()> {
             fricon::init_workspace(path).await?;
         }
         Commands::Serve { path } => {
-            let path = path::absolute(path)?;
+            let path = fs::canonicalize(path)?;
             fricon::run_server(&path).await?;
         }
         Commands::Gui => {
