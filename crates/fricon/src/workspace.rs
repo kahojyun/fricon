@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
+use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
 use diesel::prelude::*;
 use tracing::info;
@@ -18,7 +19,11 @@ pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
     let path = path.into();
     info!("Initialize workspace: {}", path.display());
     let root = WorkspaceRoot::init(path)?;
-    database::connect(root.paths().database_file()).await?;
+    let db_path = root.paths().database_file();
+    let backup_path = root
+        .paths()
+        .database_backup_file(Local::now().naive_local());
+    database::connect(db_path, backup_path).await?;
     Ok(())
 }
 
@@ -75,7 +80,11 @@ struct Shared {
 impl Shared {
     pub async fn open(path: impl Into<PathBuf>) -> Result<Self> {
         let root = WorkspaceRoot::open(path)?;
-        let database = database::connect(root.paths().database_file()).await?;
+        let db_path = root.paths().database_file();
+        let backup_path = root
+            .paths()
+            .database_backup_file(Local::now().naive_local());
+        let database = database::connect(db_path, backup_path).await?;
         Ok(Self { root, database })
     }
 

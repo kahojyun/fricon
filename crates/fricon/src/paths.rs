@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use chrono::NaiveDateTime;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -11,13 +12,35 @@ use uuid::Uuid;
 
 const WORKSPACE_VERSION: Version = Version::new(0, 1, 0);
 
+#[derive(Debug, PartialEq)]
+pub enum VersionCheckResult {
+    Current,
+    NeedsMigration,
+}
+
+fn check_version(version: &Version) -> Result<VersionCheckResult> {
+    use std::cmp::Ordering;
+
+    match version.cmp(&WORKSPACE_VERSION) {
+        Ordering::Equal => Ok(VersionCheckResult::Current),
+        Ordering::Less => Ok(VersionCheckResult::NeedsMigration),
+        Ordering::Greater => {
+            bail!(
+                "Workspace version {} is newer than supported version {}. Please update fricon.",
+                version,
+                WORKSPACE_VERSION
+            );
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-struct Metadata {
-    version: Version,
+pub struct Metadata {
+    pub version: Version,
 }
 
 impl Metadata {
-    fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
+    pub fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();
         let file = File::create(path)
             .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
@@ -26,7 +49,7 @@ impl Metadata {
         Ok(())
     }
 
-    fn read_json(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn read_json(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let file = File::open(path).with_context(|| {
             format!("Failed to read workspace metadata from {}", path.display())
@@ -35,14 +58,6 @@ impl Metadata {
             format!("Failed to read workspace metadata from {}", path.display())
         })?;
         Ok(metadata)
-    }
-
-    fn check_version(&self) -> Result<()> {
-        // TODO: Implement version checking logic and handle version mismatch
-        if self.version != WORKSPACE_VERSION {
-            bail!("Workspace version mismatch.");
-        }
-        Ok(())
     }
 }
 
@@ -96,6 +111,17 @@ impl WorkspacePaths {
     #[must_use]
     pub fn database_file(&self) -> PathBuf {
         self.root.join("fricon.sqlite3")
+    }
+
+    /// Get a path for database file backup.
+    #[must_use]
+    pub fn database_backup_file(&self, time: NaiveDateTime) -> PathBuf {
+        let mut out = self.backup_dir();
+        out.push(format!(
+            "fricon_backup_{}.sqlite3",
+            time.format("%Y%m%d_%H%M%S")
+        ));
+        out
     }
 
     /// Get the metadata file path.
@@ -184,9 +210,17 @@ impl WorkspaceRoot {
         let paths = WorkspacePaths::new(path);
         let lock = FileLock::new(paths.lock_file())?;
         let metadata = Metadata::read_json(paths.metadata_file())?;
-        metadata.check_version()?;
+        let mut root = Self { paths, _lock: lock };
 
-        Ok(Self { paths, _lock: lock })
+        match check_version(&metadata.version)? {
+            VersionCheckResult::Current => {}
+            VersionCheckResult::NeedsMigration => {
+                tracing::info!("Workspace requires migration");
+                root.migrate_to_current(&metadata.version)?;
+            }
+        }
+
+        Ok(root)
     }
 
     /// Validate that a directory is a valid workspace without opening it.
@@ -201,7 +235,11 @@ impl WorkspaceRoot {
         }
 
         let metadata = Metadata::read_json(paths.metadata_file())?;
-        metadata.check_version()?;
+        // For validation, we only check that the version is compatible (not newer)
+        // but don't perform migrations since this is read-only validation
+        match check_version(&metadata.version)? {
+            VersionCheckResult::Current | VersionCheckResult::NeedsMigration => {}
+        }
 
         Ok(())
     }
@@ -210,6 +248,20 @@ impl WorkspaceRoot {
     #[must_use]
     pub fn paths(&self) -> &WorkspacePaths {
         &self.paths
+    }
+
+    fn migrate_to_current(&mut self, version: &Version) -> Result<()> {
+        if version < &WORKSPACE_VERSION {
+            tracing::info!(
+                "Migrating workspace from version {} to {}",
+                version,
+                WORKSPACE_VERSION
+            );
+            let mut metadata = Metadata::read_json(self.paths.metadata_file())?;
+            metadata.version = WORKSPACE_VERSION;
+            metadata.write_json(self.paths.metadata_file())?;
+        }
+        Ok(())
     }
 }
 
@@ -229,6 +281,7 @@ impl FileLock {
             .truncate(true)
             .open(&path)
             .context("Failed to open file for locking.")?;
+        // Stable Rust 1.89
         file.try_lock().context("Failed to acquire file lock.")?;
         Ok(Self { file, path })
     }
@@ -247,10 +300,26 @@ impl Drop for FileLock {
 
 #[cfg(test)]
 mod tests {
+    use chrono::NaiveDate;
     use tempfile::tempdir;
     use uuid::uuid;
 
     use super::*;
+
+    #[test]
+    fn database_backup_file_path() {
+        let paths = WorkspacePaths::new("./");
+        let time = NaiveDate::from_ymd_opt(2016, 7, 8)
+            .unwrap()
+            .and_hms_opt(9, 10, 11)
+            .unwrap();
+        let expected_path = paths
+            .backup_dir()
+            .join("fricon_backup_20160708_091011.sqlite3");
+        let actual_path = paths.database_backup_file(time);
+
+        assert_eq!(actual_path, expected_path);
+    }
 
     #[test]
     fn format_dataset_path() {

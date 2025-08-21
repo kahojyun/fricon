@@ -9,21 +9,26 @@ pub use self::{
     types::{JsonValue, SimpleUuid},
 };
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use deadpool_diesel::{
     Runtime,
     sqlite::{Hook, HookError, Manager, Pool},
 };
-use diesel::{QueryResult, SqliteConnection, connection::SimpleConnection};
+use diesel::{
+    QueryResult, RunQueryDsl, SqliteConnection, connection::SimpleConnection,
+    migration::MigrationSource, sqlite::Sqlite,
+};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use futures::FutureExt;
 use tracing::info;
 
-pub async fn connect(path: impl AsRef<Path>) -> Result<Pool> {
+pub async fn connect(path: impl AsRef<Path>, backup_path: impl Into<PathBuf>) -> Result<Pool> {
     let path = path.as_ref();
+    let backup_path = backup_path.into();
     info!("Connect to database at {}", path.display());
+
     let manager = Manager::new(path.display().to_string(), Runtime::Tokio1);
     let pool = Pool::builder(manager)
         .max_size(8)
@@ -37,21 +42,54 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<Pool> {
             .boxed()
         }))
         .build()?;
-    pool.interact(run_migrations)
+    pool.interact(move |conn| run_migrations(conn, &backup_path))
         .await
         .context("Failed to run migrations")?;
     Ok(pool)
 }
 
+fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()> {
+    info!("Creating database backup at {}", backup_path.display());
+    let backup_path_str = backup_path
+        .to_str()
+        .context("Backup path contains invalid UTF-8")?;
+    diesel::sql_query("VACUUM INTO ?")
+        .bind::<diesel::sql_types::Text, _>(backup_path_str)
+        .execute(conn)?;
+    Ok(())
+}
+
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
-fn run_migrations(conn: &mut SqliteConnection) -> Result<()> {
-    let result = conn
-        .run_pending_migrations(MIGRATIONS)
+fn run_migrations(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()> {
+    let applied_migrations = conn
+        .applied_migrations()
         .map_err(anyhow::Error::from_boxed)?;
-    for migration in result {
-        info!("Database migration {} completed", migration);
+    if applied_migrations.len()
+        > MigrationSource::<Sqlite>::migrations(&MIGRATIONS)
+            .map_err(anyhow::Error::from_boxed)?
+            .len()
+    {
+        bail!("Database has more applied migrations than expected");
     }
+
+    let has_pending = conn
+        .has_pending_migration(MIGRATIONS)
+        .map_err(anyhow::Error::from_boxed)?;
+
+    if has_pending {
+        backup_database(conn, backup_path)?;
+        info!("Running pending database migrations");
+        let result = conn
+            .run_pending_migrations(MIGRATIONS)
+            .map_err(anyhow::Error::from_boxed)?;
+        for migration in result {
+            info!("Database migration {} completed", migration);
+        }
+    } else {
+        info!("Database is up to date, no migrations needed");
+    }
+
     Ok(())
 }
 
