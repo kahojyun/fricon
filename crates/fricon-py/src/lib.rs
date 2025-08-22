@@ -822,12 +822,6 @@ pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<Data
 #[pyfunction]
 #[must_use]
 pub fn main(py: Python<'_>) -> i32 {
-    fn inner(cli: Cli) -> Result<()> {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()?
-            .block_on(async { cli::main(cli).await })
-    }
     fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
         let signal = py.import("signal")?;
         let sigint = signal.getattr("SIGINT")?;
@@ -850,7 +844,7 @@ pub fn main(py: Python<'_>) -> i32 {
             return e.exit_code();
         }
     };
-    match inner(cli) {
+    match cli::main(cli) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("Error: {e:?}");

@@ -19,6 +19,10 @@ pub enum VersionCheckResult {
     NeedsMigration,
 }
 
+pub fn get_log_dir(workspace_path: impl Into<PathBuf>) -> Result<PathBuf> {
+    Ok(WorkspaceRoot::validate(workspace_path)?.log_dir())
+}
+
 fn check_version(version: &Version) -> Result<VersionCheckResult> {
     use std::cmp::Ordering;
 
@@ -227,7 +231,7 @@ impl WorkspaceRoot {
     ///
     /// This checks for the presence of required files and validates metadata
     /// without acquiring a lock.
-    pub fn validate(path: impl Into<PathBuf>) -> Result<()> {
+    pub fn validate(path: impl Into<PathBuf>) -> Result<WorkspacePaths> {
         let paths = WorkspacePaths::new(path);
 
         if !paths.metadata_file().exists() {
@@ -241,7 +245,7 @@ impl WorkspaceRoot {
             VersionCheckResult::Current | VersionCheckResult::NeedsMigration => {}
         }
 
-        Ok(())
+        Ok(paths)
     }
 
     /// Get the paths for the current workspace.

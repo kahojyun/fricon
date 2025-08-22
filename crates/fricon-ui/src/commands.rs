@@ -36,9 +36,9 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 }
 
 #[tauri::command]
-async fn get_server_status(state: State<'_, AppState>) -> Result<ServerStatus, String> {
-    Ok(ServerStatus {
-        is_running: !state.server_handle.is_finished(),
+fn get_server_status(state: State<'_, AppState>) -> ServerStatus {
+    ServerStatus {
+        is_running: state.server_handle.lock().unwrap().is_some(),
         ipc_path: state
             .app
             .root()
@@ -46,24 +46,7 @@ async fn get_server_status(state: State<'_, AppState>) -> Result<ServerStatus, S
             .ipc_file()
             .to_string_lossy()
             .to_string(),
-    })
-}
-
-#[tauri::command]
-async fn create_dataset(
-    state: State<'_, AppState>,
-    name: String,
-    description: String,
-    tags: Vec<String>,
-    index_columns: Vec<String>,
-) -> Result<i32, String> {
-    let writer = state
-        .app
-        .create_dataset(name, description, tags, index_columns)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(writer.id())
+    }
 }
 
 #[tauri::command]
@@ -84,18 +67,6 @@ async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, S
     Ok(dataset_info)
 }
 
-#[tauri::command]
-async fn shutdown_server(state: State<'_, AppState>) -> Result<(), String> {
-    state.cancellation_token.cancel();
-    Ok(())
-}
-
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
-    tauri::generate_handler![
-        get_workspace_info,
-        get_server_status,
-        create_dataset,
-        list_datasets,
-        shutdown_server
-    ]
+    tauri::generate_handler![get_workspace_info, get_server_status, list_datasets]
 }

@@ -3,10 +3,7 @@ mod storage;
 
 pub use self::storage::DatasetRecord;
 
-use std::path::PathBuf;
-
 use anyhow::Result;
-use tokio::signal;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tonic::transport::Server;
 use tracing::info;
@@ -22,28 +19,7 @@ use crate::{
 
 use self::{fricon::Fricon, storage::Storage};
 
-pub async fn run(path: impl Into<PathBuf>) -> Result<()> {
-    let app = App::open(path).await?;
-    run_with_app(app).await
-}
-
-pub async fn run_with_app(app: App) -> Result<()> {
-    let cancellation_token = CancellationToken::new();
-
-    tokio::select! {
-        result = run_with_app_and_cancellation(app, cancellation_token.clone()) => result,
-        _ = signal::ctrl_c() => {
-            info!("Received ctrl-c signal");
-            cancellation_token.cancel();
-            Ok(())
-        }
-    }
-}
-
-pub async fn run_with_app_and_cancellation(
-    app: App,
-    cancellation_token: CancellationToken,
-) -> Result<()> {
+pub async fn run(app: App, cancellation_token: CancellationToken) -> Result<()> {
     let ipc_file = app.root().paths().ipc_file();
     let tracker = TaskTracker::new();
     let storage = Storage::new(app, tracker.clone());

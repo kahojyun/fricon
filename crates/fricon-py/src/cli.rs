@@ -7,6 +7,7 @@ use std::{
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use tokio::runtime::Runtime;
 
 #[derive(Debug, Parser)]
 pub struct Cli {
@@ -28,16 +29,16 @@ pub enum Commands {
     },
 }
 
-pub async fn main(cli: Cli) -> Result<()> {
-    tracing_subscriber::fmt::init();
+pub fn main(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Init { path } => {
+            tracing_subscriber::fmt::init();
             let path = path::absolute(path)?;
-            fricon::init_workspace(path).await?;
+            Runtime::new()?.block_on(fricon::init_workspace(path))?;
         }
         Commands::Gui { path } => {
             let path = fs::canonicalize(path)?;
-            fricon_ui::run_with_workspace(path).await?;
+            fricon_ui::run_with_workspace(path)?;
         }
     }
     Ok(())

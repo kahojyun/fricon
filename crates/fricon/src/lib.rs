@@ -11,7 +11,7 @@ mod database;
 mod dataset;
 mod ipc;
 mod proto;
-pub mod server;
+mod server;
 mod utils;
 mod workspace;
 
@@ -20,6 +20,7 @@ pub use self::{
     client::{Client, Dataset, DatasetWriter},
     dataset::Metadata as DatasetMetadata,
     server::{DatasetRecord, run as run_server},
+    workspace::get_log_dir,
 };
 
 /// Version of fricon crate.

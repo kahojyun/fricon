@@ -12,7 +12,6 @@ use crate::{
         self, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid, Tag, schema,
     },
     dataset::{self, Dataset},
-    server,
     workspace::WorkspaceRoot,
 };
 
@@ -45,10 +44,6 @@ impl App {
     #[must_use]
     pub fn database(&self) -> &Pool {
         self.0.database()
-    }
-
-    pub async fn run(self) -> Result<()> {
-        server::run_with_app(self).await
     }
 
     pub async fn create_dataset(
