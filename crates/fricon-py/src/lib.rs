@@ -6,7 +6,7 @@
     clippy::significant_drop_tightening
 )]
 
-mod cli;
+pub mod cli;
 
 use std::{
     collections::HashMap,
