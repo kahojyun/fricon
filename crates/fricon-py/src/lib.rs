@@ -6,8 +6,6 @@
     clippy::significant_drop_tightening
 )]
 
-pub mod cli;
-
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -25,8 +23,8 @@ use arrow::{
     pyarrow::PyArrowType,
 };
 use chrono::{DateTime, Utc};
-use clap::Parser;
 use fricon::{Client, DatasetMetadata, DatasetRecord};
+use fricon_cli::clap::Parser;
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
@@ -36,8 +34,6 @@ use pyo3::{
     types::{PyBool, PyComplex, PyDict, PyFloat, PyInt, PyList, PySequence, PyString},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
-
-use self::cli::Cli;
 
 #[pymodule]
 pub mod _core {
@@ -819,6 +815,10 @@ pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<Data
     PyArrowType(get_trace_type(item.0, fixed_step))
 }
 
+/// Main CLI entry point that delegates to fricon-cli binary.
+///
+/// Returns:
+///     Exit code.
 #[pyfunction]
 #[must_use]
 pub fn main(py: Python<'_>) -> i32 {
@@ -837,14 +837,8 @@ pub fn main(py: Python<'_>) -> i32 {
 
     // Skip python executable
     let argv = std::env::args_os().skip(1);
-    let cli = match Cli::try_parse_from(argv) {
-        Ok(cli) => cli,
-        Err(e) => {
-            let _ = e.print();
-            return e.exit_code();
-        }
-    };
-    match cli::main(cli) {
+    let cli = fricon_cli::Cli::parse_from(argv);
+    match fricon_cli::main(cli) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("Error: {e:?}");

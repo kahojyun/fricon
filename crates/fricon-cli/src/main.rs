@@ -3,10 +3,8 @@
 use anyhow::Result;
 use clap::Parser;
 
-use fricon_py::cli;
-
 fn main() -> Result<()> {
-    let cli = cli::Cli::parse();
+    let cli = fricon_cli::Cli::parse();
 
-    cli::main(cli)
+    fricon_cli::main(cli)
 }

@@ -53,7 +53,7 @@ docs = [
 module-name = "fricon._core"
 python-source = "crates/fricon-py/python"
 manifest-path = "crates/fricon-py/Cargo.toml"
-features = ["pyo3/extension-module", "fricon-ui/prod"]
+features = ["pyo3/extension-module", "prod"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

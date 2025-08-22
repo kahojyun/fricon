@@ -9,6 +9,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tokio::runtime::Runtime;
 
+pub use clap;
+
 #[derive(Debug, Parser)]
 pub struct Cli {
     #[command(subcommand)]

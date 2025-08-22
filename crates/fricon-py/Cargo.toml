@@ -14,12 +14,11 @@ doctest = false
 
 [dependencies]
 fricon = { path = "../fricon" }
-fricon-ui = { path = "../fricon-ui" }
+fricon-cli = { path = "../fricon-cli" }
 
 anyhow = { workspace = true }
 arrow = { workspace = true, features = ["pyarrow"] }
 chrono = { workspace = true, features = ["serde"] }
-clap = { workspace = true, features = ["derive"] }
 itertools = { workspace = true }
 ndarray = { workspace = true }
 num = { workspace = true }
@@ -32,10 +31,11 @@ pyo3 = { workspace = true, features = [
     "generate-import-lib",
 ] }
 pyo3-async-runtimes = { workspace = true, features = ["tokio-runtime"] }
-tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
-tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true
+
+[features]
+prod = ["fricon-cli/prod"]

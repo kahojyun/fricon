@@ -1605,25 +1605,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "fricon-cli"
+version = "0.1.0-alpha"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fricon",
+ "fricon-ui",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "fricon-py"
 version = "0.1.0-alpha"
 dependencies = [
  "anyhow",
  "arrow",
  "chrono",
- "clap",
  "fricon",
- "fricon-ui",
+ "fricon-cli",
  "itertools",
  "ndarray",
  "num",
  "numpy",
  "pyo3",
  "pyo3-async-runtimes",
- "tokio",
  "tokio-stream",
  "tonic",
- "tracing-subscriber",
 ]
 
 [[package]]
