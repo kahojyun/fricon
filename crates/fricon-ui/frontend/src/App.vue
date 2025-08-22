@@ -1,45 +1,38 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import DataViewer from "./DataViewer.vue";
-import {
-  getConnectionStatus,
-  selectWorkspace as selectWorkspaceFromBackend,
-} from "./backend";
-import { Button } from "primevue";
+import { getWorkspaceInfo, type WorkspaceInfo } from "./backend";
 
-enum WorkspaceStatus {
-  LOADING,
-  NO_SELECTION,
-  SELECTED,
-}
-
-const workspaceStatus = ref(WorkspaceStatus.LOADING);
+const workspaceInfo = ref<WorkspaceInfo | null>(null);
+const loading = ref(true);
+const error = ref<string | null>(null);
 
 onMounted(async () => {
-  const status = await getConnectionStatus();
-  workspaceStatus.value =
-    status === "connected"
-      ? WorkspaceStatus.SELECTED
-      : WorkspaceStatus.NO_SELECTION;
-});
-
-async function selectWorkspace() {
   try {
-    await selectWorkspaceFromBackend();
-    workspaceStatus.value = WorkspaceStatus.SELECTED;
-  } catch (error) {
-    console.error("Error selecting workspace:", error);
+    workspaceInfo.value = await getWorkspaceInfo();
+  } catch (err) {
+    error.value = `Failed to get workspace info: ${err}`;
+  } finally {
+    loading.value = false;
   }
-}
+});
 </script>
 
 <template>
-  <div v-if="workspaceStatus === WorkspaceStatus.LOADING">Loading...</div>
+  <div v-if="loading" class="flex justify-center items-center h-full">
+    <div>Loading workspace...</div>
+  </div>
   <div
-    v-else-if="workspaceStatus === WorkspaceStatus.NO_SELECTION"
+    v-else-if="error"
     class="flex flex-col gap-4 justify-center items-center h-full"
   >
-    <Button label="Select workspace folder" @click="selectWorkspace" />
+    <div class="text-red-500">{{ error }}</div>
   </div>
-  <DataViewer v-else-if="workspaceStatus === WorkspaceStatus.SELECTED" />
+  <div v-else class="h-full">
+    <div class="p-4 bg-gray-100 border-b">
+      <h1 class="text-lg font-semibold">Fricon Workspace</h1>
+      <p class="text-sm text-gray-600">{{ workspaceInfo?.path }}</p>
+    </div>
+    <DataViewer />
+  </div>
 </template>

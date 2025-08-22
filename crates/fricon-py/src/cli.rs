@@ -21,13 +21,11 @@ pub enum Commands {
         /// Path to working directory
         path: PathBuf,
     },
-    /// Start server
-    Serve {
-        /// Path to working directory
+    /// Start GUI with workspace
+    Gui {
+        /// Workspace path to open
         path: PathBuf,
     },
-    /// Start GUI
-    Gui,
 }
 
 pub async fn main(cli: Cli) -> Result<()> {
@@ -37,12 +35,9 @@ pub async fn main(cli: Cli) -> Result<()> {
             let path = path::absolute(path)?;
             fricon::init_workspace(path).await?;
         }
-        Commands::Serve { path } => {
+        Commands::Gui { path } => {
             let path = fs::canonicalize(path)?;
-            fricon::run_server(&path).await?;
-        }
-        Commands::Gui => {
-            fricon_ui::run();
+            fricon_ui::run_with_workspace(path).await?;
         }
     }
     Ok(())

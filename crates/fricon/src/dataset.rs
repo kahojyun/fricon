@@ -293,6 +293,11 @@ impl Writer {
         }
     }
 
+    #[must_use]
+    pub fn id(&self) -> i32 {
+        self.dataset.id()
+    }
+
     pub fn write(&mut self, batch: RecordBatch) -> Result<()> {
         match mem::replace(&mut self.inner, WriterState::Failed) {
             WriterState::NotStarted(file) => {

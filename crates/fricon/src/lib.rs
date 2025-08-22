@@ -11,7 +11,7 @@ mod database;
 mod dataset;
 mod ipc;
 mod proto;
-mod server;
+pub mod server;
 mod utils;
 mod workspace;
 
