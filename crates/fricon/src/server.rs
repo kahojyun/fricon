@@ -4,7 +4,7 @@ mod fricon;
 pub use self::dataset::DatasetRecord;
 
 use anyhow::Result;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 use tonic::transport::Server;
 use tracing::info;
 
@@ -20,8 +20,7 @@ use self::{dataset::Storage, fricon::Fricon};
 
 pub async fn run(app: App, cancellation_token: CancellationToken) -> Result<()> {
     let ipc_file = app.root().paths().ipc_file();
-    let tracker = TaskTracker::new();
-    let storage = Storage::new(app, tracker.clone());
+    let storage = Storage::new(app);
     let service = DatasetServiceServer::new(storage);
     let listener = ipc::listen(ipc_file)?;
 
@@ -36,7 +35,5 @@ pub async fn run(app: App, cancellation_token: CancellationToken) -> Result<()> 
         .await?;
 
     info!("Server shutdown complete");
-    tracker.close();
-    tracker.wait().await;
     Ok(())
 }

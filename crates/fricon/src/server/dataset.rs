@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::DateTime;
 use futures::prelude::*;
 use prost_types::Timestamp;
-use tokio_util::{io::SyncIoBridge, task::TaskTracker};
+use tokio_util::io::SyncIoBridge;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
 use uuid::Uuid;
@@ -26,18 +26,16 @@ use crate::{
 pub struct Storage {
     app: App,
     pending_create: PendingCreate,
-    tracker: TaskTracker,
 }
 
 #[derive(Debug, Default)]
 struct PendingCreate(Mutex<HashMap<Uuid, CreateRequest>>);
 
 impl Storage {
-    pub fn new(app: App, tracker: TaskTracker) -> Self {
+    pub fn new(app: App) -> Self {
         Self {
             app,
             pending_create: PendingCreate::default(),
-            tracker,
         }
     }
 }
@@ -238,7 +236,7 @@ impl DatasetService for Storage {
                 Status::internal(e.to_string())
             })?;
         // TODO: Check error handling
-        let writer_task = self.tracker.spawn_blocking(move || {
+        let writer_task = self.app.tracker().spawn_blocking(move || {
             let reader = StreamReader::try_new(sync_reader, None)?;
             for batch in reader {
                 let batch = match batch {

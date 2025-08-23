@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
 use diesel::prelude::*;
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::info;
 use uuid::Uuid;
 
@@ -12,6 +13,7 @@ use crate::{
         self, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid, Tag, schema,
     },
     dataset::{self, Dataset},
+    server,
     workspace::WorkspaceRoot,
 };
 
@@ -31,9 +33,23 @@ pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
 pub struct App(Arc<Shared>);
 
 impl App {
-    pub async fn open(path: impl Into<PathBuf>) -> Result<Self> {
+    pub async fn serve(path: impl Into<PathBuf>) -> Result<Self> {
         let shared = Shared::open(path).await?;
-        Ok(Self(Arc::new(shared)))
+        let app = Self(Arc::new(shared));
+        app.tracker()
+            .spawn(server::run(app.clone(), app.0.shutdown_token.clone()));
+        Ok(app)
+    }
+
+    pub async fn shutdown(&self) {
+        self.0.shutdown_token.cancel();
+        self.0.tracker.close();
+        self.0.tracker.wait().await;
+    }
+
+    #[must_use]
+    pub fn tracker(&self) -> &TaskTracker {
+        &self.0.tracker
     }
 
     #[must_use]
@@ -75,6 +91,8 @@ impl App {
 struct Shared {
     root: WorkspaceRoot,
     database: Pool,
+    shutdown_token: CancellationToken,
+    tracker: TaskTracker,
 }
 
 impl Shared {
@@ -85,7 +103,14 @@ impl Shared {
             .paths()
             .database_backup_file(Local::now().naive_local());
         let database = database::connect(db_path, backup_path).await?;
-        Ok(Self { root, database })
+        let shutdown_token = CancellationToken::new();
+        let tracker = TaskTracker::new();
+        Ok(Self {
+            root,
+            database,
+            shutdown_token,
+            tracker,
+        })
     }
 
     #[must_use]

@@ -1,74 +1,45 @@
 #![allow(clippy::needless_pass_by_value, clippy::used_underscore_binding)]
 mod commands;
 
-use std::{path::PathBuf, sync::Mutex, time::Duration};
+use std::{path::PathBuf, sync::Mutex};
 
 use anyhow::{Context as _, Result};
 use tauri::{Manager, RunEvent, async_runtime};
-use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::info;
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
 
-struct AppLifetime {
-    server_handle: JoinHandle<Result<()>>,
-    _log_guard: WorkerGuard,
-}
-
-impl AppLifetime {
-    fn shutdown(self) {
-        if let Err(e) = async_runtime::block_on(async move {
-            self.server_handle.await.context("Server task panicked")?
-        }) {
-            error!("Server returned an error: {e}");
-        }
-    }
-}
-
-fn graceful_shutdown(app: &tauri::AppHandle) {
-    let state = app.state::<AppState>();
-    // Signal server to shutdown
-    state.cancellation_token.cancel();
-    state
-        .lifetime
-        .lock()
-        .unwrap()
-        .take()
-        .expect("AppLifetime should be consumed only here.")
-        .shutdown();
-}
-
-struct AppState {
-    app: fricon::App,
-    lifetime: Mutex<Option<AppLifetime>>,
-    cancellation_token: CancellationToken,
-}
+struct AppState(Mutex<Option<(fricon::App, WorkerGuard)>>);
 
 impl AppState {
     async fn new(workspace_path: PathBuf) -> Result<Self> {
         let log_guard = setup_logging(workspace_path.clone())?;
-        let app = fricon::App::open(&workspace_path).await?;
-        let cancellation_token = CancellationToken::new();
+        let app = fricon::App::serve(&workspace_path).await?;
+        Ok(Self(Mutex::new(Some((app, log_guard)))))
+    }
 
-        // Start gRPC server in background
-        let server_app = app.clone();
-        let server_token = cancellation_token.clone();
-        let server_handle =
-            tokio::spawn(async move { fricon::run_server(server_app, server_token).await });
+    fn app(&self) -> fricon::App {
+        self.0
+            .lock()
+            .unwrap()
+            .as_ref()
+            .expect("App should be running")
+            .0
+            .clone()
+    }
 
-        let lifetime = AppLifetime {
-            server_handle,
-            _log_guard: log_guard,
-        };
-
-        Ok(Self {
-            app,
-            lifetime: Mutex::new(Some(lifetime)),
-            cancellation_token,
-        })
+    fn shutdown(&self) {
+        async_runtime::block_on(async {
+            let (app, _guard) = self
+                .0
+                .lock()
+                .unwrap()
+                .take()
+                .expect("App should be running");
+            app.shutdown().await;
+        });
     }
 }
 
@@ -80,7 +51,6 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(commands::invoke_handler())
         .manage(app_state)
-        .manage(LongDrop)
         .setup(|app| {
             install_ctrl_c_handler(app);
             Ok(())
@@ -90,7 +60,7 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
 
     tauri_app.run(|app, event| {
         if let RunEvent::Exit = event {
-            graceful_shutdown(app);
+            app.state::<AppState>().shutdown();
         }
     });
 
@@ -117,12 +87,4 @@ fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
     let (writer, guard) = tracing_appender::non_blocking(rolling);
     tracing_subscriber::fmt().json().with_writer(writer).init();
     Ok(guard)
-}
-
-struct LongDrop;
-
-impl Drop for LongDrop {
-    fn drop(&mut self) {
-        std::thread::sleep(Duration::from_secs(2));
-    }
 }
