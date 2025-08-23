@@ -1,7 +1,7 @@
+mod dataset;
 mod fricon;
-mod storage;
 
-pub use self::storage::DatasetRecord;
+pub use self::dataset::DatasetRecord;
 
 use anyhow::Result;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -12,18 +12,17 @@ use crate::{
     app::App,
     ipc,
     proto::{
-        data_storage_service_server::DataStorageServiceServer,
-        fricon_service_server::FriconServiceServer,
+        dataset_service_server::DatasetServiceServer, fricon_service_server::FriconServiceServer,
     },
 };
 
-use self::{fricon::Fricon, storage::Storage};
+use self::{dataset::Storage, fricon::Fricon};
 
 pub async fn run(app: App, cancellation_token: CancellationToken) -> Result<()> {
     let ipc_file = app.root().paths().ipc_file();
     let tracker = TaskTracker::new();
     let storage = Storage::new(app, tracker.clone());
-    let service = DataStorageServiceServer::new(storage);
+    let service = DatasetServiceServer::new(storage);
     let listener = ipc::listen(ipc_file)?;
 
     info!("Starting gRPC server");

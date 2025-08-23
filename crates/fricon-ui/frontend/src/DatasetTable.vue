@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref, type Ref } from "vue";
 import { DataTable, Column } from "primevue";
+import { listDatasets, type DatasetInfo } from "./backend";
 
-const value = ref([
-  { id: 1, name: "John Doe", age: 30 },
-  { id: 2, name: "Jane Doe", age: 25 },
-  { id: 3, name: "Bob Smith", age: 40 },
-]);
+const value: Ref<DatasetInfo[]> = ref([]);
+
+onMounted(async () => {
+  let datasets = await listDatasets();
+  value.value = datasets;
+})
 </script>
 <template>
   <DataTable :value="value" removable-sort>
     <Column field="id" header="ID" />
     <Column field="name" header="Name" />
-    <Column field="age" header="Age" sortable />
+    <Column field="description" header="Description" />
+    <Column field="tags" header="Tags" />
+    <Column field="created_at" header="Created At" sortable />
   </DataTable>
 </template>

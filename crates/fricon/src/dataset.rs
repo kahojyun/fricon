@@ -13,7 +13,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail, ensure};
-use arrow::{array::RecordBatch, error::ArrowError};
+use arrow::array::RecordBatch;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -299,25 +299,19 @@ impl Writer {
     }
 
     pub fn write(&mut self, batch: RecordBatch) -> Result<()> {
-        match mem::replace(&mut self.inner, WriterState::Failed) {
+        let mut writer = match mem::replace(&mut self.inner, WriterState::Failed) {
             WriterState::NotStarted(file) => {
-                let mut writer = BatchWriter::new(BufWriter::new(file), &batch.schema())?;
-                writer.write(batch)?;
-                self.inner = WriterState::InProgress(writer);
+                BatchWriter::new(BufWriter::new(file), &batch.schema())?
             }
-            WriterState::InProgress(mut writer) => {
-                let result = writer.write(batch);
-                if matches!(result, Err(ArrowError::SchemaError(_))) {
-                    // Allow recovery from schema errors
-                    self.inner = WriterState::InProgress(writer);
-                }
-                result?;
-            }
+            WriterState::InProgress(writer) => writer,
+
             WriterState::Failed => {
                 bail!("Writer is in a failed state.");
             }
-        }
-        Ok(())
+        };
+        let result = writer.write(batch);
+        self.inner = WriterState::InProgress(writer);
+        Ok(result?)
     }
 
     pub fn finish(self) -> Result<Dataset> {

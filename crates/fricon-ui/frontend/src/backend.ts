@@ -15,6 +15,14 @@ export interface DatasetInfo {
   name: string;
   description: string;
   tags: string[];
+  created_at: Date;
+}
+
+interface RawDatasetInfo {
+  id: number;
+  name: string;
+  description: string;
+  tags: string[];
   created_at: string;
 }
 
@@ -27,23 +35,9 @@ export async function getServerStatus(): Promise<ServerStatus> {
 }
 
 export async function listDatasets(): Promise<DatasetInfo[]> {
-  return await invoke<DatasetInfo[]>("list_datasets");
-}
-
-export async function createDataset(
-  name: string,
-  description: string,
-  tags: string[],
-  indexColumns: string[]
-): Promise<number> {
-  return await invoke<number>("create_dataset", {
-    name,
-    description,
-    tags,
-    indexColumns,
-  });
-}
-
-export async function shutdownServer(): Promise<void> {
-  await invoke("shutdown_server");
+  const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets");
+  return rawDatasets.map((dataset) => ({
+    ...dataset,
+    created_at: new Date(dataset.created_at),
+  }));
 }

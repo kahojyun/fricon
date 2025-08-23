@@ -5,7 +5,7 @@ package fricon.v1;
 import "google/protobuf/timestamp.proto";
 
 // Manage datasets.
-service DataStorageService {
+service DatasetService {
   // Create a new dataset.
   rpc Create(CreateRequest) returns (CreateResponse) {}
   // Requires a write token from Create in metadata 'fricon-token-bin'.

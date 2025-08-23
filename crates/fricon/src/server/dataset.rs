@@ -19,8 +19,7 @@ use crate::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DatasetMetadata,
         DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
         RemoveTagsResponse, SearchRequest, SearchResponse, UpdateRequest, UpdateResponse,
-        WriteRequest, WriteResponse, data_storage_service_server::DataStorageService,
-        get_request::IdEnum,
+        WriteRequest, WriteResponse, dataset_service_server::DatasetService, get_request::IdEnum,
     },
 };
 
@@ -189,7 +188,7 @@ impl TryFrom<proto::Dataset> for DatasetRecord {
 
 // TODO: Use workspace methods
 #[tonic::async_trait]
-impl DataStorageService for Storage {
+impl DatasetService for Storage {
     async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
         let request = request.into_inner();

@@ -22,16 +22,13 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-full">
     <div>Loading workspace...</div>
   </div>
-  <div
-    v-else-if="error"
-    class="flex flex-col gap-4 justify-center items-center h-full"
-  >
+  <div v-else-if="error" class="flex flex-col gap-4 justify-center items-center h-full">
     <div class="text-red-500">{{ error }}</div>
   </div>
-  <div v-else class="h-full">
-    <div class="p-4 bg-gray-100 border-b">
+  <div v-else class="h-full flex flex-col">
+    <div class="p-4">
       <h1 class="text-lg font-semibold">Fricon Workspace</h1>
-      <p class="text-sm text-gray-600">{{ workspaceInfo?.path }}</p>
+      <p class="text-sm">{{ workspaceInfo?.path }}</p>
     </div>
     <DataViewer />
   </div>

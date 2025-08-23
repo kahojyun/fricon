@@ -1,27 +1,55 @@
 #![allow(clippy::needless_pass_by_value, clippy::used_underscore_binding)]
 mod commands;
 
-use std::{path::PathBuf, sync::Mutex};
+use std::{path::PathBuf, sync::Mutex, time::Duration};
 
 use anyhow::{Context as _, Result};
 use tauri::{Manager, RunEvent, async_runtime};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::error;
+use tracing::{error, info};
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
 
+struct AppLifetime {
+    server_handle: JoinHandle<Result<()>>,
+    _log_guard: WorkerGuard,
+}
+
+impl AppLifetime {
+    fn shutdown(self) {
+        if let Err(e) = async_runtime::block_on(async move {
+            self.server_handle.await.context("Server task panicked")?
+        }) {
+            error!("Server returned an error: {e}");
+        }
+    }
+}
+
+fn graceful_shutdown(app: &tauri::AppHandle) {
+    let state = app.state::<AppState>();
+    // Signal server to shutdown
+    state.cancellation_token.cancel();
+    state
+        .lifetime
+        .lock()
+        .unwrap()
+        .take()
+        .expect("AppLifetime should be consumed only here.")
+        .shutdown();
+}
+
 struct AppState {
     app: fricon::App,
-    server_handle: Mutex<Option<JoinHandle<Result<()>>>>,
+    lifetime: Mutex<Option<AppLifetime>>,
     cancellation_token: CancellationToken,
-    log_guard: Mutex<Option<WorkerGuard>>,
 }
 
 impl AppState {
-    async fn new(workspace_path: PathBuf, log_guard: WorkerGuard) -> Result<Self> {
+    async fn new(workspace_path: PathBuf) -> Result<Self> {
+        let log_guard = setup_logging(workspace_path.clone())?;
         let app = fricon::App::open(&workspace_path).await?;
         let cancellation_token = CancellationToken::new();
 
@@ -31,53 +59,70 @@ impl AppState {
         let server_handle =
             tokio::spawn(async move { fricon::run_server(server_app, server_token).await });
 
+        let lifetime = AppLifetime {
+            server_handle,
+            _log_guard: log_guard,
+        };
+
         Ok(Self {
             app,
-            server_handle: Mutex::new(Some(server_handle)),
+            lifetime: Mutex::new(Some(lifetime)),
             cancellation_token,
-            log_guard: Mutex::new(Some(log_guard)),
         })
     }
 }
 
 pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
-    let log_dir = fricon::get_log_dir(workspace_path.clone())?;
-    let rolling = RollingFileAppender::new(Rotation::DAILY, log_dir, "fricon.log");
-    let (writer, guard) = tracing_appender::non_blocking(rolling);
-    tracing_subscriber::fmt().with_writer(writer).init();
-
-    let app_state = async_runtime::block_on(AppState::new(workspace_path, guard))
+    let app_state = async_runtime::block_on(AppState::new(workspace_path))
         .context("Failed to open workspace")?;
 
     let tauri_app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(commands::invoke_handler())
         .manage(app_state)
+        .manage(LongDrop)
+        .setup(|app| {
+            install_ctrl_c_handler(app);
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
     tauri_app.run(|app, event| {
         if let RunEvent::Exit = event {
-            let state = app.state::<AppState>();
-            // Signal server to shutdown
-            state.cancellation_token.cancel();
-            let handle = state.server_handle.lock().unwrap().take().unwrap();
-
-            let result =
-                async_runtime::block_on(
-                    async move { handle.await.context("Server task panicked")? },
-                );
-            if let Err(e) = result {
-                error!("Server returned an error: {e}");
-            }
-            let _log_guard = state.log_guard.lock().unwrap().take();
+            graceful_shutdown(app);
         }
     });
 
     Ok(())
 }
 
-pub fn run() {
-    eprintln!("Error: GUI requires workspace path. Use CLI: fricon gui <workspace_path>");
-    std::process::exit(1);
+fn install_ctrl_c_handler(app: &mut tauri::App) {
+    let app_handle = app.handle().clone();
+    async_runtime::spawn(async move {
+        match tokio::signal::ctrl_c().await {
+            Ok(()) => {
+                app_handle.exit(0);
+            }
+            Err(err) => {
+                info!("Failed to listen for Ctrl+C: {}", err);
+            }
+        }
+    });
+}
+
+fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
+    let log_dir = fricon::get_log_dir(workspace_path)?;
+    let rolling = RollingFileAppender::new(Rotation::DAILY, log_dir, "fricon.log");
+    let (writer, guard) = tracing_appender::non_blocking(rolling);
+    tracing_subscriber::fmt().json().with_writer(writer).init();
+    Ok(guard)
+}
+
+struct LongDrop;
+
+impl Drop for LongDrop {
+    fn drop(&mut self) {
+        std::thread::sleep(Duration::from_secs(2));
+    }
 }

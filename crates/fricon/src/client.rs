@@ -24,8 +24,8 @@ use crate::{
     proto::{
         self, AddTagsRequest, CreateRequest, GetRequest, RemoveTagsRequest, SearchRequest,
         UpdateRequest, VersionRequest, WriteRequest, WriteResponse,
-        data_storage_service_client::DataStorageServiceClient,
-        fricon_service_client::FriconServiceClient, get_request::IdEnum,
+        dataset_service_client::DatasetServiceClient, fricon_service_client::FriconServiceClient,
+        get_request::IdEnum,
     },
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
@@ -62,7 +62,7 @@ impl Client {
             tags,
             index_columns,
         };
-        let response = self.data_storage().create(request).await?;
+        let response = self.dataset_service().create(request).await?;
         let write_token = response.into_inner().write_token;
         Ok(DatasetWriter::new(self.clone(), write_token))
     }
@@ -78,14 +78,14 @@ impl Client {
     pub async fn list_all_datasets(&self) -> Result<Vec<DatasetRecord>> {
         // TODO: Implement pagination
         let request = SearchRequest::default();
-        let response = self.data_storage().search(request).await?;
+        let response = self.dataset_service().search(request).await?;
         let records = response.into_inner().datasets;
         records.into_iter().map(TryInto::try_into).collect()
     }
 
     async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<Dataset> {
         let request = GetRequest { id_enum: Some(id) };
-        let response = self.data_storage().get(request).await?;
+        let response = self.dataset_service().get(request).await?;
         let record = response
             .into_inner()
             .dataset
@@ -96,8 +96,8 @@ impl Client {
         })
     }
 
-    fn data_storage(&self) -> DataStorageServiceClient<Channel> {
-        DataStorageServiceClient::new(self.channel.clone())
+    fn dataset_service(&self) -> DatasetServiceClient<Channel> {
+        DatasetServiceClient::new(self.channel.clone())
     }
 }
 
@@ -146,7 +146,7 @@ impl DatasetWriter {
                 request
                     .metadata_mut()
                     .insert_bin(proto::WRITE_TOKEN_KEY, MetadataValue::from_bytes(&token));
-                let response = client.data_storage().write(request).await?;
+                let response = client.dataset_service().write(request).await?;
                 Ok(response.into_inner())
             })
         };
@@ -272,7 +272,7 @@ impl Dataset {
             id: self.record.id,
             tags,
         };
-        let _response = self.client.data_storage().add_tags(request).await?;
+        let _response = self.client.dataset_service().add_tags(request).await?;
         Ok(())
     }
 
@@ -281,7 +281,7 @@ impl Dataset {
             id: self.record.id,
             tags,
         };
-        let _response = self.client.data_storage().remove_tags(request).await?;
+        let _response = self.client.dataset_service().remove_tags(request).await?;
         Ok(())
     }
 
@@ -297,7 +297,7 @@ impl Dataset {
             description,
             favorite,
         };
-        let _response = self.client.data_storage().update(request).await?;
+        let _response = self.client.dataset_service().update(request).await?;
         Ok(())
     }
 }

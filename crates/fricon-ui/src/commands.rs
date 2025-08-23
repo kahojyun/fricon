@@ -38,7 +38,7 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 #[tauri::command]
 fn get_server_status(state: State<'_, AppState>) -> ServerStatus {
     ServerStatus {
-        is_running: state.server_handle.lock().unwrap().is_some(),
+        is_running: state.lifetime.lock().unwrap().is_some(),
         ipc_path: state
             .app
             .root()

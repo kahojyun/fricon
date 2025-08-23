@@ -21,8 +21,9 @@ tauri-plugin-opener = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json"] }
 tracing-appender = { workspace = true }
+dotenvy = "0.15.7"
 
 [lints]
 workspace = true
