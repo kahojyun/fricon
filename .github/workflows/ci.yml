@@ -141,14 +141,14 @@ jobs:
           - runner: ubuntu-24.04
             os: linux
             target: x86_64
-            args: --release --out dist --zig
+            args: --release --out dist --zig --auditwheel skip
             cflags: -isystem /usr/include
             rustflags: -L /usr/lib/x86_64-linux-gnu
           # Linux aarch64
           - runner: ubuntu-24.04-arm
             os: linux
             target: aarch64
-            args: --release --out dist --zig
+            args: --release --out dist --zig --auditwheel skip
             cflags: -isystem /usr/include
             rustflags: -L /usr/lib/aarch64-linux-gnu
           # Windows x86_64
