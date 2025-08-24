@@ -152,11 +152,6 @@ jobs:
             os: linux
             target: x86_64
             args: --release --out dist --zig
-          # Linux aarch64 using native ARM runner
-          - runner: ubuntu-24.04-arm
-            os: linux
-            target: aarch64
-            args: --release --out dist --zig
           # Windows x86_64
           - runner: windows-2022
             os: windows
