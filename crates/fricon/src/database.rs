@@ -11,7 +11,7 @@ pub use self::{
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use deadpool_diesel::{
     Runtime,
     sqlite::{Hook, HookError, Manager, Pool},
@@ -116,6 +116,9 @@ impl PoolExt for Pool {
         T: Send + 'static,
     {
         let conn = self.get().await?;
-        conn.interact(f).await.expect("Interact error")
+        conn.interact(f)
+            .await
+            .map_err(|e| anyhow!("Failed to interact with database connection: {e}"))
+            .flatten()
     }
 }
