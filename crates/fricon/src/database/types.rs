@@ -8,7 +8,7 @@ use diesel::{
     sql_types::Text,
     sqlite::Sqlite,
 };
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, FromSqlRow, AsExpression)]
@@ -53,8 +53,9 @@ where
     }
 }
 
-impl<T: DeserializeOwned, DB> FromSql<Text, DB> for JsonValue<T>
+impl<T, DB> FromSql<Text, DB> for JsonValue<T>
 where
+    T: for<'de> Deserialize<'de>,
     DB: Backend,
     String: FromSql<Text, DB>,
 {

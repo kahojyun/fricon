@@ -43,9 +43,11 @@ impl<W: Write> BatchWriter<W> {
     }
 
     fn finish_inner(&mut self) -> Result<(), ArrowError> {
-        self.flush()?;
-        self.inner.finish()?;
-        self.finished = true;
+        if !self.finished {
+            self.flush()?;
+            self.inner.finish()?;
+            self.finished = true;
+        }
         Ok(())
     }
 
@@ -62,9 +64,7 @@ impl<W: Write> BatchWriter<W> {
 
 impl<W: Write> Drop for BatchWriter<W> {
     fn drop(&mut self) {
-        if !self.finished
-            && let Err(e) = self.finish_inner()
-        {
+        if let Err(e) = self.finish_inner() {
             error!("Failed to finish arrow file writing: {}", e);
         }
     }
