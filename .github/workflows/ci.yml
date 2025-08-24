@@ -52,6 +52,18 @@ jobs:
       RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
       - uses: taiki-e/install-action@v2
@@ -86,6 +98,18 @@ jobs:
       RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
       - uses: taiki-e/install-action@v2
@@ -137,6 +161,19 @@ jobs:
               name: linux
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies (Linux)
+        if: matrix.os.name == 'linux'
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc,cargo-bundle-licenses
