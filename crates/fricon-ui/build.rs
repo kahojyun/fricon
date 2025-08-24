@@ -2,6 +2,30 @@ use std::{env, process::Command};
 
 use tauri_utils::config::FrontendDist::Directory;
 
+/// Find the pnpm executable by trying multiple possible names in order
+fn find_pnpm_executable() -> &'static str {
+    if cfg!(windows) {
+        // Try multiple pnpm executable names on Windows
+        let candidates = ["pnpm", "pnpm.cmd", "pnpm.exe"];
+
+        for candidate in candidates {
+            if Command::new(candidate)
+                .arg("--version")
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false)
+            {
+                return candidate;
+            }
+        }
+
+        // If none found, default to pnpm.cmd (most common on Windows)
+        "pnpm.cmd"
+    } else {
+        "pnpm"
+    }
+}
+
 fn main() {
     tauri_build::build();
     if !tauri_build::is_dev() {
@@ -28,7 +52,7 @@ fn main() {
                 frontend_root.join(item).display()
             );
         }
-        let pnpm = if cfg!(windows) { "pnpm.cmd" } else { "pnpm" };
+        let pnpm = find_pnpm_executable();
         Command::new(pnpm)
             .current_dir(frontend_root)
             .arg("install")
