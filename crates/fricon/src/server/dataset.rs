@@ -12,7 +12,7 @@ use tracing::{error, trace};
 use uuid::Uuid;
 
 use crate::{
-    app::App,
+    app::AppHandle,
     database::{self, DatasetUpdate},
     dataset,
     proto::{
@@ -24,7 +24,7 @@ use crate::{
 };
 
 pub struct Storage {
-    app: App,
+    app: AppHandle,
     pending_create: PendingCreate,
 }
 
@@ -32,7 +32,7 @@ pub struct Storage {
 struct PendingCreate(Mutex<HashMap<Uuid, CreateRequest>>);
 
 impl Storage {
-    pub fn new(app: App) -> Self {
+    pub fn new(app: AppHandle) -> Self {
         Self {
             app,
             pending_create: PendingCreate::default(),

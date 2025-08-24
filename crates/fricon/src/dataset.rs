@@ -22,7 +22,7 @@ use uuid::Uuid;
 
 use crate::database::{self, NewTag, Tag};
 use crate::{
-    app::App,
+    app::AppHandle,
     database::{DatasetTag, PoolExt},
 };
 
@@ -32,7 +32,7 @@ pub(crate) const DATASET_NAME: &str = "dataset.arrow";
 pub(crate) const METADATA_NAME: &str = "metadata.json";
 
 pub struct Dataset {
-    app: App,
+    app: AppHandle,
     db_row: database::Dataset,
     tags: Vec<database::Tag>,
     path: PathBuf,
@@ -40,7 +40,7 @@ pub struct Dataset {
 
 impl Dataset {
     pub fn create(
-        app: App,
+        app: AppHandle,
         dataset: database::Dataset,
         tags: Vec<database::Tag>,
     ) -> Result<Writer> {
@@ -72,7 +72,11 @@ impl Dataset {
         Ok(Writer::new(dataset_file, dataset))
     }
 
-    pub(crate) fn new(app: App, dataset: database::Dataset, tags: Vec<database::Tag>) -> Self {
+    pub(crate) fn new(
+        app: AppHandle,
+        dataset: database::Dataset,
+        tags: Vec<database::Tag>,
+    ) -> Self {
         let path = app.root().paths().dataset_path_from_uuid(dataset.uuid.0);
         Self {
             app,

@@ -16,7 +16,7 @@ mod utils;
 mod workspace;
 
 pub use self::{
-    app::{App, init as init_workspace},
+    app::{AppHandle, AppManager, init as init_workspace},
     client::{Client, Dataset, DatasetWriter},
     dataset::Metadata as DatasetMetadata,
     server::{DatasetRecord, run as run_server},

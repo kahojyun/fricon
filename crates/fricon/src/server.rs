@@ -9,7 +9,7 @@ use tonic::transport::Server;
 use tracing::info;
 
 use crate::{
-    app::App,
+    app::AppHandle,
     ipc,
     proto::{
         dataset_service_server::DatasetServiceServer, fricon_service_server::FriconServiceServer,
@@ -18,7 +18,7 @@ use crate::{
 
 use self::{dataset::Storage, fricon::Fricon};
 
-pub async fn run(app: App, cancellation_token: CancellationToken) -> Result<()> {
+pub async fn run(app: AppHandle, cancellation_token: CancellationToken) -> Result<()> {
     let ipc_file = app.root().paths().ipc_file();
     let storage = Storage::new(app);
     let service = DatasetServiceServer::new(storage);

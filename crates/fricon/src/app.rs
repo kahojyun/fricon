@@ -29,37 +29,88 @@ pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+/// `AppState` contains only data - no business logic
+/// This struct is cheaply cloneable and holds all the shared state
+/// Internal-only, not exposed in public API
 #[derive(Clone)]
-pub struct App(Arc<Shared>);
+struct AppState {
+    inner: Arc<AppStateInner>,
+}
 
-impl App {
-    pub async fn serve(path: impl Into<PathBuf>) -> Result<Self> {
-        let shared = Shared::open(path).await?;
-        let app = Self(Arc::new(shared));
-        app.tracker()
-            .spawn(server::run(app.clone(), app.0.shutdown_token.clone()));
-        Ok(app)
-    }
+struct AppStateInner {
+    root: WorkspaceRoot,
+    database: Pool,
+    shutdown_token: CancellationToken,
+    tracker: TaskTracker,
+}
 
-    pub async fn shutdown(&self) {
-        self.0.shutdown_token.cancel();
-        self.0.tracker.close();
-        self.0.tracker.wait().await;
+impl AppState {
+    async fn new(path: impl Into<PathBuf>) -> Result<Self> {
+        let root = WorkspaceRoot::open(path)?;
+        let db_path = root.paths().database_file();
+        let backup_path = root
+            .paths()
+            .database_backup_file(Local::now().naive_local());
+        let database = database::connect(db_path, backup_path).await?;
+        let shutdown_token = CancellationToken::new();
+        let tracker = TaskTracker::new();
+
+        Ok(Self {
+            inner: Arc::new(AppStateInner {
+                root,
+                database,
+                shutdown_token,
+                tracker,
+            }),
+        })
     }
 
     #[must_use]
-    pub fn tracker(&self) -> &TaskTracker {
-        &self.0.tracker
+    fn root(&self) -> &WorkspaceRoot {
+        &self.inner.root
+    }
+
+    #[must_use]
+    fn database(&self) -> &Pool {
+        &self.inner.database
+    }
+
+    #[must_use]
+    fn tracker(&self) -> &TaskTracker {
+        &self.inner.tracker
+    }
+
+    #[must_use]
+    fn shutdown_token(&self) -> &CancellationToken {
+        &self.inner.shutdown_token
+    }
+}
+
+/// `AppHandle` provides business logic methods
+/// All dataset operations are implemented here
+#[derive(Clone)]
+pub struct AppHandle {
+    state: AppState,
+}
+
+impl AppHandle {
+    fn new(state: AppState) -> Self {
+        Self { state }
     }
 
     #[must_use]
     pub fn root(&self) -> &WorkspaceRoot {
-        self.0.root()
+        self.state.root()
     }
 
     #[must_use]
     pub fn database(&self) -> &Pool {
-        self.0.database()
+        self.state.database()
+    }
+
+    #[must_use]
+    pub fn tracker(&self) -> &TaskTracker {
+        self.state.tracker()
     }
 
     pub async fn create_dataset(
@@ -69,70 +120,10 @@ impl App {
         tags: Vec<String>,
         index_columns: Vec<String>,
     ) -> Result<dataset::Writer> {
-        self.0
-            .clone()
-            .create_dataset(name, description, tags, index_columns)
-            .await
-    }
-
-    pub async fn get_dataset(&self, id: i32) -> Result<Dataset> {
-        self.0.clone().get_dataset(id).await
-    }
-
-    pub async fn get_dataset_by_uuid(&self, uuid: Uuid) -> Result<Dataset> {
-        self.0.clone().get_dataset_by_uuid(uuid).await
-    }
-
-    pub async fn list_datasets(&self) -> Result<Vec<(database::Dataset, Vec<database::Tag>)>> {
-        self.0.list_datasets().await
-    }
-}
-
-struct Shared {
-    root: WorkspaceRoot,
-    database: Pool,
-    shutdown_token: CancellationToken,
-    tracker: TaskTracker,
-}
-
-impl Shared {
-    pub async fn open(path: impl Into<PathBuf>) -> Result<Self> {
-        let root = WorkspaceRoot::open(path)?;
-        let db_path = root.paths().database_file();
-        let backup_path = root
-            .paths()
-            .database_backup_file(Local::now().naive_local());
-        let database = database::connect(db_path, backup_path).await?;
-        let shutdown_token = CancellationToken::new();
-        let tracker = TaskTracker::new();
-        Ok(Self {
-            root,
-            database,
-            shutdown_token,
-            tracker,
-        })
-    }
-
-    #[must_use]
-    pub fn root(&self) -> &WorkspaceRoot {
-        &self.root
-    }
-
-    #[must_use]
-    pub fn database(&self) -> &Pool {
-        &self.database
-    }
-
-    pub async fn create_dataset(
-        self: Arc<Self>,
-        name: String,
-        description: String,
-        tags: Vec<String>,
-        index_columns: Vec<String>,
-    ) -> Result<dataset::Writer> {
         let uuid = Uuid::new_v4();
-        let (dataset, tags) = self
-            .database
+        let state = self.state.clone();
+        let (dataset, tags) = state
+            .database()
             .interact(move |conn| {
                 conn.immediate_transaction(|conn| {
                     let new_dataset = NewDataset {
@@ -170,12 +161,51 @@ impl Shared {
             })
             .await?;
         let writer =
-            Dataset::create(App(self), dataset, tags).context("Failed to create dataset.")?;
+            Dataset::create(self.clone(), dataset, tags).context("Failed to create dataset.")?;
         Ok(writer)
     }
 
+    pub async fn get_dataset(&self, id: i32) -> Result<Dataset> {
+        let (dataset, tags) = self
+            .state
+            .database()
+            .interact(move |conn| {
+                let dataset = schema::datasets::table
+                    .find(id)
+                    .select(database::Dataset::as_select())
+                    .first(conn)?;
+                let tags = database::DatasetTag::belonging_to(&dataset)
+                    .inner_join(schema::tags::table)
+                    .select(database::Tag::as_select())
+                    .load(conn)?;
+                Ok((dataset, tags))
+            })
+            .await?;
+        Ok(Dataset::new(self.clone(), dataset, tags))
+    }
+
+    pub async fn get_dataset_by_uuid(&self, uuid: Uuid) -> Result<Dataset> {
+        let (dataset, tags) = self
+            .state
+            .database()
+            .interact(move |conn| {
+                let dataset = schema::datasets::table
+                    .filter(schema::datasets::uuid.eq(uuid.as_simple().to_string()))
+                    .select(database::Dataset::as_select())
+                    .first(conn)?;
+                let tags = database::DatasetTag::belonging_to(&dataset)
+                    .inner_join(schema::tags::table)
+                    .select(database::Tag::as_select())
+                    .load(conn)?;
+                Ok((dataset, tags))
+            })
+            .await?;
+        Ok(Dataset::new(self.clone(), dataset, tags))
+    }
+
     pub async fn list_datasets(&self) -> Result<Vec<(database::Dataset, Vec<database::Tag>)>> {
-        self.database
+        self.state
+            .database()
             .interact(|conn| {
                 let all_datasets = schema::datasets::table
                     .select(database::Dataset::as_select())
@@ -200,40 +230,36 @@ impl Shared {
             })
             .await
     }
+}
 
-    pub async fn get_dataset(self: Arc<Self>, id: i32) -> Result<Dataset> {
-        let (dataset, tags) = self
-            .database
-            .interact(move |conn| {
-                let dataset = schema::datasets::table
-                    .find(id)
-                    .select(database::Dataset::as_select())
-                    .first(conn)?;
-                let tags = database::DatasetTag::belonging_to(&dataset)
-                    .inner_join(schema::tags::table)
-                    .select(database::Tag::as_select())
-                    .load(conn)?;
-                Ok((dataset, tags))
-            })
-            .await?;
-        Ok(Dataset::new(App(self), dataset, tags))
+/// `AppManager` manages the application lifecycle
+/// Responsible for initialization, server management, and shutdown
+pub struct AppManager {
+    state: AppState,
+    handle: AppHandle,
+}
+
+impl AppManager {
+    pub async fn serve(path: impl Into<PathBuf>) -> Result<Self> {
+        let state = AppState::new(path).await?;
+        let handle = AppHandle::new(state.clone());
+
+        // Start the server
+        state
+            .tracker()
+            .spawn(server::run(handle.clone(), state.shutdown_token().clone()));
+
+        Ok(Self { state, handle })
     }
 
-    pub async fn get_dataset_by_uuid(self: Arc<Self>, uuid: Uuid) -> Result<Dataset> {
-        let (dataset, tags) = self
-            .database
-            .interact(move |conn| {
-                let dataset = schema::datasets::table
-                    .filter(schema::datasets::uuid.eq(uuid.as_simple().to_string()))
-                    .select(database::Dataset::as_select())
-                    .first(conn)?;
-                let tags = database::DatasetTag::belonging_to(&dataset)
-                    .inner_join(schema::tags::table)
-                    .select(database::Tag::as_select())
-                    .load(conn)?;
-                Ok((dataset, tags))
-            })
-            .await?;
-        Ok(Dataset::new(App(self), dataset, tags))
+    pub async fn shutdown(&self) {
+        self.state.shutdown_token().cancel();
+        self.state.tracker().close();
+        self.state.tracker().wait().await;
+    }
+
+    #[must_use]
+    pub fn handle(&self) -> &AppHandle {
+        &self.handle
     }
 }

@@ -11,34 +11,35 @@ use tracing_appender::{
     rolling::{RollingFileAppender, Rotation},
 };
 
-struct AppState(Mutex<Option<(fricon::App, WorkerGuard)>>);
+struct AppState(Mutex<Option<(fricon::AppManager, WorkerGuard)>>);
 
 impl AppState {
     async fn new(workspace_path: PathBuf) -> Result<Self> {
         let log_guard = setup_logging(workspace_path.clone())?;
-        let app = fricon::App::serve(&workspace_path).await?;
-        Ok(Self(Mutex::new(Some((app, log_guard)))))
+        let app_manager = fricon::AppManager::serve(&workspace_path).await?;
+        Ok(Self(Mutex::new(Some((app_manager, log_guard)))))
     }
 
-    fn app(&self) -> fricon::App {
+    fn app(&self) -> fricon::AppHandle {
         self.0
             .lock()
             .unwrap()
             .as_ref()
             .expect("App should be running")
             .0
+            .handle()
             .clone()
     }
 
     fn shutdown(&self) {
         async_runtime::block_on(async {
-            let (app, _guard) = self
+            let (app_manager, _guard) = self
                 .0
                 .lock()
                 .unwrap()
                 .take()
                 .expect("App should be running");
-            app.shutdown().await;
+            app_manager.shutdown().await;
         });
     }
 }
