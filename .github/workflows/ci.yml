@@ -193,8 +193,8 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
         env:
-          CFLAGS: ${{ matrix.os == 'linux' && '-isystem /usr/include' || '' }}
-          RUSTFLAGS: ${{ matrix.os == 'linux' && '-L /usr/lib64' || '' }}
+          CFLAGS: ${{ matrix.os == 'linux' && '-isystem /include' || '' }}
+          RUSTFLAGS: ${{ matrix.os == 'linux' && '-L /lib64' || '' }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
