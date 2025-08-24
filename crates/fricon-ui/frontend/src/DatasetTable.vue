@@ -6,9 +6,9 @@ import { listDatasets, type DatasetInfo } from "./backend";
 const value: Ref<DatasetInfo[]> = ref([]);
 
 onMounted(async () => {
-  let datasets = await listDatasets();
+  const datasets = await listDatasets();
   value.value = datasets;
-})
+});
 </script>
 <template>
   <DataTable :value="value" removable-sort>

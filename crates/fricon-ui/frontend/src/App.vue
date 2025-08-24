@@ -11,7 +11,7 @@ onMounted(async () => {
   try {
     workspaceInfo.value = await getWorkspaceInfo();
   } catch (err) {
-    error.value = `Failed to get workspace info: ${err}`;
+    error.value = `Failed to get workspace info: ${String(err)}`;
   } finally {
     loading.value = false;
   }
@@ -22,7 +22,10 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-full">
     <div>Loading workspace...</div>
   </div>
-  <div v-else-if="error" class="flex flex-col gap-4 justify-center items-center h-full">
+  <div
+    v-else-if="error"
+    class="flex flex-col gap-4 justify-center items-center h-full"
+  >
     <div class="text-red-500">{{ error }}</div>
   </div>
   <div v-else class="h-full flex flex-col">
