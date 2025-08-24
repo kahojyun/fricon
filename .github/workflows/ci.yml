@@ -142,27 +142,45 @@ jobs:
         run: cargo deny --workspace --all-features check
 
   build:
-    runs-on: ${{ matrix.os.runner }}
+    runs-on: ${{ matrix.runner }}
     needs: [fmt]
     strategy:
       matrix:
-        os:
-          - runner: ubuntu-24.04
-            name: linux
-          - runner: windows-2022
-            name: windows
-          - runner: macos-14
-            name: macos
-        target: [x86_64, aarch64]
         include:
-          - args: --release --out dist
-          - args: --release --out dist --zig
-            os:
-              name: linux
+          # Linux x86_64
+          - runner: ubuntu-24.04
+            os: linux
+            target: x86_64
+            args: --release --out dist --zig
+          # Linux aarch64 using native ARM runner
+          - runner: ubuntu-24.04-arm
+            os: linux
+            target: aarch64
+            args: --release --out dist --zig
+          # Windows x86_64
+          - runner: windows-2022
+            os: windows
+            target: x86_64
+            args: --release --out dist
+          # Windows aarch64
+          - runner: windows-2022
+            os: windows
+            target: aarch64
+            args: --release --out dist
+          # macOS x86_64
+          - runner: macos-14
+            os: macos
+            target: x86_64
+            args: --release --out dist
+          # macOS aarch64
+          - runner: macos-14
+            os: macos
+            target: aarch64
+            args: --release --out dist
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies (Linux)
-        if: matrix.os.name == 'linux'
+        if: matrix.os == 'linux'
         run: |
           sudo apt update
           sudo apt install libwebkit2gtk-4.1-dev \
@@ -197,7 +215,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os.name }}-${{ matrix.target }}
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
           path: dist
 
   sdist:
