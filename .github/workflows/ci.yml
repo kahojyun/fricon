@@ -142,26 +142,43 @@ jobs:
             os: linux
             target: x86_64
             args: --release --out dist --zig
+            cflags: -isystem /usr/include
+            rustflags: -L /usr/lib/x86_64-linux-gnu
+          # Linux aarch64
+          - runner: ubuntu-24.04-arm
+            os: linux
+            target: aarch64
+            args: --release --out dist --zig
+            cflags: -isystem /usr/include
+            rustflags: -L /usr/lib/aarch64-linux-gnu
           # Windows x86_64
           - runner: windows-2022
             os: windows
             target: x86_64
             args: --release --out dist
+            cflags: ""
+            rustflags: ""
           # Windows aarch64
           - runner: windows-2022
             os: windows
             target: aarch64
             args: --release --out dist
+            cflags: ""
+            rustflags: ""
           # macOS x86_64
           - runner: macos-14
             os: macos
             target: x86_64
             args: --release --out dist
+            cflags: ""
+            rustflags: ""
           # macOS aarch64
           - runner: macos-14
             os: macos
             target: aarch64
             args: --release --out dist
+            cflags: ""
+            rustflags: ""
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies (Linux)
@@ -193,8 +210,8 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
         env:
-          CFLAGS: ${{ matrix.os == 'linux' && '-isystem /include' || '' }}
-          RUSTFLAGS: ${{ matrix.os == 'linux' && '-L /lib64' || '' }}
+          CFLAGS: ${{ matrix.cflags }}
+          RUSTFLAGS: ${{ matrix.rustflags }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
