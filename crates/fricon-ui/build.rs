@@ -28,12 +28,13 @@ fn main() {
                 frontend_root.join(item).display()
             );
         }
-        Command::new("pnpm")
+        let pnpm = if cfg!(windows) { "pnpm.cmd" } else { "pnpm" };
+        Command::new(pnpm)
             .current_dir(frontend_root)
             .arg("install")
             .status()
             .expect("Failed to run pnpm install");
-        Command::new("pnpm")
+        Command::new(pnpm)
             .current_dir(frontend_root)
             .arg("run")
             .arg("build")
