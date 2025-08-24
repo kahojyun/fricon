@@ -2,9 +2,10 @@
 
 use anyhow::Result;
 use clap::Parser;
+use fricon_cli::Main;
 
 fn main() -> Result<()> {
     let cli = fricon_cli::Cli::parse();
 
-    fricon_cli::main(cli)
+    cli.main()
 }

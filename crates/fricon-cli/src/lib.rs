@@ -11,10 +11,15 @@ use tokio::runtime::Runtime;
 
 pub use clap;
 
+pub trait Main {
+    fn main(self) -> Result<()>;
+}
+
 #[derive(Debug, Parser)]
+#[command(version, about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Commands,
+    command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
@@ -25,25 +30,38 @@ pub enum Commands {
         path: PathBuf,
     },
     /// Start GUI with workspace
-    Gui {
-        /// Workspace path to open
-        path: PathBuf,
-    },
+    Gui(Gui),
 }
 
-pub fn main(cli: Cli) -> Result<()> {
-    match cli.command {
-        Commands::Init { path } => {
-            tracing_subscriber::fmt::init();
-            let path = path::absolute(path)?;
-            Runtime::new()?.block_on(fricon::init_workspace(path))?;
+#[derive(Debug, Parser)]
+#[command(version, about, long_about = None)]
+pub struct Gui {
+    /// Workspace path to open
+    path: PathBuf,
+}
+
+impl Main for Cli {
+    fn main(self) -> Result<()> {
+        match self.command {
+            Commands::Init { path } => {
+                tracing_subscriber::fmt::init();
+                let path = path::absolute(path)?;
+                Runtime::new()?.block_on(fricon::init_workspace(path))?;
+            }
+            Commands::Gui(gui) => {
+                gui.main()?;
+            }
         }
-        Commands::Gui { path } => {
-            let path = fs::canonicalize(path)?;
-            fricon_ui::run_with_workspace(path)?;
-        }
+        Ok(())
     }
-    Ok(())
+}
+
+impl Main for Gui {
+    fn main(self) -> Result<()> {
+        let path = fs::canonicalize(self.path)?;
+        fricon_ui::run_with_workspace(path)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -54,6 +72,7 @@ mod tests {
 
     #[test]
     fn cli() {
+        Gui::command().debug_assert();
         Cli::command().debug_assert();
     }
 }

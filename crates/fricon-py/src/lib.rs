@@ -24,7 +24,6 @@ use arrow::{
 };
 use chrono::{DateTime, Utc};
 use fricon::{Client, DatasetMetadata, DatasetRecord};
-use fricon_cli::clap::Parser;
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
@@ -39,7 +38,8 @@ use pyo3_async_runtimes::tokio::get_runtime;
 pub mod _core {
     #[pymodule_export]
     pub use super::{
-        Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, main, trace_,
+        Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, main, main_gui,
+        trace_,
     };
 }
 
@@ -815,13 +815,7 @@ pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<Data
     PyArrowType(get_trace_type(item.0, fixed_step))
 }
 
-/// Main CLI entry point that delegates to fricon-cli binary.
-///
-/// Returns:
-///     Exit code.
-#[pyfunction]
-#[must_use]
-pub fn main(py: Python<'_>) -> i32 {
+pub fn main_impl<T: fricon_cli::clap::Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
     fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
         let signal = py.import("signal")?;
         let sigint = signal.getattr("SIGINT")?;
@@ -837,12 +831,32 @@ pub fn main(py: Python<'_>) -> i32 {
 
     // Skip python executable
     let argv = std::env::args_os().skip(1);
-    let cli = fricon_cli::Cli::parse_from(argv);
-    match fricon_cli::main(cli) {
+    let cli = T::parse_from(argv);
+    match cli.main() {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("Error: {e:?}");
             1
         }
     }
+}
+
+/// Main CLI entry point that delegates to fricon-cli binary.
+///
+/// Returns:
+///     Exit code.
+#[pyfunction]
+#[must_use]
+pub fn main(py: Python<'_>) -> i32 {
+    main_impl::<fricon_cli::Cli>(py)
+}
+
+/// GUI only CLI entry point.
+///
+/// Returns:
+///     Exit code.
+#[pyfunction]
+#[must_use]
+pub fn main_gui(py: Python<'_>) -> i32 {
+    main_impl::<fricon_cli::Gui>(py)
 }

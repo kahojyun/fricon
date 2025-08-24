@@ -31,6 +31,9 @@ Source = "https://github.com/kahojyun/fricon"
 [project.scripts]
 fricon = "fricon._core:main"
 
+[project.gui-scripts]
+fricon-gui = "fricon._core:main_gui"
+
 [dependency-groups]
 dev = [
     "ipykernel>=6.29.5",
