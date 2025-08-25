@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/fricon", "crates/fricon-py", "crates/fricon-ui", "crates/fricon-cli"]
+members = [
+    "crates/fricon",
+    "crates/fricon-py",
+    "crates/fricon-ui",
+    "crates/fricon-cli",
+]
 resolver = "3"
 
 [workspace.package]
@@ -21,6 +26,7 @@ clap = "4.5.26"
 deadpool-diesel = "0.6.1"
 diesel = "2.2.12"
 diesel_migrations = "2.2.0"
+dotenvy = "0.15.7"
 futures = "0.3.31"
 hyper-util = "0.1.10"
 itertools = "0.14.0"
@@ -35,7 +41,6 @@ pyo3-async-runtimes = "0.25.0"
 semver = "1.0.25"
 serde = "1.0.217"
 serde_json = "1.0.137"
-
 tauri = "2"
 tauri-build = "2"
 tauri-plugin-opener = "2"
