@@ -11,7 +11,7 @@ use diesel::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, FromSqlRow, AsExpression)]
+#[derive(Debug, Clone, FromSqlRow, AsExpression)]
 #[diesel(sql_type = Text)]
 pub struct SimpleUuid(pub Uuid);
 
@@ -41,6 +41,12 @@ where
 #[derive(Debug, FromSqlRow, AsExpression)]
 #[diesel(sql_type = Text)]
 pub struct JsonValue<T>(pub T);
+
+impl<T: Clone> Clone for JsonValue<T> {
+    fn clone(&self) -> Self {
+        JsonValue(self.0.clone())
+    }
+}
 
 impl<T: Serialize + fmt::Debug> ToSql<Text, Sqlite> for JsonValue<T>
 where

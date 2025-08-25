@@ -3,7 +3,7 @@ use diesel::{prelude::*, sqlite::Sqlite};
 
 use super::{JsonValue, SimpleUuid, schema};
 
-#[derive(Debug, Queryable, Selectable, Identifiable)]
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = schema::datasets, check_for_backend(Sqlite))]
 pub struct Dataset {
     pub id: i32,
@@ -32,7 +32,7 @@ pub struct NewDataset<'a> {
     pub index_columns: JsonValue<&'a [String]>,
 }
 
-#[derive(Debug, Queryable, Selectable, Identifiable)]
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = schema::tags, check_for_backend(Sqlite))]
 pub struct Tag {
     pub id: i32,

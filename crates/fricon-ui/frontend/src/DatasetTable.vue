@@ -1,13 +1,45 @@
 <script setup lang="ts">
-import { onMounted, ref, type Ref } from "vue";
+import { onMounted, onUnmounted, ref, type Ref } from "vue";
 import { DataTable, Column } from "primevue";
-import { listDatasets, type DatasetInfo } from "./backend";
+import {
+  listDatasets,
+  onDatasetCreated,
+  type DatasetInfo,
+  type DatasetCreatedEvent,
+} from "./backend";
 
 const value: Ref<DatasetInfo[]> = ref([]);
 
-onMounted(async () => {
+let unsubscribe: (() => void) | null = null;
+
+const loadDatasets = async () => {
   const datasets = await listDatasets();
   value.value = datasets;
+};
+
+const handleDatasetCreated = (event: DatasetCreatedEvent) => {
+  // Add the new dataset to the list
+  const newDataset: DatasetInfo = {
+    id: event.id,
+    name: event.name,
+    description: event.description,
+    tags: event.tags,
+    created_at: new Date(),
+  };
+  value.value.unshift(newDataset);
+};
+
+onMounted(async () => {
+  await loadDatasets();
+
+  // Listen for dataset created events
+  unsubscribe = await onDatasetCreated(handleDatasetCreated);
+});
+
+onUnmounted(() => {
+  if (unsubscribe) {
+    unsubscribe();
+  }
 });
 </script>
 <template>

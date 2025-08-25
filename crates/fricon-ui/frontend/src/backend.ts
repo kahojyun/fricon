@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export interface WorkspaceInfo {
   path: string;
@@ -40,4 +41,20 @@ export async function listDatasets(): Promise<DatasetInfo[]> {
     ...dataset,
     created_at: new Date(dataset.created_at),
   }));
+}
+
+export interface DatasetCreatedEvent {
+  id: number;
+  uuid: string;
+  name: string;
+  description: string;
+  tags: string[];
+}
+
+export function onDatasetCreated(
+  callback: (event: DatasetCreatedEvent) => void,
+) {
+  return listen<DatasetCreatedEvent>("dataset-created", (event) => {
+    callback(event.payload);
+  });
 }

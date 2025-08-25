@@ -4,6 +4,8 @@ use anyhow::{Context, Result};
 use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
 use diesel::prelude::*;
+use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::info;
 use uuid::Uuid;
@@ -29,6 +31,17 @@ pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AppEvent {
+    DatasetCreated {
+        id: i32,
+        uuid: String,
+        name: String,
+        description: String,
+        tags: Vec<String>,
+    },
+}
+
 /// `AppState` contains only data - no business logic
 /// This struct is cheaply cloneable and holds all the shared state
 /// Internal-only, not exposed in public API
@@ -42,6 +55,7 @@ struct AppStateInner {
     database: Pool,
     shutdown_token: CancellationToken,
     tracker: TaskTracker,
+    event_sender: broadcast::Sender<AppEvent>,
 }
 
 impl AppState {
@@ -54,6 +68,7 @@ impl AppState {
         let database = database::connect(db_path, backup_path).await?;
         let shutdown_token = CancellationToken::new();
         let tracker = TaskTracker::new();
+        let (event_sender, _) = broadcast::channel(1000);
 
         Ok(Self {
             inner: Arc::new(AppStateInner {
@@ -61,6 +76,7 @@ impl AppState {
                 database,
                 shutdown_token,
                 tracker,
+                event_sender,
             }),
         })
     }
@@ -83,6 +99,15 @@ impl AppState {
     #[must_use]
     fn shutdown_token(&self) -> &CancellationToken {
         &self.inner.shutdown_token
+    }
+
+    #[must_use]
+    fn event_sender(&self) -> &broadcast::Sender<AppEvent> {
+        &self.inner.event_sender
+    }
+
+    fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
+        self.inner.event_sender.subscribe()
     }
 }
 
@@ -111,6 +136,11 @@ impl AppHandle {
     #[must_use]
     pub fn tracker(&self) -> &TaskTracker {
         self.state.tracker()
+    }
+
+    #[must_use]
+    pub fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
+        self.state.subscribe_to_events()
     }
 
     pub async fn create_dataset(
@@ -160,8 +190,19 @@ impl AppHandle {
                 })
             })
             .await?;
-        let writer =
-            Dataset::create(self.clone(), dataset, tags).context("Failed to create dataset.")?;
+        let writer = Dataset::create(self.clone(), dataset.clone(), tags.clone())
+            .context("Failed to create dataset.")?;
+
+        // Send event notification
+        let event = AppEvent::DatasetCreated {
+            id: dataset.id,
+            uuid: dataset.uuid.0.simple().to_string(),
+            name: dataset.name.clone(),
+            description: dataset.description.clone(),
+            tags: tags.into_iter().map(|t| t.name).collect(),
+        };
+        let _ = self.state.event_sender().send(event);
+
         Ok(writer)
     }
 
@@ -208,6 +249,7 @@ impl AppHandle {
             .database()
             .interact(|conn| {
                 let all_datasets = schema::datasets::table
+                    .order(schema::datasets::id.desc())
                     .select(database::Dataset::as_select())
                     .load(conn)?;
 
@@ -223,7 +265,12 @@ impl AppHandle {
                     .grouped_by(&all_datasets)
                     .into_iter()
                     .zip(all_datasets)
-                    .map(|(dt, dataset)| (dataset, dt.into_iter().map(|(_, tag)| tag).collect()))
+                    .map(|(dataset_tags, dataset)| {
+                        (
+                            dataset,
+                            dataset_tags.into_iter().map(|(_, tag)| tag).collect(),
+                        )
+                    })
                     .collect();
 
                 Ok(datasets_with_tags)
