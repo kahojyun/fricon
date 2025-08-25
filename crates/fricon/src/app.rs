@@ -12,7 +12,8 @@ use uuid::Uuid;
 
 use crate::{
     database::{
-        self, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid, Tag, schema,
+        self, DatasetStatus, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid,
+        Tag, schema,
     },
     dataset::{self, Dataset},
     server,
@@ -160,6 +161,7 @@ impl AppHandle {
                         uuid: SimpleUuid(uuid),
                         name: &name,
                         description: &description,
+                        status: DatasetStatus::Pending,
                         index_columns: JsonValue(&index_columns),
                     };
                     let dataset = diesel::insert_into(schema::datasets::table)

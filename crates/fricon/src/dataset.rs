@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
 
-use crate::database::{self, NewTag, Tag};
+use crate::database::{self, DatasetStatus, NewTag, Tag};
 use crate::{
     app::AppHandle,
     database::{DatasetTag, PoolExt},
@@ -70,6 +70,25 @@ impl Dataset {
         let metadata_path = dataset.metadata_file();
         metadata.save(&metadata_path)?;
         Ok(Writer::new(dataset_file, dataset))
+    }
+
+    pub async fn set_status(&mut self, status: DatasetStatus) -> Result<()> {
+        let dataset_id = self.db_row.id;
+
+        self.db_row = self
+            .app
+            .database()
+            .interact(move |conn| {
+                use database::schema::datasets::dsl::datasets;
+
+                diesel::update(datasets.find(dataset_id))
+                    .set(database::schema::datasets::status.eq(&status))
+                    .get_result::<database::Dataset>(conn)
+                    .context("Failed to update dataset status in database")
+            })
+            .await?;
+
+        Ok(())
     }
 
     pub(crate) fn new(
@@ -248,6 +267,11 @@ impl Dataset {
     pub const fn id(&self) -> i32 {
         self.db_row.id
     }
+
+    #[must_use]
+    pub fn status(&self) -> DatasetStatus {
+        self.db_row.status
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -256,6 +280,7 @@ pub struct Metadata {
     pub name: String,
     pub description: String,
     pub favorite: bool,
+    pub status: DatasetStatus,
     pub index_columns: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub tags: Vec<String>,
@@ -270,6 +295,7 @@ impl Metadata {
             name: dataset.name.clone(),
             description: dataset.description.clone(),
             favorite: dataset.favorite,
+            status: dataset.status,
             index_columns: dataset.index_columns.0.clone(),
             created_at: dataset.created_at.and_utc(),
             tags: tag_names,

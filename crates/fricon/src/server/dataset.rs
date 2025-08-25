@@ -4,12 +4,15 @@ use anyhow::{Context, bail};
 use arrow::ipc::reader::StreamReader;
 use bytes::Bytes;
 use chrono::DateTime;
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use futures::prelude::*;
 use prost_types::Timestamp;
 use tokio_util::io::SyncIoBridge;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
 use uuid::Uuid;
+
+use crate::database::{DatasetStatus, PoolExt};
 
 use crate::{
     app::AppHandle,
@@ -52,6 +55,33 @@ impl PendingCreate {
     }
 }
 
+/// Convert from Rust `DatasetStatus` to protobuf `DatasetStatus`
+impl From<DatasetStatus> for proto::DatasetStatus {
+    fn from(status: DatasetStatus) -> Self {
+        match status {
+            DatasetStatus::Pending => proto::DatasetStatus::Pending,
+            DatasetStatus::Writing => proto::DatasetStatus::Writing,
+            DatasetStatus::Completed => proto::DatasetStatus::Completed,
+            DatasetStatus::Aborted => proto::DatasetStatus::Aborted,
+        }
+    }
+}
+
+/// Convert from protobuf `DatasetStatus` to Rust `DatasetStatus`
+impl TryFrom<proto::DatasetStatus> for DatasetStatus {
+    type Error = anyhow::Error;
+
+    fn try_from(status: proto::DatasetStatus) -> Result<Self, Self::Error> {
+        match status {
+            proto::DatasetStatus::Unspecified => bail!("Cannot convert unspecified dataset status"),
+            proto::DatasetStatus::Pending => Ok(DatasetStatus::Pending),
+            proto::DatasetStatus::Writing => Ok(DatasetStatus::Writing),
+            proto::DatasetStatus::Completed => Ok(DatasetStatus::Completed),
+            proto::DatasetStatus::Aborted => Ok(DatasetStatus::Aborted),
+        }
+    }
+}
+
 impl From<dataset::Metadata> for proto::DatasetMetadata {
     fn from(
         dataset::Metadata {
@@ -59,6 +89,7 @@ impl From<dataset::Metadata> for proto::DatasetMetadata {
             name,
             description,
             favorite,
+            status,
             index_columns,
             created_at,
             tags,
@@ -77,6 +108,7 @@ impl From<dataset::Metadata> for proto::DatasetMetadata {
             index_columns,
             created_at: Some(created_at),
             tags,
+            status: proto::DatasetStatus::from(status) as i32,
         }
     }
 }
@@ -93,6 +125,7 @@ impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
             index_columns,
             created_at,
             tags,
+            status,
         }: proto::DatasetMetadata,
     ) -> Result<Self, Self::Error> {
         let uuid = uuid.parse()?;
@@ -105,11 +138,15 @@ impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
             created_at.nanos as u32
         };
         let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
+        let proto_status =
+            proto::DatasetStatus::try_from(status).context("Invalid dataset status")?;
+        let status = DatasetStatus::try_from(proto_status)?;
         Ok(Self {
             uuid,
             name,
             description,
             favorite,
+            status,
             index_columns,
             created_at,
             tags,
@@ -132,6 +169,7 @@ impl From<(database::Dataset, Vec<database::Tag>)> for DatasetRecord {
                 name,
                 description,
                 favorite,
+                status,
                 index_columns,
                 created_at,
             },
@@ -145,6 +183,7 @@ impl From<(database::Dataset, Vec<database::Tag>)> for DatasetRecord {
                 name,
                 description,
                 favorite,
+                status,
                 index_columns: index_columns.0,
                 created_at: created_at.and_utc(),
                 tags: tags.into_iter().map(|tag| tag.name).collect(),
@@ -235,6 +274,19 @@ impl DatasetService for Storage {
                 error!("Failed to create dataset: {:?}", e);
                 Status::internal(e.to_string())
             })?;
+        // Update status to Writing before starting
+        let dataset_id = writer.id();
+        let app_clone = self.app.clone();
+        let _ = app_clone
+            .database()
+            .interact(move |conn| {
+                use crate::database::schema::datasets::dsl::datasets;
+                Ok(diesel::update(datasets.find(dataset_id))
+                    .set(crate::database::schema::datasets::status.eq("writing"))
+                    .execute(conn))
+            })
+            .await;
+
         // TODO: Check error handling
         let writer_task = self.app.tracker().spawn_blocking(move || {
             let reader = StreamReader::try_new(sync_reader, None)?;
@@ -253,16 +305,43 @@ impl DatasetService for Storage {
             }
             writer.finish()
         });
-        let dataset = writer_task
-            .await
-            .map_err(|e| {
-                error!("writer task panicked: {:?}", e);
-                Status::internal(e.to_string())
-            })?
-            .map_err(|e| {
+        let result = writer_task.await.map_err(|e| {
+            error!("writer task panicked: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+
+        let dataset = match result {
+            Ok(dataset) => {
+                // Update status to Completed on success
+                let dataset_id = dataset.id();
+                let app_clone = self.app.clone();
+                let _ = app_clone
+                    .database()
+                    .interact(move |conn| {
+                        use crate::database::schema::datasets::dsl::datasets;
+                        Ok(diesel::update(datasets.find(dataset_id))
+                            .set(crate::database::schema::datasets::status.eq("completed"))
+                            .execute(conn))
+                    })
+                    .await;
+                dataset
+            }
+            Err(e) => {
+                // Update status to Aborted on failure
+                let app_clone = self.app.clone();
+                let _ = app_clone
+                    .database()
+                    .interact(move |conn| {
+                        use crate::database::schema::datasets::dsl::datasets;
+                        Ok(diesel::update(datasets.find(dataset_id))
+                            .set(crate::database::schema::datasets::status.eq("aborted"))
+                            .execute(conn))
+                    })
+                    .await;
                 error!("write failed: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
+                return Err(Status::internal(e.to_string()));
+            }
+        };
         let record = DatasetRecord::from(dataset);
         Ok(Response::new(WriteResponse {
             dataset: Some(record.into()),
@@ -369,6 +448,7 @@ impl DatasetService for Storage {
                 name,
                 description,
                 favorite,
+                status: None,
             })
             .await
             .map_err(|e| {

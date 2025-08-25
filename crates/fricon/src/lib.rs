@@ -18,6 +18,7 @@ mod workspace;
 pub use self::{
     app::{AppEvent, AppHandle, AppManager, init as init_workspace},
     client::{Client, Dataset, DatasetWriter},
+    database::DatasetStatus,
     dataset::Metadata as DatasetMetadata,
     server::{DatasetRecord, run as run_server},
     workspace::get_log_dir,

@@ -8,7 +8,7 @@ import polars as pl
 import pyarrow as pa
 from _typeshed import StrPath
 from numpy import float64
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Literal, Self, TypeAlias
 
 __all__ = [
     "Dataset",
@@ -124,3 +124,5 @@ class Dataset:
     def created_at(self) -> datetime: ...
     @property
     def index_columns(self) -> list[str]: ...
+    @property
+    def status(self) -> Literal["pending", "writing", "completed", "aborted"]: ...

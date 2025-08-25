@@ -267,6 +267,11 @@ impl Dataset {
         &self.record.metadata.index_columns
     }
 
+    #[must_use]
+    pub fn status(&self) -> crate::database::DatasetStatus {
+        self.record.metadata.status
+    }
+
     pub async fn add_tags(&self, tags: Vec<String>) -> Result<()> {
         let request = AddTagsRequest {
             id: self.record.id,

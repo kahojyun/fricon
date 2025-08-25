@@ -6,7 +6,7 @@ mod types;
 
 pub use self::{
     models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, NewTag, Tag},
-    types::{JsonValue, SimpleUuid},
+    types::{DatasetStatus, JsonValue, SimpleUuid},
 };
 
 use std::path::{Path, PathBuf};
