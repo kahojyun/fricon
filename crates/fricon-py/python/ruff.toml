@@ -1,0 +1,17 @@
+[lint]
+select = ["ALL"]
+ignore = [
+    # Conflict with formatter
+    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "COM812", # missing-trailing-comma
+    # Not applicable
+    "PLC0414", # useless-import-alias
+    "TD002",   # Missing author in TODO
+    "TD003",   # Missing issue link for this TODO
+    "FIX",     # allow TODO
+]
+[lint.pydocstyle]
+convention = "google"
+[lint.isort]
+known-first-party = ["fricon"]
+required-imports = ["from __future__ import annotations"]

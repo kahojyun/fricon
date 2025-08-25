@@ -1,0 +1,36 @@
+[package]
+name = "fricon-ui"
+publish = false
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+[dependencies]
+fricon = { path = "../fricon" }
+
+anyhow = { workspace = true }
+chrono = { workspace = true }
+dotenvy = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true, features = ["tray-icon"] }
+tauri-plugin-opener = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json", "env-filter"] }
+tracing-appender = { workspace = true }
+
+[lints]
+workspace = true
+
+[build-dependencies]
+tauri-build = { workspace = true }
+tauri-utils = { workspace = true }
+
+[features]
+prod = ["tauri/custom-protocol"]

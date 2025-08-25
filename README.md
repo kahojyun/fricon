@@ -1,6 +1,6 @@
 # fricon
 
-10 mK fridge controller.
+Data collection automation framework.
 
 ## Documentation
 
@@ -10,43 +10,18 @@
 
 ### Requirements
 
-* Stable Rust toolchain
-* Protobuf compiler:
-
-  ```console
-  brew install protobuf # Mac
-  pacman -S protobuf # Arch
-  scoop install protobuf # Windows
-  ```
-
-* Sqlite3
-* sqlx-cli
-
-  ```console
-  brew install sqlx-cli # Mac
-  pacman -S sqlx-cli # Arch
-  cargo install sqlx-cli
-  ```
+- Stable Rust toolchain
+- Node.js 22+
+- Protobuf compiler
+- Sqlite3
+- diesel_cli
+- `uv` and `pnpm`
 
 ### Local setup
 
-* `.env` file
-
-  ```env
-  DATABASE_URL=sqlite://.dev/testdb.sqlite3
-  ```
-
-* Local `.dev` folder should be ignored
-
-  ```gitignore
-  *
-  ```
-
-* Setup development database
-
-  ```console
-  sqlx db setup
-  ```
+```console
+python3 scripts/setup-dev.py
+```
 
 ## License
 

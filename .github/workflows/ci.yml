@@ -23,6 +23,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Ruff format
@@ -31,6 +40,8 @@ jobs:
         run: uv run --only-group fmt ruff check --output-format=github
       - name: Cargo fmt
         run: cargo fmt --all --check
+      - name: Frontend check
+        run: pnpm run check
 
   test-python:
     name: Test Python
@@ -41,11 +52,25 @@ jobs:
       RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Sync project
@@ -55,9 +80,8 @@ jobs:
       - name: Basedpyright
         run: uv run basedpyright
       - name: Stubtest
-        run: uv run stubtest fricon
+        run: uv run stubtest fricon._core
       - name: Build docs
-        working-directory: python
         run: uv run --group docs mkdocs build -s -v
 
   test-rust:
@@ -69,11 +93,25 @@ jobs:
       RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
       - name: Cargo build
         run: cargo build --workspace --verbose --locked
       - name: Cargo test
@@ -94,31 +132,76 @@ jobs:
         run: cargo deny --workspace --all-features check
 
   build:
-    runs-on: ${{ matrix.os.runner }}
+    runs-on: ${{ matrix.runner }}
     needs: [fmt]
     strategy:
       matrix:
-        os:
-          - runner: ubuntu-24.04
-            name: linux
-          - runner: windows-2022
-            name: windows
-          - runner: macos-14
-            name: macos
-        target: [x86_64, aarch64]
         include:
-          - args: --release --out dist
-          - args: --release --out dist --zig
-            os:
-              name: linux
+          # Linux x86_64
+          - runner: ubuntu-24.04
+            os: linux
+            target: x86_64
+            args: --release --out dist --zig --auditwheel skip
+            cflags: -isystem /usr/include
+            rustflags: -L /usr/lib/x86_64-linux-gnu
+          # Linux aarch64
+          - runner: ubuntu-24.04-arm
+            os: linux
+            target: aarch64
+            args: --release --out dist --zig --auditwheel skip
+            cflags: -isystem /usr/include
+            rustflags: -L /usr/lib/aarch64-linux-gnu
+          # Windows x86_64
+          - runner: windows-2022
+            os: windows
+            target: x86_64
+            args: --release --out dist
+            cflags: ""
+            rustflags: ""
+          # Windows aarch64
+          - runner: windows-2022
+            os: windows
+            target: aarch64
+            args: --release --out dist
+            cflags: ""
+            rustflags: ""
+          # macOS x86_64
+          - runner: macos-14
+            os: macos
+            target: x86_64
+            args: --release --out dist
+            cflags: ""
+            rustflags: ""
+          # macOS aarch64
+          - runner: macos-14
+            os: macos
+            target: aarch64
+            args: --release --out dist
+            cflags: ""
+            rustflags: ""
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc,cargo-bundle-licenses
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
       - name: Bundle licenses
-        run: cargo bundle-licenses --format toml --output ../LICENSES-THIRDPARTY.toml
-        working-directory: fricon-py
+        run: cargo bundle-licenses --format toml --output ${{ github.workspace }}/LICENSES-THIRDPARTY.toml
+        working-directory: crates/fricon-py
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -126,10 +209,13 @@ jobs:
           args: ${{ matrix.args }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
+        env:
+          CFLAGS: ${{ matrix.cflags }}
+          RUSTFLAGS: ${{ matrix.rustflags }}
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os.name }}-${{ matrix.target }}
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
           path: dist
 
   sdist:
@@ -141,8 +227,8 @@ jobs:
         with:
           tool: cargo-bundle-licenses
       - name: Bundle licenses
-        run: cargo bundle-licenses --format toml --output ../LICENSES-THIRDPARTY.toml
-        working-directory: fricon-py
+        run: cargo bundle-licenses --format toml --output ${{ github.workspace }}/LICENSES-THIRDPARTY.toml
+        working-directory: crates/fricon-py
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:

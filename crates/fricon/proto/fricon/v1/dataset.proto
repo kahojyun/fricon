@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package fricon.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Manage datasets.
+service DatasetService {
+  // Create a new dataset.
+  rpc Create(CreateRequest) returns (CreateResponse) {}
+  // Requires a write token from Create in metadata 'fricon-token-bin'.
+  rpc Write(stream WriteRequest) returns (WriteResponse) {}
+  // Get a dataset in the workspace.
+  rpc Get(GetRequest) returns (GetResponse) {}
+  // Add tags to a dataset.
+  rpc AddTags(AddTagsRequest) returns (AddTagsResponse) {}
+  // Remove tags from a dataset.
+  rpc RemoveTags(RemoveTagsRequest) returns (RemoveTagsResponse) {}
+  // Update metadata of a dataset.
+  rpc Update(UpdateRequest) returns (UpdateResponse) {}
+  // Delete a dataset.
+  rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+  // List datasets in the workspace.
+  rpc Search(SearchRequest) returns (SearchResponse) {}
+}
+
+message CreateRequest {
+  string name = 1;
+  string description = 2;
+  repeated string tags = 3;
+  repeated string index_columns = 4;
+}
+
+message CreateResponse {
+  bytes write_token = 1;
+}
+
+message WriteRequest {
+  bytes chunk = 1;
+}
+
+message WriteResponse {
+  Dataset dataset = 1;
+}
+
+message GetRequest {
+  oneof id_enum {
+    int32 id = 1;
+    string uuid = 2;
+  }
+}
+
+message GetResponse {
+  Dataset dataset = 1;
+}
+
+message AddTagsRequest {
+  int32 id = 1;
+  repeated string tags = 2;
+}
+
+message AddTagsResponse {}
+
+message RemoveTagsRequest {
+  int32 id = 1;
+  repeated string tags = 2;
+}
+
+message RemoveTagsResponse {}
+
+message UpdateRequest {
+  int32 id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional bool favorite = 4;
+}
+
+message UpdateResponse {}
+
+message DeleteRequest {
+  int32 id = 1;
+}
+
+message DeleteResponse {}
+
+message SearchRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message SearchResponse {
+  repeated Dataset datasets = 1;
+  string next_page_token = 2;
+}
+
+message Dataset {
+  int32 id = 1;
+  DatasetMetadata metadata = 2;
+}
+
+message DatasetMetadata {
+  string uuid = 1;
+  string name = 2;
+  string description = 3;
+  bool favorite = 4;
+  repeated string index_columns = 5;
+  google.protobuf.Timestamp created_at = 6;
+  repeated string tags = 7;
+}

@@ -4,7 +4,9 @@
 # Development environment variables
 .env
 
-# Lazy.nvim local config
+# Editors
+.vscode/
+.idea/
 .lazy.lua
 
 # Byte-compiled / optimized / DLL files
@@ -12,3 +14,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Mkdocs
+/site
+
+# Node
+node_modules

@@ -1,0 +1,41 @@
+[package]
+name = "fricon-py"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+fricon = { path = "../fricon" }
+fricon-cli = { path = "../fricon-cli" }
+
+anyhow = { workspace = true }
+arrow = { workspace = true, features = ["pyarrow"] }
+chrono = { workspace = true, features = ["serde"] }
+itertools = { workspace = true }
+ndarray = { workspace = true }
+num = { workspace = true }
+numpy = { workspace = true }
+pyo3 = { workspace = true, features = [
+    "anyhow",
+    "chrono",
+    "num-complex",
+    "abi3-py39",
+    "generate-import-lib",
+] }
+pyo3-async-runtimes = { workspace = true, features = ["tokio-runtime"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+
+[lints]
+workspace = true
+
+[features]
+prod = ["fricon-cli/prod"]

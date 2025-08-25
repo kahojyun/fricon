@@ -1,0 +1,29 @@
+[package]
+name = "fricon-cli"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+
+[[bin]]
+name = "fricon"
+path = "src/main.rs"
+
+[dependencies]
+fricon = { path = "../fricon" }
+fricon-ui = { path = "../fricon-ui" }
+
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["full"] }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true
+
+[features]
+prod = ["fricon-ui/prod"]
