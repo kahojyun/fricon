@@ -5,9 +5,9 @@ import { Button } from "primevue";
   <Button
     link
     as="a"
-    href="https://www.flaticon.com/free-icons/cube"
-    title="cube icons"
+    href="https://www.flaticon.com/free-icons/computer"
+    title="computer icons"
     target="_blank"
-    label="Cube icons created by Freepik - Flaticon"
+    label="Computer icons created by Freepik - Flaticon"
   />
 </template>

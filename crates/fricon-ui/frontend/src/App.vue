@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import DataViewer from "./DataViewer.vue";
 import { getWorkspaceInfo, type WorkspaceInfo } from "./backend";
+import AppCredits from "./AppCredits.vue";
 
 const workspaceInfo = ref<WorkspaceInfo | null>(null);
 const loading = ref(true);
@@ -33,6 +34,7 @@ onMounted(async () => {
       <h1 class="text-lg font-semibold">Fricon Workspace</h1>
       <p class="text-sm">{{ workspaceInfo?.path }}</p>
     </div>
+    <AppCredits />
     <DataViewer />
   </div>
 </template>
