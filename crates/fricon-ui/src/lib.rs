@@ -83,6 +83,7 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
             let window = app.get_webview_window(&label).unwrap();
             window.hide().ok();
         }
+        #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => {
             show_main_window(app);
         }
