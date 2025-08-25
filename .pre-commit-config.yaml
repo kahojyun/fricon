@@ -15,15 +15,15 @@ repos:
       - id: check-added-large-files
         exclude: crates/fricon-ui/icons/.*
   - repo: https://github.com/crate-ci/typos
-    rev: 229c2573318986f3b0f933e761508d23a13540d5  # frozen: v1
+    rev: 7fb6e0951ad91e4772a2470012fc1ae621016b80  # frozen: v1
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: fb5a27193ad89e24d37319409d242dfd43a235dd  # frozen: 0.8.8
+    rev: 2d951338ec8cdf4fc958b42681c5e1b5ccda7b30  # frozen: 0.8.13
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 455f64b32459518aa82ec33b63f799ed048d65a9  # frozen: v0.12.8
+    rev: 0acff885bcb16381b67930fefb91e460202f172c  # frozen: v0.12.10
     hooks:
       - id: ruff
         args: [--fix]
