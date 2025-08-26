@@ -168,7 +168,7 @@ impl DatasetManager {
     /// Write data to a dataset using the provided write token
     pub async fn write_dataset<S, E>(
         &self,
-        token: Uuid,
+        uuid: Uuid,
         stream: S,
     ) -> Result<DatasetRecord, DatasetManagerError>
     where
@@ -177,7 +177,7 @@ impl DatasetManager {
     {
         // Get dataset by UUID token
         let dataset_record = self
-            .get_dataset(DatasetId::Uuid(token))
+            .get_dataset(DatasetId::Uuid(uuid))
             .await
             .map_err(|_| DatasetManagerError::InvalidToken)?;
 
@@ -188,7 +188,7 @@ impl DatasetManager {
             });
         }
 
-        let dataset_path = self.app.root().paths().dataset_path_from_uuid(token);
+        let dataset_path = self.app.root().paths().dataset_path_from_uuid(uuid);
 
         // Update status to Writing
         self.update_status(dataset_record.id, DatasetStatus::Writing)
