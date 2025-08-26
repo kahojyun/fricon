@@ -16,7 +16,7 @@ use anyhow::{Context, Result, bail};
 use arrow::array::RecordBatch;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
-use futures::Stream;
+use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
@@ -56,6 +56,51 @@ pub enum DatasetManagerError {
         #[from]
         source: std::io::Error,
     },
+}
+
+impl DatasetManagerError {
+    /// Create an IO error from a string message with `InvalidData` kind
+    fn io_invalid_data(message: impl Into<String>) -> Self {
+        Self::Io {
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()),
+        }
+    }
+
+    /// Create an IO error for stream errors
+    fn stream_error(error: impl std::error::Error) -> Self {
+        Self::io_invalid_data(format!("Stream error: {error}"))
+    }
+
+    /// Create an IO error for empty stream
+    fn empty_stream() -> Self {
+        Self::Io {
+            source: std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "Stream is empty"),
+        }
+    }
+
+    /// Create an IO error for already existing path
+    fn path_already_exists(path: &std::path::Path) -> Self {
+        Self::Io {
+            source: std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                format!("Dataset path already exists: {}", path.display()),
+            ),
+        }
+    }
+}
+
+// Convert diesel NotFound errors to DatasetManagerError::NotFound
+impl From<diesel::result::Error> for DatasetManagerError {
+    fn from(error: diesel::result::Error) -> Self {
+        match error {
+            diesel::result::Error::NotFound => Self::NotFound {
+                id: "unknown".to_string(),
+            },
+            other => Self::Database {
+                source: other.into(),
+            },
+        }
+    }
 }
 
 /// Pure data structure representing a dataset record
@@ -129,12 +174,7 @@ impl DatasetManager {
 
         // Ensure path doesn't already exist
         if dataset_path.exists() {
-            return Err(DatasetManagerError::Io {
-                source: std::io::Error::new(
-                    std::io::ErrorKind::AlreadyExists,
-                    format!("Dataset path already exists: {}", dataset_path.display()),
-                ),
-            });
+            return Err(DatasetManagerError::path_already_exists(&dataset_path));
         }
 
         // Create database record
@@ -183,7 +223,7 @@ impl DatasetManager {
                 conn.immediate_transaction(|conn| {
                     // Get dataset by UUID within transaction
                     let dataset = database::Dataset::find_by_uuid(conn, uuid)?
-                        .ok_or_else(|| diesel::result::Error::NotFound)?;
+                        .ok_or(diesel::result::Error::NotFound)?;
 
                     // Check if dataset is in pending status
                     if dataset.status != DatasetStatus::Pending {
@@ -494,7 +534,6 @@ impl DatasetManager {
         Ok(())
     }
 
-    /// Perform the actual write operation using `BatchWriter`
     async fn perform_write_async<S, E>(
         &self,
         _dataset_id: i32,
@@ -505,8 +544,6 @@ impl DatasetManager {
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        use futures::StreamExt;
-
         let dataset_path = path.join(DATASET_NAME);
 
         // Create the Arrow file
@@ -517,63 +554,38 @@ impl DatasetManager {
             )
         })?;
 
-        // Collect all batches and process them in a blocking task
-        let mut batches = Vec::new();
-        let mut schema_opt = None;
-
-        while let Some(result) = stream.next().await {
-            let batch = result.map_err(|e| DatasetManagerError::Io {
-                source: std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    format!("Stream error: {e}"),
-                ),
-            })?;
-
-            if batch.num_rows() == 0 {
-                continue; // Skip empty batches
-            }
-
-            // Initialize schema from first batch
-            if schema_opt.is_none() {
-                schema_opt = Some(batch.schema());
-            }
-
-            batches.push(batch);
-        }
-
-        if batches.is_empty() {
-            return Err(DatasetManagerError::SchemaError {
-                message: "No data written to the dataset".to_string(),
-            });
-        }
-
-        let schema = schema_opt.unwrap();
-
-        // Perform the actual writing in a blocking task
-        let app_clone = self.app.clone();
-        let write_result: Result<Result<(), DatasetManagerError>, _> = app_clone
+        // Spawn blocking task to write batches using BatchWriter
+        let write_result = self
+            .app
             .tracker()
             .spawn_blocking(move || -> Result<(), DatasetManagerError> {
-                let buf_writer = BufWriter::new(file);
-                let mut batch_writer =
-                    BatchWriter::new(buf_writer, &schema).map_err(|e| DatasetManagerError::Io {
-                        source: std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()),
-                    })?;
+                let rt_handle = tokio::runtime::Handle::current();
 
-                for batch in batches {
+                // Get the first batch to initialize the writer
+                let mut batch = match rt_handle.block_on(stream.next()) {
+                    Some(Ok(batch)) => batch,
+                    Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
+                    None => return Err(DatasetManagerError::empty_stream()),
+                };
+
+                let buf_writer = BufWriter::new(file);
+                let mut batch_writer = BatchWriter::new(buf_writer, &batch.schema())
+                    .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
+
+                loop {
                     batch_writer
                         .write(batch)
-                        .map_err(|e| DatasetManagerError::Io {
-                            source: std::io::Error::new(
-                                std::io::ErrorKind::InvalidData,
-                                e.to_string(),
-                            ),
-                        })?;
+                        .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
+                    batch = match rt_handle.block_on(stream.next()) {
+                        Some(Ok(batch)) => batch,
+                        Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
+                        None => break, // End of stream
+                    };
                 }
 
-                batch_writer.finish().map_err(|e| DatasetManagerError::Io {
-                    source: std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()),
-                })?;
+                batch_writer
+                    .finish()
+                    .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
 
                 Ok(())
             })
@@ -581,14 +593,8 @@ impl DatasetManager {
 
         match write_result {
             Ok(result) => result,
-            Err(e) => {
-                return Err(DatasetManagerError::Io {
-                    source: std::io::Error::other(format!("Write task failed: {e}")),
-                });
-            }
-        }?;
-
-        Ok(())
+            Err(e) => Err(std::io::Error::other(format!("Write task failed: {e}")).into()),
+        }
     }
 }
 

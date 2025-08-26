@@ -1,7 +1,8 @@
 use anyhow::bail;
-use arrow::{array::RecordBatch, ipc::reader::StreamReader};
+use arrow::{array::RecordBatch, error::ArrowError, ipc::reader::StreamReader};
 use bytes::Bytes;
 use futures::prelude::*;
+use tokio::sync::mpsc;
 use tokio_util::io::SyncIoBridge;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
@@ -58,7 +59,6 @@ impl TryFrom<proto::DatasetStatus> for DatasetStatus {
     }
 }
 
-// TODO: Use workspace methods
 #[tonic::async_trait]
 impl DatasetService for Storage {
     async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
@@ -111,50 +111,58 @@ impl DatasetService for Storage {
                 std::io::Error::other(e)
             })
         });
-
         let async_reader = tokio_util::io::StreamReader::new(bytes_stream);
         let sync_reader = SyncIoBridge::new(async_reader);
 
-        // Create a RecordBatch stream from the IPC stream using spawn_blocking
-        let manager_clone = self.manager.clone();
-        let write_result = manager_clone
-            .app()
-            .tracker()
-            .spawn_blocking(
-                move || -> Result<Vec<RecordBatch>, arrow::error::ArrowError> {
+        // Create a channel to stream RecordBatches from async reader to dataset_manager
+        let (batch_tx, batch_rx) =
+            mpsc::channel::<Result<RecordBatch, arrow::error::ArrowError>>(16);
+        let batch_stream = tokio_stream::wrappers::ReceiverStream::new(batch_rx);
+
+        let read_task = self.manager.app().tracker().spawn(async move {
+            let result = {
+                let batch_tx = batch_tx.clone();
+                tokio::task::spawn_blocking(move || {
                     let reader = StreamReader::try_new(sync_reader, None)?;
-                    let mut batches = Vec::new();
                     for batch_result in reader {
                         let batch = batch_result?;
-                        batches.push(batch);
+                        if batch_tx.blocking_send(Ok(batch)).is_err() {
+                            // Channel closed, stop reading
+                            break;
+                        }
                     }
-                    Ok(batches)
-                },
-            )
-            .await
-            .map_err(|e| {
-                error!("Failed to read IPC stream: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
+                    Ok::<_, ArrowError>(())
+                })
+                .await
+            };
 
-        let batches = write_result.map_err(|e| {
-            error!("Failed to parse Arrow batches: {:?}", e);
+            match result {
+                Ok(Err(e)) => {
+                    batch_tx.send(Err(e)).await.ok();
+                }
+                Err(err) => {
+                    batch_tx
+                        .send(Err(ArrowError::ExternalError(Box::new(err))))
+                        .await
+                        .ok();
+                }
+                _ => {}
+            }
+        });
+
+        // Use DatasetManager to write the dataset
+        let write_result = self.manager.write_dataset(token, batch_stream).await;
+
+        // Ensure the read task completes
+        if let Err(e) = read_task.await {
+            error!("Read task failed: {:?}", e);
+        }
+
+        let record = write_result.map_err(|e| {
+            error!("Failed to write dataset: {:?}", e);
             Status::internal(e.to_string())
         })?;
 
-        // Convert batches to stream
-        let batch_stream =
-            futures::stream::iter(batches.into_iter().map(Ok::<_, arrow::error::ArrowError>));
-
-        // Use DatasetManager to write the dataset
-        let record = self
-            .manager
-            .write_dataset(token, batch_stream)
-            .await
-            .map_err(|e| {
-                error!("Failed to write dataset: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
         Ok(Response::new(WriteResponse {
             dataset: Some(record.into()),
         }))
