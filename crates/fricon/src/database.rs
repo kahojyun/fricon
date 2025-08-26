@@ -5,7 +5,7 @@ pub mod schema;
 mod types;
 
 pub use self::{
-    models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, NewTag, Tag},
+    models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
     types::{DatasetStatus, JsonValue, SimpleUuid},
 };
 

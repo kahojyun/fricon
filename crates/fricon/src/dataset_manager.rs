@@ -26,9 +26,7 @@ use uuid::Uuid;
 use self::batch_writer::BatchWriter;
 use crate::{
     app::{AppEvent, AppHandle},
-    database::{
-        self, DatasetStatus, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt, SimpleUuid, schema,
-    },
+    database::{self, DatasetStatus, JsonValue, NewDataset, PoolExt, SimpleUuid, schema},
 };
 
 pub const DATASET_NAME: &str = "dataset.arrow";
@@ -251,22 +249,17 @@ impl DatasetManager {
             .database()
             .interact(move |conn| {
                 let dataset = match id {
-                    DatasetId::Id(dataset_id) => schema::datasets::table
-                        .find(dataset_id)
-                        .select(database::Dataset::as_select())
-                        .first(conn)?,
-                    DatasetId::Uuid(uuid) => schema::datasets::table
-                        .filter(schema::datasets::uuid.eq(SimpleUuid(uuid)))
-                        .select(database::Dataset::as_select())
-                        .first(conn)?,
+                    DatasetId::Id(dataset_id) => database::Dataset::find_by_id(conn, dataset_id)?,
+                    DatasetId::Uuid(uuid) => database::Dataset::find_by_uuid(conn, uuid)?,
                 };
 
-                let tags = database::DatasetTag::belonging_to(&dataset)
-                    .inner_join(schema::tags::table)
-                    .select(database::Tag::as_select())
-                    .load(conn)?;
+                let dataset = match dataset {
+                    Some(d) => d,
+                    None => return Err(diesel::result::Error::NotFound.into()),
+                };
 
-                Ok((dataset, tags))
+                let tags = dataset.load_tags(conn)?;
+                Ok::<_, anyhow::Error>((dataset, tags))
             })
             .await?;
 
@@ -279,10 +272,7 @@ impl DatasetManager {
             .app
             .database()
             .interact(|conn| {
-                let all_datasets = schema::datasets::table
-                    .order(schema::datasets::id.desc())
-                    .select(database::Dataset::as_select())
-                    .load(conn)?;
+                let all_datasets = database::Dataset::list_all_ordered(conn)?;
 
                 let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
                     .inner_join(schema::tags::table)
@@ -330,10 +320,7 @@ impl DatasetManager {
         self.app
             .database()
             .interact(move |conn| {
-                use database::schema::datasets::dsl::datasets;
-                diesel::update(datasets.find(id))
-                    .set(&db_update)
-                    .execute(conn)
+                database::Dataset::update_metadata(conn, id, &db_update)
                     .context("Failed to update dataset in database")
             })
             .await?;
@@ -357,30 +344,12 @@ impl DatasetManager {
             .database()
             .interact(move |conn| {
                 conn.immediate_transaction(|conn| {
-                    // Insert or ignore new tags into the tags table
-                    let new_tags: Vec<_> = tags.iter().map(|name| NewTag { name }).collect();
-                    diesel::insert_or_ignore_into(schema::tags::table)
-                        .values(new_tags)
-                        .execute(conn)?;
+                    // Create or find tags and get their IDs
+                    let created_tags = database::Tag::find_or_create_batch(conn, tags)?;
+                    let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
 
-                    // Get the IDs of the tags that were requested to be added
-                    let tag_ids = schema::tags::table
-                        .filter(schema::tags::name.eq_any(tags))
-                        .select(schema::tags::id)
-                        .load::<i32>(conn)?;
-
-                    // Insert or ignore new entries into the datasets_tags table
-                    let new_dataset_tags: Vec<_> = tag_ids
-                        .into_iter()
-                        .map(|tag_id| DatasetTag {
-                            dataset_id: id,
-                            tag_id,
-                        })
-                        .collect();
-                    diesel::insert_or_ignore_into(schema::datasets_tags::table)
-                        .values(new_dataset_tags)
-                        .execute(conn)?;
-
+                    // Create associations
+                    database::DatasetTag::create_associations(conn, id, tag_ids)?;
                     Ok(())
                 })
             })
@@ -407,16 +376,12 @@ impl DatasetManager {
                 conn.immediate_transaction(|conn| {
                     // Get the IDs of the tags to be deleted
                     let tag_ids_to_delete = schema::tags::table
-                        .filter(schema::tags::name.eq_any(tags))
+                        .filter(schema::tags::name.eq_any(&tags))
                         .select(schema::tags::id)
                         .load::<i32>(conn)?;
 
-                    // Delete the entries from datasets_tags table
-                    diesel::delete(schema::datasets_tags::table)
-                        .filter(schema::datasets_tags::dataset_id.eq(id))
-                        .filter(schema::datasets_tags::tag_id.eq_any(tag_ids_to_delete))
-                        .execute(conn)?;
-
+                    // Remove associations
+                    database::DatasetTag::remove_associations(conn, id, tag_ids_to_delete)?;
                     Ok(())
                 })
             })
@@ -449,9 +414,7 @@ impl DatasetManager {
         self.app
             .database()
             .interact(move |conn| {
-                use database::schema::datasets::dsl::datasets;
-                diesel::delete(datasets.find(id))
-                    .execute(conn)
+                database::Dataset::delete_from_db(conn, id)
                     .context("Failed to delete dataset from database")
             })
             .await?;
@@ -498,28 +461,10 @@ impl DatasetManager {
 
                     // Handle tags creation and association
                     if !request.tags.is_empty() {
-                        let new_tags: Vec<_> =
-                            request.tags.iter().map(|name| NewTag { name }).collect();
-                        diesel::insert_or_ignore_into(schema::tags::table)
-                            .values(new_tags)
-                            .execute(conn)?;
-
-                        let tag_ids = schema::tags::table
-                            .filter(schema::tags::name.eq_any(&request.tags))
-                            .select(schema::tags::id)
-                            .load::<i32>(conn)?;
-
-                        let dataset_tags: Vec<_> = tag_ids
-                            .into_iter()
-                            .map(|tag_id| DatasetTag {
-                                dataset_id: dataset.id,
-                                tag_id,
-                            })
-                            .collect();
-
-                        diesel::insert_into(schema::datasets_tags::table)
-                            .values(dataset_tags)
-                            .execute(conn)?;
+                        let created_tags = database::Tag::find_or_create_batch(conn, request.tags)?;
+                        let tag_ids: Vec<i32> =
+                            created_tags.into_iter().map(|tag| tag.id).collect();
+                        database::DatasetTag::create_associations(conn, dataset.id, tag_ids)?;
                     }
 
                     Ok(dataset.id)
@@ -539,10 +484,7 @@ impl DatasetManager {
         self.app
             .database()
             .interact(move |conn| {
-                use database::schema::datasets::dsl::datasets;
-                diesel::update(datasets.find(id))
-                    .set(database::schema::datasets::status.eq(status))
-                    .execute(conn)
+                database::Dataset::update_status(conn, id, status)
                     .context("Failed to update dataset status")
             })
             .await?;
