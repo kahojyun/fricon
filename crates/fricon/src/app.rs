@@ -145,7 +145,7 @@ impl AppHandle {
         self.state.subscribe_to_events()
     }
 
-    /// Create a DatasetManager for this app instance
+    /// Create a `DatasetManager` for this app instance
     #[must_use]
     pub fn dataset_manager(&self) -> DatasetManager {
         DatasetManager::new(self.clone())

@@ -1,6 +1,6 @@
 //! Dataset Manager - Central hub for all dataset operations
 //!
-//! The DatasetManager centralizes all server-side dataset CRUD operations and
+//! The `DatasetManager` centralizes all server-side dataset CRUD operations and
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
@@ -8,7 +8,7 @@ use std::{
     collections::HashMap,
     fs::{self, File},
     io::BufWriter,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -116,7 +116,7 @@ pub struct DatasetManager {
 }
 
 impl DatasetManager {
-    /// Create a new DatasetManager instance
+    /// Create a new `DatasetManager` instance
     pub fn new(app: AppHandle) -> Self {
         Self {
             app,
@@ -200,7 +200,7 @@ impl DatasetManager {
             .await;
 
         match result {
-            Ok(_) => {
+            Ok(()) => {
                 // Update status to Completed and save metadata
                 self.update_status(pending_write.dataset_id, DatasetStatus::Completed)
                     .await?;
@@ -540,11 +540,11 @@ impl DatasetManager {
         Ok(record.metadata)
     }
 
-    /// Perform the actual write operation using BatchWriter
+    /// Perform the actual write operation using `BatchWriter`
     async fn perform_write_async<S, E>(
         &self,
         _dataset_id: i32,
-        path: &PathBuf,
+        path: &Path,
         mut stream: S,
     ) -> Result<(), DatasetManagerError>
     where
@@ -571,7 +571,7 @@ impl DatasetManager {
             let batch = result.map_err(|e| DatasetManagerError::Io {
                 source: std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Stream error: {}", e),
+                    format!("Stream error: {e}"),
                 ),
             })?;
 
@@ -629,10 +629,7 @@ impl DatasetManager {
             Ok(result) => result,
             Err(e) => {
                 return Err(DatasetManagerError::Io {
-                    source: std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Write task failed: {}", e),
-                    ),
+                    source: std::io::Error::other(format!("Write task failed: {e}")),
                 });
             }
         }?;
@@ -642,7 +639,7 @@ impl DatasetManager {
 }
 
 impl DatasetRecord {
-    /// Create DatasetRecord from database models
+    /// Create `DatasetRecord` from database models
     pub fn from_database_models(dataset: database::Dataset, tags: Vec<database::Tag>) -> Self {
         let metadata = DatasetMetadata {
             uuid: dataset.uuid.0,

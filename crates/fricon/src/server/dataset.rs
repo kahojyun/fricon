@@ -390,19 +390,16 @@ impl DatasetService for Storage {
         };
         let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
             // Check if it's a not found error
-            match &e {
-                crate::dataset_manager::DatasetManagerError::Database { source } => {
-                    if let Some(diesel::result::Error::NotFound) = source.downcast_ref() {
-                        Status::not_found("dataset not found")
-                    } else {
-                        error!("Failed to get dataset: {:?}", e);
-                        Status::internal(e.to_string())
-                    }
-                }
-                _ => {
+            if let crate::dataset_manager::DatasetManagerError::Database { source } = &e {
+                if let Some(diesel::result::Error::NotFound) = source.downcast_ref() {
+                    Status::not_found("dataset not found")
+                } else {
                     error!("Failed to get dataset: {:?}", e);
                     Status::internal(e.to_string())
                 }
+            } else {
+                error!("Failed to get dataset: {:?}", e);
+                Status::internal(e.to_string())
             }
         })?;
         Ok(Response::new(GetResponse {
