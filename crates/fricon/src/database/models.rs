@@ -23,7 +23,7 @@ pub struct Dataset {
 impl Dataset {
     /// Find dataset by ID
     pub fn find_by_id(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<Option<Self>> {
-        use schema::datasets::dsl::*;
+        use schema::datasets::dsl::datasets;
 
         datasets
             .find(dataset_id)
@@ -37,7 +37,7 @@ impl Dataset {
         conn: &mut SqliteConnection,
         dataset_uuid: Uuid,
     ) -> QueryResult<Option<Self>> {
-        use schema::datasets::dsl::*;
+        use schema::datasets::dsl::{datasets, uuid};
 
         datasets
             .filter(uuid.eq(SimpleUuid(dataset_uuid)))
@@ -48,7 +48,7 @@ impl Dataset {
 
     /// List all datasets ordered by ID descending
     pub fn list_all_ordered(conn: &mut SqliteConnection) -> QueryResult<Vec<Self>> {
-        use schema::datasets::dsl::*;
+        use schema::datasets::dsl::{datasets, id};
 
         datasets
             .order(id.desc())
@@ -62,7 +62,7 @@ impl Dataset {
         dataset_id: i32,
         new_status: DatasetStatus,
     ) -> QueryResult<usize> {
-        use schema::datasets::dsl::*;
+        use schema::datasets::dsl::{datasets, status};
 
         diesel::update(datasets.find(dataset_id))
             .set(status.eq(new_status))
@@ -75,7 +75,7 @@ impl Dataset {
         dataset_id: i32,
         update: &DatasetUpdate,
     ) -> QueryResult<usize> {
-        use schema::datasets::dsl::*;
+        use schema::datasets::dsl::datasets;
 
         diesel::update(datasets.find(dataset_id))
             .set(update)
@@ -84,7 +84,7 @@ impl Dataset {
 
     /// Delete dataset from database
     pub fn delete_from_db(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<usize> {
-        use schema::datasets::dsl::*;
+        use schema::datasets::dsl::datasets;
 
         diesel::delete(datasets.find(dataset_id)).execute(conn)
     }
@@ -127,7 +127,7 @@ pub struct Tag {
 impl Tag {
     /// Find tag by name
     pub fn find_by_name(conn: &mut SqliteConnection, tag_name: &str) -> QueryResult<Option<Self>> {
-        use schema::tags::dsl::*;
+        use schema::tags::dsl::{name, tags};
 
         tags.filter(name.eq(tag_name))
             .select(Self::as_select())
@@ -140,7 +140,7 @@ impl Tag {
         conn: &mut SqliteConnection,
         names: Vec<String>,
     ) -> QueryResult<Vec<Self>> {
-        use schema::tags::dsl::*;
+        use schema::tags::dsl::{name, tags};
 
         // Insert new tags (ignore duplicates)
         let new_tags: Vec<_> = names
@@ -159,7 +159,7 @@ impl Tag {
 
     /// Create a new tag
     pub fn create_new(conn: &mut SqliteConnection, tag_name: &str) -> QueryResult<Self> {
-        use schema::tags::dsl::*;
+        use schema::tags::dsl::tags;
 
         let new_tag = NewTag { name: tag_name };
         diesel::insert_into(tags)
@@ -202,7 +202,7 @@ impl DatasetTag {
         ds_id: i32,
         tag_ids: Vec<i32>,
     ) -> QueryResult<Vec<Self>> {
-        use schema::datasets_tags::dsl::*;
+        use schema::datasets_tags::dsl::datasets_tags;
 
         let new_associations: Vec<_> = tag_ids
             .iter()
@@ -226,7 +226,7 @@ impl DatasetTag {
         ds_id: i32,
         tag_ids: Vec<i32>,
     ) -> QueryResult<usize> {
-        use schema::datasets_tags::dsl::*;
+        use schema::datasets_tags::dsl::{dataset_id, datasets_tags, tag_id};
 
         diesel::delete(datasets_tags)
             .filter(dataset_id.eq(ds_id))
@@ -236,7 +236,7 @@ impl DatasetTag {
 
     /// Find all dataset-tag associations for a given dataset
     pub fn find_by_dataset(conn: &mut SqliteConnection, ds_id: i32) -> QueryResult<Vec<Self>> {
-        use schema::datasets_tags::dsl::*;
+        use schema::datasets_tags::dsl::{dataset_id, datasets_tags};
 
         datasets_tags
             .filter(dataset_id.eq(ds_id))
