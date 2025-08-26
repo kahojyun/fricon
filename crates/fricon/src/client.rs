@@ -20,7 +20,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    VERSION, dataset, ipc,
+    VERSION, dataset_manager, ipc,
     proto::{
         self, AddTagsRequest, CreateRequest, GetRequest, RemoveTagsRequest, SearchRequest,
         UpdateRequest, VersionRequest, WriteRequest, WriteResponse,
@@ -224,7 +224,7 @@ impl Dataset {
 
     #[must_use]
     pub fn arrow_file(&self) -> PathBuf {
-        self.path().join(dataset::DATASET_NAME)
+        self.path().join(dataset_manager::DATASET_NAME)
     }
 
     #[must_use]

@@ -1,25 +1,14 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
-use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::info;
-use uuid::Uuid;
 
-use crate::{
-    database::{
-        self, DatasetStatus, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt as _, SimpleUuid,
-        Tag, schema,
-    },
-    dataset::{self, Dataset},
-    dataset_manager::DatasetManager,
-    server,
-    workspace::WorkspaceRoot,
-};
+use crate::{database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot};
 
 pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
     let path = path.into();
@@ -151,144 +140,10 @@ impl AppHandle {
         DatasetManager::new(self.clone())
     }
 
-    #[deprecated(note = "Use DatasetManager::create_dataset instead")]
-    pub async fn create_dataset(
-        &self,
-        name: String,
-        description: String,
-        tags: Vec<String>,
-        index_columns: Vec<String>,
-    ) -> Result<dataset::Writer> {
-        let uuid = Uuid::new_v4();
-        let state = self.state.clone();
-        let (dataset, tags) = state
-            .database()
-            .interact(move |conn| {
-                conn.immediate_transaction(|conn| {
-                    let new_dataset = NewDataset {
-                        uuid: SimpleUuid(uuid),
-                        name: &name,
-                        description: &description,
-                        status: DatasetStatus::Pending,
-                        index_columns: JsonValue(&index_columns),
-                    };
-                    let dataset = diesel::insert_into(schema::datasets::table)
-                        .values(new_dataset)
-                        .returning(database::Dataset::as_returning())
-                        .get_result(conn)?;
-                    let new_tags = tags
-                        .iter()
-                        .map(|tag| NewTag { name: tag })
-                        .collect::<Vec<_>>();
-                    diesel::insert_or_ignore_into(schema::tags::table)
-                        .values(new_tags)
-                        .execute(conn)?;
-                    let tags = schema::tags::table
-                        .filter(schema::tags::name.eq_any(&tags))
-                        .load::<Tag>(conn)?;
-                    let dataset_tags: Vec<_> = tags
-                        .iter()
-                        .map(|tag| DatasetTag {
-                            dataset_id: dataset.id,
-                            tag_id: tag.id,
-                        })
-                        .collect();
-                    diesel::insert_into(schema::datasets_tags::table)
-                        .values(dataset_tags)
-                        .execute(conn)?;
-                    Ok((dataset, tags))
-                })
-            })
-            .await?;
-        let writer = Dataset::create(self.clone(), dataset.clone(), tags.clone())
-            .context("Failed to create dataset.")?;
-
-        // Send event notification
-        let event = AppEvent::DatasetCreated {
-            id: dataset.id,
-            uuid: dataset.uuid.0.simple().to_string(),
-            name: dataset.name.clone(),
-            description: dataset.description.clone(),
-            tags: tags.into_iter().map(|t| t.name).collect(),
-        };
+    /// Send an event to all subscribers
+    pub fn send_event(&self, event: AppEvent) {
+        // Ignore send errors (no receivers)
         let _ = self.state.event_sender().send(event);
-
-        Ok(writer)
-    }
-
-    #[deprecated(note = "Use DatasetManager::get_dataset instead")]
-    pub async fn get_dataset(&self, id: i32) -> Result<Dataset> {
-        let (dataset, tags) = self
-            .state
-            .database()
-            .interact(move |conn| {
-                let dataset = schema::datasets::table
-                    .find(id)
-                    .select(database::Dataset::as_select())
-                    .first(conn)?;
-                let tags = database::DatasetTag::belonging_to(&dataset)
-                    .inner_join(schema::tags::table)
-                    .select(database::Tag::as_select())
-                    .load(conn)?;
-                Ok((dataset, tags))
-            })
-            .await?;
-        Ok(Dataset::new(self.clone(), dataset, tags))
-    }
-
-    #[deprecated(note = "Use DatasetManager::get_dataset with DatasetId::Uuid instead")]
-    pub async fn get_dataset_by_uuid(&self, uuid: Uuid) -> Result<Dataset> {
-        let (dataset, tags) = self
-            .state
-            .database()
-            .interact(move |conn| {
-                let dataset = schema::datasets::table
-                    .filter(schema::datasets::uuid.eq(uuid.as_simple().to_string()))
-                    .select(database::Dataset::as_select())
-                    .first(conn)?;
-                let tags = database::DatasetTag::belonging_to(&dataset)
-                    .inner_join(schema::tags::table)
-                    .select(database::Tag::as_select())
-                    .load(conn)?;
-                Ok((dataset, tags))
-            })
-            .await?;
-        Ok(Dataset::new(self.clone(), dataset, tags))
-    }
-
-    #[deprecated(note = "Use DatasetManager::list_datasets instead")]
-    pub async fn list_datasets(&self) -> Result<Vec<(database::Dataset, Vec<database::Tag>)>> {
-        self.state
-            .database()
-            .interact(|conn| {
-                let all_datasets = schema::datasets::table
-                    .order(schema::datasets::id.desc())
-                    .select(database::Dataset::as_select())
-                    .load(conn)?;
-
-                let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
-                    .inner_join(schema::tags::table)
-                    .select((
-                        database::DatasetTag::as_select(),
-                        database::Tag::as_select(),
-                    ))
-                    .load::<(database::DatasetTag, database::Tag)>(conn)?;
-
-                let datasets_with_tags: Vec<(database::Dataset, Vec<database::Tag>)> = dataset_tags
-                    .grouped_by(&all_datasets)
-                    .into_iter()
-                    .zip(all_datasets)
-                    .map(|(dataset_tags, dataset)| {
-                        (
-                            dataset,
-                            dataset_tags.into_iter().map(|(_, tag)| tag).collect(),
-                        )
-                    })
-                    .collect();
-
-                Ok(datasets_with_tags)
-            })
-            .await
     }
 }
 

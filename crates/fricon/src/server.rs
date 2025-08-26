@@ -1,7 +1,7 @@
 mod dataset;
 mod fricon;
 
-pub use self::dataset::DatasetRecord;
+pub use crate::dataset_manager::DatasetRecord;
 
 use anyhow::Result;
 use tokio_util::sync::CancellationToken;

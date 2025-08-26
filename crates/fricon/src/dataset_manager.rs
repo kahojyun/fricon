@@ -4,6 +4,8 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
+mod batch_writer;
+
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -21,13 +23,16 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 use uuid::Uuid;
 
+use self::batch_writer::BatchWriter;
 use crate::{
-    app::AppHandle,
+    app::{AppEvent, AppHandle},
     database::{
         self, DatasetStatus, DatasetTag, JsonValue, NewDataset, NewTag, PoolExt, SimpleUuid, schema,
     },
-    dataset::{DATASET_NAME, METADATA_NAME, batch_writer::BatchWriter},
 };
+
+pub const DATASET_NAME: &str = "dataset.arrow";
+pub const METADATA_NAME: &str = "metadata.json";
 
 /// Errors that can occur during dataset manager operations
 #[derive(Debug, thiserror::Error)]
@@ -110,6 +115,7 @@ struct PendingWrite {
 }
 
 /// Central manager for all dataset operations
+#[derive(Clone)]
 pub struct DatasetManager {
     app: AppHandle,
     pending_writers: Arc<Mutex<HashMap<Uuid, PendingWrite>>>,
@@ -122,6 +128,11 @@ impl DatasetManager {
             app,
             pending_writers: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Get access to the app handle
+    pub fn app(&self) -> &AppHandle {
+        &self.app
     }
 
     /// Create a new dataset and return a write token for data upload
@@ -164,6 +175,16 @@ impl DatasetManager {
             let mut pending = self.pending_writers.lock().unwrap();
             pending.insert(uuid, pending_write);
         }
+
+        // Send dataset created event to notify UI
+        let event = AppEvent::DatasetCreated {
+            id: dataset_id,
+            uuid: uuid.to_string(),
+            name: request.name.clone(),
+            description: request.description.clone(),
+            tags: request.tags.clone(),
+        };
+        self.app.send_event(event);
 
         info!(
             "Created dataset with UUID: {} at path: {:?}",
@@ -640,6 +661,7 @@ impl DatasetManager {
 
 impl DatasetRecord {
     /// Create `DatasetRecord` from database models
+    #[must_use]
     pub fn from_database_models(dataset: database::Dataset, tags: Vec<database::Tag>) -> Self {
         let metadata = DatasetMetadata {
             uuid: dataset.uuid.0,
@@ -669,6 +691,21 @@ impl From<DatasetRecord> for crate::proto::Dataset {
     }
 }
 
+impl TryFrom<crate::proto::Dataset> for DatasetRecord {
+    type Error = anyhow::Error;
+
+    fn try_from(dataset: crate::proto::Dataset) -> Result<Self, Self::Error> {
+        use anyhow::Context;
+        Ok(Self {
+            id: dataset.id,
+            metadata: dataset
+                .metadata
+                .context("metadata field is required")?
+                .try_into()?,
+        })
+    }
+}
+
 impl From<DatasetMetadata> for crate::proto::DatasetMetadata {
     fn from(metadata: DatasetMetadata) -> Self {
         use prost_types::Timestamp;
@@ -687,6 +724,40 @@ impl From<DatasetMetadata> for crate::proto::DatasetMetadata {
             tags: metadata.tags,
             status: crate::proto::DatasetStatus::from(metadata.status) as i32,
         }
+    }
+}
+
+impl TryFrom<crate::proto::DatasetMetadata> for DatasetMetadata {
+    type Error = anyhow::Error;
+
+    fn try_from(metadata: crate::proto::DatasetMetadata) -> Result<Self, Self::Error> {
+        use anyhow::{Context, bail};
+        use chrono::DateTime;
+
+        let uuid = metadata.uuid.parse()?;
+        let created_at = metadata.created_at.context("created_at is required")?;
+        let seconds = created_at.seconds;
+        #[expect(clippy::cast_sign_loss)]
+        let nanos = if created_at.nanos < 0 {
+            bail!("invalid created_at")
+        } else {
+            created_at.nanos as u32
+        };
+        let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
+        let proto_status = crate::proto::DatasetStatus::try_from(metadata.status)
+            .context("Invalid dataset status")?;
+        let status = DatasetStatus::try_from(proto_status)?;
+
+        Ok(Self {
+            uuid,
+            name: metadata.name,
+            description: metadata.description,
+            favorite: metadata.favorite,
+            status,
+            index_columns: metadata.index_columns,
+            created_at,
+            tags: metadata.tags,
+        })
     }
 }
 

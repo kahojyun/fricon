@@ -8,7 +8,6 @@
 mod app;
 mod client;
 mod database;
-mod dataset;
 mod dataset_manager;
 mod ipc;
 mod proto;
@@ -20,7 +19,7 @@ pub use self::{
     app::{AppEvent, AppHandle, AppManager, init as init_workspace},
     client::{Client, Dataset, DatasetWriter},
     database::DatasetStatus,
-    dataset::Metadata as DatasetMetadata,
+    dataset_manager::DatasetMetadata,
     server::{DatasetRecord, run as run_server},
     workspace::get_log_dir,
 };

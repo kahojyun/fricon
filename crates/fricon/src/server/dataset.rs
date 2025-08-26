@@ -1,60 +1,33 @@
-use std::{collections::HashMap, sync::Mutex};
-
-use anyhow::{Context, bail};
-use arrow::ipc::reader::StreamReader;
+use anyhow::bail;
+use arrow::{array::RecordBatch, ipc::reader::StreamReader};
 use bytes::Bytes;
-use chrono::DateTime;
-use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use futures::prelude::*;
-use prost_types::Timestamp;
 use tokio_util::io::SyncIoBridge;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace};
 use uuid::Uuid;
 
-use crate::database::{DatasetStatus, PoolExt};
-
 use crate::{
     app::AppHandle,
-    database::{self},
-    dataset,
-    dataset_manager::{DatasetId, DatasetManager},
+    database::DatasetStatus,
+    dataset_manager::{CreateDatasetRequest, DatasetId, DatasetManager},
     proto::{
-        self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DatasetMetadata,
-        DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
-        RemoveTagsResponse, SearchRequest, SearchResponse, UpdateRequest, UpdateResponse,
-        WriteRequest, WriteResponse, dataset_service_server::DatasetService, get_request::IdEnum,
+        self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
+        DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest, RemoveTagsResponse,
+        SearchRequest, SearchResponse, UpdateRequest, UpdateResponse, WriteRequest, WriteResponse,
+        dataset_service_server::DatasetService, get_request::IdEnum,
     },
 };
 
 pub struct Storage {
-    app: AppHandle,
     manager: DatasetManager,
-    pending_create: PendingCreate,
 }
-
-#[derive(Debug, Default)]
-struct PendingCreate(Mutex<HashMap<Uuid, CreateRequest>>);
 
 impl Storage {
     pub fn new(app: AppHandle) -> Self {
         Self {
-            manager: DatasetManager::new(app.clone()),
-            app,
-            pending_create: PendingCreate::default(),
+            manager: DatasetManager::new(app),
         }
-    }
-}
-
-impl PendingCreate {
-    fn insert(&self, token: Uuid, request: CreateRequest) {
-        let mut inner = self.0.lock().unwrap();
-        inner.insert(token, request);
-    }
-
-    fn remove(&self, token: &Uuid) -> Option<CreateRequest> {
-        let mut inner = self.0.lock().unwrap();
-        inner.remove(token)
     }
 }
 
@@ -85,157 +58,36 @@ impl TryFrom<proto::DatasetStatus> for DatasetStatus {
     }
 }
 
-impl From<dataset::Metadata> for proto::DatasetMetadata {
-    fn from(
-        dataset::Metadata {
-            uuid,
-            name,
-            description,
-            favorite,
-            status,
-            index_columns,
-            created_at,
-            tags,
-        }: dataset::Metadata,
-    ) -> Self {
-        let created_at = Timestamp {
-            seconds: created_at.timestamp(),
-            #[expect(clippy::cast_possible_wrap, reason = "Nanos are always less than 2e9.")]
-            nanos: created_at.timestamp_subsec_nanos() as i32,
-        };
-        Self {
-            uuid: uuid.simple().to_string(),
-            name,
-            description,
-            favorite,
-            index_columns,
-            created_at: Some(created_at),
-            tags,
-            status: proto::DatasetStatus::from(status) as i32,
-        }
-    }
-}
-
-impl TryFrom<proto::DatasetMetadata> for dataset::Metadata {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        DatasetMetadata {
-            uuid,
-            name,
-            description,
-            favorite,
-            index_columns,
-            created_at,
-            tags,
-            status,
-        }: proto::DatasetMetadata,
-    ) -> Result<Self, Self::Error> {
-        let uuid = uuid.parse()?;
-        let created_at = created_at.context("created_at is required")?;
-        let seconds = created_at.seconds;
-        #[expect(clippy::cast_sign_loss)]
-        let nanos = if created_at.nanos < 0 {
-            bail!("invalid created_at")
-        } else {
-            created_at.nanos as u32
-        };
-        let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
-        let proto_status =
-            proto::DatasetStatus::try_from(status).context("Invalid dataset status")?;
-        let status = DatasetStatus::try_from(proto_status)?;
-        Ok(Self {
-            uuid,
-            name,
-            description,
-            favorite,
-            status,
-            index_columns,
-            created_at,
-            tags,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DatasetRecord {
-    pub id: i32,
-    pub metadata: dataset::Metadata,
-}
-
-impl From<(database::Dataset, Vec<database::Tag>)> for DatasetRecord {
-    fn from(
-        (
-            database::Dataset {
-                id,
-                uuid,
-                name,
-                description,
-                favorite,
-                status,
-                index_columns,
-                created_at,
-            },
-            tags,
-        ): (database::Dataset, Vec<database::Tag>),
-    ) -> Self {
-        Self {
-            id,
-            metadata: dataset::Metadata {
-                uuid: uuid.0,
-                name,
-                description,
-                favorite,
-                status,
-                index_columns: index_columns.0,
-                created_at: created_at.and_utc(),
-                tags: tags.into_iter().map(|tag| tag.name).collect(),
-            },
-        }
-    }
-}
-
-impl From<dataset::Dataset> for DatasetRecord {
-    fn from(dataset: dataset::Dataset) -> Self {
-        Self {
-            id: dataset.id(),
-            metadata: dataset.metadata(),
-        }
-    }
-}
-
-impl From<DatasetRecord> for proto::Dataset {
-    fn from(DatasetRecord { id, metadata }: DatasetRecord) -> Self {
-        Self {
-            id,
-            metadata: Some(metadata.into()),
-        }
-    }
-}
-
-impl TryFrom<proto::Dataset> for DatasetRecord {
-    type Error = anyhow::Error;
-
-    fn try_from(proto::Dataset { id, metadata }: proto::Dataset) -> Result<Self, Self::Error> {
-        Ok(Self {
-            id,
-            metadata: metadata
-                .context("metadata field is required.")?
-                .try_into()?,
-        })
-    }
-}
-
 // TODO: Use workspace methods
 #[tonic::async_trait]
 impl DatasetService for Storage {
     async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
-        let request = request.into_inner();
-        let uuid = Uuid::new_v4();
-        trace!("generated uuid: {:?}", uuid);
-        self.pending_create.insert(uuid, request);
-        let write_token = Bytes::copy_from_slice(uuid.as_bytes());
+        let CreateRequest {
+            name,
+            description,
+            tags,
+            index_columns,
+        } = request.into_inner();
+
+        let create_request = CreateDatasetRequest {
+            name,
+            description,
+            tags,
+            index_columns,
+        };
+
+        let token = self
+            .manager
+            .create_dataset(create_request)
+            .await
+            .map_err(|e| {
+                error!("Failed to create dataset: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+
+        trace!("generated uuid: {:?}", token);
+        let write_token = Bytes::copy_from_slice(token.as_bytes());
         Ok(Response::new(CreateResponse { write_token }))
     }
 
@@ -251,15 +103,7 @@ impl DatasetService for Storage {
             .map_err(|_| Status::invalid_argument("invalid write token"))?;
         let token = Uuid::from_slice(&token)
             .map_err(|_| Status::invalid_argument("invalid write token"))?;
-        let CreateRequest {
-            name,
-            description,
-            tags,
-            index_columns,
-        } = self
-            .pending_create
-            .remove(&token)
-            .ok_or_else(|| Status::invalid_argument("invalid write token"))?;
+
         let request_stream = request.into_inner();
         let bytes_stream = request_stream.map(|request| {
             request.map(|x| x.chunk).map_err(|e| {
@@ -267,85 +111,50 @@ impl DatasetService for Storage {
                 std::io::Error::other(e)
             })
         });
+
         let async_reader = tokio_util::io::StreamReader::new(bytes_stream);
         let sync_reader = SyncIoBridge::new(async_reader);
-        let mut writer = self
-            .app
-            .create_dataset(name, description, tags, index_columns)
+
+        // Create a RecordBatch stream from the IPC stream using spawn_blocking
+        let manager_clone = self.manager.clone();
+        let write_result = manager_clone
+            .app()
+            .tracker()
+            .spawn_blocking(
+                move || -> Result<Vec<RecordBatch>, arrow::error::ArrowError> {
+                    let reader = StreamReader::try_new(sync_reader, None)?;
+                    let mut batches = Vec::new();
+                    for batch_result in reader {
+                        let batch = batch_result?;
+                        batches.push(batch);
+                    }
+                    Ok(batches)
+                },
+            )
             .await
             .map_err(|e| {
-                error!("Failed to create dataset: {:?}", e);
+                error!("Failed to read IPC stream: {:?}", e);
                 Status::internal(e.to_string())
             })?;
-        // Update status to Writing before starting
-        let dataset_id = writer.id();
-        let app_clone = self.app.clone();
-        let _ = app_clone
-            .database()
-            .interact(move |conn| {
-                use crate::database::schema::datasets::dsl::datasets;
-                Ok(diesel::update(datasets.find(dataset_id))
-                    .set(crate::database::schema::datasets::status.eq("writing"))
-                    .execute(conn))
-            })
-            .await;
 
-        // TODO: Check error handling
-        let writer_task = self.app.tracker().spawn_blocking(move || {
-            let reader = StreamReader::try_new(sync_reader, None)?;
-            for batch in reader {
-                let batch = match batch {
-                    Ok(batch) => batch,
-                    Err(e) => {
-                        error!("Failed to read ipc stream from client: {:?}", e);
-                        if let Err(e) = writer.finish() {
-                            error!("Failed to finish writing ipc file: {:?}", e);
-                        }
-                        return Err(e.into());
-                    }
-                };
-                writer.write(batch)?;
-            }
-            writer.finish()
-        });
-        let result = writer_task.await.map_err(|e| {
-            error!("writer task panicked: {:?}", e);
+        let batches = write_result.map_err(|e| {
+            error!("Failed to parse Arrow batches: {:?}", e);
             Status::internal(e.to_string())
         })?;
 
-        let dataset = match result {
-            Ok(dataset) => {
-                // Update status to Completed on success
-                let dataset_id = dataset.id();
-                let app_clone = self.app.clone();
-                let _ = app_clone
-                    .database()
-                    .interact(move |conn| {
-                        use crate::database::schema::datasets::dsl::datasets;
-                        Ok(diesel::update(datasets.find(dataset_id))
-                            .set(crate::database::schema::datasets::status.eq("completed"))
-                            .execute(conn))
-                    })
-                    .await;
-                dataset
-            }
-            Err(e) => {
-                // Update status to Aborted on failure
-                let app_clone = self.app.clone();
-                let _ = app_clone
-                    .database()
-                    .interact(move |conn| {
-                        use crate::database::schema::datasets::dsl::datasets;
-                        Ok(diesel::update(datasets.find(dataset_id))
-                            .set(crate::database::schema::datasets::status.eq("aborted"))
-                            .execute(conn))
-                    })
-                    .await;
-                error!("write failed: {:?}", e);
-                return Err(Status::internal(e.to_string()));
-            }
-        };
-        let record = DatasetRecord::from(dataset);
+        // Convert batches to stream
+        let batch_stream =
+            futures::stream::iter(batches.into_iter().map(Ok::<_, arrow::error::ArrowError>));
+
+        // Use DatasetManager to write the dataset
+        let record = self
+            .manager
+            .write_dataset(token, batch_stream)
+            .await
+            .map_err(|e| {
+                error!("Failed to write dataset: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
         Ok(Response::new(WriteResponse {
             dataset: Some(record.into()),
         }))
