@@ -9,6 +9,7 @@ mod app;
 mod client;
 mod database;
 mod dataset;
+mod dataset_manager;
 mod ipc;
 mod proto;
 mod server;

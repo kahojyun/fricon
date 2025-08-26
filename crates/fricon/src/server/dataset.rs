@@ -16,8 +16,9 @@ use crate::database::{DatasetStatus, PoolExt};
 
 use crate::{
     app::AppHandle,
-    database::{self, DatasetUpdate},
+    database::{self},
     dataset,
+    dataset_manager::{DatasetId, DatasetManager},
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DatasetMetadata,
         DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
@@ -28,6 +29,7 @@ use crate::{
 
 pub struct Storage {
     app: AppHandle,
+    manager: DatasetManager,
     pending_create: PendingCreate,
 }
 
@@ -37,6 +39,7 @@ struct PendingCreate(Mutex<HashMap<Uuid, CreateRequest>>);
 impl Storage {
     pub fn new(app: AppHandle) -> Self {
         Self {
+            manager: DatasetManager::new(app.clone()),
             app,
             pending_create: PendingCreate::default(),
         }
@@ -353,13 +356,12 @@ impl DatasetService for Storage {
         &self,
         _request: tonic::Request<SearchRequest>,
     ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
-        let records = self.app.list_datasets().await.map_err(|e| {
+        let records = self.manager.list_datasets().await.map_err(|e| {
             error!("Failed to list datasets: {:?}", e);
             Status::internal(e.to_string())
         })?;
         let datasets = records
             .into_iter()
-            .map(Into::<DatasetRecord>::into)
             .map(Into::<proto::Dataset>::into)
             .collect();
         Ok(Response::new(SearchResponse {
@@ -376,25 +378,33 @@ impl DatasetService for Storage {
             error!("id_enum is required");
             Status::invalid_argument("id_enum is required")
         })?;
-        let dataset = match id {
-            IdEnum::Id(id) => self.app.get_dataset(id).await,
+        let dataset_id = match id {
+            IdEnum::Id(id) => DatasetId::Id(id),
             IdEnum::Uuid(uuid) => {
                 let uuid: Uuid = uuid.parse().map_err(|e| {
                     error!("Failed to parse uuid: {:?}", e);
                     Status::invalid_argument("invalid uuid")
                 })?;
-                self.app.get_dataset_by_uuid(uuid).await
+                DatasetId::Uuid(uuid)
             }
-        }
-        .map_err(|e| {
-            if let Some(diesel::result::Error::NotFound) = e.downcast_ref() {
-                Status::not_found("dataset not found")
-            } else {
-                error!("Failed to get dataset: {:?}", e);
-                Status::internal(e.to_string())
+        };
+        let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
+            // Check if it's a not found error
+            match &e {
+                crate::dataset_manager::DatasetManagerError::Database { source } => {
+                    if let Some(diesel::result::Error::NotFound) = source.downcast_ref() {
+                        Status::not_found("dataset not found")
+                    } else {
+                        error!("Failed to get dataset: {:?}", e);
+                        Status::internal(e.to_string())
+                    }
+                }
+                _ => {
+                    error!("Failed to get dataset: {:?}", e);
+                    Status::internal(e.to_string())
+                }
             }
         })?;
-        let record = DatasetRecord::from(dataset);
         Ok(Response::new(GetResponse {
             dataset: Some(record.into()),
         }))
@@ -405,11 +415,7 @@ impl DatasetService for Storage {
         request: Request<AddTagsRequest>,
     ) -> Result<Response<AddTagsResponse>> {
         let AddTagsRequest { id, tags } = request.into_inner();
-        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
-            error!("Failed to get dataset: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
-        dataset.add_tags(tags).await.map_err(|e| {
+        self.manager.add_tags(id, tags).await.map_err(|e| {
             error!("Failed to add tags: {:?}", e);
             Status::internal(e.to_string())
         })?;
@@ -421,11 +427,7 @@ impl DatasetService for Storage {
         request: Request<RemoveTagsRequest>,
     ) -> Result<Response<RemoveTagsResponse>> {
         let RemoveTagsRequest { id, tags } = request.into_inner();
-        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
-            error!("Failed to get dataset: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
-        dataset.remove_tags(tags).await.map_err(|e| {
+        self.manager.remove_tags(id, tags).await.map_err(|e| {
             error!("Failed to remove tags: {:?}", e);
             Status::internal(e.to_string())
         })?;
@@ -439,32 +441,21 @@ impl DatasetService for Storage {
             description,
             favorite,
         } = request.into_inner();
-        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
-            error!("Failed to get dataset: {:?}", e);
+        let update = crate::dataset_manager::DatasetUpdate {
+            name,
+            description,
+            favorite,
+        };
+        self.manager.update_dataset(id, update).await.map_err(|e| {
+            error!("Failed to update dataset: {:?}", e);
             Status::internal(e.to_string())
         })?;
-        dataset
-            .update_info(DatasetUpdate {
-                name,
-                description,
-                favorite,
-                status: None,
-            })
-            .await
-            .map_err(|e| {
-                error!("Failed to update dataset: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
         Ok(Response::new(UpdateResponse {}))
     }
 
     async fn delete(&self, request: Request<DeleteRequest>) -> Result<Response<DeleteResponse>> {
         let DeleteRequest { id } = request.into_inner();
-        let mut dataset = self.app.get_dataset(id).await.map_err(|e| {
-            error!("Failed to get dataset: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
-        dataset.delete().await.map_err(|e| {
+        self.manager.delete_dataset(id).await.map_err(|e| {
             error!("Failed to delete dataset: {:?}", e);
             Status::internal(e.to_string())
         })?;

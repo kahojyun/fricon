@@ -16,6 +16,7 @@ use crate::{
         Tag, schema,
     },
     dataset::{self, Dataset},
+    dataset_manager::DatasetManager,
     server,
     workspace::WorkspaceRoot,
 };
@@ -144,6 +145,13 @@ impl AppHandle {
         self.state.subscribe_to_events()
     }
 
+    /// Create a DatasetManager for this app instance
+    #[must_use]
+    pub fn dataset_manager(&self) -> DatasetManager {
+        DatasetManager::new(self.clone())
+    }
+
+    #[deprecated(note = "Use DatasetManager::create_dataset instead")]
     pub async fn create_dataset(
         &self,
         name: String,
@@ -208,6 +216,7 @@ impl AppHandle {
         Ok(writer)
     }
 
+    #[deprecated(note = "Use DatasetManager::get_dataset instead")]
     pub async fn get_dataset(&self, id: i32) -> Result<Dataset> {
         let (dataset, tags) = self
             .state
@@ -227,6 +236,7 @@ impl AppHandle {
         Ok(Dataset::new(self.clone(), dataset, tags))
     }
 
+    #[deprecated(note = "Use DatasetManager::get_dataset with DatasetId::Uuid instead")]
     pub async fn get_dataset_by_uuid(&self, uuid: Uuid) -> Result<Dataset> {
         let (dataset, tags) = self
             .state
@@ -246,6 +256,7 @@ impl AppHandle {
         Ok(Dataset::new(self.clone(), dataset, tags))
     }
 
+    #[deprecated(note = "Use DatasetManager::list_datasets instead")]
     pub async fn list_datasets(&self) -> Result<Vec<(database::Dataset, Vec<database::Tag>)>> {
         self.state
             .database()

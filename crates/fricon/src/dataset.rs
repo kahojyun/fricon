@@ -3,7 +3,7 @@
 //! A dataset is a folder containing a single [arrow] file and a JSON file for
 //! metadata. The metadata can be updated, but the arrow file can be written
 //! only once.
-mod batch_writer;
+pub(crate) mod batch_writer;
 
 use std::{
     fs::{self, File},
