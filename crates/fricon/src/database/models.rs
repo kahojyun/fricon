@@ -138,7 +138,7 @@ impl Tag {
     /// Find or create tags in batch
     pub fn find_or_create_batch(
         conn: &mut SqliteConnection,
-        names: Vec<String>,
+        names: &[String],
     ) -> QueryResult<Vec<Self>> {
         use schema::tags::dsl::{name, tags};
 
@@ -152,7 +152,7 @@ impl Tag {
             .execute(conn)?;
 
         // Return all requested tags
-        tags.filter(name.eq_any(&names))
+        tags.filter(name.eq_any(names))
             .select(Self::as_select())
             .load(conn)
     }
@@ -200,7 +200,7 @@ impl DatasetTag {
     pub fn create_associations(
         conn: &mut SqliteConnection,
         ds_id: i32,
-        tag_ids: Vec<i32>,
+        tag_ids: &[i32],
     ) -> QueryResult<Vec<Self>> {
         use schema::datasets_tags::dsl::datasets_tags;
 
@@ -224,13 +224,13 @@ impl DatasetTag {
     pub fn remove_associations(
         conn: &mut SqliteConnection,
         ds_id: i32,
-        tag_ids: Vec<i32>,
+        tag_ids: &[i32],
     ) -> QueryResult<usize> {
         use schema::datasets_tags::dsl::{dataset_id, datasets_tags, tag_id};
 
         diesel::delete(datasets_tags)
             .filter(dataset_id.eq(ds_id))
-            .filter(tag_id.eq_any(&tag_ids))
+            .filter(tag_id.eq_any(tag_ids))
             .execute(conn)
     }
 

@@ -109,7 +109,6 @@ pub enum DatasetId {
 struct PendingWrite {
     dataset_id: i32,
     path: PathBuf,
-    request: CreateDatasetRequest,
 }
 
 /// Central manager for all dataset operations
@@ -166,7 +165,6 @@ impl DatasetManager {
         let pending_write = PendingWrite {
             dataset_id,
             path: dataset_path.clone(),
-            request: request.clone(),
         };
 
         {
@@ -253,9 +251,8 @@ impl DatasetManager {
                     DatasetId::Uuid(uuid) => database::Dataset::find_by_uuid(conn, uuid)?,
                 };
 
-                let dataset = match dataset {
-                    Some(d) => d,
-                    None => return Err(diesel::result::Error::NotFound.into()),
+                let Some(dataset) = dataset else {
+                    return Err(diesel::result::Error::NotFound.into());
                 };
 
                 let tags = dataset.load_tags(conn)?;
@@ -345,11 +342,11 @@ impl DatasetManager {
             .interact(move |conn| {
                 conn.immediate_transaction(|conn| {
                     // Create or find tags and get their IDs
-                    let created_tags = database::Tag::find_or_create_batch(conn, tags)?;
+                    let created_tags = database::Tag::find_or_create_batch(conn, &tags)?;
                     let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
 
                     // Create associations
-                    database::DatasetTag::create_associations(conn, id, tag_ids)?;
+                    database::DatasetTag::create_associations(conn, id, &tag_ids)?;
                     Ok(())
                 })
             })
@@ -381,7 +378,7 @@ impl DatasetManager {
                         .load::<i32>(conn)?;
 
                     // Remove associations
-                    database::DatasetTag::remove_associations(conn, id, tag_ids_to_delete)?;
+                    database::DatasetTag::remove_associations(conn, id, &tag_ids_to_delete)?;
                     Ok(())
                 })
             })
@@ -461,10 +458,11 @@ impl DatasetManager {
 
                     // Handle tags creation and association
                     if !request.tags.is_empty() {
-                        let created_tags = database::Tag::find_or_create_batch(conn, request.tags)?;
+                        let created_tags =
+                            database::Tag::find_or_create_batch(conn, &request.tags)?;
                         let tag_ids: Vec<i32> =
                             created_tags.into_iter().map(|tag| tag.id).collect();
-                        database::DatasetTag::create_associations(conn, dataset.id, tag_ids)?;
+                        database::DatasetTag::create_associations(conn, dataset.id, &tag_ids)?;
                     }
 
                     Ok(dataset.id)
