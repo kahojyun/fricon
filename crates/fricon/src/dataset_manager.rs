@@ -141,10 +141,19 @@ pub struct DatasetUpdate {
 }
 
 /// Identifier for dataset lookup operations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum DatasetId {
     Id(i32),
     Uuid(Uuid),
+}
+
+/// Errors that can occur during the dataset write transaction
+#[derive(Debug, thiserror::Error)]
+enum WriteDatasetTxError {
+    #[error("Dataset not found")]
+    NotFound,
+    #[error("Dataset is not in writable state: {0:?}")]
+    NotWritable(DatasetStatus),
 }
 
 /// Central manager for all dataset operations
@@ -216,18 +225,20 @@ impl DatasetManager {
         E: std::error::Error + Send + Sync + 'static,
     {
         // Atomically check status and update to Writing to prevent race conditions
-        let dataset_record = self
+        let (dataset, tags) = self
             .app
             .database()
             .interact(move |conn| {
                 conn.immediate_transaction(|conn| {
                     // Get dataset by UUID within transaction
                     let dataset = database::Dataset::find_by_uuid(conn, uuid)?
-                        .ok_or(diesel::result::Error::NotFound)?;
+                        .ok_or_else(|| anyhow::Error::new(WriteDatasetTxError::NotFound))?;
 
                     // Check if dataset is in pending status
                     if dataset.status != DatasetStatus::Pending {
-                        bail!("Dataset is not writable: status={:?}", dataset.status);
+                        return Err(anyhow::Error::new(WriteDatasetTxError::NotWritable(
+                            dataset.status,
+                        )));
                     }
 
                     // Update status to Writing atomically
@@ -240,18 +251,19 @@ impl DatasetManager {
             })
             .await
             .map_err(|e| {
-                // Check if it's a status-related error
-                if let Some(anyhow_err) = e.downcast_ref::<anyhow::Error>()
-                    && anyhow_err.to_string().contains("not writable")
-                {
-                    // Extract status from error for proper error handling
-                    return DatasetManagerError::InvalidToken;
+                if let Some(tx_err) = e.downcast_ref::<WriteDatasetTxError>() {
+                    match tx_err {
+                        WriteDatasetTxError::NotFound => DatasetManagerError::InvalidToken,
+                        WriteDatasetTxError::NotWritable(status) => {
+                            DatasetManagerError::NotWritable { status: *status }
+                        }
+                    }
+                } else {
+                    e.into()
                 }
-                DatasetManagerError::InvalidToken
             })?;
 
-        let dataset_record =
-            DatasetRecord::from_database_models(dataset_record.0, dataset_record.1);
+        let dataset_record = DatasetRecord::from_database_models(dataset, tags);
         let dataset_path = self.app.root().paths().dataset_path_from_uuid(uuid);
 
         // Perform the actual write operation
@@ -286,7 +298,7 @@ impl DatasetManager {
 
     /// Get a dataset by ID or UUID
     pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
-        let (dataset, tags) = self
+        let result = self
             .app
             .database()
             .interact(move |conn| {
@@ -300,11 +312,22 @@ impl DatasetManager {
                 };
 
                 let tags = dataset.load_tags(conn)?;
-                Ok::<_, anyhow::Error>((dataset, tags))
+                Ok((dataset, tags))
             })
-            .await?;
+            .await;
 
-        Ok(DatasetRecord::from_database_models(dataset, tags))
+        match result {
+            Ok((dataset, tags)) => Ok(DatasetRecord::from_database_models(dataset, tags)),
+            Err(e) => {
+                if let Some(diesel::result::Error::NotFound) = e.downcast_ref() {
+                    Err(DatasetManagerError::NotFound {
+                        id: format!("{id:?}"),
+                    })
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
     }
 
     /// List all datasets with optional filtering

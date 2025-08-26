@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::{
     app::AppHandle,
     database::DatasetStatus,
-    dataset_manager::{CreateDatasetRequest, DatasetId, DatasetManager},
+    dataset_manager::{CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError},
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
         DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest, RemoveTagsResponse,
@@ -160,7 +160,15 @@ impl DatasetService for Storage {
 
         let record = write_result.map_err(|e| {
             error!("Failed to write dataset: {:?}", e);
-            Status::internal(e.to_string())
+            match e {
+                DatasetManagerError::InvalidToken => {
+                    Status::invalid_argument("invalid or expired write token")
+                }
+                DatasetManagerError::NotWritable { status } => Status::failed_precondition(
+                    format!("dataset not writable: status is {status:?}"),
+                ),
+                _ => Status::internal(e.to_string()),
+            }
         })?;
 
         Ok(Response::new(WriteResponse {
@@ -206,17 +214,10 @@ impl DatasetService for Storage {
             }
         };
         let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
-            // Check if it's a not found error
-            if let crate::dataset_manager::DatasetManagerError::Database { source } = &e {
-                if let Some(diesel::result::Error::NotFound) = source.downcast_ref() {
-                    Status::not_found("dataset not found")
-                } else {
-                    error!("Failed to get dataset: {:?}", e);
-                    Status::internal(e.to_string())
-                }
-            } else {
-                error!("Failed to get dataset: {:?}", e);
-                Status::internal(e.to_string())
+            error!("Failed to get dataset: {:?}", e);
+            match e {
+                DatasetManagerError::NotFound { .. } => Status::not_found("dataset not found"),
+                _ => Status::internal(e.to_string()),
             }
         })?;
         Ok(Response::new(GetResponse {
