@@ -7,11 +7,9 @@
 mod batch_writer;
 
 use std::{
-    collections::HashMap,
     fs::{self, File},
     io::BufWriter,
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    path::Path,
 };
 
 use anyhow::{Context, Result};
@@ -104,27 +102,16 @@ pub enum DatasetId {
     Uuid(Uuid),
 }
 
-/// Information about a pending write operation
-#[derive(Debug)]
-struct PendingWrite {
-    dataset_id: i32,
-    path: PathBuf,
-}
-
 /// Central manager for all dataset operations
 #[derive(Clone)]
 pub struct DatasetManager {
     app: AppHandle,
-    pending_writers: Arc<Mutex<HashMap<Uuid, PendingWrite>>>,
 }
 
 impl DatasetManager {
     /// Create a new `DatasetManager` instance
     pub fn new(app: AppHandle) -> Self {
-        Self {
-            app,
-            pending_writers: Arc::new(Mutex::new(HashMap::new())),
-        }
+        Self { app }
     }
 
     /// Get access to the app handle
@@ -161,17 +148,6 @@ impl DatasetManager {
             )
         })?;
 
-        // Store pending write information
-        let pending_write = PendingWrite {
-            dataset_id,
-            path: dataset_path.clone(),
-        };
-
-        {
-            let mut pending = self.pending_writers.lock().unwrap();
-            pending.insert(uuid, pending_write);
-        }
-
         // Send dataset created event to notify UI
         let event = AppEvent::DatasetCreated {
             id: dataset_id,
@@ -199,41 +175,49 @@ impl DatasetManager {
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        // Get pending write info and remove from pending map
-        let pending_write = {
-            let mut pending = self.pending_writers.lock().unwrap();
-            pending
-                .remove(&token)
-                .ok_or(DatasetManagerError::InvalidToken)?
-        };
+        // Get dataset by UUID token
+        let dataset_record = self
+            .get_dataset(DatasetId::Uuid(token))
+            .await
+            .map_err(|_| DatasetManagerError::InvalidToken)?;
+
+        // Check if dataset is in pending status
+        if dataset_record.metadata.status != DatasetStatus::Pending {
+            return Err(DatasetManagerError::NotWritable {
+                status: dataset_record.metadata.status,
+            });
+        }
+
+        let dataset_path = self.app.root().paths().dataset_path_from_uuid(token);
 
         // Update status to Writing
-        self.update_status(pending_write.dataset_id, DatasetStatus::Writing)
+        self.update_status(dataset_record.id, DatasetStatus::Writing)
             .await?;
 
         // Perform the actual write operation
         let result = self
-            .perform_write_async(pending_write.dataset_id, &pending_write.path, stream)
+            .perform_write_async(dataset_record.id, &dataset_path, stream)
             .await;
 
         match result {
             Ok(()) => {
                 // Update status to Completed and save metadata
-                self.update_status(pending_write.dataset_id, DatasetStatus::Completed)
+                self.update_status(dataset_record.id, DatasetStatus::Completed)
                     .await?;
 
-                // Save metadata file
-                let metadata = self.create_metadata(&pending_write).await?;
-                metadata.save(&pending_write.path.join(METADATA_NAME))?;
+                // Get updated dataset record and save metadata file
+                let updated_record = self.get_dataset(DatasetId::Id(dataset_record.id)).await?;
+                updated_record
+                    .metadata
+                    .save(&dataset_path.join(METADATA_NAME))?;
 
                 // Return the completed dataset record
-                self.get_dataset(DatasetId::Id(pending_write.dataset_id))
-                    .await
+                Ok(updated_record)
             }
             Err(e) => {
                 // Update status to Aborted on failure
                 let _ = self
-                    .update_status(pending_write.dataset_id, DatasetStatus::Aborted)
+                    .update_status(dataset_record.id, DatasetStatus::Aborted)
                     .await;
                 Err(e)
             }
@@ -488,17 +472,6 @@ impl DatasetManager {
             .await?;
 
         Ok(())
-    }
-
-    /// Create metadata from pending write info and current database state
-    async fn create_metadata(
-        &self,
-        pending_write: &PendingWrite,
-    ) -> Result<DatasetMetadata, DatasetManagerError> {
-        let record = self
-            .get_dataset(DatasetId::Id(pending_write.dataset_id))
-            .await?;
-        Ok(record.metadata)
     }
 
     /// Perform the actual write operation using `BatchWriter`
