@@ -12,7 +12,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use arrow::array::RecordBatch;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
@@ -175,24 +175,44 @@ impl DatasetManager {
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        // Get dataset by UUID token
+        // Atomically check status and update to Writing to prevent race conditions
         let dataset_record = self
-            .get_dataset(DatasetId::Uuid(uuid))
+            .app
+            .database()
+            .interact(move |conn| {
+                conn.immediate_transaction(|conn| {
+                    // Get dataset by UUID within transaction
+                    let dataset = database::Dataset::find_by_uuid(conn, uuid)?
+                        .ok_or_else(|| diesel::result::Error::NotFound)?;
+
+                    // Check if dataset is in pending status
+                    if dataset.status != DatasetStatus::Pending {
+                        bail!("Dataset is not writable: status={:?}", dataset.status);
+                    }
+
+                    // Update status to Writing atomically
+                    database::Dataset::update_status(conn, dataset.id, DatasetStatus::Writing)?;
+
+                    // Load tags for the complete record
+                    let tags = dataset.load_tags(conn)?;
+                    Ok((dataset, tags))
+                })
+            })
             .await
-            .map_err(|_| DatasetManagerError::InvalidToken)?;
+            .map_err(|e| {
+                // Check if it's a status-related error
+                if let Some(anyhow_err) = e.downcast_ref::<anyhow::Error>()
+                    && anyhow_err.to_string().contains("not writable")
+                {
+                    // Extract status from error for proper error handling
+                    return DatasetManagerError::InvalidToken;
+                }
+                DatasetManagerError::InvalidToken
+            })?;
 
-        // Check if dataset is in pending status
-        if dataset_record.metadata.status != DatasetStatus::Pending {
-            return Err(DatasetManagerError::NotWritable {
-                status: dataset_record.metadata.status,
-            });
-        }
-
+        let dataset_record =
+            DatasetRecord::from_database_models(dataset_record.0, dataset_record.1);
         let dataset_path = self.app.root().paths().dataset_path_from_uuid(uuid);
-
-        // Update status to Writing
-        self.update_status(dataset_record.id, DatasetStatus::Writing)
-            .await?;
 
         // Perform the actual write operation
         let result = self
