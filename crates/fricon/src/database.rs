@@ -11,7 +11,7 @@ pub use self::{
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, anyhow};
 use deadpool_diesel::{
     Runtime,
     sqlite::{Hook, HookError, Manager, Pool},
@@ -22,9 +22,28 @@ use diesel::{
 };
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use futures::FutureExt;
-use tracing::info;
+use thiserror::Error;
+use tracing::{error, info};
 
-pub async fn connect(path: impl AsRef<Path>, backup_path: impl Into<PathBuf>) -> Result<Pool> {
+#[derive(Debug, Error)]
+pub enum DatabaseError {
+    #[error(transparent)]
+    Pool(#[from] deadpool_diesel::PoolError),
+
+    #[error(transparent)]
+    Migration(#[from] Box<dyn std::error::Error + Send + Sync>),
+
+    #[error(transparent)]
+    Query(#[from] diesel::result::Error),
+
+    #[error(transparent)]
+    General(#[from] anyhow::Error),
+}
+
+pub async fn connect(
+    path: impl AsRef<Path>,
+    backup_path: impl Into<PathBuf>,
+) -> Result<Pool, DatabaseError> {
     let path = path.as_ref();
     let backup_path = backup_path.into();
     info!("Connect to database at {}", path.display());
@@ -41,18 +60,18 @@ pub async fn connect(path: impl AsRef<Path>, backup_path: impl Into<PathBuf>) ->
             }
             .boxed()
         }))
-        .build()?;
+        .build()
+        .context("Failed to create database pool")?;
     pool.interact(move |conn| run_migrations(conn, &backup_path))
-        .await
-        .context("Failed to run migrations")?;
+        .await?
+        .context("Migration execution failed during connection")?;
     Ok(pool)
 }
 
-fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()> {
-    info!("Creating database backup at {}", backup_path.display());
+fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<(), DatabaseError> {
     let backup_path_str = backup_path
         .to_str()
-        .context("Backup path contains invalid UTF-8")?;
+        .context("Invalid backup path encoding")?;
     diesel::sql_query("VACUUM INTO ?")
         .bind::<diesel::sql_types::Text, _>(backup_path_str)
         .execute(conn)?;
@@ -61,33 +80,23 @@ fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
-fn run_migrations(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()> {
-    let applied_migrations = conn
-        .applied_migrations()
-        .map_err(anyhow::Error::from_boxed)?;
-    if applied_migrations.len()
-        > MigrationSource::<Sqlite>::migrations(&MIGRATIONS)
-            .map_err(anyhow::Error::from_boxed)?
-            .len()
-    {
-        bail!("Database has more applied migrations than expected");
+fn run_migrations(conn: &mut SqliteConnection, backup_path: &Path) -> Result<(), DatabaseError> {
+    let applied_migrations = conn.applied_migrations()?;
+    let available_migrations = MigrationSource::<Sqlite>::migrations(&MIGRATIONS)?;
+
+    if applied_migrations.len() > available_migrations.len() {
+        return Err(DatabaseError::Migration(
+            anyhow!("Migration count mismatch").into(),
+        ));
     }
 
-    let has_pending = conn
-        .has_pending_migration(MIGRATIONS)
-        .map_err(anyhow::Error::from_boxed)?;
+    let has_pending = conn.has_pending_migration(MIGRATIONS)?;
 
     if has_pending {
-        backup_database(conn, backup_path)?;
         info!("Running pending database migrations");
-        let result = conn
-            .run_pending_migrations(MIGRATIONS)
-            .map_err(anyhow::Error::from_boxed)?;
-        for migration in result {
-            info!("Database migration {} completed", migration);
-        }
-    } else {
-        info!("Database is up to date, no migrations needed");
+        backup_database(conn, backup_path)?;
+        let _result = conn.run_pending_migrations(MIGRATIONS)?;
+        info!("Database migrations completed");
     }
 
     Ok(())
@@ -103,22 +112,22 @@ fn initialize_connection(conn: &mut SqliteConnection) -> QueryResult<()> {
 }
 
 pub trait PoolExt {
-    async fn interact<F, T>(&self, f: F) -> Result<T>
+    async fn interact<F, R>(&self, f: F) -> Result<R, DatabaseError>
     where
-        F: FnOnce(&mut SqliteConnection) -> Result<T> + Send + 'static,
-        T: Send + 'static;
+        F: FnOnce(&mut SqliteConnection) -> R + Send + 'static,
+        R: Send + 'static;
 }
 
 impl PoolExt for Pool {
-    async fn interact<F, T>(&self, f: F) -> Result<T>
+    async fn interact<F, R>(&self, f: F) -> Result<R, DatabaseError>
     where
-        F: FnOnce(&mut SqliteConnection) -> Result<T> + Send + 'static,
-        T: Send + 'static,
+        F: FnOnce(&mut SqliteConnection) -> R + Send + 'static,
+        R: Send + 'static,
     {
-        let conn = self.get().await?;
-        conn.interact(f)
+        self.get()
+            .await?
+            .interact(f)
             .await
-            .map_err(|e| anyhow!("Failed to interact with database connection: {e}"))
-            .flatten()
+            .map_err(|e| DatabaseError::General(anyhow!("Interact error: {e}")))
     }
 }
