@@ -9,6 +9,7 @@ Thank you for your interest in contributing to Fricon! This document provides gu
 #### System Dependencies
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
@@ -21,6 +22,7 @@ sudo apt-get install -y \
 ```
 
 **macOS:**
+
 ```bash
 # Install Homebrew if not already installed
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -30,12 +32,14 @@ brew install protobuf sqlite3 pkg-config
 ```
 
 **Windows:**
+
 ```powershell
 # Install via Chocolatey (install chocolatey first if needed)
 choco install protoc
 ```
 
 **Linux (Additional for Tauri UI):**
+
 ```bash
 # Required for Tauri 2.0 on Linux (refer to official guide for latest info)
 sudo apt update
@@ -67,49 +71,53 @@ For the latest information, refer to the [official Tauri prerequisites guide](ht
 ### Installation Steps
 
 1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/kahojyun/fricon.git
-   cd fricon
-   ```
+
+    ```bash
+    git clone https://github.com/kahojyun/fricon.git
+    cd fricon
+    ```
 
 2. **Install Rust toolchain:**
-   ```bash
-   # Rust will be automatically installed/configured via rust-toolchain.toml
-   # when you run cargo commands
-   ```
+
+    ```bash
+    # Rust will be automatically installed/configured via rust-toolchain.toml
+    # when you run cargo commands
+    ```
 
 3. **Install uv (Python package manager):**
 
-   Follow the official installation guide at [uv installation](https://docs.astral.sh/uv/getting-started/installation/)
+    Follow the official installation guide at [uv installation](https://docs.astral.sh/uv/getting-started/installation/)
 
-   ```bash
-   # Quick install via curl (recommended)
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
+    ```bash
+    # Quick install via curl (recommended)
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
 
 4. **Install pnpm (Node.js package manager):**
 
-   Follow the official installation guide at [pnpm installation](https://pnpm.io/installation)
+    Follow the official installation guide at [pnpm installation](https://pnpm.io/installation)
 
-   ```bash
-   # Quick install via curl
-   curl -fsSL https://get.pnpm.io/install.sh | sh
-   ```
+    ```bash
+    # Quick install via curl
+    curl -fsSL https://get.pnpm.io/install.sh | sh
+    ```
 
 5. **Install diesel_cli (Rust database tool):**
-   ```bash
-   cargo install diesel_cli --no-default-features --features sqlite
-   ```
+
+    ```bash
+    cargo install diesel_cli --no-default-features --features sqlite
+    ```
 
 6. **Run the development setup script:**
-   ```bash
-   python3 scripts/setup-dev.py
-   ```
 
-   This script will:
-   - Create a `.dev` folder for development files
-   - Set up the `.env` file with database configuration
-   - Initialize and run database migrations
+    ```bash
+    python3 scripts/setup-dev.py
+    ```
+
+    This script will:
+    - Create a `.dev` folder for development files
+    - Set up the `.env` file with database configuration
+    - Initialize and run database migrations
 
 ### Project Structure
 
@@ -135,6 +143,7 @@ fricon/
 ### Building the Project
 
 #### Rust Components
+
 ```bash
 # Check all Rust crates
 cargo check
@@ -148,6 +157,7 @@ cargo build -p fricon-ui
 ```
 
 #### Python Development
+
 ```bash
 # Set up Python environment and install dependencies
 uv sync --dev
@@ -162,6 +172,7 @@ uv run pytest
 ```
 
 #### Frontend Development (UI)
+
 ```bash
 # Navigate to frontend directory
 cd crates/fricon-ui/frontend
@@ -179,6 +190,7 @@ pnpm run build
 ### Testing
 
 #### Rust Tests
+
 ```bash
 # Run all Rust tests
 cargo test
@@ -188,6 +200,7 @@ cargo test -p fricon
 ```
 
 #### Python Tests
+
 ```bash
 # Run Python tests with uv
 uv run pytest
@@ -197,6 +210,7 @@ uv run pytest --cov=fricon
 ```
 
 #### Frontend Tests
+
 ```bash
 cd crates/fricon-ui/frontend
 pnpm run test
@@ -205,6 +219,7 @@ pnpm run test
 ### Code Style and Linting
 
 #### Rust
+
 ```bash
 # Format code
 cargo fmt
@@ -217,6 +232,7 @@ cargo clippy --all-features
 ```
 
 #### Python
+
 ```bash
 # Format with ruff
 uv run ruff format
@@ -229,6 +245,7 @@ uv run mypy
 ```
 
 #### Frontend (TypeScript/Vue)
+
 ```bash
 cd crates/fricon-ui/frontend
 
@@ -266,6 +283,7 @@ diesel migration revert
 ### Code Style
 
 #### Rust
+
 - Follow the official Rust style guide
 - Use `cargo fmt` for formatting
 - Address all `cargo clippy` warnings
@@ -273,12 +291,14 @@ diesel migration revert
 - Use `Result<T, Error>` for error handling, avoid `panic!` and `unwrap()`
 
 #### Python
+
 - Follow PEP 8 style guide
 - Use type hints for all function signatures
 - Write docstrings for public functions and classes
 - Use `ruff` for formatting and linting
 
 #### Vue3/TypeScript
+
 - Use Composition API with `<script setup lang="ts">` syntax
 - Follow Vue.js style guide
 - Use Pinia for state management
@@ -287,6 +307,7 @@ diesel migration revert
 ### Commit Messages
 
 Use conventional commit format:
+
 ```
 type(scope): description
 
@@ -298,6 +319,7 @@ type(scope): description
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 Examples:
+
 - `feat(core): add new dataset export functionality`
 - `fix(ui): resolve workspace loading issue`
 - `docs: update installation instructions`
@@ -314,6 +336,7 @@ Examples:
 ### Issue Reporting
 
 When reporting issues:
+
 - Use the issue templates if available
 - Provide clear reproduction steps
 - Include relevant system information
@@ -339,6 +362,7 @@ Fricon is a data collection automation framework with the following components:
 ### Development Dependencies
 
 The project uses several development tools:
+
 - **release-plz**: Automated release management
 - **pre-commit**: Git hooks for code quality
 - **GitHub Actions**: CI/CD workflows
@@ -381,6 +405,7 @@ python3 scripts/dev.py clean
 ### Common Development Tasks
 
 **Full project build and test:**
+
 ```bash
 # Set up environment (run once)
 python3 scripts/setup-dev.py
@@ -397,6 +422,7 @@ cd crates/fricon-ui/frontend && pnpm run test
 ```
 
 **Working with specific components:**
+
 ```bash
 # Core Rust development
 cargo check -p fricon
@@ -413,6 +439,7 @@ pnpm run build  # Build for production
 ```
 
 **Database operations:**
+
 ```bash
 cd crates/fricon
 diesel migration generate new_feature
@@ -420,6 +447,7 @@ diesel migration run  # Automatically updates schema.rs in src/database/
 ```
 
 **Code quality checks:**
+
 ```bash
 # Rust
 cargo fmt --all
@@ -441,48 +469,51 @@ pnpm run format
 **Build Issues:**
 
 1. **Protobuf compiler not found:**
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get install protobuf-compiler
 
-   # macOS
-   brew install protobuf
-   ```
+    ```bash
+    # Ubuntu/Debian
+    sudo apt-get install protobuf-compiler
+
+    # macOS
+    brew install protobuf
+    ```
 
 2. **SQLite development libraries missing:**
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get install libsqlite3-dev
 
-   # macOS
-   brew install sqlite3
-   ```
+    ```bash
+    # Ubuntu/Debian
+    sudo apt-get install libsqlite3-dev
+
+    # macOS
+    brew install sqlite3
+    ```
 
 3. **Diesel CLI not found:**
-   ```bash
-   cargo install diesel_cli --no-default-features --features sqlite
-   ```
+
+    ```bash
+    cargo install diesel_cli --no-default-features --features sqlite
+    ```
 
 4. **Node.js/pnpm issues:**
-   ```bash
-   # Update to Node.js 22+
-   # Install pnpm
-   npm install -g pnpm
-   ```
+    ```bash
+    # Update to Node.js 22+
+    # Install pnpm
+    npm install -g pnpm
+    ```
 
 **Runtime Issues:**
 
 1. **Database connection errors:**
-   - Ensure `.env` file exists and has correct `DATABASE_URL`
-   - Run `python3 scripts/setup-dev.py` to recreate
+    - Ensure `.env` file exists and has correct `DATABASE_URL`
+    - Run `python3 scripts/setup-dev.py` to recreate
 
 2. **Python import errors:**
-   - Make sure you've run `uv run maturin develop`
-   - Check that Python environment is activated
+    - Make sure you've run `uv run maturin develop`
+    - Check that Python environment is activated
 
 3. **UI build failures:**
-   - Ensure all system dependencies are installed
-   - Try deleting `node_modules` and running `pnpm install` again
+    - Ensure all system dependencies are installed
+    - Try deleting `node_modules` and running `pnpm install` again
 
 **Performance Tips:**
 

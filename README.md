@@ -21,6 +21,7 @@ Fricon is a multi-language data collection automation framework designed for man
 ### Installation
 
 **For Python users (recommended):**
+
 ```bash
 pip install fricon
 ```
