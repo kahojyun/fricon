@@ -8,11 +8,10 @@ Data collection automation framework.
 
 ## Overview
 
-Fricon is a multi-language data collection automation framework designed for managing datasets in scientific and research workflows. It provides:
+Fricon is a data collection automation framework designed for managing datasets in scientific and research workflows. It provides:
 
 - **Workspace Management**: Organized data storage with metadata tracking
 - **Dataset Operations**: Arrow-format data tables with UUID and incremental ID tracking
-- **Multi-language Support**: Core Rust library with Python bindings
 - **Desktop UI**: Cross-platform Tauri application with Vue3 frontend
 - **Server Architecture**: IPC-based server for workspace operations
 
@@ -54,16 +53,6 @@ dataset = ws.create_dataset(data)
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on development environment setup, building components, testing, and contribution workflow.
-
-## Project Structure
-
-- `crates/fricon/`: Core Rust library
-- `crates/fricon-py/`: Python bindings (PyO3)
-- `crates/fricon-ui/`: Desktop application (Tauri + Vue3)
-- `crates/fricon-cli/`: Command-line interface
-- `docs/`: Documentation source
-- `examples/`: Usage examples
-- `tests/`: Python test suite
 
 ## License
 
