@@ -8,7 +8,12 @@ import {
   type DatasetCreatedEvent,
 } from "./backend";
 
+const emit = defineEmits<{
+  "dataset-selected": [dataset: DatasetInfo];
+}>();
+
 const value: Ref<DatasetInfo[]> = ref([]);
+const selectedDataset = ref<DatasetInfo | null>(null);
 
 let unsubscribe: (() => void) | null = null;
 
@@ -29,6 +34,11 @@ const handleDatasetCreated = (event: DatasetCreatedEvent) => {
   value.value.unshift(newDataset);
 };
 
+const onSelectionChange = (event: { data: DatasetInfo }) => {
+  selectedDataset.value = event.data;
+  emit("dataset-selected", event.data);
+};
+
 onMounted(async () => {
   await loadDatasets();
 
@@ -43,12 +53,22 @@ onUnmounted(() => {
 });
 </script>
 <template>
-  <DataTable :value="value" removable-sort>
+  <DataTable
+    v-model:selection="selectedDataset"
+    :value="value"
+    removable-sort
+    selection-mode="single"
+    @row-select="onSelectionChange"
+  >
     <Column field="id" header="ID" />
     <Column field="name" header="Name" />
     <Column field="tags" header="Tags">
       <template #body="slotProps">
-        <Tag v-for="(tag, index) in slotProps.data.tags" :key="index" class="mr-1 mb-1">
+        <Tag
+          v-for="(tag, index) in slotProps.data.tags"
+          :key="index"
+          class="mr-1 mb-1"
+        >
           {{ tag }}
         </Tag>
       </template>

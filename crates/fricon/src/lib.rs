@@ -6,6 +6,7 @@
 //! - **Dataset Operations**: Create, store, and query datasets using Apache Arrow format
 //! - **Client-Server Architecture**: gRPC-based communication
 mod app;
+mod chart;
 mod client;
 mod database;
 mod dataset_manager;
@@ -17,6 +18,10 @@ mod workspace;
 
 pub use self::{
     app::{AppEvent, AppHandle, AppManager, init as init_workspace},
+    chart::{
+        ChartDataReader, ChartDataRequest, ChartSchemaReader, ChartSchemaResponse, ColumnInfo,
+        ColumnValue, EChartsDataResponse, IndexColumnFilter,
+    },
     client::{Client, Dataset, DatasetWriter},
     database::DatasetStatus,
     dataset_manager::DatasetMetadata,

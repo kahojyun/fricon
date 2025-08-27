@@ -1,6 +1,9 @@
 use super::AppState;
 
 use chrono::{DateTime, Utc};
+use fricon::{
+    ChartDataReader, ChartDataRequest, ChartSchemaReader, ChartSchemaResponse, EChartsDataResponse,
+};
 use serde::Serialize;
 use tauri::{State, ipc::Invoke};
 
@@ -73,6 +76,38 @@ async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, S
     Ok(dataset_info)
 }
 
+#[tauri::command]
+async fn get_chart_schema(
+    state: State<'_, AppState>,
+    dataset_id: i32,
+) -> Result<ChartSchemaResponse, String> {
+    let app = state.app();
+    let schema_reader = ChartSchemaReader::new(app.clone());
+    schema_reader
+        .read_chart_schema(dataset_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_chart_data(
+    state: State<'_, AppState>,
+    request: ChartDataRequest,
+) -> Result<EChartsDataResponse, String> {
+    let app = state.app();
+    let data_reader = ChartDataReader::new(app.clone());
+    data_reader
+        .read_chart_data(request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
-    tauri::generate_handler![get_workspace_info, get_server_status, list_datasets]
+    tauri::generate_handler![
+        get_workspace_info,
+        get_server_status,
+        list_datasets,
+        get_chart_schema,
+        get_chart_data
+    ]
 }

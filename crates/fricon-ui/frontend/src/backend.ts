@@ -58,3 +58,64 @@ export function onDatasetCreated(
     callback(event.payload);
   });
 }
+
+// Chart types and interfaces
+export type ColumnValue =
+  | { type: "Number"; value: number }
+  | { type: "String"; value: string }
+  | { type: "Boolean"; value: boolean };
+
+export type ColumnDataType = "Numeric" | "Text" | "Boolean" | "Other";
+
+export interface ColumnInfo {
+  name: string;
+  data_type: ColumnDataType;
+  is_index_column: boolean;
+  unique_values?: ColumnValue[];
+}
+
+export interface ChartSchemaResponse {
+  columns: ColumnInfo[];
+  index_columns: string[];
+}
+
+export interface IndexColumnFilter {
+  column: string;
+  value: ColumnValue;
+}
+
+export interface ChartDataRequest {
+  dataset_id: number;
+  x_column: string;
+  y_columns: string[];
+  index_column_filters: IndexColumnFilter[];
+}
+
+export interface EChartsDataset {
+  dimensions: string[];
+  source: ColumnValue[][];
+}
+
+export interface EChartsSeries {
+  name: string;
+  type: string;
+  data_group_id: number;
+}
+
+export interface EChartsDataResponse {
+  dataset: EChartsDataset;
+  series: EChartsSeries[];
+}
+
+// Chart API functions
+export async function getChartSchema(
+  datasetId: number,
+): Promise<ChartSchemaResponse> {
+  return await invoke<ChartSchemaResponse>("get_chart_schema", { datasetId });
+}
+
+export async function getChartData(
+  request: ChartDataRequest,
+): Promise<EChartsDataResponse> {
+  return await invoke<EChartsDataResponse>("get_chart_data", { request });
+}
