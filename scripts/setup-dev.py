@@ -87,16 +87,16 @@ class Project:
 def main() -> None:
     print("Setting up Fricon development environment...")
     project = Project()
-    
+
     print("1. Setting up environment variables...")
     project.write_dotenv()
-    
+
     print("2. Creating development directory...")
     project.create_dev_folder()
-    
+
     print("3. Setting up database...")
     project.diesel_setup()
-    
+
     print("\nDevelopment environment setup completed!")
     print(f"Database path: {project.database_path}")
     print(f"Environment file: {project.dotenv_path}")

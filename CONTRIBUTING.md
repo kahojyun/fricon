@@ -61,7 +61,7 @@ For the latest information, refer to the [official Tauri prerequisites guide](ht
 #### Package Managers and Tools
 
 - **uv**: Modern Python package manager
-- **pnpm**: Fast, disk space efficient Node.js package manager  
+- **pnpm**: Fast, disk space efficient Node.js package manager
 - **diesel_cli**: Database migration tool for Rust
 
 ### Installation Steps
@@ -79,18 +79,18 @@ For the latest information, refer to the [official Tauri prerequisites guide](ht
    ```
 
 3. **Install uv (Python package manager):**
-   
+
    Follow the official installation guide at [uv installation](https://docs.astral.sh/uv/getting-started/installation/)
-   
+
    ```bash
    # Quick install via curl (recommended)
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
 4. **Install pnpm (Node.js package manager):**
-   
+
    Follow the official installation guide at [pnpm installation](https://pnpm.io/installation)
-   
+
    ```bash
    # Quick install via curl
    curl -fsSL https://get.pnpm.io/install.sh | sh
@@ -444,7 +444,7 @@ pnpm run format
    ```bash
    # Ubuntu/Debian
    sudo apt-get install protobuf-compiler
-   
+
    # macOS
    brew install protobuf
    ```
@@ -453,7 +453,7 @@ pnpm run format
    ```bash
    # Ubuntu/Debian
    sudo apt-get install libsqlite3-dev
-   
+
    # macOS
    brew install sqlite3
    ```

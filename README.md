@@ -11,7 +11,7 @@ Data collection automation framework.
 Fricon is a multi-language data collection automation framework designed for managing datasets in scientific and research workflows. It provides:
 
 - **Workspace Management**: Organized data storage with metadata tracking
-- **Dataset Operations**: Arrow-format data tables with UUID and incremental ID tracking  
+- **Dataset Operations**: Arrow-format data tables with UUID and incremental ID tracking
 - **Multi-language Support**: Core Rust library with Python bindings
 - **Desktop UI**: Cross-platform Tauri application with Vue3 frontend
 - **Server Architecture**: IPC-based server for workspace operations
@@ -43,7 +43,7 @@ from fricon import Workspace
 # Initialize a new workspace from CLI
 # fricon workspace init path/to/workspace
 
-# Connect to existing workspace  
+# Connect to existing workspace
 ws = Workspace.connect("path/to/workspace")
 
 # Create and manipulate datasets
