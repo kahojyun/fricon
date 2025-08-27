@@ -58,29 +58,52 @@ class Project:
     def diesel_setup(self) -> None:
         fricon_path = self.root / "crates" / "fricon"
         try:
+            print("Setting up database...")
             _ = subprocess.run(
                 ["diesel", "setup"],
                 cwd=fricon_path,
                 check=True,
             )
+            print("Running database migrations...")
             _ = subprocess.run(
                 ["diesel", "migration", "run"],
                 cwd=fricon_path,
                 check=True,
             )
+            print("Database setup completed successfully!")
         except FileNotFoundError:
             print(
-                "`diesel` not found in $PATH. Please check development requirements in "
-                + "README.md."
+                "ERROR: `diesel` not found in $PATH. Please install diesel_cli:\n"
+                + "  cargo install diesel_cli --no-default-features --features sqlite\n"
+                + "For more information, see CONTRIBUTING.md or README.md."
             )
+            raise
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: Database setup failed with exit code {e.returncode}")
+            print("Make sure you have SQLite3 development libraries installed.")
             raise
 
 
 def main() -> None:
+    print("Setting up Fricon development environment...")
     project = Project()
+    
+    print("1. Setting up environment variables...")
     project.write_dotenv()
+    
+    print("2. Creating development directory...")
     project.create_dev_folder()
+    
+    print("3. Setting up database...")
     project.diesel_setup()
+    
+    print("\nDevelopment environment setup completed!")
+    print(f"Database path: {project.database_path}")
+    print(f"Environment file: {project.dotenv_path}")
+    print("\nNext steps:")
+    print("- Run 'cargo build' to build Rust components")
+    print("- Run 'uv sync --dev' to set up Python environment")
+    print("- See CONTRIBUTING.md for detailed development instructions")
 
 
 if __name__ == "__main__":
