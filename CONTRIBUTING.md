@@ -32,7 +32,17 @@ brew install protobuf sqlite3 pkg-config
 **Windows:**
 ```powershell
 # Install via Chocolatey (install chocolatey first if needed)
-choco install protoc sqlite
+choco install protoc
+```
+
+**Linux (Additional for Tauri UI):**
+```bash
+# Required for Tauri 2.0 on Linux
+sudo apt-get install -y \
+    libwebkit2gtk-4.1-dev \
+    libjavascriptcoregtk-4.1-dev \
+    libsoup-3.0-dev \
+    libgtk-3-dev
 ```
 
 #### Programming Language Requirements
@@ -40,7 +50,6 @@ choco install protoc sqlite
 - **Rust**: Stable toolchain (automatically managed via `rust-toolchain.toml`)
 - **Python**: 3.9+ (project uses Python 3.9 as specified in `.python-version`)
 - **Node.js**: 22+ for frontend development
-- **SQLite3**: For database functionality
 
 #### Package Managers and Tools
 
@@ -63,20 +72,20 @@ choco install protoc sqlite
    ```
 
 3. **Install uv (Python package manager):**
-   ```bash
-   # Via pip
-   pip install uv
    
-   # Or via curl (recommended)
+   Follow the official installation guide at [uv installation](https://docs.astral.sh/uv/getting-started/installation/)
+   
+   ```bash
+   # Quick install via curl (recommended)
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
 4. **Install pnpm (Node.js package manager):**
-   ```bash
-   # Via npm
-   npm install -g pnpm
    
-   # Or via curl
+   Follow the official installation guide at [pnpm installation](https://pnpm.io/installation)
+   
+   ```bash
+   # Quick install via curl
    curl -fsSL https://get.pnpm.io/install.sh | sh
    ```
 
@@ -138,6 +147,8 @@ uv sync --dev
 
 # Build Python package (requires Rust toolchain)
 uv run maturin develop
+
+# Note: After modifying Rust code, you need to re-run maturin develop for changes to take effect
 
 # Run Python tests
 uv run pytest
@@ -398,7 +409,7 @@ pnpm run build  # Build for production
 ```bash
 cd crates/fricon
 diesel migration generate new_feature
-diesel migration run
+diesel migration run  # Migrations run automatically after this
 diesel print-schema > src/schema.rs
 ```
 
