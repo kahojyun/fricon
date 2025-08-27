@@ -104,6 +104,11 @@ dataset = ws.create_dataset(data)
    python3 scripts/setup-dev.py
    ```
 
+   Or use the development utility script:
+   ```bash
+   python3 scripts/dev.py setup
+   ```
+
 This script automatically:
 - Creates development folder structure
 - Sets up environment variables
@@ -114,15 +119,21 @@ This script automatically:
 ```bash
 # Rust (core library)
 cargo build -p fricon
+# or
+python3 scripts/dev.py build rust
 
 # Python bindings
 uv run maturin develop
+# or
+python3 scripts/dev.py build python
 
 # Desktop UI
 cargo build -p fricon-ui
 
 # Frontend development
 cd crates/fricon-ui/frontend && pnpm run dev
+# or
+python3 scripts/dev.py build frontend --dev
 ```
 
 ### Testing
@@ -130,12 +141,22 @@ cd crates/fricon-ui/frontend && pnpm run dev
 ```bash
 # Rust tests
 cargo test
+# or 
+python3 scripts/dev.py test rust
 
 # Python tests  
 uv run pytest
+# or
+python3 scripts/dev.py test python
 
 # Frontend tests
 cd crates/fricon-ui/frontend && pnpm run test
+# or
+python3 scripts/dev.py test frontend
+
+# All linting and formatting
+python3 scripts/dev.py lint
+python3 scripts/dev.py fix
 ```
 
 For detailed development instructions, see [CONTRIBUTING.md](CONTRIBUTING.md).

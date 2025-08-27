@@ -332,6 +332,147 @@ The project uses several development tools:
 - **Issues**: [GitHub Issues](https://github.com/kahojyun/fricon/issues)
 - **Discussions**: Use GitHub Discussions for questions and ideas
 
+## Quick Reference
+
+### Development Utility Script
+
+For convenience, use the development utility script:
+
+```bash
+# Set up development environment
+python3 scripts/dev.py setup
+
+# Build components
+python3 scripts/dev.py build rust
+python3 scripts/dev.py build python
+python3 scripts/dev.py build frontend
+
+# Run tests
+python3 scripts/dev.py test rust
+python3 scripts/dev.py test python
+python3 scripts/dev.py test frontend
+
+# Linting and formatting
+python3 scripts/dev.py lint        # Check all code style
+python3 scripts/dev.py fix         # Fix auto-fixable issues
+
+# Clean build artifacts
+python3 scripts/dev.py clean
+```
+
+### Common Development Tasks
+
+**Full project build and test:**
+```bash
+# Set up environment (run once)
+python3 scripts/setup-dev.py
+
+# Build all components
+cargo build
+uv run maturin develop
+cd crates/fricon-ui/frontend && pnpm install && pnpm run build
+
+# Run all tests
+cargo test
+uv run pytest
+cd crates/fricon-ui/frontend && pnpm run test
+```
+
+**Working with specific components:**
+```bash
+# Core Rust development
+cargo check -p fricon
+cargo test -p fricon
+
+# Python development
+uv run python examples/basic_usage.py
+uv run pytest tests/
+
+# UI development
+cd crates/fricon-ui/frontend
+pnpm run dev  # Start dev server
+pnpm run build  # Build for production
+```
+
+**Database operations:**
+```bash
+cd crates/fricon
+diesel migration generate new_feature
+diesel migration run
+diesel print-schema > src/schema.rs
+```
+
+**Code quality checks:**
+```bash
+# Rust
+cargo fmt --all
+cargo clippy --all-targets --all-features
+
+# Python
+uv run ruff format .
+uv run ruff check .
+uv run mypy .
+
+# Frontend
+cd crates/fricon-ui/frontend
+pnpm run lint
+pnpm run format
+```
+
+### Troubleshooting
+
+**Build Issues:**
+
+1. **Protobuf compiler not found:**
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install protobuf-compiler
+   
+   # macOS
+   brew install protobuf
+   ```
+
+2. **SQLite development libraries missing:**
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install libsqlite3-dev
+   
+   # macOS
+   brew install sqlite3
+   ```
+
+3. **Diesel CLI not found:**
+   ```bash
+   cargo install diesel_cli --no-default-features --features sqlite
+   ```
+
+4. **Node.js/pnpm issues:**
+   ```bash
+   # Update to Node.js 22+
+   # Install pnpm
+   npm install -g pnpm
+   ```
+
+**Runtime Issues:**
+
+1. **Database connection errors:**
+   - Ensure `.env` file exists and has correct `DATABASE_URL`
+   - Run `python3 scripts/setup-dev.py` to recreate
+
+2. **Python import errors:**
+   - Make sure you've run `uv run maturin develop`
+   - Check that Python environment is activated
+
+3. **UI build failures:**
+   - Ensure all system dependencies are installed
+   - Try deleting `node_modules` and running `pnpm install` again
+
+**Performance Tips:**
+
+- Use `cargo check` instead of `cargo build` for faster compilation during development
+- Use `--release` flag for performance testing: `cargo build --release`
+- Enable incremental compilation: set `CARGO_INCREMENTAL=1`
+
 ## License
 
 This project is licensed under MIT OR Apache-2.0. See [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE) for details.
