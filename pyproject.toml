@@ -63,4 +63,4 @@ testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 
 [tool.basedpyright]
-include = ["crates/fricon-py/python", "examples", "tests", "scripts"]
+include = ["crates/fricon-py/python", "examples", "tests"]
