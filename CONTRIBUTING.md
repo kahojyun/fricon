@@ -37,13 +37,20 @@ choco install protoc
 
 **Linux (Additional for Tauri UI):**
 ```bash
-# Required for Tauri 2.0 on Linux
-sudo apt-get install -y \
-    libwebkit2gtk-4.1-dev \
-    libjavascriptcoregtk-4.1-dev \
-    libsoup-3.0-dev \
-    libgtk-3-dev
+# Required for Tauri 2.0 on Linux (refer to official guide for latest info)
+sudo apt update
+sudo apt install libwebkit2gtk-4.1-dev \
+  build-essential \
+  curl \
+  wget \
+  file \
+  libxdo-dev \
+  libssl-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev
 ```
+
+For the latest information, refer to the [official Tauri prerequisites guide](https://tauri.app/start/prerequisites/).
 
 #### Programming Language Requirements
 
@@ -409,8 +416,7 @@ pnpm run build  # Build for production
 ```bash
 cd crates/fricon
 diesel migration generate new_feature
-diesel migration run  # Migrations run automatically after this
-diesel print-schema > src/schema.rs
+diesel migration run  # Automatically updates schema.rs in src/database/
 ```
 
 **Code quality checks:**

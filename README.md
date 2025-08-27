@@ -27,21 +27,13 @@ pip install fricon
 
 **For development or building from source:**
 
-1. **Install package managers:**
-   ```bash
-   # Install uv (Python package manager)  
-   pip install uv
-   
-   # Install pnpm (Node.js package manager)
-   npm install -g pnpm
-   ```
+Building from source requires several dependencies including Rust, protoc, uv, pnpm, and platform-specific libraries. See [CONTRIBUTING.md](CONTRIBUTING.md) for complete setup instructions.
 
-2. **Build from source:**
-   ```bash
-   git clone https://github.com/kahojyun/fricon.git
-   cd fricon
-   python3 scripts/setup-dev.py
-   ```
+```bash
+git clone https://github.com/kahojyun/fricon.git
+cd fricon
+python3 scripts/setup-dev.py
+```
 
 ### Basic Usage
 
