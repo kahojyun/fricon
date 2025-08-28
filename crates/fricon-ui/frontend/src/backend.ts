@@ -119,3 +119,26 @@ export async function getChartData(
 ): Promise<EChartsDataResponse> {
   return await invoke<EChartsDataResponse>("get_chart_data", { request });
 }
+
+// Live chart update types and interfaces
+export type ChartUpdateType = "BatchAdded" | "DatasetCompleted" | "BufferFull";
+
+export interface ChartUpdate {
+  dataset_id: number;
+  update_type: ChartUpdateType;
+  data?: EChartsDataResponse;
+  timestamp: string;
+}
+
+// Live chart API functions
+export async function subscribeLiveChartUpdates(
+  datasetId: number,
+): Promise<void> {
+  return await invoke<void>("subscribe_live_chart_updates", { datasetId });
+}
+
+export function onChartUpdate(callback: (update: ChartUpdate) => void) {
+  return listen<ChartUpdate>("chart-update", (event) => {
+    callback(event.payload);
+  });
+}

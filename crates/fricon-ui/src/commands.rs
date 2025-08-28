@@ -1,11 +1,9 @@
 use super::AppState;
 
 use chrono::{DateTime, Utc};
-use fricon::chart::{
-    ChartDataReader, ChartDataRequest, ChartSchemaReader, ChartSchemaResponse, EChartsDataResponse,
-};
+use fricon::chart::{ChartDataRequest, ChartSchemaResponse, EChartsDataResponse};
 use serde::Serialize;
-use tauri::{State, ipc::Invoke};
+use tauri::{Emitter, State, Window, ipc::Invoke};
 
 #[derive(Serialize)]
 struct DatasetInfo {
@@ -82,9 +80,9 @@ async fn get_chart_schema(
     dataset_id: i32,
 ) -> Result<ChartSchemaResponse, String> {
     let app = state.app();
-    let schema_reader = ChartSchemaReader::new(app.clone());
-    schema_reader
-        .read_chart_schema(dataset_id)
+    // Use the new ChartService with unified API
+    app.chart_service()
+        .get_schema(dataset_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -95,11 +93,40 @@ async fn get_chart_data(
     request: ChartDataRequest,
 ) -> Result<EChartsDataResponse, String> {
     let app = state.app();
-    let data_reader = ChartDataReader::new(app.clone());
-    data_reader
-        .read_chart_data(request)
+    // Use the new ChartService with automatic data source detection
+    app.chart_service()
+        .get_data(request)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Subscribe to live chart updates for real-time visualization
+#[tauri::command]
+async fn subscribe_live_chart_updates(
+    state: State<'_, AppState>,
+    dataset_id: i32,
+    window: Window,
+) -> Result<(), String> {
+    let app = state.app();
+
+    // Try to subscribe to updates for the dataset
+    let mut rx = app
+        .chart_service()
+        .subscribe_updates(dataset_id)
+        .map_err(|e| e.to_string())?;
+
+    // Spawn a task to forward updates to the frontend
+    tokio::spawn(async move {
+        while let Ok(update) = rx.recv().await {
+            // Emit the chart update event to the frontend
+            if let Err(e) = window.emit("chart-update", &update) {
+                tracing::warn!("Failed to emit chart update: {}", e);
+                break;
+            }
+        }
+    });
+
+    Ok(())
 }
 
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
@@ -108,6 +135,7 @@ pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
         get_server_status,
         list_datasets,
         get_chart_schema,
-        get_chart_data
+        get_chart_data,
+        subscribe_live_chart_updates
     ]
 }

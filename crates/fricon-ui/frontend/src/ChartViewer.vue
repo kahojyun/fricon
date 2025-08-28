@@ -11,10 +11,13 @@ import * as echarts from "echarts";
 import {
   getChartSchema,
   getChartData,
+  subscribeLiveChartUpdates,
+  onChartUpdate,
   type ChartSchemaResponse,
   type ColumnValue,
   type ChartDataRequest,
   type EChartsDataResponse,
+  type ChartUpdate,
 } from "./backend";
 
 // Props
@@ -33,6 +36,13 @@ const chart = useTemplateRef("chart");
 const schema = ref<ChartSchemaResponse | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+
+// Live update state
+const liveUpdatesEnabled = ref(false);
+const isLiveDataset = ref(false);
+const lastUpdateTime = ref<Date | null>(null);
+const updateCount = ref(0);
+let chartUpdateUnlisten: (() => void) | null = null;
 
 // Configuration state
 const selectedXColumn = ref<string>("");
@@ -100,6 +110,14 @@ async function loadSchema() {
         selectedYColumns.value = [firstY.name];
       }
     }
+
+    // Auto-enable live updates for new datasets (optional)
+    // This could be made configurable via user preferences
+    if (canGenerateChart.value) {
+      setTimeout(() => {
+        void enableLiveUpdates();
+      }, 500); // Small delay to let chart generate first
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load schema";
   } finally {
@@ -133,6 +151,60 @@ async function generateChart() {
       err instanceof Error ? err.message : "Failed to generate chart";
   } finally {
     loading.value = false;
+  }
+}
+
+// Live update functions
+async function enableLiveUpdates() {
+  if (!props.datasetId || liveUpdatesEnabled.value) return;
+
+  try {
+    // Subscribe to live chart updates
+    await subscribeLiveChartUpdates(props.datasetId);
+
+    // Set up event listener
+    chartUpdateUnlisten = await onChartUpdate(handleChartUpdate);
+
+    liveUpdatesEnabled.value = true;
+    isLiveDataset.value = true;
+
+    console.log(`Live updates enabled for dataset ${props.datasetId}`);
+  } catch (err) {
+    console.warn("Failed to enable live updates:", err);
+    error.value = "Failed to enable live updates";
+  }
+}
+
+function disableLiveUpdates() {
+  if (chartUpdateUnlisten) {
+    chartUpdateUnlisten();
+    chartUpdateUnlisten = null;
+  }
+
+  liveUpdatesEnabled.value = false;
+  console.log(`Live updates disabled for dataset ${props.datasetId}`);
+}
+
+function handleChartUpdate(update: ChartUpdate) {
+  // Only handle updates for our dataset
+  if (update.dataset_id !== props.datasetId) return;
+
+  updateCount.value += 1;
+  lastUpdateTime.value = new Date(update.timestamp);
+
+  console.log(`Chart update received:`, update.update_type);
+
+  // Refresh chart data on updates
+  if (canGenerateChart.value) {
+    generateChart();
+  }
+
+  // Handle dataset completion
+  if (update.update_type === "DatasetCompleted") {
+    isLiveDataset.value = false;
+    setTimeout(() => {
+      disableLiveUpdates();
+    }, 1000); // Give a moment for final updates
   }
 }
 
@@ -182,6 +254,9 @@ function cleanup() {
   observer.disconnect();
   chartInstance?.dispose();
   chartInstance = null;
+
+  // Clean up live updates
+  disableLiveUpdates();
 }
 
 function initChart() {
@@ -246,7 +321,46 @@ onUnmounted(cleanup);
   <div class="chart-viewer h-full flex flex-col">
     <!-- Configuration Panel -->
     <div class="config-panel bg-gray-50 p-4 border-b">
-      <h3 class="text-lg font-medium mb-4">Chart Configuration</h3>
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-medium">Chart Configuration</h3>
+
+        <!-- Live Update Controls -->
+        <div v-if="props.datasetId" class="flex items-center gap-4">
+          <div class="flex items-center gap-2">
+            <button
+              v-if="!liveUpdatesEnabled"
+              class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+              @click="enableLiveUpdates"
+            >
+              📊 Enable Live Updates
+            </button>
+            <button
+              v-else
+              class="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600"
+              @click="disableLiveUpdates"
+            >
+              ⏸️ Disable Live Updates
+            </button>
+          </div>
+
+          <!-- Live Update Status -->
+          <div v-if="liveUpdatesEnabled" class="text-sm">
+            <div class="flex items-center gap-2">
+              <div
+                class="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+              ></div>
+              <span class="text-green-700">Live</span>
+              <span v-if="isLiveDataset" class="text-gray-600">
+                ({{ updateCount }} updates)
+              </span>
+              <span v-else class="text-blue-600">(Dataset Complete)</span>
+            </div>
+            <div v-if="lastUpdateTime" class="text-xs text-gray-500">
+              Last update: {{ lastUpdateTime.toLocaleTimeString() }}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div v-if="loading" class="text-blue-600">Loading schema...</div>
 

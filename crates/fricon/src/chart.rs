@@ -199,6 +199,45 @@ impl ChartDataReader {
         Ok(Self::format_for_echarts(request, chart_data))
     }
 
+    /// Process chart data from a single `RecordBatch` (used by `ChartService`)
+    pub fn process_batch_data(
+        request: ChartDataRequest,
+        batch: &RecordBatch,
+    ) -> Result<EChartsDataResponse> {
+        let filtered_indices = Self::apply_index_filters(batch, &request.index_column_filters)?;
+        let mut chart_data = Vec::new();
+
+        for &row_idx in &filtered_indices {
+            let mut row_values = Vec::new();
+
+            // X-axis value
+            if let Some(x_value) = Self::extract_value_at(batch, &request.x_column, row_idx)? {
+                row_values.push(x_value);
+
+                // Y-axis values (numeric only)
+                let mut all_y_valid = true;
+                let mut y_values = Vec::new();
+
+                for y_column in &request.y_columns {
+                    if let Some(y_value) = Self::extract_numeric_value_at(batch, y_column, row_idx)?
+                    {
+                        y_values.push(ColumnValue::Number(y_value));
+                    } else {
+                        all_y_valid = false;
+                        break;
+                    }
+                }
+
+                if all_y_valid {
+                    row_values.extend(y_values);
+                    chart_data.push(row_values);
+                }
+            }
+        }
+
+        Ok(Self::format_for_echarts(request, chart_data))
+    }
+
     fn apply_index_filters(
         batch: &RecordBatch,
         filters: &[IndexColumnFilter],

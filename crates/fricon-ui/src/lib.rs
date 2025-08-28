@@ -50,6 +50,9 @@ impl AppState {
                             }),
                         );
                     }
+                    fricon::AppEvent::ChartUpdate(chart_update) => {
+                        let _ = app_handle.emit("chart-update", &chart_update);
+                    }
                 }
             }
         });

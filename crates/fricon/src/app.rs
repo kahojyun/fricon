@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, OnceLock},
+};
 
 use anyhow::Result;
 use chrono::Local;
@@ -8,7 +11,13 @@ use tokio::sync::broadcast;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::info;
 
-use crate::{database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot};
+use crate::{
+    chart_service::{ChartService, ChartUpdate},
+    database,
+    dataset_manager::DatasetManager,
+    server,
+    workspace::WorkspaceRoot,
+};
 
 pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
     let path = path.into();
@@ -31,6 +40,7 @@ pub enum AppEvent {
         description: String,
         tags: Vec<String>,
     },
+    ChartUpdate(ChartUpdate),
 }
 
 /// `AppState` contains only data - no business logic
@@ -47,6 +57,7 @@ struct AppStateInner {
     shutdown_token: CancellationToken,
     tracker: TaskTracker,
     event_sender: broadcast::Sender<AppEvent>,
+    chart_service: OnceLock<ChartService>,
 }
 
 impl AppState {
@@ -68,6 +79,7 @@ impl AppState {
                 shutdown_token,
                 tracker,
                 event_sender,
+                chart_service: OnceLock::new(),
             }),
         })
     }
@@ -138,6 +150,15 @@ impl AppHandle {
     #[must_use]
     pub fn dataset_manager(&self) -> DatasetManager {
         DatasetManager::new(self.clone())
+    }
+
+    /// Get the `ChartService` for this app instance (lazy initialization)
+    #[must_use]
+    pub fn chart_service(&self) -> &ChartService {
+        self.state
+            .inner
+            .chart_service
+            .get_or_init(|| ChartService::new(self.clone()))
     }
 
     /// Send an event to all subscribers

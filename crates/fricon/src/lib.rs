@@ -7,6 +7,7 @@
 //! - **Client-Server Architecture**: gRPC-based communication
 mod app;
 pub mod chart;
+pub mod chart_service;
 mod client;
 mod database;
 mod dataset_manager;
