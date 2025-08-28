@@ -48,7 +48,11 @@ onUnmounted(() => {
     <Column field="name" header="Name" />
     <Column field="tags" header="Tags">
       <template #body="slotProps">
-        <Tag v-for="(tag, index) in slotProps.data.tags" :key="index" class="mr-1 mb-1">
+        <Tag
+          v-for="(tag, index) in slotProps.data.tags"
+          :key="index"
+          class="mr-1 mb-1"
+        >
           {{ tag }}
         </Tag>
       </template>
