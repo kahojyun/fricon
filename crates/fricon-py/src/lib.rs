@@ -6,11 +6,7 @@
     clippy::significant_drop_tightening
 )]
 
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, LazyLock},
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{
@@ -19,7 +15,7 @@ use arrow::{
         StringArray, StringBuilder, StructArray, downcast_array, make_array,
     },
     buffer::OffsetBuffer,
-    datatypes::{DataType, Field, Fields, Schema},
+    datatypes::{DataType, Field, Schema},
     pyarrow::PyArrowType,
 };
 use chrono::{DateTime, Utc};
@@ -778,39 +774,20 @@ impl DatasetWriter {
 }
 
 fn get_complex_type() -> DataType {
-    static COMPLEX: LazyLock<DataType> = LazyLock::new(|| {
-        let fields = vec![
-            Field::new("real", DataType::Float64, false),
-            Field::new("imag", DataType::Float64, false),
-        ];
-        DataType::Struct(Fields::from(fields))
-    });
-    COMPLEX.clone()
+    fricon::complex128()
 }
 
 fn get_trace_type(item: DataType, fixed_step: bool) -> DataType {
-    let y_field = Field::new("ys", DataType::new_list(item, false), false);
-    if fixed_step {
-        let fields = vec![
-            Field::new("x0", DataType::Float64, false),
-            Field::new("dx", DataType::Float64, false),
-            y_field,
-        ];
-        DataType::Struct(Fields::from(fields))
-    } else {
-        let x_field = Field::new("xs", DataType::new_list(DataType::Float64, false), false);
-        let fields = vec![x_field, y_field];
-        DataType::Struct(Fields::from(fields))
-    }
+    fricon::trace(item, fixed_step)
 }
 
-/// Get a pyarrow data type representing 128 bit compelex number.
+/// Get a pyarrow data type representing 128 bit complex number.
 ///
 /// Returns:
 ///     A pyarrow data type.
 #[pyfunction]
 pub fn complex128() -> PyArrowType<DataType> {
-    PyArrowType(get_complex_type())
+    PyArrowType(fricon::complex128())
 }
 
 /// Get a pyarrow data type representing [`Trace`][fricon.Trace].

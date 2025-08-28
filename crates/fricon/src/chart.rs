@@ -2,46 +2,41 @@
 //!
 //! This module provides functionality to read Arrow schema information and
 //! extract chart data for parameter sweep visualization in the GUI.
+//!
+//! Note: This module now uses the centralized `schema_utils` for schema operations.
 
-use std::collections::HashSet;
 use std::fs::File;
-use std::path::Path;
 
 use anyhow::{Context, Result};
-use arrow::array::*;
-use arrow::datatypes::DataType;
 use arrow::ipc::reader::FileReader;
 use arrow::record_batch::RecordBatch;
 use serde::{Deserialize, Serialize};
 
 use crate::app::AppHandle;
-use crate::dataset_manager::{DatasetId, DatasetRecord};
+use crate::dataset_manager::DatasetId;
+use crate::schema_utils::{ColumnValue, extract_column_value_at, inspect_dataset_schema};
 
-/// Represents different types of column values for charting
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value")]
-pub enum ColumnValue {
-    Number(f64),
-    String(String),
-    Boolean(bool),
-}
+// Re-export commonly used types for backward compatibility
+pub use crate::schema_utils::{ColumnDataType, ColumnInfo as SchemaColumnInfo};
 
-/// Simplified data types for chart UI
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ColumnDataType {
-    Numeric,
-    Text,
-    Boolean,
-    Other,
-}
-
-/// Column information for chart configuration
+/// Column information for chart configuration (legacy compatibility)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColumnInfo {
     pub name: String,
     pub data_type: ColumnDataType,
     pub is_index_column: bool,
     pub unique_values: Option<Vec<ColumnValue>>,
+}
+
+impl From<SchemaColumnInfo> for ColumnInfo {
+    fn from(info: SchemaColumnInfo) -> Self {
+        Self {
+            name: info.name,
+            data_type: info.data_type,
+            is_index_column: info.is_index_column,
+            unique_values: info.sample_values, // Use sample_values as unique_values
+        }
+    }
 }
 
 /// Schema response for chart configuration UI
@@ -67,14 +62,14 @@ pub struct ChartDataRequest {
     pub index_column_filters: Vec<IndexColumnFilter>,
 }
 
-/// ECharts optimized dataset format
+/// `ECharts` optimized dataset format
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EChartsDataset {
     pub dimensions: Vec<String>,
     pub source: Vec<Vec<ColumnValue>>,
 }
 
-/// ECharts series configuration
+/// `ECharts` series configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EChartsSeries {
     pub name: String,
@@ -83,76 +78,11 @@ pub struct EChartsSeries {
     pub data_group_id: usize,
 }
 
-/// Response with ECharts formatted data
+/// Response with `ECharts` formatted data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EChartsDataResponse {
     pub dataset: EChartsDataset,
     pub series: Vec<EChartsSeries>,
-}
-
-/// Helper function to extract column values at a specific row index
-fn extract_column_value_at(column: &dyn Array, row_idx: usize) -> Result<Option<ColumnValue>> {
-    if column.is_null(row_idx) {
-        return Ok(None);
-    }
-
-    let value = match column.data_type() {
-        DataType::Int8 => {
-            let array = column.as_any().downcast_ref::<Int8Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::Int16 => {
-            let array = column.as_any().downcast_ref::<Int16Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::Int32 => {
-            let array = column.as_any().downcast_ref::<Int32Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::Int64 => {
-            let array = column.as_any().downcast_ref::<Int64Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::UInt8 => {
-            let array = column.as_any().downcast_ref::<UInt8Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::UInt16 => {
-            let array = column.as_any().downcast_ref::<UInt16Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::UInt32 => {
-            let array = column.as_any().downcast_ref::<UInt32Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::UInt64 => {
-            let array = column.as_any().downcast_ref::<UInt64Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::Float32 => {
-            let array = column.as_any().downcast_ref::<Float32Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx) as f64)
-        }
-        DataType::Float64 => {
-            let array = column.as_any().downcast_ref::<Float64Array>().unwrap();
-            ColumnValue::Number(array.value(row_idx))
-        }
-        DataType::Utf8 => {
-            let array = column.as_any().downcast_ref::<StringArray>().unwrap();
-            ColumnValue::String(array.value(row_idx).to_string())
-        }
-        DataType::LargeUtf8 => {
-            let array = column.as_any().downcast_ref::<LargeStringArray>().unwrap();
-            ColumnValue::String(array.value(row_idx).to_string())
-        }
-        DataType::Boolean => {
-            let array = column.as_any().downcast_ref::<BooleanArray>().unwrap();
-            ColumnValue::Boolean(array.value(row_idx))
-        }
-        _ => return Ok(None), // Unsupported type
-    };
-
-    Ok(Some(value))
 }
 
 /// Reads schema information from Arrow files for chart configuration
@@ -161,6 +91,7 @@ pub struct ChartSchemaReader {
 }
 
 impl ChartSchemaReader {
+    #[must_use]
     pub fn new(app: AppHandle) -> Self {
         Self { app }
     }
@@ -179,142 +110,21 @@ impl ChartSchemaReader {
             .paths()
             .dataset_path_from_uuid(dataset.metadata.uuid);
 
-        // Read Arrow schema from IPC file
+        // Read Arrow schema from IPC file using schema_utils
         let arrow_file = dataset_path.join("dataset.arrow");
-        let schema_info = self.read_arrow_schema(&arrow_file, &dataset).await?;
+        let schema_info = inspect_dataset_schema(&arrow_file, &dataset.metadata.index_columns)?;
 
-        Ok(schema_info)
-    }
-
-    async fn read_arrow_schema(
-        &self,
-        arrow_file: &Path,
-        dataset: &DatasetRecord,
-    ) -> Result<ChartSchemaResponse> {
-        let file = File::open(arrow_file)
-            .with_context(|| format!("Failed to open Arrow file: {:?}", arrow_file))?;
-
-        let reader =
-            FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
-        let schema = reader.schema();
-
-        let mut columns = Vec::new();
-
-        for field in schema.fields() {
-            let data_type = self.classify_data_type(field.data_type());
-            let is_index_column = dataset.metadata.index_columns.contains(field.name());
-
-            // For index columns, read unique values in a separate file read
-            let unique_values = if is_index_column {
-                Some(
-                    self.extract_unique_values_for_column(arrow_file, field.name())
-                        .await?,
-                )
-            } else {
-                None
-            };
-
-            columns.push(ColumnInfo {
-                name: field.name().clone(),
-                data_type,
-                is_index_column,
-                unique_values,
-            });
-        }
+        // Convert to chart-specific format for backward compatibility
+        let columns: Vec<ColumnInfo> = schema_info
+            .columns
+            .into_iter()
+            .map(std::convert::Into::into)
+            .collect();
 
         Ok(ChartSchemaResponse {
             columns,
-            index_columns: dataset.metadata.index_columns.clone(),
+            index_columns: dataset.metadata.index_columns,
         })
-    }
-
-    fn classify_data_type(&self, arrow_type: &DataType) -> ColumnDataType {
-        match arrow_type {
-            DataType::Int8
-            | DataType::Int16
-            | DataType::Int32
-            | DataType::Int64
-            | DataType::UInt8
-            | DataType::UInt16
-            | DataType::UInt32
-            | DataType::UInt64
-            | DataType::Float16
-            | DataType::Float32
-            | DataType::Float64 => ColumnDataType::Numeric,
-            DataType::Utf8 | DataType::LargeUtf8 => ColumnDataType::Text,
-            DataType::Boolean => ColumnDataType::Boolean,
-            _ => ColumnDataType::Other,
-        }
-    }
-
-    async fn extract_unique_values_for_column(
-        &self,
-        arrow_file: &Path,
-        column_name: &str,
-    ) -> Result<Vec<ColumnValue>> {
-        let file = File::open(arrow_file)
-            .with_context(|| format!("Failed to open Arrow file: {:?}", arrow_file))?;
-
-        let reader =
-            FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
-
-        self.extract_unique_values(reader, column_name).await
-    }
-
-    async fn extract_unique_values(
-        &self,
-        reader: FileReader<File>,
-        column_name: &str,
-    ) -> Result<Vec<ColumnValue>> {
-        let mut unique_values = HashSet::new();
-        const MAX_UNIQUE_VALUES: usize = 100; // Limit to avoid excessive memory usage
-
-        for batch_result in reader {
-            let batch = batch_result?;
-            let column_index = batch
-                .schema()
-                .column_with_name(column_name)
-                .map(|(idx, _)| idx)
-                .with_context(|| format!("Column '{}' not found in batch", column_name))?;
-
-            let column = batch.column(column_index);
-
-            for row_idx in 0..column.len() {
-                if unique_values.len() >= MAX_UNIQUE_VALUES {
-                    break;
-                }
-
-                if let Some(value) = extract_column_value_at(column, row_idx)? {
-                    unique_values.insert(format!("{:?}", value)); // Use debug format as key
-                    if unique_values.len() >= MAX_UNIQUE_VALUES {
-                        break;
-                    }
-                }
-            }
-
-            if unique_values.len() >= MAX_UNIQUE_VALUES {
-                break;
-            }
-        }
-
-        // Convert back to ColumnValue (this is a simplification)
-        // In a real implementation, we'd need more sophisticated deduplication
-        let result: Vec<ColumnValue> = unique_values
-            .into_iter()
-            .take(MAX_UNIQUE_VALUES)
-            .filter_map(|s| {
-                // This is a placeholder - we'd need proper parsing based on the column type
-                if let Ok(num) = s.parse::<f64>() {
-                    Some(ColumnValue::Number(num))
-                } else if s == "true" || s == "false" {
-                    Some(ColumnValue::Boolean(s.parse().unwrap()))
-                } else {
-                    Some(ColumnValue::String(s))
-                }
-            })
-            .collect();
-
-        Ok(result)
     }
 }
 
@@ -324,6 +134,7 @@ pub struct ChartDataReader {
 }
 
 impl ChartDataReader {
+    #[must_use]
     pub fn new(app: AppHandle) -> Self {
         Self { app }
     }
@@ -343,7 +154,7 @@ impl ChartDataReader {
 
         let arrow_file = dataset_path.join("dataset.arrow");
         let file = File::open(&arrow_file)
-            .with_context(|| format!("Failed to open Arrow file: {:?}", arrow_file))?;
+            .with_context(|| format!("Failed to open Arrow file: {arrow_file:?}"))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -434,7 +245,7 @@ impl ChartDataReader {
             .schema()
             .column_with_name(column_name)
             .map(|(idx, _)| idx)
-            .with_context(|| format!("Column '{}' not found", column_name))?;
+            .with_context(|| format!("Column '{column_name}' not found"))?;
 
         let column = batch.column(column_index);
         extract_column_value_at(column, row_idx)
