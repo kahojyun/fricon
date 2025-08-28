@@ -1,40 +1,47 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import DataViewer from "./DataViewer.vue";
-import { getWorkspaceInfo, type WorkspaceInfo } from "./backend";
-import AppCredits from "./AppCredits.vue";
+import { ref } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import Button from "primevue/button";
 
-const workspaceInfo = ref<WorkspaceInfo | null>(null);
-const loading = ref(true);
-const error = ref<string | null>(null);
+// Try to read workspace path from Tauri (if available at runtime)
+const workspacePath = ref<string>("(no workspace)");
 
-onMounted(async () => {
-  try {
-    workspaceInfo.value = await getWorkspaceInfo();
-  } catch (err) {
-    error.value = `Failed to get workspace info: ${String(err)}`;
-  } finally {
-    loading.value = false;
-  }
-});
+const router = useRouter();
+const route = useRoute();
+
+function goTo(name: string) {
+  void router.push({ name });
+}
 </script>
 
 <template>
-  <div v-if="loading" class="flex justify-center items-center h-full">
-    <div>Loading workspace...</div>
-  </div>
-  <div
-    v-else-if="error"
-    class="flex flex-col gap-4 justify-center items-center h-full"
-  >
-    <div class="text-red-500">{{ error }}</div>
-  </div>
-  <div v-else class="h-full flex flex-col">
-    <div class="p-4">
-      <h1 class="text-lg font-semibold">Fricon Workspace</h1>
-      <p class="text-sm">{{ workspaceInfo?.path }}</p>
+  <div class="h-full flex flex-col">
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Left sidebar (like VS Code) -->
+      <aside class="w-14 bg-surface-700 flex flex-col items-center py-2 gap-2">
+        <Button
+          icon="pi pi-database"
+          :aria-label="'Data'"
+          :outlined="route.name !== 'data'"
+          @click="goTo('data')"
+        />
+        <Button
+          icon="pi pi-info-circle"
+          :aria-label="'Credits'"
+          :outlined="route.name !== 'credits'"
+          @click="goTo('credits')"
+        />
+      </aside>
+
+      <!-- Main content -->
+      <main class="flex-1 relative overflow-hidden">
+        <router-view />
+      </main>
     </div>
-    <AppCredits />
-    <DataViewer />
+
+    <!-- Bottom status bar -->
+    <footer class="h-8 bg-surface-800 text-sm px-3 flex items-center">
+      <div class="truncate">Workspace: {{ workspacePath }}</div>
+    </footer>
   </div>
 </template>

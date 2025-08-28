@@ -436,6 +436,17 @@ impl Dataset {
     pub fn index_columns(&self) -> &[String] {
         self.inner.index_columns()
     }
+
+    /// Status of the dataset.
+    #[getter]
+    pub fn status(&self) -> String {
+        match self.inner.status() {
+            fricon::DatasetStatus::Pending => "pending".to_string(),
+            fricon::DatasetStatus::Writing => "writing".to_string(),
+            fricon::DatasetStatus::Completed => "completed".to_string(),
+            fricon::DatasetStatus::Aborted => "aborted".to_string(),
+        }
+    }
 }
 
 /// Writer for newly created dataset.

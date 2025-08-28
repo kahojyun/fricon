@@ -20,7 +20,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    VERSION, dataset, ipc,
+    VERSION, dataset_manager, ipc,
     proto::{
         self, AddTagsRequest, CreateRequest, GetRequest, RemoveTagsRequest, SearchRequest,
         UpdateRequest, VersionRequest, WriteRequest, WriteResponse,
@@ -224,7 +224,7 @@ impl Dataset {
 
     #[must_use]
     pub fn arrow_file(&self) -> PathBuf {
-        self.path().join(dataset::DATASET_NAME)
+        self.path().join(dataset_manager::DATASET_NAME)
     }
 
     #[must_use]
@@ -265,6 +265,11 @@ impl Dataset {
     #[must_use]
     pub fn index_columns(&self) -> &[String] {
         &self.record.metadata.index_columns
+    }
+
+    #[must_use]
+    pub fn status(&self) -> crate::database::DatasetStatus {
+        self.record.metadata.status
     }
 
     pub async fn add_tags(&self, tags: Vec<String>) -> Result<()> {

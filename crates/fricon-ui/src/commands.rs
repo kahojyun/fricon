@@ -53,16 +53,20 @@ fn get_server_status(state: State<'_, AppState>) -> ServerStatus {
 #[tauri::command]
 async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, String> {
     let app = state.app();
-    let datasets = app.list_datasets().await.map_err(|e| e.to_string())?;
+    let dataset_manager = app.dataset_manager();
+    let datasets = dataset_manager
+        .list_datasets()
+        .await
+        .map_err(|e| e.to_string())?;
 
     let dataset_info: Vec<DatasetInfo> = datasets
         .into_iter()
-        .map(|(dataset, tags)| DatasetInfo {
-            id: dataset.id,
-            name: dataset.name,
-            description: dataset.description,
-            tags: tags.into_iter().map(|t| t.name).collect(),
-            created_at: dataset.created_at.and_utc(),
+        .map(|record| DatasetInfo {
+            id: record.id,
+            name: record.metadata.name,
+            description: record.metadata.description,
+            tags: record.metadata.tags,
+            created_at: record.metadata.created_at,
         })
         .collect();
 

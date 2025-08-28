@@ -4,7 +4,7 @@ import DatasetTable from "./DatasetTable.vue";
 import ChartViewer from "./ChartViewer.vue";
 </script>
 <template>
-  <Splitter class="size-full">
+  <Splitter class="size-full select-none">
     <SplitterPanel>
       <DatasetTable />
     </SplitterPanel>

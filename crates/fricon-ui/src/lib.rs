@@ -5,7 +5,7 @@ use std::{path::PathBuf, sync::Mutex};
 
 use anyhow::{Context as _, Result};
 use tauri::{
-    Manager, RunEvent, WindowEvent, async_runtime,
+    Emitter, Manager, RunEvent, WindowEvent, async_runtime,
     menu::MenuBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
@@ -23,6 +23,36 @@ impl AppState {
         let log_guard = setup_logging(workspace_path.clone())?;
         let app_manager = fricon::AppManager::serve(&workspace_path).await?;
         Ok(Self(Mutex::new(Some((app_manager, log_guard)))))
+    }
+
+    fn start_event_listener(&self, app_handle: tauri::AppHandle) {
+        let app = self.app();
+        let mut event_rx = app.subscribe_to_events();
+
+        async_runtime::spawn(async move {
+            while let Ok(event) = event_rx.recv().await {
+                match event {
+                    fricon::AppEvent::DatasetCreated {
+                        id,
+                        uuid,
+                        name,
+                        description,
+                        tags,
+                    } => {
+                        let _ = app_handle.emit(
+                            "dataset-created",
+                            serde_json::json!({
+                                "id": id,
+                                "uuid": uuid,
+                                "name": name,
+                                "description": description,
+                                "tags": tags
+                            }),
+                        );
+                    }
+                }
+            }
+        });
     }
 
     fn app(&self) -> fricon::AppHandle {
@@ -60,6 +90,11 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
         .setup(|app| {
             install_ctrl_c_handler(app);
             build_system_tray(app)?;
+
+            // Start event listener
+            let app_state = app.state::<AppState>();
+            app_state.start_event_listener(app.handle().clone());
+
             Ok(())
         })
         .build(tauri::generate_context!())

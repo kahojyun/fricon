@@ -7,6 +7,7 @@ diesel::table! {
         name -> Text,
         description -> Text,
         favorite -> Bool,
+        status -> Text,
         index_columns -> Text,
         created_at -> Timestamp,
     }

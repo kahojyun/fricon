@@ -4,6 +4,15 @@ package fricon.v1;
 
 import "google/protobuf/timestamp.proto";
 
+// Dataset status enum
+enum DatasetStatus {
+  DATASET_STATUS_UNSPECIFIED = 0;
+  DATASET_STATUS_PENDING = 1;
+  DATASET_STATUS_WRITING = 2;
+  DATASET_STATUS_COMPLETED = 3;
+  DATASET_STATUS_ABORTED = 4;
+}
+
 // Manage datasets.
 service DatasetService {
   // Create a new dataset.
@@ -106,4 +115,5 @@ message DatasetMetadata {
   repeated string index_columns = 5;
   google.protobuf.Timestamp created_at = 6;
   repeated string tags = 7;
+  DatasetStatus status = 8;
 }

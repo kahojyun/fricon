@@ -1,29 +1,60 @@
 <script setup lang="ts">
-import { onMounted, ref, type Ref } from "vue";
-import { DataTable, Column } from "primevue";
-import { listDatasets, type DatasetInfo } from "./backend";
+import { onMounted, onUnmounted, ref, type Ref } from "vue";
+import { DataTable, Column, Tag } from "primevue";
+import {
+  listDatasets,
+  onDatasetCreated,
+  type DatasetInfo,
+  type DatasetCreatedEvent,
+} from "./backend";
 
 const value: Ref<DatasetInfo[]> = ref([]);
 
-onMounted(async () => {
+let unsubscribe: (() => void) | null = null;
+
+const loadDatasets = async () => {
   const datasets = await listDatasets();
   value.value = datasets;
+};
+
+const handleDatasetCreated = (event: DatasetCreatedEvent) => {
+  // Add the new dataset to the list
+  const newDataset: DatasetInfo = {
+    id: event.id,
+    name: event.name,
+    description: event.description,
+    tags: event.tags,
+    created_at: new Date(),
+  };
+  value.value.unshift(newDataset);
+};
+
+onMounted(async () => {
+  await loadDatasets();
+
+  // Listen for dataset created events
+  unsubscribe = await onDatasetCreated(handleDatasetCreated);
+});
+
+onUnmounted(() => {
+  if (unsubscribe) {
+    unsubscribe();
+  }
 });
 </script>
 <template>
   <DataTable :value="value" removable-sort>
     <Column field="id" header="ID" />
     <Column field="name" header="Name" />
-    <Column field="description" header="Description" />
     <Column field="tags" header="Tags">
       <template #body="slotProps">
-        <span
+        <Tag
           v-for="(tag, index) in slotProps.data.tags"
           :key="index"
-          class="inline-block bg-primary-100 text-primary-800 text-xs font-medium px-2 py-1 rounded-full mr-1 mb-1"
+          class="mr-1 mb-1"
         >
           {{ tag }}
-        </span>
+        </Tag>
       </template>
     </Column>
     <Column field="created_at" header="Created At" sortable>
