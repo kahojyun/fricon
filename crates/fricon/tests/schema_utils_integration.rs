@@ -1,4 +1,4 @@
-//! Integration tests for schema_utils module
+//! Integration tests for `schema_utils` module
 
 use arrow::datatypes::DataType;
 use fricon::{

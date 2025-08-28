@@ -309,7 +309,7 @@ impl VisualizationCompatibility {
     pub fn get_summary(&self) -> String {
         let mut summary = String::new();
 
-        summary.push_str(&"Dataset Visualization Summary:\n".to_string());
+        summary.push_str("Dataset Visualization Summary:\n");
         summary.push_str(&format!(
             "- Plottable columns: {}\n",
             self.plottable_columns.len()
@@ -405,7 +405,7 @@ mod tests {
         ];
 
         let compatibility = VisualizationCompatibility::analyze(&columns);
-        let chart_types = compatibility.get_chart_types_for_columns("x", &vec!["y".to_string()]);
+        let chart_types = compatibility.get_chart_types_for_columns("x", &["y".to_string()]);
 
         assert!(chart_types.contains(&ChartType::Line));
         assert!(chart_types.contains(&ChartType::Scatter));
