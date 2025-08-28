@@ -154,7 +154,7 @@ impl ChartDataReader {
 
         let arrow_file = dataset_path.join("dataset.arrow");
         let file = File::open(&arrow_file)
-            .with_context(|| format!("Failed to open Arrow file: {arrow_file:?}"))?;
+            .with_context(|| format!("Failed to open Arrow file: {}", arrow_file.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -164,13 +164,13 @@ impl ChartDataReader {
         for batch_result in reader {
             let batch = batch_result?;
             let filtered_indices =
-                self.apply_index_filters(&batch, &request.index_column_filters)?;
+                Self::apply_index_filters(&batch, &request.index_column_filters)?;
 
             for &row_idx in &filtered_indices {
                 let mut row_values = Vec::new();
 
                 // X-axis value
-                if let Some(x_value) = self.extract_value_at(&batch, &request.x_column, row_idx)? {
+                if let Some(x_value) = Self::extract_value_at(&batch, &request.x_column, row_idx)? {
                     row_values.push(x_value);
 
                     // Y-axis values (numeric only)
@@ -179,7 +179,7 @@ impl ChartDataReader {
 
                     for y_column in &request.y_columns {
                         if let Some(y_value) =
-                            self.extract_numeric_value_at(&batch, y_column, row_idx)?
+                            Self::extract_numeric_value_at(&batch, y_column, row_idx)?
                         {
                             y_values.push(ColumnValue::Number(y_value));
                         } else {
@@ -196,11 +196,10 @@ impl ChartDataReader {
             }
         }
 
-        self.format_for_echarts(request, chart_data)
+        Ok(Self::format_for_echarts(request, chart_data))
     }
 
     fn apply_index_filters(
-        &self,
         batch: &RecordBatch,
         filters: &[IndexColumnFilter],
     ) -> Result<Vec<usize>> {
@@ -236,7 +235,6 @@ impl ChartDataReader {
     }
 
     fn extract_value_at(
-        &self,
         batch: &RecordBatch,
         column_name: &str,
         row_idx: usize,
@@ -252,12 +250,11 @@ impl ChartDataReader {
     }
 
     fn extract_numeric_value_at(
-        &self,
         batch: &RecordBatch,
         column_name: &str,
         row_idx: usize,
     ) -> Result<Option<f64>> {
-        if let Some(value) = self.extract_value_at(batch, column_name, row_idx)? {
+        if let Some(value) = Self::extract_value_at(batch, column_name, row_idx)? {
             match value {
                 ColumnValue::Number(n) => Ok(Some(n)),
                 _ => Ok(None), // Non-numeric values are filtered out
@@ -268,10 +265,9 @@ impl ChartDataReader {
     }
 
     fn format_for_echarts(
-        &self,
         request: ChartDataRequest,
         rows: Vec<Vec<ColumnValue>>,
-    ) -> Result<EChartsDataResponse> {
+    ) -> EChartsDataResponse {
         let mut dimensions = vec![request.x_column];
         dimensions.extend(request.y_columns.iter().cloned());
 
@@ -291,6 +287,6 @@ impl ChartDataReader {
             })
             .collect();
 
-        Ok(EChartsDataResponse { dataset, series })
+        EChartsDataResponse { dataset, series }
     }
 }

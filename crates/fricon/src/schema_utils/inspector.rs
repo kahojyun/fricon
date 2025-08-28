@@ -40,8 +40,8 @@ impl SchemaInspector {
         path: &Path,
         index_columns: &[String],
     ) -> Result<DatasetSchemaInfo> {
-        let file =
-            File::open(path).with_context(|| format!("Failed to open Arrow file: {path:?}"))?;
+        let file = File::open(path)
+            .with_context(|| format!("Failed to open Arrow file: {}", path.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -87,8 +87,8 @@ impl SchemaInspector {
 
     /// Extract dataset shape information
     pub fn extract_shape_info(&self, path: &Path) -> Result<DatasetShape> {
-        let file =
-            File::open(path).with_context(|| format!("Failed to open Arrow file: {path:?}"))?;
+        let file = File::open(path)
+            .with_context(|| format!("Failed to open Arrow file: {}", path.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -129,18 +129,17 @@ impl SchemaInspector {
         column_name: &str,
         limit: usize,
     ) -> Result<Vec<ColumnValue>> {
-        let file =
-            File::open(path).with_context(|| format!("Failed to open Arrow file: {path:?}"))?;
+        let file = File::open(path)
+            .with_context(|| format!("Failed to open Arrow file: {}", path.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
 
-        self.extract_unique_values_from_reader(reader, column_name, limit, path)
+        Self::extract_unique_values_from_reader(reader, column_name, limit, path)
     }
 
     /// Extract unique values from a `FileReader`
     fn extract_unique_values_from_reader(
-        &self,
         reader: FileReader<File>,
         column_name: &str,
         limit: usize,
@@ -183,19 +182,18 @@ impl SchemaInspector {
         }
 
         // Convert back to ColumnValue (re-read to maintain order and types)
-        self.collect_unique_values(arrow_file, column_name, unique_values, limit)
+        Self::collect_unique_values(arrow_file, column_name, &unique_values, limit)
     }
 
     /// Re-read the file to collect actual unique values maintaining proper types
     fn collect_unique_values(
-        &self,
         arrow_file: &Path,
         column_name: &str,
-        seen_keys: HashSet<String>,
+        seen_keys: &HashSet<String>,
         limit: usize,
     ) -> Result<Vec<ColumnValue>> {
         let file = File::open(arrow_file)
-            .with_context(|| format!("Failed to open Arrow file: {arrow_file:?}"))?;
+            .with_context(|| format!("Failed to open Arrow file: {}", arrow_file.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -246,8 +244,8 @@ impl SchemaInspector {
         column_name: &str,
         sample_size: usize,
     ) -> Result<Vec<ColumnValue>> {
-        let file =
-            File::open(path).with_context(|| format!("Failed to open Arrow file: {path:?}"))?;
+        let file = File::open(path)
+            .with_context(|| format!("Failed to open Arrow file: {}", path.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -273,8 +271,8 @@ impl SchemaInspector {
         };
 
         // Second pass: collect samples
-        let file =
-            File::open(path).with_context(|| format!("Failed to open Arrow file: {path:?}"))?;
+        let file = File::open(path)
+            .with_context(|| format!("Failed to open Arrow file: {}", path.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -313,8 +311,8 @@ impl SchemaInspector {
 
     /// Get schema summary statistics
     pub fn get_schema_summary(&self, path: &Path) -> Result<SchemaSummary> {
-        let file =
-            File::open(path).with_context(|| format!("Failed to open Arrow file: {path:?}"))?;
+        let file = File::open(path)
+            .with_context(|| format!("Failed to open Arrow file: {}", path.display()))?;
 
         let reader =
             FileReader::try_new(file, None).context("Failed to create Arrow file reader")?;
@@ -329,7 +327,8 @@ impl SchemaInspector {
             return Ok(false);
         }
 
-        let file = File::open(path).with_context(|| format!("Failed to open file: {path:?}"))?;
+        let file =
+            File::open(path).with_context(|| format!("Failed to open file: {}", path.display()))?;
 
         match FileReader::try_new(file, None) {
             Ok(_) => Ok(true),

@@ -244,15 +244,15 @@ pub struct SchemaSummary {
 
 /// Helper function to extract column value at specific row index
 pub fn extract_column_value_at(column: &dyn Array, row_idx: usize) -> Result<Option<ColumnValue>> {
+    use arrow::array::{
+        Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array,
+        Int64Array, LargeStringArray, StringArray, StructArray, UInt8Array, UInt16Array,
+        UInt32Array, UInt64Array,
+    };
+
     if column.is_null(row_idx) {
         return Ok(None);
     }
-
-    use arrow::array::{
-        Array, ArrayAccessor, ArrayBuilder, BooleanArray, Float32Array, Float64Array, Int8Array,
-        Int16Array, Int32Array, Int64Array, LargeStringArray, StringArray, StructArray, UInt8Array,
-        UInt16Array, UInt32Array, UInt64Array,
-    };
 
     let value = match column.data_type() {
         DataType::Int8 => {
@@ -269,6 +269,7 @@ pub fn extract_column_value_at(column: &dyn Array, row_idx: usize) -> Result<Opt
         }
         DataType::Int64 => {
             let array = column.as_any().downcast_ref::<Int64Array>().unwrap();
+            #[allow(clippy::cast_precision_loss)]
             ColumnValue::Number(array.value(row_idx) as f64)
         }
         DataType::UInt8 => {
@@ -285,6 +286,7 @@ pub fn extract_column_value_at(column: &dyn Array, row_idx: usize) -> Result<Opt
         }
         DataType::UInt64 => {
             let array = column.as_any().downcast_ref::<UInt64Array>().unwrap();
+            #[allow(clippy::cast_precision_loss)]
             ColumnValue::Number(array.value(row_idx) as f64)
         }
         DataType::Float32 => {
