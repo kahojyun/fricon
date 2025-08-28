@@ -2,8 +2,11 @@
 
 use arrow::datatypes::DataType;
 use fricon::{
-    ColumnDataType, classify_data_type, complex128, is_complex_type, is_trace_type,
-    trace_variable_step,
+    ColumnDataType,
+    schema_utils::{
+        classify_data_type,
+        custom_types::{complex128, is_complex_type, is_trace_type, trace_variable_step},
+    },
 };
 
 #[test]

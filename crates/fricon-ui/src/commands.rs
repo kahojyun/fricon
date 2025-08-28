@@ -1,7 +1,7 @@
 use super::AppState;
 
 use chrono::{DateTime, Utc};
-use fricon::{
+use fricon::chart::{
     ChartDataReader, ChartDataRequest, ChartSchemaReader, ChartSchemaResponse, EChartsDataResponse,
 };
 use serde::Serialize;

@@ -19,7 +19,10 @@ use arrow::{
     pyarrow::PyArrowType,
 };
 use chrono::{DateTime, Utc};
-use fricon::{Client, DatasetMetadata, DatasetRecord};
+use fricon::{
+    Client, DatasetMetadata, DatasetRecord,
+    schema_utils::custom_types::{complex128 as fricon_complex128, trace as fricon_trace},
+};
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
@@ -225,7 +228,7 @@ fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
         let arr = make_array(data);
         return match arr.data_type() {
             DataType::Boolean | DataType::Int64 | DataType::Float64 | DataType::Utf8 => Ok(arr),
-            t @ DataType::Struct(_) if *t == get_complex_type() => Ok(arr),
+            t @ DataType::Struct(_) if *t == fricon_complex128() => Ok(arr),
             _ => bail!("The data type of the given arrow array is not float64."),
         };
     }
@@ -476,7 +479,7 @@ fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
     } else if value.is_instance_of::<PyFloat>() {
         Ok(DataType::Float64)
     } else if value.is_instance_of::<PyComplex>() {
-        Ok(get_complex_type())
+        Ok(fricon_complex128())
     } else if value.is_instance_of::<PyString>() {
         Ok(DataType::Utf8)
     } else {
@@ -630,7 +633,7 @@ fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRe
             Ok(Arc::new(array))
         }
         // complex scalar
-        t @ DataType::Struct(fields) if *t == get_complex_type() => {
+        t @ DataType::Struct(fields) if *t == fricon_complex128() => {
             let Ok(value) = value.extract::<Complex64>() else {
                 bail!("Failed to extract complex value.")
             };
@@ -773,21 +776,13 @@ impl DatasetWriter {
     }
 }
 
-fn get_complex_type() -> DataType {
-    fricon::complex128()
-}
-
-fn get_trace_type(item: DataType, fixed_step: bool) -> DataType {
-    fricon::trace(item, fixed_step)
-}
-
 /// Get a pyarrow data type representing 128 bit complex number.
 ///
 /// Returns:
 ///     A pyarrow data type.
 #[pyfunction]
 pub fn complex128() -> PyArrowType<DataType> {
-    PyArrowType(fricon::complex128())
+    PyArrowType(fricon_complex128())
 }
 
 /// Get a pyarrow data type representing [`Trace`][fricon.Trace].
@@ -800,7 +795,7 @@ pub fn complex128() -> PyArrowType<DataType> {
 ///     A pyarrow data type.
 #[pyfunction]
 pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<DataType> {
-    PyArrowType(get_trace_type(item.0, fixed_step))
+    PyArrowType(fricon_trace(item.0, fixed_step))
 }
 
 pub fn main_impl<T: fricon_cli::clap::Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
