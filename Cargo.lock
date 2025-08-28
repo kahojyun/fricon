@@ -1577,7 +1577,7 @@ dependencies = [
 
 [[package]]
 name = "fricon"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "arrow",
@@ -1612,7 +1612,7 @@ dependencies = [
 
 [[package]]
 name = "fricon-cli"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1624,7 +1624,7 @@ dependencies = [
 
 [[package]]
 name = "fricon-py"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "arrow",
@@ -1643,7 +1643,7 @@ dependencies = [
 
 [[package]]
 name = "fricon-ui"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "chrono",
