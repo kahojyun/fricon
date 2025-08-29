@@ -20,7 +20,6 @@ use crate::{
     },
 };
 
-// Protobuf conversion implementations for DatasetRecord and DatasetMetadata
 impl From<crate::dataset_manager::DatasetRecord> for crate::proto::Dataset {
     fn from(record: crate::dataset_manager::DatasetRecord) -> Self {
         Self {
@@ -112,7 +111,6 @@ impl Storage {
     }
 }
 
-/// Convert from Rust `DatasetStatus` to protobuf `DatasetStatus`
 impl From<DatasetStatus> for proto::DatasetStatus {
     fn from(status: DatasetStatus) -> Self {
         match status {
@@ -124,7 +122,6 @@ impl From<DatasetStatus> for proto::DatasetStatus {
     }
 }
 
-/// Convert from protobuf `DatasetStatus` to Rust `DatasetStatus`
 impl TryFrom<proto::DatasetStatus> for DatasetStatus {
     type Error = anyhow::Error;
 
@@ -194,7 +191,6 @@ impl DatasetService for Storage {
         let async_reader = tokio_util::io::StreamReader::new(bytes_stream);
         let sync_reader = SyncIoBridge::new(async_reader);
 
-        // Create a channel to stream RecordBatches from async reader to dataset_manager
         let (batch_tx, batch_rx) =
             mpsc::channel::<Result<RecordBatch, arrow::error::ArrowError>>(16);
         let batch_stream = tokio_stream::wrappers::ReceiverStream::new(batch_rx);
@@ -207,7 +203,6 @@ impl DatasetService for Storage {
                     for batch_result in reader {
                         let batch = batch_result?;
                         if batch_tx.blocking_send(Ok(batch)).is_err() {
-                            // Channel closed, stop reading
                             break;
                         }
                     }
@@ -230,10 +225,8 @@ impl DatasetService for Storage {
             }
         });
 
-        // Use DatasetManager to write the dataset
         let write_result = self.manager.write_dataset(token, batch_stream).await;
 
-        // Ensure the read task completes
         if let Err(e) = read_task.await {
             error!("Read task failed: {:?}", e);
         }
@@ -256,7 +249,6 @@ impl DatasetService for Storage {
         }))
     }
 
-    // TODO: Add search implementation
     async fn search(
         &self,
         _request: tonic::Request<SearchRequest>,

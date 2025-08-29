@@ -21,7 +21,6 @@ pub struct Dataset {
 }
 
 impl Dataset {
-    /// Find dataset by ID
     pub fn find_by_id(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<Option<Self>> {
         use schema::datasets::dsl::datasets;
 
@@ -32,7 +31,6 @@ impl Dataset {
             .optional()
     }
 
-    /// Find dataset by UUID
     pub fn find_by_uuid(
         conn: &mut SqliteConnection,
         dataset_uuid: Uuid,
@@ -46,7 +44,6 @@ impl Dataset {
             .optional()
     }
 
-    /// List all datasets ordered by ID descending
     pub fn list_all_ordered(conn: &mut SqliteConnection) -> QueryResult<Vec<Self>> {
         use schema::datasets::dsl::{datasets, id};
 
@@ -56,7 +53,6 @@ impl Dataset {
             .load(conn)
     }
 
-    /// Update dataset status
     pub fn update_status(
         conn: &mut SqliteConnection,
         dataset_id: i32,
@@ -69,7 +65,6 @@ impl Dataset {
             .execute(conn)
     }
 
-    /// Update dataset metadata
     pub fn update_metadata(
         conn: &mut SqliteConnection,
         dataset_id: i32,
@@ -82,14 +77,12 @@ impl Dataset {
             .execute(conn)
     }
 
-    /// Delete dataset from database
     pub fn delete_from_db(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<usize> {
         use schema::datasets::dsl::datasets;
 
         diesel::delete(datasets.find(dataset_id)).execute(conn)
     }
 
-    /// Load tags associated with this dataset
     pub fn load_tags(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Tag>> {
         DatasetTag::belonging_to(self)
             .inner_join(schema::tags::table)
@@ -125,7 +118,6 @@ pub struct Tag {
 }
 
 impl Tag {
-    /// Find tag by name
     pub fn find_by_name(conn: &mut SqliteConnection, tag_name: &str) -> QueryResult<Option<Self>> {
         use schema::tags::dsl::{name, tags};
 
@@ -135,14 +127,12 @@ impl Tag {
             .optional()
     }
 
-    /// Find or create tags in batch
     pub fn find_or_create_batch(
         conn: &mut SqliteConnection,
         names: &[String],
     ) -> QueryResult<Vec<Self>> {
         use schema::tags::dsl::{name, tags};
 
-        // Insert new tags (ignore duplicates)
         let new_tags: Vec<_> = names
             .iter()
             .map(|tag_name| NewTag { name: tag_name })
@@ -151,13 +141,11 @@ impl Tag {
             .values(new_tags)
             .execute(conn)?;
 
-        // Return all requested tags
         tags.filter(name.eq_any(names))
             .select(Self::as_select())
             .load(conn)
     }
 
-    /// Create a new tag
     pub fn create_new(conn: &mut SqliteConnection, tag_name: &str) -> QueryResult<Self> {
         use schema::tags::dsl::tags;
 
@@ -168,7 +156,6 @@ impl Tag {
             .get_result(conn)
     }
 
-    /// Get all datasets associated with this tag
     pub fn datasets(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Dataset>> {
         use schema::{datasets, datasets_tags};
 
@@ -196,7 +183,6 @@ pub struct DatasetTag {
 }
 
 impl DatasetTag {
-    /// Create associations between dataset and multiple tags
     pub fn create_associations(
         conn: &mut SqliteConnection,
         ds_id: i32,
@@ -216,11 +202,9 @@ impl DatasetTag {
             .values(&new_associations)
             .execute(conn)?;
 
-        // Return the associations that were requested
         Ok(new_associations)
     }
 
-    /// Remove associations between dataset and tags
     pub fn remove_associations(
         conn: &mut SqliteConnection,
         ds_id: i32,
@@ -234,7 +218,6 @@ impl DatasetTag {
             .execute(conn)
     }
 
-    /// Find all dataset-tag associations for a given dataset
     pub fn find_by_dataset(conn: &mut SqliteConnection, ds_id: i32) -> QueryResult<Vec<Self>> {
         use schema::datasets_tags::dsl::{dataset_id, datasets_tags};
 
