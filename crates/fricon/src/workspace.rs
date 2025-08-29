@@ -76,49 +76,41 @@ pub struct WorkspacePaths {
 }
 
 impl WorkspacePaths {
-    /// Creates a new `WorkspacePaths` instance from a given root path.
     #[must_use]
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self { root: root.into() }
     }
 
-    /// Get the root path of the workspace.
     #[must_use]
     pub fn root(&self) -> &Path {
         &self.root
     }
 
-    /// Get the data directory path.
     #[must_use]
     pub fn data_dir(&self) -> PathBuf {
         self.root.join("data")
     }
 
-    /// Get the log directory path.
     #[must_use]
     pub fn log_dir(&self) -> PathBuf {
         self.root.join("log")
     }
 
-    /// Get the backup directory path.
     #[must_use]
     pub fn backup_dir(&self) -> PathBuf {
         self.root.join("backup")
     }
 
-    /// Get the IPC socket file path.
     #[must_use]
     pub fn ipc_file(&self) -> PathBuf {
         self.root.join("fricon.socket")
     }
 
-    /// Get the database file path.
     #[must_use]
     pub fn database_file(&self) -> PathBuf {
         self.root.join("fricon.sqlite3")
     }
 
-    /// Get a path for database file backup.
     #[must_use]
     pub fn database_backup_file(&self, time: NaiveDateTime) -> PathBuf {
         let mut out = self.backup_dir();
@@ -129,19 +121,16 @@ impl WorkspacePaths {
         out
     }
 
-    /// Get the metadata file path.
     #[must_use]
     pub fn metadata_file(&self) -> PathBuf {
         self.root.join(".fricon_workspace.json")
     }
 
-    /// Get the lock file path.
     #[must_use]
     pub fn lock_file(&self) -> PathBuf {
         self.root.join(".fricon.lock")
     }
 
-    /// Get the dataset path from a UUID.
     #[must_use]
     pub fn dataset_path_from_uuid(&self, uuid: Uuid) -> PathBuf {
         let mut data_dir = self.data_dir();
@@ -182,7 +171,6 @@ impl WorkspaceRoot {
         let paths = WorkspacePaths::new(path);
         let root = paths.root();
 
-        // Success if path already exists.
         fs::create_dir_all(root).context("Failed to create directory.")?;
         let lock_file_path = paths.lock_file();
         let lock = FileLock::new(&lock_file_path)?;
@@ -239,8 +227,6 @@ impl WorkspaceRoot {
         }
 
         let metadata = WorkspaceMetadata::read_json(paths.metadata_file())?;
-        // For validation, we only check that the version is compatible (not newer)
-        // but don't perform migrations since this is read-only validation
         match check_version(&metadata.version)? {
             VersionCheckResult::Current | VersionCheckResult::NeedsMigration => {}
         }
@@ -248,14 +234,12 @@ impl WorkspaceRoot {
         Ok(paths)
     }
 
-    /// Get the paths for the current workspace.
     #[must_use]
     pub fn paths(&self) -> &WorkspacePaths {
         &self.paths
     }
 
     fn migrate_to_current(&mut self, version: &Version) -> Result<()> {
-        // No migrations needed yet
         if version < &WORKSPACE_VERSION {
             tracing::info!(
                 "Migrating workspace from version {} to {}",
@@ -308,7 +292,6 @@ mod tests {
         let root = WorkspaceRoot::init(workspace_path).unwrap();
         let paths = root.paths();
 
-        // Check that all expected directories exist
         assert!(paths.data_dir().exists());
         assert!(paths.log_dir().exists());
         assert!(paths.backup_dir().exists());
@@ -321,11 +304,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path();
 
-        // Initialize workspace first
         let root1 = WorkspaceRoot::init(workspace_path).unwrap();
         drop(root1);
 
-        // Should be able to open existing workspace
         let root2 = WorkspaceRoot::open(workspace_path).unwrap();
         assert_eq!(root2.paths().root(), workspace_path);
     }
@@ -335,14 +316,11 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path();
 
-        // Should fail on non-workspace directory
         assert!(WorkspaceRoot::validate(workspace_path).is_err());
 
-        // Initialize workspace
         let root = WorkspaceRoot::init(workspace_path).unwrap();
         drop(root);
 
-        // Should succeed on valid workspace
         assert!(WorkspaceRoot::validate(workspace_path).is_ok());
     }
 
@@ -353,7 +331,6 @@ mod tests {
 
         let _root1 = WorkspaceRoot::init(workspace_path).unwrap();
 
-        // Should fail to open the same workspace again due to exclusive lock
         assert!(WorkspaceRoot::open(workspace_path).is_err());
     }
 }

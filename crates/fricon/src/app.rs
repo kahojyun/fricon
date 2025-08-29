@@ -33,9 +33,6 @@ pub enum AppEvent {
     },
 }
 
-/// `AppState` contains only data - no business logic
-/// This struct is cheaply cloneable and holds all the shared state
-/// Internal-only, not exposed in public API
 #[derive(Clone)]
 struct AppState {
     inner: Arc<AppStateInner>,
@@ -102,8 +99,6 @@ impl AppState {
     }
 }
 
-/// `AppHandle` provides business logic methods
-/// All dataset operations are implemented here
 #[derive(Clone)]
 pub struct AppHandle {
     state: AppState,
@@ -134,21 +129,16 @@ impl AppHandle {
         self.state.subscribe_to_events()
     }
 
-    /// Create a `DatasetManager` for this app instance
     #[must_use]
     pub fn dataset_manager(&self) -> DatasetManager {
         DatasetManager::new(self.clone())
     }
 
-    /// Send an event to all subscribers
     pub fn send_event(&self, event: AppEvent) {
-        // Ignore send errors (no receivers)
         let _ = self.state.event_sender().send(event);
     }
 }
 
-/// `AppManager` manages the application lifecycle
-/// Responsible for initialization, server management, and shutdown
 pub struct AppManager {
     state: AppState,
     handle: AppHandle,
@@ -159,7 +149,6 @@ impl AppManager {
         let state = AppState::new(path).await?;
         let handle = AppHandle::new(state.clone());
 
-        // Start the server
         state
             .tracker()
             .spawn(server::run(handle.clone(), state.shutdown_token().clone()));

@@ -83,7 +83,6 @@ mod tests {
 
     use super::*;
 
-    // Helper to create a standard schema for testing
     fn create_test_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int32, false),
@@ -91,7 +90,6 @@ mod tests {
         ]))
     }
 
-    // Helper to create a RecordBatch with dummy data
     fn create_test_batch(schema: &Schema, start_id: i32, num_rows: i32) -> RecordBatch {
         let id_array = Int32Array::from_iter_values(start_id..(start_id + num_rows));
         let name_array =
@@ -117,7 +115,6 @@ mod tests {
         writer.write(batch2.clone())?;
         writer.finish()?;
 
-        // Verify the written data by reading it back
         let written_data = buffer.into_inner();
         let reader = FileReader::try_new(Cursor::new(written_data), None)?;
 
@@ -126,7 +123,6 @@ mod tests {
             read_batches.push(batch?);
         }
 
-        // `concat_batches` means all written batches are combined into one when flushed
         assert_eq!(read_batches.len(), 1);
         let combined_batch = arrow::compute::concat_batches(&schema, vec![&batch1, &batch2])?;
         assert_eq!(read_batches[0], combined_batch);
@@ -137,22 +133,20 @@ mod tests {
     #[test]
     fn batch_writer_schema_mismatch() -> ArrowResult<()> {
         let schema1 = create_test_schema();
-        // Create a different schema
         let schema2 = Schema::new(vec![Field::new("other_id", DataType::Int64, false)]);
 
         let mut buffer = Cursor::new(Vec::new());
         let mut writer = BatchWriter::new(&mut buffer, &schema1)?;
 
         let batch_ok = create_test_batch(&schema1, 0, 1);
-        // Create a batch with the mismatching schema
         let batch_bad = RecordBatch::try_new(
             Arc::new(schema2),
             vec![Arc::new(arrow::array::Int64Array::from_iter_values([1])) as _],
         )
         .unwrap();
 
-        writer.write(batch_ok)?; // This should work
-        let result = writer.write(batch_bad); // This should fail
+        writer.write(batch_ok)?;
+        let result = writer.write(batch_bad);
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -174,7 +168,6 @@ mod tests {
             writer.write(create_test_batch(&schema, 10, 5))?;
         }
 
-        // Verify the data was written even without explicitly calling `finish()`
         let written_data = buffer.into_inner();
         let reader = FileReader::try_new(Cursor::new(written_data), None)?;
 
@@ -183,7 +176,7 @@ mod tests {
             read_batches.push(batch?);
         }
 
-        assert_eq!(read_batches.len(), 1); // Concat_batches means only one batch is written
+        assert_eq!(read_batches.len(), 1);
         let expected_batch = arrow::compute::concat_batches(
             &schema,
             vec![
@@ -202,10 +195,8 @@ mod tests {
         let mut buffer = Cursor::new(Vec::new());
         let writer = BatchWriter::new(&mut buffer, &schema)?;
 
-        // Finish writer without writing any batches
         writer.finish()?;
 
-        // Verify the output is a valid empty Arrow file
         let written_data = buffer.into_inner();
         let reader = FileReader::try_new(Cursor::new(written_data), None)?;
 
@@ -214,7 +205,7 @@ mod tests {
             read_batches.push(batch?);
         }
 
-        assert!(read_batches.is_empty()); // No batches should have been written
+        assert!(read_batches.is_empty());
 
         Ok(())
     }
