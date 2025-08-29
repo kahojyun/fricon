@@ -1,4 +1,6 @@
 #![allow(clippy::needless_pass_by_value, clippy::used_underscore_binding)]
+mod chart_config;
+mod chart_service;
 mod commands;
 
 use std::{path::PathBuf, sync::Mutex};
@@ -16,13 +18,20 @@ use tracing_appender::{
 };
 use tracing_subscriber::{EnvFilter, prelude::*};
 
-struct AppState(Mutex<Option<(fricon::AppManager, WorkerGuard)>>);
+use crate::chart_service::UIChartService;
+
+struct AppState(Mutex<Option<(fricon::AppManager, UIChartService, WorkerGuard)>>);
 
 impl AppState {
     async fn new(workspace_path: PathBuf) -> Result<Self> {
         let log_guard = setup_logging(workspace_path.clone())?;
         let app_manager = fricon::AppManager::serve(&workspace_path).await?;
-        Ok(Self(Mutex::new(Some((app_manager, log_guard)))))
+        let ui_chart_service = UIChartService::new(app_manager.handle().clone());
+        Ok(Self(Mutex::new(Some((
+            app_manager,
+            ui_chart_service,
+            log_guard,
+        )))))
     }
 
     fn start_event_listener(&self, app_handle: tauri::AppHandle) {
@@ -50,8 +59,8 @@ impl AppState {
                             }),
                         );
                     }
-                    fricon::AppEvent::ChartUpdate(chart_update) => {
-                        let _ = app_handle.emit("chart-update", &chart_update);
+                    fricon::AppEvent::ConfigurationChanged(config_event) => {
+                        let _ = app_handle.emit("configuration-changed", &config_event);
                     }
                 }
             }
@@ -69,9 +78,23 @@ impl AppState {
             .clone()
     }
 
+    fn chart_service(&self) -> &UIChartService {
+        unsafe {
+            // This is safe because we never replace the UIChartService after creation
+            // and AppState is only accessed when the app is running
+            &*(&self
+                .0
+                .lock()
+                .unwrap()
+                .as_ref()
+                .expect("App should be running")
+                .1 as *const UIChartService)
+        }
+    }
+
     fn shutdown(&self) {
         async_runtime::block_on(async {
-            let (app_manager, _guard) = self
+            let (app_manager, _ui_chart_service, _guard) = self
                 .0
                 .lock()
                 .unwrap()

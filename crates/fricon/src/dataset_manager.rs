@@ -143,6 +143,12 @@ impl DatasetManager {
         &self.app
     }
 
+    /// Get the configuration service for this dataset manager
+    #[must_use]
+    pub fn configuration_service(&self) -> &crate::configuration_service::ConfigurationService {
+        self.app.configuration_service()
+    }
+
     pub async fn create_dataset(
         &self,
         request: CreateDatasetRequest,
@@ -474,16 +480,6 @@ impl DatasetManager {
 
         let file = File::create_new(&dataset_path)?;
 
-        // Check if there's a live plotter for this dataset
-        let live_plotter = {
-            let chart_service = self.app.chart_service();
-            // Try to get existing live plotter or create one if needed
-            chart_service.create_live_plotter(dataset_id).await.ok()
-        };
-
-        // Clone for checking after completion
-        let live_plotter_check = live_plotter.clone();
-
         let write_result = self
             .app
             .tracker()
@@ -501,17 +497,10 @@ impl DatasetManager {
                     .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
 
                 loop {
-                    // Write to file (existing behavior)
+                    // Write to file
                     batch_writer
                         .write(batch.clone())
                         .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-
-                    // Also write to live plotter if available
-                    if let Some(ref plotter) = live_plotter
-                        && let Err(e) = plotter.write_batch(batch.clone())
-                    {
-                        tracing::warn!("Failed to write batch to live plotter: {}", e);
-                    }
 
                     batch = match rt_handle.block_on(stream.next()) {
                         Some(Ok(batch)) => batch,
@@ -524,22 +513,9 @@ impl DatasetManager {
                     .finish()
                     .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
 
-                // Mark live plotter as completed if it exists
-                if let Some(ref plotter) = live_plotter {
-                    plotter.mark_completed();
-                }
-
                 Ok(())
             })
             .await;
-
-        // Clean up live plotter after completion
-        if live_plotter_check.is_some() {
-            self.app
-                .chart_service()
-                .cleanup_completed_dataset(dataset_id)
-                .await;
-        }
 
         match write_result {
             Ok(result) => result,

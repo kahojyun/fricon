@@ -12,7 +12,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::info;
 
 use crate::{
-    chart_service::{ChartService, ChartUpdate},
+    configuration_service::{ConfigurationEvent, ConfigurationService},
     database,
     dataset_manager::DatasetManager,
     server,
@@ -40,7 +40,7 @@ pub enum AppEvent {
         description: String,
         tags: Vec<String>,
     },
-    ChartUpdate(ChartUpdate),
+    ConfigurationChanged(ConfigurationEvent),
 }
 
 /// `AppState` contains only data - no business logic
@@ -57,7 +57,7 @@ struct AppStateInner {
     shutdown_token: CancellationToken,
     tracker: TaskTracker,
     event_sender: broadcast::Sender<AppEvent>,
-    chart_service: OnceLock<ChartService>,
+    configuration_service: OnceLock<ConfigurationService>,
 }
 
 impl AppState {
@@ -79,7 +79,7 @@ impl AppState {
                 shutdown_token,
                 tracker,
                 event_sender,
-                chart_service: OnceLock::new(),
+                configuration_service: OnceLock::new(),
             }),
         })
     }
@@ -152,13 +152,13 @@ impl AppHandle {
         DatasetManager::new(self.clone())
     }
 
-    /// Get the `ChartService` for this app instance (lazy initialization)
+    /// Get the `ConfigurationService` for this app instance (lazy initialization)
     #[must_use]
-    pub fn chart_service(&self) -> &ChartService {
+    pub fn configuration_service(&self) -> &ConfigurationService {
         self.state
             .inner
-            .chart_service
-            .get_or_init(|| ChartService::new(self.clone()))
+            .configuration_service
+            .get_or_init(|| ConfigurationService::new(self.clone()))
     }
 
     /// Send an event to all subscribers

@@ -6,9 +6,8 @@
 //! - **Dataset Operations**: Create, store, and query datasets using Apache Arrow format
 //! - **Client-Server Architecture**: gRPC-based communication
 mod app;
-pub mod chart;
-pub mod chart_service;
 mod client;
+pub mod configuration_service;
 mod database;
 mod dataset_manager;
 mod ipc;
@@ -32,8 +31,13 @@ pub use self::{
     workspace::get_log_dir,
 };
 
+// Configuration service for dataset-specific JSON configs
+pub use self::configuration_service::{
+    ConfigurationError, ConfigurationEvent, ConfigurationService,
+};
+
 // Module re-exports for organized access
-// Users can access these as fricon::chart::*, fricon::schema_utils::*, etc.
+// Users can access these as fricon::schema_utils::*, fricon::configuration_service::*, etc.
 // The modules are made public above
 
 // Commonly used types from modules with many exports

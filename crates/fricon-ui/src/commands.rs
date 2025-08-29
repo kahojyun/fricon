@@ -1,9 +1,11 @@
 use super::AppState;
 
 use chrono::{DateTime, Utc};
-use fricon::chart::{ChartDataRequest, ChartSchemaResponse, EChartsDataResponse};
 use serde::Serialize;
 use tauri::{Emitter, State, Window, ipc::Invoke};
+
+use crate::chart_config::{ChartConfigurationManager, CompleteChartConfiguration};
+use crate::chart_service::{ChartDataRequest, ChartSchemaResponse, EChartsDataResponse};
 
 #[derive(Serialize)]
 struct DatasetInfo {
@@ -79,9 +81,9 @@ async fn get_chart_schema(
     state: State<'_, AppState>,
     dataset_id: i32,
 ) -> Result<ChartSchemaResponse, String> {
-    let app = state.app();
-    // Use the new ChartService with unified API
-    app.chart_service()
+    // Use the local UI chart service
+    state
+        .chart_service()
         .get_schema(dataset_id)
         .await
         .map_err(|e| e.to_string())
@@ -92,9 +94,9 @@ async fn get_chart_data(
     state: State<'_, AppState>,
     request: ChartDataRequest,
 ) -> Result<EChartsDataResponse, String> {
-    let app = state.app();
-    // Use the new ChartService with automatic data source detection
-    app.chart_service()
+    // Use the local UI chart service with automatic data source detection
+    state
+        .chart_service()
         .get_data(request)
         .await
         .map_err(|e| e.to_string())
@@ -107,10 +109,8 @@ async fn subscribe_live_chart_updates(
     dataset_id: i32,
     window: Window,
 ) -> Result<(), String> {
-    let app = state.app();
-
-    // Try to subscribe to updates for the dataset
-    let mut rx = app
+    // Try to subscribe to updates for the dataset using local UI chart service
+    let mut rx = state
         .chart_service()
         .subscribe_updates(dataset_id)
         .map_err(|e| e.to_string())?;
@@ -129,6 +129,49 @@ async fn subscribe_live_chart_updates(
     Ok(())
 }
 
+/// Save chart configuration for a dataset
+#[tauri::command]
+async fn save_chart_config(
+    state: State<'_, AppState>,
+    dataset_id: i32,
+    config: CompleteChartConfiguration,
+) -> Result<(), String> {
+    let app = state.app();
+    let config_manager = ChartConfigurationManager::new(app);
+
+    config_manager
+        .save_config(dataset_id, &config)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Load chart configuration for a dataset
+#[tauri::command]
+async fn load_chart_config(
+    state: State<'_, AppState>,
+    dataset_id: i32,
+) -> Result<CompleteChartConfiguration, String> {
+    let app = state.app();
+    let config_manager = ChartConfigurationManager::new(app);
+
+    config_manager
+        .load_config_with_defaults(dataset_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Delete chart configuration for a dataset
+#[tauri::command]
+async fn delete_chart_config(state: State<'_, AppState>, dataset_id: i32) -> Result<(), String> {
+    let app = state.app();
+    let config_manager = ChartConfigurationManager::new(app);
+
+    config_manager
+        .delete_config(dataset_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
     tauri::generate_handler![
         get_workspace_info,
@@ -136,6 +179,9 @@ pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
         list_datasets,
         get_chart_schema,
         get_chart_data,
-        subscribe_live_chart_updates
+        subscribe_live_chart_updates,
+        save_chart_config,
+        load_chart_config,
+        delete_chart_config
     ]
 }
