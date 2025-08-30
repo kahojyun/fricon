@@ -83,6 +83,25 @@ pub struct ViewDefinition {
 pub enum ChartType { Line, Heatmap }
 
 pub struct ViewRoles { pub x: String, pub y: Vec<String>, pub z: Option<String>, pub color: Option<String> }
+
+// Logical (derived) column typing – computed, not persisted
+pub enum LogicalColumnType {
+    Int32, Int64, Float32, Float64, Timestamp,
+    Complex,   // struct(real:f64, imag:f64)
+    Trace,     // per-row sequence with internal x domain
+    Unsupported(String),
+}
+
+pub enum ComplexMode { Real, Imag, Mag, Phase }
+
+pub struct ColumnMeta {
+    pub name: String,
+    pub physical: arrow::datatypes::DataType,
+    pub logical: LogicalColumnType,
+    pub plottable: bool,
+    pub plot_modes: Vec<ComplexMode>,
+    pub reason: Option<String>,
+}
 ```
 
 Write session:
@@ -97,6 +116,7 @@ struct ActiveWriteSession {
     flushed_row_count: u64,
     last_flush_instant: Instant,
     scan_params_spec: Option<Vec<String>>,
+    schema_frozen: bool,
 }
 ```
 
@@ -113,6 +133,7 @@ Python mapping: `DatasetWriter` keeps a PyO3 wrapper referencing an internal Arc
 5. After each flush emit `AppEvent::DatasetRowsAppended { uuid, appended_row_count }`.
 6. Context exit success: finish writer, update DB status Completed, run deferred index inference if needed, save config.
 7. Context exit error: abort writer (drop file open handle), DB status Aborted.
+8. Schema freezes at first flush; before freeze numeric widening (int->float) allowed; after freeze incompatible type => error. Complex always f64 in MVP (future generic). Trace rows validated structure (implicit/uniform/explicit) per add.
 
 ### Real-Time Visualization
 
@@ -146,25 +167,48 @@ We extend existing Dataset service; no separate visualization service. Implement
 
 ## 6. Python API Contracts
 
-Contract: `create_writer(name, description=None, tags=None, index_columns=None, scan_params_spec=None) -> DatasetWriter`
+Contract: `create_writer(name, description=None, tags=None, index_columns=None, scan_params_spec=None, schema_overrides=None) -> DatasetWriter`
 DatasetWriter:
 
 ```python
-with create_writer("exp1", scan_params_spec=["temp","voltage"]) as w:
+with create_writer("exp1", scan_params_spec=["temp","voltage"], schema_overrides={"temp":"float64"}) as w:
     w.add_row({"temp":1.0,"voltage":2.0,"value":0.5})
     w.add_rows([{...}, {...}])
 handle = w.handle  # only after context
 df = handle.to_pandas()
+
+# Complex & trace examples
+w.add_row({"freq": 1.0, "resp": 0.3+0.4j})                # complex scalar
+w.add_row({"freq": 2.0, "trace": {"y": [0.1,0.2,0.3]}})  # implicit index trace
+w.add_row({"freq": 2.5, "trace": {"x0":0.0, "dx":0.5, "y":[0.1,0.2,0.3]}})  # uniform step trace
+w.add_row({"freq": 3.0, "trace": {"x":[0.0,1.0], "y":[0.1+0.2j,0.3+0.4j]}})  # explicit complex trace
 ```
 
 Errors: ValueError(schema mismatch), RuntimeError(after finalize), KeyError(not found).
 
-## 7. Batch & Flush Strategy
+## 7. Persistence & Flush Strategy
 
-- Parameter: FLUSH_BATCH_SIZE (env or config) default 1024 rows.
-- Manual flush for low-latency viz: `w.flush()` exposed.
-- Each flush builds Arrow arrays for all columns; columns discovered on first row.
-- Single writer per dataset enforced by registry (HashMap<Uuid, ActiveWriteSession>). Attempts to create second writer => error.
+Goals: minimize crash data loss (row-by-row workloads) while keeping throughput reasonable & providing low-latency visualization.
+
+Modes (writer creation param `flush_mode`, Python default `immediate`):
+
+1. immediate: each `add_row` writes a single-row batch directly. Pros: <=1 row loss window, real-time latency. Cons: more batches.
+2. interval: buffer rows; flush when rows >= FLUSH_BATCH_SIZE OR FLUSH_MAX_INTERVAL elapsed since last durability (timer task). Default size 512, interval 2000ms.
+3. manual (optional / maybe deferred): only flush on explicit `flush()` or finalize.
+
+Schema freeze triggers on first durability event (immediate write or first flush).
+
+Durability actions emit RowsAppended event with row count.
+
+Parameters (env or global config): FLUSH_MODE, FLUSH_BATCH_SIZE, FLUSH_MAX_INTERVAL_MS.
+
+Immediate path: construct minimal arrays (length 1) via small reusable builders or scalar-to-array convenience.
+Interval path: store RowBuffer vec; background tokio interval drains if time trigger; writer drop cancels after final flush.
+Manual path: same as interval without timer.
+
+Finalize: always forces flush of pending buffer before status Completed.
+
+Single writer per dataset enforced by registry (HashMap<Uuid, ActiveWriteSession>); second attempt errors.
 
 ## 8. Index Inference Algorithm
 
@@ -212,6 +256,8 @@ Emission points: flush (RowsAppended), successful config save (ConfigUpdated), f
 | Config validation fail           | Config    | ValueError          | No write                        |
 | Index inference file read fail   | Inference | OSError             | Log + skip inference            |
 | Partial dataset read (truncated) | Reader    | (no error)          | Return partial data             |
+| Complex mode on non-complex      | UI/Core   | ValueError          | Reject                          |
+| Trace column assigned to role    | UI/Core   | ValueError          | Reject                          |
 
 ## 12. Testing Strategy
 
@@ -224,6 +270,8 @@ Add explicit in-process vs gRPC coverage:
 - Index inference: perfect unique, partial unique, override manual.
 - Config validation (line vs heatmap required roles).
 - Real-time events emission counts.
+- Complex column modes: real/imag/mag/phase transforms.
+- Trace column ingestion & classification (non-plottable) cases.
 
 Integration:
 

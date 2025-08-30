@@ -81,12 +81,49 @@ IF no contiguous prefix yields global uniqueness THEN the system SHALL select th
 WHEN the dataset is still Writing and subsequent rows later invalidate previously unique prefix uniqueness THEN the system SHALL NOT auto-adjust `index_columns` (user may override manually).
 WHEN user explicitly sets index columns (manual override) THEN the system SHALL overwrite any inferred columns.
 
+## 9A. Schema & Data Type Constraints (Revised)
+
+Supported primitive scalars: int32, int64, float32, float64, timestamp(UTC).
+
+Custom logical types:
+
+- complex: struct(real: f64, imag: f64) with virtual modes real/imag/mag/phase (only f64 precision MVP; extensible generically later).
+- trace: per-row sequence of (x,y) points (y real or complex). Consumes an implicit independent axis; selectable only as dependent variable.
+
+Trace x specification forms (mutually exclusive):
+
+1. Implicit: only `y` provided => x = 0..n-1.
+2. Uniform: `x0` + `dx` + `y` list.
+3. Explicit: `x` list + `y` list (equal length).
+
+Inference rules:
+WHEN first row arrives THEN un-overridden, non-Scalar columns infer type from first non-null.
+WHEN mixed int & float pre-freeze THEN promote to float64.
+WHEN Python complex observed pre-freeze THEN assign complex.
+WHEN trace dict observed THEN assign trace type & validate form (length consistency; exactly one x form).
+WHEN pyarrow Scalar supplied THEN adopt its type (no widening pre-freeze; conflicting later value => ValueError).
+Schema freezes at first persistence event (immediate single-row write or first batch/interval flush); after freeze incompatible widening => ValueError. All columns nullable.
+
+Overrides:
+`schema_overrides` may set selected column types (numeric or timestamp). Complex alternative precisions & forcing trace via override not supported MVP.
+
+Plot classification:
+
+- Independent: index_columns + numeric scalars + timestamp.
+- Dependent: numeric scalars + complex (modes) + trace.
+- Timestamp SHALL NOT be dependent in MVP.
+- Non-plottable: strings, bool, unsupported nested types.
+  Complex modes: `<col>.real`, `<col>.imag`, `<col>.mag`, `<col>.phase`.
+  Trace line plotting: selecting trace as y uses internal x; disallows explicit x selection or mixing with non-trace y needing explicit x (MVP simplification). Heatmap excludes trace.
+
+Snippet notes: append complex columns comment if any; append trace columns comment listing their x mode forms if any.
+
 ## 10. Python API Functional Requirements
 
 Ubiquitous requirements (API surface):
 THE SYSTEM SHALL provide a Python module `fricon.datasets` exposing:
 
-1. create_writer(name, description="", tags=None, index_columns=None, scan_params_spec=None) -> DatasetWriter (context manager)
+1. create_writer(name, description="", tags=None, index_columns=None, scan_params_spec=None, schema_overrides:dict=None) -> DatasetWriter (context manager)
 2. open_dataset(uuid|name) -> DatasetHandle (read-only + config/views edits)
 3. list_datasets(filters: optional) -> list[DatasetInfo]
 4. delete_dataset(uuid)
@@ -103,6 +140,9 @@ WHEN `add_rows(list_of_row_dicts)` is called THEN the system SHALL process rows 
 WHEN context exits without error THEN the system SHALL finalize Arrow file and mark status=Completed returning a DatasetHandle.
 IF an exception escapes THEN the system SHALL mark status=Aborted and return no handle.
 IF any write method is called after finalization THEN the system SHALL raise `RuntimeError`.
+WHEN a pyarrow Scalar is supplied THEN the system SHALL respect its type and not widen that column.
+WHEN a Python complex / numpy complex value is supplied THEN the system SHALL map it to complex logical type.
+WHEN a trace dict (implicit / uniform / explicit) is supplied THEN the system SHALL validate and store it as trace logical type (line y supported with internal x; heatmap unsupported in MVP).
 
 DatasetHandle methods:
 WHEN `to_pandas(columns=None, limit=None)` is called THEN the system SHALL read Arrow data (partial allowed if status=Writing or Aborted) into a DataFrame (columns subset & limit applied in-memory for MVP).
@@ -121,6 +161,8 @@ WHEN a view is created or updated via Python or GUI THEN the system SHALL persis
 WHEN a dataset has no explicit views THEN the system SHALL create a default `main` view placeholder with empty roles.
 WHEN `chart_type` = `heatmap` THEN the system SHALL require roles: x, y, z (value) explicitly (no implicit fallback); optional role `color` MAY be introduced later (NOT MVP if adds complexity).
 WHEN `chart_type` = `line` THEN the system SHALL require roles: x and at least one y; additional index columns MAY implicitly differentiate series (color) when user selects multiple values.
+WHEN selecting y roles THEN the system SHALL allow choosing virtual modes of complex columns; multiple modes of same base column allowed.
+WHEN listing available columns THEN the system SHALL group them into: Independent / Dependent / Other (non-plottable with reason).
 WHEN saving a view THEN the system SHALL allow specifying filters (subset/fixed values of index columns) to pre-slice the dataset for rendering (may be minimal / empty in MVP if implementation complexity high).
 IF a required role is missing at save time THEN the system SHALL reject the view with validation error.
 WHEN a view is set as default THEN the system SHALL update `default_view`.
@@ -131,6 +173,7 @@ WHEN user opens dataset list page THEN the system SHALL display: name, tags, sta
 WHEN user filters by tag(s) THEN the system SHALL show datasets containing ALL selected tags (logical AND).
 WHEN user opens a dataset detail THEN the system SHALL display: metadata fields, available views, current default view rendered (no raw table preview in MVP).
 WHEN configuring a plot THEN the system SHALL provide UI to select roles (x, y(s), z for heatmap) from available columns and to select fixed values for remaining index columns OR choose multiple values producing multiple line series.
+WHEN opening a column info panel THEN the system SHALL list each column's name, logical type, plottable status, complex modes (if any), or reason if not plottable.
 WHEN user edits metadata (name/description/favorite, tags) THEN the change SHALL persist immediately to DB (and reflect in detail view without reload).
 WHEN user copies snippet THEN the system SHALL place the Python snippet string into clipboard.
 WHEN dataset status is Writing THEN the default view (if valid) SHALL auto-refresh with newly appended data (see Section 18) else provide a manual refresh control as fallback.
@@ -152,17 +195,18 @@ IF IO errors occur during write THEN the system SHALL surface an `OSError` (wrap
 WHEN snippet requested THEN the system SHALL generate a minimal reproducible Python example including dataset UUID and `to_pandas()` call.
 IF columns parameter is provided by user in GUI snippet dialog THEN the system SHALL include `columns=[...]` argument.
 WHEN generating a snippet THEN the system SHALL include a commented placeholder line for workspace path if relevant, e.g. `# workspace = "/path/to/workspace"`.
+IF dataset contains complex columns THEN the system SHALL append a comment enumerating complex columns & modes.
 
 ## 17. Validation & Integrity
 
 WHEN writing the first row THEN the system SHALL lock in the column order & types inferred from Python (mapping to Arrow types) for the session.
 IF subsequent row adds produce a type incompatible with established Arrow field type THEN the system SHALL raise a `ValueError` before persisting that row.
-WHEN finalizing write THEN the system SHALL flush and close the Arrow writer before updating status=Completed.
+WHEN finalizing write THEN the system SHALL persist any pending buffered rows (if batching/interval/manual mode) and close the Arrow writer before updating status=Completed.
 
 ## 18. Real-Time Visualization (Writing / Partial Datasets)
 
 WHEN a dataset is in Writing state THEN the system SHALL support real-time visualization updates without waiting for completion.
-WHEN new rows are flushed during a write session THEN the system SHALL emit an incremental update event (e.g., `AppEvent::DatasetRowsAppended { uuid, batch_summary }`).
+WHEN new rows are persisted (immediate or scheduled flush) during a write session THEN the system SHALL emit an incremental update event (e.g., `AppEvent::DatasetRowsAppended { uuid, batch_summary }`).
 WHEN the GUI receives an appended event AND the active dataset view references that dataset THEN the GUI SHALL request the new data slice (entire dataset or tail-N incremental API — selection deferred to design).
 WHEN reading a partially written dataset for plotting THEN the system SHALL tolerate end-of-stream conditions without treating them as corruption.
 IF real-time streaming is unavailable (platform limitation) THEN the system SHALL allow manual refresh producing a consistent partial snapshot.
@@ -199,6 +243,7 @@ If new questions arise they will be appended here before design phase.
 | ----------------------------- | --------------------- |
 | Python creation & analysis    | 10, 11, 16, 17        |
 | Multi-dim scan optimization   | 9, 11                 |
+| Schema & type constraints     | 9A, 10, 12            |
 | Visualization (line, heatmap) | 8, 12, 18             |
 | GUI inspection                | 13, 16, 18            |
 | Config separation             | 6, 8, 9               |

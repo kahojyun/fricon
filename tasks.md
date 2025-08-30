@@ -10,8 +10,8 @@ Legend: ID, Description, ReqRefs, Depends, Est (S/M/L), Status(Pending)
 | A4  | Implement WriteSessionRegistry (new struct in dataset_manager or submodule)       | 10        | A3        | M   | Pending     |
 | A5  | Implement DatasetWriter struct (public API in core crate)                         | 10,17     | A4        | M   | Pending     |
 | A6  | Expose create_writer binding in `fricon-py` (PyO3)                                | 10        | A5        | M   | Pending     |
-| A7  | Implement row -> Arrow builders + flush logic                                     | 10,17,18  | A5        | M   | Pending     |
-| A8  | Emit RowsAppended event on flush                                                  | 18,19     | A7        | S   | Pending     |
+| A7  | Implement row -> Arrow builders + persistence abstraction (immediate + buffer)    | 10,17,18  | A5        | M   | Pending     |
+| A8  | Emit RowsAppended event on durability (row or batch)                              | 18,19     | A7        | S   | Pending     |
 | A9  | Finalize logic: finish writer, update status, run index inference if needed       | 5,9,10,17 | A7        | M   | Pending     |
 | A10 | Aborted finalize path (exception propagation)                                     | 5,10,15   | A7        | S   | Pending     |
 | A11 | Index inference module + perfect/partial selection                                | 9         | A9        | M   | Pending     |
@@ -33,9 +33,22 @@ Legend: ID, Description, ReqRefs, Depends, Est (S/M/L), Status(Pending)
 | A27 | Docs: Update README + API docs (Python usage snippet)                             | 10,16     | A6,A18    | S   | Pending     |
 | A28 | Changelog entry                                                                   | all       | after all | S   | Pending     |
 | A29 | Technical debt placeholder issues (inference perf, tail API, mmap)                | 9,18      | A11,A14   | S   | Pending     |
+| A30 | Schema inference engine (primitive + overrides)                                   | 9A,10,17  | A5        | M   | Pending     |
+| A31 | Complex logical type support (struct real/imag + mode exposure)                   | 9A,12     | A30       | M   | Pending     |
+| A32 | Trace logical type ingestion & validation                                         | 9A        | A30       | M   | Pending     |
+| A33 | Column classification utility (plottable grouping)                                | 9A,12     | A30       | S   | Pending     |
+| A34 | Python binding: complex & trace value adapters                                    | 9A,10     | A31,A32   | S   | Pending     |
+| A35 | UI: column info panel (plottable & modes)                                         | 13,9A     | A19,A33   | M   | Pending     |
+| A36 | Tests: schema inference edge cases                                                | 9A        | A30       | S   | Pending     |
+| A37 | Tests: complex modes numeric correctness                                          | 9A,12     | A31       | S   | Pending     |
+| A38 | Tests: trace ingestion & non-plottable classification                             | 9A        | A32,A33   | S   | Pending     |
+| A39 | Snippet generator: complex columns comment                                        | 16,9A     | A18       | S   | Pending     |
+| A40 | Interval flush timer task (interval mode)                                         | 7         | A7        | S   | Pending     |
+| A41 | Immediate mode single-row write fast path optimizations                           | 7         | A7        | S   | Pending     |
+| A42 | Tests: persistence modes (immediate/interval) & event timing                      | 7,18      | A7,A8,A40 | S   | Pending     |
 
 Dependency Graph (simplified):
-Core foundation (A1,A3) -> Writer infra (A4-A7) -> Flush/events (A8) -> Finalize + inference (A9,A11) -> View & config core (A13,A14) -> gRPC (A15,A16) & Python (A17) -> GUI direct (A19,A20) -> Tests (A21-A26) -> Docs/Changelog (A27,A28) -> Debt (A29).
+Core foundation (A1,A3) -> Writer infra (A4-A7) -> Durability/events (A8,A40) -> Finalize + inference (A9,A11) -> View & config core (A13,A14) -> Schema/Types (A30-A33) -> gRPC (A15,A16) & Python (A17,A34) -> GUI direct (A19,A20,A35) -> Flush optimizations (A41) -> Tests (A21-A26,A36-A38,A42) -> Snippet/Docs/Changelog (A18,A39,A27,A28) -> Debt (A29).
 
 ## Execution Strategy
 
@@ -56,3 +69,4 @@ Confidence high; proceed full implementation. Parallelizable clusters:
 - Views CRUD persists & validates roles.
 - Python snippet includes workspace comment line.
 - GUI receives RowsAppended and re-renders with new data.
+- Complex & trace columns ingested; complex modes exposed; trace marked non-plottable.
