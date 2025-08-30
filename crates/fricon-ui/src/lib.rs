@@ -9,7 +9,7 @@ use tauri::{
     menu::MenuBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
-use tracing::info;
+use tracing::{info, warn};
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
@@ -49,6 +49,9 @@ impl AppState {
                                 "tags": tags
                             }),
                         );
+                    }
+                    _ => {
+                        warn!("Unknown event received");
                     }
                 }
             }

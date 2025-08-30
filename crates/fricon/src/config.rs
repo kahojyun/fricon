@@ -53,23 +53,12 @@ pub enum ChartType {
     Heatmap,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ViewRoles {
     pub x: String,
     pub y: Vec<String>,
     pub z: Option<String>,
     pub color: Option<String>,
-}
-
-impl Default for ViewRoles {
-    fn default() -> Self {
-        Self {
-            x: "".to_string(),
-            y: vec![],
-            z: None,
-            color: None,
-        }
-    }
 }
 
 impl DatasetConfig {
@@ -91,9 +80,8 @@ impl DatasetConfig {
         // clobbering the same tmp file. Lock file: <config_filename>.lock
         let filename = path
             .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "config".to_string());
-        let lock_path = path.with_file_name(format!("{}.lock", filename));
+            .map_or_else(|| "config".to_string(), |s| s.to_string_lossy().to_string());
+        let lock_path = path.with_file_name(format!("{filename}.lock"));
         let _lock = FileLock::new(&lock_path)
             .with_context(|| format!("Failed to acquire config lock: {}", lock_path.display()))?;
 
@@ -118,10 +106,8 @@ impl DatasetConfig {
 
         // simple validation: heatmap requires z role
         for (name, view) in &self.views {
-            if matches!(view.chart_type, ChartType::Heatmap) {
-                if view.roles.z.is_none() {
-                    anyhow::bail!("view '{}' is heatmap but missing z role", name);
-                }
+            if matches!(view.chart_type, ChartType::Heatmap) && view.roles.z.is_none() {
+                anyhow::bail!("view '{}' is heatmap but missing z role", name);
             }
         }
 
