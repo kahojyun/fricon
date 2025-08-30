@@ -7,6 +7,7 @@
 //! - **Client-Server Architecture**: gRPC-based communication
 mod app;
 mod client;
+mod config;
 mod database;
 mod dataset_manager;
 mod ipc;
@@ -18,6 +19,7 @@ mod workspace;
 pub use self::{
     app::{AppEvent, AppHandle, AppManager, init as init_workspace},
     client::{Client, Dataset, DatasetWriter},
+    config::DatasetConfig,
     database::DatasetStatus,
     dataset_manager::DatasetMetadata,
     server::{DatasetRecord, run as run_server},

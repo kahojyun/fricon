@@ -31,6 +31,13 @@ pub enum AppEvent {
         description: String,
         tags: Vec<String>,
     },
+    DatasetRowsAppended {
+        uuid: String,
+        appended: u64,
+    },
+    ConfigUpdated {
+        uuid: String,
+    },
 }
 
 #[derive(Clone)]

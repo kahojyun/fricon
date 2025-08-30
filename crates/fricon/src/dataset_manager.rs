@@ -228,6 +228,24 @@ impl DatasetManager {
                     .metadata
                     .save(&dataset_path.join(METADATA_NAME))?;
 
+                // Ensure dataset config exists on disk. Load existing or default and save atomically.
+                match crate::config::DatasetConfig::load(&dataset_path.join("config.json")) {
+                    Ok(cfg) => {
+                        if let Err(e) = cfg.save_atomic(&dataset_path.join("config.json")) {
+                            tracing::warn!("Failed to save config.json for {}: {}", uuid, e);
+                        } else {
+                            // Emit ConfigUpdated event so UI can react
+                            let event = crate::app::AppEvent::ConfigUpdated {
+                                uuid: uuid.to_string(),
+                            };
+                            self.app.send_event(event);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load config.json for {}: {}", uuid, e);
+                    }
+                }
+
                 Ok(updated_record)
             }
             Err(e) => {
