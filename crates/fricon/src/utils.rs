@@ -4,11 +4,12 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
+
 use tracing::warn;
 
 #[derive(Debug)]
 pub struct FileLock {
-    file: File,
+    _file: File,
     path: PathBuf,
 }
 
@@ -22,19 +23,47 @@ impl FileLock {
             .truncate(true)
             .open(&path)
             .context("Failed to open file for locking.")?;
-        // Stable Rust 1.89
         file.try_lock().context("Failed to acquire file lock.")?;
-        Ok(Self { file, path })
+        Ok(Self { _file: file, path })
     }
 }
 
 impl Drop for FileLock {
     fn drop(&mut self) {
-        if let Err(e) = self.file.unlock() {
-            warn!("Failed to release file lock: {e}");
-        }
         if let Err(e) = fs::remove_file(&self.path) {
             warn!("Failed to remove locked file: {e}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn creates_and_removes_lock_file() {
+        let dir = tempdir().unwrap();
+        let lock_path = dir.path().join("test.lock");
+        {
+            let _lock = FileLock::new(&lock_path).expect("Should create lock");
+            assert!(lock_path.exists());
+        }
+        // File should be removed after drop
+        assert!(!lock_path.exists());
+    }
+
+    #[test]
+    fn cannot_acquire_lock_twice() {
+        let dir = tempdir().unwrap();
+        let lock_path = dir.path().join("double.lock");
+        let _first_lock = FileLock::new(&lock_path).expect("Should acquire first lock");
+        // Attempting to acquire the same lock again should fail
+        let second_lock = FileLock::new(&lock_path);
+        assert!(
+            second_lock.is_err(),
+            "Should not acquire lock twice on same file"
+        );
     }
 }
