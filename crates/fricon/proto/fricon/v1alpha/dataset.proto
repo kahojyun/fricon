@@ -7,10 +7,9 @@ import "google/protobuf/timestamp.proto";
 // Dataset status enum
 enum DatasetStatus {
   DATASET_STATUS_UNSPECIFIED = 0;
-  DATASET_STATUS_PENDING = 1;
-  DATASET_STATUS_WRITING = 2;
-  DATASET_STATUS_COMPLETED = 3;
-  DATASET_STATUS_ABORTED = 4;
+  DATASET_STATUS_WRITING = 1;
+  DATASET_STATUS_COMPLETED = 2;
+  DATASET_STATUS_ABORTED = 3;
 }
 
 // Manage datasets.

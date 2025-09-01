@@ -424,7 +424,6 @@ impl Dataset {
     #[getter]
     pub fn status(&self) -> String {
         match self.inner.status() {
-            fricon::DatasetStatus::Pending => "pending".to_string(),
             fricon::DatasetStatus::Writing => "writing".to_string(),
             fricon::DatasetStatus::Completed => "completed".to_string(),
             fricon::DatasetStatus::Aborted => "aborted".to_string(),

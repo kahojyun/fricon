@@ -12,7 +12,6 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromSqlRow, AsExpression)]
 #[diesel(sql_type = Text)]
 pub enum DatasetStatus {
-    Pending,
     Writing,
     Completed,
     Aborted,
@@ -24,7 +23,6 @@ where
 {
     fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
         let status_str = match self {
-            DatasetStatus::Pending => "pending",
             DatasetStatus::Writing => "writing",
             DatasetStatus::Completed => "completed",
             DatasetStatus::Aborted => "aborted",
@@ -42,7 +40,6 @@ where
     fn from_sql(bytes: DB::RawValue<'_>) -> deserialize::Result<Self> {
         let string = String::from_sql(bytes)?;
         match string.as_str() {
-            "pending" => Ok(DatasetStatus::Pending),
             "writing" => Ok(DatasetStatus::Writing),
             "completed" => Ok(DatasetStatus::Completed),
             "aborted" => Ok(DatasetStatus::Aborted),

@@ -112,7 +112,6 @@ impl Storage {
 impl From<DatasetStatus> for proto::DatasetStatus {
     fn from(status: DatasetStatus) -> Self {
         match status {
-            DatasetStatus::Pending => proto::DatasetStatus::Pending,
             DatasetStatus::Writing => proto::DatasetStatus::Writing,
             DatasetStatus::Completed => proto::DatasetStatus::Completed,
             DatasetStatus::Aborted => proto::DatasetStatus::Aborted,
@@ -126,7 +125,6 @@ impl TryFrom<proto::DatasetStatus> for DatasetStatus {
     fn try_from(status: proto::DatasetStatus) -> Result<Self, Self::Error> {
         match status {
             proto::DatasetStatus::Unspecified => bail!("Cannot convert unspecified dataset status"),
-            proto::DatasetStatus::Pending => Ok(DatasetStatus::Pending),
             proto::DatasetStatus::Writing => Ok(DatasetStatus::Writing),
             proto::DatasetStatus::Completed => Ok(DatasetStatus::Completed),
             proto::DatasetStatus::Aborted => Ok(DatasetStatus::Aborted),
@@ -162,20 +160,6 @@ impl DatasetService for Storage {
                 "first message must be CreateMetadata",
             ));
         };
-
-        let create_request = CreateDatasetRequest {
-            name,
-            description,
-            tags,
-        };
-        let dataset_uuid = self
-            .manager
-            .create_dataset(create_request)
-            .await
-            .map_err(|e| {
-                error!("Failed to create dataset: {:?}", e);
-                Status::internal(e.to_string())
-            })?;
 
         let bytes_stream = stream.map(|request| {
             let request = request.map_err(|e| {
@@ -244,7 +228,15 @@ impl DatasetService for Storage {
             }
         });
 
-        let write_result = self.manager.write_dataset(dataset_uuid, batch_stream).await;
+        let create_request = CreateDatasetRequest {
+            name,
+            description,
+            tags,
+        };
+        let write_result = self
+            .manager
+            .create_dataset(create_request, batch_stream)
+            .await;
 
         if let Err(e) = read_task.await {
             error!("Read task failed: {:?}", e);
