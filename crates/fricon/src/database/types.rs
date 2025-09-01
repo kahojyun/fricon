@@ -1,5 +1,3 @@
-use std::fmt;
-
 use diesel::{
     backend::Backend,
     deserialize::{self, FromSql, FromSqlRow},
@@ -77,39 +75,5 @@ where
         let string = String::from_sql(bytes)?;
         let uuid = string.parse()?;
         Ok(SimpleUuid(uuid))
-    }
-}
-
-#[derive(Debug, FromSqlRow, AsExpression)]
-#[diesel(sql_type = Text)]
-pub struct JsonValue<T>(pub T);
-
-impl<T: Clone> Clone for JsonValue<T> {
-    fn clone(&self) -> Self {
-        JsonValue(self.0.clone())
-    }
-}
-
-impl<T: Serialize + fmt::Debug> ToSql<Text, Sqlite> for JsonValue<T>
-where
-    String: ToSql<Text, Sqlite>,
-{
-    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
-        let json = serde_json::to_string(&self.0)?;
-        out.set_value(json);
-        Ok(serialize::IsNull::No)
-    }
-}
-
-impl<T, DB> FromSql<Text, DB> for JsonValue<T>
-where
-    T: for<'de> Deserialize<'de>,
-    DB: Backend,
-    String: FromSql<Text, DB>,
-{
-    fn from_sql(bytes: DB::RawValue<'_>) -> deserialize::Result<Self> {
-        let string = String::from_sql(bytes)?;
-        let value = serde_json::from_str(&string)?;
-        Ok(JsonValue(value))
     }
 }

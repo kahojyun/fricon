@@ -42,7 +42,7 @@ class DatasetManager:
         description: str | None = ...,
         tags: Iterable[str] | None = ...,
         schema: pa.Schema | None = ...,
-        index: Sequence[str] | None = ...,
+        index_columns: Sequence[str] | None = ...,
     ) -> DatasetWriter: ...
     def open(
         self,
@@ -122,7 +122,5 @@ class Dataset:
     def path(self) -> str: ...
     @property
     def created_at(self) -> datetime: ...
-    @property
-    def index_columns(self) -> list[str]: ...
     @property
     def status(self) -> Literal["pending", "writing", "completed", "aborted"]: ...

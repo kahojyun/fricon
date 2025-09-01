@@ -1,11 +1,10 @@
 use anyhow::bail;
 use arrow::{array::RecordBatch, error::ArrowError, ipc::reader::StreamReader};
-use bytes::Bytes;
 use futures::prelude::*;
 use tokio::sync::mpsc;
 use tokio_util::io::SyncIoBridge;
 use tonic::{Request, Response, Result, Status, Streaming};
-use tracing::{error, trace};
+use tracing::{error, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -13,10 +12,10 @@ use crate::{
     database::DatasetStatus,
     dataset_manager::{CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError},
     proto::{
-        self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
-        DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest, RemoveTagsResponse,
-        SearchRequest, SearchResponse, UpdateRequest, UpdateResponse, WriteRequest, WriteResponse,
-        dataset_service_server::DatasetService, get_request::IdEnum,
+        self, AddTagsRequest, AddTagsResponse, CreateAbort, CreateMetadata, CreateRequest,
+        CreateResponse, DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
+        RemoveTagsResponse, SearchRequest, SearchResponse, UpdateRequest, UpdateResponse,
+        create_request::CreateMessage, dataset_service_server::DatasetService, get_request::IdEnum,
     },
 };
 
@@ -47,6 +46,7 @@ impl TryFrom<crate::proto::Dataset> for crate::dataset_manager::DatasetRecord {
 impl From<crate::dataset_manager::DatasetMetadata> for crate::proto::DatasetMetadata {
     fn from(metadata: crate::dataset_manager::DatasetMetadata) -> Self {
         use prost_types::Timestamp;
+
         let created_at = Timestamp {
             seconds: metadata.created_at.timestamp(),
             #[expect(clippy::cast_possible_wrap, reason = "Nanos are always less than 2e9.")]
@@ -57,7 +57,6 @@ impl From<crate::dataset_manager::DatasetMetadata> for crate::proto::DatasetMeta
             name: metadata.name,
             description: metadata.description,
             favorite: metadata.favorite,
-            index_columns: metadata.index_columns,
             created_at: Some(created_at),
             tags: metadata.tags,
             status: crate::proto::DatasetStatus::from(metadata.status) as i32,
@@ -92,7 +91,6 @@ impl TryFrom<crate::proto::DatasetMetadata> for crate::dataset_manager::DatasetM
             description: metadata.description,
             favorite: metadata.favorite,
             status,
-            index_columns: metadata.index_columns,
             created_at,
             tags: metadata.tags,
         })
@@ -138,23 +136,39 @@ impl TryFrom<proto::DatasetStatus> for DatasetStatus {
 
 #[tonic::async_trait]
 impl DatasetService for Storage {
-    async fn create(&self, request: Request<CreateRequest>) -> Result<Response<CreateResponse>> {
+    #[expect(clippy::too_many_lines)]
+    async fn create(
+        &self,
+        request: Request<Streaming<CreateRequest>>,
+    ) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
-        let CreateRequest {
+        let mut stream = request.into_inner();
+        let first_message = stream
+            .next()
+            .await
+            .ok_or_else(|| Status::invalid_argument("request stream is empty"))?
+            .map_err(|e| {
+                error!("Failed to read first message: {:?}", e);
+                Status::internal("failed to read first message")
+            })?;
+        let Some(CreateMessage::Metadata(CreateMetadata {
             name,
             description,
             tags,
-            index_columns,
-        } = request.into_inner();
+        })) = first_message.create_message
+        else {
+            error!("First message must be CreateMetadata");
+            return Err(Status::invalid_argument(
+                "first message must be CreateMetadata",
+            ));
+        };
 
         let create_request = CreateDatasetRequest {
             name,
             description,
             tags,
-            index_columns,
         };
-
-        let token = self
+        let dataset_uuid = self
             .manager
             .create_dataset(create_request)
             .await
@@ -163,30 +177,35 @@ impl DatasetService for Storage {
                 Status::internal(e.to_string())
             })?;
 
-        trace!("generated uuid: {:?}", token);
-        let write_token = Bytes::copy_from_slice(token.as_bytes());
-        Ok(Response::new(CreateResponse { write_token }))
-    }
-
-    async fn write(
-        &self,
-        request: Request<Streaming<WriteRequest>>,
-    ) -> Result<Response<WriteResponse>> {
-        let token = request
-            .metadata()
-            .get_bin(proto::WRITE_TOKEN_KEY)
-            .ok_or_else(|| Status::unauthenticated("write token is required"))?
-            .to_bytes()
-            .map_err(|_| Status::invalid_argument("invalid write token"))?;
-        let token = Uuid::from_slice(&token)
-            .map_err(|_| Status::invalid_argument("invalid write token"))?;
-
-        let request_stream = request.into_inner();
-        let bytes_stream = request_stream.map(|request| {
-            request.map(|x| x.chunk).map_err(|e| {
+        let bytes_stream = stream.map(|request| {
+            let request = request.map_err(|e| {
                 error!("Client connection error: {e:?}");
                 std::io::Error::other(e)
-            })
+            })?;
+            match request.create_message {
+                Some(CreateMessage::Payload(data)) => Ok(data),
+                Some(CreateMessage::Metadata(_)) => {
+                    error!("Unexpected CreateMetadata message after the first message");
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "unexpected CreateMetadata message after the first message",
+                    ))
+                }
+                Some(CreateMessage::Abort(CreateAbort { reason })) => {
+                    warn!("Client aborted the upload: {}", reason);
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::Interrupted,
+                        format!("client aborted the upload: {reason}"),
+                    ))
+                }
+                None => {
+                    error!("Empty CreateRequest message");
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "empty CreateRequest message",
+                    ))
+                }
+            }
         });
         let async_reader = tokio_util::io::StreamReader::new(bytes_stream);
         let sync_reader = SyncIoBridge::new(async_reader);
@@ -225,7 +244,7 @@ impl DatasetService for Storage {
             }
         });
 
-        let write_result = self.manager.write_dataset(token, batch_stream).await;
+        let write_result = self.manager.write_dataset(dataset_uuid, batch_stream).await;
 
         if let Err(e) = read_task.await {
             error!("Read task failed: {:?}", e);
@@ -244,7 +263,7 @@ impl DatasetService for Storage {
             }
         })?;
 
-        Ok(Response::new(WriteResponse {
+        Ok(Response::new(CreateResponse {
             dataset: Some(record.into()),
         }))
     }

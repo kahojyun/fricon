@@ -23,13 +23,10 @@ use uuid::Uuid;
 use self::batch_writer::BatchWriter;
 use crate::{
     app::{AppEvent, AppHandle},
-    database::{
-        self, DatabaseError, DatasetStatus, JsonValue, NewDataset, PoolExt, SimpleUuid, schema,
-    },
+    database::{self, DatabaseError, DatasetStatus, NewDataset, PoolExt, SimpleUuid, schema},
 };
 
 pub const DATASET_NAME: &str = "dataset.arrow";
-pub const METADATA_NAME: &str = "metadata.json";
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatasetManagerError {
@@ -103,7 +100,6 @@ pub struct DatasetMetadata {
     pub description: String,
     pub favorite: bool,
     pub status: DatasetStatus,
-    pub index_columns: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub tags: Vec<String>,
 }
@@ -113,7 +109,6 @@ pub struct CreateDatasetRequest {
     pub name: String,
     pub description: String,
     pub tags: Vec<String>,
-    pub index_columns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -224,10 +219,6 @@ impl DatasetManager {
                     .await?;
 
                 let updated_record = self.get_dataset(DatasetId::Id(dataset_record.id)).await?;
-                updated_record
-                    .metadata
-                    .save(&dataset_path.join(METADATA_NAME))?;
-
                 Ok(updated_record)
             }
             Err(e) => {
@@ -316,15 +307,6 @@ impl DatasetManager {
         })
         .await?;
 
-        let record = self.get_dataset(DatasetId::Id(id)).await?;
-        let metadata_path = self
-            .app
-            .root()
-            .paths()
-            .dataset_path_from_uuid(record.metadata.uuid)
-            .join(METADATA_NAME);
-        record.metadata.save(&metadata_path)?;
-
         Ok(())
     }
 
@@ -339,15 +321,6 @@ impl DatasetManager {
             })
         })
         .await?;
-
-        let record = self.get_dataset(DatasetId::Id(id)).await?;
-        let metadata_path = self
-            .app
-            .root()
-            .paths()
-            .dataset_path_from_uuid(record.metadata.uuid)
-            .join(METADATA_NAME);
-        record.metadata.save(&metadata_path)?;
 
         Ok(())
     }
@@ -365,15 +338,6 @@ impl DatasetManager {
             })
         })
         .await?;
-
-        let record = self.get_dataset(DatasetId::Id(id)).await?;
-        let metadata_path = self
-            .app
-            .root()
-            .paths()
-            .dataset_path_from_uuid(record.metadata.uuid)
-            .join(METADATA_NAME);
-        record.metadata.save(&metadata_path)?;
 
         Ok(())
     }
@@ -413,7 +377,6 @@ impl DatasetManager {
                         name: &request.name,
                         description: &request.description,
                         status: DatasetStatus::Pending,
-                        index_columns: JsonValue(&request.index_columns),
                     };
 
                     let dataset = diesel::insert_into(schema::datasets::table)
@@ -525,7 +488,6 @@ impl DatasetRecord {
             description: dataset.description,
             favorite: dataset.favorite,
             status: dataset.status,
-            index_columns: dataset.index_columns.0,
             created_at: dataset.created_at.and_utc(),
             tags: tags.into_iter().map(|tag| tag.name).collect(),
         };
@@ -534,14 +496,5 @@ impl DatasetRecord {
             id: dataset.id,
             metadata,
         }
-    }
-}
-
-impl DatasetMetadata {
-    pub fn save(&self, path: &std::path::Path) -> Result<(), DatasetManagerError> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
-        serde_json::to_writer(writer, self).map_err(std::io::Error::other)?;
-        Ok(())
     }
 }
