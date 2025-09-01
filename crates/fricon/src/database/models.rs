@@ -5,7 +5,7 @@ use diesel::{
 };
 use uuid::Uuid;
 
-use super::{DatasetStatus, JsonValue, SimpleUuid, schema};
+use super::{DatasetStatus, SimpleUuid, schema};
 
 #[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = schema::datasets, check_for_backend(Sqlite))]
@@ -16,7 +16,6 @@ pub struct Dataset {
     pub description: String,
     pub favorite: bool,
     pub status: DatasetStatus,
-    pub index_columns: JsonValue<Vec<String>>,
     pub created_at: NaiveDateTime,
 }
 
@@ -107,7 +106,6 @@ pub struct NewDataset<'a> {
     pub name: &'a str,
     pub description: &'a str,
     pub status: DatasetStatus,
-    pub index_columns: JsonValue<&'a [String]>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Identifiable)]

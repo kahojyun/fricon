@@ -23,24 +23,15 @@ use uuid::Uuid;
 use self::batch_writer::BatchWriter;
 use crate::{
     app::{AppEvent, AppHandle},
-    database::{
-        self, DatabaseError, DatasetStatus, JsonValue, NewDataset, PoolExt, SimpleUuid, schema,
-    },
+    database::{self, DatabaseError, DatasetStatus, NewDataset, PoolExt, SimpleUuid, schema},
 };
 
 pub const DATASET_NAME: &str = "dataset.arrow";
-pub const METADATA_NAME: &str = "metadata.json";
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatasetManagerError {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
-
-    #[error("Invalid write token")]
-    InvalidToken,
-
-    #[error("Dataset is not in writable state: {status:?}")]
-    NotWritable { status: DatasetStatus },
 
     #[error("Schema validation failed: {message}")]
     SchemaError { message: String },
@@ -103,7 +94,6 @@ pub struct DatasetMetadata {
     pub description: String,
     pub favorite: bool,
     pub status: DatasetStatus,
-    pub index_columns: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub tags: Vec<String>,
 }
@@ -113,7 +103,6 @@ pub struct CreateDatasetRequest {
     pub name: String,
     pub description: String,
     pub tags: Vec<String>,
-    pub index_columns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -143,10 +132,15 @@ impl DatasetManager {
         &self.app
     }
 
-    pub async fn create_dataset(
+    pub async fn create_dataset<S, E>(
         &self,
         request: CreateDatasetRequest,
-    ) -> Result<Uuid, DatasetManagerError> {
+        stream: S,
+    ) -> Result<DatasetRecord, DatasetManagerError>
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
         let uuid = Uuid::new_v4();
         let dataset_path = self.app.root().paths().dataset_path_from_uuid(uuid);
 
@@ -160,12 +154,12 @@ impl DatasetManager {
             request.name, uuid
         );
 
-        let dataset_id = self.create_db_record(&request, uuid).await?;
+        let (dataset, tags) = self.create_db_record(&request, uuid).await?;
 
         fs::create_dir_all(&dataset_path)?;
 
         let event = AppEvent::DatasetCreated {
-            id: dataset_id,
+            id: dataset.id,
             uuid: uuid.to_string(),
             name: request.name.clone(),
             description: request.description.clone(),
@@ -178,42 +172,7 @@ impl DatasetManager {
             uuid, dataset_path
         );
 
-        Ok(uuid)
-    }
-
-    pub async fn write_dataset<S, E>(
-        &self,
-        uuid: Uuid,
-        stream: S,
-    ) -> Result<DatasetRecord, DatasetManagerError>
-    where
-        S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
-        E: std::error::Error + Send + Sync + 'static,
-    {
-        info!("Starting write operation for dataset with UUID: {}", uuid);
-
-        let (dataset, tags) = self
-            .db(move |conn| {
-                conn.immediate_transaction(|conn| {
-                    let dataset = database::Dataset::find_by_uuid(conn, uuid)?
-                        .ok_or(DatasetManagerError::InvalidToken)?;
-
-                    if dataset.status != DatasetStatus::Pending {
-                        return Err(DatasetManagerError::NotWritable {
-                            status: dataset.status,
-                        });
-                    }
-
-                    database::Dataset::update_status(conn, dataset.id, DatasetStatus::Writing)?;
-
-                    let tags = dataset.load_tags(conn)?;
-                    Ok((dataset, tags))
-                })
-            })
-            .await?;
-
         let dataset_record = DatasetRecord::from_database_models(dataset, tags);
-        let dataset_path = self.app.root().paths().dataset_path_from_uuid(uuid);
 
         let result = self
             .perform_write_async(dataset_record.id, &dataset_path, stream)
@@ -224,10 +183,6 @@ impl DatasetManager {
                     .await?;
 
                 let updated_record = self.get_dataset(DatasetId::Id(dataset_record.id)).await?;
-                updated_record
-                    .metadata
-                    .save(&dataset_path.join(METADATA_NAME))?;
-
                 Ok(updated_record)
             }
             Err(e) => {
@@ -316,15 +271,6 @@ impl DatasetManager {
         })
         .await?;
 
-        let record = self.get_dataset(DatasetId::Id(id)).await?;
-        let metadata_path = self
-            .app
-            .root()
-            .paths()
-            .dataset_path_from_uuid(record.metadata.uuid)
-            .join(METADATA_NAME);
-        record.metadata.save(&metadata_path)?;
-
         Ok(())
     }
 
@@ -339,15 +285,6 @@ impl DatasetManager {
             })
         })
         .await?;
-
-        let record = self.get_dataset(DatasetId::Id(id)).await?;
-        let metadata_path = self
-            .app
-            .root()
-            .paths()
-            .dataset_path_from_uuid(record.metadata.uuid)
-            .join(METADATA_NAME);
-        record.metadata.save(&metadata_path)?;
 
         Ok(())
     }
@@ -365,15 +302,6 @@ impl DatasetManager {
             })
         })
         .await?;
-
-        let record = self.get_dataset(DatasetId::Id(id)).await?;
-        let metadata_path = self
-            .app
-            .root()
-            .paths()
-            .dataset_path_from_uuid(record.metadata.uuid)
-            .join(METADATA_NAME);
-        record.metadata.save(&metadata_path)?;
 
         Ok(())
     }
@@ -403,17 +331,16 @@ impl DatasetManager {
         &self,
         request: &CreateDatasetRequest,
         uuid: Uuid,
-    ) -> Result<i32, DatasetManagerError> {
+    ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError> {
         let request = request.clone();
-        let dataset_id = self
+        let res = self
             .db(move |conn| {
                 conn.immediate_transaction(|conn| {
                     let new_dataset = NewDataset {
                         uuid: SimpleUuid(uuid),
                         name: &request.name,
                         description: &request.description,
-                        status: DatasetStatus::Pending,
-                        index_columns: JsonValue(&request.index_columns),
+                        status: DatasetStatus::Writing,
                     };
 
                     let dataset = diesel::insert_into(schema::datasets::table)
@@ -421,20 +348,22 @@ impl DatasetManager {
                         .returning(database::Dataset::as_returning())
                         .get_result(conn)?;
 
-                    if !request.tags.is_empty() {
+                    let tags = if request.tags.is_empty() {
+                        vec![]
+                    } else {
                         let created_tags =
                             database::Tag::find_or_create_batch(conn, &request.tags)?;
-                        let tag_ids: Vec<i32> =
-                            created_tags.into_iter().map(|tag| tag.id).collect();
+                        let tag_ids: Vec<i32> = created_tags.iter().map(|tag| tag.id).collect();
                         database::DatasetTag::create_associations(conn, dataset.id, &tag_ids)?;
-                    }
+                        created_tags
+                    };
 
-                    Ok(dataset.id)
+                    Ok((dataset, tags))
                 })
             })
             .await?;
 
-        Ok(dataset_id)
+        Ok(res)
     }
 
     async fn update_status(
@@ -525,7 +454,6 @@ impl DatasetRecord {
             description: dataset.description,
             favorite: dataset.favorite,
             status: dataset.status,
-            index_columns: dataset.index_columns.0,
             created_at: dataset.created_at.and_utc(),
             tags: tags.into_iter().map(|tag| tag.name).collect(),
         };
@@ -534,14 +462,5 @@ impl DatasetRecord {
             id: dataset.id,
             metadata,
         }
-    }
-}
-
-impl DatasetMetadata {
-    pub fn save(&self, path: &std::path::Path) -> Result<(), DatasetManagerError> {
-        let file = File::create(path)?;
-        let writer = BufWriter::new(file);
-        serde_json::to_writer(writer, self).map_err(std::io::Error::other)?;
-        Ok(())
     }
 }

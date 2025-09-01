@@ -3,7 +3,8 @@
     clippy::missing_panics_doc,
     clippy::doc_markdown,
     clippy::must_use_candidate,
-    clippy::significant_drop_tightening
+    clippy::significant_drop_tightening,
+    clippy::needless_pass_by_value
 )]
 
 use std::{
@@ -92,29 +93,27 @@ impl DatasetManager {
     ///     tags: Tags of the dataset. Duplicate tags will be add only once.
     ///     schema: Schema of the underlying arrow table. Can be only a subset
     /// of all columns,         other fields will be inferred from first
-    /// row.     index: Names of index columns.
+    /// row.     index_columns: Names of index columns.
     ///
     /// Returns:
     ///     A writer of the newly created dataset.
-    #[pyo3(signature = (name, *, description=None, tags=None, schema=None, index=None))]
+    #[pyo3(signature = (name, *, description=None, tags=None, schema=None, index_columns=None))]
     pub fn create(
         &self,
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
         schema: Option<PyArrowType<Schema>>,
-        index: Option<Vec<String>>,
+        index_columns: Option<Vec<String>>,
     ) -> Result<DatasetWriter> {
+        let _ = index_columns; // TODO: support index columns
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
         let schema = schema.map_or_else(Schema::empty, |s| s.0);
-        let index = index.unwrap_or_default();
-        let writer = get_runtime().block_on(self.workspace.client.create_dataset(
-            name,
-            description,
-            tags,
-            index,
-        ))?;
+        let writer = self
+            .workspace
+            .client
+            .create_dataset(name, description, tags)?;
         Ok(DatasetWriter::new(writer, Arc::new(schema)))
     }
 
@@ -157,7 +156,6 @@ impl DatasetManager {
                          name,
                          description,
                          favorite,
-                         index_columns,
                          created_at,
                          tags,
                          ..
@@ -165,16 +163,7 @@ impl DatasetManager {
                  ..
              }| {
                 let uuid = uuid.simple().to_string();
-                (
-                    id,
-                    uuid,
-                    name,
-                    description,
-                    favorite,
-                    index_columns,
-                    created_at,
-                    tags,
-                )
+                (id, uuid, name, description, favorite, created_at, tags)
             },
         );
         let py_records = PyList::new(py, py_records)?;
@@ -432,17 +421,10 @@ impl Dataset {
         self.inner.created_at()
     }
 
-    /// Index columns of the dataset.
-    #[getter]
-    pub fn index_columns(&self) -> &[String] {
-        self.inner.index_columns()
-    }
-
     /// Status of the dataset.
     #[getter]
     pub fn status(&self) -> String {
         match self.inner.status() {
-            fricon::DatasetStatus::Pending => "pending".to_string(),
             fricon::DatasetStatus::Writing => "writing".to_string(),
             fricon::DatasetStatus::Completed => "completed".to_string(),
             fricon::DatasetStatus::Aborted => "aborted".to_string(),
