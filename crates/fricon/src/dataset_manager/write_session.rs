@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use arrow::{array::RecordBatch, datatypes::Schema, ipc::writer::FileWriter};
+use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::writer::FileWriter};
 use futures::{Stream, StreamExt};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc};
@@ -39,17 +39,15 @@ pub struct WriteSession {
 }
 
 impl WriteSession {
-    pub fn new(tracker: &TaskTracker, path: impl AsRef<Path>, schema: &Schema) -> Self {
+    pub fn new(tracker: &TaskTracker, path: impl AsRef<Path>, schema: SchemaRef) -> Self {
         let path = path.as_ref().to_path_buf();
         let (sender, receiver) = mpsc::channel(32);
         let (event_sender, _) = broadcast::channel(16);
 
-        let event_sender_clone = event_sender.clone();
-        let schema_clone = schema.clone();
+        let event_sender_for_task = event_sender.clone();
 
         tracker.spawn(async move {
-            if let Err(e) = Self::write_task(path, schema_clone, receiver, event_sender_clone).await
-            {
+            if let Err(e) = Self::write_task(path, schema, receiver, event_sender_for_task).await {
                 error!("Write task failed: {}", e);
             }
         });
@@ -88,7 +86,7 @@ impl WriteSession {
 
     async fn write_task(
         path: PathBuf,
-        schema: Schema,
+        schema: SchemaRef,
         mut receiver: mpsc::Receiver<RecordBatch>,
         event_sender: broadcast::Sender<Event>,
     ) -> Result<()> {
@@ -163,7 +161,7 @@ mod tests {
         let schema = create_test_schema();
 
         let tracker = TaskTracker::new();
-        let session = WriteSession::new(&tracker, &file_path, &schema);
+        let session = WriteSession::new(&tracker, &file_path, Arc::new(schema.clone()));
 
         let batch = create_test_batch(&schema, 0, 10);
         session.write(batch).await.unwrap();
@@ -181,7 +179,7 @@ mod tests {
         let schema = create_test_schema();
 
         let tracker = TaskTracker::new();
-        let session = WriteSession::new(&tracker, &file_path, &schema);
+        let session = WriteSession::new(&tracker, &file_path, Arc::new(schema.clone()));
         let mut events = session.subscribe();
 
         let batch = create_test_batch(&schema, 0, 5);
@@ -216,7 +214,7 @@ mod tests {
         let schema = create_test_schema();
 
         let tracker = TaskTracker::new();
-        let session = WriteSession::new(&tracker, &file_path, &schema);
+        let session = WriteSession::new(&tracker, &file_path, Arc::new(schema.clone()));
         let mut events = session.subscribe();
 
         for i in 0..3 {

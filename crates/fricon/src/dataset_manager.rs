@@ -410,7 +410,7 @@ impl DatasetManager {
         let session = write_session::WriteSession::new(
             self.app.tracker(),
             path.join(DATASET_NAME),
-            &first_batch.schema(),
+            first_batch.schema(),
         );
 
         session
