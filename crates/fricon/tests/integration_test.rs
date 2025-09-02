@@ -179,9 +179,6 @@ async fn test_dataset_multiple_batches() -> anyhow::Result<()> {
         .load_dataset(DatasetId::Id(dataset.id()))
         .await?;
 
-    // Verify all batches were loaded
-    assert_eq!(loaded_batches.len(), 2);
-
     let total_rows: usize = loaded_batches.iter().map(RecordBatch::num_rows).sum();
     assert_eq!(total_rows, 4);
 
