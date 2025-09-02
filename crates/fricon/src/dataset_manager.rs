@@ -4,15 +4,9 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
-mod batch_writer;
+use std::{fs, path::Path};
 
-use std::{
-    fs::{self, File},
-    io::BufWriter,
-    path::Path,
-};
-
-use arrow::array::RecordBatch;
+use arrow::{array::RecordBatch, error::ArrowError};
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use futures::prelude::*;
@@ -20,13 +14,10 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use self::batch_writer::BatchWriter;
 use crate::{
     app::{AppEvent, AppHandle},
     database::{self, DatabaseError, DatasetStatus, NewDataset, PoolExt, SimpleUuid, schema},
 };
-
-pub const DATASET_NAME: &str = "dataset.arrow";
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatasetManagerError {
@@ -41,10 +32,16 @@ pub enum DatasetManagerError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Arrow error: {0}")]
+    Arrow(#[from] ArrowError),
+
+    #[error("Task join error: {0}")]
+    TaskJoin(#[from] tokio::task::JoinError),
 }
 
 impl DatasetManagerError {
-    fn io_invalid_data(message: impl Into<String>) -> Self {
+    pub(crate) fn io_invalid_data(message: impl Into<String>) -> Self {
         Self::Io(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             message.into(),
@@ -124,15 +121,45 @@ pub struct DatasetManager {
 }
 
 impl DatasetManager {
+    #[must_use]
     pub fn new(app: AppHandle) -> Self {
         Self { app }
     }
 
+    #[must_use]
     pub fn app(&self) -> &AppHandle {
         &self.app
     }
 
     pub async fn create_dataset<S, E>(
+        &self,
+        request: CreateDatasetRequest,
+        stream: S,
+    ) -> Result<DatasetRecord, DatasetManagerError>
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let app = self.app.clone();
+        let tracker = app.tracker().clone();
+
+        let dataset_record = tracker
+            .spawn(async move {
+                let result = app
+                    .dataset_manager()
+                    .create_dataset_tracked(request, stream)
+                    .await;
+                if let Err(e) = &result {
+                    error!("Dataset creation failed: {}", e);
+                }
+                result
+            })
+            .await??;
+
+        Ok(dataset_record)
+    }
+
+    async fn create_dataset_tracked<S, E>(
         &self,
         request: CreateDatasetRequest,
         stream: S,
@@ -307,6 +334,23 @@ impl DatasetManager {
     }
 
     pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
+        let app = self.app.clone();
+        let tracker = app.tracker().clone();
+
+        tracker
+            .spawn(async move {
+                let result = app.dataset_manager().delete_dataset_tracked(id).await;
+                if let Err(e) = &result {
+                    error!("Dataset deletion failed: {}", e);
+                }
+                result
+            })
+            .await??;
+
+        Ok(())
+    }
+
+    async fn delete_dataset_tracked(&self, id: i32) -> Result<(), DatasetManagerError> {
         let record = self.get_dataset(DatasetId::Id(id)).await?;
         let dataset_path = self
             .app
@@ -391,7 +435,7 @@ impl DatasetManager {
 
     async fn perform_write_async<S, E>(
         &self,
-        _dataset_id: i32,
+        dataset_id: i32,
         path: &Path,
         mut stream: S,
     ) -> Result<(), DatasetManagerError>
@@ -399,48 +443,100 @@ impl DatasetManager {
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        let dataset_path = path.join(DATASET_NAME);
+        let first_batch = match stream.next().await {
+            Some(Ok(batch)) => batch,
+            Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
+            None => return Err(DatasetManagerError::empty_stream()),
+        };
 
-        let file = File::create_new(&dataset_path)?;
+        let session_guard = self.app.write_sessions().create(
+            dataset_id,
+            self.app.tracker(),
+            path,
+            first_batch.schema(),
+        );
 
-        let write_result = self
-            .app
-            .tracker()
-            .spawn_blocking(move || {
-                let rt_handle = tokio::runtime::Handle::current();
+        let mut write_error: Option<DatasetManagerError> = None;
 
-                let mut batch = match rt_handle.block_on(stream.next()) {
-                    Some(Ok(batch)) => batch,
-                    Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
-                    None => return Err(DatasetManagerError::empty_stream()),
-                };
-
-                let buf_writer = BufWriter::new(file);
-                let mut batch_writer = BatchWriter::new(buf_writer, &batch.schema())
-                    .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-
-                loop {
-                    batch_writer
-                        .write(batch)
-                        .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-                    batch = match rt_handle.block_on(stream.next()) {
-                        Some(Ok(batch)) => batch,
-                        Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
-                        None => break,
-                    };
+        if let Err(e) = session_guard
+            .write(first_batch)
+            .await
+            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))
+        {
+            write_error = Some(e);
+        } else {
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok(batch) => {
+                        if let Err(e) = session_guard
+                            .write(batch)
+                            .await
+                            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))
+                        {
+                            write_error = Some(e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        write_error = Some(DatasetManagerError::stream_error(e));
+                        break;
+                    }
                 }
+            }
+        }
 
-                batch_writer
-                    .finish()
-                    .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
+        let finish_result = session_guard.finish().await;
+        if let Err(e) = finish_result {
+            let finish_err = DatasetManagerError::io_invalid_data(e.to_string());
+            if write_error.is_none() {
+                write_error = Some(finish_err);
+            }
+        }
 
-                Ok(())
-            })
-            .await;
+        if let Some(e) = write_error {
+            Err(e)
+        } else {
+            Ok(())
+        }
+    }
 
-        match write_result {
-            Ok(result) => result,
-            Err(e) => Err(std::io::Error::other(format!("Write task failed: {e}")).into()),
+    /// Return a unified dataset reader (Completed or Live/Writing).
+    pub async fn get_dataset_reader(
+        &self,
+        id: DatasetId,
+    ) -> Result<crate::reader::DatasetReader, DatasetManagerError> {
+        let record = self.get_dataset(id).await?;
+        match record.metadata.status {
+            DatasetStatus::Completed | DatasetStatus::Aborted => {
+                // Aborted datasets may still have partially written chunk files (valid up to
+                // last flush).
+                let dataset_path = self
+                    .app
+                    .root()
+                    .paths()
+                    .dataset_path_from_uuid(record.metadata.uuid);
+                let completed = crate::reader::CompletedDataset::open(&dataset_path)?;
+                Ok(crate::reader::DatasetReader::Completed(completed))
+            }
+            DatasetStatus::Writing => {
+                if let Some(session) = self.app.write_sessions().get(record.id) {
+                    return Ok(crate::reader::DatasetReader::Live(session.live().clone()));
+                }
+                // Fallback: if writer already dropped but directory exists, expose as Completed
+                // view.
+                let dataset_path = self
+                    .app
+                    .root()
+                    .paths()
+                    .dataset_path_from_uuid(record.metadata.uuid);
+                if dataset_path.exists() {
+                    let completed = crate::reader::CompletedDataset::open(&dataset_path)?;
+                    return Ok(crate::reader::DatasetReader::Completed(completed));
+                }
+                Err(DatasetManagerError::io_invalid_data(
+                    "Dataset in Writing state has no active session and no file yet",
+                ))
+            }
         }
     }
 }

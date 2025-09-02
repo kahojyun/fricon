@@ -8,7 +8,10 @@ use tokio::sync::broadcast;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::info;
 
-use crate::{database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot};
+use crate::{
+    database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot,
+    write_registry::WriteSessionRegistry,
+};
 
 pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
     let path = path.into();
@@ -44,6 +47,7 @@ struct AppStateInner {
     shutdown_token: CancellationToken,
     tracker: TaskTracker,
     event_sender: broadcast::Sender<AppEvent>,
+    write_sessions: WriteSessionRegistry,
 }
 
 impl AppState {
@@ -58,6 +62,7 @@ impl AppState {
         let tracker = TaskTracker::new();
         let (event_sender, _) = broadcast::channel(1000);
 
+        let write_sessions = WriteSessionRegistry::new();
         Ok(Self {
             inner: Arc::new(AppStateInner {
                 root,
@@ -65,6 +70,7 @@ impl AppState {
                 shutdown_token,
                 tracker,
                 event_sender,
+                write_sessions,
             }),
         })
     }
@@ -92,6 +98,10 @@ impl AppState {
     #[must_use]
     fn event_sender(&self) -> &broadcast::Sender<AppEvent> {
         &self.inner.event_sender
+    }
+
+    fn write_sessions(&self) -> &WriteSessionRegistry {
+        &self.inner.write_sessions
     }
 
     fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
@@ -132,6 +142,11 @@ impl AppHandle {
     #[must_use]
     pub fn dataset_manager(&self) -> DatasetManager {
         DatasetManager::new(self.clone())
+    }
+
+    #[must_use]
+    pub fn write_sessions(&self) -> &WriteSessionRegistry {
+        self.state.write_sessions()
     }
 
     pub fn send_event(&self, event: AppEvent) {
