@@ -411,8 +411,7 @@ impl DatasetManager {
             self.app.tracker(),
             path.join(DATASET_NAME),
             &first_batch.schema(),
-        )
-        .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
+        );
 
         session
             .write(first_batch)

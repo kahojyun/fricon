@@ -14,16 +14,12 @@ use tracing::{error, info};
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Failed to write batch to dataset: {0}")]
-    WriteFailed(String),
-    #[error("Invalid dataset path: {0}")]
-    InvalidPath(String),
     #[error("Arrow error: {0}")]
     ArrowError(#[from] arrow::error::ArrowError),
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     #[error("Send error: {0}")]
-    SendError(String),
+    Send(String),
     #[error("Task join error: {0}")]
     JoinError(#[from] JoinError),
 }
@@ -32,17 +28,18 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    BatchWritten { rows: usize },
+    BatchWritten,
     Closed,
 }
 
 pub struct WriteSession {
     sender: mpsc::Sender<RecordBatch>,
+    #[allow(dead_code)]
     event_sender: broadcast::Sender<Event>,
 }
 
 impl WriteSession {
-    pub fn new(tracker: &TaskTracker, path: impl AsRef<Path>, schema: &Schema) -> Result<Self> {
+    pub fn new(tracker: &TaskTracker, path: impl AsRef<Path>, schema: &Schema) -> Self {
         let path = path.as_ref().to_path_buf();
         let (sender, receiver) = mpsc::channel(32);
         let (event_sender, _) = broadcast::channel(16);
@@ -57,31 +54,33 @@ impl WriteSession {
             }
         });
 
-        Ok(Self {
+        Self {
             sender,
             event_sender,
-        })
+        }
     }
 
     pub async fn write(&self, batch: RecordBatch) -> Result<()> {
         self.sender
             .send(batch)
             .await
-            .map_err(|e| Error::SendError(e.to_string()))?;
+            .map_err(|e| Error::Send(e.to_string()))?;
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.event_sender.subscribe()
     }
 
+    #[allow(dead_code)]
     pub async fn write_stream<S, E>(&self, mut stream: S) -> Result<()>
     where
         S: Stream<Item = std::result::Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
         while let Some(result) = stream.next().await {
-            let batch = result.map_err(|e| Error::WriteFailed(e.to_string()))?;
+            let batch = result.map_err(|e| Error::Send(e.to_string()))?;
             self.write(batch).await?;
         }
         Ok(())
@@ -107,7 +106,7 @@ impl WriteSession {
                 writer.write(&batch)?;
                 total_rows += rows;
 
-                let _ = event_sender_clone.send(Event::BatchWritten { rows });
+                let _ = event_sender_clone.send(Event::BatchWritten);
             }
 
             writer.finish()?;
@@ -164,7 +163,7 @@ mod tests {
         let schema = create_test_schema();
 
         let tracker = TaskTracker::new();
-        let session = WriteSession::new(&tracker, &file_path, &schema).unwrap();
+        let session = WriteSession::new(&tracker, &file_path, &schema);
 
         let batch = create_test_batch(&schema, 0, 10);
         session.write(batch).await.unwrap();
@@ -182,7 +181,7 @@ mod tests {
         let schema = create_test_schema();
 
         let tracker = TaskTracker::new();
-        let session = WriteSession::new(&tracker, &file_path, &schema).unwrap();
+        let session = WriteSession::new(&tracker, &file_path, &schema);
         let mut events = session.subscribe();
 
         let batch = create_test_batch(&schema, 0, 5);
@@ -193,8 +192,8 @@ mod tests {
             .unwrap()
             .unwrap();
         match event {
-            Event::BatchWritten { rows } => assert_eq!(rows, 5),
-            _ => panic!("Expected BatchWritten event"),
+            Event::BatchWritten => {}
+            Event::Closed => panic!("Expected BatchWritten event"),
         }
 
         drop(session);
@@ -205,18 +204,19 @@ mod tests {
             .unwrap();
         match event {
             Event::Closed => {}
-            _ => panic!("Expected Closed event"),
+            Event::BatchWritten => panic!("Expected Closed event"),
         }
     }
 
     #[tokio::test]
     async fn test_write_multiple_batches() {
+        use arrow::ipc::reader::FileReader;
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test.arrow");
         let schema = create_test_schema();
 
         let tracker = TaskTracker::new();
-        let session = WriteSession::new(&tracker, &file_path, &schema).unwrap();
+        let session = WriteSession::new(&tracker, &file_path, &schema);
         let mut events = session.subscribe();
 
         for i in 0..3 {
@@ -228,8 +228,8 @@ mod tests {
                 .unwrap()
                 .unwrap();
             match event {
-                Event::BatchWritten { rows } => assert_eq!(rows, 10),
-                _ => panic!("Expected BatchWritten event"),
+                Event::BatchWritten => {}
+                Event::Closed => panic!("Expected BatchWritten event"),
             }
         }
 
@@ -240,12 +240,11 @@ mod tests {
             .unwrap();
         match event {
             Event::Closed => {}
-            _ => panic!("Expected Closed event"),
+            Event::BatchWritten => panic!("Expected Closed event"),
         }
 
         tokio::time::sleep(Duration::from_millis(10)).await;
 
-        use arrow::ipc::reader::FileReader;
         let file = std::fs::File::open(&file_path).unwrap();
         let reader = FileReader::try_new(file, None).unwrap();
 
