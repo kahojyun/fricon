@@ -244,15 +244,7 @@ impl DatasetService for Storage {
 
         let record = write_result.map_err(|e| {
             error!("Failed to write dataset: {:?}", e);
-            match e {
-                DatasetManagerError::InvalidToken => {
-                    Status::invalid_argument("invalid or expired write token")
-                }
-                DatasetManagerError::NotWritable { status } => Status::failed_precondition(
-                    format!("dataset not writable: status is {status:?}"),
-                ),
-                _ => Status::internal(e.to_string()),
-            }
+            Status::internal(e.to_string())
         })?;
 
         Ok(Response::new(CreateResponse {

@@ -33,12 +33,6 @@ pub enum DatasetManagerError {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
 
-    #[error("Invalid write token")]
-    InvalidToken,
-
-    #[error("Dataset is not in writable state: {status:?}")]
-    NotWritable { status: DatasetStatus },
-
     #[error("Schema validation failed: {message}")]
     SchemaError { message: String },
 
