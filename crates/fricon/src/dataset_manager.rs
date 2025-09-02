@@ -5,12 +5,9 @@
 //! operations and file system interactions.
 
 mod batch_writer;
+mod write_session;
 
-use std::{
-    fs::{self, File},
-    io::BufWriter,
-    path::Path,
-};
+use std::{fs, path::Path};
 
 use arrow::array::RecordBatch;
 use chrono::{DateTime, Utc};
@@ -20,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use self::batch_writer::BatchWriter;
 use crate::{
     app::{AppEvent, AppHandle},
     database::{self, DatabaseError, DatasetStatus, NewDataset, PoolExt, SimpleUuid, schema},
@@ -399,49 +395,33 @@ impl DatasetManager {
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
-        let dataset_path = path.join(DATASET_NAME);
+        let first_batch = match stream.next().await {
+            Some(Ok(batch)) => batch,
+            Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
+            None => return Err(DatasetManagerError::empty_stream()),
+        };
 
-        let file = File::create_new(&dataset_path)?;
+        let session = write_session::WriteSession::new(
+            self.app.tracker(),
+            path.join(DATASET_NAME),
+            &first_batch.schema(),
+        )
+        .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
 
-        let write_result = self
-            .app
-            .tracker()
-            .spawn_blocking(move || {
-                let rt_handle = tokio::runtime::Handle::current();
+        session
+            .write(first_batch)
+            .await
+            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
 
-                let mut batch = match rt_handle.block_on(stream.next()) {
-                    Some(Ok(batch)) => batch,
-                    Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
-                    None => return Err(DatasetManagerError::empty_stream()),
-                };
-
-                let buf_writer = BufWriter::new(file);
-                let mut batch_writer = BatchWriter::new(buf_writer, &batch.schema())
-                    .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-
-                loop {
-                    batch_writer
-                        .write(batch)
-                        .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-                    batch = match rt_handle.block_on(stream.next()) {
-                        Some(Ok(batch)) => batch,
-                        Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
-                        None => break,
-                    };
-                }
-
-                batch_writer
-                    .finish()
-                    .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-
-                Ok(())
-            })
-            .await;
-
-        match write_result {
-            Ok(result) => result,
-            Err(e) => Err(std::io::Error::other(format!("Write task failed: {e}")).into()),
+        while let Some(result) = stream.next().await {
+            let batch = result.map_err(|e| DatasetManagerError::stream_error(e))?;
+            session
+                .write(batch)
+                .await
+                .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
         }
+
+        Ok(())
     }
 }
 
