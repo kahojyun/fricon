@@ -4,12 +4,13 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
-mod batch_writer;
 mod write_session;
 
 use std::{fs, path::Path};
 
 use arrow::array::RecordBatch;
+use arrow::error::ArrowError;
+use arrow::ipc::reader::FileReader;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use futures::prelude::*;
@@ -37,6 +38,9 @@ pub enum DatasetManagerError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Arrow error: {0}")]
+    Arrow(#[from] ArrowError),
 }
 
 impl DatasetManagerError {
@@ -120,10 +124,12 @@ pub struct DatasetManager {
 }
 
 impl DatasetManager {
+    #[must_use]
     pub fn new(app: AppHandle) -> Self {
         Self { app }
     }
 
+    #[must_use]
     pub fn app(&self) -> &AppHandle {
         &self.app
     }
@@ -422,6 +428,42 @@ impl DatasetManager {
         }
 
         Ok(())
+    }
+
+    pub async fn load_dataset(
+        &self,
+        dataset_id: DatasetId,
+    ) -> Result<Vec<RecordBatch>, DatasetManagerError> {
+        let record = self.get_dataset(dataset_id).await?;
+        let dataset_path = self
+            .app
+            .root()
+            .paths()
+            .dataset_path_from_uuid(record.metadata.uuid);
+
+        let arrow_file_path = dataset_path.join(DATASET_NAME);
+        if !arrow_file_path.exists() {
+            return Err(DatasetManagerError::io_invalid_data(format!(
+                "Dataset file not found: {}",
+                arrow_file_path.display()
+            )));
+        }
+
+        let batches = tokio::task::spawn_blocking(move || {
+            let file = fs::File::open(arrow_file_path)?;
+            let reader = FileReader::try_new(file, None)?;
+            let mut batches = Vec::new();
+
+            for batch in reader {
+                batches.push(batch?);
+            }
+
+            Ok::<_, DatasetManagerError>(batches)
+        })
+        .await
+        .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))??;
+
+        Ok(batches)
     }
 }
 

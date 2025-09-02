@@ -19,8 +19,10 @@ pub use self::{
     app::{AppEvent, AppHandle, AppManager, init as init_workspace},
     client::{Client, Dataset, DatasetWriter},
     database::DatasetStatus,
-    dataset_manager::DatasetMetadata,
-    server::{DatasetRecord, run as run_server},
+    dataset_manager::{
+        CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
+    },
+    server::DatasetRecord,
     workspace::get_log_dir,
 };
 
