@@ -4,14 +4,12 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
-pub mod live;
-mod write_session;
+// live / reader / write_session moved to crate root modules (see lib.rs re-exports)
 
 use std::{fs, path::Path};
 
 use arrow::array::RecordBatch;
 use arrow::error::ArrowError;
-use arrow::ipc::reader::FileReader;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use futures::prelude::*;
@@ -45,7 +43,7 @@ pub enum DatasetManagerError {
 }
 
 impl DatasetManagerError {
-    fn io_invalid_data(message: impl Into<String>) -> Self {
+    pub(crate) fn io_invalid_data(message: impl Into<String>) -> Self {
         Self::Io(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             message.into(),
@@ -394,7 +392,7 @@ impl DatasetManager {
 
     async fn perform_write_async<S, E>(
         &self,
-        _dataset_id: i32,
+        dataset_id: i32,
         path: &Path,
         mut stream: S,
     ) -> Result<(), DatasetManagerError>
@@ -408,62 +406,70 @@ impl DatasetManager {
             None => return Err(DatasetManagerError::empty_stream()),
         };
 
-        let session = write_session::WriteSession::new(
+        let session_guard = self.app.write_sessions().create(
+            dataset_id,
             self.app.tracker(),
             path.join(DATASET_NAME),
             first_batch.schema(),
         );
 
-        session
+        session_guard
             .write(first_batch)
             .await
             .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
 
         while let Some(result) = stream.next().await {
             let batch = result.map_err(|e| DatasetManagerError::stream_error(e))?;
-            session
+            session_guard
                 .write(batch)
                 .await
                 .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
         }
 
+        // On scope end _session_guard drops and removes registry entry.
+
         Ok(())
     }
 
-    pub async fn load_dataset(
+    /// Return a unified dataset reader (Completed or Live/Writing).
+    pub async fn get_dataset_reader(
         &self,
-        dataset_id: DatasetId,
-    ) -> Result<Vec<RecordBatch>, DatasetManagerError> {
-        let record = self.get_dataset(dataset_id).await?;
-        let dataset_path = self
-            .app
-            .root()
-            .paths()
-            .dataset_path_from_uuid(record.metadata.uuid);
-
-        let arrow_file_path = dataset_path.join(DATASET_NAME);
-        if !arrow_file_path.exists() {
-            return Err(DatasetManagerError::io_invalid_data(format!(
-                "Dataset file not found: {}",
-                arrow_file_path.display()
-            )));
-        }
-
-        let batches = tokio::task::spawn_blocking(move || {
-            let file = fs::File::open(arrow_file_path)?;
-            let reader = FileReader::try_new(file, None)?;
-            let mut batches = Vec::new();
-
-            for batch in reader {
-                batches.push(batch?);
+        id: DatasetId,
+    ) -> Result<crate::reader::DatasetReader, DatasetManagerError> {
+        let record = self.get_dataset(id).await?;
+        match record.metadata.status {
+            DatasetStatus::Completed | DatasetStatus::Aborted => {
+                // Aborted datasets may still have a partially written (but valid up to last flush) Arrow file.
+                let dataset_path = self
+                    .app
+                    .root()
+                    .paths()
+                    .dataset_path_from_uuid(record.metadata.uuid)
+                    .join(DATASET_NAME);
+                let completed = crate::reader::CompletedDataset::from_arrow_file(&dataset_path)?;
+                Ok(crate::reader::DatasetReader::Completed(completed))
             }
-
-            Ok::<_, DatasetManagerError>(batches)
-        })
-        .await
-        .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))??;
-
-        Ok(batches)
+            DatasetStatus::Writing => {
+                if let Some(session) = self.app.write_sessions().get(record.id) {
+                    return Ok(crate::reader::DatasetReader::Live(session.live()));
+                }
+                // Fallback: if writer already dropped but file exists, expose as Completed view.
+                let dataset_path = self
+                    .app
+                    .root()
+                    .paths()
+                    .dataset_path_from_uuid(record.metadata.uuid)
+                    .join(DATASET_NAME);
+                if dataset_path.exists() {
+                    let completed =
+                        crate::reader::CompletedDataset::from_arrow_file(&dataset_path)?;
+                    return Ok(crate::reader::DatasetReader::Completed(completed));
+                }
+                Err(DatasetManagerError::io_invalid_data(
+                    "Dataset in Writing state has no active session and no file yet",
+                ))
+            }
+        }
     }
 }
 

@@ -7,44 +7,38 @@ use std::{
 use arrow::{array::RecordBatch, datatypes::SchemaRef};
 use tokio::sync::broadcast;
 
-/// Minimal live dataset implementation focusing on in-memory buffering + append events.
-/// Persisting to chunk files and advanced indexing are intentionally omitted for now.
-#[derive(Debug)]
+/// Live, in-memory representation of a dataset while it is being written.
+///
+/// Provides:
+/// - Append semantics mirroring what's persisted
+/// - Lightweight event stream for UI/reactive consumers
+/// - Row selection (by sorted unique indices) with optional column projection
+/// - Ability to replace a sequential front segment (used by future compaction / reordering)
+#[derive(Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub struct LiveDataset {
     inner: Arc<LiveInner>,
 }
 
 #[derive(Debug)]
-#[expect(
-    dead_code,
-    reason = "Internal backing state; public API exposure pending"
-)]
 struct LiveInner {
     schema: SchemaRef,
-    /// Ordered batches in memory (no eviction yet for minimal version)
-    batches: RwLock<VecDeque<RecordBatch>>,
-    /// Total rows cached (cached to avoid recompute)
-    total_rows: RwLock<usize>,
+    batches: RwLock<VecDeque<RecordBatch>>, // ordered batches
+    total_rows: RwLock<usize>,              // cached total rows
     event_tx: broadcast::Sender<LiveEvent>,
-    /// Rows already sequentially replaced from the very front
-    replaced_front_rows: RwLock<usize>,
+    replaced_front_rows: RwLock<usize>, // cursor advanced by replace_sequential_front
+    #[allow(dead_code)]
     path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
-#[expect(dead_code, reason = "Event consumption layer not implemented yet")]
 pub enum LiveEvent {
     Appended { new_rows: usize, total_rows: usize },
     SequentialFrontReplaced { replaced_rows: usize, cursor: usize },
     Closed,
 }
 
-#[expect(
-    dead_code,
-    reason = "Methods currently exercised only by unit tests; external integration pending"
-)]
 impl LiveDataset {
     pub fn new(schema: SchemaRef, path: PathBuf) -> Self {
         let (event_tx, _) = broadcast::channel(1024);
@@ -63,13 +57,10 @@ impl LiveDataset {
     pub fn schema(&self) -> SchemaRef {
         self.inner.schema.clone()
     }
-
     pub fn subscribe(&self) -> broadcast::Receiver<LiveEvent> {
         self.inner.event_tx.subscribe()
     }
-
     pub fn append(&self, batch: RecordBatch) {
-        // Assumption: schema matches; minimal version skips validation beyond equality check.
         if batch.schema() != self.inner.schema {
             return;
         }
@@ -85,15 +76,10 @@ impl LiveDataset {
             });
         }
     }
-
     pub fn total_rows(&self) -> usize {
         *self.inner.total_rows.read().unwrap()
     }
 
-    /// Sequentially replace the next (front) logical segment starting exactly at current cursor.
-    /// Caller supplies replacement batches whose total rows N will replace the next N rows from the front.
-    /// Start is always aligned to a batch boundary (cursor) while the end may split a batch.
-    /// Invariants: total row count unchanged; an internal cursor advances by N.
     pub fn replace_sequential_front(
         &self,
         new_batches: &[RecordBatch],
@@ -101,18 +87,15 @@ impl LiveDataset {
         if new_batches.is_empty() {
             return Ok(());
         }
-        // Validate schema
         for b in new_batches {
             if b.schema() != self.inner.schema {
                 return Err(ReplaceError::SchemaMismatch);
             }
         }
-
         let new_rows: usize = new_batches.iter().map(RecordBatch::num_rows).sum();
         if new_rows == 0 {
             return Ok(());
         }
-
         let mut batches = self
             .inner
             .batches
@@ -134,8 +117,6 @@ impl LiveDataset {
         if total - *cursor < new_rows {
             return Err(ReplaceError::InsufficientRows);
         }
-
-        // Drain exactly new_rows from front; split a batch if needed.
         let mut remaining = new_rows;
         while remaining > 0 {
             let Some(front) = batches.pop_front() else {
@@ -145,13 +126,11 @@ impl LiveDataset {
             if rows <= remaining {
                 remaining -= rows;
             } else {
-                // Split: keep tail part
                 let tail = front.slice(remaining, rows - remaining);
                 batches.push_front(tail);
                 remaining = 0;
             }
         }
-        // Insert new batches at front (preserve order)
         for b in new_batches.iter().rev() {
             batches.push_front(b.clone());
         }
@@ -169,18 +148,12 @@ impl LiveDataset {
         Ok(())
     }
 
-    /// Return last n rows (simple concatenation). Inefficient but fine for minimal version.
     pub fn tail(&self, n: usize) -> Option<RecordBatch> {
         use arrow::compute::concat_batches;
         let vec = self.inner.batches.read().unwrap();
-        if vec.is_empty() {
+        if vec.is_empty() || n == 0 {
             return None;
         }
-        if n == 0 {
-            return None;
-        }
-
-        // Collect batches from the end until we have >= n rows.
         let mut collected = Vec::new();
         let mut rows = 0usize;
         for batch in vec.iter().rev() {
@@ -195,14 +168,12 @@ impl LiveDataset {
         concat_batches(&schema_ref, &collected).ok()
     }
 
-    /// Select rows by (sorted, unique) global indices with optional numeric column projection.
     pub fn select_by_indices(
         &self,
         indices: &[usize],
         column_indices: Option<&[usize]>,
     ) -> Result<RecordBatch, SelectError> {
         let batches = self.inner.batches.read().map_err(|_| SelectError::Poison)?;
-
         if batches.is_empty() {
             return self.empty_selection(indices, column_indices);
         }
@@ -227,7 +198,6 @@ impl LiveDataset {
         }
         let base = self.inner.schema.clone();
         let cols = self.resolve_columns(column_indices)?;
-        // (Optional) project schema
         let projected_schema = if cols.len() == base.fields().len() {
             base
         } else {
@@ -252,7 +222,6 @@ impl LiveDataset {
         }
         Ok(())
     }
-
     fn validate_indices_in_bounds(
         indices: &[usize],
         batches: &VecDeque<RecordBatch>,
@@ -265,7 +234,6 @@ impl LiveDataset {
         }
         Ok(())
     }
-
     fn resolve_columns(&self, column_indices: Option<&[usize]>) -> Result<Vec<usize>, SelectError> {
         let schema = self.inner.schema.clone();
         let max = schema.fields().len();
@@ -282,7 +250,6 @@ impl LiveDataset {
         };
         Ok(cols)
     }
-
     fn build_row_mapping(
         indices: &[usize],
         batches: &VecDeque<RecordBatch>,
@@ -310,7 +277,6 @@ impl LiveDataset {
         }
         mapping
     }
-
     fn interleave_projected(
         &self,
         batches: &VecDeque<RecordBatch>,
@@ -322,12 +288,10 @@ impl LiveDataset {
             return self.empty_selection(&[], Some(cols));
         }
         let full_width = self.inner.schema.fields().len();
-        // Mark used batches
         let mut used = vec![false; batches.len()];
         for (bi, _) in mapping {
             used[*bi] = true;
         }
-        // Pre-allocate projected vector exactly
         let used_count = used.iter().filter(|u| **u).count();
         let mut projected = Vec::with_capacity(used_count);
         for (i, b) in batches.iter().enumerate() {
@@ -340,7 +304,6 @@ impl LiveDataset {
                 });
             }
         }
-        // Remap to compressed index space
         let mut remap = vec![usize::MAX; batches.len()];
         let mut next = 0;
         for (i, u) in used.iter().enumerate() {
@@ -356,6 +319,34 @@ impl LiveDataset {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ReplaceError {
+    #[error("range out of bounds")]
+    OutOfBounds,
+    #[error("schema mismatch")]
+    SchemaMismatch,
+    #[error("lock poisoned")]
+    Poison,
+    #[error("insufficient rows to replace")]
+    InsufficientRows,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SelectError {
+    #[error("out of bounds index")]
+    OutOfBounds,
+    #[error("column out of range")]
+    ColumnOutOfRange,
+    #[error("index too large")]
+    IndexTooLarge,
+    #[error("poisoned lock")]
+    Poison,
+    #[error("arrow error: {0}")]
+    Arrow(String),
+    #[error("indices not strictly increasing unique")]
+    NotSortedUnique,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,16 +355,13 @@ mod tests {
         datatypes::{DataType, Field, Schema},
     };
     use std::sync::Arc;
-
     fn make_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]))
     }
-
     fn make_batch(schema: &SchemaRef, start: i32, n: i32) -> RecordBatch {
         let arr = Int32Array::from_iter_values(start..start + n);
         RecordBatch::try_new(schema.clone(), vec![Arc::new(arr)]).unwrap()
     }
-
     #[test]
     fn live_dataset_append_and_tail() {
         let schema = make_schema();
@@ -383,10 +371,8 @@ mod tests {
         }
         assert_eq!(live.total_rows(), 50);
         let tail = live.tail(15).unwrap();
-        // minimal tail returns full batches; last 2 batches = 20 rows (>= 15)
         assert_eq!(tail.num_rows(), 20);
     }
-
     #[test]
     fn events_fire() {
         let schema = make_schema();
@@ -405,7 +391,6 @@ mod tests {
             _ => panic!("unexpected"),
         }
     }
-
     #[test]
     fn sequential_front_replace_partial_end() {
         let schema = make_schema();
@@ -424,7 +409,6 @@ mod tests {
         assert_eq!(col.value(7), 1000 + 7);
         assert_eq!(col.value(8), 2000);
     }
-
     #[test]
     fn select_by_indices_basic() {
         let schema = make_schema();
@@ -445,7 +429,6 @@ mod tests {
         assert_eq!(col.value(2), 12);
         assert_eq!(col.value(3), 29);
     }
-
     #[test]
     fn select_by_indices_empty_and_oob() {
         let schema = make_schema();
@@ -457,7 +440,6 @@ mod tests {
             Err(SelectError::OutOfBounds)
         ));
     }
-
     #[test]
     fn select_by_indices_multi_column_subset() {
         use arrow::{array::Int32Array, datatypes::Schema};
@@ -467,7 +449,6 @@ mod tests {
             Field::new("c", DataType::Int32, false),
         ]));
         let live = LiveDataset::new(schema.clone(), PathBuf::from("/tmp/unused"));
-        // batch 0: rows 0..5
         let make_tri_batch = |start: i32, n: i32| {
             let a = Int32Array::from_iter_values(start..start + n);
             let b = Int32Array::from_iter_values((start * 10)..(start * 10 + n));
@@ -478,7 +459,6 @@ mod tests {
         live.append(make_tri_batch(0, 5));
         live.append(make_tri_batch(5, 5));
         let indices = [1usize, 7];
-        // select columns b (1) and c (2)
         let batch = live.select_by_indices(&indices, Some(&[1, 2])).unwrap();
         assert_eq!(batch.num_columns(), 2);
         let bcol = batch
@@ -491,44 +471,9 @@ mod tests {
             .as_any()
             .downcast_ref::<Int32Array>()
             .unwrap();
-        // Row mapping:
-        // Global row 1: batch0 local1 -> a=1, b=1, c=1
-        // Global row 7: batch1 (rows5..9) local2 -> a=7, b sequence 50..55 so b=52, c sequence 500..505 so c=502
         assert_eq!(bcol.value(0), 1);
         assert_eq!(bcol.value(1), 52);
         assert_eq!(ccol.value(0), 1);
         assert_eq!(ccol.value(1), 502);
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ReplaceError {
-    #[error("range out of bounds")]
-    OutOfBounds,
-    #[error("schema mismatch")]
-    SchemaMismatch,
-    #[error("lock poisoned")]
-    Poison,
-    #[error("insufficient rows to replace")]
-    InsufficientRows,
-}
-
-#[derive(Debug, thiserror::Error)]
-#[expect(
-    dead_code,
-    reason = "Used in future public querying API; present in tests now"
-)]
-pub enum SelectError {
-    #[error("out of bounds index")]
-    OutOfBounds,
-    #[error("column out of range")]
-    ColumnOutOfRange,
-    #[error("index too large")]
-    IndexTooLarge,
-    #[error("poisoned lock")]
-    Poison,
-    #[error("arrow error: {0}")]
-    Arrow(String),
-    #[error("indices not strictly increasing unique")]
-    NotSortedUnique,
 }

@@ -8,12 +8,16 @@
 mod app;
 mod client;
 mod database;
-mod dataset_manager;
+mod dataset_manager; // core manager
 mod ipc;
+mod live;
 mod proto;
+mod reader;
 mod server;
 mod utils;
 mod workspace;
+mod write_registry;
+mod write_session;
 
 pub use self::{
     app::{AppEvent, AppHandle, AppManager, init as init_workspace},
@@ -22,6 +26,7 @@ pub use self::{
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
     },
+    reader::DatasetReader,
     server::DatasetRecord,
     workspace::get_log_dir,
 };

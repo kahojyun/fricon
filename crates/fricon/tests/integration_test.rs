@@ -68,9 +68,13 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
 
     // Load dataset using DatasetManager directly
     let dataset_manager = app_manager.handle().dataset_manager();
-    let loaded_batches = dataset_manager
-        .load_dataset(DatasetId::Id(dataset.id()))
+    let reader = dataset_manager
+        .get_dataset_reader(DatasetId::Id(dataset.id()))
         .await?;
+    let loaded_batches: Vec<RecordBatch> = reader
+        .batches()
+        .expect("expected completed dataset")
+        .to_vec();
 
     // Verify loaded data matches original
     assert_eq!(loaded_batches.len(), 1);
@@ -175,9 +179,13 @@ async fn test_dataset_multiple_batches() -> anyhow::Result<()> {
 
     // Load dataset using DatasetManager
     let dataset_manager = app_manager.handle().dataset_manager();
-    let loaded_batches = dataset_manager
-        .load_dataset(DatasetId::Id(dataset.id()))
+    let reader = dataset_manager
+        .get_dataset_reader(DatasetId::Id(dataset.id()))
         .await?;
+    let loaded_batches: Vec<RecordBatch> = reader
+        .batches()
+        .expect("expected completed dataset")
+        .to_vec();
 
     let total_rows: usize = loaded_batches.iter().map(RecordBatch::num_rows).sum();
     assert_eq!(total_rows, 4);
