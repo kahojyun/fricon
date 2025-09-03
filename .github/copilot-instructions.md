@@ -14,7 +14,7 @@ Architecture and important files (why they matter):
 - crates/fricon/src/lib.rs — high-level exports and crate purpose. Start here to find public APIs.
 - crates/fricon/src/app.rs — App lifecycle: `AppManager::serve`, `AppHandle`, event broadcasting. Use this to understand how the server is started and how components get access to the workspace and DB pool.
 - crates/fricon/src/server.rs — Starts gRPC server using `ipc::listen`; registers Dataset service and a Fricon service. Useful for debugging RPC surface.
-- crates/fricon/src/dataset_manager.rs — Central dataset lifecycle: create, write, update, delete. Contains filesystem layout for datasets (see DATASET_NAME and METADATA_NAME constants) and how DB transactions are used.
+- crates/fricon/src/dataset_manager.rs — Central dataset lifecycle: create, write, update, delete. Contains filesystem layout for datasets and how DB transactions are used.
 - crates/fricon/src/workspace.rs — Workspace layout and locking: metadata file `.fricon_workspace.json`, exclusive lock `.fricon.lock`, and path helpers like `dataset_path_from_uuid(uuid)` (prefix = first two hex chars).
 - crates/fricon/src/proto.rs & crates/fricon/proto/ — gRPC proto inclusion and token key constant.
 - crates/fricon/src/database.rs & crates/fricon/migrations — DB connection, PRAGMA settings, and migration flow. The pool uses `deadpool-diesel` and runs pending migrations at startup.
@@ -30,7 +30,7 @@ Developer workflows (concrete commands & caveats):
 
 Project-specific conventions and patterns (discoverable in code):
 
-- Dataset storage: each dataset is stored under `<workspace>/data/<xx>/<uuid>/` where `<xx>` is the first two hex characters of the UUID (see `dataset_path_from_uuid`). Files: `dataset.arrow` (DATASET_NAME) and `metadata.json` (METADATA_NAME).
+- Dataset storage: each dataset is stored under `<workspace>/data/<xx>/<uuid>/` where `<xx>` is the first two hex characters of the UUID (see `dataset_path_from_uuid`). Files: chunked Arrow IPC files `data_chunk_*.arrow` plus `metadata.json`.
 - Dataset status values are strings in the DB (Json-backed type `DatasetStatus`) and the lifecycle follows: `pending` -> `writing` -> `completed` or `aborted`. Many functions guard by checking status (see `DatasetManager::write_dataset`).
 - DB interactions: prefer `PoolExt::interact` to run synchronous Diesel queries on the pooled connection. For multi-step updates use `conn.immediate_transaction` to ensure atomic transitions (see dataset write flow).
 - Eventing: app-level events are broadcast via `tokio::sync::broadcast` (see `AppEvent` in `app.rs`) — other components subscribe via `AppHandle::subscribe_to_events()`.

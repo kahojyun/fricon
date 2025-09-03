@@ -341,7 +341,8 @@ impl Dataset {
     /// Returns:
     ///     A polars DataFrame.
     pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
-        helper_module(py)?.call_method1(py, "read_polars", (self.inner.arrow_file(),))
+        // Pass dataset directory; helper will gather chunk files.
+        helper_module(py)?.call_method1(py, "read_polars", (self.inner.path(),))
     }
 
     /// Load the dataset as an Arrow Table.
@@ -349,7 +350,7 @@ impl Dataset {
     /// Returns:
     ///     An Arrow Table.
     pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
-        helper_module(py)?.call_method1(py, "read_arrow", (self.inner.arrow_file(),))
+        helper_module(py)?.call_method1(py, "read_arrow", (self.inner.path(),))
     }
 
     #[pyo3(signature = (*tag))]

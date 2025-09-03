@@ -1,4 +1,4 @@
-mod background_writer;
+pub(crate) mod background_writer;
 
 use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader};
 use std::{fs::File, path::Path};
@@ -69,6 +69,9 @@ impl WriteSession {
     pub async fn write(&self, batch: RecordBatch) -> Result<()> {
         self.live_writer.append(batch.clone());
         self.writer.write(batch).await
+    }
+    pub(crate) fn subscribe(&self) -> tokio::sync::broadcast::Receiver<Event> {
+        self.writer.subscribe()
     }
     pub fn handle(&self) -> WriteSessionHandle {
         WriteSessionHandle {

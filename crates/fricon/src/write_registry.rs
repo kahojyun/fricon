@@ -6,6 +6,9 @@ use std::sync::{Arc, RwLock};
 use arrow::datatypes::SchemaRef;
 use tokio_util::task::TaskTracker;
 
+use crate::write_session::background_writer::{
+    Error as BackgroundError, Event, Result as BackgroundResult,
+};
 use crate::write_session::{WriteSession, WriteSessionHandle};
 
 #[derive(Clone, Default)]
@@ -31,7 +34,7 @@ impl WriteSessionRegistry {
         WriteSessionGuard {
             id,
             registry: self.clone(),
-            session,
+            session: Some(session),
         }
     }
     pub fn get(&self, id: i32) -> Option<WriteSessionHandle> {
@@ -48,16 +51,50 @@ impl WriteSessionRegistry {
 pub struct WriteSessionGuard {
     id: i32,
     registry: WriteSessionRegistry,
-    session: WriteSession,
+    // Wrapped so we can drop the underlying WriteSession (closing its senders)
+    // without dropping the guard itself. This lets us keep the registry entry
+    // alive until the background writer signals Closed, ensuring readers can
+    // still obtain a live handle while final flush is in progress.
+    session: Option<WriteSession>,
 }
 impl Deref for WriteSessionGuard {
     type Target = WriteSession;
     fn deref(&self) -> &Self::Target {
-        &self.session
+        self.session
+            .as_ref()
+            .expect("session already taken in finish()")
     }
 }
 impl Drop for WriteSessionGuard {
     fn drop(&mut self) {
+        // If finish() already ran we will have explicitly removed; removal is idempotent.
         self.registry.remove(self.id);
+    }
+}
+
+impl WriteSessionGuard {
+    /// Flush remaining buffered batches and wait until the underlying background writer
+    /// signals `Closed`. This guarantees that all chunk files have been finalized on disk.
+    pub async fn finish(mut self) -> BackgroundResult<()> {
+        // Subscribe before dropping the session so we can observe Closed.
+        let mut rx = self.session.as_ref().unwrap().subscribe();
+        let id = self.id;
+        // Drop only the underlying WriteSession (closes mpsc sender) but keep guard so
+        // registry entry is still present until we observe Closed.
+        drop(self.session.take());
+        let res = loop {
+            match rx.recv().await {
+                Ok(Event::Closed) => break Ok(()),
+                Ok(_) => { /* ignore other events */ }
+                Err(e) => {
+                    break Err(BackgroundError::Send(format!(
+                        "session {id} channel closed before Closed event: {e}"
+                    )));
+                }
+            }
+        };
+        // Now that background writer is fully closed, explicitly remove.
+        self.registry.remove(self.id);
+        res
     }
 }

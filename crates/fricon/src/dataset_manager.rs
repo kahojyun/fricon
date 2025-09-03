@@ -22,8 +22,6 @@ use crate::{
     database::{self, DatabaseError, DatasetStatus, NewDataset, PoolExt, SimpleUuid, schema},
 };
 
-pub const DATASET_NAME: &str = "dataset.arrow";
-
 #[derive(Debug, thiserror::Error)]
 pub enum DatasetManagerError {
     #[error("Dataset not found: {id}")]
@@ -409,26 +407,54 @@ impl DatasetManager {
         let session_guard = self.app.write_sessions().create(
             dataset_id,
             self.app.tracker(),
-            path.join(DATASET_NAME),
+            path,
             first_batch.schema(),
         );
 
-        session_guard
+        // Accumulate potential error but always drive finish() to guarantee ordering:
+        // (flush + Closed) -> remove registry -> caller updates status.
+        let mut write_error: Option<DatasetManagerError> = None;
+
+        if let Err(e) = session_guard
             .write(first_batch)
             .await
-            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-
-        while let Some(result) = stream.next().await {
-            let batch = result.map_err(|e| DatasetManagerError::stream_error(e))?;
-            session_guard
-                .write(batch)
-                .await
-                .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
+            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))
+        {
+            write_error = Some(e);
+        } else {
+            while let Some(result) = stream.next().await {
+                match result {
+                    Ok(batch) => {
+                        if let Err(e) = session_guard
+                            .write(batch)
+                            .await
+                            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))
+                        {
+                            write_error = Some(e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        write_error = Some(DatasetManagerError::stream_error(e));
+                        break;
+                    }
+                }
+            }
         }
 
-        // On scope end _session_guard drops and removes registry entry.
+        let finish_result = session_guard.finish().await;
+        if let Err(e) = finish_result {
+            let finish_err = DatasetManagerError::io_invalid_data(e.to_string());
+            if write_error.is_none() {
+                write_error = Some(finish_err);
+            }
+        }
 
-        Ok(())
+        if let Some(e) = write_error {
+            Err(e)
+        } else {
+            Ok(())
+        }
     }
 
     /// Return a unified dataset reader (Completed or Live/Writing).

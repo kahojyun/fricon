@@ -1,5 +1,3 @@
-pub use crate::server::DatasetRecord;
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -20,7 +18,9 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    VERSION, dataset_manager, ipc,
+    VERSION,
+    dataset_manager::DatasetRecord,
+    ipc,
     proto::{
         self, AddTagsRequest, CreateMetadata, CreateRequest, CreateResponse, GetRequest,
         RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
@@ -228,11 +228,6 @@ impl Dataset {
         self.client
             .workspace_paths
             .dataset_path_from_uuid(self.record.metadata.uuid)
-    }
-
-    #[must_use]
-    pub fn arrow_file(&self) -> PathBuf {
-        self.path().join(dataset_manager::DATASET_NAME)
     }
 
     #[must_use]
