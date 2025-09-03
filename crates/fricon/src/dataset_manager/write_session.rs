@@ -7,7 +7,6 @@ use std::{
 use arrow::{
     array::RecordBatch, compute::BatchCoalescer, datatypes::SchemaRef, ipc::writer::FileWriter,
 };
-use futures::{Stream, StreamExt};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinError;
@@ -70,22 +69,10 @@ impl WriteSession {
         Ok(())
     }
 
+    // TODO: Will be used by real-time plotting
     #[allow(dead_code)]
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.event_sender.subscribe()
-    }
-
-    #[allow(dead_code)]
-    pub async fn write_stream<S, E>(&self, mut stream: S) -> Result<()>
-    where
-        S: Stream<Item = std::result::Result<RecordBatch, E>> + Send + 'static + Unpin,
-        E: std::error::Error + Send + Sync + 'static,
-    {
-        while let Some(result) = stream.next().await {
-            let batch = result.map_err(|e| Error::Send(e.to_string()))?;
-            self.write(batch).await?;
-        }
-        Ok(())
     }
 
     async fn write_task(
@@ -189,9 +176,9 @@ mod tests {
             .unwrap()
             .unwrap();
         match (event, expected) {
-            (Event::Received, Event::Received) => {}
-            (Event::BatchWritten, Event::BatchWritten) => {}
-            (Event::Closed, Event::Closed) => {}
+            (Event::Received, Event::Received)
+            | (Event::BatchWritten, Event::BatchWritten)
+            | (Event::Closed, Event::Closed) => {}
             (actual, expected) => panic!("Expected {expected:?}, got {actual:?}"),
         }
         events
@@ -210,14 +197,11 @@ mod tests {
                     // Found Closed event, return
                     return;
                 }
-                Ok(Ok(Event::BatchWritten)) => {
-                    // Skip BatchWritten events
+                Ok(Ok(Event::BatchWritten)) | Err(_) => {
+                    // Skip BatchWritten events or timeout, continue loop
                 }
                 Ok(Ok(other)) => panic!("Unexpected event: {other:?}"),
                 Ok(Err(_)) => panic!("Failed to receive event"),
-                Err(_) => {
-                    // Timeout, continue loop
-                }
             }
         }
         panic!("Did not receive Closed event within timeout");

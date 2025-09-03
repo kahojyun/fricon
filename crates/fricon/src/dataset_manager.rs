@@ -4,6 +4,7 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
+pub mod live;
 mod write_session;
 
 use std::{fs, path::Path};
