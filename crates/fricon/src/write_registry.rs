@@ -6,11 +6,11 @@ use std::sync::{Arc, RwLock};
 use arrow::datatypes::SchemaRef;
 use tokio_util::task::TaskTracker;
 
-use crate::write_session::WriteSession;
+use crate::write_session::{WriteSession, WriteSessionHandle};
 
 #[derive(Clone, Default)]
 pub struct WriteSessionRegistry {
-    inner: Arc<RwLock<HashMap<i32, WriteSession>>>,
+    inner: Arc<RwLock<HashMap<i32, WriteSessionHandle>>>,
 }
 
 impl WriteSessionRegistry {
@@ -26,7 +26,7 @@ impl WriteSessionRegistry {
     ) -> WriteSessionGuard {
         let session = WriteSession::new(tracker, path, schema);
         if let Ok(mut m) = self.inner.write() {
-            m.insert(id, session.clone());
+            m.insert(id, session.handle());
         }
         WriteSessionGuard {
             id,
@@ -34,7 +34,7 @@ impl WriteSessionRegistry {
             session,
         }
     }
-    pub fn get(&self, id: i32) -> Option<WriteSession> {
+    pub fn get(&self, id: i32) -> Option<WriteSessionHandle> {
         self.inner.read().ok().and_then(|m| m.get(&id).cloned())
     }
     fn remove(&self, id: i32) {
@@ -44,6 +44,7 @@ impl WriteSessionRegistry {
     }
 }
 
+/// Owner of a `WriteSession`, ensuring it is properly cleaned up.
 pub struct WriteSessionGuard {
     id: i32,
     registry: WriteSessionRegistry,

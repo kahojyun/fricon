@@ -451,7 +451,7 @@ impl DatasetManager {
             }
             DatasetStatus::Writing => {
                 if let Some(session) = self.app.write_sessions().get(record.id) {
-                    return Ok(crate::reader::DatasetReader::Live(session.live()));
+                    return Ok(crate::reader::DatasetReader::Live(session.live().clone()));
                 }
                 // Fallback: if writer already dropped but file exists, expose as Completed view.
                 let dataset_path = self
