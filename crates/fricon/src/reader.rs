@@ -1,5 +1,5 @@
 use crate::dataset_manager::DatasetManagerError;
-use crate::live::{LiveDataset, SelectError as LiveSelectError};
+use crate::live::{LiveDataset, LiveDatasetWriter, SelectError as LiveSelectError};
 use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader};
 use std::{
     fs::File,
@@ -46,8 +46,9 @@ impl CompletedDataset {
         }
         let full = concat_batches(&self.schema, &self.batches[..])
             .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-        let live = LiveDataset::new(self.schema.clone(), PathBuf::from("/dev/null"));
-        live.append(full);
+        let writer = LiveDatasetWriter::new(self.schema.clone(), PathBuf::from("/dev/null"));
+        let live = writer.reader();
+        writer.append(full);
         live.select_by_indices(indices, column_indices)
             .map_err(map_live_select_err)
     }

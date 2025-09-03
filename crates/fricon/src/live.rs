@@ -14,6 +14,16 @@ use tokio::sync::broadcast;
 /// - Lightweight event stream for UI/reactive consumers
 /// - Row selection (by sorted unique indices) with optional column projection
 /// - Ability to replace a sequential front segment (used by future compaction / reordering)
+#[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub struct LiveDatasetWriter {
+    inner: Arc<LiveInner>,
+}
+
+/// Shareable read-only (logical) view of a live in-memory dataset.
+///
+/// Cloning is cheap (Arc clone). Mutation APIs are exposed only via
+/// `LiveDatasetWriter` ensuring clearer ownership around who may append.
 #[derive(Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub struct LiveDataset {
@@ -39,47 +49,43 @@ pub enum LiveEvent {
     Closed,
 }
 
-impl LiveDataset {
+impl LiveDatasetWriter {
+    /// Create a new writer (and internal shared state). Use `live()` to obtain
+    /// a `LiveDataset` reader handle. Prefer this over the older `new_pair`.
     pub fn new(schema: SchemaRef, path: PathBuf) -> Self {
         let (event_tx, _) = broadcast::channel(1024);
-        Self {
-            inner: Arc::new(LiveInner {
-                schema,
-                batches: RwLock::new(VecDeque::new()),
-                total_rows: RwLock::new(0),
-                event_tx,
-                replaced_front_rows: RwLock::new(0),
-                path,
-            }),
-        }
+        let inner = Arc::new(LiveInner {
+            schema,
+            batches: RwLock::new(VecDeque::new()),
+            total_rows: RwLock::new(0),
+            event_tx,
+            replaced_front_rows: RwLock::new(0),
+            path,
+        });
+        Self { inner }
     }
 
-    pub fn schema(&self) -> SchemaRef {
-        self.inner.schema.clone()
-    }
-    pub fn subscribe(&self) -> broadcast::Receiver<LiveEvent> {
-        self.inner.event_tx.subscribe()
+    /// (Deprecated) Create writer + reader pair. Use `LiveDatasetWriter::new` + `writer.live()` instead.
+    #[allow(dead_code)]
+    pub fn new_pair(schema: SchemaRef, path: PathBuf) -> (Self, LiveDataset) {
+        let writer = Self::new(schema, path);
+        let reader = writer.reader();
+        (writer, reader)
     }
     pub fn append(&self, batch: RecordBatch) {
         if batch.schema() != self.inner.schema {
             return;
         }
         let rows = batch.num_rows();
-        {
-            let mut total = self.inner.total_rows.write().unwrap();
-            let mut vec = self.inner.batches.write().unwrap();
-            vec.push_back(batch);
-            *total += rows;
-            let _ = self.inner.event_tx.send(LiveEvent::Appended {
-                new_rows: rows,
-                total_rows: *total,
-            });
-        }
+        let mut total = self.inner.total_rows.write().unwrap();
+        let mut vec = self.inner.batches.write().unwrap();
+        vec.push_back(batch);
+        *total += rows;
+        let _ = self.inner.event_tx.send(LiveEvent::Appended {
+            new_rows: rows,
+            total_rows: *total,
+        });
     }
-    pub fn total_rows(&self) -> usize {
-        *self.inner.total_rows.read().unwrap()
-    }
-
     pub fn replace_sequential_front(
         &self,
         new_batches: &[RecordBatch],
@@ -147,7 +153,24 @@ impl LiveDataset {
             });
         Ok(())
     }
+    /// Obtain a shareable read-only handle.
+    pub fn reader(&self) -> LiveDataset {
+        LiveDataset {
+            inner: self.inner.clone(),
+        }
+    }
+}
 
+impl LiveDataset {
+    pub fn schema(&self) -> SchemaRef {
+        self.inner.schema.clone()
+    }
+    pub fn subscribe(&self) -> broadcast::Receiver<LiveEvent> {
+        self.inner.event_tx.subscribe()
+    }
+    pub fn total_rows(&self) -> usize {
+        *self.inner.total_rows.read().unwrap()
+    }
     pub fn tail(&self, n: usize) -> Option<RecordBatch> {
         use arrow::compute::concat_batches;
         let vec = self.inner.batches.read().unwrap();
@@ -365,9 +388,10 @@ mod tests {
     #[test]
     fn live_dataset_append_and_tail() {
         let schema = make_schema();
-        let live = LiveDataset::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let live = writer.reader();
         for i in 0..5 {
-            live.append(make_batch(&schema, i * 10, 10));
+            writer.append(make_batch(&schema, i * 10, 10));
         }
         assert_eq!(live.total_rows(), 50);
         let tail = live.tail(15).unwrap();
@@ -376,9 +400,10 @@ mod tests {
     #[test]
     fn events_fire() {
         let schema = make_schema();
-        let live = LiveDataset::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let live = writer.reader();
         let mut rx = live.subscribe();
-        live.append(make_batch(&schema, 0, 5));
+        writer.append(make_batch(&schema, 0, 5));
         let evt = rx.try_recv().unwrap();
         match evt {
             LiveEvent::Appended {
@@ -394,14 +419,15 @@ mod tests {
     #[test]
     fn sequential_front_replace_partial_end() {
         let schema = make_schema();
-        let live = LiveDataset::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let live = writer.reader();
         for i in 0..3 {
-            live.append(make_batch(&schema, i * 10, 10));
+            writer.append(make_batch(&schema, i * 10, 10));
         }
         assert_eq!(live.total_rows(), 30);
         let nb1 = make_batch(&schema, 1000, 8);
         let nb2 = make_batch(&schema, 2000, 7);
-        live.replace_sequential_front(&[nb1, nb2]).unwrap();
+        writer.replace_sequential_front(&[nb1, nb2]).unwrap();
         assert_eq!(live.total_rows(), 30);
         let all = live.tail(30).unwrap();
         let col = all.column(0).as_any().downcast_ref::<Int32Array>().unwrap();
@@ -412,9 +438,10 @@ mod tests {
     #[test]
     fn select_by_indices_basic() {
         let schema = make_schema();
-        let live = LiveDataset::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let live = writer.reader();
         for i in 0..3 {
-            live.append(make_batch(&schema, i * 10, 10));
+            writer.append(make_batch(&schema, i * 10, 10));
         }
         let indices = [0usize, 5, 12, 29];
         let batch = live.select_by_indices(&indices, None).unwrap();
@@ -432,7 +459,8 @@ mod tests {
     #[test]
     fn select_by_indices_empty_and_oob() {
         let schema = make_schema();
-        let live = LiveDataset::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let live = writer.reader();
         let empty = live.select_by_indices(&[], None).unwrap();
         assert_eq!(empty.num_rows(), 0);
         assert!(matches!(
@@ -448,7 +476,8 @@ mod tests {
             Field::new("b", DataType::Int32, false),
             Field::new("c", DataType::Int32, false),
         ]));
-        let live = LiveDataset::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let live = writer.reader();
         let make_tri_batch = |start: i32, n: i32| {
             let a = Int32Array::from_iter_values(start..start + n);
             let b = Int32Array::from_iter_values((start * 10)..(start * 10 + n));
@@ -456,8 +485,8 @@ mod tests {
             RecordBatch::try_new(schema.clone(), vec![Arc::new(a), Arc::new(b), Arc::new(c)])
                 .unwrap()
         };
-        live.append(make_tri_batch(0, 5));
-        live.append(make_tri_batch(5, 5));
+        writer.append(make_tri_batch(0, 5));
+        writer.append(make_tri_batch(5, 5));
         let indices = [1usize, 7];
         let batch = live.select_by_indices(&indices, Some(&[1, 2])).unwrap();
         assert_eq!(batch.num_columns(), 2);
