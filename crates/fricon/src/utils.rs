@@ -1,11 +1,21 @@
 use std::{
     fs::{self, File},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context as _, Result};
 
 use tracing::warn;
+
+/// Generate a chunk filename for the given chunk index
+pub fn chunk_filename(chunk_index: usize) -> String {
+    format!("data_chunk_{chunk_index}.arrow")
+}
+
+/// Get the chunk path by joining the base path with the chunk filename
+pub fn chunk_path(base_path: &Path, chunk_index: usize) -> PathBuf {
+    base_path.join(chunk_filename(chunk_index))
+}
 
 #[derive(Debug)]
 pub struct FileLock {

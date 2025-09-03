@@ -439,30 +439,27 @@ impl DatasetManager {
         let record = self.get_dataset(id).await?;
         match record.metadata.status {
             DatasetStatus::Completed | DatasetStatus::Aborted => {
-                // Aborted datasets may still have a partially written (but valid up to last flush) Arrow file.
+                // Aborted datasets may still have partially written chunk files (valid up to last flush).
                 let dataset_path = self
                     .app
                     .root()
                     .paths()
-                    .dataset_path_from_uuid(record.metadata.uuid)
-                    .join(DATASET_NAME);
-                let completed = crate::reader::CompletedDataset::from_arrow_file(&dataset_path)?;
+                    .dataset_path_from_uuid(record.metadata.uuid);
+                let completed = crate::reader::CompletedDataset::open(&dataset_path)?;
                 Ok(crate::reader::DatasetReader::Completed(completed))
             }
             DatasetStatus::Writing => {
                 if let Some(session) = self.app.write_sessions().get(record.id) {
                     return Ok(crate::reader::DatasetReader::Live(session.live().clone()));
                 }
-                // Fallback: if writer already dropped but file exists, expose as Completed view.
+                // Fallback: if writer already dropped but directory exists, expose as Completed view.
                 let dataset_path = self
                     .app
                     .root()
                     .paths()
-                    .dataset_path_from_uuid(record.metadata.uuid)
-                    .join(DATASET_NAME);
+                    .dataset_path_from_uuid(record.metadata.uuid);
                 if dataset_path.exists() {
-                    let completed =
-                        crate::reader::CompletedDataset::from_arrow_file(&dataset_path)?;
+                    let completed = crate::reader::CompletedDataset::open(&dataset_path)?;
                     return Ok(crate::reader::DatasetReader::Completed(completed));
                 }
                 Err(DatasetManagerError::io_invalid_data(

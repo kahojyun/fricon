@@ -1,6 +1,5 @@
 use std::{
     collections::VecDeque,
-    path::PathBuf,
     sync::{Arc, RwLock},
 };
 
@@ -14,7 +13,7 @@ use tokio::sync::broadcast;
 /// - Lightweight event stream for UI/reactive consumers
 /// - Row selection (by sorted unique indices) with optional column projection
 /// - Ability to replace a sequential front segment (used by future compaction / reordering)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub struct LiveDatasetWriter {
     inner: Arc<LiveInner>,
@@ -37,8 +36,6 @@ struct LiveInner {
     total_rows: RwLock<usize>,              // cached total rows
     event_tx: broadcast::Sender<LiveEvent>,
     replaced_front_rows: RwLock<usize>, // cursor advanced by replace_sequential_front
-    #[allow(dead_code)]
-    path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +49,7 @@ pub enum LiveEvent {
 impl LiveDatasetWriter {
     /// Create a new writer (and internal shared state). Use `live()` to obtain
     /// a `LiveDataset` reader handle. Prefer this over the older `new_pair`.
-    pub fn new(schema: SchemaRef, path: PathBuf) -> Self {
+    pub fn new(schema: SchemaRef) -> Self {
         let (event_tx, _) = broadcast::channel(1024);
         let inner = Arc::new(LiveInner {
             schema,
@@ -60,18 +57,10 @@ impl LiveDatasetWriter {
             total_rows: RwLock::new(0),
             event_tx,
             replaced_front_rows: RwLock::new(0),
-            path,
         });
         Self { inner }
     }
 
-    /// (Deprecated) Create writer + reader pair. Use `LiveDatasetWriter::new` + `writer.live()` instead.
-    #[allow(dead_code)]
-    pub fn new_pair(schema: SchemaRef, path: PathBuf) -> (Self, LiveDataset) {
-        let writer = Self::new(schema, path);
-        let reader = writer.reader();
-        (writer, reader)
-    }
     pub fn append(&self, batch: RecordBatch) {
         if batch.schema() != self.inner.schema {
             return;
@@ -388,7 +377,7 @@ mod tests {
     #[test]
     fn live_dataset_append_and_tail() {
         let schema = make_schema();
-        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone());
         let live = writer.reader();
         for i in 0..5 {
             writer.append(make_batch(&schema, i * 10, 10));
@@ -400,7 +389,7 @@ mod tests {
     #[test]
     fn events_fire() {
         let schema = make_schema();
-        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone());
         let live = writer.reader();
         let mut rx = live.subscribe();
         writer.append(make_batch(&schema, 0, 5));
@@ -419,7 +408,7 @@ mod tests {
     #[test]
     fn sequential_front_replace_partial_end() {
         let schema = make_schema();
-        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone());
         let live = writer.reader();
         for i in 0..3 {
             writer.append(make_batch(&schema, i * 10, 10));
@@ -438,7 +427,7 @@ mod tests {
     #[test]
     fn select_by_indices_basic() {
         let schema = make_schema();
-        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone());
         let live = writer.reader();
         for i in 0..3 {
             writer.append(make_batch(&schema, i * 10, 10));
@@ -459,7 +448,7 @@ mod tests {
     #[test]
     fn select_by_indices_empty_and_oob() {
         let schema = make_schema();
-        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone());
         let live = writer.reader();
         let empty = live.select_by_indices(&[], None).unwrap();
         assert_eq!(empty.num_rows(), 0);
@@ -476,7 +465,7 @@ mod tests {
             Field::new("b", DataType::Int32, false),
             Field::new("c", DataType::Int32, false),
         ]));
-        let writer = LiveDatasetWriter::new(schema.clone(), PathBuf::from("/tmp/unused"));
+        let writer = LiveDatasetWriter::new(schema.clone());
         let live = writer.reader();
         let make_tri_batch = |start: i32, n: i32| {
             let a = Int32Array::from_iter_values(start..start + n);
