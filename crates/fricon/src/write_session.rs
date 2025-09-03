@@ -1,10 +1,12 @@
+mod background_writer;
+
 use arrow::{array::RecordBatch, datatypes::SchemaRef};
 use std::path::Path;
-use tokio::sync::broadcast;
 use tokio_util::task::TaskTracker;
 
-use crate::background_writer::{BackgroundWriter, Event, Result};
+use self::background_writer::{BackgroundWriter, Result};
 use crate::live::{LiveDataset, LiveDatasetWriter};
+
 /// High-level write session combining a `BackgroundWriter` with a `LiveDataset`.
 ///
 /// Separation of concerns:
@@ -28,9 +30,6 @@ impl WriteSession {
     pub async fn write(&self, batch: RecordBatch) -> Result<()> {
         self.live_writer.append(batch.clone());
         self.writer.write(batch).await
-    }
-    pub fn subscribe(&self) -> broadcast::Receiver<Event> {
-        self.writer.subscribe()
     }
     pub fn handle(&self) -> WriteSessionHandle {
         WriteSessionHandle {

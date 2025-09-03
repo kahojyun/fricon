@@ -6,7 +6,6 @@
 //! - **Dataset Operations**: Create, store, and query datasets using Apache Arrow format
 //! - **Client-Server Architecture**: gRPC-based communication
 mod app;
-mod background_writer;
 mod client;
 mod database;
 mod dataset_manager; // core manager
