@@ -27,8 +27,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Received,
-    BatchWritten,
     #[allow(dead_code)]
     ChunkCompleted {
         chunk_index: usize,
@@ -41,7 +39,7 @@ pub enum Event {
 ///
 /// Responsibilities extracted from `WriteSession`:
 /// - Own the mpsc sender for `RecordBatch`
-/// - Own the broadcast event channel (Received / `BatchWritten` / Closed)
+/// - Own the broadcast event channel (ChunkCompleted / Closed)
 /// - Spawn blocking write / coalesce task
 pub struct BackgroundWriter {
     sender: mpsc::Sender<RecordBatch>,
@@ -68,8 +66,6 @@ impl BackgroundWriter {
     }
 
     pub async fn write(&self, batch: RecordBatch) -> Result<()> {
-        // Fire Received event before enqueueing so listeners can react immediately
-        let _ = self.event_sender.send(Event::Received);
         self.sender
             .send(batch)
             .await
@@ -152,7 +148,6 @@ fn blocking_write_task(
 
         while let Some(coalesced_batch) = coalescer.next_completed_batch() {
             chunk_writer.write_batch(&coalesced_batch)?;
-            let _ = event_sender.send(Event::BatchWritten);
 
             if chunk_writer.should_rotate(MAX_CHUNK_SIZE) {
                 chunk_writer.finish_chunk(event_sender)?;
@@ -166,7 +161,6 @@ fn blocking_write_task(
     coalescer.finish_buffered_batch()?;
     while let Some(coalesced_batch) = coalescer.next_completed_batch() {
         chunk_writer.write_batch(&coalesced_batch)?;
-        let _ = event_sender.send(Event::BatchWritten);
     }
 
     // Finish the final chunk
@@ -208,25 +202,22 @@ mod tests {
         // Wait for task completion
         tracker.close();
         tracker.wait().await;
-        // Collect events (order: some Received + BatchWritten .., finally Closed)
+        // Collect events (order: some ChunkCompleted .., finally Closed)
         let mut saw_closed = false;
-        let mut saw_batch = false;
         for _ in 0..10 {
             // bounded to avoid hanging
             match rx.try_recv() {
-                Ok(Event::BatchWritten) => saw_batch = true,
                 Ok(Event::Closed) => {
                     saw_closed = true;
                     break;
                 }
-                Ok(Event::Received | Event::ChunkCompleted { .. }) => {}
+                Ok(Event::ChunkCompleted { .. }) => {}
                 Err(broadcast::error::TryRecvError::Empty) => {
                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                 }
                 Err(_) => break,
             }
         }
-        assert!(saw_batch, "expected at least one BatchWritten event");
         assert!(saw_closed, "expected Closed event");
         // File should exist and be non-empty (data_chunk_0.arrow)
         let chunk_path = chunk_path(dir.path(), 0);
