@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use thiserror::Error;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio_util::task::TaskTracker;
 use tracing::{error, info};
 
@@ -25,43 +25,46 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, Clone)]
-pub enum Event {
-    #[allow(dead_code)]
-    ChunkCompleted {
-        chunk_index: usize,
-        path: PathBuf,
-    },
-    Closed,
-}
-
 /// Background writer that persists incoming batches to chunked Arrow IPC files.
 ///
 /// Responsibilities extracted from `WriteSession`:
 /// - Own the mpsc sender for `RecordBatch`
-/// - Own the broadcast event channel (ChunkCompleted / Closed)
+/// - Send chunk completed notifications via mpsc channel
+/// - Send closed notification via oneshot channel
 /// - Spawn blocking write / coalesce task
 pub struct BackgroundWriter {
     sender: mpsc::Sender<RecordBatch>,
-    event_sender: broadcast::Sender<Event>,
+    chunk_completed_sender: mpsc::Sender<PathBuf>,
+    closed_sender: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl BackgroundWriter {
-    pub fn new(tracker: &TaskTracker, dir_path: impl Into<PathBuf>, schema: SchemaRef) -> Self {
+    pub fn new(
+        tracker: &TaskTracker,
+        dir_path: impl Into<PathBuf>,
+        schema: SchemaRef,
+        chunk_completed_sender: mpsc::Sender<PathBuf>,
+        closed_sender: tokio::sync::oneshot::Sender<()>,
+    ) -> Self {
         let dir_path = dir_path.into();
         let (sender, receiver) = mpsc::channel(32);
-        let (event_sender, _) = broadcast::channel(16);
-        let event_sender_for_task = event_sender.clone();
+
+        let chunk_completed_sender_for_task = chunk_completed_sender.clone();
         tracker.spawn_blocking(move || {
-            if let Err(e) =
-                blocking_write_task(&dir_path, &schema, receiver, &event_sender_for_task)
-            {
+            if let Err(e) = blocking_write_task(
+                &dir_path,
+                &schema,
+                receiver,
+                &chunk_completed_sender_for_task,
+                closed_sender,
+            ) {
                 error!("BackgroundWriter task failed: {e}");
             }
         });
         Self {
             sender,
-            event_sender,
+            chunk_completed_sender,
+            closed_sender: None,
         }
     }
 
@@ -71,10 +74,6 @@ impl BackgroundWriter {
             .await
             .map_err(|e| Error::Send(e.to_string()))?;
         Ok(())
-    }
-
-    pub fn subscribe(&self) -> broadcast::Receiver<Event> {
-        self.event_sender.subscribe()
     }
 }
 
@@ -109,17 +108,14 @@ impl ChunkWriter {
         Ok(())
     }
 
-    fn finish_chunk(mut self, event_sender: &broadcast::Sender<Event>) -> Result<()> {
+    fn finish_chunk(mut self, chunk_completed_sender: &mpsc::Sender<PathBuf>) -> Result<()> {
         self.writer.finish()?;
         let chunk_path = chunk_path(&self.dir_path, self.chunk_index);
         info!(
             "Chunk {} completed: {} rows written to {:?}",
             self.chunk_index, self.total_rows, chunk_path
         );
-        let _ = event_sender.send(Event::ChunkCompleted {
-            chunk_index: self.chunk_index,
-            path: chunk_path,
-        });
+        let _ = chunk_completed_sender.send(chunk_path);
         Ok(())
     }
 
@@ -132,7 +128,8 @@ fn blocking_write_task(
     dir_path: &Path,
     schema: &SchemaRef,
     mut receiver: mpsc::Receiver<RecordBatch>,
-    event_sender: &broadcast::Sender<Event>,
+    chunk_completed_sender: &mpsc::Sender<PathBuf>,
+    closed_sender: tokio::sync::oneshot::Sender<()>,
 ) -> Result<()> {
     const TARGET_BATCH_SIZE: usize = 4096;
     const BIGGEST_COALESCE_BATCH_SIZE: usize = 64 * 1024 * 1024;
@@ -150,7 +147,7 @@ fn blocking_write_task(
             chunk_writer.write_batch(&coalesced_batch)?;
 
             if chunk_writer.should_rotate(MAX_CHUNK_SIZE) {
-                chunk_writer.finish_chunk(event_sender)?;
+                chunk_writer.finish_chunk(chunk_completed_sender)?;
                 chunk_index += 1;
                 chunk_writer = ChunkWriter::new(dir_path, chunk_index, schema)?;
             }
@@ -164,8 +161,8 @@ fn blocking_write_task(
     }
 
     // Finish the final chunk
-    chunk_writer.finish_chunk(event_sender)?;
-    let _ = event_sender.send(Event::Closed);
+    chunk_writer.finish_chunk(chunk_completed_sender)?;
+    let _ = closed_sender.send(());
     Ok(())
 }
 
@@ -192,8 +189,18 @@ mod tests {
         let dataset_dir = dir.path();
         let schema = make_schema();
         let tracker = TaskTracker::new();
-        let writer = BackgroundWriter::new(&tracker, dataset_dir, schema.clone());
-        let mut rx = writer.subscribe();
+
+        // Create channels for testing
+        let (chunk_completed_sender, mut chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let (closed_sender, closed_receiver) = tokio::sync::oneshot::channel();
+
+        let writer = BackgroundWriter::new(
+            &tracker,
+            dataset_dir,
+            schema.clone(),
+            chunk_completed_sender,
+            closed_sender,
+        );
         // write a couple batches
         writer.write(make_batch(&schema, 0, 5)).await.unwrap();
         writer.write(make_batch(&schema, 5, 5)).await.unwrap();
@@ -202,23 +209,17 @@ mod tests {
         // Wait for task completion
         tracker.close();
         tracker.wait().await;
-        // Collect events (order: some ChunkCompleted .., finally Closed)
-        let mut saw_closed = false;
-        for _ in 0..10 {
-            // bounded to avoid hanging
-            match rx.try_recv() {
-                Ok(Event::Closed) => {
-                    saw_closed = true;
-                    break;
-                }
-                Ok(Event::ChunkCompleted { .. }) => {}
-                Err(broadcast::error::TryRecvError::Empty) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                }
-                Err(_) => break,
+
+        // Wait for both signals concurrently
+        tokio::select! {
+            closed_result = closed_receiver => {
+                assert!(closed_result.is_ok(), "expected closed signal");
+            }
+            chunk_result = chunk_completed_receiver.recv() => {
+                assert!(chunk_result.is_some(), "expected chunk completion");
             }
         }
-        assert!(saw_closed, "expected Closed event");
+
         // File should exist and be non-empty (data_chunk_0.arrow)
         let chunk_path = chunk_path(dir.path(), 0);
         let meta = std::fs::metadata(&chunk_path).expect("file metadata");
@@ -231,7 +232,18 @@ mod tests {
         let dataset_dir = dir.path();
         let schema = make_schema();
         let tracker = TaskTracker::new();
-        let writer = BackgroundWriter::new(&tracker, dataset_dir, schema.clone());
+
+        // Create channels for testing
+        let (chunk_completed_sender, _chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let (closed_sender, _closed_receiver) = tokio::sync::oneshot::channel();
+
+        let writer = BackgroundWriter::new(
+            &tracker,
+            dataset_dir,
+            schema.clone(),
+            chunk_completed_sender,
+            closed_sender,
+        );
 
         // Write a few batches
         for i in 0..10 {

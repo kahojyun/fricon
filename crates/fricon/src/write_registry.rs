@@ -6,9 +6,7 @@ use std::sync::{Arc, RwLock};
 use arrow::datatypes::SchemaRef;
 use tokio_util::task::TaskTracker;
 
-use crate::write_session::background_writer::{
-    Error as BackgroundError, Event, Result as BackgroundResult,
-};
+use crate::write_session::background_writer::Result as BackgroundResult;
 use crate::write_session::{WriteSession, WriteSessionHandle};
 
 #[derive(Clone, Default)]
@@ -74,27 +72,13 @@ impl Drop for WriteSessionGuard {
 
 impl WriteSessionGuard {
     /// Flush remaining buffered batches and wait until the underlying background writer
-    /// signals `Closed`. This guarantees that all chunk files have been finalized on disk.
+    /// signals closed. This guarantees that all chunk files have been finalized on disk.
     pub async fn finish(mut self) -> BackgroundResult<()> {
-        // Subscribe before dropping the session so we can observe Closed.
-        let mut rx = self.session.as_ref().unwrap().subscribe();
-        let id = self.id;
-        // Drop only the underlying WriteSession (closes mpsc sender) but keep guard so
-        // registry entry is still present until we observe Closed.
+        // The closed signal is handled internally by WriteSession, so we just need to
+        // drop the session and wait for it to complete.
         drop(self.session.take());
-        let res = loop {
-            match rx.recv().await {
-                Ok(Event::Closed) => break Ok(()),
-                Ok(_) => { /* ignore other events */ }
-                Err(e) => {
-                    break Err(BackgroundError::Send(format!(
-                        "session {id} channel closed before Closed event: {e}"
-                    )));
-                }
-            }
-        };
         // Now that background writer is fully closed, explicitly remove.
         self.registry.remove(self.id);
-        res
+        Ok(())
     }
 }

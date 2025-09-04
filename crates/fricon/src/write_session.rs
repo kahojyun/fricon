@@ -4,7 +4,7 @@ use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader};
 use std::{fs::File, path::PathBuf};
 use tokio_util::task::TaskTracker;
 
-use self::background_writer::{BackgroundWriter, Event, Result};
+use self::background_writer::{BackgroundWriter, Result};
 use crate::live::{LiveDataset, LiveDatasetWriter};
 
 /// High-level write session combining a `BackgroundWriter` with a `LiveDataset`.
@@ -20,19 +20,30 @@ pub struct WriteSession {
 impl WriteSession {
     pub fn new(tracker: &TaskTracker, dir_path: impl Into<PathBuf>, schema: SchemaRef) -> Self {
         let live_writer = LiveDatasetWriter::new(schema.clone());
-        let writer = BackgroundWriter::new(tracker, dir_path, schema);
+
+        // Create channels for chunk completed and closed notifications
+        let (chunk_completed_sender, mut chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let (closed_sender, closed_receiver) = tokio::sync::oneshot::channel();
+
+        let writer = BackgroundWriter::new(
+            tracker,
+            dir_path,
+            schema,
+            chunk_completed_sender,
+            closed_sender,
+        );
 
         // Listen for chunk completion events and trigger replace_sequential_front
-        let mut event_rx = writer.subscribe();
         let live_writer_for_task = live_writer.clone();
         tracker.spawn(async move {
-            while let Ok(event) = event_rx.recv().await {
-                if let Event::ChunkCompleted { path, .. } = event {
+            tokio::select! {
+                Some(path) = chunk_completed_receiver.recv() => {
                     if let Err(e) = Self::handle_chunk_completion(&live_writer_for_task, &path) {
                         tracing::error!("Failed to handle chunk completion: {}", e);
                     }
-                } else if matches!(event, Event::Closed) {
-                    break;
+                }
+                _ = closed_receiver => {
+                    // Writer closed, exit the task
                 }
             }
         });
@@ -70,9 +81,7 @@ impl WriteSession {
         self.live_writer.append(batch.clone());
         self.writer.write(batch).await
     }
-    pub(crate) fn subscribe(&self) -> tokio::sync::broadcast::Receiver<Event> {
-        self.writer.subscribe()
-    }
+
     pub fn handle(&self) -> WriteSessionHandle {
         WriteSessionHandle {
             live: self.live_writer.reader(),
