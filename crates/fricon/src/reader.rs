@@ -8,7 +8,7 @@ use arrow::{
     ipc::{
         Block,
         convert::fb_to_schema,
-        reader::{FileDecoder, FileReader, read_footer_length},
+        reader::{FileDecoder, read_footer_length},
         root_as_footer,
     },
 };
@@ -21,68 +21,6 @@ pub struct CompletedDataset {
 }
 impl CompletedDataset {
     pub fn open(dir_path: &Path) -> Result<Self, DatasetManagerError> {
-        let mut batches = Vec::new();
-        let mut schema = None;
-
-        // Try to read chunked files starting from data_chunk_0.arrow
-        let mut chunk_index = 0;
-
-        loop {
-            let chunk_path = chunk_path(dir_path, chunk_index);
-
-            // If chunk file doesn't exist, break
-            if !chunk_path.exists() {
-                break;
-            }
-
-            let file = File::open(&chunk_path)?;
-            let reader = FileReader::try_new(file, None)?;
-
-            for b in reader {
-                let b = b?;
-                if schema.is_none() {
-                    schema = Some(b.schema());
-                }
-                batches.push(b);
-            }
-
-            chunk_index += 1;
-        }
-
-        let schema = schema.ok_or_else(|| {
-            DatasetManagerError::io_invalid_data("no chunk files found in dataset directory")
-        })?;
-        Ok(Self {
-            schema,
-            batches: Arc::new(batches),
-        })
-    }
-    pub fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-    pub fn select_by_indices(
-        &self,
-        indices: &[usize],
-        column_indices: Option<&[usize]>,
-    ) -> Result<RecordBatch, DatasetManagerError> {
-        use arrow::compute::concat_batches;
-        if self.batches.is_empty() {
-            return Err(DatasetManagerError::io_invalid_data("empty dataset"));
-        }
-        let full = concat_batches(&self.schema, &self.batches[..])
-            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-        let writer = LiveDatasetWriter::new(self.schema.clone());
-        let live = writer.reader();
-        writer.append(full);
-        live.select_by_indices(indices, column_indices)
-            .map_err(map_live_select_err)
-    }
-    pub fn batches_slice(&self) -> &[RecordBatch] {
-        &self.batches
-    }
-
-    /// Open a dataset using memory-mapped IPC files for zero-copy reading
-    pub fn open_mmap(dir_path: &Path) -> Result<Self, DatasetManagerError> {
         let mut batches = Vec::new();
         let mut schema = None;
 
@@ -130,6 +68,29 @@ impl CompletedDataset {
             schema,
             batches: Arc::new(batches),
         })
+    }
+    pub fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+    pub fn select_by_indices(
+        &self,
+        indices: &[usize],
+        column_indices: Option<&[usize]>,
+    ) -> Result<RecordBatch, DatasetManagerError> {
+        use arrow::compute::concat_batches;
+        if self.batches.is_empty() {
+            return Err(DatasetManagerError::io_invalid_data("empty dataset"));
+        }
+        let full = concat_batches(&self.schema, &self.batches[..])
+            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
+        let writer = LiveDatasetWriter::new(self.schema.clone());
+        let live = writer.reader();
+        writer.append(full);
+        live.select_by_indices(indices, column_indices)
+            .map_err(map_live_select_err)
+    }
+    pub fn batches_slice(&self) -> &[RecordBatch] {
+        &self.batches
     }
 }
 #[allow(clippy::needless_pass_by_value)]
@@ -221,12 +182,6 @@ impl DatasetReader {
         }
     }
 
-    /// Open a dataset using memory-mapped IPC files for zero-copy reading
-    pub fn open_mmap(dir_path: &Path) -> Result<Self, DatasetManagerError> {
-        let completed = CompletedDataset::open_mmap(dir_path)?;
-        Ok(Self::Completed(completed))
-    }
-
     pub fn select_by_indices(
         &self,
         indices: &[usize],
@@ -252,7 +207,7 @@ impl DatasetReader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::write_session::WriteSession;
+    use crate::write_session::background_writer::BackgroundWriter;
     use arrow::array::Int32Array;
     use arrow::datatypes::{DataType, Field, Schema};
     use std::sync::Arc;
@@ -269,65 +224,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_completed_dataset_chunked_files() {
-        let dir = tempdir().unwrap();
-        let dataset_dir = dir.path();
-        let schema = make_schema();
-        let tracker = TaskTracker::new();
-
-        // Create chunked files using WriteSession
-        let session = WriteSession::new(&tracker, dataset_dir, schema.clone());
-
-        // Write some data
-        for i in 0..10 {
-            let batch = make_batch(&schema, i * 10, 10);
-            session.write(batch).await.unwrap();
-        }
-
-        drop(session);
-        tracker.close();
-        tracker.wait().await;
-
-        // Now try to read using CompletedDataset
-        let dataset = CompletedDataset::open(dataset_dir).unwrap();
-
-        assert_eq!(dataset.schema(), schema);
-        assert_eq!(
-            dataset
-                .batches_slice()
-                .iter()
-                .map(arrow::array::RecordBatch::num_rows)
-                .sum::<usize>(),
-            100
-        );
-
-        // Test selection
-        let result = dataset.select_by_indices(&[0, 1, 2], None).unwrap();
-        assert_eq!(result.num_rows(), 3);
-    }
-
-    #[tokio::test]
     async fn test_completed_dataset_mmap() {
         let dir = tempdir().unwrap();
         let dataset_dir = dir.path();
         let schema = make_schema();
         let tracker = TaskTracker::new();
 
-        // Create chunked files using WriteSession
-        let session = WriteSession::new(&tracker, dataset_dir, schema.clone());
+        // Create chunked files using BackgroundWriter
+        let (chunk_completed_sender, _chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let writer = BackgroundWriter::new(
+            &tracker,
+            dataset_dir,
+            schema.clone(),
+            chunk_completed_sender,
+        );
 
         // Write some data
         for i in 0..10 {
             let batch = make_batch(&schema, i * 10, 10);
-            session.write(batch).await.unwrap();
+            writer.write(batch).await.unwrap();
         }
 
-        drop(session);
+        // Shutdown and wait for completion
+        writer.shutdown().await.unwrap();
         tracker.close();
         tracker.wait().await;
 
         // Now try to read using mmap
-        let dataset = CompletedDataset::open_mmap(dataset_dir).unwrap();
+        let dataset = CompletedDataset::open(dataset_dir).unwrap();
 
         assert_eq!(dataset.schema(), schema);
         assert_eq!(
