@@ -49,14 +49,14 @@ pub struct BackgroundWriter {
 }
 
 impl BackgroundWriter {
-    pub fn new(tracker: &TaskTracker, dir_path: impl AsRef<Path>, schema: SchemaRef) -> Self {
-        let base_path = dir_path.as_ref().to_path_buf();
+    pub fn new(tracker: &TaskTracker, dir_path: impl Into<PathBuf>, schema: SchemaRef) -> Self {
+        let dir_path = dir_path.into();
         let (sender, receiver) = mpsc::channel(32);
         let (event_sender, _) = broadcast::channel(16);
         let event_sender_for_task = event_sender.clone();
         tracker.spawn_blocking(move || {
             if let Err(e) =
-                blocking_write_task(&base_path, &schema, receiver, &event_sender_for_task)
+                blocking_write_task(&dir_path, &schema, receiver, &event_sender_for_task)
             {
                 error!("BackgroundWriter task failed: {e}");
             }
@@ -87,12 +87,12 @@ struct ChunkWriter {
     chunk_index: usize,
     current_chunk_size: u64,
     total_rows: usize,
-    base_path: PathBuf,
+    dir_path: PathBuf,
 }
 
 impl ChunkWriter {
-    fn new(base_path: &Path, chunk_index: usize, schema: &SchemaRef) -> Result<Self> {
-        let chunk_path = chunk_path(base_path, chunk_index);
+    fn new(dir_path: &Path, chunk_index: usize, schema: &SchemaRef) -> Result<Self> {
+        let chunk_path = chunk_path(dir_path, chunk_index);
         let file = File::create_new(&chunk_path)?;
         let buf_writer = BufWriter::new(file);
         let writer = FileWriter::try_new(buf_writer, schema)?;
@@ -102,7 +102,7 @@ impl ChunkWriter {
             chunk_index,
             current_chunk_size: 0,
             total_rows: 0,
-            base_path: base_path.to_path_buf(),
+            dir_path: dir_path.to_path_buf(),
         })
     }
 
@@ -115,7 +115,7 @@ impl ChunkWriter {
 
     fn finish_chunk(mut self, event_sender: &broadcast::Sender<Event>) -> Result<()> {
         self.writer.finish()?;
-        let chunk_path = chunk_path(&self.base_path, self.chunk_index);
+        let chunk_path = chunk_path(&self.dir_path, self.chunk_index);
         info!(
             "Chunk {} completed: {} rows written to {:?}",
             self.chunk_index, self.total_rows, chunk_path
@@ -133,7 +133,7 @@ impl ChunkWriter {
 }
 
 fn blocking_write_task(
-    base_path: &Path,
+    dir_path: &Path,
     schema: &SchemaRef,
     mut receiver: mpsc::Receiver<RecordBatch>,
     event_sender: &broadcast::Sender<Event>,
@@ -142,9 +142,7 @@ fn blocking_write_task(
     const BIGGEST_COALESCE_BATCH_SIZE: usize = 64 * 1024 * 1024;
     const MAX_CHUNK_SIZE: u64 = 256 * 1024 * 1024; // 256MB
 
-    std::fs::create_dir_all(base_path)?;
-
-    let mut chunk_writer = ChunkWriter::new(base_path, 0, schema)?;
+    let mut chunk_writer = ChunkWriter::new(dir_path, 0, schema)?;
     let mut coalescer = BatchCoalescer::new(schema.clone(), TARGET_BATCH_SIZE)
         .with_biggest_coalesce_batch_size(Some(BIGGEST_COALESCE_BATCH_SIZE));
     let mut chunk_index = 0;
@@ -159,7 +157,7 @@ fn blocking_write_task(
             if chunk_writer.should_rotate(MAX_CHUNK_SIZE) {
                 chunk_writer.finish_chunk(event_sender)?;
                 chunk_index += 1;
-                chunk_writer = ChunkWriter::new(base_path, chunk_index, schema)?;
+                chunk_writer = ChunkWriter::new(dir_path, chunk_index, schema)?;
             }
         }
     }

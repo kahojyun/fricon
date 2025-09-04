@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use arrow::datatypes::SchemaRef;
@@ -24,7 +24,7 @@ impl WriteSessionRegistry {
         &self,
         id: i32,
         tracker: &TaskTracker,
-        path: impl AsRef<Path>,
+        path: impl Into<PathBuf>,
         schema: SchemaRef,
     ) -> WriteSessionGuard {
         let session = WriteSession::new(tracker, path, schema);

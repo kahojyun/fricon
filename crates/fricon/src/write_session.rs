@@ -1,7 +1,7 @@
 pub(crate) mod background_writer;
 
 use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader};
-use std::{fs::File, path::Path};
+use std::{fs::File, path::PathBuf};
 use tokio_util::task::TaskTracker;
 
 use self::background_writer::{BackgroundWriter, Event, Result};
@@ -18,7 +18,7 @@ pub struct WriteSession {
 }
 
 impl WriteSession {
-    pub fn new(tracker: &TaskTracker, dir_path: impl AsRef<Path>, schema: SchemaRef) -> Self {
+    pub fn new(tracker: &TaskTracker, dir_path: impl Into<PathBuf>, schema: SchemaRef) -> Self {
         let live_writer = LiveDatasetWriter::new(schema.clone());
         let writer = BackgroundWriter::new(tracker, dir_path, schema);
 
