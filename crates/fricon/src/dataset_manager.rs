@@ -38,6 +38,9 @@ pub enum DatasetManagerError {
 
     #[error("Arrow error: {0}")]
     Arrow(#[from] ArrowError),
+
+    #[error("Task join error: {0}")]
+    TaskJoin(#[from] tokio::task::JoinError),
 }
 
 impl DatasetManagerError {
@@ -132,6 +135,34 @@ impl DatasetManager {
     }
 
     pub async fn create_dataset<S, E>(
+        &self,
+        request: CreateDatasetRequest,
+        stream: S,
+    ) -> Result<DatasetRecord, DatasetManagerError>
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let app = self.app.clone();
+        let tracker = app.tracker().clone();
+
+        let dataset_record = tracker
+            .spawn(async move {
+                let result = app
+                    .dataset_manager()
+                    .create_dataset_tracked(request, stream)
+                    .await;
+                if let Err(e) = &result {
+                    error!("Dataset creation failed: {}", e);
+                }
+                result
+            })
+            .await??;
+
+        Ok(dataset_record)
+    }
+
+    async fn create_dataset_tracked<S, E>(
         &self,
         request: CreateDatasetRequest,
         stream: S,
@@ -306,6 +337,23 @@ impl DatasetManager {
     }
 
     pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
+        let app = self.app.clone();
+        let tracker = app.tracker().clone();
+
+        tracker
+            .spawn(async move {
+                let result = app.dataset_manager().delete_dataset_tracked(id).await;
+                if let Err(e) = &result {
+                    error!("Dataset deletion failed: {}", e);
+                }
+                result
+            })
+            .await??;
+
+        Ok(())
+    }
+
+    async fn delete_dataset_tracked(&self, id: i32) -> Result<(), DatasetManagerError> {
         let record = self.get_dataset(DatasetId::Id(id)).await?;
         let dataset_path = self
             .app
