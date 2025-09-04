@@ -1,18 +1,10 @@
 use crate::dataset_manager::DatasetManagerError;
 use crate::live::{LiveDataset, LiveDatasetWriter, SelectError as LiveSelectError};
-use crate::utils::chunk_path;
-use arrow::{
-    array::RecordBatch,
-    buffer::Buffer,
-    datatypes::SchemaRef,
-    ipc::{
-        Block,
-        convert::fb_to_schema,
-        reader::{FileDecoder, read_footer_length},
-        root_as_footer,
-    },
-};
-use std::{fs::File, path::Path, sync::Arc};
+use crate::utils::{chunk_path, read_ipc_file_mmap};
+use arrow::array::RecordBatch;
+use arrow::datatypes::SchemaRef;
+use std::path::Path;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct CompletedDataset {
@@ -35,27 +27,15 @@ impl CompletedDataset {
                 break;
             }
 
-            // Open the file and memory map it
-            let ipc_file = File::open(&chunk_path)
-                .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-            let mmap = unsafe { memmap2::Mmap::map(&ipc_file) }
+            // Use shared mmap reading function
+            let chunk_batches = read_ipc_file_mmap(&chunk_path)
                 .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
 
-            // Convert the mmap region to an Arrow `Buffer`
-            let bytes = bytes::Bytes::from_owner(mmap);
-            let buffer = Buffer::from(bytes);
-
-            // Use the IPCBufferDecoder to read batches
-            let decoder = IPCBufferDecoder::new(buffer)?;
-
-            for i in 0..decoder.num_batches() {
-                let batch = decoder.get_batch(i)?.ok_or_else(|| {
-                    DatasetManagerError::io_invalid_data("failed to read batch: batch was None")
-                })?;
+            if !chunk_batches.is_empty() {
                 if schema.is_none() {
-                    schema = Some(batch.schema());
+                    schema = Some(chunk_batches[0].schema());
                 }
-                batches.push(batch);
+                batches.extend(chunk_batches);
             }
 
             chunk_index += 1;
@@ -96,76 +76,6 @@ impl CompletedDataset {
 #[allow(clippy::needless_pass_by_value)]
 fn map_live_select_err(err: LiveSelectError) -> DatasetManagerError {
     DatasetManagerError::io_invalid_data(format!("selection error: {err}"))
-}
-
-/// Incrementally decodes [`RecordBatch`]es from an IPC file stored in a Arrow
-/// [`Buffer`] using the [`FileDecoder`] API.
-///
-/// This is a wrapper around the example in the `FileDecoder` which handles the
-/// low level interaction with the Arrow IPC format.
-struct IPCBufferDecoder {
-    /// Memory (or memory mapped) Buffer with the data
-    buffer: Buffer,
-    /// Decoder that reads Arrays that refers to the underlying buffers
-    decoder: FileDecoder,
-    /// Location of the batches within the buffer
-    batches: Vec<Block>,
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-impl IPCBufferDecoder {
-    fn new(buffer: Buffer) -> Result<Self, DatasetManagerError> {
-        let trailer_start = buffer.len() - 10;
-        let footer_len = read_footer_length(buffer[trailer_start..].try_into().unwrap())
-            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-        let footer = root_as_footer(&buffer[trailer_start - footer_len..trailer_start])
-            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-
-        let schema = fb_to_schema(footer.schema().unwrap());
-
-        let mut decoder = FileDecoder::new(Arc::new(schema), footer.version());
-
-        // Read dictionaries
-        for block in footer.dictionaries().iter().flatten() {
-            let block_len = block.bodyLength() as usize + block.metaDataLength() as usize;
-            let data = buffer.slice_with_length(block.offset() as _, block_len);
-            decoder
-                .read_dictionary(block, &data)
-                .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))?;
-        }
-
-        // convert to Vec from the flatbuffers Vector to avoid having a direct dependency on flatbuffers
-        let batches = footer
-            .recordBatches()
-            .map(|b| b.iter().copied().collect())
-            .unwrap_or_default();
-
-        Ok(Self {
-            buffer,
-            decoder,
-            batches,
-        })
-    }
-
-    /// Return the number of [`RecordBatch`]es in this buffer
-    fn num_batches(&self) -> usize {
-        self.batches.len()
-    }
-
-    /// Return the [`RecordBatch`] at message index `i`.
-    ///
-    /// This may return `None` if the IPC message was None
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn get_batch(&self, i: usize) -> Result<Option<RecordBatch>, DatasetManagerError> {
-        let block = &self.batches[i];
-        let block_len = block.bodyLength() as usize + block.metaDataLength() as usize;
-        let data = self
-            .buffer
-            .slice_with_length(block.offset() as _, block_len);
-        self.decoder
-            .read_record_batch(block, &data)
-            .map_err(|e| DatasetManagerError::io_invalid_data(e.to_string()))
-    }
 }
 #[derive(Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]

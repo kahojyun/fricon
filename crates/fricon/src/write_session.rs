@@ -1,7 +1,8 @@
 pub(crate) mod background_writer;
 
-use arrow::{array::RecordBatch, datatypes::SchemaRef, ipc::reader::FileReader};
-use std::{fs::File, path::PathBuf};
+use crate::utils::read_ipc_file_mmap;
+use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use std::path::PathBuf;
 use tokio_util::task::TaskTracker;
 
 use self::background_writer::{BackgroundWriter, Result};
@@ -47,15 +48,9 @@ impl WriteSession {
         live_writer: &LiveDatasetWriter,
         chunk_path: &std::path::Path,
     ) -> Result<()> {
-        // Read the completed chunk and replace the sequential front in live dataset
-        let file = File::open(chunk_path)?;
-        let reader = FileReader::try_new(file, None)?;
-        let mut batches = Vec::new();
-
-        for batch_result in reader {
-            let batch = batch_result?;
-            batches.push(batch);
-        }
+        // Read the completed chunk using memory-mapped reading and replace the sequential front in live dataset
+        let batches = read_ipc_file_mmap(chunk_path)
+            .map_err(|e| background_writer::Error::Io(std::io::Error::other(e)))?;
 
         if !batches.is_empty()
             && let Err(e) = live_writer.replace_sequential_front(&batches)
