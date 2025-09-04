@@ -46,20 +46,15 @@ def read_arrow(dir_path: str) -> pa.Table:
     for f in files:
         with pa.memory_map(str(f), "rb") as source:
             tables.append(pa.ipc.open_file(source).read_all())
-    if len(tables) == 1:
-        return tables[0]
-    return pa.concat_tables(tables, promote=True)
+    return pa.concat_tables(tables)
 
 
-def read_polars(dir_path: str) -> pl.DataFrame:
+def read_polars(dir_path: str) -> pl.LazyFrame:
     files = _collect_chunk_files(dir_path)
     if not files:
         msg = f"no chunk files found in {dir_path}"
         raise FileNotFoundError(msg)
-    dfs = [pl.read_ipc(str(f)) for f in files]
-    if len(dfs) == 1:
-        return dfs[0]
-    return pl.concat(dfs, how="vertical_relaxed")
+    return pl.scan_ipc(files)
 
 
 def arrow_to_numpy(arr: pa.Array[Any] | pa.ChunkedArray[Any]) -> npt.NDArray[Any]:

@@ -336,10 +336,10 @@ fn helper_module(py: Python<'_>) -> PyResult<&PyObject> {
 
 #[pymethods]
 impl Dataset {
-    /// Load the dataset as a polars DataFrame.
+    /// Load the dataset as a polars LazyFrame.
     ///
     /// Returns:
-    ///     A polars DataFrame.
+    ///     A polars LazyFrame.
     pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
         // Pass dataset directory; helper will gather chunk files.
         helper_module(py)?.call_method1(py, "read_polars", (self.inner.path(),))
