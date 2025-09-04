@@ -9,6 +9,7 @@ use std::{
 };
 use thiserror::Error;
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tokio_util::task::TaskTracker;
 use tracing::{error, info};
 
@@ -30,12 +31,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Responsibilities extracted from `WriteSession`:
 /// - Own the mpsc sender for `RecordBatch`
 /// - Send chunk completed notifications via mpsc channel
-/// - Send closed notification via oneshot channel
+/// - (Previously had a separate closed notification channel; removed in favor of awaiting join)
 /// - Spawn blocking write / coalesce task
 pub struct BackgroundWriter {
     sender: mpsc::Sender<RecordBatch>,
-    chunk_completed_sender: mpsc::Sender<PathBuf>,
-    closed_sender: Option<tokio::sync::oneshot::Sender<()>>,
+    // Join handle for the blocking write task so callers can await completion and capture errors.
+    join: JoinHandle<Result<()>>,
 }
 
 impl BackgroundWriter {
@@ -44,28 +45,15 @@ impl BackgroundWriter {
         dir_path: impl Into<PathBuf>,
         schema: SchemaRef,
         chunk_completed_sender: mpsc::Sender<PathBuf>,
-        closed_sender: tokio::sync::oneshot::Sender<()>,
     ) -> Self {
         let dir_path = dir_path.into();
         let (sender, receiver) = mpsc::channel(32);
 
-        let chunk_completed_sender_for_task = chunk_completed_sender.clone();
-        tracker.spawn_blocking(move || {
-            if let Err(e) = blocking_write_task(
-                &dir_path,
-                &schema,
-                receiver,
-                &chunk_completed_sender_for_task,
-                closed_sender,
-            ) {
-                error!("BackgroundWriter task failed: {e}");
-            }
+        // Spawn and keep the JoinHandle so we can explicitly await completion.
+        let join = tracker.spawn_blocking(move || {
+            blocking_write_task(&dir_path, &schema, receiver, &chunk_completed_sender)
         });
-        Self {
-            sender,
-            chunk_completed_sender,
-            closed_sender: None,
-        }
+        Self { sender, join }
     }
 
     pub async fn write(&self, batch: RecordBatch) -> Result<()> {
@@ -74,6 +62,18 @@ impl BackgroundWriter {
             .await
             .map_err(|e| Error::Send(e.to_string()))?;
         Ok(())
+    }
+
+    /// Signal no more input (by dropping sender) and await background task completion.
+    pub async fn shutdown(self) -> Result<()> {
+        let join = self.join;
+        // Dropping sender closes channel; writer task drains remaining buffered batches.
+        drop(self.sender);
+        // Join returns Result<Result<()>>; map outer join errors.
+        match join.await {
+            Ok(inner) => inner,
+            Err(e) => Err(Error::JoinError(e)),
+        }
     }
 }
 
@@ -115,7 +115,7 @@ impl ChunkWriter {
             "Chunk {} completed: {} rows written to {:?}",
             self.chunk_index, self.total_rows, chunk_path
         );
-        let _ = chunk_completed_sender.send(chunk_path);
+        let _ = chunk_completed_sender.blocking_send(chunk_path);
         Ok(())
     }
 
@@ -129,7 +129,6 @@ fn blocking_write_task(
     schema: &SchemaRef,
     mut receiver: mpsc::Receiver<RecordBatch>,
     chunk_completed_sender: &mpsc::Sender<PathBuf>,
-    closed_sender: tokio::sync::oneshot::Sender<()>,
 ) -> Result<()> {
     const TARGET_BATCH_SIZE: usize = 4096;
     const BIGGEST_COALESCE_BATCH_SIZE: usize = 64 * 1024 * 1024;
@@ -162,7 +161,6 @@ fn blocking_write_task(
 
     // Finish the final chunk
     chunk_writer.finish_chunk(chunk_completed_sender)?;
-    let _ = closed_sender.send(());
     Ok(())
 }
 
@@ -192,33 +190,21 @@ mod tests {
 
         // Create channels for testing
         let (chunk_completed_sender, mut chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
-        let (closed_sender, closed_receiver) = tokio::sync::oneshot::channel();
 
         let writer = BackgroundWriter::new(
             &tracker,
             dataset_dir,
             schema.clone(),
             chunk_completed_sender,
-            closed_sender,
         );
-        // write a couple batches
         writer.write(make_batch(&schema, 0, 5)).await.unwrap();
         writer.write(make_batch(&schema, 5, 5)).await.unwrap();
-        // Drop sender side to close channel -> triggers flush & Closed event after task drains
-        drop(writer);
-        // Wait for task completion
-        tracker.close();
-        tracker.wait().await;
+        // Explicitly shutdown ensuring join awaited
+        writer.shutdown().await.unwrap();
 
         // Wait for both signals concurrently
-        tokio::select! {
-            closed_result = closed_receiver => {
-                assert!(closed_result.is_ok(), "expected closed signal");
-            }
-            chunk_result = chunk_completed_receiver.recv() => {
-                assert!(chunk_result.is_some(), "expected chunk completion");
-            }
-        }
+        let chunk_result = chunk_completed_receiver.recv().await;
+        assert!(chunk_result.is_some(), "expected chunk completion");
 
         // File should exist and be non-empty (data_chunk_0.arrow)
         let chunk_path = chunk_path(dir.path(), 0);
@@ -235,14 +221,12 @@ mod tests {
 
         // Create channels for testing
         let (chunk_completed_sender, _chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
-        let (closed_sender, _closed_receiver) = tokio::sync::oneshot::channel();
 
         let writer = BackgroundWriter::new(
             &tracker,
             dataset_dir,
             schema.clone(),
             chunk_completed_sender,
-            closed_sender,
         );
 
         // Write a few batches
@@ -251,12 +235,8 @@ mod tests {
             writer.write(batch).await.unwrap();
         }
 
-        // Drop sender side to close channel
-        drop(writer);
-
-        // Wait for task completion
-        tracker.close();
-        tracker.wait().await;
+        // Explicitly shutdown
+        writer.shutdown().await.unwrap();
 
         // Check that at least the first chunk file exists
         let chunk0_path = chunk_path(dir.path(), 0);

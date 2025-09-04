@@ -21,29 +21,18 @@ impl WriteSession {
     pub fn new(tracker: &TaskTracker, dir_path: impl Into<PathBuf>, schema: SchemaRef) -> Self {
         let live_writer = LiveDatasetWriter::new(schema.clone());
 
-        // Create channels for chunk completed and closed notifications
+        // Channel for chunk completed notifications
         let (chunk_completed_sender, mut chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
-        let (closed_sender, closed_receiver) = tokio::sync::oneshot::channel();
 
-        let writer = BackgroundWriter::new(
-            tracker,
-            dir_path,
-            schema,
-            chunk_completed_sender,
-            closed_sender,
-        );
+        let writer = BackgroundWriter::new(tracker, dir_path, schema, chunk_completed_sender);
 
         // Listen for chunk completion events and trigger replace_sequential_front
         let live_writer_for_task = live_writer.clone();
         tracker.spawn(async move {
-            tokio::select! {
-                Some(path) = chunk_completed_receiver.recv() => {
-                    if let Err(e) = Self::handle_chunk_completion(&live_writer_for_task, &path) {
-                        tracing::error!("Failed to handle chunk completion: {}", e);
-                    }
-                }
-                _ = closed_receiver => {
-                    // Writer closed, exit the task
+            // Single chunk completion expected in current design; loop if future needs multiple.
+            while let Some(path) = chunk_completed_receiver.recv().await {
+                if let Err(e) = Self::handle_chunk_completion(&live_writer_for_task, &path) {
+                    tracing::error!("Failed to handle chunk completion: {}", e);
                 }
             }
         });
@@ -86,6 +75,11 @@ impl WriteSession {
         WriteSessionHandle {
             live: self.live_writer.reader(),
         }
+    }
+
+    /// Flush and finalize by shutting down the background writer.
+    pub async fn shutdown(self) -> Result<()> {
+        self.writer.shutdown().await
     }
 }
 
@@ -140,12 +134,8 @@ mod tests {
         let live = handle.live();
         assert_eq!(live.total_rows(), 50);
 
-        // Drop session to trigger flush
-        drop(session);
-
-        // Wait for completion
-        tracker.close();
-        tracker.wait().await;
+        // Explicit shutdown instead of relying on tracker close.
+        session.shutdown().await.unwrap();
 
         // Check that chunk file exists
         let chunk_path = chunk_path(dir.path(), 0);

@@ -74,10 +74,14 @@ impl WriteSessionGuard {
     /// Flush remaining buffered batches and wait until the underlying background writer
     /// signals closed. This guarantees that all chunk files have been finalized on disk.
     pub async fn finish(mut self) -> BackgroundResult<()> {
-        // The closed signal is handled internally by WriteSession, so we just need to
-        // drop the session and wait for it to complete.
-        drop(self.session.take());
-        // Now that background writer is fully closed, explicitly remove.
+        if let Some(session) = self.session.take() {
+            // Await background writer completion so chunk files are guaranteed finalized.
+            let res = session.shutdown().await;
+            // Remove from registry regardless of success/failure (idempotent).
+            self.registry.remove(self.id);
+            return res;
+        }
+        // Already taken; ensure registry removal.
         self.registry.remove(self.id);
         Ok(())
     }
