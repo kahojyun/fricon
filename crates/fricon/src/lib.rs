@@ -9,8 +9,10 @@ mod app;
 mod client;
 mod database;
 mod dataset_manager; // core manager
+mod datatypes;
 mod ipc;
 mod live;
+mod plot_config;
 mod proto;
 mod reader;
 mod server;
@@ -25,6 +27,10 @@ pub use self::{
     database::DatasetStatus,
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
+    },
+    datatypes::{ComplexType, FriconDataTypeExt, FriconSchemaBuilder, TraceType, TraceVariant},
+    plot_config::{
+        ColumnPlotConfig, DatasetPlotConfig, PlotConfigError, PlotType, generate_plot_config,
     },
     reader::DatasetReader,
     server::DatasetRecord,
