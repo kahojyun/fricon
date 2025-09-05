@@ -70,6 +70,7 @@ pub enum PlotConfigError {
 }
 
 /// Generate plot configuration from an Arrow schema
+#[must_use]
 pub fn generate_plot_config(dataset_name: &str, schema: &SchemaRef) -> DatasetPlotConfig {
     let mut columns = Vec::new();
 
@@ -90,7 +91,7 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
     let data_type = field.data_type();
     let type_name = format!("{data_type:?}");
 
-    let (can_be_x_axis, can_be_y_axis, suggested_plot_types) = if field.is_complex() {
+    let (can_x, can_y, suggested_plot_types) = if field.is_complex() {
         // Complex numbers can be used for both axes (magnitude/phase or real/imaginary)
         (true, true, vec![PlotType::Scatter, PlotType::Heatmap])
     } else if field.is_trace() {
@@ -150,18 +151,16 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
     // Add specific settings for fricon data types
     if data_type.is_complex() {
         settings.insert("complex".to_string(), "true".to_string());
-    } else if data_type.is_trace() {
-        if let Some(variant) = data_type.trace_variant() {
-            settings.insert("trace".to_string(), "true".to_string());
-            settings.insert("trace_variant".to_string(), variant.to_string());
-        }
+    } else if let Some(variant) = data_type.trace_variant() {
+        settings.insert("trace".to_string(), "true".to_string());
+        settings.insert("trace_variant".to_string(), variant.to_string());
     }
 
     ColumnPlotConfig {
         name: field.name().clone(),
         data_type: type_name,
-        can_be_x_axis,
-        can_be_y_axis,
+        can_be_x_axis: can_x,
+        can_be_y_axis: can_y,
         suggested_plot_types,
         settings,
     }
@@ -170,7 +169,7 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datatypes::{ComplexType, FriconTypeExt, TraceType, create_fricon_schema};
+    use crate::datatypes::{ComplexType, TraceType};
     use arrow::datatypes::{DataType, Field, Schema};
     use std::sync::Arc;
 
@@ -317,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_mixed_schema_plot_config() {
-        let schema = create_fricon_schema(vec![
+        let schema = Schema::new(vec![
             ComplexType::field("complex_col", false),
             TraceType::simple_list_field("simple_trace", true),
             TraceType::fixed_step_field("fixed_trace", false),
