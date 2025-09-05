@@ -27,18 +27,6 @@ pub struct ComplexType {
 }
 
 impl ComplexType {
-    /// Create a new complex type
-    pub fn new() -> Self {
-        Self {
-            extension_name: "fricon.complex".to_string(),
-        }
-    }
-
-    /// Get the extension name
-    pub fn extension_name(&self) -> &str {
-        &self.extension_name
-    }
-
     /// Get the Arrow data type representation (storage type)
     pub fn storage_type() -> DataType {
         // Complex numbers are stored as a struct with real and imaginary fields
@@ -76,6 +64,75 @@ pub enum TraceVariant {
     FixedStep,
     /// Variable step size x values (explicit x array)
     VariableStep,
+}
+
+impl TraceVariant {
+    /// Create a field for this trace variant with extension metadata
+    pub fn field(self, name: &str, nullable: bool) -> Field {
+        let mut field = Field::new(name, self.storage_type(), nullable);
+
+        // Add extension name (required)
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            ARROW_EXTENSION_NAME.to_string(),
+            self.extension_name().to_string(),
+        );
+
+        field.set_metadata(metadata);
+        field
+    }
+
+    /// Get the extension name for this variant
+    fn extension_name(&self) -> &'static str {
+        match self {
+            TraceVariant::SimpleList => "fricon.trace.simple_list",
+            TraceVariant::FixedStep => "fricon.trace.fixed_step",
+            TraceVariant::VariableStep => "fricon.trace.variable_step",
+        }
+    }
+
+    /// Get the Arrow data type representation (storage type)
+    fn storage_type(&self) -> DataType {
+        match self {
+            TraceVariant::SimpleList => {
+                // Simple list: just y values as f64 array
+                DataType::List(Arc::new(Field::new("y", DataType::Float64, false)))
+            }
+            TraceVariant::FixedStep => {
+                // Fixed step: struct with x0, step, and y values
+                DataType::Struct(
+                    vec![
+                        Field::new("x0", DataType::Float64, false),
+                        Field::new("step", DataType::Float64, false),
+                        Field::new(
+                            "y",
+                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
+                            false,
+                        ),
+                    ]
+                    .into(),
+                )
+            }
+            TraceVariant::VariableStep => {
+                // Variable step: struct with x and y arrays
+                DataType::Struct(
+                    vec![
+                        Field::new(
+                            "x",
+                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
+                            false,
+                        ),
+                        Field::new(
+                            "y",
+                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
+                            false,
+                        ),
+                    ]
+                    .into(),
+                )
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for TraceVariant {
@@ -135,65 +192,32 @@ impl TraceType {
 
     /// Get the Arrow data type representation (storage type)
     pub fn storage_type(&self) -> DataType {
-        match self.variant {
-            TraceVariant::SimpleList => {
-                // Simple list: just y values as f64 array
-                DataType::List(Arc::new(Field::new("y", DataType::Float64, false)))
-            }
-            TraceVariant::FixedStep => {
-                // Fixed step: struct with x0, step, and y values
-                DataType::Struct(
-                    vec![
-                        Field::new("x0", DataType::Float64, false),
-                        Field::new("step", DataType::Float64, false),
-                        Field::new(
-                            "y",
-                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
-                            false,
-                        ),
-                    ]
-                    .into(),
-                )
-            }
-            TraceVariant::VariableStep => {
-                // Variable step: struct with x and y arrays
-                DataType::Struct(
-                    vec![
-                        Field::new(
-                            "x",
-                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
-                            false,
-                        ),
-                        Field::new(
-                            "y",
-                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
-                            false,
-                        ),
-                    ]
-                    .into(),
-                )
-            }
-        }
+        self.variant.storage_type()
     }
 
     /// Create a field for trace data with extension metadata
     pub fn field(&self, name: &str, nullable: bool) -> Field {
-        let mut field = Field::new(name, self.storage_type(), nullable);
+        self.variant.field(name, nullable)
+    }
 
-        // Add extension name (required)
-        let mut metadata = HashMap::new();
-        metadata.insert(
-            ARROW_EXTENSION_NAME.to_string(),
-            self.extension_name.clone(),
-        );
+    /// Convenience method to create a simple list trace field
+    pub fn simple_list_field(name: &str, nullable: bool) -> Field {
+        TraceVariant::SimpleList.field(name, nullable)
+    }
 
-        field.set_metadata(metadata);
-        field
+    /// Convenience method to create a fixed step trace field
+    pub fn fixed_step_field(name: &str, nullable: bool) -> Field {
+        TraceVariant::FixedStep.field(name, nullable)
+    }
+
+    /// Convenience method to create a variable step trace field
+    pub fn variable_step_field(name: &str, nullable: bool) -> Field {
+        TraceVariant::VariableStep.field(name, nullable)
     }
 }
 
-/// Extension trait for DataType to easily check for fricon custom types
-pub trait FriconDataTypeExt {
+/// Unified extension trait for checking fricon custom types
+pub trait FriconTypeExt {
     /// Check if the data type is a complex number
     fn is_complex(&self) -> bool;
 
@@ -204,19 +228,7 @@ pub trait FriconDataTypeExt {
     fn trace_variant(&self) -> Option<TraceVariant>;
 }
 
-/// Extension trait for Field to easily check for fricon custom types via metadata
-pub trait FriconFieldExt {
-    /// Check if the field is a complex number extension type
-    fn is_complex_extension(&self) -> bool;
-
-    /// Check if the field is a trace extension type
-    fn is_trace_extension(&self) -> bool;
-
-    /// Get the trace variant if it's a trace extension type
-    fn trace_variant_extension(&self) -> Option<TraceVariant>;
-}
-
-impl FriconDataTypeExt for DataType {
+impl FriconTypeExt for DataType {
     fn is_complex(&self) -> bool {
         match self {
             DataType::Struct(fields) => {
@@ -263,87 +275,42 @@ impl FriconDataTypeExt for DataType {
     }
 }
 
-impl FriconFieldExt for Field {
-    fn is_complex_extension(&self) -> bool {
+impl FriconTypeExt for Field {
+    fn is_complex(&self) -> bool {
+        // Check extension metadata first, then fall back to structural check
         self.metadata()
             .get(ARROW_EXTENSION_NAME)
             .map(|name| name == "fricon.complex")
-            .unwrap_or(false)
+            .unwrap_or_else(|| self.data_type().is_complex())
     }
 
-    fn is_trace_extension(&self) -> bool {
+    fn is_trace(&self) -> bool {
+        // Check extension metadata first, then fall back to structural check
         self.metadata()
             .get(ARROW_EXTENSION_NAME)
             .map(|name| name.starts_with("fricon.trace."))
-            .unwrap_or(false)
+            .unwrap_or_else(|| self.data_type().is_trace())
     }
 
-    fn trace_variant_extension(&self) -> Option<TraceVariant> {
-        let extension_name = self.metadata().get(ARROW_EXTENSION_NAME)?;
-
-        match extension_name.as_str() {
-            "fricon.trace.simple_list" => Some(TraceVariant::SimpleList),
-            "fricon.trace.fixed_step" => Some(TraceVariant::FixedStep),
-            "fricon.trace.variable_step" => Some(TraceVariant::VariableStep),
-            _ => None,
+    fn trace_variant(&self) -> Option<TraceVariant> {
+        // Check extension metadata first
+        if let Some(extension_name) = self.metadata().get(ARROW_EXTENSION_NAME) {
+            match extension_name.as_str() {
+                "fricon.trace.simple_list" => return Some(TraceVariant::SimpleList),
+                "fricon.trace.fixed_step" => return Some(TraceVariant::FixedStep),
+                "fricon.trace.variable_step" => return Some(TraceVariant::VariableStep),
+                _ => {}
+            }
         }
+
+        // Fall back to structural check
+        self.data_type().trace_variant()
     }
 }
 
-/// Utility functions for creating fricon-specific schemas
-pub struct FriconSchemaBuilder {
-    fields: Vec<Field>,
-}
-
-impl FriconSchemaBuilder {
-    /// Create a new schema builder
-    pub fn new() -> Self {
-        Self { fields: Vec::new() }
-    }
-
-    /// Add a complex field
-    pub fn add_complex(mut self, name: &str, nullable: bool) -> Self {
-        self.fields.push(ComplexType::field(name, nullable));
-        self
-    }
-
-    /// Add a simple list trace field
-    pub fn add_simple_list_trace(mut self, name: &str, nullable: bool) -> Self {
-        self.fields
-            .push(TraceType::simple_list().field(name, nullable));
-        self
-    }
-
-    /// Add a fixed step trace field
-    pub fn add_fixed_step_trace(mut self, name: &str, nullable: bool) -> Self {
-        self.fields
-            .push(TraceType::fixed_step().field(name, nullable));
-        self
-    }
-
-    /// Add a variable step trace field
-    pub fn add_variable_step_trace(mut self, name: &str, nullable: bool) -> Self {
-        self.fields
-            .push(TraceType::variable_step().field(name, nullable));
-        self
-    }
-
-    /// Add a standard field
-    pub fn add_field(mut self, field: Field) -> Self {
-        self.fields.push(field);
-        self
-    }
-
-    /// Build the schema
-    pub fn build(self) -> Schema {
-        Schema::new(self.fields)
-    }
-}
-
-impl Default for FriconSchemaBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Convenience function to create a schema with fricon-specific fields
+pub fn create_fricon_schema(fields: Vec<Field>) -> Schema {
+    Schema::new(fields)
 }
 
 #[cfg(test)]
@@ -352,7 +319,6 @@ mod tests {
 
     #[test]
     fn test_complex_type() {
-        let _complex_type = ComplexType::new();
         let data_type = ComplexType::storage_type();
 
         assert!(data_type.is_complex());
@@ -361,6 +327,8 @@ mod tests {
         let field = ComplexType::field("complex_field", false);
         assert_eq!(field.name(), "complex_field");
         assert_eq!(field.data_type(), &data_type);
+        assert!(field.is_complex());
+        assert!(!field.is_trace());
 
         // Check extension metadata
         assert_eq!(
@@ -404,52 +372,94 @@ mod tests {
             simple_field.metadata().get(ARROW_EXTENSION_NAME),
             Some(&"fricon.trace.simple_list".to_string())
         );
+        assert!(simple_field.is_trace());
+        assert_eq!(simple_field.trace_variant(), Some(TraceVariant::SimpleList));
 
         let fixed_field = TraceType::fixed_step().field("fixed", false);
         assert_eq!(
             fixed_field.metadata().get(ARROW_EXTENSION_NAME),
             Some(&"fricon.trace.fixed_step".to_string())
         );
+        assert!(fixed_field.is_trace());
+        assert_eq!(fixed_field.trace_variant(), Some(TraceVariant::FixedStep));
 
         let variable_field = TraceType::variable_step().field("variable", false);
         assert_eq!(
             variable_field.metadata().get(ARROW_EXTENSION_NAME),
             Some(&"fricon.trace.variable_step".to_string())
         );
+        assert!(variable_field.is_trace());
+        assert_eq!(
+            variable_field.trace_variant(),
+            Some(TraceVariant::VariableStep)
+        );
     }
 
     #[test]
-    fn test_schema_builder() {
-        let schema = FriconSchemaBuilder::new()
-            .add_complex("complex_data", false)
-            .add_simple_list_trace("simple_trace", true)
-            .add_fixed_step_trace("fixed_trace", false)
-            .add_variable_step_trace("variable_trace", true)
-            .add_field(Field::new("regular_field", DataType::Int32, false))
-            .build();
+    fn test_trace_variant_field_creation() {
+        // Test direct field creation from TraceVariant
+        let simple_field = TraceVariant::SimpleList.field("simple", false);
+        assert!(simple_field.is_trace());
+        assert_eq!(simple_field.trace_variant(), Some(TraceVariant::SimpleList));
+
+        let fixed_field = TraceVariant::FixedStep.field("fixed", false);
+        assert!(fixed_field.is_trace());
+        assert_eq!(fixed_field.trace_variant(), Some(TraceVariant::FixedStep));
+
+        let variable_field = TraceVariant::VariableStep.field("variable", false);
+        assert!(variable_field.is_trace());
+        assert_eq!(
+            variable_field.trace_variant(),
+            Some(TraceVariant::VariableStep)
+        );
+    }
+
+    #[test]
+    fn test_trace_type_convenience_methods() {
+        // Test convenience methods
+        let simple_field = TraceType::simple_list_field("simple", false);
+        assert!(simple_field.is_trace());
+        assert_eq!(simple_field.trace_variant(), Some(TraceVariant::SimpleList));
+
+        let fixed_field = TraceType::fixed_step_field("fixed", false);
+        assert!(fixed_field.is_trace());
+        assert_eq!(fixed_field.trace_variant(), Some(TraceVariant::FixedStep));
+
+        let variable_field = TraceType::variable_step_field("variable", false);
+        assert!(variable_field.is_trace());
+        assert_eq!(
+            variable_field.trace_variant(),
+            Some(TraceVariant::VariableStep)
+        );
+    }
+
+    #[test]
+    fn test_schema_creation() {
+        // Test creating schemas directly without builder
+        let schema = create_fricon_schema(vec![
+            ComplexType::field("complex_data", false),
+            TraceType::simple_list_field("simple_trace", true),
+            TraceType::fixed_step_field("fixed_trace", false),
+            TraceType::variable_step_field("variable_trace", true),
+            Field::new("regular_field", DataType::Int32, false),
+        ]);
 
         assert_eq!(schema.fields().len(), 5);
 
         // Check complex field
         let complex_field = schema.field_with_name("complex_data").unwrap();
-        assert!(complex_field.data_type().is_complex());
+        assert!(complex_field.is_complex());
 
         // Check trace fields
         let simple_field = schema.field_with_name("simple_trace").unwrap();
-        assert_eq!(
-            simple_field.data_type().trace_variant(),
-            Some(TraceVariant::SimpleList)
-        );
+        assert_eq!(simple_field.trace_variant(), Some(TraceVariant::SimpleList));
 
         let fixed_field = schema.field_with_name("fixed_trace").unwrap();
-        assert_eq!(
-            fixed_field.data_type().trace_variant(),
-            Some(TraceVariant::FixedStep)
-        );
+        assert_eq!(fixed_field.trace_variant(), Some(TraceVariant::FixedStep));
 
         let variable_field = schema.field_with_name("variable_trace").unwrap();
         assert_eq!(
-            variable_field.data_type().trace_variant(),
+            variable_field.trace_variant(),
             Some(TraceVariant::VariableStep)
         );
     }

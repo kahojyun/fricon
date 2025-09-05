@@ -4,7 +4,8 @@
 //! from Arrow dataset schemas, analyzing column types and suggesting
 //! appropriate visualization settings.
 
-use crate::datatypes::{FriconDataTypeExt, FriconFieldExt};
+use crate::TraceVariant;
+use crate::datatypes::FriconTypeExt;
 use arrow::datatypes::{DataType, Field, SchemaRef};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -89,19 +90,17 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
     let data_type = field.data_type();
     let type_name = format!("{data_type:?}");
 
-    let (can_be_x_axis, can_be_y_axis, suggested_plot_types) = if field.is_complex_extension() {
+    let (can_be_x_axis, can_be_y_axis, suggested_plot_types) = if field.is_complex() {
         // Complex numbers can be used for both axes (magnitude/phase or real/imaginary)
         (true, true, vec![PlotType::Scatter, PlotType::Heatmap])
-    } else if field.is_trace_extension() {
+    } else if field.is_trace() {
         // Trace data is typically plotted as line or scatter
-        match field.trace_variant_extension() {
-            Some(crate::datatypes::TraceVariant::SimpleList) => {
+        match field.trace_variant() {
+            Some(TraceVariant::SimpleList) => {
                 (false, true, vec![PlotType::Line, PlotType::Scatter])
             }
-            Some(crate::datatypes::TraceVariant::FixedStep) => {
-                (true, true, vec![PlotType::Line, PlotType::Scatter])
-            }
-            Some(crate::datatypes::TraceVariant::VariableStep) => {
+            Some(TraceVariant::FixedStep) => (true, true, vec![PlotType::Line, PlotType::Scatter]),
+            Some(TraceVariant::VariableStep) => {
                 (true, true, vec![PlotType::Line, PlotType::Scatter])
             }
             None => (false, false, Vec::new()),
@@ -171,7 +170,7 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datatypes::{ComplexType, FriconSchemaBuilder, TraceType};
+    use crate::datatypes::{ComplexType, FriconTypeExt, TraceType, create_fricon_schema};
     use arrow::datatypes::{DataType, Field, Schema};
     use std::sync::Arc;
 
@@ -266,8 +265,7 @@ mod tests {
 
     #[test]
     fn test_simple_list_trace_plot_config() {
-        let trace_type = TraceType::simple_list();
-        let field = trace_type.field("simple_trace", false);
+        let field = TraceType::simple_list_field("simple_trace", false);
         let config = generate_column_config(&field);
 
         assert_eq!(config.name, "simple_trace");
@@ -284,8 +282,7 @@ mod tests {
 
     #[test]
     fn test_fixed_step_trace_plot_config() {
-        let trace_type = TraceType::fixed_step();
-        let field = trace_type.field("fixed_trace", true);
+        let field = TraceType::fixed_step_field("fixed_trace", true);
         let config = generate_column_config(&field);
 
         assert_eq!(config.name, "fixed_trace");
@@ -303,8 +300,7 @@ mod tests {
 
     #[test]
     fn test_variable_step_trace_plot_config() {
-        let trace_type = TraceType::variable_step();
-        let field = trace_type.field("variable_trace", false);
+        let field = TraceType::variable_step_field("variable_trace", false);
         let config = generate_column_config(&field);
 
         assert_eq!(config.name, "variable_trace");
@@ -321,13 +317,13 @@ mod tests {
 
     #[test]
     fn test_mixed_schema_plot_config() {
-        let schema = FriconSchemaBuilder::new()
-            .add_complex("complex_col", false)
-            .add_simple_list_trace("simple_trace", true)
-            .add_fixed_step_trace("fixed_trace", false)
-            .add_variable_step_trace("variable_trace", true)
-            .add_field(Field::new("regular_int", DataType::Int32, false))
-            .build();
+        let schema = create_fricon_schema(vec![
+            ComplexType::field("complex_col", false),
+            TraceType::simple_list_field("simple_trace", true),
+            TraceType::fixed_step_field("fixed_trace", false),
+            TraceType::variable_step_field("variable_trace", true),
+            Field::new("regular_int", DataType::Int32, false),
+        ]);
 
         let schema_ref = Arc::new(schema);
         let config = generate_plot_config("mixed_dataset", &schema_ref);

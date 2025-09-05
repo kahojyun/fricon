@@ -28,7 +28,7 @@ pub use self::{
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
     },
-    datatypes::{ComplexType, FriconDataTypeExt, FriconSchemaBuilder, TraceType, TraceVariant},
+    datatypes::{ComplexType, FriconTypeExt, TraceType, TraceVariant, create_fricon_schema},
     plot_config::{
         ColumnPlotConfig, DatasetPlotConfig, PlotConfigError, PlotType, generate_plot_config,
     },
