@@ -4,7 +4,7 @@
 //! from Arrow dataset schemas, analyzing column types and suggesting
 //! appropriate visualization settings.
 
-use crate::datatypes::FriconDataTypeExt;
+use crate::datatypes::{FriconDataTypeExt, FriconFieldExt};
 use arrow::datatypes::{DataType, Field, SchemaRef};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -89,12 +89,12 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
     let data_type = field.data_type();
     let type_name = format!("{data_type:?}");
 
-    let (can_be_x_axis, can_be_y_axis, suggested_plot_types) = if data_type.is_complex() {
+    let (can_be_x_axis, can_be_y_axis, suggested_plot_types) = if field.is_complex_extension() {
         // Complex numbers can be used for both axes (magnitude/phase or real/imaginary)
         (true, true, vec![PlotType::Scatter, PlotType::Heatmap])
-    } else if data_type.is_trace() {
+    } else if field.is_trace_extension() {
         // Trace data is typically plotted as line or scatter
-        match data_type.trace_variant() {
+        match field.trace_variant_extension() {
             Some(crate::datatypes::TraceVariant::SimpleList) => {
                 (false, true, vec![PlotType::Line, PlotType::Scatter])
             }
