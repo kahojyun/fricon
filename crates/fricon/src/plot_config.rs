@@ -4,8 +4,7 @@
 //! from Arrow dataset schemas, analyzing column types and suggesting
 //! appropriate visualization settings.
 
-use crate::TraceVariant;
-use crate::datatypes::FriconTypeExt;
+use crate::datatypes::{FriconTypeExt, TraceType};
 use arrow::datatypes::{DataType, Field, SchemaRef};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -96,12 +95,9 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
         (true, true, vec![PlotType::Scatter, PlotType::Heatmap])
     } else if field.is_trace() {
         // Trace data is typically plotted as line or scatter
-        match field.trace_variant() {
-            Some(TraceVariant::SimpleList) => {
-                (false, true, vec![PlotType::Line, PlotType::Scatter])
-            }
-            Some(TraceVariant::FixedStep) => (true, true, vec![PlotType::Line, PlotType::Scatter]),
-            Some(TraceVariant::VariableStep) => {
+        match field.trace_type() {
+            Some(TraceType::SimpleList) => (false, true, vec![PlotType::Line, PlotType::Scatter]),
+            Some(TraceType::FixedStep | TraceType::VariableStep) => {
                 (true, true, vec![PlotType::Line, PlotType::Scatter])
             }
             None => (false, false, Vec::new()),
@@ -151,9 +147,9 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
     // Add specific settings for fricon data types
     if data_type.is_complex() {
         settings.insert("complex".to_string(), "true".to_string());
-    } else if let Some(variant) = data_type.trace_variant() {
+    } else if let Some(trace_type) = data_type.trace_type() {
         settings.insert("trace".to_string(), "true".to_string());
-        settings.insert("trace_variant".to_string(), variant.to_string());
+        settings.insert("trace_variant".to_string(), trace_type.to_string());
     }
 
     ColumnPlotConfig {

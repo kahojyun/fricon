@@ -19,6 +19,7 @@ keywords = ["experimental"]
 [workspace.dependencies]
 anyhow = "1.0.99"
 arrow = "56.1.0"
+arrow-schema = "56.1.0"
 async-stream = "0.3.6"
 bytes = "1.10.1"
 chrono = "0.4.41"

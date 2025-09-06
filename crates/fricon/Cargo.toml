@@ -12,6 +12,7 @@ keywords.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 arrow = { workspace = true }
+arrow-schema = { workspace = true }
 async-stream = { workspace = true }
 bytes = { workspace = true }
 memmap2 = { workspace = true }
