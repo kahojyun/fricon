@@ -20,13 +20,24 @@ pub const ARROW_EXTENSION_NAME: &str = "ARROW:extension:name";
 ///
 /// Represents complex numbers with real and imaginary parts as f64 values
 /// using Arrow's extension type specification.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct ComplexType {
-    /// Extension type name
-    extension_name: String,
+    // ComplexType is a unit struct since the storage type is always the same
 }
 
 impl ComplexType {
+    /// Create a new complex type
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Get the extension name
+    #[must_use]
+    pub fn extension_name() -> &'static str {
+        "fricon.complex"
+    }
+
     /// Get the Arrow data type representation (storage type)
     #[must_use]
     pub fn storage_type() -> DataType {
@@ -49,7 +60,7 @@ impl ComplexType {
         let mut metadata = HashMap::new();
         metadata.insert(
             ARROW_EXTENSION_NAME.to_string(),
-            "fricon.complex".to_string(),
+            Self::extension_name().to_string(),
         );
 
         field.set_metadata(metadata);
@@ -71,8 +82,8 @@ pub enum TraceVariant {
 impl TraceVariant {
     /// Create a field for this trace variant with extension metadata
     #[must_use]
-    pub fn field(self, name: &str, nullable: bool) -> Field {
-        let mut field = Field::new(name, self.storage_type(), nullable);
+    pub fn field(self, name: &str, y_item_type: DataType, nullable: bool) -> Field {
+        let mut field = Field::new(name, self.storage_type(y_item_type), nullable);
 
         // Add extension name (required)
         let mut metadata = HashMap::new();
@@ -86,7 +97,8 @@ impl TraceVariant {
     }
 
     /// Get the extension name for this variant
-    fn extension_name(self) -> &'static str {
+    #[must_use]
+    pub fn extension_name(self) -> &'static str {
         match self {
             TraceVariant::SimpleList => "fricon.trace.simple_list",
             TraceVariant::FixedStep => "fricon.trace.fixed_step",
@@ -95,11 +107,11 @@ impl TraceVariant {
     }
 
     /// Get the Arrow data type representation (storage type)
-    fn storage_type(self) -> DataType {
+    fn storage_type(self, y_item_type: DataType) -> DataType {
         match self {
             TraceVariant::SimpleList => {
-                // Simple list: just y values as f64 array
-                DataType::List(Arc::new(Field::new("y", DataType::Float64, false)))
+                // Simple list: just y values as list of specified data type
+                DataType::List(Arc::new(Field::new_list_field(y_item_type.clone(), false)))
             }
             TraceVariant::FixedStep => {
                 // Fixed step: struct with x0, step, and y values
@@ -109,7 +121,10 @@ impl TraceVariant {
                         Field::new("step", DataType::Float64, false),
                         Field::new(
                             "y",
-                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
+                            DataType::List(Arc::new(Field::new_list_field(
+                                y_item_type.clone(),
+                                false,
+                            ))),
                             false,
                         ),
                     ]
@@ -122,12 +137,18 @@ impl TraceVariant {
                     vec![
                         Field::new(
                             "x",
-                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
+                            DataType::List(Arc::new(Field::new_list_field(
+                                DataType::Float64,
+                                false,
+                            ))),
                             false,
                         ),
                         Field::new(
                             "y",
-                            DataType::List(Arc::new(Field::new("item", DataType::Float64, false))),
+                            DataType::List(Arc::new(Field::new_list_field(
+                                y_item_type.clone(),
+                                false,
+                            ))),
                             false,
                         ),
                     ]
@@ -150,46 +171,46 @@ impl std::fmt::Display for TraceVariant {
 
 /// Trace data type for storing time series or signal data
 /// using Arrow's extension type specification.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TraceType {
-    /// Extension type name
-    extension_name: String,
     /// Variant of the trace
     variant: TraceVariant,
+    /// Data type for y list items
+    y_item_type: DataType,
 }
 
 impl TraceType {
     /// Create a new simple list trace type
     #[must_use]
-    pub fn simple_list() -> Self {
+    pub fn simple_list(y_item_type: DataType) -> Self {
         Self {
-            extension_name: "fricon.trace.simple_list".to_string(),
             variant: TraceVariant::SimpleList,
+            y_item_type,
         }
     }
 
     /// Create a new fixed step trace type
     #[must_use]
-    pub fn fixed_step() -> Self {
+    pub fn fixed_step(y_item_type: DataType) -> Self {
         Self {
-            extension_name: "fricon.trace.fixed_step".to_string(),
             variant: TraceVariant::FixedStep,
+            y_item_type,
         }
     }
 
     /// Create a new variable step trace type
     #[must_use]
-    pub fn variable_step() -> Self {
+    pub fn variable_step(y_item_type: DataType) -> Self {
         Self {
-            extension_name: "fricon.trace.variable_step".to_string(),
             variant: TraceVariant::VariableStep,
+            y_item_type,
         }
     }
 
     /// Get the extension name
     #[must_use]
     pub fn extension_name(&self) -> &str {
-        &self.extension_name
+        self.variant.extension_name()
     }
 
     /// Get the trace variant
@@ -201,31 +222,31 @@ impl TraceType {
     /// Get the Arrow data type representation (storage type)
     #[must_use]
     pub fn storage_type(&self) -> DataType {
-        self.variant.storage_type()
+        self.variant.storage_type(self.y_item_type.clone())
     }
 
     /// Create a field for trace data with extension metadata
     #[must_use]
     pub fn field(&self, name: &str, nullable: bool) -> Field {
-        self.variant.field(name, nullable)
+        self.variant.field(name, self.y_item_type.clone(), nullable)
     }
 
     /// Convenience method to create a simple list trace field
     #[must_use]
-    pub fn simple_list_field(name: &str, nullable: bool) -> Field {
-        TraceVariant::SimpleList.field(name, nullable)
+    pub fn simple_list_field(name: &str, y_item_type: DataType, nullable: bool) -> Field {
+        TraceVariant::SimpleList.field(name, y_item_type, nullable)
     }
 
     /// Convenience method to create a fixed step trace field
     #[must_use]
-    pub fn fixed_step_field(name: &str, nullable: bool) -> Field {
-        TraceVariant::FixedStep.field(name, nullable)
+    pub fn fixed_step_field(name: &str, y_item_type: DataType, nullable: bool) -> Field {
+        TraceVariant::FixedStep.field(name, y_item_type, nullable)
     }
 
     /// Convenience method to create a variable step trace field
     #[must_use]
-    pub fn variable_step_field(name: &str, nullable: bool) -> Field {
-        TraceVariant::VariableStep.field(name, nullable)
+    pub fn variable_step_field(name: &str, y_item_type: DataType, nullable: bool) -> Field {
+        TraceVariant::VariableStep.field(name, y_item_type, nullable)
     }
 }
 
@@ -261,23 +282,26 @@ impl FriconTypeExt for DataType {
 
     fn trace_variant(&self) -> Option<TraceVariant> {
         match self {
-            DataType::List(field) => {
-                // Check if it's a simple list trace (list of f64)
-                if field.data_type() == &DataType::Float64 {
-                    return Some(TraceVariant::SimpleList);
-                }
+            DataType::List(_field) => {
+                // Check if it's a simple list trace (any list can be a simple list trace)
+                return Some(TraceVariant::SimpleList);
             }
             DataType::Struct(fields) => {
                 if fields.len() == 3 {
-                    // Check for fixed step: x0, step, y
+                    // Check for fixed step: x0, step, y (with y being a list)
                     let field_names: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
-                    if field_names == ["x0", "step", "y"] {
+                    if field_names == ["x0", "step", "y"]
+                        && let DataType::List(_) = fields[2].data_type()
+                    {
                         return Some(TraceVariant::FixedStep);
                     }
                 } else if fields.len() == 2 {
-                    // Check for variable step: x, y
+                    // Check for variable step: x, y (both being lists)
                     let field_names: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
-                    if field_names == ["x", "y"] {
+                    if field_names == ["x", "y"]
+                        && let (DataType::List(_), DataType::List(_)) =
+                            (&fields[0].data_type(), &fields[1].data_type())
+                    {
                         return Some(TraceVariant::VariableStep);
                     }
                 }
@@ -346,12 +370,16 @@ mod tests {
             field.metadata().get(ARROW_EXTENSION_NAME),
             Some(&"fricon.complex".to_string())
         );
+
+        // Test new() method and extension_name()
+        let _complex_type = ComplexType::new();
+        assert_eq!(ComplexType::extension_name(), "fricon.complex");
     }
 
     #[test]
     fn test_trace_types() {
         // Test simple list trace
-        let simple_trace = TraceType::simple_list();
+        let simple_trace = TraceType::simple_list(DataType::Float64);
         let simple_data_type = simple_trace.storage_type();
         assert!(simple_data_type.is_trace());
         assert_eq!(
@@ -360,7 +388,7 @@ mod tests {
         );
 
         // Test fixed step trace
-        let fixed_trace = TraceType::fixed_step();
+        let fixed_trace = TraceType::fixed_step(DataType::Float64);
         let fixed_data_type = fixed_trace.storage_type();
         assert!(fixed_data_type.is_trace());
         assert_eq!(
@@ -369,7 +397,7 @@ mod tests {
         );
 
         // Test variable step trace
-        let variable_trace = TraceType::variable_step();
+        let variable_trace = TraceType::variable_step(DataType::Float64);
         let variable_data_type = variable_trace.storage_type();
         assert!(variable_data_type.is_trace());
         assert_eq!(
@@ -378,7 +406,7 @@ mod tests {
         );
 
         // Test extension metadata
-        let simple_field = TraceType::simple_list().field("simple", false);
+        let simple_field = TraceType::simple_list(DataType::Float64).field("simple", false);
         assert_eq!(
             simple_field.metadata().get(ARROW_EXTENSION_NAME),
             Some(&"fricon.trace.simple_list".to_string())
@@ -386,7 +414,7 @@ mod tests {
         assert!(simple_field.is_trace());
         assert_eq!(simple_field.trace_variant(), Some(TraceVariant::SimpleList));
 
-        let fixed_field = TraceType::fixed_step().field("fixed", false);
+        let fixed_field = TraceType::fixed_step(DataType::Float64).field("fixed", false);
         assert_eq!(
             fixed_field.metadata().get(ARROW_EXTENSION_NAME),
             Some(&"fricon.trace.fixed_step".to_string())
@@ -394,7 +422,7 @@ mod tests {
         assert!(fixed_field.is_trace());
         assert_eq!(fixed_field.trace_variant(), Some(TraceVariant::FixedStep));
 
-        let variable_field = TraceType::variable_step().field("variable", false);
+        let variable_field = TraceType::variable_step(DataType::Float64).field("variable", false);
         assert_eq!(
             variable_field.metadata().get(ARROW_EXTENSION_NAME),
             Some(&"fricon.trace.variable_step".to_string())
@@ -409,15 +437,15 @@ mod tests {
     #[test]
     fn test_trace_variant_field_creation() {
         // Test direct field creation from TraceVariant
-        let simple_field = TraceVariant::SimpleList.field("simple", false);
+        let simple_field = TraceVariant::SimpleList.field("simple", DataType::Float64, false);
         assert!(simple_field.is_trace());
         assert_eq!(simple_field.trace_variant(), Some(TraceVariant::SimpleList));
 
-        let fixed_field = TraceVariant::FixedStep.field("fixed", false);
+        let fixed_field = TraceVariant::FixedStep.field("fixed", DataType::Float64, false);
         assert!(fixed_field.is_trace());
         assert_eq!(fixed_field.trace_variant(), Some(TraceVariant::FixedStep));
 
-        let variable_field = TraceVariant::VariableStep.field("variable", false);
+        let variable_field = TraceVariant::VariableStep.field("variable", DataType::Float64, false);
         assert!(variable_field.is_trace());
         assert_eq!(
             variable_field.trace_variant(),
@@ -428,15 +456,15 @@ mod tests {
     #[test]
     fn test_trace_type_convenience_methods() {
         // Test convenience methods
-        let simple_field = TraceType::simple_list_field("simple", false);
+        let simple_field = TraceType::simple_list_field("simple", DataType::Float64, false);
         assert!(simple_field.is_trace());
         assert_eq!(simple_field.trace_variant(), Some(TraceVariant::SimpleList));
 
-        let fixed_field = TraceType::fixed_step_field("fixed", false);
+        let fixed_field = TraceType::fixed_step_field("fixed", DataType::Float64, false);
         assert!(fixed_field.is_trace());
         assert_eq!(fixed_field.trace_variant(), Some(TraceVariant::FixedStep));
 
-        let variable_field = TraceType::variable_step_field("variable", false);
+        let variable_field = TraceType::variable_step_field("variable", DataType::Float64, false);
         assert!(variable_field.is_trace());
         assert_eq!(
             variable_field.trace_variant(),
@@ -449,9 +477,9 @@ mod tests {
         // Test creating schemas directly without builder
         let schema = Schema::new(vec![
             ComplexType::field("complex_data", false),
-            TraceType::simple_list_field("simple_trace", true),
-            TraceType::fixed_step_field("fixed_trace", false),
-            TraceType::variable_step_field("variable_trace", true),
+            TraceType::simple_list_field("simple_trace", DataType::Float64, true),
+            TraceType::fixed_step_field("fixed_trace", DataType::Float64, false),
+            TraceType::variable_step_field("variable_trace", DataType::Float64, true),
             Field::new("regular_field", DataType::Int32, false),
         ]);
 
@@ -480,5 +508,60 @@ mod tests {
         assert_eq!(TraceVariant::SimpleList.to_string(), "simple_list");
         assert_eq!(TraceVariant::FixedStep.to_string(), "fixed_step");
         assert_eq!(TraceVariant::VariableStep.to_string(), "variable_step");
+    }
+
+    #[test]
+    fn test_trace_with_custom_y_datatype() {
+        // Test creating traces with different y data types
+        let simple_int = TraceType::simple_list(DataType::Int32);
+        let simple_int_type = simple_int.storage_type();
+        assert!(simple_int_type.is_trace());
+        assert_eq!(
+            simple_int_type.trace_variant(),
+            Some(TraceVariant::SimpleList)
+        );
+
+        let simple_string = TraceType::simple_list(DataType::Utf8);
+        let simple_string_type = simple_string.storage_type();
+        assert!(simple_string_type.is_trace());
+        assert_eq!(
+            simple_string_type.trace_variant(),
+            Some(TraceVariant::SimpleList)
+        );
+
+        let simple_bool = TraceType::simple_list(DataType::Boolean);
+        let simple_bool_type = simple_bool.storage_type();
+        assert!(simple_bool_type.is_trace());
+        assert_eq!(
+            simple_bool_type.trace_variant(),
+            Some(TraceVariant::SimpleList)
+        );
+
+        // Test fixed step with different y data types
+        let fixed_int = TraceType::fixed_step(DataType::Int32);
+        let fixed_int_type = fixed_int.storage_type();
+        assert!(fixed_int_type.is_trace());
+        assert_eq!(
+            fixed_int_type.trace_variant(),
+            Some(TraceVariant::FixedStep)
+        );
+
+        // Test variable step with different y data types
+        let variable_string = TraceType::variable_step(DataType::Utf8);
+        let variable_string_type = variable_string.storage_type();
+        assert!(variable_string_type.is_trace());
+        assert_eq!(
+            variable_string_type.trace_variant(),
+            Some(TraceVariant::VariableStep)
+        );
+
+        // Test field creation with custom y data types
+        let int_field = TraceType::simple_list_field("int_trace", DataType::Int32, false);
+        assert!(int_field.is_trace());
+        assert_eq!(int_field.trace_variant(), Some(TraceVariant::SimpleList));
+
+        let string_field = TraceVariant::FixedStep.field("string_trace", DataType::Utf8, false);
+        assert!(string_field.is_trace());
+        assert_eq!(string_field.trace_variant(), Some(TraceVariant::FixedStep));
     }
 }

@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_simple_list_trace_plot_config() {
-        let field = TraceType::simple_list_field("simple_trace", false);
+        let field = TraceType::simple_list_field("simple_trace", DataType::Float64, false);
         let config = generate_column_config(&field);
 
         assert_eq!(config.name, "simple_trace");
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_fixed_step_trace_plot_config() {
-        let field = TraceType::fixed_step_field("fixed_trace", true);
+        let field = TraceType::fixed_step_field("fixed_trace", DataType::Float64, true);
         let config = generate_column_config(&field);
 
         assert_eq!(config.name, "fixed_trace");
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_variable_step_trace_plot_config() {
-        let field = TraceType::variable_step_field("variable_trace", false);
+        let field = TraceType::variable_step_field("variable_trace", DataType::Float64, false);
         let config = generate_column_config(&field);
 
         assert_eq!(config.name, "variable_trace");
@@ -318,9 +318,9 @@ mod tests {
     fn test_mixed_schema_plot_config() {
         let schema = Schema::new(vec![
             ComplexType::field("complex_col", false),
-            TraceType::simple_list_field("simple_trace", true),
-            TraceType::fixed_step_field("fixed_trace", false),
-            TraceType::variable_step_field("variable_trace", true),
+            TraceType::simple_list_field("simple_trace", DataType::Float64, true),
+            TraceType::fixed_step_field("fixed_trace", DataType::Float64, false),
+            TraceType::variable_step_field("variable_trace", DataType::Float64, true),
             Field::new("regular_int", DataType::Int32, false),
         ]);
 
