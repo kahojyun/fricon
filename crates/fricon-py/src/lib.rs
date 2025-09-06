@@ -40,7 +40,7 @@ pub mod _core {
     #[pymodule_export]
     pub use super::{
         Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, main, main_gui,
-        trace_,
+        serve_workspace, trace_,
     };
 }
 
@@ -110,10 +110,16 @@ impl DatasetManager {
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
         let schema = schema.map_or_else(Schema::empty, |s| s.0);
+
+        // Enter Tokio runtime context to handle tokio::spawn calls in DatasetWriter::new
+        let runtime = get_runtime();
+        let _guard = runtime.enter();
+
         let writer = self
             .workspace
             .client
             .create_dataset(name, description, tags)?;
+
         Ok(DatasetWriter::new(writer, Arc::new(schema)))
     }
 
@@ -177,7 +183,6 @@ impl DatasetManager {
                 "name",
                 "description",
                 "favorite",
-                "index",
                 "created_at",
                 "tags",
             ],
@@ -853,4 +858,48 @@ pub fn main(py: Python<'_>) -> i32 {
 #[must_use]
 pub fn main_gui(py: Python<'_>) -> i32 {
     main_impl::<fricon_cli::Gui>(py)
+}
+
+/// Create a workspace for integration testing.
+///
+/// This function creates a new workspace at the given path and starts a server.
+/// The server will run in the background and the workspace client is returned.
+/// It's not exported to the public API and should only be used for testing.
+///
+/// Note: The server runs in the background. When the workspace client is dropped,
+/// the connection is closed but the server continues running. For proper cleanup,
+/// you may need to manually stop the server process.
+///
+/// Parameters:
+///     path: The path where to create the workspace.
+///
+/// Returns:
+///     A workspace client connected to the newly created workspace.
+#[pyfunction]
+pub fn serve_workspace(path: PathBuf) -> Result<Workspace> {
+    let runtime = get_runtime();
+
+    // Create the workspace first
+    let root = fricon::WorkspaceRoot::create_new(&path)?;
+
+    // Start the server in the background
+    let _manager = runtime.block_on(fricon::AppManager::serve(root))?;
+
+    // Wait a bit for the server to start up
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // Try to connect with retries
+    let mut retries = 0;
+    loop {
+        match Workspace::connect(path.clone()) {
+            Ok(workspace) => return Ok(workspace),
+            Err(e) => {
+                retries += 1;
+                if retries > 10 {
+                    return Err(e);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+    }
 }
