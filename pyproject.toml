@@ -59,8 +59,8 @@ manifest-path = "crates/fricon-py/Cargo.toml"
 features = ["pyo3/extension-module", "prod"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["crates/fricon-py/tests"]
 addopts = "--import-mode=importlib"
 
 [tool.basedpyright]
-include = ["crates/fricon-py/python", "examples", "tests"]
+include = ["crates/fricon-py/python", "examples", "crates/fricon-py/tests"]

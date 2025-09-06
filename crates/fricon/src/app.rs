@@ -6,24 +6,11 @@ use deadpool_diesel::sqlite::Pool;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::info;
 
 use crate::{
     database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot,
     write_registry::WriteSessionRegistry,
 };
-
-pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
-    let path = path.into();
-    info!("Initialize workspace: {}", path.display());
-    let root = WorkspaceRoot::init(path)?;
-    let db_path = root.paths().database_file();
-    let backup_path = root
-        .paths()
-        .database_backup_file(Local::now().naive_local());
-    database::connect(db_path, backup_path).await?;
-    Ok(())
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AppEvent {
@@ -51,8 +38,7 @@ struct AppStateInner {
 }
 
 impl AppState {
-    async fn new(path: impl Into<PathBuf>) -> Result<Self> {
-        let root = WorkspaceRoot::open(path)?;
+    async fn new(root: WorkspaceRoot) -> Result<Self> {
         let db_path = root.paths().database_file();
         let backup_path = root
             .paths()
@@ -160,8 +146,8 @@ pub struct AppManager {
 }
 
 impl AppManager {
-    pub async fn serve(path: impl Into<PathBuf>) -> Result<Self> {
-        let state = AppState::new(path).await?;
+    pub async fn serve(root: WorkspaceRoot) -> Result<Self> {
+        let state = AppState::new(root).await?;
         let handle = AppHandle::new(state.clone());
 
         state
@@ -171,7 +157,13 @@ impl AppManager {
         Ok(Self { state, handle })
     }
 
-    pub async fn shutdown(&self) {
+    /// Creates a new `AppManager` with workspace creation.
+    pub async fn serve_with_path(path: impl Into<PathBuf>) -> Result<Self> {
+        let root = WorkspaceRoot::create(path)?;
+        Self::serve(root).await
+    }
+
+    pub async fn shutdown(self) {
         self.state.shutdown_token().cancel();
         self.state.tracker().close();
         self.state.tracker().wait().await;

@@ -21,7 +21,7 @@ mod write_registry;
 mod write_session;
 
 pub use self::{
-    app::{AppEvent, AppHandle, AppManager, init as init_workspace},
+    app::{AppEvent, AppHandle, AppManager},
     client::{Client, Dataset, DatasetWriter},
     database::DatasetStatus,
     dataset_manager::{
@@ -29,7 +29,7 @@ pub use self::{
     },
     reader::DatasetReader,
     server::DatasetRecord,
-    workspace::get_log_dir,
+    workspace::{WorkspaceRoot, get_log_dir},
 };
 
 /// Version of fricon crate.

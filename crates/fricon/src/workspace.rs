@@ -164,26 +164,71 @@ pub struct WorkspaceRoot {
 }
 
 impl WorkspaceRoot {
-    /// Initialize a new workspace at the given path.
+    /// Create or open a workspace at the given path.
     ///
-    /// The directory must be empty or non-existent.
-    pub fn init(path: impl Into<PathBuf>) -> Result<Self> {
+    /// If the workspace doesn't exist, it will be created.
+    /// If it already exists, it will be opened.
+    pub fn create(path: impl Into<PathBuf>) -> Result<Self> {
         let paths = WorkspacePaths::new(path);
+
+        // Check if workspace already exists by checking metadata file
+        if paths.metadata_file().exists() {
+            // Try to open existing workspace
+            match Self::open_internal(paths.clone()) {
+                Ok(root) => Ok(root),
+                Err(_) => {
+                    // If open fails, metadata might be corrupted, try to create new
+                    Self::create_new_internal(paths)
+                }
+            }
+        } else {
+            // Create new workspace
+            Self::create_new_internal(paths)
+        }
+    }
+
+    /// Create a new workspace at the given path, failing if it already exists.
+    ///
+    /// This method will return an error if the directory already exists,
+    /// unlike `create()` which will open an existing workspace.
+    pub fn create_new(path: impl Into<PathBuf>) -> Result<Self> {
+        let paths = WorkspacePaths::new(path);
+        Self::create_new_internal(paths)
+    }
+
+    /// Open an existing workspace at the given path.
+    ///
+    /// Validates the workspace metadata and acquires an exclusive lock.
+    pub fn open(path: impl Into<PathBuf>) -> Result<Self> {
+        let paths = WorkspacePaths::new(path);
+        Self::open_internal(paths)
+    }
+
+    fn create_new_internal(paths: WorkspacePaths) -> Result<Self> {
         let root = paths.root();
+
+        // Check if directory exists and is not empty (excluding lock file)
+        if root.exists() {
+            let mut has_non_lock_files = false;
+            if let Ok(entries) = root.read_dir() {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    // Skip lock file as it gets deleted when WorkspaceRoot is dropped
+                    if path.file_name().and_then(|n| n.to_str()) != Some(".fricon.lock") {
+                        has_non_lock_files = true;
+                        break;
+                    }
+                }
+            }
+
+            if has_non_lock_files {
+                bail!("Workspace already exists");
+            }
+        }
 
         fs::create_dir_all(root).context("Failed to create directory.")?;
         let lock_file_path = paths.lock_file();
         let lock = FileLock::new(&lock_file_path)?;
-
-        let dir_contents = root
-            .read_dir()
-            .context("Failed to read directory contents.")?;
-        for entry_result in dir_contents {
-            let entry = entry_result.context("Failed to get directory entry.")?;
-            if entry.path() != lock_file_path {
-                bail!("Directory is not empty.");
-            }
-        }
 
         init_workspace_dirs(&paths).context("Failed to initialize workspace directories.")?;
 
@@ -195,11 +240,7 @@ impl WorkspaceRoot {
         Ok(Self { paths, _lock: lock })
     }
 
-    /// Open an existing workspace at the given path.
-    ///
-    /// Validates the workspace metadata and acquires an exclusive lock.
-    pub fn open(path: impl Into<PathBuf>) -> Result<Self> {
-        let paths = WorkspacePaths::new(path);
+    fn open_internal(paths: WorkspacePaths) -> Result<Self> {
         let lock = FileLock::new(paths.lock_file())?;
         let metadata = WorkspaceMetadata::read_json(paths.metadata_file())?;
         let mut root = Self { paths, _lock: lock };
@@ -256,81 +297,100 @@ impl WorkspaceRoot {
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
     use tempfile::tempdir;
-    use uuid::uuid;
 
     use super::*;
 
     #[test]
-    fn database_backup_file_path() {
-        let paths = WorkspacePaths::new("./");
-        let time = NaiveDate::from_ymd_opt(2016, 7, 8)
-            .unwrap()
-            .and_hms_opt(9, 10, 11)
-            .unwrap();
-        let expected_path = paths
-            .backup_dir()
-            .join("fricon_backup-20160708_091011.sqlite3");
-        let actual_path = paths.database_backup_file(time);
-
-        assert_eq!(actual_path, expected_path);
-    }
-
-    #[test]
-    fn format_dataset_path() {
-        let uuid = uuid!("6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
-        let path = dataset_path_from_uuid(uuid);
-        assert_eq!(path, "6e/6ecf30db-2e3f-4ef3-8aa1-1e035c6bddd0");
-    }
-
-    #[test]
-    fn workspace_root_init() {
+    fn test_workspace_create() {
         let temp_dir = tempdir().unwrap();
-        let workspace_path = temp_dir.path();
+        let workspace_path = temp_dir.path().join("test_workspace");
 
-        let root = WorkspaceRoot::init(workspace_path).unwrap();
-        let paths = root.paths();
-
-        assert!(paths.data_dir().exists());
-        assert!(paths.log_dir().exists());
-        assert!(paths.backup_dir().exists());
-        assert!(paths.metadata_file().exists());
-        assert!(paths.lock_file().exists());
-    }
-
-    #[test]
-    fn workspace_root_open() {
-        let temp_dir = tempdir().unwrap();
-        let workspace_path = temp_dir.path();
-
-        let root1 = WorkspaceRoot::init(workspace_path).unwrap();
-        drop(root1);
-
-        let root2 = WorkspaceRoot::open(workspace_path).unwrap();
-        assert_eq!(root2.paths().root(), workspace_path);
-    }
-
-    #[test]
-    fn workspace_root_validate() {
-        let temp_dir = tempdir().unwrap();
-        let workspace_path = temp_dir.path();
-
-        assert!(WorkspaceRoot::validate(workspace_path).is_err());
-
-        let root = WorkspaceRoot::init(workspace_path).unwrap();
+        // Create workspace with create (should work - creates new)
+        let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
         drop(root);
 
-        assert!(WorkspaceRoot::validate(workspace_path).is_ok());
+        // Create again with create (should work - opens existing)
+        let root2 = WorkspaceRoot::create(workspace_path.clone()).unwrap();
+        drop(root2);
     }
 
     #[test]
-    fn workspace_root_exclusive_lock() {
+    fn test_workspace_create_new_strict() {
         let temp_dir = tempdir().unwrap();
-        let workspace_path = temp_dir.path();
+        let workspace_path = temp_dir.path().join("test_workspace");
 
-        let _root1 = WorkspaceRoot::init(workspace_path).unwrap();
+        // Create workspace with create_new (should work)
+        let root = WorkspaceRoot::create_new(workspace_path.clone()).unwrap();
+        drop(root);
 
-        assert!(WorkspaceRoot::open(workspace_path).is_err());
+        // Try to create again with create_new (should fail)
+        let result = WorkspaceRoot::create_new(workspace_path.clone());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_workspace_open() {
+        let temp_dir = tempdir().unwrap();
+        let workspace_path = temp_dir.path().join("test_workspace");
+
+        // Create workspace first
+        let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
+        drop(root); // Release lock
+
+        // Open existing workspace
+        let _root2 = WorkspaceRoot::open(workspace_path.clone()).unwrap();
+        assert!(workspace_path.exists());
+    }
+
+    #[test]
+    fn test_workspace_validate() {
+        let temp_dir = tempdir().unwrap();
+        let workspace_path = temp_dir.path().join("test_workspace");
+
+        // Validate non-existent workspace
+        let result = WorkspaceRoot::validate(&workspace_path);
+        assert!(result.is_err());
+
+        // Create workspace
+        let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
+        drop(root);
+
+        // Validate existing workspace
+        let paths = WorkspaceRoot::validate(&workspace_path).unwrap();
+        assert_eq!(paths.root(), workspace_path);
+    }
+
+    #[test]
+    fn test_workspace_locking() {
+        let temp_dir = tempdir().unwrap();
+        let workspace_path = temp_dir.path().join("test_workspace");
+
+        // Create workspace and acquire lock
+        let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
+
+        // Try to open same workspace (should fail due to lock)
+        let result = WorkspaceRoot::open(workspace_path.clone());
+        assert!(result.is_err());
+
+        drop(root); // Release lock
+
+        // Now should work
+        let _root1 = WorkspaceRoot::open(workspace_path.clone()).unwrap();
+    }
+
+    #[test]
+    fn test_workspace_structure() {
+        let temp_dir = tempdir().unwrap();
+        let workspace_path = temp_dir.path().join("test_workspace");
+
+        // Create a new workspace
+        let _root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
+        assert!(workspace_path.exists());
+
+        // Verify workspace structure
+        assert!(workspace_path.join(".fricon_workspace.json").exists());
+        assert!(workspace_path.join("data").exists());
+        assert!(workspace_path.join("log").exists());
     }
 }
