@@ -21,7 +21,7 @@ struct AppState(Mutex<Option<(fricon::AppManager, WorkerGuard)>>);
 impl AppState {
     async fn new(workspace_path: PathBuf) -> Result<Self> {
         let log_guard = setup_logging(workspace_path.clone())?;
-        let app_manager = fricon::AppManager::serve(&workspace_path).await?;
+        let app_manager = fricon::AppManager::serve_with_path(&workspace_path).await?;
         Ok(Self(Mutex::new(Some((app_manager, log_guard)))))
     }
 

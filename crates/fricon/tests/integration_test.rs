@@ -4,7 +4,7 @@ use arrow::array::{Array, Int32Array, RecordBatch, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use tempfile::TempDir;
 
-use fricon::{AppManager, Client, DatasetId, init_workspace};
+use fricon::{AppManager, Client, DatasetId, WorkspaceRoot};
 
 fn create_test_batch() -> RecordBatch {
     let schema = Schema::new(vec![
@@ -35,10 +35,10 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
     let workspace_path = temp_dir.path();
 
     // Initialize the workspace
-    init_workspace(workspace_path).await?;
+    WorkspaceRoot::create_new(workspace_path)?;
 
     // Start the server
-    let app_manager = AppManager::serve(workspace_path).await?;
+    let app_manager = AppManager::serve_with_path(workspace_path).await?;
 
     // Wait a bit for the server to start
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -128,10 +128,10 @@ async fn test_dataset_multiple_batches() -> anyhow::Result<()> {
     let workspace_path = temp_dir.path();
 
     // Initialize the workspace
-    init_workspace(workspace_path).await?;
+    WorkspaceRoot::create_new(workspace_path)?;
 
     // Start the server
-    let app_manager = AppManager::serve(workspace_path).await?;
+    let app_manager = AppManager::serve_with_path(workspace_path).await?;
 
     // Wait a bit for the server to start
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
