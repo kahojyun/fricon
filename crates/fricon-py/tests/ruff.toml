@@ -1,0 +1,15 @@
+[lint]
+select = ["ALL"]
+ignore = [
+    # Conflict with formatter
+    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "COM812", # missing-trailing-comma
+    "TD",
+    "FIX",
+    "D",
+    "S",
+    "SLF",
+    "INP",
+]
+[lint.isort]
+required-imports = ["from __future__ import annotations"]

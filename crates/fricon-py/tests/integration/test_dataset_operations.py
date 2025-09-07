@@ -2,8 +2,10 @@
 Integration tests for dataset operations.
 """
 
-import os
+from __future__ import annotations
+
 import tempfile
+from pathlib import Path
 
 import fricon._core
 
@@ -11,10 +13,10 @@ import fricon._core
 class TestDatasetOperations:
     """Integration tests for dataset operations."""
 
-    def test_dataset_writer_context_manager(self):
+    def test_dataset_writer_context_manager(self) -> None:
         """Test dataset writer with context manager."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
@@ -30,10 +32,10 @@ class TestDatasetOperations:
             assert len(datasets) == 1
             assert datasets.iloc[0]["name"] == "context_test"
 
-    def test_dataset_manual_close(self):
+    def test_dataset_manual_close(self) -> None:
         """Test dataset writer with manual close."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
@@ -47,10 +49,10 @@ class TestDatasetOperations:
             assert len(datasets) == 1
             assert datasets.iloc[0]["name"] == "manual_test"
 
-    def test_dataset_with_tags(self):
+    def test_dataset_with_tags(self) -> None:
         """Test dataset creation with tags."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
@@ -72,10 +74,10 @@ class TestDatasetOperations:
             assert "test" in tags
             assert "integration" in tags
 
-    def test_dataset_schema_inference(self):
+    def test_dataset_schema_inference(self) -> None:
         """Test automatic schema inference."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
@@ -97,10 +99,10 @@ class TestDatasetOperations:
             assert len(datasets) == 1
             assert datasets.iloc[0]["name"] == "schema_test"
 
-    def test_multiple_datasets_in_workspace(self):
+    def test_multiple_datasets_in_workspace(self) -> None:
         """Test creating multiple datasets in the same workspace."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
@@ -123,7 +125,8 @@ class TestDatasetOperations:
 
             # Verify all datasets were created
             datasets = dm.list_all()
-            assert len(datasets) == 3
+            expected_dataset_count = 3
+            assert len(datasets) == expected_dataset_count
 
             # Verify dataset names
             names = datasets["name"].tolist()  # pyright: ignore[reportUnknownVariableType]
@@ -131,10 +134,10 @@ class TestDatasetOperations:
             assert "dataset2" in names
             assert "dataset3" in names
 
-    def test_dataset_metadata_operations(self):
+    def test_dataset_metadata_operations(self) -> None:
         """Test dataset metadata operations."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 

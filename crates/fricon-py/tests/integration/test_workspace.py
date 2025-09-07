@@ -2,44 +2,47 @@
 Integration tests for fricon workspace functionality.
 """
 
+from __future__ import annotations
+
 import tempfile
-import os
+from pathlib import Path
+
 import fricon._core
 
 
 class TestWorkspaceIntegration:
     """Integration tests for workspace creation and management."""
 
-    def test_serve_workspace_creates_new_workspace(self):
+    def test_serve_workspace_creates_new_workspace(self) -> None:
         """Test that serve_workspace creates a new workspace."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
 
             # Create workspace and start server
             workspace = fricon._core.serve_workspace(workspace_path)
 
             # Verify workspace was created
-            assert os.path.exists(workspace_path)
+            assert workspace_path.exists()
             assert isinstance(workspace, fricon._core.Workspace)
 
             # Verify workspace is functional
             dm = workspace.dataset_manager
             assert isinstance(dm, fricon._core.DatasetManager)
 
-    def test_serve_multiple_workspaces(self):
+    def test_serve_multiple_workspaces(self) -> None:
         """Test creating multiple independent workspaces."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create first workspace
-            workspace1_path = os.path.join(tmpdir, "workspace1")
+            workspace1_path = Path(tmpdir) / "workspace1"
             workspace1 = fricon._core.serve_workspace(workspace1_path)
 
             # Create second workspace
-            workspace2_path = os.path.join(tmpdir, "workspace2")
+            workspace2_path = Path(tmpdir) / "workspace2"
             workspace2 = fricon._core.serve_workspace(workspace2_path)
 
             # Both workspaces should exist and be independent
-            assert os.path.exists(workspace1_path)
-            assert os.path.exists(workspace2_path)
+            assert workspace1_path.exists()
+            assert workspace2_path.exists()
             assert workspace1_path != workspace2_path
 
             # Both should have functional dataset managers
@@ -48,10 +51,10 @@ class TestWorkspaceIntegration:
             assert isinstance(dm1, fricon._core.DatasetManager)
             assert isinstance(dm2, fricon._core.DatasetManager)
 
-    def test_workspace_dataset_creation(self):
+    def test_workspace_dataset_creation(self) -> None:
         """Test dataset creation in workspace."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
@@ -63,10 +66,10 @@ class TestWorkspaceIntegration:
             writer.write(id=1, value=42.0, name="test_item")
             writer.close()
 
-    def test_workspace_dataset_listing(self):
+    def test_workspace_dataset_listing(self) -> None:
         """Test dataset listing in workspace."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
@@ -84,10 +87,10 @@ class TestWorkspaceIntegration:
             assert len(datasets) == 1
             assert datasets.iloc[0]["name"] == "test_dataset"
 
-    def test_workspace_with_context_manager(self):
+    def test_workspace_with_context_manager(self) -> None:
         """Test workspace operations with context manager."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            workspace_path = os.path.join(tmpdir, "test_workspace")
+            workspace_path = Path(tmpdir) / "test_workspace"
             workspace = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
