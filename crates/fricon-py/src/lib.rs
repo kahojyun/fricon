@@ -7,11 +7,7 @@
     clippy::needless_pass_by_value
 )]
 
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, LazyLock},
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{
@@ -20,11 +16,11 @@ use arrow::{
         StringArray, StringBuilder, StructArray, downcast_array, make_array,
     },
     buffer::OffsetBuffer,
-    datatypes::{DataType, Field, Fields, Schema},
+    datatypes::{DataType, Field, Schema},
     pyarrow::PyArrowType,
 };
 use chrono::{DateTime, Utc};
-use fricon::{Client, DatasetMetadata, DatasetRecord};
+use fricon::{Client, ComplexType, DatasetMetadata, DatasetRecord, FriconTypeExt, TraceType};
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
@@ -39,8 +35,8 @@ use pyo3_async_runtimes::tokio::get_runtime;
 pub mod _core {
     #[pymodule_export]
     pub use super::{
-        Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, main, main_gui,
-        serve_workspace, trace_,
+        Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, fixed_step_trace,
+        main, main_gui, serve_workspace, simple_list_trace, variable_step_trace,
     };
 }
 
@@ -223,7 +219,7 @@ fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
         let arr = make_array(data);
         return match arr.data_type() {
             DataType::Boolean | DataType::Int64 | DataType::Float64 | DataType::Utf8 => Ok(arr),
-            t @ DataType::Struct(_) if *t == get_complex_type() => Ok(arr),
+            t @ DataType::Struct(_) if t.is_complex() => Ok(arr),
             _ => bail!("The data type of the given arrow array is not float64."),
         };
     }
@@ -468,7 +464,7 @@ fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
     } else if value.is_instance_of::<PyFloat>() {
         Ok(DataType::Float64)
     } else if value.is_instance_of::<PyComplex>() {
-        Ok(get_complex_type())
+        Ok(ComplexType::storage_type())
     } else if value.is_instance_of::<PyString>() {
         Ok(DataType::Utf8)
     } else {
@@ -622,14 +618,17 @@ fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRe
             Ok(Arc::new(array))
         }
         // complex scalar
-        t @ DataType::Struct(fields) if *t == get_complex_type() => {
+        t @ DataType::Struct(_) if t.is_complex() => {
             let Ok(value) = value.extract::<Complex64>() else {
                 bail!("Failed to extract complex value.")
             };
             let real = Float64Array::new_scalar(value.re).into_inner();
             let imag = Float64Array::new_scalar(value.im).into_inner();
-            let array =
-                StructArray::new(fields.clone(), vec![Arc::new(real), Arc::new(imag)], None);
+            let fields = vec![
+                Field::new("real", DataType::Float64, false),
+                Field::new("imag", DataType::Float64, false),
+            ];
+            let array = StructArray::new(fields.into(), vec![Arc::new(real), Arc::new(imag)], None);
             Ok(Arc::new(array))
         }
         // Trace
@@ -765,53 +764,49 @@ impl DatasetWriter {
     }
 }
 
-fn get_complex_type() -> DataType {
-    static COMPLEX: LazyLock<DataType> = LazyLock::new(|| {
-        let fields = vec![
-            Field::new("real", DataType::Float64, false),
-            Field::new("imag", DataType::Float64, false),
-        ];
-        DataType::Struct(Fields::from(fields))
-    });
-    COMPLEX.clone()
-}
-
-fn get_trace_type(item: DataType, fixed_step: bool) -> DataType {
-    let y_field = Field::new("ys", DataType::new_list(item, false), false);
-    if fixed_step {
-        let fields = vec![
-            Field::new("x0", DataType::Float64, false),
-            Field::new("dx", DataType::Float64, false),
-            y_field,
-        ];
-        DataType::Struct(Fields::from(fields))
-    } else {
-        let x_field = Field::new("xs", DataType::new_list(DataType::Float64, false), false);
-        let fields = vec![x_field, y_field];
-        DataType::Struct(Fields::from(fields))
-    }
-}
-
-/// Get a pyarrow data type representing 128 bit compelex number.
+/// Get a pyarrow data type representing 128 bit complex number.
 ///
 /// Returns:
 ///     A pyarrow data type.
 #[pyfunction]
 pub fn complex128() -> PyArrowType<DataType> {
-    PyArrowType(get_complex_type())
+    PyArrowType(ComplexType::storage_type())
 }
 
-/// Get a pyarrow data type representing [`Trace`][fricon.Trace].
+/// Get a pyarrow data type representing a simple list trace.
 ///
 /// Parameters:
 ///     item: Data type of the y values.
-///     fixed_step: Whether the trace has fixed x steps.
 ///
 /// Returns:
 ///     A pyarrow data type.
 #[pyfunction]
-pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<DataType> {
-    PyArrowType(get_trace_type(item.0, fixed_step))
+pub fn simple_list_trace(item: PyArrowType<DataType>) -> PyArrowType<DataType> {
+    PyArrowType(TraceType::simple_list().storage_type(item.0))
+}
+
+/// Get a pyarrow data type representing a fixed step trace.
+///
+/// Parameters:
+///     item: Data type of the y values.
+///
+/// Returns:
+///     A pyarrow data type.
+#[pyfunction]
+pub fn fixed_step_trace(item: PyArrowType<DataType>) -> PyArrowType<DataType> {
+    PyArrowType(TraceType::fixed_step().storage_type(item.0))
+}
+
+/// Get a pyarrow data type representing a variable step trace.
+///
+/// Parameters:
+///     item: Data type of the y values.
+///
+/// Returns:
+///     A pyarrow data type.
+#[pyfunction]
+pub fn variable_step_trace(item: PyArrowType<DataType>) -> PyArrowType<DataType> {
+    PyArrowType(TraceType::variable_step().storage_type(item.0))
 }
 
 pub fn main_impl<T: fricon_cli::clap::Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {

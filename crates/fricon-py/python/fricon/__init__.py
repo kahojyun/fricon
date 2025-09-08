@@ -9,7 +9,9 @@ from ._core import (
     Trace,
     Workspace,
     complex128,
-    trace_,
+    fixed_step_trace,
+    simple_list_trace,
+    variable_step_trace,
 )
 from ._helper import arrow_to_numpy
 
@@ -21,5 +23,7 @@ __all__ = [
     "Workspace",
     "arrow_to_numpy",
     "complex128",
-    "trace_",
+    "fixed_step_trace",
+    "simple_list_trace",
+    "variable_step_trace",
 ]
