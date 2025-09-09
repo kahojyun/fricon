@@ -24,7 +24,10 @@ pub mod _core {
         cli::{main, main_gui, serve_workspace},
         dataset::Dataset,
         trace::Trace,
-        types::{complex128, fixed_step_trace, simple_list_trace, variable_step_trace},
+        types::{
+            complex128_field, fixed_step_trace_field, simple_list_trace_field,
+            variable_step_trace_field,
+        },
         workspace::{DatasetManager, Workspace},
         writer::DatasetWriter,
     };

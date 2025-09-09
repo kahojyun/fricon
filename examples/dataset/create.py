@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pyarrow as pa
-from fricon import DatasetManager, Workspace, complex128
+from fricon import DatasetManager, Workspace, complex128_field
 
 
 def simple(manager: DatasetManager) -> None:
@@ -32,10 +32,10 @@ def with_schema(manager: DatasetManager) -> None:
     # complex128 is a struct with two float64 fields named "real" and "imag".
     schema = pa.schema(
         [
-            ("a", pa.int64()),
-            ("b", pa.int64()),
-            ("c", complex128()),
-            ("d", pa.list_(pa.int64())),
+            pa.field("a", pa.int64()),
+            pa.field("b", pa.int64()),
+            complex128_field("c", False),
+            pa.field("d", pa.list_(pa.int64())),
         ]
     )
     with manager.create("example", schema=schema) as writer:

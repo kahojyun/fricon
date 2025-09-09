@@ -8,12 +8,11 @@ from ._core import (
     DatasetWriter,
     Trace,
     Workspace,
-    complex128,
-    fixed_step_trace,
-    simple_list_trace,
-    variable_step_trace,
+    complex128_field,
+    fixed_step_trace_field,
+    simple_list_trace_field,
+    variable_step_trace_field,
 )
-from ._helper import arrow_to_numpy
 
 __all__ = [
     "Dataset",
@@ -21,9 +20,8 @@ __all__ = [
     "DatasetWriter",
     "Trace",
     "Workspace",
-    "arrow_to_numpy",
-    "complex128",
-    "fixed_step_trace",
-    "simple_list_trace",
-    "variable_step_trace",
+    "complex128_field",
+    "fixed_step_trace_field",
+    "simple_list_trace_field",
+    "variable_step_trace_field",
 ]

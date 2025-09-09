@@ -1,49 +1,78 @@
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, Field};
 use pyo3::prelude::*;
 
 use arrow::pyarrow::PyArrowType;
 
-/// Get a pyarrow data type representing 128 bit complex number.
-///
-/// Returns:
-///     A pyarrow data type.
-#[pyfunction]
-pub fn complex128() -> PyArrowType<DataType> {
-    PyArrowType(fricon::ComplexType::storage_type())
-}
-
-/// Get a pyarrow data type representing a simple list trace.
+/// Get a pyarrow field representing 128 bit complex number.
 ///
 /// Parameters:
-///     item: Data type of the y values.
+///     name: Field name (defaults to empty string)
+///     nullable: Whether the field is nullable (defaults to true)
 ///
 /// Returns:
-///     A pyarrow data type.
+///     A pyarrow field.
 #[pyfunction]
-pub fn simple_list_trace(item: PyArrowType<DataType>) -> PyArrowType<DataType> {
-    PyArrowType(fricon::TraceType::simple_list().storage_type(item.0))
+pub fn complex128_field(name: String, nullable: Option<bool>) -> PyArrowType<Field> {
+    let nullable = nullable.unwrap_or(true);
+    PyArrowType(fricon::ComplexType::field(&name, nullable))
 }
 
-/// Get a pyarrow data type representing a fixed step trace.
+/// Get a pyarrow field representing a simple list trace.
 ///
 /// Parameters:
-///     item: Data type of the y values.
+///     name: Field name (defaults to empty string)
+///     item_type: Data type of the y values (required)
+///     nullable: Whether the field is nullable (defaults to true)
 ///
 /// Returns:
-///     A pyarrow data type.
+///     A pyarrow field.
 #[pyfunction]
-pub fn fixed_step_trace(item: PyArrowType<DataType>) -> PyArrowType<DataType> {
-    PyArrowType(fricon::TraceType::fixed_step().storage_type(item.0))
+pub fn simple_list_trace_field(
+    name: String,
+    item_type: Option<PyArrowType<DataType>>,
+    nullable: Option<bool>,
+) -> PyArrowType<Field> {
+    let nullable = nullable.unwrap_or(true);
+    let item_type = item_type.expect("item_type is required for trace fields");
+    PyArrowType(fricon::TraceType::simple_list().field(&name, item_type.0, nullable))
 }
 
-/// Get a pyarrow data type representing a variable step trace.
+/// Get a pyarrow field representing a fixed step trace.
 ///
 /// Parameters:
-///     item: Data type of the y values.
+///     name: Field name (defaults to empty string)
+///     item_type: Data type of the y values (required)
+///     nullable: Whether the field is nullable (defaults to true)
 ///
 /// Returns:
-///     A pyarrow data type.
+///     A pyarrow field.
 #[pyfunction]
-pub fn variable_step_trace(item: PyArrowType<DataType>) -> PyArrowType<DataType> {
-    PyArrowType(fricon::TraceType::variable_step().storage_type(item.0))
+pub fn fixed_step_trace_field(
+    name: String,
+    item_type: Option<PyArrowType<DataType>>,
+    nullable: Option<bool>,
+) -> PyArrowType<Field> {
+    let nullable = nullable.unwrap_or(true);
+    let item_type = item_type.expect("item_type is required for trace fields");
+    PyArrowType(fricon::TraceType::fixed_step().field(&name, item_type.0, nullable))
+}
+
+/// Get a pyarrow field representing a variable step trace.
+///
+/// Parameters:
+///     name: Field name (defaults to empty string)
+///     item_type: Data type of the y values (required)
+///     nullable: Whether the field is nullable (defaults to true)
+///
+/// Returns:
+///     A pyarrow field.
+#[pyfunction]
+pub fn variable_step_trace_field(
+    name: String,
+    item_type: Option<PyArrowType<DataType>>,
+    nullable: Option<bool>,
+) -> PyArrowType<Field> {
+    let nullable = nullable.unwrap_or(true);
+    let item_type = item_type.expect("item_type is required for trace fields");
+    PyArrowType(fricon::TraceType::variable_step().field(&name, item_type.0, nullable))
 }

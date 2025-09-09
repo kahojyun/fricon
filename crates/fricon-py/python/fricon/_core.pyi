@@ -16,22 +16,28 @@ __all__ = [
     "DatasetWriter",
     "Trace",
     "Workspace",
-    "complex128",
-    "fixed_step_trace",
+    "complex128_field",
+    "fixed_step_trace_field",
     "main",
     "main_gui",
     "serve_workspace",
-    "simple_list_trace",
-    "variable_step_trace",
+    "simple_list_trace_field",
+    "variable_step_trace_field",
 ]
 
 def main() -> int: ...
 def main_gui() -> int: ...
 def serve_workspace(path: StrPath) -> Workspace: ...
-def complex128() -> pa.DataType: ...
-def simple_list_trace(item: pa.DataType) -> pa.DataType: ...
-def fixed_step_trace(item: pa.DataType) -> pa.DataType: ...
-def variable_step_trace(item: pa.DataType) -> pa.DataType: ...
+def complex128_field(name: str, nullable: bool = True) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
+def simple_list_trace_field(
+    name: str, item_type: pa.DataType | None = None, nullable: bool = True
+) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
+def fixed_step_trace_field(
+    name: str, item_type: pa.DataType | None = None, nullable: bool = True
+) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
+def variable_step_trace_field(
+    name: str, item_type: pa.DataType | None = None, nullable: bool = True
+) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
 @final
 class Workspace:
     @staticmethod
