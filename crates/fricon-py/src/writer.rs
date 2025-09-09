@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use arrow::datatypes::Schema;
+use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3_async_runtimes::tokio::get_runtime;
 
@@ -38,7 +39,7 @@ impl DatasetWriter {
     pub fn write(
         &mut self,
         py: Python<'_>,
-        kwargs: Option<std::collections::HashMap<String, PyObject>>,
+        kwargs: Option<IndexMap<String, PyObject>>,
     ) -> Result<()> {
         let Some(values) = kwargs else {
             bail!("No data to write.")
@@ -51,11 +52,7 @@ impl DatasetWriter {
     /// Parameters:
     ///     values: A dictionary of names and values in the row.
     #[expect(clippy::needless_pass_by_value)]
-    pub fn write_dict(
-        &mut self,
-        py: Python<'_>,
-        values: std::collections::HashMap<String, PyObject>,
-    ) -> Result<()> {
+    pub fn write_dict(&mut self, py: Python<'_>, values: IndexMap<String, PyObject>) -> Result<()> {
         if values.is_empty() {
             bail!("No data to write.")
         }

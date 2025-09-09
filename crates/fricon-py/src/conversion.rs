@@ -9,6 +9,7 @@ use arrow::{
     pyarrow::PyArrowType,
 };
 use fricon::FriconTypeExt;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use num::complex::Complex64;
 use numpy::PyArrayMethods;
@@ -47,9 +48,9 @@ pub fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
         };
     }
     if let Ok(sequence) = values.downcast::<PySequence>() {
-        let data_type =
-            infer_sequence_item_type(sequence).context("Inferring sequence item data type.")?;
-        return build_array_from_sequence(&data_type, sequence);
+        let field = infer_sequence_item_field("item", sequence)
+            .context("Inferring sequence item field.")?;
+        return build_array_from_sequence(field.data_type(), sequence);
     }
     let py_type = values.get_type();
     bail!("Cannot convert {py_type} to scalar array.");
@@ -64,40 +65,42 @@ pub fn wrap_as_list_array(array: ArrayRef) -> ListArray {
     )
 }
 
-pub fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
+pub fn infer_scalar_field(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
     // Check bool first because bool is a subclass of int.
     if value.is_instance_of::<PyBool>() {
-        Ok(DataType::Boolean)
+        Ok(Field::new(name, DataType::Boolean, false))
     } else if value.is_instance_of::<PyInt>() {
-        Ok(DataType::Int64)
+        Ok(Field::new(name, DataType::Int64, false))
     } else if value.is_instance_of::<PyFloat>() {
-        Ok(DataType::Float64)
+        Ok(Field::new(name, DataType::Float64, false))
     } else if value.is_instance_of::<PyComplex>() {
-        Ok(fricon::ComplexType::storage_type())
+        Ok(fricon::ComplexType::field(name, false))
     } else if value.is_instance_of::<PyString>() {
-        Ok(DataType::Utf8)
+        Ok(Field::new(name, DataType::Utf8, false))
     } else {
         let py_type = value.get_type();
-        bail!("Cannot infer scalar arrow data type for python type '{py_type}'.");
+        bail!("Cannot infer scalar arrow field for python type '{py_type}'.");
     }
 }
 
-pub fn infer_sequence_item_type(sequence: &Bound<'_, PySequence>) -> Result<DataType> {
+pub fn infer_sequence_item_field(name: &str, sequence: &Bound<'_, PySequence>) -> Result<Field> {
     ensure!(
         sequence.len()? > 0,
-        "Cannot infer data type for empty sequence."
+        "Cannot infer field for empty sequence."
     );
     let first_item = sequence.get_item(0)?;
-    infer_scalar_type(&first_item)
+    infer_scalar_field(name, &first_item)
 }
 
-pub fn infer_sequence_type(sequence: &Bound<'_, PySequence>) -> Result<DataType> {
-    let item_type = infer_sequence_item_type(sequence)?;
-    let data_type = DataType::new_list(item_type, false);
-    Ok(data_type)
+pub fn infer_sequence_field(name: &str, sequence: &Bound<'_, PySequence>) -> Result<Field> {
+    let item_field = infer_sequence_item_field("item", sequence)?;
+    Ok(fricon::TraceType::SimpleList.field(name, item_field.data_type().clone(), false))
 }
 
-/// Infer [`arrow::datatypes::DataType`] from value in row.
+/// Infer [`arrow::datatypes::Field`] from name and value.
+///
+/// This function infers the complete Field including extension type metadata,
+/// which is not available when only inferring DataType.
 ///
 /// Currently supports:
 ///
@@ -107,38 +110,38 @@ pub fn infer_sequence_type(sequence: &Bound<'_, PySequence>) -> Result<DataType>
 /// 4. Python Sequence protocol
 ///
 /// TODO: support numpy array
-pub fn infer_data_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
-    if let Ok(data_type) = infer_scalar_type(value) {
-        Ok(data_type)
-    } else if let Ok(trace) = value.downcast_exact::<Trace>() {
-        Ok(trace.borrow().data_type().0)
+pub fn infer_field(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
+    if let Ok(trace) = value.downcast_exact::<Trace>() {
+        let trace_data_type = trace.borrow().data_type().0.clone();
+        Ok(Field::new(name, trace_data_type, false))
     } else if let Ok(PyArrowType(data)) = value.extract() {
         let arr = make_array(data);
-        Ok(arr.data_type().clone())
+        Ok(Field::new(name, arr.data_type().clone(), false))
     } else if let Ok(sequence) = value.downcast::<PySequence>() {
-        infer_sequence_type(sequence)
+        infer_sequence_field(name, sequence)
     } else {
-        let py_type = value.get_type();
-        bail!("Cannot infer arrow data type for python type '{py_type}'.");
+        infer_scalar_field(name, value)
     }
 }
 
 pub fn infer_schema(
     py: Python<'_>,
     initial_schema: &Schema,
-    values: &std::collections::HashMap<String, PyObject>,
+    values: &IndexMap<String, PyObject>,
 ) -> Result<Schema> {
-    let new_fields: Vec<Field> = values
-        .iter()
-        .filter(|(name, _)| initial_schema.field_with_name(name).is_err())
-        .map(|(name, value)| {
-            let datatype = infer_data_type(value.bind(py))
-                .with_context(|| format!("Inferring data type for column '{name}'."))?;
-            anyhow::Ok(Field::new(name, datatype, false))
-        })
-        .try_collect()?;
-    Schema::try_merge([initial_schema.clone(), Schema::new(new_fields)])
-        .context("Failed to merge initial schema with inferred schema.")
+    let mut fields: Vec<Field> = Vec::new();
+
+    for (name, value) in values {
+        if let Ok(field) = initial_schema.field_with_name(name) {
+            fields.push(field.clone());
+        } else {
+            let field = infer_field(name, value.bind(py))
+                .with_context(|| format!("Inferring field for column '{name}'."))?;
+            fields.push(field);
+        }
+    }
+
+    Ok(Schema::new(fields))
 }
 
 pub fn build_array_from_sequence(
@@ -276,7 +279,7 @@ pub fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<Arr
 pub fn build_record_batch(
     py: Python<'_>,
     schema: std::sync::Arc<Schema>,
-    values: &std::collections::HashMap<String, PyObject>,
+    values: &IndexMap<String, PyObject>,
 ) -> Result<RecordBatch> {
     ensure!(
         schema.fields().len() == values.len(),
