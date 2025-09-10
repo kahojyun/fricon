@@ -6,7 +6,10 @@ use arrow::{
 };
 use pyo3::prelude::*;
 
-use crate::conversion::{extract_float_array, extract_scalar_array, wrap_as_list_array};
+use crate::conversion::{
+    create_item_field_from_array, extract_float_array, extract_scalar_array, wrap_as_list_array,
+    wrap_as_list_array_with_field,
+};
 
 /// 1-D list of values with optional x-axis values.
 #[pyclass(module = "fricon._core")]
@@ -33,7 +36,9 @@ impl Trace {
             "Length of `xs` and `ys` should be equal."
         );
         let xs_list = wrap_as_list_array(std::sync::Arc::new(xs));
-        let ys_list = wrap_as_list_array(ys);
+        // Use utility function to preserve extension metadata
+        let ys_item_field = create_item_field_from_array(&ys);
+        let ys_list = wrap_as_list_array_with_field(ys.clone(), ys_item_field);
         let fields = vec![
             Field::new("xs", xs_list.data_type().clone(), false),
             Field::new("ys", ys_list.data_type().clone(), false),
@@ -60,7 +65,9 @@ impl Trace {
         let x0 = Float64Array::new_scalar(x0).into_inner();
         let dx = Float64Array::new_scalar(dx).into_inner();
         let ys = extract_scalar_array(ys)?;
-        let ys_list = wrap_as_list_array(ys);
+        // Use utility function to preserve extension metadata
+        let ys_item_field = create_item_field_from_array(&ys);
+        let ys_list = wrap_as_list_array_with_field(ys.clone(), ys_item_field);
         let fields = vec![
             Field::new("x0", DataType::Float64, false),
             Field::new("dx", DataType::Float64, false),

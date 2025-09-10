@@ -56,13 +56,45 @@ pub fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
     bail!("Cannot convert {py_type} to scalar array.");
 }
 
-pub fn wrap_as_list_array(array: ArrayRef) -> ListArray {
+/// Create a field that preserves extension metadata from an array
+pub fn create_field_from_array(name: &str, array: &ArrayRef, nullable: bool) -> Field {
+    let data_type = array.data_type();
+
+    // Check if the array's data type has extension metadata
+    if data_type.is_complex() {
+        fricon::ComplexType::field(name, nullable)
+    } else if let Some(trace_type) = data_type.trace_type() {
+        let mut field = Field::new(name, data_type.clone(), nullable);
+        let _ = field.try_with_extension_type(trace_type);
+        field
+    } else {
+        Field::new(name, data_type.clone(), nullable)
+    }
+}
+
+/// Create an item field that preserves extension metadata
+pub fn create_item_field_from_array(array: &ArrayRef) -> Field {
+    create_field_from_array("item", array, false)
+}
+
+pub fn wrap_as_list_array_with_field(array: ArrayRef, item_field: Field) -> ListArray {
+    let list_field = Field::new(
+        "list",
+        DataType::List(std::sync::Arc::new(item_field)),
+        false,
+    );
     ListArray::new(
-        std::sync::Arc::new(Field::new_list_field(array.data_type().clone(), false)),
+        std::sync::Arc::new(list_field),
         OffsetBuffer::from_lengths([array.len()]),
         array,
         None,
     )
+}
+
+pub fn wrap_as_list_array(array: ArrayRef) -> ListArray {
+    // Create a proper list field that preserves extension metadata
+    let item_field = create_item_field_from_array(&array);
+    wrap_as_list_array_with_field(array, item_field)
 }
 
 pub fn infer_scalar_field(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
@@ -94,7 +126,7 @@ pub fn infer_sequence_item_field(name: &str, sequence: &Bound<'_, PySequence>) -
 
 pub fn infer_sequence_field(name: &str, sequence: &Bound<'_, PySequence>) -> Result<Field> {
     let item_field = infer_sequence_item_field("item", sequence)?;
-    Ok(fricon::TraceType::SimpleList.field(name, item_field.data_type().clone(), false))
+    Ok(fricon::TraceType::SimpleList.field(name, std::sync::Arc::new(item_field), false))
 }
 
 /// Infer [`arrow::datatypes::Field`] from name and value.
@@ -113,10 +145,22 @@ pub fn infer_sequence_field(name: &str, sequence: &Bound<'_, PySequence>) -> Res
 pub fn infer_field(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
     if let Ok(trace) = value.downcast_exact::<Trace>() {
         let trace_data_type = trace.borrow().data_type().0.clone();
-        Ok(Field::new(name, trace_data_type, false))
+        // For trace objects, preserve the extension metadata if it's a trace type
+        if trace_data_type.is_trace() {
+            if let Some(trace_type) = trace_data_type.trace_type() {
+                let mut field = Field::new(name, trace_data_type, false);
+                let _ = field.try_with_extension_type(trace_type);
+                Ok(field)
+            } else {
+                Ok(Field::new(name, trace_data_type, false))
+            }
+        } else {
+            Ok(Field::new(name, trace_data_type, false))
+        }
     } else if let Ok(PyArrowType(data)) = value.extract() {
         let arr = make_array(data);
-        Ok(Field::new(name, arr.data_type().clone(), false))
+        // Use the utility function to preserve extension metadata
+        Ok(create_field_from_array(name, &arr, false))
     } else if let Ok(sequence) = value.downcast::<PySequence>() {
         infer_sequence_field(name, sequence)
     } else {

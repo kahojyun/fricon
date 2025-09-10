@@ -1,6 +1,7 @@
 use arrow::datatypes::{DataType, Field};
 use arrow_schema::extension::ExtensionType;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ComplexType {
@@ -187,21 +188,21 @@ impl TraceType {
     }
 
     #[must_use]
-    pub fn storage_type(&self, y_item_type: DataType) -> DataType {
+    pub fn storage_type(&self, y_item_field: Arc<Field>) -> DataType {
         match self {
-            TraceType::SimpleList => DataType::new_list(y_item_type, false),
+            TraceType::SimpleList => DataType::List(y_item_field),
             TraceType::FixedStep => DataType::Struct(
                 vec![
                     Field::new("x0", DataType::Float64, false),
                     Field::new("step", DataType::Float64, false),
-                    Field::new("y", DataType::new_list(y_item_type, false), false),
+                    Field::new("y", DataType::List(y_item_field), false),
                 ]
                 .into(),
             ),
             TraceType::VariableStep => DataType::Struct(
                 vec![
                     Field::new("x", DataType::new_list(DataType::Float64, false), false),
-                    Field::new("y", DataType::new_list(y_item_type, false), false),
+                    Field::new("y", DataType::List(y_item_field), false),
                 ]
                 .into(),
             ),
@@ -209,26 +210,26 @@ impl TraceType {
     }
 
     #[must_use]
-    pub fn field(&self, name: &str, y_item_type: DataType, nullable: bool) -> Field {
-        let storage_type = self.storage_type(y_item_type);
+    pub fn field(&self, name: &str, y_item_field: Arc<Field>, nullable: bool) -> Field {
+        let storage_type = self.storage_type(y_item_field);
         let mut field = Field::new(name, storage_type, nullable);
         let _ = field.try_with_extension_type(*self);
         field
     }
 
     #[must_use]
-    pub fn simple_list_field(name: &str, y_item_type: DataType, nullable: bool) -> Field {
-        Self::simple_list().field(name, y_item_type, nullable)
+    pub fn simple_list_field(name: &str, y_item_field: Arc<Field>, nullable: bool) -> Field {
+        Self::simple_list().field(name, y_item_field, nullable)
     }
 
     #[must_use]
-    pub fn fixed_step_field(name: &str, y_item_type: DataType, nullable: bool) -> Field {
-        Self::fixed_step().field(name, y_item_type, nullable)
+    pub fn fixed_step_field(name: &str, y_item_field: Arc<Field>, nullable: bool) -> Field {
+        Self::fixed_step().field(name, y_item_field, nullable)
     }
 
     #[must_use]
-    pub fn variable_step_field(name: &str, y_item_type: DataType, nullable: bool) -> Field {
-        Self::variable_step().field(name, y_item_type, nullable)
+    pub fn variable_step_field(name: &str, y_item_field: Arc<Field>, nullable: bool) -> Field {
+        Self::variable_step().field(name, y_item_field, nullable)
     }
 }
 
@@ -318,19 +319,20 @@ mod tests {
     fn test_trace_types() {
         // Test simple list trace
         let simple_trace = TraceType::simple_list();
-        let simple_data_type = simple_trace.storage_type(DataType::Float64);
+        let item_field = Field::new("item", DataType::Float64, false);
+        let simple_data_type = simple_trace.storage_type(Arc::new(item_field.clone()));
         assert!(simple_data_type.is_trace());
         assert_eq!(simple_data_type.trace_type(), Some(TraceType::SimpleList));
 
         // Test fixed step trace
         let fixed_trace = TraceType::fixed_step();
-        let fixed_data_type = fixed_trace.storage_type(DataType::Float64);
+        let fixed_data_type = fixed_trace.storage_type(Arc::new(item_field.clone()));
         assert!(fixed_data_type.is_trace());
         assert_eq!(fixed_data_type.trace_type(), Some(TraceType::FixedStep));
 
         // Test variable step trace
         let variable_trace = TraceType::variable_step();
-        let variable_data_type = variable_trace.storage_type(DataType::Float64);
+        let variable_data_type = variable_trace.storage_type(Arc::new(item_field));
         assert!(variable_data_type.is_trace());
         assert_eq!(
             variable_data_type.trace_type(),
@@ -338,17 +340,21 @@ mod tests {
         );
 
         // Test extension metadata
-        let simple_field = TraceType::simple_list().field("simple", DataType::Float64, false);
+        let item_field = Field::new("item", DataType::Float64, false);
+        let simple_field =
+            TraceType::simple_list().field("simple", Arc::new(item_field.clone()), false);
         assert_eq!(simple_field.extension_type_name(), Some("fricon.trace"));
         assert!(simple_field.is_trace());
         assert_eq!(simple_field.trace_type(), Some(TraceType::SimpleList));
 
-        let fixed_field = TraceType::fixed_step().field("fixed", DataType::Float64, false);
+        let fixed_field =
+            TraceType::fixed_step().field("fixed", Arc::new(item_field.clone()), false);
         assert_eq!(fixed_field.extension_type_name(), Some("fricon.trace"));
         assert!(fixed_field.is_trace());
         assert_eq!(fixed_field.trace_type(), Some(TraceType::FixedStep));
 
-        let variable_field = TraceType::variable_step().field("variable", DataType::Float64, false);
+        let variable_field =
+            TraceType::variable_step().field("variable", Arc::new(item_field), false);
         assert_eq!(variable_field.extension_type_name(), Some("fricon.trace"));
         assert!(variable_field.is_trace());
         assert_eq!(variable_field.trace_type(), Some(TraceType::VariableStep));
@@ -357,15 +363,17 @@ mod tests {
     #[test]
     fn test_trace_type_field_creation() {
         // Test direct field creation from TraceType
-        let simple_field = TraceType::SimpleList.field("simple", DataType::Float64, false);
+        let item_field = Field::new("item", DataType::Float64, false);
+        let simple_field =
+            TraceType::SimpleList.field("simple", Arc::new(item_field.clone()), false);
         assert!(simple_field.is_trace());
         assert_eq!(simple_field.trace_type(), Some(TraceType::SimpleList));
 
-        let fixed_field = TraceType::FixedStep.field("fixed", DataType::Float64, false);
+        let fixed_field = TraceType::FixedStep.field("fixed", Arc::new(item_field.clone()), false);
         assert!(fixed_field.is_trace());
         assert_eq!(fixed_field.trace_type(), Some(TraceType::FixedStep));
 
-        let variable_field = TraceType::VariableStep.field("variable", DataType::Float64, false);
+        let variable_field = TraceType::VariableStep.field("variable", Arc::new(item_field), false);
         assert!(variable_field.is_trace());
         assert_eq!(variable_field.trace_type(), Some(TraceType::VariableStep));
     }
@@ -373,15 +381,18 @@ mod tests {
     #[test]
     fn test_trace_type_convenience_methods() {
         // Test convenience methods
-        let simple_field = TraceType::simple_list_field("simple", DataType::Float64, false);
+        let item_field = Field::new("item", DataType::Float64, false);
+        let simple_field =
+            TraceType::simple_list_field("simple", Arc::new(item_field.clone()), false);
         assert!(simple_field.is_trace());
         assert_eq!(simple_field.trace_type(), Some(TraceType::SimpleList));
 
-        let fixed_field = TraceType::fixed_step_field("fixed", DataType::Float64, false);
+        let fixed_field = TraceType::fixed_step_field("fixed", Arc::new(item_field.clone()), false);
         assert!(fixed_field.is_trace());
         assert_eq!(fixed_field.trace_type(), Some(TraceType::FixedStep));
 
-        let variable_field = TraceType::variable_step_field("variable", DataType::Float64, false);
+        let variable_field =
+            TraceType::variable_step_field("variable", Arc::new(item_field), false);
         assert!(variable_field.is_trace());
         assert_eq!(variable_field.trace_type(), Some(TraceType::VariableStep));
     }
@@ -389,11 +400,12 @@ mod tests {
     #[test]
     fn test_schema_creation() {
         // Test creating schemas directly without builder
+        let item_field = Field::new("item", DataType::Float64, false);
         let schema = Schema::new(vec![
             ComplexType::field("complex_data", false),
-            TraceType::simple_list_field("simple_trace", DataType::Float64, true),
-            TraceType::fixed_step_field("fixed_trace", DataType::Float64, false),
-            TraceType::variable_step_field("variable_trace", DataType::Float64, true),
+            TraceType::simple_list_field("simple_trace", Arc::new(item_field.clone()), true),
+            TraceType::fixed_step_field("fixed_trace", Arc::new(item_field.clone()), false),
+            TraceType::variable_step_field("variable_trace", Arc::new(item_field), true),
             Field::new("regular_field", DataType::Int32, false),
         ]);
 
@@ -425,29 +437,32 @@ mod tests {
     fn test_trace_with_custom_y_datatype() {
         // Test creating traces with different y data types
         let simple_int = TraceType::simple_list();
-        let simple_int_type = simple_int.storage_type(DataType::Int32);
+        let int_item_field = Field::new("item", DataType::Int32, false);
+        let simple_int_type = simple_int.storage_type(Arc::new(int_item_field.clone()));
         assert!(simple_int_type.is_trace());
         assert_eq!(simple_int_type.trace_type(), Some(TraceType::SimpleList));
 
         let simple_string = TraceType::simple_list();
-        let simple_string_type = simple_string.storage_type(DataType::Utf8);
+        let string_item_field = Field::new("item", DataType::Utf8, false);
+        let simple_string_type = simple_string.storage_type(Arc::new(string_item_field.clone()));
         assert!(simple_string_type.is_trace());
         assert_eq!(simple_string_type.trace_type(), Some(TraceType::SimpleList));
 
         let simple_bool = TraceType::simple_list();
-        let simple_bool_type = simple_bool.storage_type(DataType::Boolean);
+        let bool_item_field = Field::new("item", DataType::Boolean, false);
+        let simple_bool_type = simple_bool.storage_type(Arc::new(bool_item_field));
         assert!(simple_bool_type.is_trace());
         assert_eq!(simple_bool_type.trace_type(), Some(TraceType::SimpleList));
 
         // Test fixed step with different y data types
         let fixed_int = TraceType::fixed_step();
-        let fixed_int_type = fixed_int.storage_type(DataType::Int32);
+        let fixed_int_type = fixed_int.storage_type(Arc::new(int_item_field));
         assert!(fixed_int_type.is_trace());
         assert_eq!(fixed_int_type.trace_type(), Some(TraceType::FixedStep));
 
         // Test variable step with different y data types
         let variable_string = TraceType::variable_step();
-        let variable_string_type = variable_string.storage_type(DataType::Utf8);
+        let variable_string_type = variable_string.storage_type(Arc::new(string_item_field));
         assert!(variable_string_type.is_trace());
         assert_eq!(
             variable_string_type.trace_type(),
@@ -455,11 +470,14 @@ mod tests {
         );
 
         // Test field creation with custom y data types
-        let int_field = TraceType::simple_list_field("int_trace", DataType::Int32, false);
+        let int_item_field = Field::new("item", DataType::Int32, false);
+        let int_field = TraceType::simple_list_field("int_trace", Arc::new(int_item_field), false);
         assert!(int_field.is_trace());
         assert_eq!(int_field.trace_type(), Some(TraceType::SimpleList));
 
-        let string_field = TraceType::FixedStep.field("string_trace", DataType::Utf8, false);
+        let string_item_field = Field::new("item", DataType::Utf8, false);
+        let string_field =
+            TraceType::FixedStep.field("string_trace", Arc::new(string_item_field), false);
         assert!(string_field.is_trace());
         assert_eq!(string_field.trace_type(), Some(TraceType::FixedStep));
     }

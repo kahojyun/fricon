@@ -34,7 +34,12 @@ pub fn simple_list_trace_field(
 ) -> PyArrowType<Field> {
     let nullable = nullable.unwrap_or(true);
     let item_type = item_type.expect("item_type is required for trace fields");
-    PyArrowType(fricon::TraceType::simple_list().field(&name, item_type.0, nullable))
+    let item_field = Field::new("item", item_type.0, false);
+    PyArrowType(fricon::TraceType::simple_list().field(
+        &name,
+        std::sync::Arc::new(item_field),
+        nullable,
+    ))
 }
 
 /// Get a pyarrow field representing a fixed step trace.
@@ -54,7 +59,12 @@ pub fn fixed_step_trace_field(
 ) -> PyArrowType<Field> {
     let nullable = nullable.unwrap_or(true);
     let item_type = item_type.expect("item_type is required for trace fields");
-    PyArrowType(fricon::TraceType::fixed_step().field(&name, item_type.0, nullable))
+    let item_field = Field::new("item", item_type.0, false);
+    PyArrowType(fricon::TraceType::fixed_step().field(
+        &name,
+        std::sync::Arc::new(item_field),
+        nullable,
+    ))
 }
 
 /// Get a pyarrow field representing a variable step trace.
@@ -74,5 +84,10 @@ pub fn variable_step_trace_field(
 ) -> PyArrowType<Field> {
     let nullable = nullable.unwrap_or(true);
     let item_type = item_type.expect("item_type is required for trace fields");
-    PyArrowType(fricon::TraceType::variable_step().field(&name, item_type.0, nullable))
+    let item_field = Field::new("item", item_type.0, false);
+    PyArrowType(fricon::TraceType::variable_step().field(
+        &name,
+        std::sync::Arc::new(item_field),
+        nullable,
+    ))
 }
