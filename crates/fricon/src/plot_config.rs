@@ -5,6 +5,7 @@
 //! appropriate visualization settings.
 
 use crate::datatypes::{FriconTypeExt, TraceType};
+use crate::multi_index::MultiIndex;
 use arrow::datatypes::{DataType, Field, SchemaRef};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,6 +36,8 @@ pub struct DatasetPlotConfig {
     pub columns: Vec<ColumnPlotConfig>,
     /// Overall dataset settings
     pub settings: HashMap<String, String>,
+    /// Optional multi-index description (levels and names)
+    pub multi_index: Option<MultiIndex>,
 }
 
 /// Supported plot types
@@ -82,7 +85,20 @@ pub fn generate_plot_config(dataset_name: &str, schema: &SchemaRef) -> DatasetPl
         dataset_name: dataset_name.to_string(),
         columns,
         settings: HashMap::new(),
+        multi_index: None,
     }
+}
+
+/// Generate plot config, allowing caller to pass an inferred multi-index.
+#[must_use]
+pub fn generate_plot_config_with_index(
+    dataset_name: &str,
+    schema: &SchemaRef,
+    multi_index: Option<MultiIndex>,
+) -> DatasetPlotConfig {
+    let mut base = generate_plot_config(dataset_name, schema);
+    base.multi_index = multi_index;
+    base
 }
 
 /// Generate plot configuration for a single column

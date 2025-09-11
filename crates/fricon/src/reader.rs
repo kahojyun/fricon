@@ -72,6 +72,12 @@ impl CompletedDataset {
     pub fn batches_slice(&self) -> &[RecordBatch] {
         &self.batches
     }
+
+    /// Infer a multi-index over the dataset based on column change patterns.
+    #[must_use]
+    pub fn infer_multi_index(&self) -> crate::multi_index::MultiIndex {
+        crate::multi_index::infer_multi_index_from_batches(self.batches_slice())
+    }
 }
 #[allow(clippy::needless_pass_by_value)]
 fn map_live_select_err(err: LiveSelectError) -> DatasetManagerError {
@@ -110,6 +116,32 @@ impl DatasetReader {
         match self {
             Self::Completed(c) => Some(c.batches_slice()),
             Self::Live(_) => None,
+        }
+    }
+
+    /// Infer multi-index if possible. For Completed datasets this analyzes persisted batches.
+    /// For Live datasets, infer using the first two logical rows when available.
+    #[must_use]
+    pub fn infer_multi_index(&self) -> crate::multi_index::MultiIndex {
+        match self {
+            Self::Completed(c) => c.infer_multi_index(),
+            Self::Live(l) => {
+                if l.total_rows() < 2 {
+                    return crate::multi_index::MultiIndex {
+                        level_indices: Vec::new(),
+                        level_names: Vec::new(),
+                        deepest_level_col: None,
+                    };
+                }
+                match l.select_by_indices(&[0, 1], None) {
+                    Ok(b) => crate::multi_index::infer_multi_index_from_batches(&[b]),
+                    Err(_) => crate::multi_index::MultiIndex {
+                        level_indices: Vec::new(),
+                        level_names: Vec::new(),
+                        deepest_level_col: None,
+                    },
+                }
+            }
         }
     }
 }

@@ -12,6 +12,7 @@ mod dataset_manager; // core manager
 mod datatypes;
 mod ipc;
 mod live;
+mod multi_index;
 mod plot_config;
 mod proto;
 mod reader;
@@ -29,8 +30,10 @@ pub use self::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
     },
     datatypes::{ComplexType, FriconTypeExt, TraceType},
+    multi_index::{MultiIndex, infer_multi_index_from_batches},
     plot_config::{
         ColumnPlotConfig, DatasetPlotConfig, PlotConfigError, PlotType, generate_plot_config,
+        generate_plot_config_with_index,
     },
     reader::DatasetReader,
     server::DatasetRecord,
