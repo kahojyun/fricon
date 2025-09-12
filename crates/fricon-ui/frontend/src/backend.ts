@@ -58,3 +58,30 @@ export function onDatasetCreated(
     callback(event.payload);
   });
 }
+
+// Plot configuration types
+export interface ColumnPlotConfig {
+  name: string;
+  data_type: string;
+  can_be_x_axis: boolean;
+  can_be_y_axis: boolean;
+  suggested_plot_types: string[];
+  settings: Record<string, string>;
+}
+
+export interface MultiIndex {
+  level_indices: number[];
+  level_names: string[];
+  deepest_level_col: number | null;
+}
+
+export interface DatasetPlotConfig {
+  dataset_name: string;
+  columns: ColumnPlotConfig[];
+  settings: Record<string, string>;
+  multi_index: MultiIndex | null;
+}
+
+export async function getDatasetPlotConfig(datasetId: number): Promise<DatasetPlotConfig> {
+  return await invoke<DatasetPlotConfig>("get_dataset_plot_config", { datasetId });
+}

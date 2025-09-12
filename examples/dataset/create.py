@@ -10,8 +10,9 @@ def simple(manager: DatasetManager) -> None:
     """When no schema is provided, the schema is inferred from the first write."""
     with manager.create("example", description="test", tags=["tagA", "tagB"]) as writer:
         for i in range(10):
-            # supports primitive types and 1d arrays
-            writer.write(a=i, b=i * 2, c=[1, 2, 3])
+            for j in range(10):
+                # supports primitive types and 1d arrays
+                writer.write(i=i, j=j, a=i, b=i * j, c=[1, 2, 3])
 
     d = writer.dataset
     assert d.name == "example"

@@ -9,6 +9,9 @@ import {
 } from "./backend";
 
 const value: Ref<DatasetInfo[]> = ref([]);
+const selectedDataset = defineModel<DatasetInfo | null>("selectedDataset", {
+  required: false,
+});
 
 let unsubscribe: (() => void) | null = null;
 
@@ -29,6 +32,10 @@ const handleDatasetCreated = (event: DatasetCreatedEvent) => {
   value.value.unshift(newDataset);
 };
 
+const onRowSelect = (event: { data: DatasetInfo }) => {
+  selectedDataset.value = event.data;
+};
+
 onMounted(async () => {
   await loadDatasets();
 
@@ -43,7 +50,13 @@ onUnmounted(() => {
 });
 </script>
 <template>
-  <DataTable :value="value" removable-sort>
+  <DataTable
+    :value="value"
+    removable-sort
+    v-model:selection="selectedDataset"
+    selection-mode="single"
+    @row-select="onRowSelect"
+  >
     <Column field="id" header="ID" />
     <Column field="name" header="Name" />
     <Column field="tags" header="Tags">

@@ -1,6 +1,7 @@
 use super::AppState;
 
 use chrono::{DateTime, Utc};
+use fricon::{DatasetId, DatasetPlotConfig, generate_plot_config_with_index};
 use serde::Serialize;
 use tauri::{State, ipc::Invoke};
 
@@ -73,6 +74,38 @@ async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, S
     Ok(dataset_info)
 }
 
+#[tauri::command]
+async fn get_dataset_plot_config(
+    state: State<'_, AppState>,
+    dataset_id: i32,
+) -> Result<DatasetPlotConfig, String> {
+    let app = state.app();
+    let dataset_manager = app.dataset_manager();
+
+    // Get the dataset reader which contains the schema
+    let dataset_reader = dataset_manager
+        .get_dataset_reader(DatasetId::Id(dataset_id))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Get the schema from the dataset reader
+    let schema = dataset_reader.schema();
+
+    // Generate the plot configuration from the schema
+    let plot_config = generate_plot_config_with_index(
+        &format!("dataset_{dataset_id}"),
+        &schema,
+        Some(dataset_reader.infer_multi_index()),
+    );
+
+    Ok(plot_config)
+}
+
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
-    tauri::generate_handler![get_workspace_info, get_server_status, list_datasets]
+    tauri::generate_handler![
+        get_workspace_info,
+        get_server_status,
+        list_datasets,
+        get_dataset_plot_config
+    ]
 }
