@@ -26,14 +26,12 @@ classes in the python binding of Arrow:
 ## How are datasets stored?
 
 A dataset is exactly one Arrow table stored in [Arrow IPC format]. When a dataset
-is created, the schema of the table must be determined first. In `fricon`,
-users can specify a partial schema in
-[`DatasetManager.create`][fricon.DatasetManager.create], and unspecified
-columns will be inferred from the first row of the dataset.
+is created using [`DatasetManager.create`][fricon.DatasetManager.create], the schema
+of the table is automatically inferred from the first row of data written to the dataset.
 
 ## Type inference
 
-`fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
+`fricon` automatically infers the dataset schema from the first row of data. The system enforces a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
 | Python type        | Dataset data type | Description                                  |
 | ------------------ | ----------------- | -------------------------------------------- |
