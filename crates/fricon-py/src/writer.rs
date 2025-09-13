@@ -4,8 +4,9 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3_async_runtimes::tokio::get_runtime;
 
-use crate::conversion::{build_record_batch, infer_schema};
+use crate::conversion::{build_record_batch_from_dataset, infer_dataset_type};
 use crate::dataset::Dataset;
+use fricon::dataset_schema::DatasetSchema;
 
 /// Writer for newly created dataset.
 ///
@@ -15,16 +16,18 @@ pub struct DatasetWriter {
     writer: Option<fricon::DatasetWriter>,
     dataset: Option<Py<Dataset>>,
     first_row: bool,
-    schema: std::sync::Arc<Schema>,
+    schema: Option<std::sync::Arc<Schema>>, // Arrow schema inferred from first row
+    dataset_schema: Option<DatasetSchema>,  // Business schema inferred from first row
 }
 
 impl DatasetWriter {
-    pub const fn new(writer: fricon::DatasetWriter, schema: std::sync::Arc<Schema>) -> Self {
+    pub fn new(writer: fricon::DatasetWriter) -> Self {
         Self {
             writer: Some(writer),
             dataset: None,
             first_row: true,
-            schema,
+            schema: None,
+            dataset_schema: None,
         }
     }
 }
@@ -60,10 +63,25 @@ impl DatasetWriter {
             bail!("Writer closed.");
         };
         if self.first_row {
-            self.schema = std::sync::Arc::new(infer_schema(py, &self.schema, &values)?);
+            // Infer dataset schema (business) from first row.
+            let mut dataset_fields = Vec::with_capacity(values.len());
+            for (name, value) in &values {
+                let bound = value.bind(py);
+                let dtype = infer_dataset_type(bound)
+                    .with_context(|| format!("Inferring field for column '{name}'."))?;
+                let dataset_field = fricon::dataset_schema::DatasetField::new(name, dtype, false);
+                dataset_fields.push(dataset_field);
+            }
+            let dataset_schema = DatasetSchema::new(dataset_fields);
+            self.schema = Some(dataset_schema.to_arrow());
+            self.dataset_schema = Some(dataset_schema);
             self.first_row = false;
         }
-        let batch = build_record_batch(py, self.schema.clone(), &values)?;
+        let dataset_schema = self
+            .dataset_schema
+            .as_ref()
+            .expect("Dataset schema inferred");
+        let batch = build_record_batch_from_dataset(py, dataset_schema, &values)?;
         get_runtime().block_on(writer.write(batch))?;
         Ok(())
     }

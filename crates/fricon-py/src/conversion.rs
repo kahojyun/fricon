@@ -1,21 +1,22 @@
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{
     array::{
-        Array, ArrayData, ArrayRef, BooleanArray, Float64Array, Int64Array, ListArray, RecordBatch,
-        StringArray, StringBuilder, StructArray, downcast_array, make_array,
+        Array, ArrayData, ArrayRef, Float64Array, ListArray, RecordBatch, StructArray,
+        downcast_array, make_array,
     },
     buffer::OffsetBuffer,
     datatypes::{DataType, Field, Schema},
     pyarrow::PyArrowType,
 };
-use fricon::{FriconTypeExt, dataset_schema::DatasetField};
+use fricon::{
+    FriconTypeExt,
+    dataset_schema::{DatasetDataType, DatasetSchema as BusinessSchema, ScalarKind, TraceVariant},
+};
 use indexmap::IndexMap;
-use itertools::Itertools;
-use num::complex::Complex64;
 use numpy::PyArrayMethods;
 use pyo3::{
     prelude::*,
-    types::{PyBool, PyComplex, PyFloat, PyInt, PySequence, PyString},
+    types::{PyComplex, PyFloat, PyInt, PySequence},
 };
 
 use crate::trace::Trace;
@@ -38,46 +39,79 @@ pub fn extract_float_array(values: &Bound<'_, PyAny>) -> Result<Float64Array> {
     bail!("Cannot convert values with type {py_type} to float64 array.");
 }
 
-pub fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
-    if let Ok(PyArrowType(data)) = values.extract() {
+// Removed legacy Arrow-first helper functions in favor of business-type centric builders.
+
+/// Infer DatasetDataType directly from Python value (MVP)
+pub fn infer_dataset_type(
+    value: &Bound<'_, PyAny>,
+) -> Result<fricon::dataset_schema::DatasetDataType> {
+    use fricon::dataset_schema::{DatasetDataType, ScalarKind, TraceVariant};
+    // Trace object
+    if let Ok(trace) = value.downcast_exact::<Trace>() {
+        let trace_data_type = trace.borrow().data_type().0.clone();
+        if trace_data_type.is_trace() {
+            let variant = trace_data_type
+                .trace_type()
+                .map(TraceVariant::from_trace_type)
+                .ok_or_else(|| anyhow::anyhow!("Unsupported trace type."))?;
+            let y = if trace_data_type.is_complex() {
+                ScalarKind::Complex128
+            } else {
+                ScalarKind::Float64
+            };
+            return Ok(DatasetDataType::Trace { variant, y });
+        }
+    }
+    // Arrow array primitive acceptable
+    if let Ok(PyArrowType(data)) = value.extract() {
         let arr = make_array(data);
-        return match arr.data_type() {
-            DataType::Boolean | DataType::Int64 | DataType::Float64 | DataType::Utf8 => Ok(arr),
-            t @ DataType::Struct(_) if t.is_complex() => Ok(arr),
-            _ => bail!("The data type of the given arrow array is not float64."),
-        };
+        let dt = arr.data_type();
+        if dt.is_complex() {
+            return Ok(DatasetDataType::Scalar(ScalarKind::Complex128));
+        }
+        if matches!(dt, DataType::Float64) {
+            return Ok(DatasetDataType::Scalar(ScalarKind::Float64));
+        }
+        bail!("Unsupported arrow array data type '{dt}'.");
     }
-    if let Ok(sequence) = values.downcast::<PySequence>() {
-        let field = infer_sequence_item_field("item", sequence)
-            .context("Inferring sequence item field.")?;
-        return build_array_from_sequence(field.data_type(), sequence);
+    // Sequence -> SimpleList trace
+    if let Ok(sequence) = value.downcast::<PySequence>() {
+        ensure!(
+            sequence.len()? > 0,
+            "Cannot infer field for empty sequence."
+        );
+        let first = sequence.get_item(0)?;
+        if first.is_instance_of::<PyFloat>() || first.is_instance_of::<PyInt>() {
+            return Ok(DatasetDataType::Trace {
+                variant: TraceVariant::SimpleList,
+                y: ScalarKind::Float64,
+            });
+        }
+        if first.is_instance_of::<PyComplex>() {
+            return Ok(DatasetDataType::Trace {
+                variant: TraceVariant::SimpleList,
+                y: ScalarKind::Complex128,
+            });
+        }
+        bail!("Unsupported sequence element type.");
     }
-    let py_type = values.get_type();
-    bail!("Cannot convert {py_type} to scalar array.");
+    // Scalars
+    if value.is_instance_of::<PyFloat>() || value.is_instance_of::<PyInt>() {
+        return Ok(DatasetDataType::Scalar(ScalarKind::Float64));
+    }
+    if value.is_instance_of::<PyComplex>() {
+        return Ok(DatasetDataType::Scalar(ScalarKind::Complex128));
+    }
+    bail!(
+        "Unsupported python type. Only float, int, complex, trace, supported arrow arrays, and numeric sequences are allowed."
+    );
 }
 
-/// Create a field that preserves extension metadata from an array
-pub fn create_field_from_array(name: &str, array: &ArrayRef, nullable: bool) -> Field {
-    let data_type = array.data_type();
+// Legacy Arrow-first sequence/array/batch builder functions removed.
 
-    // Check if the array's data type has extension metadata
-    if data_type.is_complex() {
-        fricon::ComplexType::field(name, nullable)
-    } else if let Some(trace_type) = data_type.trace_type() {
-        let mut field = Field::new(name, data_type.clone(), nullable);
-        let _ = field.try_with_extension_type(trace_type);
-        field
-    } else {
-        Field::new(name, data_type.clone(), nullable)
-    }
-}
-
-/// Create an item field that preserves extension metadata
-pub fn create_item_field_from_array(array: &ArrayRef) -> Field {
-    create_field_from_array("item", array, false)
-}
-
-pub fn wrap_as_list_array_with_field(array: ArrayRef, item_field: Field) -> ListArray {
+fn wrap_as_list_array(array: ArrayRef) -> ListArray {
+    // Minimal retained helper: wraps array into a single list element (length 1 list of full array)
+    let item_field = Field::new("item", array.data_type().clone(), false);
     let list_field = Field::new(
         "list",
         DataType::List(std::sync::Arc::new(item_field)),
@@ -91,275 +125,153 @@ pub fn wrap_as_list_array_with_field(array: ArrayRef, item_field: Field) -> List
     )
 }
 
-pub fn wrap_as_list_array(array: ArrayRef) -> ListArray {
-    // Create a proper list field that preserves extension metadata
-    let item_field = create_item_field_from_array(&array);
-    wrap_as_list_array_with_field(array, item_field)
-}
-
-pub fn infer_scalar_field(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
-    // Check bool first because bool is a subclass of int.
-    if value.is_instance_of::<PyBool>() {
-        Ok(Field::new(name, DataType::Boolean, false))
-    } else if value.is_instance_of::<PyInt>() {
-        Ok(Field::new(name, DataType::Int64, false))
-    } else if value.is_instance_of::<PyFloat>() {
-        Ok(Field::new(name, DataType::Float64, false))
-    } else if value.is_instance_of::<PyComplex>() {
-        Ok(fricon::ComplexType::field(name, false))
-    } else if value.is_instance_of::<PyString>() {
-        Ok(Field::new(name, DataType::Utf8, false))
-    } else {
-        let py_type = value.get_type();
-        bail!("Cannot infer scalar arrow field for python type '{py_type}'.");
+fn build_simple_list_trace_array(y_kind: ScalarKind, value: &Bound<'_, PyAny>) -> Result<ArrayRef> {
+    if let Ok(trace) = value.downcast_exact::<Trace>() {
+        let data_type = trace.borrow().data_type().0.clone();
+        ensure!(
+            data_type.is_trace(),
+            "Provided Trace does not have trace data type"
+        );
+        return Ok(make_array(trace.borrow().to_arrow_array().0.clone()));
     }
-}
-
-pub fn infer_sequence_item_field(name: &str, sequence: &Bound<'_, PySequence>) -> Result<Field> {
+    let sequence = match value.downcast::<PySequence>() {
+        Ok(seq) => seq,
+        Err(_e) => bail!("Expected a Trace or a Python sequence for SimpleList trace"),
+    };
     ensure!(
         sequence.len()? > 0,
-        "Cannot infer field for empty sequence."
+        "Cannot build trace from empty sequence."
     );
-    let first_item = sequence.get_item(0)?;
-    infer_scalar_field(name, &first_item)
-}
-
-pub fn infer_sequence_field(name: &str, sequence: &Bound<'_, PySequence>) -> Result<Field> {
-    let item_field = infer_sequence_item_field("item", sequence)?;
-    Ok(fricon::TraceType::SimpleList.field(name, std::sync::Arc::new(item_field), false))
-}
-
-/// Infer [`arrow::datatypes::Field`] from name and value.
-///
-/// This function infers the complete Field including extension type metadata,
-/// which is not available when only inferring DataType.
-///
-/// Currently supports:
-///
-/// 1. Scalar types: bool, int, float, complex, str
-/// 2. [`Trace`]
-/// 3. [`arrow::array::Array`]
-/// 4. Python Sequence protocol
-///
-/// Infer DatasetField from Python value (MVP types only: float64, complex128, traces)
-/// Returns an error for unsupported types instead of inferring arbitrary Arrow types
-#[expect(dead_code)]
-pub fn infer_dataset_field(name: &str, value: &Bound<'_, PyAny>) -> Result<DatasetField> {
-    // Try to infer Arrow field first using existing logic
-    let arrow_field = infer_field_arrow(name, value)?;
-
-    // Convert to DatasetField, ensuring only MVP types are supported
-    DatasetField::from_arrow_field(&arrow_field)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Unsupported data type '{}' for field '{}'. Only float64, complex128, and trace types are supported in this version.",
-                arrow_field.data_type(),
-                name
-            )
-        })
-}
-
-/// Original infer_field function renamed to infer_field_arrow for internal use
-/// TODO: support numpy array
-pub fn infer_field_arrow(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
-    if let Ok(trace) = value.downcast_exact::<Trace>() {
-        let trace_data_type = trace.borrow().data_type().0.clone();
-        // For trace objects, preserve the extension metadata if it's a trace type
-        if trace_data_type.is_trace() {
-            if let Some(trace_type) = trace_data_type.trace_type() {
-                let mut field = Field::new(name, trace_data_type, false);
-                let _ = field.try_with_extension_type(trace_type);
-                Ok(field)
-            } else {
-                Ok(Field::new(name, trace_data_type, false))
+    // Build inner scalar values array
+    let mut float_vec: Vec<f64> = Vec::new();
+    let mut complex_real: Vec<f64> = Vec::new();
+    let mut complex_imag: Vec<f64> = Vec::new();
+    match y_kind {
+        ScalarKind::Float64 => {
+            for item in sequence.try_iter()? {
+                float_vec.push(item?.extract::<f64>()?);
             }
-        } else {
-            Ok(Field::new(name, trace_data_type, false))
-        }
-    } else if let Ok(PyArrowType(data)) = value.extract() {
-        let arr = make_array(data);
-        // Use the utility function to preserve extension metadata
-        Ok(create_field_from_array(name, &arr, false))
-    } else if let Ok(sequence) = value.downcast::<PySequence>() {
-        infer_sequence_field(name, sequence)
-    } else {
-        infer_scalar_field(name, value)
-    }
-}
-
-pub fn infer_schema(
-    py: Python<'_>,
-    initial_schema: &Schema,
-    values: &IndexMap<String, PyObject>,
-) -> Result<Schema> {
-    let mut fields: Vec<Field> = Vec::new();
-
-    for (name, value) in values {
-        if let Ok(field) = initial_schema.field_with_name(name) {
-            fields.push(field.clone());
-        } else {
-            let field = infer_field_arrow(name, value.bind(py))
-                .with_context(|| format!("Inferring field for column '{name}'."))?;
-            fields.push(field);
-        }
-    }
-
-    Ok(Schema::new(fields))
-}
-
-pub fn build_array_from_sequence(
-    data_type: &DataType,
-    sequence: &Bound<'_, PySequence>,
-) -> Result<ArrayRef> {
-    match data_type {
-        DataType::Boolean => {
-            let mut builder = BooleanArray::builder(sequence.len()?);
-            for v in sequence.try_iter()? {
-                let v = v?.extract()?;
-                builder.append_value(v);
-            }
-            Ok(std::sync::Arc::new(builder.finish()))
-        }
-        DataType::Int64 => {
-            let mut builder = Int64Array::builder(sequence.len()?);
-            for v in sequence.try_iter()? {
-                let v = v?.extract()?;
-                builder.append_value(v);
-            }
-            Ok(std::sync::Arc::new(builder.finish()))
-        }
-        DataType::Float64 => {
-            let mut builder = Float64Array::builder(sequence.len()?);
-            for v in sequence.try_iter()? {
-                let v = v?.extract()?;
-                builder.append_value(v);
-            }
-            Ok(std::sync::Arc::new(builder.finish()))
-        }
-        DataType::Utf8 => {
-            let mut builder = StringBuilder::new();
-            for v in sequence.try_iter()? {
-                let v = v?.extract::<String>()?;
-                builder.append_value(v);
-            }
-            Ok(std::sync::Arc::new(builder.finish()))
-        }
-        _ => bail!("Unsupported data type."),
-    }
-}
-
-pub fn build_list(
-    field: std::sync::Arc<Field>,
-    sequence: &Bound<'_, PySequence>,
-) -> Result<ListArray> {
-    let values = build_array_from_sequence(field.data_type(), sequence)?;
-    let offsets = OffsetBuffer::from_lengths([values.len()]);
-    Ok(ListArray::try_new(field, offsets, values, None)?)
-}
-
-pub fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRef> {
-    if let Ok(PyArrowType(data)) = value.extract::<PyArrowType<ArrayData>>() {
-        ensure!(
-            data.data_type() == data_type,
-            "Different data type: schema: {data_type}, value: {}",
-            data.data_type()
-        );
-        return Ok(make_array(data));
-    }
-    match data_type {
-        DataType::Boolean => {
-            let Ok(value) = value.extract::<bool>() else {
-                bail!("Not a boolean value.")
-            };
-            let array = BooleanArray::new_scalar(value).into_inner();
-            Ok(std::sync::Arc::new(array))
-        }
-        DataType::Int64 => {
-            let Ok(value) = value.extract::<i64>() else {
-                bail!("Failed to extract int64 value.")
-            };
-            let array = Int64Array::new_scalar(value).into_inner();
-            Ok(std::sync::Arc::new(array))
-        }
-        DataType::Float64 => {
-            let Ok(value) = value.extract::<f64>() else {
-                bail!("Failed to extract float64 value.")
-            };
-            let array = Float64Array::new_scalar(value).into_inner();
-            Ok(std::sync::Arc::new(array))
-        }
-        DataType::Utf8 => {
-            let Ok(value) = value.extract::<String>() else {
-                bail!("Failed to extract float64 value.")
-            };
-            let array = StringArray::new_scalar(value).into_inner();
-            Ok(std::sync::Arc::new(array))
-        }
-        // complex scalar
-        t @ DataType::Struct(_) if t.is_complex() => {
-            let Ok(value) = value.extract::<Complex64>() else {
-                bail!("Failed to extract complex value.")
-            };
-            let real = Float64Array::new_scalar(value.re).into_inner();
-            let imag = Float64Array::new_scalar(value.im).into_inner();
-            let fields = vec![
-                Field::new("real", DataType::Float64, false),
-                Field::new("imag", DataType::Float64, false),
-            ];
+            let ys = Float64Array::from(float_vec);
+            let list_array = wrap_as_list_array(std::sync::Arc::new(ys));
+            // Represent simple list trace as struct with ys only (like variable/fixed forms). For MVP we mimic Trace.variable_step with implicit xs (index).
+            // xs omitted: we encode as a single-field struct { ys } for SimpleList.
+            let field = Field::new("ys", list_array.data_type().clone(), false);
             let array = StructArray::new(
-                fields.into(),
-                vec![std::sync::Arc::new(real), std::sync::Arc::new(imag)],
+                vec![field].into(),
+                vec![std::sync::Arc::new(list_array)],
                 None,
             );
             Ok(std::sync::Arc::new(array))
         }
-        // Trace
-        t @ DataType::Struct(_fields) => {
-            let Ok(value) = value.downcast_exact::<Trace>() else {
-                bail!("Failed to extract `Trace` value.")
-            };
-            let value = value.borrow();
-            if *t != value.data_type().0 {
-                bail!("Incompatible data type.")
+        ScalarKind::Complex128 => {
+            for item in sequence.try_iter()? {
+                let c = item?.extract::<num::complex::Complex64>()?;
+                complex_real.push(c.re);
+                complex_imag.push(c.im);
             }
-            let array = value.to_arrow_array().0;
-            Ok(make_array(array))
-        }
-        // Sequence
-        DataType::List(field) => {
-            let Ok(value) = value.downcast() else {
-                bail!("Value is not a python `Sequence`");
-            };
-            let list = build_list(field.clone(), value)?;
-            Ok(std::sync::Arc::new(list))
-        }
-        _ => {
-            bail!("Unsupported data type {data_type}, please manually construct a `pyarrow.Array`.")
+            let real_arr = Float64Array::from(complex_real);
+            let imag_arr = Float64Array::from(complex_imag);
+            // Build complex struct elements then list
+            let fields = vec![
+                Field::new("real", DataType::Float64, false),
+                Field::new("imag", DataType::Float64, false),
+            ];
+            let struct_elems = StructArray::new(
+                fields.clone().into(),
+                vec![std::sync::Arc::new(real_arr), std::sync::Arc::new(imag_arr)],
+                None,
+            );
+            let list_array = wrap_as_list_array(std::sync::Arc::new(struct_elems));
+            let field = Field::new("ys", list_array.data_type().clone(), false);
+            let array = StructArray::new(
+                vec![field].into(),
+                vec![std::sync::Arc::new(list_array)],
+                None,
+            );
+            Ok(std::sync::Arc::new(array))
         }
     }
 }
 
-pub fn build_record_batch(
+fn build_array_from_dataset_value(
+    dtype: &DatasetDataType,
+    value: &Bound<'_, PyAny>,
+) -> Result<ArrayRef> {
+    match dtype {
+        DatasetDataType::Scalar(ScalarKind::Float64) => {
+            if let Ok(PyArrowType(data)) = value.extract::<PyArrowType<ArrayData>>() {
+                ensure!(
+                    data.data_type() == &DataType::Float64,
+                    "Arrow array type mismatch"
+                );
+                return Ok(make_array(data));
+            }
+            let v = value.extract::<f64>()?;
+            let arr = Float64Array::new_scalar(v).into_inner();
+            Ok(std::sync::Arc::new(arr))
+        }
+        DatasetDataType::Scalar(ScalarKind::Complex128) => {
+            if let Ok(PyArrowType(data)) = value.extract::<PyArrowType<ArrayData>>() {
+                ensure!(
+                    data.data_type().is_complex(),
+                    "Arrow array not complex struct"
+                );
+                return Ok(make_array(data));
+            }
+            let c = value.extract::<num::complex::Complex64>()?;
+            let real = Float64Array::new_scalar(c.re).into_inner();
+            let imag = Float64Array::new_scalar(c.im).into_inner();
+            let fields = vec![
+                Field::new("real", DataType::Float64, false),
+                Field::new("imag", DataType::Float64, false),
+            ];
+            let struct_arr = StructArray::new(
+                fields.into(),
+                vec![std::sync::Arc::new(real), std::sync::Arc::new(imag)],
+                None,
+            );
+            Ok(std::sync::Arc::new(struct_arr))
+        }
+        DatasetDataType::Trace {
+            variant: TraceVariant::SimpleList,
+            y,
+        } => build_simple_list_trace_array(*y, value),
+        DatasetDataType::Trace {
+            variant: TraceVariant::FixedStep | TraceVariant::VariableStep,
+            ..
+        } => {
+            let Ok(trace) = value.downcast_exact::<Trace>() else {
+                bail!("FixedStep/VariableStep trace columns require a Trace object");
+            };
+            Ok(make_array(trace.borrow().to_arrow_array().0.clone()))
+        }
+    }
+}
+
+pub fn build_record_batch_from_dataset(
     py: Python<'_>,
-    schema: std::sync::Arc<Schema>,
+    business_schema: &BusinessSchema,
     values: &IndexMap<String, PyObject>,
 ) -> Result<RecordBatch> {
     ensure!(
-        schema.fields().len() == values.len(),
+        business_schema.fields.len() == values.len(),
         "Values not compatible with schema."
     );
-    let columns = schema
-        .fields()
-        .into_iter()
-        .map(|field| {
-            let name = field.name();
-            let value = values
-                .get(name)
-                .with_context(|| format!("Missing value {name}"))?
-                .bind(py);
-            build_array(value, field.data_type())
-                .with_context(|| format!("Building array for column {name}"))
-        })
-        .try_collect()?;
-    Ok(RecordBatch::try_new(schema, columns)?)
+    let mut arrays: Vec<ArrayRef> = Vec::with_capacity(values.len());
+    let mut arrow_fields: Vec<Field> = Vec::with_capacity(values.len());
+    for field in &business_schema.fields {
+        let value = values
+            .get(&field.name)
+            .with_context(|| format!("Missing value {}", field.name))?
+            .bind(py);
+        let array = build_array_from_dataset_value(&field.dtype, value)
+            .with_context(|| format!("Building array for column {}", field.name))?;
+        arrow_fields.push(field.to_arrow_field());
+        arrays.push(array);
+    }
+    let arrow_schema = Schema::new(arrow_fields);
+    Ok(RecordBatch::try_new(
+        std::sync::Arc::new(arrow_schema),
+        arrays,
+    )?)
 }
