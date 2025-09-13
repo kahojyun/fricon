@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3_async_runtimes::tokio::get_runtime;
 
-use crate::conversion::{build_record_batch, infer_schema, infer_dataset_schema_from_values};
+use crate::conversion::{build_record_batch, infer_dataset_schema_from_values};
 use crate::dataset::Dataset;
 
 /// Writer for newly created dataset.
@@ -60,13 +60,8 @@ impl DatasetWriter {
             bail!("Writer closed.");
         };
         if self.first_row {
-            if self.schema.fields().is_empty() {
-                // New behavior: infer fricon DatasetSchema first, then convert to Arrow
-                self.schema = std::sync::Arc::new(infer_dataset_schema_from_values(py, &values)?);
-            } else {
-                // Backward compatibility: use existing schema merging logic
-                self.schema = std::sync::Arc::new(infer_schema(py, &self.schema, &values)?);
-            }
+            // Infer fricon DatasetSchema first, then convert to Arrow
+            self.schema = std::sync::Arc::new(infer_dataset_schema_from_values(py, &values)?);
             self.first_row = false;
         }
         let batch = build_record_batch(py, self.schema.clone(), &values)?;

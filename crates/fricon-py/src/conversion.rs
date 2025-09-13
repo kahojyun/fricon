@@ -208,6 +208,9 @@ pub fn infer_dataset_schema_from_values(
     Ok((*dataset_schema.to_arrow()).clone())
 }
 
+/// Legacy schema inference function (DEPRECATED)
+/// This function merges provided schema with inferred fields from values.
+/// It's kept for potential compatibility but is no longer used in the main path.
 pub fn infer_schema(
     py: Python<'_>,
     initial_schema: &Schema,
