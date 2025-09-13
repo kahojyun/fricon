@@ -4,6 +4,9 @@
 # Development environment variables
 .env
 
+# Python virtual environment
+.venv/
+
 # Editors
 .vscode/
 .idea/

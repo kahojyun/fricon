@@ -143,7 +143,6 @@ pub fn infer_sequence_field(name: &str, sequence: &Bound<'_, PySequence>) -> Res
 ///
 /// Infer DatasetField from Python value (MVP types only: float64, complex128, traces)
 /// Returns an error for unsupported types instead of inferring arbitrary Arrow types
-#[expect(dead_code)]
 pub fn infer_dataset_field(name: &str, value: &Bound<'_, PyAny>) -> Result<DatasetField> {
     // Try to infer Arrow field first using existing logic
     let arrow_field = infer_field_arrow(name, value)?;
@@ -185,6 +184,28 @@ pub fn infer_field_arrow(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> 
     } else {
         infer_scalar_field(name, value)
     }
+}
+
+/// Infer fricon DatasetSchema from Python values, then convert to Arrow Schema
+/// This is the new approach that first infers business logic types, then converts to Arrow
+pub fn infer_dataset_schema_from_values(
+    py: Python<'_>,
+    values: &IndexMap<String, PyObject>,
+) -> Result<Schema> {
+    use fricon::dataset_schema::{DatasetSchema};
+    
+    let mut dataset_fields = Vec::new();
+    
+    // First, infer fricon DatasetFields from the values
+    for (name, value) in values {
+        let dataset_field = infer_dataset_field(name, value.bind(py))
+            .with_context(|| format!("Inferring dataset field for column '{name}'."))?;
+        dataset_fields.push(dataset_field);
+    }
+    
+    // Create DatasetSchema and convert to Arrow Schema
+    let dataset_schema = DatasetSchema::new(dataset_fields);
+    Ok((*dataset_schema.to_arrow()).clone())
 }
 
 pub fn infer_schema(

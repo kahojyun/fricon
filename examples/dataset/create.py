@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import pyarrow as pa
-from fricon import DatasetManager, Workspace, complex128_field
+from fricon import DatasetManager, Workspace
 
 
 def simple(manager: DatasetManager) -> None:
@@ -22,24 +21,11 @@ def simple(manager: DatasetManager) -> None:
 
 
 def with_schema(manager: DatasetManager) -> None:
-    """When a schema is provided, the schema is used.
-
-    .. note::
-
-        Although arrow supports nested types, we should avoid using them in the
-        schema so that visualization tools can work with the data.
+    """Schema is now automatically inferred from the first write.
+    
+    The schema inference supports fricon's core types: float64, complex128, and traces.
     """
-    # Arrow doesn't have complex128, so we need to import it from fricon.
-    # complex128 is a struct with two float64 fields named "real" and "imag".
-    schema = pa.schema(
-        [
-            pa.field("a", pa.int64()),
-            pa.field("b", pa.int64()),
-            complex128_field("c", False),
-            pa.field("d", pa.list_(pa.int64())),
-        ]
-    )
-    with manager.create("example", schema=schema) as writer:
+    with manager.create("example") as writer:
         for i in range(10):
             writer.write(a=i, b=i * 2, c=1j, d=[1, 2])
 
