@@ -33,25 +33,25 @@ columns will be inferred from the first row of the dataset.
 
 ## Type inference
 
-`fricon` only tries to infer a subset of Arrow data types. The following table
-lists the mapping between Python types and Arrow data types:
+`fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
-| Python type                            | Arrow data type         |
-| -------------------------------------- | ----------------------- |
-| [`bool`][]                             | [`pyarrow.bool_`][]     |
-| [`int`][]                              | [`pyarrow.int64`][]     |
-| [`float`][]                            | [`pyarrow.float64`][]   |
-| [`complex`][]                          | [`fricon.complex128`][] |
-| [`str`][]                              | [`pyarrow.string`][]    |
-| [`Sequence`][collections.abc.Sequence] | [`pyarrow.list_`][]     |
-| [`fricon.Trace`][]                     | [`fricon.trace_`][]     |
+| Python type        | Dataset data type | Description                                  |
+| ------------------ | ----------------- | -------------------------------------------- |
+| [`float`][]        | `Float64`         | 64-bit floating point numbers                |
+| [`complex`][]      | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
+| [`fricon.Trace`][] | `Trace`           | Time series data with various x-axis formats |
 
-Notice that `fricon` defines custom data types for complex numbers and traces.
-Users can use utility functions to convert these custom data types back to
-Python types, or process them directly with `pyarrow` or `polars`.
+### Supported trace variants
 
-If users want to store other data types, they need to construct [`pyarrow.Scalar`][] values
-by themselves. `fricon` will store these values as is.
+Trace data supports three different formats depending on how the x-axis (independent variable) is stored:
+
+- **SimpleList**: Only y-values are stored, x-values are implicit indices (0, 1, 2, ...)
+- **FixedStep**: Regular spacing with x₀ (starting point) and step size
+- **VariableStep**: Arbitrary x-values stored alongside y-values
+
+### Future extensions
+
+Additional data types (strings, booleans, integers, timestamps) may be supported in future versions. The current focus on scalar and trace types ensures optimal performance and correctness for the most common scientific use cases.
 
 <!-- TODO: `pyarrow` and `polars` tips -->
 

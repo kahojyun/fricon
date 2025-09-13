@@ -9,6 +9,7 @@ mod app;
 mod client;
 mod database;
 mod dataset_manager; // core manager
+pub mod dataset_schema;
 mod datatypes;
 mod ipc;
 mod live;
@@ -29,11 +30,12 @@ pub use self::{
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
     },
+    dataset_schema::{DatasetDataType, DatasetField, DatasetSchema, ScalarKind, TraceVariant},
     datatypes::{ComplexType, FriconTypeExt, TraceType},
     multi_index::{MultiIndex, infer_multi_index_from_batches},
     plot_config::{
         ColumnPlotConfig, DatasetPlotConfig, PlotConfigError, PlotType, generate_plot_config,
-        generate_plot_config_with_index,
+        generate_plot_config_from_dataset_schema, generate_plot_config_with_index,
     },
     reader::DatasetReader,
     server::DatasetRecord,

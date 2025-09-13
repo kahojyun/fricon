@@ -4,6 +4,9 @@
 //! from Arrow dataset schemas, analyzing column types and suggesting
 //! appropriate visualization settings.
 
+use crate::dataset_schema::{
+    DatasetDataType, DatasetField, DatasetSchema, ScalarKind, TraceVariant,
+};
 use crate::datatypes::{FriconTypeExt, TraceType};
 use crate::multi_index::MultiIndex;
 use arrow::datatypes::{DataType, Field, SchemaRef};
@@ -71,7 +74,28 @@ pub enum PlotConfigError {
     InvalidSchema(String),
 }
 
-/// Generate plot configuration from an Arrow schema
+/// Generate plot configuration from a `DatasetSchema` (preferred method for MVP types)
+#[must_use]
+pub fn generate_plot_config_from_dataset_schema(
+    dataset_name: &str,
+    dataset_schema: &DatasetSchema,
+) -> DatasetPlotConfig {
+    let mut columns = Vec::new();
+
+    for field in &dataset_schema.fields {
+        let column_config = generate_column_config_from_dataset_field(field);
+        columns.push(column_config);
+    }
+
+    DatasetPlotConfig {
+        dataset_name: dataset_name.to_string(),
+        columns,
+        settings: HashMap::new(),
+        multi_index: None,
+    }
+}
+
+/// Generate plot configuration from an Arrow schema (legacy method)
 #[must_use]
 pub fn generate_plot_config(dataset_name: &str, schema: &SchemaRef) -> DatasetPlotConfig {
     let mut columns = Vec::new();
@@ -101,7 +125,84 @@ pub fn generate_plot_config_with_index(
     base
 }
 
-/// Generate plot configuration for a single column
+/// Generate plot configuration for a single `DatasetField` (MVP types)
+fn generate_column_config_from_dataset_field(field: &DatasetField) -> ColumnPlotConfig {
+    let type_name = match &field.dtype {
+        DatasetDataType::Scalar(ScalarKind::Float64) => "Float64".to_string(),
+        DatasetDataType::Scalar(ScalarKind::Complex128) => "Complex128".to_string(),
+        DatasetDataType::Trace { variant, y } => {
+            let y_str = match y {
+                ScalarKind::Float64 => "Float64",
+                ScalarKind::Complex128 => "Complex128",
+            };
+            match variant {
+                TraceVariant::SimpleList => format!("Trace(SimpleList<{y_str}>)"),
+                TraceVariant::FixedStep => format!("Trace(FixedStep<{y_str}>)"),
+                TraceVariant::VariableStep => format!("Trace(VariableStep<{y_str}>)"),
+            }
+        }
+    };
+
+    let (can_x, can_y, suggested_plot_types) = match &field.dtype {
+        DatasetDataType::Scalar(ScalarKind::Float64) => {
+            // Float64 can be used for both axes
+            (
+                true,
+                true,
+                vec![PlotType::Line, PlotType::Scatter, PlotType::Histogram],
+            )
+        }
+        DatasetDataType::Scalar(ScalarKind::Complex128) => {
+            // Complex numbers can be used for both axes (magnitude/phase or real/imaginary)
+            (true, true, vec![PlotType::Scatter, PlotType::Heatmap])
+        }
+        DatasetDataType::Trace { variant, .. } => {
+            // Trace data is typically plotted as line or scatter
+            match variant {
+                TraceVariant::SimpleList => (false, true, vec![PlotType::Line, PlotType::Scatter]),
+                TraceVariant::FixedStep | TraceVariant::VariableStep => {
+                    (true, true, vec![PlotType::Line, PlotType::Scatter])
+                }
+            }
+        }
+    };
+
+    let mut settings = HashMap::new();
+    settings.insert("nullable".to_string(), field.nullable.to_string());
+
+    // Add specific settings for dataset data types
+    match &field.dtype {
+        DatasetDataType::Scalar(ScalarKind::Complex128) => {
+            settings.insert("complex".to_string(), "true".to_string());
+        }
+        DatasetDataType::Trace { variant, y } => {
+            settings.insert("trace".to_string(), "true".to_string());
+            let variant_str = match variant {
+                TraceVariant::SimpleList => "simple_list",
+                TraceVariant::FixedStep => "fixed_step",
+                TraceVariant::VariableStep => "variable_step",
+            };
+            settings.insert("trace_variant".to_string(), variant_str.to_string());
+            let y_type_str = match y {
+                ScalarKind::Float64 => "float64",
+                ScalarKind::Complex128 => "complex128",
+            };
+            settings.insert("trace_y_type".to_string(), y_type_str.to_string());
+        }
+        DatasetDataType::Scalar(ScalarKind::Float64) => {}
+    }
+
+    ColumnPlotConfig {
+        name: field.name.clone(),
+        data_type: type_name.to_string(),
+        can_be_x_axis: can_x,
+        can_be_y_axis: can_y,
+        suggested_plot_types,
+        settings,
+    }
+}
+
+/// Generate plot configuration for a single column (legacy Arrow-based method)
 fn generate_column_config(field: &Field) -> ColumnPlotConfig {
     let data_type = field.data_type();
     let type_name = format!("{data_type:?}");
@@ -389,5 +490,160 @@ mod tests {
         assert!(regular_col.can_be_x_axis);
         assert!(regular_col.can_be_y_axis);
         assert!(regular_col.suggested_plot_types.contains(&PlotType::Line));
+    }
+
+    #[test]
+    fn test_generate_plot_config_from_dataset_schema() {
+        // Create a DatasetSchema with MVP types
+        let dataset_schema = DatasetSchema::new(vec![
+            DatasetField::new(
+                "float_col",
+                DatasetDataType::Scalar(ScalarKind::Float64),
+                false,
+            ),
+            DatasetField::new(
+                "complex_col",
+                DatasetDataType::Scalar(ScalarKind::Complex128),
+                true,
+            ),
+            DatasetField::new(
+                "trace_simple",
+                DatasetDataType::Trace {
+                    variant: TraceVariant::SimpleList,
+                    y: ScalarKind::Float64,
+                },
+                false,
+            ),
+            DatasetField::new(
+                "trace_fixed",
+                DatasetDataType::Trace {
+                    variant: TraceVariant::FixedStep,
+                    y: ScalarKind::Complex128,
+                },
+                true,
+            ),
+        ]);
+
+        let config = generate_plot_config_from_dataset_schema("test_dataset", &dataset_schema);
+
+        assert_eq!(config.dataset_name, "test_dataset");
+        assert_eq!(config.columns.len(), 4);
+
+        // Check float column
+        let float_col = &config.columns[0];
+        assert_eq!(float_col.name, "float_col");
+        assert_eq!(float_col.data_type, "Float64");
+        assert!(float_col.can_be_x_axis);
+        assert!(float_col.can_be_y_axis);
+        assert!(float_col.suggested_plot_types.contains(&PlotType::Line));
+        assert_eq!(
+            float_col.settings.get("nullable"),
+            Some(&"false".to_string())
+        );
+
+        // Check complex column
+        let complex_col = &config.columns[1];
+        assert_eq!(complex_col.name, "complex_col");
+        assert_eq!(complex_col.data_type, "Complex128");
+        assert!(complex_col.can_be_x_axis);
+        assert!(complex_col.can_be_y_axis);
+        assert!(
+            complex_col
+                .suggested_plot_types
+                .contains(&PlotType::Scatter)
+        );
+        assert_eq!(
+            complex_col.settings.get("complex"),
+            Some(&"true".to_string())
+        );
+        assert_eq!(
+            complex_col.settings.get("nullable"),
+            Some(&"true".to_string())
+        );
+
+        // Check simple trace
+        let trace_simple = &config.columns[2];
+        assert_eq!(trace_simple.name, "trace_simple");
+        assert_eq!(trace_simple.data_type, "Trace(SimpleList<Float64>)");
+        assert!(!trace_simple.can_be_x_axis);
+        assert!(trace_simple.can_be_y_axis);
+        assert_eq!(
+            trace_simple.settings.get("trace_variant"),
+            Some(&"simple_list".to_string())
+        );
+        assert_eq!(
+            trace_simple.settings.get("trace_y_type"),
+            Some(&"float64".to_string())
+        );
+
+        // Check fixed step trace with complex y
+        let trace_fixed = &config.columns[3];
+        assert_eq!(trace_fixed.name, "trace_fixed");
+        assert_eq!(trace_fixed.data_type, "Trace(FixedStep<Complex128>)");
+        assert!(trace_fixed.can_be_x_axis);
+        assert!(trace_fixed.can_be_y_axis);
+        assert_eq!(
+            trace_fixed.settings.get("trace_variant"),
+            Some(&"fixed_step".to_string())
+        );
+        assert_eq!(
+            trace_fixed.settings.get("trace_y_type"),
+            Some(&"complex128".to_string())
+        );
+        assert_eq!(
+            trace_fixed.settings.get("nullable"),
+            Some(&"true".to_string())
+        );
+    }
+
+    #[test]
+    fn test_dataset_schema_roundtrip_with_plot_config() {
+        // Create a schema, convert to Arrow, then back to DatasetSchema, and test plot config
+        let original_schema = DatasetSchema::new(vec![
+            DatasetField::new(
+                "measurement",
+                DatasetDataType::Scalar(ScalarKind::Float64),
+                false,
+            ),
+            DatasetField::new(
+                "signal",
+                DatasetDataType::Trace {
+                    variant: TraceVariant::VariableStep,
+                    y: ScalarKind::Float64,
+                },
+                false,
+            ),
+        ]);
+
+        // Convert to Arrow schema and back
+        let arrow_schema = original_schema.to_arrow();
+        let recovered_schema = DatasetSchema::try_from_arrow(&arrow_schema).unwrap();
+
+        // Generate plot config from both
+        let config_original = generate_plot_config_from_dataset_schema("test", &original_schema);
+        let config_recovered = generate_plot_config_from_dataset_schema("test", &recovered_schema);
+
+        // Both should produce identical plot configs
+        assert_eq!(
+            config_original.columns.len(),
+            config_recovered.columns.len()
+        );
+
+        for (orig, recovered) in config_original
+            .columns
+            .iter()
+            .zip(&config_recovered.columns)
+        {
+            assert_eq!(orig.name, recovered.name);
+            assert_eq!(orig.data_type, recovered.data_type);
+            assert_eq!(orig.can_be_x_axis, recovered.can_be_x_axis);
+            assert_eq!(orig.can_be_y_axis, recovered.can_be_y_axis);
+            assert_eq!(orig.suggested_plot_types, recovered.suggested_plot_types);
+            // Settings might have slight differences due to the roundtrip, but key ones should match
+            assert_eq!(
+                orig.settings.get("trace_variant"),
+                recovered.settings.get("trace_variant")
+            );
+        }
     }
 }

@@ -8,7 +8,7 @@ use arrow::{
     datatypes::{DataType, Field, Schema},
     pyarrow::PyArrowType,
 };
-use fricon::FriconTypeExt;
+use fricon::{FriconTypeExt, dataset_schema::DatasetField};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use num::complex::Complex64;
@@ -141,8 +141,27 @@ pub fn infer_sequence_field(name: &str, sequence: &Bound<'_, PySequence>) -> Res
 /// 3. [`arrow::array::Array`]
 /// 4. Python Sequence protocol
 ///
+/// Infer DatasetField from Python value (MVP types only: float64, complex128, traces)
+/// Returns an error for unsupported types instead of inferring arbitrary Arrow types
+#[expect(dead_code)]
+pub fn infer_dataset_field(name: &str, value: &Bound<'_, PyAny>) -> Result<DatasetField> {
+    // Try to infer Arrow field first using existing logic
+    let arrow_field = infer_field_arrow(name, value)?;
+
+    // Convert to DatasetField, ensuring only MVP types are supported
+    DatasetField::from_arrow_field(&arrow_field)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Unsupported data type '{}' for field '{}'. Only float64, complex128, and trace types are supported in this version.",
+                arrow_field.data_type(),
+                name
+            )
+        })
+}
+
+/// Original infer_field function renamed to infer_field_arrow for internal use
 /// TODO: support numpy array
-pub fn infer_field(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
+pub fn infer_field_arrow(name: &str, value: &Bound<'_, PyAny>) -> Result<Field> {
     if let Ok(trace) = value.downcast_exact::<Trace>() {
         let trace_data_type = trace.borrow().data_type().0.clone();
         // For trace objects, preserve the extension metadata if it's a trace type
@@ -179,7 +198,7 @@ pub fn infer_schema(
         if let Ok(field) = initial_schema.field_with_name(name) {
             fields.push(field.clone());
         } else {
-            let field = infer_field(name, value.bind(py))
+            let field = infer_field_arrow(name, value.bind(py))
                 .with_context(|| format!("Inferring field for column '{name}'."))?;
             fields.push(field);
         }
