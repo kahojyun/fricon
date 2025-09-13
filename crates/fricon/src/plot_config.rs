@@ -4,9 +4,7 @@
 //! from Arrow dataset schemas, analyzing column types and suggesting
 //! appropriate visualization settings.
 
-use crate::dataset_schema::{
-    DatasetDataType, DatasetField, DatasetSchema, ScalarKind, TraceVariant,
-};
+use crate::dataset_schema::{DatasetDataType, DatasetField, DatasetSchema, ScalarKind};
 use crate::datatypes::{FriconTypeExt, TraceType};
 use crate::multi_index::MultiIndex;
 use arrow::datatypes::{DataType, Field, SchemaRef};
@@ -136,9 +134,9 @@ fn generate_column_config_from_dataset_field(field: &DatasetField) -> ColumnPlot
                 ScalarKind::Complex128 => "Complex128",
             };
             match variant {
-                TraceVariant::SimpleList => format!("Trace(SimpleList<{y_str}>)"),
-                TraceVariant::FixedStep => format!("Trace(FixedStep<{y_str}>)"),
-                TraceVariant::VariableStep => format!("Trace(VariableStep<{y_str}>)"),
+                TraceType::SimpleList => format!("Trace(SimpleList<{y_str}>)"),
+                TraceType::FixedStep => format!("Trace(FixedStep<{y_str}>)"),
+                TraceType::VariableStep => format!("Trace(VariableStep<{y_str}>)"),
             }
         }
     };
@@ -159,8 +157,8 @@ fn generate_column_config_from_dataset_field(field: &DatasetField) -> ColumnPlot
         DatasetDataType::Trace { variant, .. } => {
             // Trace data is typically plotted as line or scatter
             match variant {
-                TraceVariant::SimpleList => (false, true, vec![PlotType::Line, PlotType::Scatter]),
-                TraceVariant::FixedStep | TraceVariant::VariableStep => {
+                TraceType::SimpleList => (false, true, vec![PlotType::Line, PlotType::Scatter]),
+                TraceType::FixedStep | TraceType::VariableStep => {
                     (true, true, vec![PlotType::Line, PlotType::Scatter])
                 }
             }
@@ -178,9 +176,9 @@ fn generate_column_config_from_dataset_field(field: &DatasetField) -> ColumnPlot
         DatasetDataType::Trace { variant, y } => {
             settings.insert("trace".to_string(), "true".to_string());
             let variant_str = match variant {
-                TraceVariant::SimpleList => "simple_list",
-                TraceVariant::FixedStep => "fixed_step",
-                TraceVariant::VariableStep => "variable_step",
+                TraceType::SimpleList => "simple_list",
+                TraceType::FixedStep => "fixed_step",
+                TraceType::VariableStep => "variable_step",
             };
             settings.insert("trace_variant".to_string(), variant_str.to_string());
             let y_type_str = match y {
@@ -509,7 +507,7 @@ mod tests {
             DatasetField::new(
                 "trace_simple",
                 DatasetDataType::Trace {
-                    variant: TraceVariant::SimpleList,
+                    variant: TraceType::SimpleList,
                     y: ScalarKind::Float64,
                 },
                 false,
@@ -517,7 +515,7 @@ mod tests {
             DatasetField::new(
                 "trace_fixed",
                 DatasetDataType::Trace {
-                    variant: TraceVariant::FixedStep,
+                    variant: TraceType::FixedStep,
                     y: ScalarKind::Complex128,
                 },
                 true,
@@ -608,7 +606,7 @@ mod tests {
             DatasetField::new(
                 "signal",
                 DatasetDataType::Trace {
-                    variant: TraceVariant::VariableStep,
+                    variant: TraceType::VariableStep,
                     y: ScalarKind::Float64,
                 },
                 false,

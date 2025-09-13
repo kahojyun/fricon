@@ -30,7 +30,7 @@ pub use self::{
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
     },
-    dataset_schema::{DatasetDataType, DatasetField, DatasetSchema, ScalarKind, TraceVariant},
+    dataset_schema::{DatasetDataType, DatasetField, DatasetSchema, ScalarKind},
     datatypes::{ComplexType, FriconTypeExt, TraceType},
     multi_index::{MultiIndex, infer_multi_index_from_batches},
     plot_config::{

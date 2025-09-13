@@ -9,8 +9,8 @@ use arrow::{
     pyarrow::PyArrowType,
 };
 use fricon::{
-    FriconTypeExt,
-    dataset_schema::{DatasetDataType, DatasetSchema as BusinessSchema, ScalarKind, TraceVariant},
+    FriconTypeExt, TraceType,
+    dataset_schema::{DatasetDataType, DatasetSchema as BusinessSchema, ScalarKind},
 };
 use indexmap::IndexMap;
 use numpy::PyArrayMethods;
@@ -45,14 +45,14 @@ pub fn extract_float_array(values: &Bound<'_, PyAny>) -> Result<Float64Array> {
 pub fn infer_dataset_type(
     value: &Bound<'_, PyAny>,
 ) -> Result<fricon::dataset_schema::DatasetDataType> {
-    use fricon::dataset_schema::{DatasetDataType, ScalarKind, TraceVariant};
+    use fricon::TraceType;
+    use fricon::dataset_schema::{DatasetDataType, ScalarKind};
     // Trace object
     if let Ok(trace) = value.downcast_exact::<Trace>() {
         let trace_data_type = trace.borrow().data_type().0.clone();
         if trace_data_type.is_trace() {
             let variant = trace_data_type
                 .trace_type()
-                .map(TraceVariant::from_trace_type)
                 .ok_or_else(|| anyhow::anyhow!("Unsupported trace type."))?;
             let y = if trace_data_type.is_complex() {
                 ScalarKind::Complex128
@@ -83,13 +83,13 @@ pub fn infer_dataset_type(
         let first = sequence.get_item(0)?;
         if first.is_instance_of::<PyFloat>() || first.is_instance_of::<PyInt>() {
             return Ok(DatasetDataType::Trace {
-                variant: TraceVariant::SimpleList,
+                variant: TraceType::SimpleList,
                 y: ScalarKind::Float64,
             });
         }
         if first.is_instance_of::<PyComplex>() {
             return Ok(DatasetDataType::Trace {
-                variant: TraceVariant::SimpleList,
+                variant: TraceType::SimpleList,
                 y: ScalarKind::Complex128,
             });
         }
@@ -233,11 +233,11 @@ fn build_array_from_dataset_value(
             Ok(std::sync::Arc::new(struct_arr))
         }
         DatasetDataType::Trace {
-            variant: TraceVariant::SimpleList,
+            variant: TraceType::SimpleList,
             y,
         } => build_simple_list_trace_array(*y, value),
         DatasetDataType::Trace {
-            variant: TraceVariant::FixedStep | TraceVariant::VariableStep,
+            variant: TraceType::FixedStep | TraceType::VariableStep,
             ..
         } => {
             let Ok(trace) = value.downcast_exact::<Trace>() else {

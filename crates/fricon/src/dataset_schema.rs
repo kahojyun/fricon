@@ -1,7 +1,4 @@
-//! Dataset schema definition and conversion utilities.
-//!
-//! This module defines the core business logic types for dataset schemas,
-//! providing a simplified type system that maps to Arrow types at boundaries.
+//! Dataset schema core types and Arrow conversion helpers.
 
 use arrow::datatypes::{DataType, Field, Schema};
 use serde::{Deserialize, Serialize};
@@ -9,32 +6,21 @@ use std::sync::Arc;
 
 use crate::datatypes::{ComplexType, FriconTypeExt, TraceType};
 
-/// Scalar data types supported in MVP
+/// Scalar data types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ScalarKind {
     Float64,
     Complex128,
 }
 
-/// Trace variants supported in MVP
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TraceVariant {
-    SimpleList,
-    FixedStep,
-    VariableStep,
-}
-
-/// Core dataset data types for business logic
+/// Dataset data types
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DatasetDataType {
     Scalar(ScalarKind),
-    Trace {
-        variant: TraceVariant,
-        y: ScalarKind,
-    },
+    Trace { variant: TraceType, y: ScalarKind },
 }
 
-/// A field in a dataset schema
+/// Field definition
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DatasetField {
     pub name: String,
@@ -42,14 +28,14 @@ pub struct DatasetField {
     pub nullable: bool,
 }
 
-/// Dataset schema containing field definitions
+/// Schema (ordered fields)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DatasetSchema {
     pub fields: Vec<DatasetField>,
 }
 
 impl ScalarKind {
-    /// Convert to Arrow Field for the scalar type
+    /// Convert to Arrow field
     #[must_use]
     pub fn to_arrow_field(&self, name: &str, nullable: bool) -> Field {
         match self {
@@ -58,7 +44,7 @@ impl ScalarKind {
         }
     }
 
-    /// Try to infer `ScalarKind` from Arrow Field
+    /// Infer from Arrow field
     #[must_use]
     pub fn from_arrow_field(field: &Field) -> Option<ScalarKind> {
         match field.data_type() {
@@ -69,30 +55,10 @@ impl ScalarKind {
     }
 }
 
-impl TraceVariant {
-    /// Convert to `TraceType` for Arrow conversion
-    #[must_use]
-    pub fn to_trace_type(self) -> TraceType {
-        match self {
-            TraceVariant::SimpleList => TraceType::SimpleList,
-            TraceVariant::FixedStep => TraceType::FixedStep,
-            TraceVariant::VariableStep => TraceType::VariableStep,
-        }
-    }
-
-    /// Convert from `TraceType`
-    #[must_use]
-    pub fn from_trace_type(trace_type: TraceType) -> TraceVariant {
-        match trace_type {
-            TraceType::SimpleList => TraceVariant::SimpleList,
-            TraceType::FixedStep => TraceVariant::FixedStep,
-            TraceType::VariableStep => TraceVariant::VariableStep,
-        }
-    }
-}
+// Traces use extension type `TraceType` directly.
 
 impl DatasetDataType {
-    /// Convert to Arrow Field with proper extension types
+    /// Convert to Arrow field (adds extension types where needed)
     #[must_use]
     pub fn to_arrow_field(&self, name: &str, nullable: bool) -> Field {
         match self {
@@ -102,8 +68,7 @@ impl DatasetDataType {
                     ScalarKind::Float64 => Arc::new(Field::new("item", DataType::Float64, false)),
                     ScalarKind::Complex128 => Arc::new(ComplexType::field("item", false)),
                 };
-                let trace_type = variant.to_trace_type();
-                trace_type.field(name, y_item_field, nullable)
+                variant.field(name, y_item_field, nullable)
             }
         }
     }
@@ -111,18 +76,17 @@ impl DatasetDataType {
     /// Try to infer `DatasetDataType` from Arrow Field
     #[must_use]
     pub fn from_arrow_field(field: &Field) -> Option<DatasetDataType> {
-        // Try scalar types first
+        // Scalar?
         if let Some(scalar) = ScalarKind::from_arrow_field(field) {
             return Some(DatasetDataType::Scalar(scalar));
         }
 
-        // Try trace types
+        // Trace?
         if field.is_trace()
             && let Some(trace_type) = field.trace_type()
         {
-            let variant = TraceVariant::from_trace_type(trace_type);
-            // For MVP, assume y is Float64 for traces
-            // TODO: In the future, we should infer the y type from the trace structure
+            let variant = trace_type;
+            // TODO: infer y type from trace structure (currently assumes Float64)
             let y = ScalarKind::Float64;
             return Some(DatasetDataType::Trace { variant, y });
         }
@@ -130,7 +94,7 @@ impl DatasetDataType {
         None
     }
 
-    /// Get a human-readable description of this type
+    /// Human-readable description
     #[must_use]
     pub fn description(&self) -> String {
         match self {
@@ -142,9 +106,9 @@ impl DatasetDataType {
                     ScalarKind::Complex128 => "complex128",
                 };
                 let variant_desc = match variant {
-                    TraceVariant::SimpleList => "simple list",
-                    TraceVariant::FixedStep => "fixed step",
-                    TraceVariant::VariableStep => "variable step",
+                    TraceType::SimpleList => "simple list",
+                    TraceType::FixedStep => "fixed step",
+                    TraceType::VariableStep => "variable step",
                 };
                 format!("Trace ({variant_desc}) of {y_desc} values")
             }
@@ -153,7 +117,7 @@ impl DatasetDataType {
 }
 
 impl DatasetField {
-    /// Create a new field
+    /// New field
     pub fn new(name: impl Into<String>, dtype: DatasetDataType, nullable: bool) -> Self {
         Self {
             name: name.into(),
@@ -162,13 +126,13 @@ impl DatasetField {
         }
     }
 
-    /// Convert to Arrow Field
+    /// To Arrow field
     #[must_use]
     pub fn to_arrow_field(&self) -> Field {
         self.dtype.to_arrow_field(&self.name, self.nullable)
     }
 
-    /// Try to create from Arrow Field
+    /// From Arrow field (lossy for unsupported types)
     #[must_use]
     pub fn from_arrow_field(field: &Field) -> Option<DatasetField> {
         let dtype = DatasetDataType::from_arrow_field(field)?;
@@ -181,13 +145,13 @@ impl DatasetField {
 }
 
 impl DatasetSchema {
-    /// Create a new schema
+    /// New schema
     #[must_use]
     pub fn new(fields: Vec<DatasetField>) -> Self {
         Self { fields }
     }
 
-    /// Convert to Arrow Schema
+    /// To Arrow schema
     #[must_use]
     pub fn to_arrow(&self) -> Arc<Schema> {
         let fields: Vec<Field> = self
@@ -198,8 +162,7 @@ impl DatasetSchema {
         Arc::new(Schema::new(fields))
     }
 
-    /// Try to create from Arrow Schema
-    /// Returns None if any field cannot be converted to `DatasetDataType`
+    /// Try from Arrow (fails if any field unsupported)
     #[must_use]
     pub fn try_from_arrow(schema: &Schema) -> Option<Self> {
         let mut fields = Vec::new();
@@ -210,8 +173,7 @@ impl DatasetSchema {
         Some(Self::new(fields))
     }
 
-    /// Create from Arrow Schema, filtering out unsupported fields
-    /// Returns the schema and a list of field names that were skipped
+    /// From Arrow filtering out unsupported fields (returns skipped names)
     #[must_use]
     pub fn from_arrow_with_filter(schema: &Schema) -> (Self, Vec<String>) {
         let mut fields = Vec::new();
@@ -228,13 +190,13 @@ impl DatasetSchema {
         (Self::new(fields), skipped)
     }
 
-    /// Get field by name
+    /// Field by name
     #[must_use]
     pub fn field(&self, name: &str) -> Option<&DatasetField> {
         self.fields.iter().find(|f| f.name == name)
     }
 
-    /// Get field by index
+    /// Field by index
     #[must_use]
     pub fn field_at(&self, index: usize) -> Option<&DatasetField> {
         self.fields.get(index)
@@ -246,18 +208,18 @@ impl DatasetSchema {
         self.fields.len()
     }
 
-    /// Check if schema is empty
+    /// Is empty
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
     }
 
-    /// Serialize to JSON string
+    /// Serialize to JSON
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
 
-    /// Deserialize from JSON string
+    /// Deserialize from JSON
     pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(json)
     }
@@ -297,7 +259,7 @@ mod tests {
         let field = DatasetField::new(
             "test_trace",
             DatasetDataType::Trace {
-                variant: TraceVariant::SimpleList,
+                variant: TraceType::SimpleList,
                 y: ScalarKind::Float64,
             },
             false,
@@ -323,7 +285,7 @@ mod tests {
             DatasetField::new(
                 "trace_col",
                 DatasetDataType::Trace {
-                    variant: TraceVariant::FixedStep,
+                    variant: TraceType::FixedStep,
                     y: ScalarKind::Float64,
                 },
                 false,
