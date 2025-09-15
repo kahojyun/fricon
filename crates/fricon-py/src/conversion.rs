@@ -42,25 +42,10 @@ pub fn extract_float_array(values: &Bound<'_, PyAny>) -> Result<Float64Array> {
 // Removed legacy Arrow-first helper functions in favor of business-type centric builders.
 
 /// Infer DatasetDataType directly from Python value (MVP)
-pub fn infer_dataset_type(
-    value: &Bound<'_, PyAny>,
-) -> Result<fricon::dataset_schema::DatasetDataType> {
-    use fricon::TraceType;
-    use fricon::dataset_schema::{DatasetDataType, ScalarKind};
+pub fn infer_dataset_type(value: &Bound<'_, PyAny>) -> Result<DatasetDataType> {
     // Trace object
     if let Ok(trace) = value.downcast_exact::<Trace>() {
-        let trace_data_type = trace.borrow().data_type().0.clone();
-        if trace_data_type.is_trace() {
-            let variant = trace_data_type
-                .trace_type()
-                .ok_or_else(|| anyhow::anyhow!("Unsupported trace type."))?;
-            let y = if trace_data_type.is_complex() {
-                ScalarKind::Complex128
-            } else {
-                ScalarKind::Float64
-            };
-            return Ok(DatasetDataType::Trace { variant, y });
-        }
+        return Ok(trace.borrow().dataset_dtype().clone());
     }
     // Arrow array primitive acceptable
     if let Ok(PyArrowType(data)) = value.extract() {
@@ -127,12 +112,7 @@ fn wrap_as_list_array(array: ArrayRef) -> ListArray {
 
 fn build_simple_list_trace_array(y_kind: ScalarKind, value: &Bound<'_, PyAny>) -> Result<ArrayRef> {
     if let Ok(trace) = value.downcast_exact::<Trace>() {
-        let data_type = trace.borrow().data_type().0.clone();
-        ensure!(
-            data_type.is_trace(),
-            "Provided Trace does not have trace data type"
-        );
-        return Ok(make_array(trace.borrow().to_arrow_array().0.clone()));
+        return Ok(trace.borrow().array().clone());
     }
     let sequence = match value.downcast::<PySequence>() {
         Ok(seq) => seq,
@@ -243,7 +223,7 @@ fn build_array_from_dataset_value(
             let Ok(trace) = value.downcast_exact::<Trace>() else {
                 bail!("FixedStep/VariableStep trace columns require a Trace object");
             };
-            Ok(make_array(trace.borrow().to_arrow_array().0.clone()))
+            Ok(trace.borrow().array().clone())
         }
     }
 }

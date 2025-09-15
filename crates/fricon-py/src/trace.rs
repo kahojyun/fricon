@@ -14,7 +14,7 @@ use pyo3::{
 };
 
 use crate::conversion::extract_float_array;
-use fricon::FriconTypeExt;
+use fricon::{FriconTypeExt, ScalarKind, TraceType, dataset_schema::DatasetDataType};
 
 // Minimal helpers retained locally after legacy removal.
 fn create_item_field_from_array(array: &ArrayRef) -> Field {
@@ -92,11 +92,45 @@ fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
 /// 1-D list of values with optional x-axis values.
 #[pyclass(module = "fricon._core")]
 pub struct Trace {
-    array: StructArray,
+    dtype: DatasetDataType, // Always a Trace variant
+    array: ArrayRef,
+}
+
+fn infer_scalar_kind(arr: &ArrayRef) -> Result<ScalarKind> {
+    let dt = arr.data_type();
+    if dt.is_complex() {
+        Ok(ScalarKind::Complex128)
+    } else if matches!(dt, DataType::Float64) {
+        Ok(ScalarKind::Float64)
+    } else {
+        bail!("Unsupported scalar kind for trace: {dt}");
+    }
 }
 
 #[pymethods]
 impl Trace {
+    /// Create a simple list trace (y-only values, implicit integer x starting at 0).
+    ///
+    /// Parameters:
+    ///     ys: Sequence or Arrow array of scalar values.
+    ///
+    /// Returns:
+    ///     A simple list trace.
+    #[staticmethod]
+    pub fn simple_list(ys: &Bound<'_, PyAny>) -> Result<Self> {
+        let ys = extract_scalar_array(ys)?;
+        let item_type = infer_scalar_kind(&ys)?;
+        // Layout: single value list (length 1) containing all y values
+        let list = wrap_as_list_array_with_field(ys.clone(), create_item_field_from_array(&ys));
+        Ok(Self {
+            dtype: DatasetDataType::Trace {
+                variant: TraceType::SimpleList,
+                y: item_type,
+            },
+            array: std::sync::Arc::new(list),
+        })
+    }
+
     /// Create a new trace with variable x steps.
     ///
     /// Parameters:
@@ -113,19 +147,27 @@ impl Trace {
             xs.len() == ys.len(),
             "Length of `xs` and `ys` should be equal."
         );
-        let xs_list = wrap_as_list_array(std::sync::Arc::new(xs));
-        let ys_item_field = create_item_field_from_array(&ys);
-        let ys_list = wrap_as_list_array_with_field(ys.clone(), ys_item_field);
+        let x_list = wrap_as_list_array(std::sync::Arc::new(xs));
+        let y_item_field = create_item_field_from_array(&ys);
+        let y_list = wrap_as_list_array_with_field(ys.clone(), y_item_field);
+        // Must match TraceType::VariableStep storage: Struct { x: List<f64>, y: List<item> }
         let fields = vec![
-            Field::new("xs", xs_list.data_type().clone(), false),
-            Field::new("ys", ys_list.data_type().clone(), false),
+            Field::new("x", x_list.data_type().clone(), false),
+            Field::new("y", y_list.data_type().clone(), false),
         ];
         let array = StructArray::new(
             fields.into(),
-            vec![std::sync::Arc::new(xs_list), std::sync::Arc::new(ys_list)],
+            vec![std::sync::Arc::new(x_list), std::sync::Arc::new(y_list)],
             None,
         );
-        Ok(Self { array })
+        let item_type = infer_scalar_kind(&ys)?;
+        Ok(Self {
+            dtype: DatasetDataType::Trace {
+                variant: TraceType::VariableStep,
+                y: item_type,
+            },
+            array: std::sync::Arc::new(array),
+        })
     }
 
     /// Create a new trace with fixed x steps.
@@ -142,36 +184,41 @@ impl Trace {
         let x0 = Float64Array::new_scalar(x0).into_inner();
         let dx = Float64Array::new_scalar(dx).into_inner();
         let ys = extract_scalar_array(ys)?;
-        let ys_item_field = create_item_field_from_array(&ys);
-        let ys_list = wrap_as_list_array_with_field(ys.clone(), ys_item_field);
+        let y_item_field = create_item_field_from_array(&ys);
+        let y_list = wrap_as_list_array_with_field(ys.clone(), y_item_field);
+        // Must match TraceType::FixedStep storage: Struct { x0: f64, step: f64, y: List<item> }
         let fields = vec![
             Field::new("x0", DataType::Float64, false),
-            Field::new("dx", DataType::Float64, false),
-            Field::new("ys", ys_list.data_type().clone(), false),
+            Field::new("step", DataType::Float64, false),
+            Field::new("y", y_list.data_type().clone(), false),
         ];
         let array = StructArray::new(
             fields.into(),
             vec![
                 std::sync::Arc::new(x0),
                 std::sync::Arc::new(dx),
-                std::sync::Arc::new(ys_list),
+                std::sync::Arc::new(y_list),
             ],
             None,
         );
-        Ok(Self { array })
+        let item_type = infer_scalar_kind(&ys)?;
+        Ok(Self {
+            dtype: DatasetDataType::Trace {
+                variant: TraceType::FixedStep,
+                y: item_type,
+            },
+            array: std::sync::Arc::new(array),
+        })
+    }
+}
+
+// Internal (Rust-only) helpers
+impl Trace {
+    pub(crate) fn dataset_dtype(&self) -> &DatasetDataType {
+        &self.dtype
     }
 
-    /// Arrow data type of the trace.
-    #[getter]
-    pub fn data_type(&self) -> PyArrowType<DataType> {
-        PyArrowType(self.array.data_type().clone())
-    }
-
-    /// Convert to an arrow array.
-    ///
-    /// Returns:
-    ///     Arrow array.
-    pub fn to_arrow_array(&self) -> PyArrowType<arrow::array::ArrayData> {
-        PyArrowType(self.array.to_data())
+    pub(crate) fn array(&self) -> &ArrayRef {
+        &self.array
     }
 }

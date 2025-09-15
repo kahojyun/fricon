@@ -82,13 +82,11 @@ impl DatasetDataType {
         }
 
         // Trace?
-        if field.is_trace()
-            && let Some(trace_type) = field.trace_type()
-        {
-            let variant = trace_type;
-            // TODO: infer y type from trace structure (currently assumes Float64)
-            let y = ScalarKind::Float64;
-            return Some(DatasetDataType::Trace { variant, y });
+        if let Some((variant, item_field)) = field.parse_trace_datatype() {
+            if let Some(y) = ScalarKind::from_arrow_field(item_field) {
+                return Some(DatasetDataType::Trace { variant, y });
+            }
+            return None; // Unsupported inner type (e.g., Int32) – we cannot represent it yet
         }
 
         None
@@ -265,6 +263,28 @@ mod tests {
             false,
         );
         let arrow_field = field.to_arrow_field();
+        let converted = DatasetField::from_arrow_field(&arrow_field).unwrap();
+        assert_eq!(field, converted);
+    }
+
+    #[test]
+    fn test_trace_simple_list_complex_roundtrip() {
+        // Build a simple list trace whose y item is Complex128.
+        let field = DatasetField::new(
+            "complex_trace",
+            DatasetDataType::Trace {
+                variant: TraceType::SimpleList,
+                y: ScalarKind::Complex128,
+            },
+            false,
+        );
+        let arrow_field = field.to_arrow_field();
+        // Ensure Arrow representation actually has a complex item type
+        if let DataType::List(item) = arrow_field.data_type() {
+            assert!(item.is_complex());
+        } else {
+            panic!("expected list data type for complex trace");
+        }
         let converted = DatasetField::from_arrow_field(&arrow_field).unwrap();
         assert_eq!(field, converted);
     }

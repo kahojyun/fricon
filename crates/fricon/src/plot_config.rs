@@ -210,9 +210,11 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
         (true, true, vec![PlotType::Scatter, PlotType::Heatmap])
     } else if field.is_trace() {
         // Trace data is typically plotted as line or scatter
-        match field.trace_type() {
-            Some(TraceType::SimpleList) => (false, true, vec![PlotType::Line, PlotType::Scatter]),
-            Some(TraceType::FixedStep | TraceType::VariableStep) => {
+        match field.parse_trace_datatype() {
+            Some((TraceType::SimpleList, _)) => {
+                (false, true, vec![PlotType::Line, PlotType::Scatter])
+            }
+            Some((TraceType::FixedStep | TraceType::VariableStep, _)) => {
                 (true, true, vec![PlotType::Line, PlotType::Scatter])
             }
             None => (false, false, Vec::new()),
@@ -262,7 +264,7 @@ fn generate_column_config(field: &Field) -> ColumnPlotConfig {
     // Add specific settings for fricon data types
     if data_type.is_complex() {
         settings.insert("complex".to_string(), "true".to_string());
-    } else if let Some(trace_type) = data_type.trace_type() {
+    } else if let Some((trace_type, _)) = data_type.parse_trace_datatype() {
         settings.insert("trace".to_string(), "true".to_string());
         settings.insert("trace_variant".to_string(), trace_type.to_string());
     }

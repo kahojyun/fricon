@@ -1,12 +1,10 @@
 use arrow::datatypes::{DataType, Field};
-use arrow_schema::extension::ExtensionType;
+use arrow_schema::{FieldRef, extension::ExtensionType};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ComplexType {
-    // ComplexType is a unit struct since the storage type is always the same
-}
+pub struct ComplexType;
 
 impl ExtensionType for ComplexType {
     const NAME: &'static str = "fricon.complex";
@@ -50,18 +48,13 @@ impl ExtensionType for ComplexType {
         data_type: &DataType,
         _metadata: Self::Metadata,
     ) -> Result<Self, arrow_schema::ArrowError> {
-        let temp_self = Self::default();
+        let temp_self = Self;
         temp_self.supports_data_type(data_type)?;
         Ok(temp_self)
     }
 }
 
 impl ComplexType {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     #[must_use]
     pub fn storage_type() -> DataType {
         DataType::Struct(
@@ -75,7 +68,7 @@ impl ComplexType {
 
     #[must_use]
     pub fn field(name: &str, nullable: bool) -> Field {
-        Field::new(name, Self::storage_type(), nullable).with_extension_type(Self::default())
+        Field::new(name, Self::storage_type(), nullable).with_extension_type(Self)
     }
 }
 
@@ -115,50 +108,14 @@ impl ExtensionType for TraceType {
     }
 
     fn supports_data_type(&self, data_type: &DataType) -> Result<(), arrow_schema::ArrowError> {
-        match self {
-            TraceType::SimpleList => {
-                if let DataType::List(_) = data_type {
-                    Ok(())
-                } else {
-                    Err(arrow_schema::ArrowError::InvalidArgumentError(
-                        "SimpleList trace requires List data type".to_string(),
-                    ))
-                }
-            }
-            TraceType::FixedStep => {
-                if let DataType::Struct(fields) = data_type
-                    && fields.len() == 3
-                {
-                    let field_names: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
-                    if field_names == ["x0", "step", "y"]
-                        && fields[0].data_type() == &DataType::Float64
-                        && fields[1].data_type() == &DataType::Float64
-                        && matches!(fields[2].data_type(), DataType::List(_))
-                    {
-                        return Ok(());
-                    }
-                }
-                Err(arrow_schema::ArrowError::InvalidArgumentError(
-                    "FixedStep trace requires struct with x0, step, y fields".to_string(),
-                ))
-            }
-            TraceType::VariableStep => {
-                if let DataType::Struct(fields) = data_type
-                    && fields.len() == 2
-                {
-                    let field_names: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
-                    if field_names == ["x", "y"]
-                        && matches!(fields[0].data_type(), DataType::List(_))
-                        && matches!(fields[1].data_type(), DataType::List(_))
-                    {
-                        return Ok(());
-                    }
-                }
-                Err(arrow_schema::ArrowError::InvalidArgumentError(
-                    "VariableStep trace requires struct with x, y fields".to_string(),
-                ))
-            }
+        if let Some((trace_type, _item_field)) = data_type.parse_trace_datatype()
+            && trace_type == *self
+        {
+            return Ok(());
         }
+        Err(arrow_schema::ArrowError::InvalidArgumentError(format!(
+            "TraceType::{self:?} does not match provided data type"
+        )))
     }
 
     fn try_new(
@@ -246,26 +203,51 @@ impl std::fmt::Display for TraceType {
 pub trait FriconTypeExt {
     fn is_complex(&self) -> bool;
     fn is_trace(&self) -> bool;
-    fn trace_type(&self) -> Option<TraceType>;
+    fn parse_trace_datatype(&self) -> Option<(TraceType, &FieldRef)>;
 }
 
 impl FriconTypeExt for DataType {
     fn is_complex(&self) -> bool {
-        ComplexType::default().supports_data_type(self).is_ok()
+        ComplexType.supports_data_type(self).is_ok()
     }
 
     fn is_trace(&self) -> bool {
-        self.trace_type().is_some()
+        self.parse_trace_datatype().is_some()
     }
 
-    fn trace_type(&self) -> Option<TraceType> {
-        [
-            TraceType::SimpleList,
-            TraceType::FixedStep,
-            TraceType::VariableStep,
-        ]
-        .into_iter()
-        .find(|&trace_type| trace_type.supports_data_type(self).is_ok())
+    fn parse_trace_datatype(&self) -> Option<(TraceType, &FieldRef)> {
+        match self {
+            DataType::List(item_field) => {
+                // SimpleList: List<item>
+                Some((TraceType::SimpleList, item_field))
+            }
+            DataType::Struct(fields) => {
+                // FixedStep: Struct{x0, step, y: List<item>}
+                if fields.len() == 3 {
+                    let names: Vec<_> = fields.iter().map(|f| f.name().as_str()).collect();
+                    if names == ["x0", "step", "y"]
+                        && fields[0].data_type() == &DataType::Float64
+                        && fields[1].data_type() == &DataType::Float64
+                        && matches!(fields[2].data_type(), DataType::List(_))
+                        && let DataType::List(item_field) = fields[2].data_type()
+                    {
+                        return Some((TraceType::FixedStep, item_field));
+                    }
+                }
+                // VariableStep: Struct{x: List<f64>, y: List<item>}
+                if fields.len() == 2 {
+                    let names: Vec<_> = fields.iter().map(|f| f.name().as_str()).collect();
+                    if names == ["x", "y"]
+                        && matches!(fields[1].data_type(), DataType::List(_))
+                        && let DataType::List(item_field) = fields[1].data_type()
+                    {
+                        return Some((TraceType::VariableStep, item_field));
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
     }
 }
 
@@ -278,21 +260,16 @@ impl FriconTypeExt for Field {
         self.try_extension_type::<TraceType>().is_ok()
     }
 
-    fn trace_type(&self) -> Option<TraceType> {
-        if let Ok(trace_type) = self.try_extension_type::<TraceType>() {
-            Some(trace_type)
-        } else {
-            self.data_type().trace_type()
-        }
+    fn parse_trace_datatype(&self) -> Option<(TraceType, &FieldRef)> {
+        self.data_type().parse_trace_datatype()
     }
 }
 
-// helper removed — construct Schema::new(...) directly where needed
-
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
-    use arrow::datatypes::Schema;
 
     #[test]
     fn test_complex_type() {
@@ -310,120 +287,33 @@ mod tests {
         // Check extension metadata
         assert_eq!(field.extension_type_name(), Some("fricon.complex"));
 
-        // Test new() method and extension name
-        let _complex_type = ComplexType::new();
         assert_eq!(ComplexType::NAME, "fricon.complex");
-    }
-
-    #[test]
-    fn test_trace_types() {
-        // Test simple list trace
-        let simple_trace = TraceType::simple_list();
-        let item_field = Field::new("item", DataType::Float64, false);
-        let simple_data_type = simple_trace.storage_type(Arc::new(item_field.clone()));
-        assert!(simple_data_type.is_trace());
-        assert_eq!(simple_data_type.trace_type(), Some(TraceType::SimpleList));
-
-        // Test fixed step trace
-        let fixed_trace = TraceType::fixed_step();
-        let fixed_data_type = fixed_trace.storage_type(Arc::new(item_field.clone()));
-        assert!(fixed_data_type.is_trace());
-        assert_eq!(fixed_data_type.trace_type(), Some(TraceType::FixedStep));
-
-        // Test variable step trace
-        let variable_trace = TraceType::variable_step();
-        let variable_data_type = variable_trace.storage_type(Arc::new(item_field));
-        assert!(variable_data_type.is_trace());
-        assert_eq!(
-            variable_data_type.trace_type(),
-            Some(TraceType::VariableStep)
-        );
-
-        // Test extension metadata
-        let item_field = Field::new("item", DataType::Float64, false);
-        let simple_field =
-            TraceType::simple_list().field("simple", Arc::new(item_field.clone()), false);
-        assert_eq!(simple_field.extension_type_name(), Some("fricon.trace"));
-        assert!(simple_field.is_trace());
-        assert_eq!(simple_field.trace_type(), Some(TraceType::SimpleList));
-
-        let fixed_field =
-            TraceType::fixed_step().field("fixed", Arc::new(item_field.clone()), false);
-        assert_eq!(fixed_field.extension_type_name(), Some("fricon.trace"));
-        assert!(fixed_field.is_trace());
-        assert_eq!(fixed_field.trace_type(), Some(TraceType::FixedStep));
-
-        let variable_field =
-            TraceType::variable_step().field("variable", Arc::new(item_field), false);
-        assert_eq!(variable_field.extension_type_name(), Some("fricon.trace"));
-        assert!(variable_field.is_trace());
-        assert_eq!(variable_field.trace_type(), Some(TraceType::VariableStep));
     }
 
     #[test]
     fn test_trace_type_field_creation() {
         // Test direct field creation from TraceType
-        let item_field = Field::new("item", DataType::Float64, false);
-        let simple_field =
-            TraceType::SimpleList.field("simple", Arc::new(item_field.clone()), false);
+        let item_field = Arc::new(Field::new("item", DataType::Float64, false));
+        let simple_field = TraceType::SimpleList.field("simple", item_field.clone(), false);
         assert!(simple_field.is_trace());
-        assert_eq!(simple_field.trace_type(), Some(TraceType::SimpleList));
+        assert_eq!(
+            simple_field.parse_trace_datatype(),
+            Some((TraceType::SimpleList, &item_field))
+        );
 
-        let fixed_field = TraceType::FixedStep.field("fixed", Arc::new(item_field.clone()), false);
+        let fixed_field = TraceType::FixedStep.field("fixed", item_field.clone(), false);
         assert!(fixed_field.is_trace());
-        assert_eq!(fixed_field.trace_type(), Some(TraceType::FixedStep));
+        assert_eq!(
+            fixed_field.parse_trace_datatype(),
+            Some((TraceType::FixedStep, &item_field))
+        );
 
-        let variable_field = TraceType::VariableStep.field("variable", Arc::new(item_field), false);
+        let variable_field = TraceType::VariableStep.field("variable", item_field.clone(), false);
         assert!(variable_field.is_trace());
-        assert_eq!(variable_field.trace_type(), Some(TraceType::VariableStep));
-    }
-
-    #[test]
-    fn test_trace_type_convenience_methods() {
-        // Test convenience methods
-        let item_field = Field::new("item", DataType::Float64, false);
-        let simple_field =
-            TraceType::simple_list_field("simple", Arc::new(item_field.clone()), false);
-        assert!(simple_field.is_trace());
-        assert_eq!(simple_field.trace_type(), Some(TraceType::SimpleList));
-
-        let fixed_field = TraceType::fixed_step_field("fixed", Arc::new(item_field.clone()), false);
-        assert!(fixed_field.is_trace());
-        assert_eq!(fixed_field.trace_type(), Some(TraceType::FixedStep));
-
-        let variable_field =
-            TraceType::variable_step_field("variable", Arc::new(item_field), false);
-        assert!(variable_field.is_trace());
-        assert_eq!(variable_field.trace_type(), Some(TraceType::VariableStep));
-    }
-
-    #[test]
-    fn test_schema_creation() {
-        // Test creating schemas directly without builder
-        let item_field = Field::new("item", DataType::Float64, false);
-        let schema = Schema::new(vec![
-            ComplexType::field("complex_data", false),
-            TraceType::simple_list_field("simple_trace", Arc::new(item_field.clone()), true),
-            TraceType::fixed_step_field("fixed_trace", Arc::new(item_field.clone()), false),
-            TraceType::variable_step_field("variable_trace", Arc::new(item_field), true),
-            Field::new("regular_field", DataType::Int32, false),
-        ]);
-
-        assert_eq!(schema.fields().len(), 5);
-
-        // Check complex field
-        let complex_field = schema.field_with_name("complex_data").unwrap();
-        assert!(complex_field.is_complex());
-
-        // Check trace fields
-        let simple_field = schema.field_with_name("simple_trace").unwrap();
-        assert_eq!(simple_field.trace_type(), Some(TraceType::SimpleList));
-
-        let fixed_field = schema.field_with_name("fixed_trace").unwrap();
-        assert_eq!(fixed_field.trace_type(), Some(TraceType::FixedStep));
-
-        let variable_field = schema.field_with_name("variable_trace").unwrap();
-        assert_eq!(variable_field.trace_type(), Some(TraceType::VariableStep));
+        assert_eq!(
+            variable_field.parse_trace_datatype(),
+            Some((TraceType::VariableStep, &item_field))
+        );
     }
 
     #[test]
@@ -437,49 +327,49 @@ mod tests {
     fn test_trace_with_custom_y_datatype() {
         // Test creating traces with different y data types
         let simple_int = TraceType::simple_list();
-        let int_item_field = Field::new("item", DataType::Int32, false);
-        let simple_int_type = simple_int.storage_type(Arc::new(int_item_field.clone()));
+        let int_item_field = Arc::new(Field::new("item", DataType::Int32, false));
+        let simple_int_type = simple_int.storage_type(int_item_field.clone());
         assert!(simple_int_type.is_trace());
-        assert_eq!(simple_int_type.trace_type(), Some(TraceType::SimpleList));
+        assert_eq!(
+            simple_int_type.parse_trace_datatype(),
+            Some((TraceType::SimpleList, &int_item_field))
+        );
 
         let simple_string = TraceType::simple_list();
-        let string_item_field = Field::new("item", DataType::Utf8, false);
-        let simple_string_type = simple_string.storage_type(Arc::new(string_item_field.clone()));
+        let string_item_field = Arc::new(Field::new("item", DataType::Utf8, false));
+        let simple_string_type = simple_string.storage_type(string_item_field.clone());
         assert!(simple_string_type.is_trace());
-        assert_eq!(simple_string_type.trace_type(), Some(TraceType::SimpleList));
+        assert_eq!(
+            simple_string_type.parse_trace_datatype(),
+            Some((TraceType::SimpleList, &string_item_field))
+        );
 
         let simple_bool = TraceType::simple_list();
-        let bool_item_field = Field::new("item", DataType::Boolean, false);
-        let simple_bool_type = simple_bool.storage_type(Arc::new(bool_item_field));
+        let bool_item_field = Arc::new(Field::new("item", DataType::Boolean, false));
+        let simple_bool_type = simple_bool.storage_type(bool_item_field.clone());
         assert!(simple_bool_type.is_trace());
-        assert_eq!(simple_bool_type.trace_type(), Some(TraceType::SimpleList));
+        assert_eq!(
+            simple_bool_type.parse_trace_datatype(),
+            Some((TraceType::SimpleList, &bool_item_field))
+        );
 
         // Test fixed step with different y data types
         let fixed_int = TraceType::fixed_step();
-        let fixed_int_type = fixed_int.storage_type(Arc::new(int_item_field));
+        let fixed_int_type = fixed_int.storage_type(int_item_field.clone());
         assert!(fixed_int_type.is_trace());
-        assert_eq!(fixed_int_type.trace_type(), Some(TraceType::FixedStep));
+        assert_eq!(
+            fixed_int_type.parse_trace_datatype(),
+            Some((TraceType::FixedStep, &int_item_field))
+        );
 
         // Test variable step with different y data types
         let variable_string = TraceType::variable_step();
-        let variable_string_type = variable_string.storage_type(Arc::new(string_item_field));
+        let variable_string_type = variable_string.storage_type(string_item_field.clone());
         assert!(variable_string_type.is_trace());
         assert_eq!(
-            variable_string_type.trace_type(),
-            Some(TraceType::VariableStep)
+            variable_string_type.parse_trace_datatype(),
+            Some((TraceType::VariableStep, &string_item_field))
         );
-
-        // Test field creation with custom y data types
-        let int_item_field = Field::new("item", DataType::Int32, false);
-        let int_field = TraceType::simple_list_field("int_trace", Arc::new(int_item_field), false);
-        assert!(int_field.is_trace());
-        assert_eq!(int_field.trace_type(), Some(TraceType::SimpleList));
-
-        let string_item_field = Field::new("item", DataType::Utf8, false);
-        let string_field =
-            TraceType::FixedStep.field("string_trace", Arc::new(string_item_field), false);
-        assert!(string_field.is_trace());
-        assert_eq!(string_field.trace_type(), Some(TraceType::FixedStep));
     }
 
     #[test]
@@ -508,5 +398,52 @@ mod tests {
             let deserialized = TraceType::deserialize_metadata(Some(&serialized)).unwrap();
             assert_eq!(deserialized, expected_variant);
         }
+    }
+
+    #[test]
+    fn test_parse_trace_datatype_trait_method() {
+        // Simple list
+        let item_field = Arc::new(Field::new("item", DataType::Float64, false));
+        let simple_type = TraceType::SimpleList.storage_type(item_field.clone());
+        let parsed = simple_type.parse_trace_datatype();
+        assert!(matches!(parsed, Some((TraceType::SimpleList, _))));
+
+        // Fixed step
+        let fixed_type = TraceType::FixedStep.storage_type(item_field.clone());
+        let parsed_fixed = fixed_type.parse_trace_datatype();
+        assert!(matches!(parsed_fixed, Some((TraceType::FixedStep, _))));
+
+        // Variable step
+        let variable_type = TraceType::VariableStep.storage_type(item_field.clone());
+        let parsed_variable = variable_type.parse_trace_datatype();
+        assert!(matches!(
+            parsed_variable,
+            Some((TraceType::VariableStep, _))
+        ));
+
+        // Field variants
+        let simple_field = TraceType::SimpleList.field("simple", item_field.clone(), false);
+        assert!(matches!(
+            simple_field.parse_trace_datatype(),
+            Some((TraceType::SimpleList, _))
+        ));
+
+        let fixed_field = TraceType::FixedStep.field("fixed", item_field.clone(), false);
+        assert!(matches!(
+            fixed_field.parse_trace_datatype(),
+            Some((TraceType::FixedStep, _))
+        ));
+
+        let variable_field = TraceType::VariableStep.field("variable", item_field, false);
+        assert!(matches!(
+            variable_field.parse_trace_datatype(),
+            Some((TraceType::VariableStep, _))
+        ));
+
+        // Non-trace type returns None
+        let regular_type = DataType::Int32;
+        assert!(regular_type.parse_trace_datatype().is_none());
+        let regular_field = Field::new("regular", DataType::Int32, false);
+        assert!(regular_field.parse_trace_datatype().is_none());
     }
 }
