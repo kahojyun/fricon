@@ -19,6 +19,7 @@ fricon-cli = { path = "../fricon-cli" }
 anyhow = { workspace = true }
 arrow = { workspace = true, features = ["pyarrow"] }
 chrono = { workspace = true, features = ["serde"] }
+indexmap = { workspace = true }
 itertools = { workspace = true }
 ndarray = { workspace = true }
 num = { workspace = true }
@@ -29,6 +30,7 @@ pyo3 = { workspace = true, features = [
     "num-complex",
     "abi3-py39",
     "generate-import-lib",
+    "indexmap",
 ] }
 pyo3-async-runtimes = { workspace = true, features = ["tokio-runtime"] }
 tokio-stream = { workspace = true }
