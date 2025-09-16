@@ -39,15 +39,13 @@ pub fn extract_float_array(values: &Bound<'_, PyAny>) -> Result<Float64Array> {
     bail!("Cannot convert values with type {py_type} to float64 array.");
 }
 
-// Removed legacy Arrow-first helper functions in favor of business-type centric builders.
-
-/// Infer DatasetDataType directly from Python value (MVP)
+/// Infer DatasetDataType from a Python value.
 pub fn infer_dataset_type(value: &Bound<'_, PyAny>) -> Result<DatasetDataType> {
     // Trace object
     if let Ok(trace) = value.downcast_exact::<Trace>() {
         return Ok(trace.borrow().dataset_dtype().clone());
     }
-    // Arrow array primitive acceptable
+    // Arrow array primitives
     if let Ok(PyArrowType(data)) = value.extract() {
         let arr = make_array(data);
         let dt = arr.data_type();
@@ -91,8 +89,6 @@ pub fn infer_dataset_type(value: &Bound<'_, PyAny>) -> Result<DatasetDataType> {
         "Unsupported python type. Only float, int, complex, trace, supported arrow arrays, and numeric sequences are allowed."
     );
 }
-
-// Legacy Arrow-first sequence/array/batch builder functions removed.
 
 fn wrap_as_list_array(array: ArrayRef) -> ListArray {
     // Minimal retained helper: wraps array into a single list element (length 1 list of full array)

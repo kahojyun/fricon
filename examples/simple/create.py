@@ -3,11 +3,10 @@ from fricon import Trace, Workspace
 ws = Workspace.connect("path/to/workspace")
 manager = ws.dataset_manager
 with manager.create("example_dataset") as writer:
+    # Only numeric scalars and traces are supported
     writer.write(
         i=1,
-        a="Alice",
-        b=[1, 2],
-        c=["A", "B"],
-        d=Trace.fixed_step(0.1, 1.1, [1, 2, 3]),
+        value=3.14,
+        trace=Trace.fixed_step(0.0, 0.5, [1.0, 2.0, 3.5]),
     )
-print(f"Id of the dataset: {writer.dataset.id}")
+print(writer.dataset.id)

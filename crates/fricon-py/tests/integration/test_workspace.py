@@ -63,7 +63,7 @@ class TestWorkspaceIntegration:
             assert isinstance(writer, fricon._core.DatasetWriter)
 
             # Write data and close
-            writer.write(id=1, value=42.0, name="test_item")
+            writer.write(id=1, value=42.0)
             writer.close()
 
     def test_workspace_dataset_listing(self) -> None:
@@ -79,7 +79,7 @@ class TestWorkspaceIntegration:
 
             # Create a dataset
             writer = dm.create("test_dataset", description="Test dataset")
-            writer.write(id=1, value=42.0, name="test_item")
+            writer.write(id=1, value=42.0)
             writer.close()
 
             # Should have one dataset now
@@ -98,8 +98,9 @@ class TestWorkspaceIntegration:
             with dm.create(
                 "context_test", description="Context manager test"
             ) as writer:
-                writer.write(id=1, value=100.0, name="context_item")
-                writer.write(id=2, value=200.0, name="context_item2")
+                # Only numeric columns supported currently
+                writer.write(id=1, value=100.0)
+                writer.write(id=2, value=200.0)
 
             # Dataset should be automatically closed and completed
             datasets = dm.list_all()

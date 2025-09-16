@@ -33,7 +33,7 @@ columns will be inferred from the first row of the dataset.
 
 ## Type inference
 
-`fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
+`fricon` currently supports a focused set of numeric and trace data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
 | Python type        | Dataset data type | Description                                  |
 | ------------------ | ----------------- | -------------------------------------------- |
@@ -51,7 +51,7 @@ Trace data supports three different formats depending on how the x-axis (indepen
 
 ### Future extensions
 
-Additional data types (strings, booleans, integers, timestamps) may be supported in future versions. The current focus on scalar and trace types ensures optimal performance and correctness for the most common scientific use cases.
+Additional data types (strings, booleans, integers, timestamps) may be added later. Current focus keeps implementation minimal and fast.
 
 <!-- TODO: `pyarrow` and `polars` tips -->
 

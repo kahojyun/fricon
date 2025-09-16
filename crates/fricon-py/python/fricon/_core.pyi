@@ -1,13 +1,13 @@
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
-from typing import Any, TypeVar, final
+from typing import Any, final
 
 import numpy.typing as npt
 import pandas as pd
 import polars as pl
 import pyarrow as pa
 from _typeshed import StrPath
-from numpy import float64
+from numpy import complex128, float64
 from typing_extensions import Literal, Self, TypeAlias
 
 __all__ = [
@@ -16,28 +16,14 @@ __all__ = [
     "DatasetWriter",
     "Trace",
     "Workspace",
-    "complex128_field",
-    "fixed_step_trace_field",
     "main",
     "main_gui",
     "serve_workspace",
-    "simple_list_trace_field",
-    "variable_step_trace_field",
 ]
 
 def main() -> int: ...
 def main_gui() -> int: ...
 def serve_workspace(path: StrPath) -> Workspace: ...
-def complex128_field(name: str, nullable: bool = True) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
-def simple_list_trace_field(
-    name: str, item_type: pa.DataType | None = None, nullable: bool = True
-) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
-def fixed_step_trace_field(
-    name: str, item_type: pa.DataType | None = None, nullable: bool = True
-) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
-def variable_step_trace_field(
-    name: str, item_type: pa.DataType | None = None, nullable: bool = True
-) -> pa.Field[Any]: ...  # pyright: ignore[reportExplicitAny]
 @final
 class Workspace:
     @staticmethod
@@ -60,35 +46,38 @@ class DatasetManager:
     ) -> Dataset: ...
     def list_all(self) -> pd.DataFrame: ...
 
-_ScalarT_co = TypeVar("_ScalarT_co", str, bool, complex, covariant=True)
 _ArrowAnyArray: TypeAlias = pa.Array[Any]  # pyright: ignore[reportExplicitAny]
 
 @final
 class Trace:
     @staticmethod
+    def simple_list(
+        y: Sequence[float | complex]
+        | npt.NDArray[float64]
+        | npt.NDArray[complex128]
+        | _ArrowAnyArray,
+    ) -> Trace: ...
+    @staticmethod
     def variable_step(
-        xs: Sequence[float] | npt.NDArray[float64],
-        ys: Sequence[_ScalarT_co] | _ArrowAnyArray,
+        x: Sequence[float] | npt.NDArray[float64],
+        y: Sequence[float | complex]
+        | npt.NDArray[float64]
+        | npt.NDArray[complex128]
+        | _ArrowAnyArray,
     ) -> Trace: ...
     @staticmethod
     def fixed_step(
         x0: float,
-        dx: float,
-        ys: Sequence[_ScalarT_co] | _ArrowAnyArray,
+        step: float,
+        y: Sequence[float | complex]
+        | npt.NDArray[float64]
+        | npt.NDArray[complex128]
+        | _ArrowAnyArray,
     ) -> Trace: ...
-    @property
-    def data_type(self) -> pa.DataType: ...
     def to_arrow_array(self) -> _ArrowAnyArray: ...
 
 _ColumnType: TypeAlias = (
-    str
-    | bool
-    | complex
-    | Sequence[str]
-    | Sequence[bool]
-    | Sequence[complex]
-    | Trace
-    | _ArrowAnyArray
+    float | complex | Sequence[float] | Sequence[complex] | Trace | _ArrowAnyArray
 )
 
 @final

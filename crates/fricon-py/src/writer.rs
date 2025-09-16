@@ -63,7 +63,6 @@ impl DatasetWriter {
             bail!("Writer closed.");
         };
         if self.first_row {
-            // Infer dataset schema (business) from first row.
             let mut dataset_fields = Vec::with_capacity(values.len());
             for (name, value) in &values {
                 let bound = value.bind(py);

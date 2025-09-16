@@ -8,10 +8,6 @@ from ._core import (
     DatasetWriter,
     Trace,
     Workspace,
-    complex128_field,
-    fixed_step_trace_field,
-    simple_list_trace_field,
-    variable_step_trace_field,
 )
 
 __all__ = [
@@ -20,8 +16,4 @@ __all__ = [
     "DatasetWriter",
     "Trace",
     "Workspace",
-    "complex128_field",
-    "fixed_step_trace_field",
-    "simple_list_trace_field",
-    "variable_step_trace_field",
 ]

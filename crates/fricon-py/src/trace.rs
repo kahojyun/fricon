@@ -1,22 +1,22 @@
+use std::sync::Arc;
+
 use anyhow::{Result, bail, ensure};
 use arrow::{
-    array::{
-        Array, ArrayRef, BooleanArray, Float64Array, Int64Array, ListArray, StringBuilder,
-        StructArray, make_array,
-    },
+    array::{Array, ArrayRef, Float64Array, ListArray, StructArray, make_array},
     buffer::OffsetBuffer,
-    datatypes::{DataType, Field},
+    datatypes::{DataType, Field, FieldRef},
     pyarrow::PyArrowType,
 };
+use num::complex::Complex64;
+use numpy::{PyArray1, PyArrayMethods};
 use pyo3::{
     prelude::*,
-    types::{PyBool, PyFloat, PyInt, PySequence, PyString},
+    types::{PyComplex, PyFloat, PySequence},
 };
 
 use crate::conversion::extract_float_array;
 use fricon::{FriconTypeExt, ScalarKind, TraceType, dataset_schema::DatasetDataType};
 
-// Minimal helpers retained locally after legacy removal.
 fn create_item_field_from_array(array: &ArrayRef) -> Field {
     let dt = array.data_type();
     if dt.is_complex() {
@@ -27,14 +27,10 @@ fn create_item_field_from_array(array: &ArrayRef) -> Field {
     }
 }
 
-fn wrap_as_list_array_with_field(array: ArrayRef, item_field: Field) -> ListArray {
-    let list_field = Field::new(
-        "list",
-        DataType::List(std::sync::Arc::new(item_field)),
-        false,
-    );
+fn wrap_as_list_array_with_field(array: ArrayRef, item_field: FieldRef) -> ListArray {
+    // Build List(Field<item>) data type implicitly via ListArray constructor which takes the item field.
     ListArray::new(
-        std::sync::Arc::new(list_field),
+        item_field,
         OffsetBuffer::from_lengths([array.len()]),
         array,
         None,
@@ -43,45 +39,80 @@ fn wrap_as_list_array_with_field(array: ArrayRef, item_field: Field) -> ListArra
 
 fn wrap_as_list_array(array: ArrayRef) -> ListArray {
     let item_field = create_item_field_from_array(&array);
-    wrap_as_list_array_with_field(array, item_field)
+    wrap_as_list_array_with_field(array, Arc::new(item_field))
 }
 
 fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
     if let Ok(PyArrowType(data)) = values.extract::<PyArrowType<arrow::array::ArrayData>>() {
         let arr = make_array(data);
         return match arr.data_type() {
-            DataType::Boolean | DataType::Int64 | DataType::Float64 | DataType::Utf8 => Ok(arr),
+            DataType::Float64 => Ok(arr),
             t @ DataType::Struct(_) if t.is_complex() => Ok(arr),
             _ => bail!("Unsupported arrow array type for ys."),
         };
     }
+    if let Ok(array_obj) = values.downcast::<PyArray1<Complex64>>() {
+        let arr = array_obj.readonly();
+        let view = arr.as_array();
+        ensure!(!view.is_empty(), "Cannot build trace from empty array.");
+        let mut real: Vec<f64> = Vec::with_capacity(view.len());
+        let mut imag: Vec<f64> = Vec::with_capacity(view.len());
+        for &c in view {
+            real.push(c.re);
+            imag.push(c.im);
+        }
+        let real_arr = Float64Array::from(real);
+        let imag_arr = Float64Array::from(imag);
+        let fields = vec![
+            Field::new("real", DataType::Float64, false),
+            Field::new("imag", DataType::Float64, false),
+        ];
+        let struct_arr = StructArray::new(
+            fields.into(),
+            vec![Arc::new(real_arr), Arc::new(imag_arr)],
+            None,
+        );
+        return Ok(Arc::new(struct_arr));
+    }
+    if let Ok(array_obj) = values.downcast::<PyArray1<f64>>() {
+        let arr = array_obj.readonly();
+        let view = arr.as_array();
+        ensure!(!view.is_empty(), "Cannot build trace from empty array.");
+        let float_arr = Float64Array::from_iter_values(view.iter().copied());
+        return Ok(Arc::new(float_arr));
+    }
     if let Ok(seq) = values.downcast::<PySequence>() {
         ensure!(seq.len()? > 0, "Cannot build trace from empty sequence.");
         let first = seq.get_item(0)?;
-        if first.is_instance_of::<PyBool>() {
-            let mut b = BooleanArray::builder(seq.len()?);
-            for v in seq.try_iter()? {
-                b.append_value(v?.extract::<bool>()?);
-            }
-            return Ok(std::sync::Arc::new(b.finish()));
-        } else if first.is_instance_of::<PyInt>() {
-            let mut b = Int64Array::builder(seq.len()?);
-            for v in seq.try_iter()? {
-                b.append_value(v?.extract::<i64>()?);
-            }
-            return Ok(std::sync::Arc::new(b.finish()));
-        } else if first.is_instance_of::<PyFloat>() {
+        if first.is_instance_of::<PyFloat>() {
             let mut b = Float64Array::builder(seq.len()?);
             for v in seq.try_iter()? {
                 b.append_value(v?.extract::<f64>()?);
             }
-            return Ok(std::sync::Arc::new(b.finish()));
-        } else if first.is_instance_of::<PyString>() {
-            let mut b = StringBuilder::new();
+            return Ok(Arc::new(b.finish()));
+        }
+        if first.is_instance_of::<PyComplex>() {
+            // Build complex struct array: StructArray{real: Float64Array, imag: Float64Array}
+            let len = seq.len()?;
+            let mut real: Vec<f64> = Vec::with_capacity(len);
+            let mut imag: Vec<f64> = Vec::with_capacity(len);
             for v in seq.try_iter()? {
-                b.append_value(v?.extract::<String>()?);
+                let c: Complex64 = v?.extract()?;
+                real.push(c.re);
+                imag.push(c.im);
             }
-            return Ok(std::sync::Arc::new(b.finish()));
+            let real_arr = Float64Array::from(real);
+            let imag_arr = Float64Array::from(imag);
+            let fields = vec![
+                Field::new("real", DataType::Float64, false),
+                Field::new("imag", DataType::Float64, false),
+            ];
+            let struct_arr = StructArray::new(
+                fields.into(),
+                vec![Arc::new(real_arr), Arc::new(imag_arr)],
+                None,
+            );
+            return Ok(Arc::new(struct_arr));
         }
         bail!("Unsupported sequence element type for ys.");
     }
@@ -112,61 +143,55 @@ impl Trace {
     /// Create a simple list trace (y-only values, implicit integer x starting at 0).
     ///
     /// Parameters:
-    ///     ys: Sequence or Arrow array of scalar values.
+    ///     y: Sequence or Arrow array of scalar values.
     ///
     /// Returns:
     ///     A simple list trace.
     #[staticmethod]
-    pub fn simple_list(ys: &Bound<'_, PyAny>) -> Result<Self> {
-        let ys = extract_scalar_array(ys)?;
-        let item_type = infer_scalar_kind(&ys)?;
-        // Layout: single value list (length 1) containing all y values
-        let list = wrap_as_list_array_with_field(ys.clone(), create_item_field_from_array(&ys));
+    pub fn simple_list(y: &Bound<'_, PyAny>) -> Result<Self> {
+        let y = extract_scalar_array(y)?;
+        let item_type = infer_scalar_kind(&y)?;
+        let list = wrap_as_list_array(y);
         Ok(Self {
             dtype: DatasetDataType::Trace {
                 variant: TraceType::SimpleList,
                 y: item_type,
             },
-            array: std::sync::Arc::new(list),
+            array: Arc::new(list),
         })
     }
 
     /// Create a new trace with variable x steps.
     ///
     /// Parameters:
-    ///     xs: List of x-axis values.
-    ///     ys: List of y-axis values.
+    ///     x: List of x-axis values.
+    ///     y: List of y-axis values.
     ///
     /// Returns:
     ///     A variable-step trace.
     #[staticmethod]
-    pub fn variable_step(xs: &Bound<'_, PyAny>, ys: &Bound<'_, PyAny>) -> Result<Self> {
-        let xs = extract_float_array(xs)?;
-        let ys = extract_scalar_array(ys)?;
-        ensure!(
-            xs.len() == ys.len(),
-            "Length of `xs` and `ys` should be equal."
-        );
-        let x_list = wrap_as_list_array(std::sync::Arc::new(xs));
-        let y_item_field = create_item_field_from_array(&ys);
-        let y_list = wrap_as_list_array_with_field(ys.clone(), y_item_field);
-        // Must match TraceType::VariableStep storage: Struct { x: List<f64>, y: List<item> }
+    pub fn variable_step(x: &Bound<'_, PyAny>, y: &Bound<'_, PyAny>) -> Result<Self> {
+        let x = extract_float_array(x)?;
+        let y = extract_scalar_array(y)?;
+        ensure!(x.len() == y.len(), "Length of `x` and `y` should be equal.");
+        let item_type = infer_scalar_kind(&y)?;
+        let x_list = wrap_as_list_array(Arc::new(x));
+        let y_list = wrap_as_list_array(y);
         let fields = vec![
             Field::new("x", x_list.data_type().clone(), false),
             Field::new("y", y_list.data_type().clone(), false),
         ];
         let array = StructArray::new(
             fields.into(),
-            vec![std::sync::Arc::new(x_list), std::sync::Arc::new(y_list)],
+            vec![Arc::new(x_list), Arc::new(y_list)],
             None,
         );
-        let item_type = infer_scalar_kind(&ys)?;
         Ok(Self {
             dtype: DatasetDataType::Trace {
                 variant: TraceType::VariableStep,
                 y: item_type,
             },
-            array: std::sync::Arc::new(array),
+            array: Arc::new(array),
         })
     }
 
@@ -174,19 +199,18 @@ impl Trace {
     ///
     /// Parameters:
     ///     x0: Starting x-axis value.
-    ///     dx: Step size of x-axis values.
-    ///     ys: List of y-axis values.
+    ///     step: Step size of x-axis values.
+    ///     y: List of y-axis values.
     ///
     /// Returns:
     ///     A fixed-step trace.
     #[staticmethod]
-    pub fn fixed_step(x0: f64, dx: f64, ys: &Bound<'_, PyAny>) -> Result<Self> {
+    pub fn fixed_step(x0: f64, step: f64, y: &Bound<'_, PyAny>) -> Result<Self> {
         let x0 = Float64Array::new_scalar(x0).into_inner();
-        let dx = Float64Array::new_scalar(dx).into_inner();
-        let ys = extract_scalar_array(ys)?;
-        let y_item_field = create_item_field_from_array(&ys);
-        let y_list = wrap_as_list_array_with_field(ys.clone(), y_item_field);
-        // Must match TraceType::FixedStep storage: Struct { x0: f64, step: f64, y: List<item> }
+        let step = Float64Array::new_scalar(step).into_inner();
+        let y = extract_scalar_array(y)?;
+        let item_type = infer_scalar_kind(&y)?;
+        let y_list = wrap_as_list_array(y);
         let fields = vec![
             Field::new("x0", DataType::Float64, false),
             Field::new("step", DataType::Float64, false),
@@ -194,21 +218,24 @@ impl Trace {
         ];
         let array = StructArray::new(
             fields.into(),
-            vec![
-                std::sync::Arc::new(x0),
-                std::sync::Arc::new(dx),
-                std::sync::Arc::new(y_list),
-            ],
+            vec![Arc::new(x0), Arc::new(step), Arc::new(y_list)],
             None,
         );
-        let item_type = infer_scalar_kind(&ys)?;
         Ok(Self {
             dtype: DatasetDataType::Trace {
                 variant: TraceType::FixedStep,
                 y: item_type,
             },
-            array: std::sync::Arc::new(array),
+            array: Arc::new(array),
         })
+    }
+
+    /// Convert to an arrow array.
+    ///
+    /// Returns:
+    ///     Arrow array.
+    pub fn to_arrow_array(&self) -> PyArrowType<arrow::array::ArrayData> {
+        PyArrowType(self.array.to_data())
     }
 }
 

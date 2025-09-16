@@ -83,7 +83,6 @@ impl DatasetManager {
             .client
             .create_dataset(name, description, tags)?;
 
-        // Pass an empty schema placeholder; actual schema inferred on first write.
         Ok(DatasetWriter::new(writer))
     }
 
