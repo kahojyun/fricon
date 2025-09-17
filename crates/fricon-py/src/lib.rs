@@ -90,9 +90,9 @@ impl DatasetManager {
     ///     name: Name of the dataset.
     ///     description: Description of the dataset.
     ///     tags: Tags of the dataset. Duplicate tags will be add only once.
-    ///     schema: Schema of the underlying arrow table. Can be only a subset of all columns,
-    ///         other fields will be inferred from first row.
-    ///     index: Names of index columns.
+    ///     schema: Schema of the underlying arrow table. Can be only a subset
+    /// of all columns,         other fields will be inferred from first
+    /// row.     index: Names of index columns.
     ///
     /// Returns:
     ///     A writer of the newly created dataset.
@@ -334,7 +334,8 @@ impl Trace {
 
 /// A dataset.
 ///
-/// Datasets can be created and opened using the [`DatasetManager`][fricon.DatasetManager].
+/// Datasets can be created and opened using the
+/// [`DatasetManager`][fricon.DatasetManager].
 #[pyclass(module = "fricon._core")]
 pub struct Dataset {
     inner: fricon::Dataset,
@@ -451,7 +452,8 @@ impl Dataset {
 
 /// Writer for newly created dataset.
 ///
-/// Writers are constructed by calling [`DatasetManager.create`][fricon.DatasetManager.create].
+/// Writers are constructed by calling
+/// [`DatasetManager.create`][fricon.DatasetManager.create].
 #[pyclass(module = "fricon._core")]
 pub struct DatasetWriter {
     writer: Option<fricon::DatasetWriter>,

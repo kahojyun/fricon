@@ -1,5 +1,3 @@
-pub use crate::server::DatasetRecord;
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -19,6 +17,7 @@ use tower::service_fn;
 use tracing::error;
 use uuid::Uuid;
 
+pub use crate::server::DatasetRecord;
 use crate::{
     VERSION, dataset_manager, ipc,
     proto::{

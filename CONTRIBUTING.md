@@ -222,7 +222,7 @@ pnpm run test
 
 ```bash
 # Format code
-cargo fmt
+cargo +nightly fmt
 
 # Run linter
 cargo clippy
@@ -285,7 +285,7 @@ diesel migration revert
 #### Rust
 
 - Follow the official Rust style guide
-- Use `cargo fmt` for formatting
+- Use `cargo +nightly fmt` for formatting
 - Address all `cargo clippy` warnings
 - Write documentation for public APIs
 - Use `Result<T, Error>` for error handling, avoid `panic!` and `unwrap()`
@@ -450,7 +450,7 @@ diesel migration run  # Automatically updates schema.rs in src/database/
 
 ```bash
 # Rust
-cargo fmt --all
+cargo +nightly fmt --all
 cargo clippy --all-targets --all-features
 
 # Python
