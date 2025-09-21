@@ -1,14 +1,15 @@
 //! Provides cross-platform inter-process communication (IPC) functionality.
 #[cfg(unix)]
 mod unix;
-#[cfg(unix)]
-pub use unix::{connect, listen};
 #[cfg(windows)]
 mod win;
-#[cfg(windows)]
-pub use win::{connect, listen};
 
 use thiserror::Error;
+
+#[cfg(unix)]
+pub use self::unix::{connect, listen};
+#[cfg(windows)]
+pub use self::win::{connect, listen};
 
 #[derive(Debug, Error)]
 pub enum ConnectError {

@@ -39,7 +39,9 @@ jobs:
       - name: Ruff lint
         run: uv run --only-group fmt ruff check --output-format=github
       - name: Cargo fmt
-        run: cargo fmt --all --check
+        run: |
+          rustup toolchain install nightly --component rustfmt
+          cargo +nightly fmt --all --check
       - name: Frontend check
         run: pnpm run check
 

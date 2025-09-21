@@ -30,8 +30,4 @@ diesel::table! {
 diesel::joinable!(datasets_tags -> datasets (dataset_id));
 diesel::joinable!(datasets_tags -> tags (tag_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    datasets,
-    datasets_tags,
-    tags,
-);
+diesel::allow_tables_to_appear_in_same_query!(datasets, datasets_tags, tags,);

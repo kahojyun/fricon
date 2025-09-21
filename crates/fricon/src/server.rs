@@ -1,13 +1,13 @@
 mod dataset;
 mod fricon;
 
-pub use crate::dataset_manager::DatasetRecord;
-
 use anyhow::Result;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Server;
 use tracing::info;
 
+use self::{dataset::Storage, fricon::Fricon};
+pub use crate::dataset_manager::DatasetRecord;
 use crate::{
     app::AppHandle,
     ipc,
@@ -15,8 +15,6 @@ use crate::{
         dataset_service_server::DatasetServiceServer, fricon_service_server::FriconServiceServer,
     },
 };
-
-use self::{dataset::Storage, fricon::Fricon};
 
 pub async fn run(app: AppHandle, cancellation_token: CancellationToken) -> Result<()> {
     let ipc_file = app.root().paths().ipc_file();

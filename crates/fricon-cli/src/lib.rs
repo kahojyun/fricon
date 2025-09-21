@@ -6,10 +6,9 @@ use std::{
 };
 
 use anyhow::Result;
+pub use clap;
 use clap::{Parser, Subcommand};
 use tokio::runtime::Runtime;
-
-pub use clap;
 
 pub trait Main {
     fn main(self) -> Result<()>;
