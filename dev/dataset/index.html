@@ -412,6 +412,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Type inference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-trace-variants" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported trace variants
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Future extensions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -473,6 +497,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Type inference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-trace-variants" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported trace variants
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Future extensions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -520,66 +568,49 @@ classes in the python binding of Arrow:</p>
 <p>A dataset is exactly one Arrow table stored in <a href="https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc">Arrow IPC format</a>. When a dataset
 is created, the schema of the table must be determined first. In <code>fricon</code>,
 users can specify a partial schema in
-<a class="autorefs autorefs-internal" title="            create(name, *, description=None, tags=None, schema=None, index=None)
+<a class="autorefs autorefs-internal" title="            create(name, *, description=None, tags=None, schema=None, index_columns=None)
 
   
       method descriptor
   " href="../api/#fricon.DatasetManager.create"><code>DatasetManager.create</code></a>, and unspecified
 columns will be inferred from the first row of the dataset.</p>
 <h2 id="type-inference">Type inference</h2>
-<p><code>fricon</code> only tries to infer a subset of Arrow data types. The following table
-lists the mapping between Python types and Arrow data types:</p>
+<p><code>fricon</code> currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:</p>
 <table>
 <thead>
 <tr>
 <th>Python type</th>
-<th>Arrow data type</th>
+<th>Dataset data type</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool"><code>bool</code></a></td>
-<td><a class="autorefs autorefs-external" href="https://arrow.apache.org/docs/python/generated/pyarrow.bool_.html#pyarrow.bool_"><code>pyarrow.bool_</code></a></td>
-</tr>
-<tr>
-<td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int"><code>int</code></a></td>
-<td><a class="autorefs autorefs-external" href="https://arrow.apache.org/docs/python/generated/pyarrow.int64.html#pyarrow.int64"><code>pyarrow.int64</code></a></td>
-</tr>
-<tr>
 <td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float"><code>float</code></a></td>
-<td><a class="autorefs autorefs-external" href="https://arrow.apache.org/docs/python/generated/pyarrow.float64.html#pyarrow.float64"><code>pyarrow.float64</code></a></td>
+<td><code>Float64</code></td>
+<td>64-bit floating point numbers</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#complex"><code>complex</code></a></td>
-<td><a class="autorefs autorefs-internal" title="            complex128()
-
-  
-      builtin
-  " href="../api/#fricon.complex128"><code>fricon.complex128</code></a></td>
-</tr>
-<tr>
-<td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str"><code>str</code></a></td>
-<td><a class="autorefs autorefs-external" href="https://arrow.apache.org/docs/python/generated/pyarrow.string.html#pyarrow.string"><code>pyarrow.string</code></a></td>
-</tr>
-<tr>
-<td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence"><code>Sequence</code></a></td>
-<td><a class="autorefs autorefs-external" href="https://arrow.apache.org/docs/python/generated/pyarrow.list_.html#pyarrow.list_"><code>pyarrow.list_</code></a></td>
+<td><code>Complex128</code></td>
+<td>128-bit complex numbers (real + imaginary)</td>
 </tr>
 <tr>
 <td><a class="autorefs autorefs-internal" title="            Trace" href="../api/#fricon.Trace"><code>fricon.Trace</code></a></td>
-<td><a class="autorefs autorefs-internal" title="            trace_(item, fixed_step)
-
-  
-      builtin
-  " href="../api/#fricon.trace_"><code>fricon.trace_</code></a></td>
+<td><code>Trace</code></td>
+<td>Time series data with various x-axis formats</td>
 </tr>
 </tbody>
 </table>
-<p>Notice that <code>fricon</code> defines custom data types for complex numbers and traces.
-Users can use utility functions to convert these custom data types back to
-Python types, or process them directly with <code>pyarrow</code> or <code>polars</code>.</p>
-<p>If users want to store other data types, they need to construct <a class="autorefs autorefs-external" href="https://arrow.apache.org/docs/python/generated/pyarrow.Scalar.html#pyarrow.Scalar"><code>pyarrow.Scalar</code></a> values
-by themselves. <code>fricon</code> will store these values as is.</p>
+<h3 id="supported-trace-variants">Supported trace variants</h3>
+<p>Trace data supports three different formats depending on how the x-axis (independent variable) is stored:</p>
+<ul>
+<li><strong>SimpleList</strong>: Only y-values are stored, x-values are implicit indices (0, 1, 2, ...)</li>
+<li><strong>FixedStep</strong>: Regular spacing with x₀ (starting point) and step size</li>
+<li><strong>VariableStep</strong>: Arbitrary x-values stored alongside y-values</li>
+</ul>
+<h3 id="future-extensions">Future extensions</h3>
+<p>Additional data types (strings, booleans, integers, timestamps) may be supported in future versions. The current focus on scalar and trace types ensures optimal performance and correctness for the most common scientific use cases.</p>
 <!-- TODO: `pyarrow` and `polars` tips -->
 
 
