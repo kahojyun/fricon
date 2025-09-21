@@ -22,7 +22,7 @@ use tracing::{error, info};
 
 pub use self::{
     models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
-    types::{DatasetStatus, JsonValue, SimpleUuid},
+    types::{DatasetStatus, SimpleUuid},
 };
 
 #[derive(Debug, Error)]

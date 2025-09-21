@@ -12,19 +12,20 @@ use hyper_util::rt::TokioIo;
 use semver::Version;
 use tokio::{io, sync::mpsc, task::JoinHandle};
 use tokio_util::io::{ReaderStream, SyncIoBridge};
-use tonic::{Request, metadata::MetadataValue, transport::Channel};
+use tonic::{Request, transport::Channel};
 use tower::service_fn;
 use tracing::error;
 use uuid::Uuid;
 
-pub use crate::server::DatasetRecord;
 use crate::{
-    VERSION, dataset_manager, ipc,
+    VERSION,
+    dataset_manager::DatasetRecord,
+    ipc,
     proto::{
-        self, AddTagsRequest, CreateRequest, GetRequest, RemoveTagsRequest, SearchRequest,
-        UpdateRequest, VersionRequest, WriteRequest, WriteResponse,
-        dataset_service_client::DatasetServiceClient, fricon_service_client::FriconServiceClient,
-        get_request::IdEnum,
+        self, AddTagsRequest, CreateMetadata, CreateRequest, CreateResponse, GetRequest,
+        RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
+        create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
+        fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
@@ -48,22 +49,13 @@ impl Client {
         })
     }
 
-    pub async fn create_dataset(
+    pub fn create_dataset(
         &self,
         name: String,
         description: String,
         tags: Vec<String>,
-        index_columns: Vec<String>,
     ) -> Result<DatasetWriter> {
-        let request = CreateRequest {
-            name,
-            description,
-            tags,
-            index_columns,
-        };
-        let response = self.dataset_service().create(request).await?;
-        let write_token = response.into_inner().write_token;
-        Ok(DatasetWriter::new(self.clone(), write_token))
+        Ok(DatasetWriter::new(self.clone(), name, description, tags))
     }
 
     pub async fn get_dataset_by_id(&self, id: i32) -> Result<Dataset> {
@@ -107,14 +99,17 @@ struct WriterHandle {
 
 pub struct DatasetWriter {
     handle: Option<WriterHandle>,
-    connection_handle: JoinHandle<Result<WriteResponse>>,
+    connection_handle: JoinHandle<Result<CreateResponse>>,
     client: Client,
 }
 
 impl DatasetWriter {
-    fn new(client: Client, token: Bytes) -> Self {
+    fn new(client: Client, name: String, description: String, tags: Vec<String>) -> Self {
         let (tx, mut rx) = mpsc::channel::<RecordBatch>(16);
         let (dtx, drx) = io::duplex(1024 * 1024);
+
+        let request_stream = build_request_stream(name, description, tags, ReaderStream::new(drx));
+
         let writer_handle = tokio::task::spawn_blocking(move || {
             let Some(batch) = rx.blocking_recv() else {
                 bail!("No record batch received.")
@@ -131,21 +126,8 @@ impl DatasetWriter {
         let connection_handle = {
             let client = client.clone();
             tokio::spawn(async move {
-                let request_stream = ReaderStream::new(drx).map(|chunk| {
-                    let chunk = match chunk {
-                        Ok(chunk) => chunk,
-                        Err(e) => {
-                            error!("Writer failed: {:?}", e);
-                            Bytes::new()
-                        }
-                    };
-                    WriteRequest { chunk }
-                });
-                let mut request = Request::new(request_stream);
-                request
-                    .metadata_mut()
-                    .insert_bin(proto::WRITE_TOKEN_KEY, MetadataValue::from_bytes(&token));
-                let response = client.dataset_service().write(request).await?;
+                let request = Request::new(request_stream);
+                let response = client.dataset_service().create(request).await?;
                 Ok(response.into_inner())
             })
         };
@@ -195,6 +177,33 @@ impl DatasetWriter {
     }
 }
 
+fn build_request_stream(
+    name: String,
+    description: String,
+    tags: Vec<String>,
+    bytes_stream: impl Stream<Item = io::Result<Bytes>>,
+) -> impl Stream<Item = CreateRequest> {
+    let first_message = CreateMessage::Metadata(CreateMetadata {
+        name,
+        description,
+        tags,
+    });
+    let payload_stream = bytes_stream.map(|chunk| match chunk {
+        Ok(chunk) => CreateMessage::Payload(chunk),
+        Err(e) => {
+            error!("Reader failed: {:?}", e);
+            CreateMessage::Abort(proto::CreateAbort {
+                reason: format!("Reader failed: {e:?}"),
+            })
+        }
+    });
+    futures::stream::once(async move { first_message })
+        .chain(payload_stream)
+        .map(|msg| CreateRequest {
+            create_message: Some(msg),
+        })
+}
+
 async fn connect_ipc_channel(path: PathBuf) -> Result<Channel> {
     let channel = Channel::from_static("http://ignored.com:50051")
         .connect_with_connector(service_fn(move |_| {
@@ -219,11 +228,6 @@ impl Dataset {
         self.client
             .workspace_paths
             .dataset_path_from_uuid(self.record.metadata.uuid)
-    }
-
-    #[must_use]
-    pub fn arrow_file(&self) -> PathBuf {
-        self.path().join(dataset_manager::DATASET_NAME)
     }
 
     #[must_use]
@@ -259,11 +263,6 @@ impl Dataset {
     #[must_use]
     pub const fn created_at(&self) -> DateTime<Utc> {
         self.record.metadata.created_at
-    }
-
-    #[must_use]
-    pub fn index_columns(&self) -> &[String] {
-        &self.record.metadata.index_columns
     }
 
     #[must_use]

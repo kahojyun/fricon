@@ -12,6 +12,7 @@ keywords.workspace = true
 [[bin]]
 name = "fricon"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
 fricon = { path = "../fricon" }

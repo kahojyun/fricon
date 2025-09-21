@@ -8,7 +8,10 @@ use tokio::sync::broadcast;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::info;
 
-use crate::{database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot};
+use crate::{
+    database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot,
+    write_registry::WriteSessionRegistry,
+};
 
 pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
     let path = path.into();
@@ -33,9 +36,6 @@ pub enum AppEvent {
     },
 }
 
-/// `AppState` contains only data - no business logic
-/// This struct is cheaply cloneable and holds all the shared state
-/// Internal-only, not exposed in public API
 #[derive(Clone)]
 struct AppState {
     inner: Arc<AppStateInner>,
@@ -47,6 +47,7 @@ struct AppStateInner {
     shutdown_token: CancellationToken,
     tracker: TaskTracker,
     event_sender: broadcast::Sender<AppEvent>,
+    write_sessions: WriteSessionRegistry,
 }
 
 impl AppState {
@@ -61,6 +62,7 @@ impl AppState {
         let tracker = TaskTracker::new();
         let (event_sender, _) = broadcast::channel(1000);
 
+        let write_sessions = WriteSessionRegistry::new();
         Ok(Self {
             inner: Arc::new(AppStateInner {
                 root,
@@ -68,6 +70,7 @@ impl AppState {
                 shutdown_token,
                 tracker,
                 event_sender,
+                write_sessions,
             }),
         })
     }
@@ -97,13 +100,15 @@ impl AppState {
         &self.inner.event_sender
     }
 
+    fn write_sessions(&self) -> &WriteSessionRegistry {
+        &self.inner.write_sessions
+    }
+
     fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
         self.inner.event_sender.subscribe()
     }
 }
 
-/// `AppHandle` provides business logic methods
-/// All dataset operations are implemented here
 #[derive(Clone)]
 pub struct AppHandle {
     state: AppState,
@@ -134,21 +139,21 @@ impl AppHandle {
         self.state.subscribe_to_events()
     }
 
-    /// Create a `DatasetManager` for this app instance
     #[must_use]
     pub fn dataset_manager(&self) -> DatasetManager {
         DatasetManager::new(self.clone())
     }
 
-    /// Send an event to all subscribers
+    #[must_use]
+    pub fn write_sessions(&self) -> &WriteSessionRegistry {
+        self.state.write_sessions()
+    }
+
     pub fn send_event(&self, event: AppEvent) {
-        // Ignore send errors (no receivers)
         let _ = self.state.event_sender().send(event);
     }
 }
 
-/// `AppManager` manages the application lifecycle
-/// Responsible for initialization, server management, and shutdown
 pub struct AppManager {
     state: AppState,
     handle: AppHandle,
@@ -159,7 +164,6 @@ impl AppManager {
         let state = AppState::new(path).await?;
         let handle = AppHandle::new(state.clone());
 
-        // Start the server
         state
             .tracker()
             .spawn(server::run(handle.clone(), state.shutdown_token().clone()));

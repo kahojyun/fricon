@@ -11,17 +11,24 @@ mod client;
 mod database;
 mod dataset_manager;
 mod ipc;
+mod live;
 mod proto;
+mod reader;
 mod server;
 mod utils;
 mod workspace;
+mod write_registry;
+mod write_session;
 
 pub use self::{
     app::{AppEvent, AppHandle, AppManager, init as init_workspace},
     client::{Client, Dataset, DatasetWriter},
     database::DatasetStatus,
-    dataset_manager::DatasetMetadata,
-    server::{DatasetRecord, run as run_server},
+    dataset_manager::{
+        CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
+    },
+    reader::DatasetReader,
+    server::DatasetRecord,
     workspace::get_log_dir,
 };
 
