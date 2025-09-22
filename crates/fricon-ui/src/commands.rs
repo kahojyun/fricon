@@ -28,7 +28,8 @@ struct ServerStatus {
 #[tauri::command]
 async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, String> {
     let app = state.app();
-    let workspace_path = app.root().paths().root();
+    let workspace_paths = app.paths();
+    let workspace_path = workspace_paths.root();
 
     Ok(WorkspaceInfo {
         path: workspace_path.to_string_lossy().to_string(),
@@ -40,13 +41,7 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 fn get_server_status(state: State<'_, AppState>) -> ServerStatus {
     ServerStatus {
         is_running: true,
-        ipc_path: state
-            .app()
-            .root()
-            .paths()
-            .ipc_file()
-            .to_string_lossy()
-            .to_string(),
+        ipc_path: state.app().paths().ipc_file().to_string_lossy().to_string(),
     }
 }
 

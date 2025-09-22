@@ -198,35 +198,42 @@ impl DatasetService for Storage {
             mpsc::channel::<Result<RecordBatch, arrow::error::ArrowError>>(16);
         let batch_stream = tokio_stream::wrappers::ReceiverStream::new(batch_rx);
 
-        let read_task = self.manager.app().tracker().spawn(async move {
-            let result = {
-                let batch_tx = batch_tx.clone();
-                tokio::task::spawn_blocking(move || {
-                    let reader = StreamReader::try_new(sync_reader, None)?;
-                    for batch_result in reader {
-                        let batch = batch_result?;
-                        if batch_tx.blocking_send(Ok(batch)).is_err() {
-                            break;
+        let read_task = self
+            .manager
+            .app()
+            .spawn(move |_state| async move {
+                let result = {
+                    let batch_tx = batch_tx.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let reader = StreamReader::try_new(sync_reader, None)?;
+                        for batch_result in reader {
+                            let batch = batch_result?;
+                            if batch_tx.blocking_send(Ok(batch)).is_err() {
+                                break;
+                            }
                         }
-                    }
-                    Ok::<_, ArrowError>(())
-                })
-                .await
-            };
+                        Ok::<_, ArrowError>(())
+                    })
+                    .await
+                };
 
-            match result {
-                Ok(Err(e)) => {
-                    batch_tx.send(Err(e)).await.ok();
+                match result {
+                    Ok(Err(e)) => {
+                        batch_tx.send(Err(e)).await.ok();
+                    }
+                    Err(err) => {
+                        batch_tx
+                            .send(Err(ArrowError::ExternalError(Box::new(err))))
+                            .await
+                            .ok();
+                    }
+                    _ => {}
                 }
-                Err(err) => {
-                    batch_tx
-                        .send(Err(ArrowError::ExternalError(Box::new(err))))
-                        .await
-                        .ok();
-                }
-                _ => {}
-            }
-        });
+            })
+            .map_err(|e| {
+                error!("Failed to spawn read task: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
 
         let create_request = CreateDatasetRequest {
             name,

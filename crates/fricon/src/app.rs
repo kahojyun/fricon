@@ -1,14 +1,21 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Weak},
+};
 
 use anyhow::Result;
 use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast;
+use thiserror::Error;
+use tokio::{sync::broadcast, task::JoinHandle};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::{
-    database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot,
+    database,
+    dataset_manager::DatasetManager,
+    server,
+    workspace::{WorkspacePaths, WorkspaceRoot},
     write_registry::WriteSessionRegistry,
 };
 
@@ -23,22 +30,23 @@ pub enum AppEvent {
     },
 }
 
-#[derive(Clone)]
-struct AppState {
-    inner: Arc<AppStateInner>,
+#[derive(Debug, Error)]
+pub enum AppError {
+    #[error("AppState has been dropped")]
+    StateDropped,
 }
 
-struct AppStateInner {
-    root: WorkspaceRoot,
-    database: Pool,
-    shutdown_token: CancellationToken,
-    tracker: TaskTracker,
-    event_sender: broadcast::Sender<AppEvent>,
-    write_sessions: WriteSessionRegistry,
+pub struct AppState {
+    pub root: WorkspaceRoot,
+    pub database: Pool,
+    pub shutdown_token: CancellationToken,
+    pub tracker: TaskTracker,
+    pub event_sender: broadcast::Sender<AppEvent>,
+    pub write_sessions: WriteSessionRegistry,
 }
 
 impl AppState {
-    async fn new(root: WorkspaceRoot) -> Result<Self> {
+    async fn new(root: WorkspaceRoot) -> Result<Arc<Self>> {
         let db_path = root.paths().database_file();
         let backup_path = root
             .paths()
@@ -49,80 +57,37 @@ impl AppState {
         let (event_sender, _) = broadcast::channel(1000);
 
         let write_sessions = WriteSessionRegistry::new();
-        Ok(Self {
-            inner: Arc::new(AppStateInner {
-                root,
-                database,
-                shutdown_token,
-                tracker,
-                event_sender,
-                write_sessions,
-            }),
-        })
-    }
-
-    #[must_use]
-    fn root(&self) -> &WorkspaceRoot {
-        &self.inner.root
-    }
-
-    #[must_use]
-    fn database(&self) -> &Pool {
-        &self.inner.database
-    }
-
-    #[must_use]
-    fn tracker(&self) -> &TaskTracker {
-        &self.inner.tracker
-    }
-
-    #[must_use]
-    fn shutdown_token(&self) -> &CancellationToken {
-        &self.inner.shutdown_token
-    }
-
-    #[must_use]
-    fn event_sender(&self) -> &broadcast::Sender<AppEvent> {
-        &self.inner.event_sender
-    }
-
-    fn write_sessions(&self) -> &WriteSessionRegistry {
-        &self.inner.write_sessions
-    }
-
-    fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
-        self.inner.event_sender.subscribe()
+        Ok(Arc::new(Self {
+            root,
+            database,
+            shutdown_token,
+            tracker,
+            event_sender,
+            write_sessions,
+        }))
     }
 }
 
 #[derive(Clone)]
 pub struct AppHandle {
-    state: AppState,
+    state: Weak<AppState>,
 }
 
 impl AppHandle {
-    fn new(state: AppState) -> Self {
+    pub(crate) fn new(state: Weak<AppState>) -> Self {
         Self { state }
     }
 
-    #[must_use]
-    pub fn root(&self) -> &WorkspaceRoot {
-        self.state.root()
+    pub(crate) fn get_state(&self) -> Result<Arc<AppState>, AppError> {
+        self.state.upgrade().ok_or(AppError::StateDropped)
     }
 
-    #[must_use]
-    pub fn database(&self) -> &Pool {
-        self.state.database()
+    pub fn paths(&self) -> Result<WorkspacePaths, AppError> {
+        Ok(self.get_state()?.root.paths().clone())
     }
 
-    #[must_use]
-    pub fn tracker(&self) -> &TaskTracker {
-        self.state.tracker()
-    }
-
-    #[must_use]
-    pub fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
-        self.state.subscribe_to_events()
+    pub fn subscribe_to_events(&self) -> Result<broadcast::Receiver<AppEvent>, AppError> {
+        Ok(self.get_state()?.event_sender.subscribe())
     }
 
     #[must_use]
@@ -130,29 +95,41 @@ impl AppHandle {
         DatasetManager::new(self.clone())
     }
 
-    #[must_use]
-    pub fn write_sessions(&self) -> &WriteSessionRegistry {
-        self.state.write_sessions()
+    pub fn spawn<F, Fut, T>(&self, f: F) -> Result<JoinHandle<T>, AppError>
+    where
+        F: FnOnce(Arc<AppState>) -> Fut + Send + 'static,
+        Fut: Future<Output = T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let state = self.get_state()?;
+        let tracker = state.tracker.clone();
+        Ok(tracker.spawn(f(state)))
     }
 
-    pub fn send_event(&self, event: AppEvent) {
-        let _ = self.state.event_sender().send(event);
+    pub fn spawn_blocking<F, T>(&self, f: F) -> Result<JoinHandle<T>, AppError>
+    where
+        F: FnOnce(Arc<AppState>) -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        let state = self.get_state()?;
+        let tracker = state.tracker.clone();
+        Ok(tracker.spawn_blocking(move || f(state)))
     }
 }
 
 pub struct AppManager {
-    state: AppState,
+    state: Arc<AppState>,
     handle: AppHandle,
 }
 
 impl AppManager {
     pub async fn serve(root: WorkspaceRoot) -> Result<Self> {
         let state = AppState::new(root).await?;
-        let handle = AppHandle::new(state.clone());
+        let handle = AppHandle::new(Arc::downgrade(&state));
 
         state
-            .tracker()
-            .spawn(server::run(handle.clone(), state.shutdown_token().clone()));
+            .tracker
+            .spawn(server::run(handle.clone(), state.shutdown_token.clone()));
 
         Ok(Self { state, handle })
     }
@@ -164,9 +141,9 @@ impl AppManager {
     }
 
     pub async fn shutdown(self) {
-        self.state.shutdown_token().cancel();
-        self.state.tracker().close();
-        self.state.tracker().wait().await;
+        self.state.shutdown_token.cancel();
+        self.state.tracker.close();
+        self.state.tracker.wait().await;
     }
 
     #[must_use]

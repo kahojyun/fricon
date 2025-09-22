@@ -4,7 +4,7 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::Arc};
 
 use arrow::{array::RecordBatch, error::ArrowError};
 use chrono::{DateTime, Utc};
@@ -38,6 +38,9 @@ pub enum DatasetManagerError {
 
     #[error("Task join error: {0}")]
     TaskJoin(#[from] tokio::task::JoinError),
+
+    #[error("App error: {0}")]
+    App(#[from] crate::app::AppError),
 }
 
 impl DatasetManagerError {
@@ -141,20 +144,20 @@ impl DatasetManager {
         E: std::error::Error + Send + Sync + 'static,
     {
         let app = self.app.clone();
-        let tracker = app.tracker().clone();
 
-        let dataset_record = tracker
-            .spawn(async move {
-                let result = app
-                    .dataset_manager()
-                    .create_dataset_tracked(request, stream)
-                    .await;
-                if let Err(e) = &result {
-                    error!("Dataset creation failed: {}", e);
-                }
-                result
-            })
-            .await??;
+        let join_handle = app.spawn(move |state| async move {
+            let temp_app = AppHandle::new(Arc::downgrade(&state));
+            let result = temp_app
+                .dataset_manager()
+                .create_dataset_tracked(request, stream)
+                .await;
+            if let Err(e) = &result {
+                error!("Dataset creation failed: {}", e);
+            }
+            result
+        })?;
+
+        let dataset_record = join_handle.await??;
 
         Ok(dataset_record)
     }
@@ -168,8 +171,9 @@ impl DatasetManager {
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
+        let app_state = self.app.get_state()?;
         let uuid = Uuid::new_v4();
-        let dataset_path = self.app.root().paths().dataset_path_from_uuid(uuid);
+        let dataset_path = app_state.root.paths().dataset_path_from_uuid(uuid);
 
         if dataset_path.exists() {
             warn!("Dataset path already exists: {}", dataset_path.display());
@@ -192,7 +196,7 @@ impl DatasetManager {
             description: request.description.clone(),
             tags: request.tags.clone(),
         };
-        self.app.send_event(event);
+        app_state.event_sender.send(event).ok();
 
         info!(
             "Created dataset with UUID: {} at path: {:?}",
@@ -335,26 +339,26 @@ impl DatasetManager {
 
     pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
         let app = self.app.clone();
-        let tracker = app.tracker().clone();
 
-        tracker
-            .spawn(async move {
-                let result = app.dataset_manager().delete_dataset_tracked(id).await;
-                if let Err(e) = &result {
-                    error!("Dataset deletion failed: {}", e);
-                }
-                result
-            })
-            .await??;
+        let join_handle = app.spawn(move |state| async move {
+            let temp_app = AppHandle::new(Arc::downgrade(&state));
+            let result = temp_app.dataset_manager().delete_dataset_tracked(id).await;
+            if let Err(e) = &result {
+                error!("Dataset deletion failed: {}", e);
+            }
+            result
+        })?;
+
+        join_handle.await??;
 
         Ok(())
     }
 
     async fn delete_dataset_tracked(&self, id: i32) -> Result<(), DatasetManagerError> {
+        let app_state = self.app.get_state()?;
         let record = self.get_dataset(DatasetId::Id(id)).await?;
-        let dataset_path = self
-            .app
-            .root()
+        let dataset_path = app_state
+            .root
             .paths()
             .dataset_path_from_uuid(record.metadata.uuid);
 
@@ -429,7 +433,7 @@ impl DatasetManager {
         F: FnOnce(&mut diesel::SqliteConnection) -> Result<T, DatasetManagerError> + Send + 'static,
         T: Send + 'static,
     {
-        let res = self.app.database().interact(f).await??;
+        let res = self.app.get_state()?.database.interact(f).await??;
         Ok(res)
     }
 
@@ -443,15 +447,16 @@ impl DatasetManager {
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
         E: std::error::Error + Send + Sync + 'static,
     {
+        let app_state = self.app.get_state()?;
         let first_batch = match stream.next().await {
             Some(Ok(batch)) => batch,
             Some(Err(e)) => return Err(DatasetManagerError::stream_error(e)),
             None => return Err(DatasetManagerError::empty_stream()),
         };
 
-        let session_guard = self.app.write_sessions().create(
+        let session_guard = app_state.write_sessions.create(
             dataset_id,
-            self.app.tracker(),
+            &app_state.tracker,
             path,
             first_batch.schema(),
         );
@@ -505,28 +510,27 @@ impl DatasetManager {
         &self,
         id: DatasetId,
     ) -> Result<crate::reader::DatasetReader, DatasetManagerError> {
+        let app_state = self.app.get_state()?;
         let record = self.get_dataset(id).await?;
         match record.metadata.status {
             DatasetStatus::Completed | DatasetStatus::Aborted => {
                 // Aborted datasets may still have partially written chunk files (valid up to
                 // last flush).
-                let dataset_path = self
-                    .app
-                    .root()
+                let dataset_path = app_state
+                    .root
                     .paths()
                     .dataset_path_from_uuid(record.metadata.uuid);
                 let completed = crate::reader::CompletedDataset::open(&dataset_path)?;
                 Ok(crate::reader::DatasetReader::Completed(completed))
             }
             DatasetStatus::Writing => {
-                if let Some(session) = self.app.write_sessions().get(record.id) {
+                if let Some(session) = app_state.write_sessions.get(record.id) {
                     return Ok(crate::reader::DatasetReader::Live(session.live().clone()));
                 }
                 // Fallback: if writer already dropped but directory exists, expose as Completed
                 // view.
-                let dataset_path = self
-                    .app
-                    .root()
+                let dataset_path = app_state
+                    .root
                     .paths()
                     .dataset_path_from_uuid(record.metadata.uuid);
                 if dataset_path.exists() {

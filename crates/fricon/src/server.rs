@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub async fn run(app: AppHandle, cancellation_token: CancellationToken) -> Result<()> {
-    let ipc_file = app.root().paths().ipc_file();
+    let ipc_file = app.paths()?.ipc_file();
     let storage = Storage::new(app);
     let service = DatasetServiceServer::new(storage);
     let listener = ipc::listen(ipc_file)?;
