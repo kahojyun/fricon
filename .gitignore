@@ -27,3 +27,5 @@ node_modules
 .ruff_cache
 .pytest_cache
 .venv
+
+.claude/settings.local.json
