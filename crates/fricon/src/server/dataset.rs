@@ -198,7 +198,7 @@ impl DatasetService for Storage {
             mpsc::channel::<Result<RecordBatch, arrow::error::ArrowError>>(16);
         let batch_stream = tokio_stream::wrappers::ReceiverStream::new(batch_rx);
 
-        let read_task = self.manager.app().tracker().spawn(async move {
+        let read_task = tokio::spawn(async move {
             let result = {
                 let batch_tx = batch_tx.clone();
                 tokio::task::spawn_blocking(move || {

@@ -39,8 +39,8 @@ use pyo3_async_runtimes::tokio::get_runtime;
 pub mod _core {
     #[pymodule_export]
     pub use super::{
-        Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, main, main_gui,
-        trace_,
+        Dataset, DatasetManager, DatasetWriter, ServerHandle, Trace, Workspace, complex128, main,
+        main_gui, serve_workspace, trace_,
     };
 }
 
@@ -110,10 +110,17 @@ impl DatasetManager {
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
         let schema = schema.map_or_else(Schema::empty, |s| s.0);
+
+        // Enter Tokio runtime context to handle tokio::spawn calls in
+        // DatasetWriter::new
+        let runtime = get_runtime();
+        let _guard = runtime.enter();
+
         let writer = self
             .workspace
             .client
             .create_dataset(name, description, tags)?;
+
         Ok(DatasetWriter::new(writer, Arc::new(schema)))
     }
 
@@ -177,7 +184,6 @@ impl DatasetManager {
                 "name",
                 "description",
                 "favorite",
-                "index",
                 "created_at",
                 "tags",
             ],
@@ -429,6 +435,45 @@ impl Dataset {
             fricon::DatasetStatus::Writing => "writing".to_string(),
             fricon::DatasetStatus::Completed => "completed".to_string(),
             fricon::DatasetStatus::Aborted => "aborted".to_string(),
+        }
+    }
+}
+
+/// A handle to manage the lifecycle of a fricon server.
+///
+/// This handle keeps the server alive and allows for graceful shutdown.
+/// When this handle is dropped, the server will be automatically shut down.
+#[pyclass(module = "fricon._core")]
+pub struct ServerHandle {
+    manager: Option<fricon::AppManager>,
+}
+
+#[pymethods]
+impl ServerHandle {
+    /// Shutdown the server gracefully.
+    ///
+    /// This will stop the server and release all resources.
+    /// After calling this method, the handle cannot be used again.
+    pub fn shutdown(&mut self, _py: Python<'_>) {
+        if let Some(manager) = self.manager.take() {
+            get_runtime().block_on(manager.shutdown());
+        }
+    }
+
+    /// Check if the server is still running.
+    ///
+    /// Returns:
+    ///     True if the server is running, False if it has been shut down.
+    #[getter]
+    pub fn is_running(&self) -> bool {
+        self.manager.is_some()
+    }
+}
+
+impl Drop for ServerHandle {
+    fn drop(&mut self) {
+        if let Some(manager) = self.manager.take() {
+            get_runtime().block_on(manager.shutdown());
         }
     }
 }
@@ -855,4 +900,56 @@ pub fn main(py: Python<'_>) -> i32 {
 #[must_use]
 pub fn main_gui(py: Python<'_>) -> i32 {
     main_impl::<fricon_cli::Gui>(py)
+}
+
+/// Create a workspace for integration testing.
+///
+/// This function creates a new workspace at the given path and starts a server.
+/// The server will run in the background and the workspace client is returned.
+/// It's not exported to the public API and should only be used for testing.
+///
+/// Note: The server runs in the background. When the workspace client is
+/// dropped, the connection is closed but the server continues running. For
+/// proper cleanup, you may need to manually stop the server process.
+///
+/// Parameters:
+///     path: The path where to create the workspace.
+///
+/// Returns:
+///     A tuple containing (workspace_client, server_handle) where:
+///     - workspace_client: A workspace client connected to the newly created
+///       workspace
+///     - server_handle: A handle to manage the server lifecycle
+#[pyfunction]
+pub fn serve_workspace(path: PathBuf) -> Result<(Workspace, ServerHandle)> {
+    let runtime = get_runtime();
+
+    // Create the workspace first
+    let root = fricon::WorkspaceRoot::create_new(&path)?;
+
+    // Start the server in the background and keep the manager
+    let manager = runtime.block_on(fricon::AppManager::serve(root))?;
+
+    // Wait a bit for the server to start up
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // Try to connect with retries
+    let mut retries = 0;
+    loop {
+        match Workspace::connect(path.clone()) {
+            Ok(workspace) => {
+                let server_handle = ServerHandle {
+                    manager: Some(manager),
+                };
+                return Ok((workspace, server_handle));
+            }
+            Err(e) => {
+                retries += 1;
+                if retries > 10 {
+                    return Err(e);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+    }
 }

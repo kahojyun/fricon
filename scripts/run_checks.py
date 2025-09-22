@@ -3,51 +3,28 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 
-def run_command(
-    cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None
-) -> bool:
+def run_command(cmd: list[str]) -> bool:
     """Run a command and return success status."""
     print(f"Running: {' '.join(cmd)}")
-    if cwd:
-        print(f"Working directory: {cwd}")
 
+    # Use shell=True for more realistic output behavior
+    shell_cmd = " ".join(cmd)
     try:
-        process = subprocess.Popen(
-            cmd,
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+        _ = subprocess.run(
+            shell_cmd,
+            shell=True,
+            check=True,
             text=True,
-            bufsize=1,
-            env=env,
         )
-
-        # Stream output in real-time
-        assert process.stdout is not None, (
-            "stdout should be available when PIPE is used"
-        )
-        while True:
-            output = process.stdout.readline()
-            if output == "" and process.poll() is not None:
-                break
-            if output:
-                print(output.strip())
-
-        return_code = process.poll()
-        if return_code == 0:
-            print("✓ Success")
-            return True
-        else:
-            print(f"✗ Failed with return code {return_code}")
-            return False
+        print("✓ Success")
+        return True
     except subprocess.CalledProcessError as e:
-        print(f"✗ Failed: {e}")
+        print(f"✗ Failed with return code {e.returncode}")
         return False
     except FileNotFoundError as e:
         print(f"✗ Command not found: {e}")
@@ -59,51 +36,42 @@ def main():
     project_root = Path(__file__).parent.parent
     print(f"Project root: {project_root}")
 
-    # Enable color output for tools that support it
-    env = os.environ.copy()
-    env["CARGO_TERM_COLOR"] = "always"
-
     checks = [
         # Dependency installation
-        (["uv", "sync", "--locked", "--all-groups"], None),
+        ["uv", "sync", "--locked", "--all-groups"],
         # Format checks
-        (["uv", "run", "ruff", "format", "--check"], None),
-        (["uv", "run", "ruff", "check"], None),
-        (["cargo", "+nightly", "fmt", "--all", "--check"], None),
-        (["pnpm", "run", "check"], None),
+        ["uv", "run", "ruff", "format", "--check"],
+        ["uv", "run", "ruff", "check"],
+        ["cargo", "+nightly", "fmt", "--all", "--check"],
+        ["pnpm", "run", "check"],
         # Build and test checks
-        (["cargo", "build", "--workspace", "--locked"], None),
-        (["cargo", "test", "--workspace"], None),
-        (
-            [
-                "cargo",
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--all-features",
-                "--",
-                "-D",
-                "warnings",
-            ],
-            None,
-        ),
+        ["cargo", "build", "--workspace", "--locked"],
+        ["cargo", "test", "--workspace"],
+        [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings",
+        ],
         # Python checks
-        (["uv", "run", "pytest"], None),
-        (["uv", "run", "basedpyright"], None),
-        (["uv", "run", "stubtest", "fricon._core"], None),
+        ["uv", "run", "pytest"],
+        ["uv", "run", "basedpyright"],
+        ["uv", "run", "stubtest", "fricon._core"],
         # Documentation
-        (["uv", "run", "mkdocs", "build", "-s"], None),
+        ["uv", "run", "mkdocs", "build", "-s"],
         # Dependency checks
-        (["cargo", "deny", "--workspace", "--all-features", "check"], None),
+        ["cargo", "deny", "--workspace", "--all-features", "check"],
     ]
 
     failed_checks: list[str] = []
 
-    for cmd, cwd in checks:
+    for cmd in checks:
         print(f"\n{'=' * 60}")
-        # Use color environment for cargo commands
-        cmd_env = env if cmd[0] == "cargo" else None
-        if not run_command(cmd, cwd, cmd_env):
+        if not run_command(cmd):
             failed_checks.append(" ".join(cmd))
 
     print(f"\n{'=' * 60}")

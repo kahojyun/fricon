@@ -14,18 +14,27 @@ __all__ = [
     "Dataset",
     "DatasetManager",
     "DatasetWriter",
+    "ServerHandle",
     "Trace",
     "Workspace",
     "complex128",
     "main",
     "main_gui",
+    "serve_workspace",
     "trace_",
 ]
 
 def main() -> int: ...
 def main_gui() -> int: ...
+def serve_workspace(path: StrPath) -> tuple[Workspace, ServerHandle]: ...
 def complex128() -> pa.DataType: ...
 def trace_(item: pa.DataType, fixed_step: bool) -> pa.DataType: ...
+@final
+class ServerHandle:
+    def shutdown(self) -> None: ...
+    @property
+    def is_running(self) -> bool: ...
+
 @final
 class Workspace:
     @staticmethod
