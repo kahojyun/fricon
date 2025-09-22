@@ -9,7 +9,7 @@ cargo fmt --check                 # Verify formatting
 cargo clippy --all-targets --all-features  # Run linter
 cargo test                        # Run tests
 
-# Python code changes  
+# Python code changes
 uv run ruff format --check         # Verify formatting
 uv run ruff check                  # Run linter
 uv run basedpyright               # Type checking
