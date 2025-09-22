@@ -10,6 +10,7 @@ mod app;
 mod client;
 mod database;
 mod dataset_manager;
+mod dataset_tasks;
 mod ipc;
 mod live;
 mod proto;

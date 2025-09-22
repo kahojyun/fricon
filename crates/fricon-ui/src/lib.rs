@@ -27,7 +27,9 @@ impl AppState {
 
     fn start_event_listener(&self, app_handle: tauri::AppHandle) {
         let app = self.app();
-        let mut event_rx = app.subscribe_to_events();
+        let mut event_rx = app
+            .subscribe_to_events()
+            .expect("Failed to subscribe to events");
 
         async_runtime::spawn(async move {
             while let Ok(event) = event_rx.recv().await {
