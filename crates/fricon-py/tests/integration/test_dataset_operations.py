@@ -17,7 +17,7 @@ class TestDatasetOperations:
         """Test dataset writer with context manager."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"
-            workspace = fricon._core.serve_workspace(workspace_path)
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
             # Create dataset using context manager
@@ -32,11 +32,15 @@ class TestDatasetOperations:
             assert len(datasets) == 1
             assert datasets.iloc[0]["name"] == "context_test"
 
+            # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_dataset_manual_close(self) -> None:
         """Test dataset writer with manual close."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"
-            workspace = fricon._core.serve_workspace(workspace_path)
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
             # Create dataset manually
@@ -49,11 +53,15 @@ class TestDatasetOperations:
             assert len(datasets) == 1
             assert datasets.iloc[0]["name"] == "manual_test"
 
+            # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_dataset_with_tags(self) -> None:
         """Test dataset creation with tags."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"
-            workspace = fricon._core.serve_workspace(workspace_path)
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
             # Create dataset with tags
@@ -74,11 +82,15 @@ class TestDatasetOperations:
             assert "test" in tags
             assert "integration" in tags
 
+            # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_dataset_schema_inference(self) -> None:
         """Test automatic schema inference."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"
-            workspace = fricon._core.serve_workspace(workspace_path)
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
             # Create dataset without specifying schema
@@ -99,11 +111,15 @@ class TestDatasetOperations:
             assert len(datasets) == 1
             assert datasets.iloc[0]["name"] == "schema_test"
 
+            # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_multiple_datasets_in_workspace(self) -> None:
         """Test creating multiple datasets in the same workspace."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"
-            workspace = fricon._core.serve_workspace(workspace_path)
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
             # Create first dataset
@@ -134,11 +150,15 @@ class TestDatasetOperations:
             assert "dataset2" in names
             assert "dataset3" in names
 
+            # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_dataset_metadata_operations(self) -> None:
         """Test dataset metadata operations."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"
-            workspace = fricon._core.serve_workspace(workspace_path)
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
             # Create dataset
@@ -157,3 +177,7 @@ class TestDatasetOperations:
 
             # Note: update_metadata, add_tags, remove_tags would be tested here
             # but they require async runtime context which needs additional setup
+
+            # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
