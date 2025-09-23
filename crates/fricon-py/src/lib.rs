@@ -930,26 +930,10 @@ pub fn serve_workspace(path: PathBuf) -> Result<(Workspace, ServerHandle)> {
     // Start the server in the background and keep the manager
     let manager = runtime.block_on(fricon::AppManager::serve(root))?;
 
-    // Wait a bit for the server to start up
-    std::thread::sleep(std::time::Duration::from_millis(100));
-
-    // Try to connect with retries
-    let mut retries = 0;
-    loop {
-        match Workspace::connect(path.clone()) {
-            Ok(workspace) => {
-                let server_handle = ServerHandle {
-                    manager: Some(manager),
-                };
-                return Ok((workspace, server_handle));
-            }
-            Err(e) => {
-                retries += 1;
-                if retries > 10 {
-                    return Err(e);
-                }
-                std::thread::sleep(std::time::Duration::from_millis(50));
-            }
-        }
-    }
+    // Connect to the workspace
+    let workspace = Workspace::connect(path.clone())?;
+    let server_handle = ServerHandle {
+        manager: Some(manager),
+    };
+    Ok((workspace, server_handle))
 }
