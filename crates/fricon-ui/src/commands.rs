@@ -1,8 +1,8 @@
-use super::AppState;
-
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use tauri::{State, ipc::Invoke};
+
+use super::AppState;
 
 #[derive(Serialize)]
 struct DatasetInfo {
@@ -28,7 +28,10 @@ struct ServerStatus {
 #[tauri::command]
 async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, String> {
     let app = state.app();
-    let workspace_path = app.root().paths().root();
+    let workspace_paths = app
+        .paths()
+        .map_err(|e| format!("Failed to get paths: {e}"))?;
+    let workspace_path = workspace_paths.root();
 
     Ok(WorkspaceInfo {
         path: workspace_path.to_string_lossy().to_string(),
@@ -37,17 +40,15 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 }
 
 #[tauri::command]
-fn get_server_status(state: State<'_, AppState>) -> ServerStatus {
-    ServerStatus {
+fn get_server_status(state: State<'_, AppState>) -> Result<ServerStatus, String> {
+    let app = state.app();
+    let workspace_paths = app
+        .paths()
+        .map_err(|e| format!("Failed to get paths: {e}"))?;
+    Ok(ServerStatus {
         is_running: true,
-        ipc_path: state
-            .app()
-            .root()
-            .paths()
-            .ipc_file()
-            .to_string_lossy()
-            .to_string(),
-    }
+        ipc_path: workspace_paths.ipc_file().to_string_lossy().to_string(),
+    })
 }
 
 #[tauri::command]

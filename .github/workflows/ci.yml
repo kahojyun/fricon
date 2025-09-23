@@ -39,11 +39,13 @@ jobs:
       - name: Ruff lint
         run: uv run --only-group fmt ruff check --output-format=github
       - name: Cargo fmt
-        run: cargo fmt --all --check
+        run: |
+          rustup toolchain install nightly --component rustfmt
+          cargo +nightly fmt --all --check
       - name: Frontend check
         run: pnpm run check
 
-  test-python:
+  test:
     name: Test Python
     needs: [fmt]
     runs-on: ubuntu-24.04
@@ -73,6 +75,12 @@ jobs:
           cache: "pnpm"
       - name: Install uv
         uses: astral-sh/setup-uv@v6
+      - name: Cargo build
+        run: cargo build --workspace --verbose --locked
+      - name: Cargo test
+        run: cargo test --workspace --verbose
+      - name: Cargo clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Sync project
         run: uv sync --locked --group ci
       - name: Pytest
@@ -84,44 +92,8 @@ jobs:
       - name: Build docs
         run: uv run --group docs mkdocs build -s -v
 
-  test-rust:
-    name: Test Rust
-    needs: [fmt]
-    runs-on: ubuntu-24.04
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: protoc
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22.x"
-          cache: "pnpm"
-      - name: Cargo build
-        run: cargo build --workspace --verbose --locked
-      - name: Cargo test
-        run: cargo test --workspace --verbose
-      - name: Cargo clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
   cargo-deny:
     name: Check cargo dependencies
-    needs: [fmt]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -137,45 +109,10 @@ jobs:
     strategy:
       matrix:
         include:
-          # Linux x86_64
-          - runner: ubuntu-24.04
-            os: linux
-            target: x86_64
-            args: --release --out dist --zig --auditwheel skip
-            cflags: -isystem /usr/include
-            rustflags: -L /usr/lib/x86_64-linux-gnu
-          # Linux aarch64
-          - runner: ubuntu-24.04-arm
-            os: linux
-            target: aarch64
-            args: --release --out dist --zig --auditwheel skip
-            cflags: -isystem /usr/include
-            rustflags: -L /usr/lib/aarch64-linux-gnu
           # Windows x86_64
           - runner: windows-2022
             os: windows
             target: x86_64
-            args: --release --out dist
-            cflags: ""
-            rustflags: ""
-          # Windows aarch64
-          - runner: windows-2022
-            os: windows
-            target: aarch64
-            args: --release --out dist
-            cflags: ""
-            rustflags: ""
-          # macOS x86_64
-          - runner: macos-14
-            os: macos
-            target: x86_64
-            args: --release --out dist
-            cflags: ""
-            rustflags: ""
-          # macOS aarch64
-          - runner: macos-14
-            os: macos
-            target: aarch64
             args: --release --out dist
             cflags: ""
             rustflags: ""
@@ -243,7 +180,7 @@ jobs:
   # For branch protection rules
   check:
     if: always()
-    needs: [test-python, test-rust, cargo-deny, build, sdist]
+    needs: [test, cargo-deny, build, sdist]
     runs-on: ubuntu-24.04
     steps:
       - name: Decide whether the needed jobs succeeded or failed

@@ -1,24 +1,21 @@
 syntax = "proto3";
 
-package fricon.v1;
+package fricon.v1alpha;
 
 import "google/protobuf/timestamp.proto";
 
 // Dataset status enum
 enum DatasetStatus {
   DATASET_STATUS_UNSPECIFIED = 0;
-  DATASET_STATUS_PENDING = 1;
-  DATASET_STATUS_WRITING = 2;
-  DATASET_STATUS_COMPLETED = 3;
-  DATASET_STATUS_ABORTED = 4;
+  DATASET_STATUS_WRITING = 1;
+  DATASET_STATUS_COMPLETED = 2;
+  DATASET_STATUS_ABORTED = 3;
 }
 
 // Manage datasets.
 service DatasetService {
   // Create a new dataset.
-  rpc Create(CreateRequest) returns (CreateResponse) {}
-  // Requires a write token from Create in metadata 'fricon-token-bin'.
-  rpc Write(stream WriteRequest) returns (WriteResponse) {}
+  rpc Create(stream CreateRequest) returns (CreateResponse) {}
   // Get a dataset in the workspace.
   rpc Get(GetRequest) returns (GetResponse) {}
   // Add tags to a dataset.
@@ -34,21 +31,29 @@ service DatasetService {
 }
 
 message CreateRequest {
+  // The streaming sequence for CreateRequest:
+  // 1. The client must first send a CreateMetadata message to initiate dataset creation.
+  // 2. The client can then send one or more payload messages containing dataset data.
+  // 3. If the client wishes to abort the creation, it can send a CreateAbort message.
+  // Only one of these fields should be set per message.
+  oneof create_message {
+    CreateMetadata metadata = 1;
+    bytes payload = 2;
+    CreateAbort abort = 3;
+  }
+}
+
+message CreateMetadata {
   string name = 1;
   string description = 2;
   repeated string tags = 3;
-  repeated string index_columns = 4;
+}
+
+message CreateAbort {
+  string reason = 1;
 }
 
 message CreateResponse {
-  bytes write_token = 1;
-}
-
-message WriteRequest {
-  bytes chunk = 1;
-}
-
-message WriteResponse {
   Dataset dataset = 1;
 }
 
@@ -112,8 +117,7 @@ message DatasetMetadata {
   string name = 2;
   string description = 3;
   bool favorite = 4;
-  repeated string index_columns = 5;
-  google.protobuf.Timestamp created_at = 6;
-  repeated string tags = 7;
-  DatasetStatus status = 8;
+  google.protobuf.Timestamp created_at = 5;
+  repeated string tags = 6;
+  DatasetStatus status = 7;
 }

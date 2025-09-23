@@ -18,7 +18,8 @@ workspace/
   data/
     <uuid[0:2]>/
       <uuid>/
-        dataset.arrow
+        data_chunk_0.arrow
+        data_chunk_1.arrow (optional, written when first exceeds chunk size)
   backup/
   log/
 ```

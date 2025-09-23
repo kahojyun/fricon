@@ -9,6 +9,8 @@ dist
 target
 pnpm-lock.yaml
 **/gen/schemas
+.github/instructions
+.serena
 
 .pre-commit-config.yaml
 CHANGELOG.md

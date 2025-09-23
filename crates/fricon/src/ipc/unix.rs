@@ -101,7 +101,8 @@ mod tests {
             "Inodes should be different after recreation"
         );
 
-        // Drop listener1. It should NOT remove the file because its inode doesn't match the current one.
+        // Drop listener1. It should NOT remove the file because its inode doesn't match
+        // the current one.
         drop(listener1);
         assert!(
             socket_path.exists(),

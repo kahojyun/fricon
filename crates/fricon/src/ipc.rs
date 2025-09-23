@@ -1,20 +1,21 @@
 //! Provides cross-platform inter-process communication (IPC) functionality.
 #[cfg(unix)]
 mod unix;
-#[cfg(unix)]
-pub use unix::{connect, listen};
 #[cfg(windows)]
 mod win;
-#[cfg(windows)]
-pub use win::{connect, listen};
 
 use thiserror::Error;
 
+#[cfg(unix)]
+pub use self::unix::{connect, listen};
+#[cfg(windows)]
+pub use self::win::{connect, listen};
+
 #[derive(Debug, Error)]
 pub enum ConnectError {
-    #[error("Connect target not found")]
+    #[error("Connect target not found: {0}")]
     NotFound(#[source] std::io::Error),
-    #[error("Unexpected IO error")]
+    #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }
 
