@@ -1,6 +1,7 @@
 use std::{
     path::PathBuf,
     sync::{Arc, Weak},
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -8,7 +9,7 @@ use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::{sync::broadcast, task::JoinHandle};
+use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 use crate::{
@@ -127,9 +128,13 @@ impl AppManager {
         let state = AppState::new(root).await?;
         let handle = AppHandle::new(Arc::downgrade(&state));
 
-        state
-            .tracker
-            .spawn(server::run(handle.clone(), state.shutdown_token.clone()));
+        let ipc_file = handle.paths()?.ipc_file();
+        server::start(
+            ipc_file,
+            handle.clone(),
+            &state.tracker,
+            state.shutdown_token.clone(),
+        )?;
 
         Ok(Self { state, handle })
     }
@@ -144,6 +149,9 @@ impl AppManager {
         self.state.shutdown_token.cancel();
         self.state.tracker.close();
         self.state.tracker.wait().await;
+        drop(self.state);
+        // TODO: remove this after migrating to r2d2 pool
+        sleep(Duration::from_millis(200)).await;
     }
 
     #[must_use]

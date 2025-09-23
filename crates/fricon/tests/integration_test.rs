@@ -41,9 +41,6 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
     // Start the server
     let app_manager = AppManager::serve_with_path(workspace_path).await?;
 
-    // Wait a bit for the server to start
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
     // Connect the client
     let client = Client::connect(workspace_path).await?;
 
@@ -133,9 +130,6 @@ async fn test_dataset_multiple_batches() -> anyhow::Result<()> {
 
     // Start the server
     let app_manager = AppManager::serve_with_path(workspace_path).await?;
-
-    // Wait a bit for the server to start
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // Connect the client
     let client = Client::connect(workspace_path).await?;

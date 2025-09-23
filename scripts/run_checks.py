@@ -39,6 +39,7 @@ def main():
     checks = [
         # Dependency installation
         ["uv", "sync", "--locked", "--all-groups"],
+        ["uv", "run", "maturin", "develop"],
         # Format checks
         ["uv", "run", "ruff", "format", "--check"],
         ["uv", "run", "ruff", "check"],

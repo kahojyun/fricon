@@ -15,7 +15,7 @@ cargo test
 cargo check
 
 # Format code
-cargo fmt
+cargo +nightly fmt
 
 # Lint with clippy
 cargo clippy --all-targets --all-features
