@@ -13,10 +13,8 @@ keywords.workspace = true
 anyhow = { workspace = true }
 arrow = { workspace = true }
 arrow-schema = { workspace = true }
-async-stream = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-clap = { workspace = true, features = ["derive"] }
 deadpool-diesel = { workspace = true, features = ["sqlite", "tracing"] }
 diesel = { workspace = true, features = [
     "sqlite",
@@ -40,7 +38,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true, features = ["full"] }
-toml = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
 tower = { workspace = true }

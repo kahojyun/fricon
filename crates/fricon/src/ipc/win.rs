@@ -3,10 +3,10 @@ use std::{
     io::{self, Read},
     path::{Path, PathBuf},
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
 };
 
-use async_stream::try_stream;
 use futures::prelude::*;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
@@ -22,11 +22,18 @@ use super::ConnectError;
 const HEADER: &[u8; 4] = b"FRIC";
 const BINARY_FORMAT_SIZE: usize = 20; // 4 bytes header + 16 bytes UUID
 
-fn write_uuid_to_socket_file(path: &Path, uuid: &Uuid) -> io::Result<()> {
+fn write_uuid_to_socket_file(path: &Path, uuid: Uuid) -> io::Result<()> {
     let mut binary_data = [0u8; BINARY_FORMAT_SIZE];
     let (header, uuid_bytes) = binary_data.split_at_mut(4);
     header.copy_from_slice(HEADER);
     uuid_bytes.copy_from_slice(uuid.as_bytes());
+
+    if path.exists() && read_uuid_from_socket_file(path).is_err() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "Existing file is not a fricon socket file",
+        ));
+    }
     fs::write(path, binary_data)
 }
 
@@ -41,10 +48,12 @@ fn read_uuid_from_socket_file(path: &Path) -> io::Result<Uuid> {
     Ok(Uuid::from_bytes(uuid_bytes.try_into().unwrap()))
 }
 
+fn get_pipe_name(server_uuid: Uuid) -> String {
+    format!(r"\\.\pipe\fricon-{server_uuid}")
+}
+
 pub async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectError> {
     let socket_path = path.as_ref();
-
-    // Read UUID from socket file
     let server_uuid = match read_uuid_from_socket_file(socket_path) {
         Ok(uuid) => uuid,
         Err(e) => {
@@ -53,7 +62,7 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectE
         }
     };
 
-    let pipe_name = format!(r"\\.\pipe\fricon-{server_uuid}");
+    let pipe_name = get_pipe_name(server_uuid);
     debug!(
         "Connecting to named pipe with UUID: {}, pipe name: {}",
         server_uuid, pipe_name
@@ -74,51 +83,31 @@ pub fn listen(
 
     // Generate a new UUID for this server instance
     let server_uuid = Uuid::new_v4();
-    let pipe_name = format!(r"\\.\\pipe\\fricon-{server_uuid}");
-
-    // Write binary format to socket file
-    if socket_path.exists() {
-        // Check if existing file has our format before removing
-        match read_uuid_from_socket_file(&socket_path) {
-            Ok(_) => {
-                // File has our format, safe to remove
-                fs::remove_file(&socket_path)?;
-            }
-            Err(_) => {
-                // File doesn't have our format, return error
-                return Err(io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    "Existing file is not a fricon socket file",
-                ));
-            }
-        }
-    }
-
-    write_uuid_to_socket_file(&socket_path, &server_uuid)?;
-
+    let pipe_name: Arc<str> = get_pipe_name(server_uuid).into();
+    write_uuid_to_socket_file(&socket_path, server_uuid)?;
+    let first_server = ServerOptions::new()
+        .first_pipe_instance(true)
+        .create(&*pipe_name)
+        .inspect_err(|e| error!("Failed to create named pipe server: {e}"))?;
     debug!(
         "Created named pipe server with UUID: {}, socket file: {}",
         server_uuid,
         socket_path.display()
     );
 
-    let mut server = ServerOptions::new()
-        .first_pipe_instance(true)
-        .create(&pipe_name)
-        .inspect_err(|e| error!("Failed to create named pipe server: {e}"))?;
-
-    let stream = try_stream! {
-        let _file = SocketFile {
-            socket_path,
-            server_uuid,
-        };
-        loop {
-            server.connect().await?;
-            let connector = NamedPipeConnector(server);
-            server = ServerOptions::new().create(&pipe_name)?;
-            yield connector;
-        }
+    let file = SocketFile {
+        socket_path,
+        server_uuid,
     };
+    let stream = stream::try_unfold((first_server, file), move |(current_server, file)| {
+        let pipe_name = pipe_name.clone();
+        async move {
+            current_server.connect().await?;
+            let connector = NamedPipeConnector(current_server);
+            let new_server = ServerOptions::new().create(&*pipe_name)?;
+            Ok(Some((connector, (new_server, file))))
+        }
+    });
     Ok(stream)
 }
 
