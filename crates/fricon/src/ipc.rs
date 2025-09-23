@@ -13,9 +13,9 @@ pub use self::win::{connect, listen};
 
 #[derive(Debug, Error)]
 pub enum ConnectError {
-    #[error("Connect target not found")]
+    #[error("Connect target not found: {0}")]
     NotFound(#[source] std::io::Error),
-    #[error("Unexpected IO error")]
+    #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }
 
