@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{Context as _, Result};
@@ -29,6 +30,8 @@ pub fn chunk_path(dir_path: &Path, chunk_index: usize) -> PathBuf {
 /// Read Arrow IPC batches from a file using memory-mapped zero-copy reading
 pub fn read_ipc_file_mmap(file_path: &Path) -> Result<Vec<RecordBatch>> {
     let ipc_file = File::open(file_path).context("Failed to open IPC file")?;
+    // SAFETY: Safe because we're only reading from the memory-mapped file and not
+    // modifying it
     let mmap = unsafe { memmap2::Mmap::map(&ipc_file) }.context("Failed to create memory map")?;
 
     // Convert the mmap region to an Arrow `Buffer`
@@ -60,7 +63,11 @@ struct IPCBufferDecoder {
     batches: Vec<Block>,
 }
 
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Casts from FlatBuffer types are safe within the context of Arrow file format"
+)]
 impl IPCBufferDecoder {
     fn new(buffer: Buffer) -> Result<Self> {
         let trailer_start = buffer.len() - 10;
@@ -71,7 +78,7 @@ impl IPCBufferDecoder {
 
         let schema = fb_to_schema(footer.schema().unwrap());
 
-        let mut decoder = FileDecoder::new(std::sync::Arc::new(schema), footer.version());
+        let mut decoder = FileDecoder::new(Arc::new(schema), footer.version());
 
         // Read dictionaries
         for block in footer.dictionaries().iter().flatten() {
@@ -104,7 +111,11 @@ impl IPCBufferDecoder {
     /// Return the [`RecordBatch`] at message index `i`.
     ///
     /// This may return `None` if the IPC message was None
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Casts from FlatBuffer types are safe within the context of Arrow file format"
+    )]
     fn get_batch(&self, i: usize) -> Result<Option<RecordBatch>> {
         let block = &self.batches[i];
         let block_len = block.bodyLength() as usize + block.metaDataLength() as usize;

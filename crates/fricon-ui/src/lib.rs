@@ -1,7 +1,6 @@
-#![allow(clippy::needless_pass_by_value, clippy::used_underscore_binding)]
 mod commands;
 
-use std::{path::PathBuf, sync::Mutex};
+use std::{io, path::PathBuf, sync::Mutex};
 
 use anyhow::{Context as _, Result};
 use tauri::{
@@ -9,12 +8,13 @@ use tauri::{
     menu::MenuBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+use tokio::signal;
 use tracing::info;
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
-use tracing_subscriber::{EnvFilter, prelude::*};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 struct AppState(Mutex<Option<(fricon::AppManager, WorkerGuard)>>);
 
@@ -85,6 +85,7 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
     let app_state = async_runtime::block_on(AppState::new(workspace_path))
         .context("Failed to open workspace")?;
 
+    #[expect(clippy::exit, reason = "Required by Tauri framework")]
     let tauri_app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(commands::invoke_handler())
@@ -167,7 +168,7 @@ fn build_system_tray(app: &mut tauri::App) -> Result<()> {
 fn install_ctrl_c_handler(app: &mut tauri::App) {
     let app_handle = app.handle().clone();
     async_runtime::spawn(async move {
-        match tokio::signal::ctrl_c().await {
+        match signal::ctrl_c().await {
             Ok(()) => {
                 app_handle.exit(0);
             }
@@ -182,12 +183,12 @@ fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
     let log_dir = fricon::get_log_dir(workspace_path)?;
     let rolling = RollingFileAppender::new(Rotation::DAILY, log_dir, "fricon.log");
     let (writer, guard) = tracing_appender::non_blocking(rolling);
-    let file_layer = tracing_subscriber::fmt::layer().json().with_writer(writer);
+    let file_layer = fmt::layer().json().with_writer(writer);
 
     let registry = tracing_subscriber::registry().with(file_layer);
 
     #[cfg(debug_assertions)]
-    let registry = registry.with(tracing_subscriber::fmt::layer().with_writer(std::io::stdout));
+    let registry = registry.with(fmt::layer().with_writer(io::stdout));
 
     registry.with(EnvFilter::from_default_env()).init();
     Ok(guard)

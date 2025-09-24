@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use arrow::{array::RecordBatch, compute::concat_batches, datatypes::SchemaRef};
 
 use crate::{
     dataset_manager::DatasetManagerError,
@@ -59,7 +59,6 @@ impl CompletedDataset {
         indices: &[usize],
         column_indices: Option<&[usize]>,
     ) -> Result<RecordBatch, DatasetManagerError> {
-        use arrow::compute::concat_batches;
         if self.batches.is_empty() {
             return Err(DatasetManagerError::io_invalid_data("empty dataset"));
         }
@@ -75,12 +74,14 @@ impl CompletedDataset {
         &self.batches
     }
 }
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Value is intentionally consumed to avoid unnecessary cloning"
+)]
 fn map_live_select_err(err: LiveSelectError) -> DatasetManagerError {
     DatasetManagerError::io_invalid_data(format!("selection error: {err}"))
 }
 #[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub enum DatasetReader {
     Completed(CompletedDataset),
     Live(LiveDataset),
@@ -125,6 +126,7 @@ mod tests {
         datatypes::{DataType, Field, Schema},
     };
     use tempfile::tempdir;
+    use tokio::sync::mpsc;
     use tokio_util::task::TaskTracker;
 
     use super::*;
@@ -147,7 +149,7 @@ mod tests {
         let tracker = TaskTracker::new();
 
         // Create chunked files using BackgroundWriter
-        let (chunk_completed_sender, _chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let (chunk_completed_sender, _chunk_completed_receiver) = mpsc::channel(16);
         let writer = BackgroundWriter::new(
             &tracker,
             dataset_dir,
@@ -174,7 +176,7 @@ mod tests {
             dataset
                 .batches_slice()
                 .iter()
-                .map(arrow::array::RecordBatch::num_rows)
+                .map(RecordBatch::num_rows)
                 .sum::<usize>(),
             100
         );

@@ -1,8 +1,11 @@
+use std::io::{Error as IoError, ErrorKind};
+
 use anyhow::bail;
 use arrow::{array::RecordBatch, error::ArrowError, ipc::reader::StreamReader};
 use futures::prelude::*;
-use tokio::sync::mpsc;
-use tokio_util::io::SyncIoBridge;
+use tokio::{sync::mpsc, task::spawn_blocking};
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_util::io::{StreamReader as TokioStreamReader, SyncIoBridge};
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace, warn};
 use uuid::Uuid;
@@ -10,7 +13,10 @@ use uuid::Uuid;
 use crate::{
     app::AppHandle,
     database::DatasetStatus,
-    dataset_manager::{CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError},
+    dataset_manager::{
+        CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
+        DatasetRecord, DatasetUpdate,
+    },
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateAbort, CreateMetadata, CreateRequest,
         CreateResponse, DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
@@ -19,8 +25,8 @@ use crate::{
     },
 };
 
-impl From<crate::dataset_manager::DatasetRecord> for crate::proto::Dataset {
-    fn from(record: crate::dataset_manager::DatasetRecord) -> Self {
+impl From<DatasetRecord> for proto::Dataset {
+    fn from(record: DatasetRecord) -> Self {
         Self {
             id: record.id,
             metadata: Some(record.metadata.into()),
@@ -28,10 +34,10 @@ impl From<crate::dataset_manager::DatasetRecord> for crate::proto::Dataset {
     }
 }
 
-impl TryFrom<crate::proto::Dataset> for crate::dataset_manager::DatasetRecord {
+impl TryFrom<proto::Dataset> for DatasetRecord {
     type Error = anyhow::Error;
 
-    fn try_from(dataset: crate::proto::Dataset) -> Result<Self, Self::Error> {
+    fn try_from(dataset: proto::Dataset) -> Result<Self, Self::Error> {
         use anyhow::Context;
         Ok(Self {
             id: dataset.id,
@@ -43,13 +49,16 @@ impl TryFrom<crate::proto::Dataset> for crate::dataset_manager::DatasetRecord {
     }
 }
 
-impl From<crate::dataset_manager::DatasetMetadata> for crate::proto::DatasetMetadata {
-    fn from(metadata: crate::dataset_manager::DatasetMetadata) -> Self {
+impl From<DatasetMetadata> for proto::DatasetMetadata {
+    fn from(metadata: DatasetMetadata) -> Self {
         use prost_types::Timestamp;
 
         let created_at = Timestamp {
             seconds: metadata.created_at.timestamp(),
-            #[expect(clippy::cast_possible_wrap, reason = "Nanos are always less than 2e9.")]
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "Nanos are always less than 2e9 and within i32 range"
+            )]
             nanos: metadata.created_at.timestamp_subsec_nanos() as i32,
         };
         Self {
@@ -59,30 +68,33 @@ impl From<crate::dataset_manager::DatasetMetadata> for crate::proto::DatasetMeta
             favorite: metadata.favorite,
             created_at: Some(created_at),
             tags: metadata.tags,
-            status: crate::proto::DatasetStatus::from(metadata.status) as i32,
+            status: proto::DatasetStatus::from(metadata.status) as i32,
         }
     }
 }
 
-impl TryFrom<crate::proto::DatasetMetadata> for crate::dataset_manager::DatasetMetadata {
+impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
     type Error = anyhow::Error;
 
-    fn try_from(metadata: crate::proto::DatasetMetadata) -> Result<Self, Self::Error> {
+    fn try_from(metadata: proto::DatasetMetadata) -> Result<Self, Self::Error> {
         use anyhow::{Context, bail};
         use chrono::DateTime;
 
         let uuid = metadata.uuid.parse()?;
         let created_at = metadata.created_at.context("created_at is required")?;
         let seconds = created_at.seconds;
-        #[expect(clippy::cast_sign_loss)]
+        #[expect(
+            clippy::cast_sign_loss,
+            reason = "Negative values are explicitly checked and rejected above"
+        )]
         let nanos = if created_at.nanos < 0 {
             bail!("invalid created_at")
         } else {
             created_at.nanos as u32
         };
         let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
-        let proto_status = crate::proto::DatasetStatus::try_from(metadata.status)
-            .context("Invalid dataset status")?;
+        let proto_status =
+            proto::DatasetStatus::try_from(metadata.status).context("Invalid dataset status")?;
         let status = DatasetStatus::try_from(proto_status)?;
 
         Ok(Self {
@@ -134,7 +146,11 @@ impl TryFrom<proto::DatasetStatus> for DatasetStatus {
 
 #[tonic::async_trait]
 impl DatasetService for Storage {
-    #[expect(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "The create method handles a complex gRPC streaming operation with many \
+                  validation steps"
+    )]
     async fn create(
         &self,
         request: Request<Streaming<CreateRequest>>,
@@ -164,44 +180,43 @@ impl DatasetService for Storage {
         let bytes_stream = stream.map(|request| {
             let request = request.map_err(|e| {
                 error!("Client connection error: {e:?}");
-                std::io::Error::other(e)
+                IoError::other(e)
             })?;
             match request.create_message {
                 Some(CreateMessage::Payload(data)) => Ok(data),
                 Some(CreateMessage::Metadata(_)) => {
                     error!("Unexpected CreateMetadata message after the first message");
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
+                    Err(IoError::new(
+                        ErrorKind::InvalidInput,
                         "unexpected CreateMetadata message after the first message",
                     ))
                 }
                 Some(CreateMessage::Abort(CreateAbort { reason })) => {
                     warn!("Client aborted the upload: {}", reason);
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::Interrupted,
+                    Err(IoError::new(
+                        ErrorKind::Interrupted,
                         format!("client aborted the upload: {reason}"),
                     ))
                 }
                 None => {
                     error!("Empty CreateRequest message");
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
+                    Err(IoError::new(
+                        ErrorKind::InvalidInput,
                         "empty CreateRequest message",
                     ))
                 }
             }
         });
-        let async_reader = tokio_util::io::StreamReader::new(bytes_stream);
+        let async_reader = TokioStreamReader::new(bytes_stream);
         let sync_reader = SyncIoBridge::new(async_reader);
 
-        let (batch_tx, batch_rx) =
-            mpsc::channel::<Result<RecordBatch, arrow::error::ArrowError>>(16);
-        let batch_stream = tokio_stream::wrappers::ReceiverStream::new(batch_rx);
+        let (batch_tx, batch_rx) = mpsc::channel::<Result<RecordBatch, ArrowError>>(16);
+        let batch_stream = ReceiverStream::new(batch_rx);
 
         let read_task = tokio::spawn(async move {
             let result = {
                 let batch_tx = batch_tx.clone();
-                tokio::task::spawn_blocking(move || {
+                spawn_blocking(move || {
                     let reader = StreamReader::try_new(sync_reader, None)?;
                     for batch_result in reader {
                         let batch = batch_result?;
@@ -331,7 +346,7 @@ impl DatasetService for Storage {
             description,
             favorite,
         } = request.into_inner();
-        let update = crate::dataset_manager::DatasetUpdate {
+        let update = DatasetUpdate {
             name,
             description,
             favorite,

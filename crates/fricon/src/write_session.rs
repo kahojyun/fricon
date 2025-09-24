@@ -1,8 +1,12 @@
 pub(crate) mod background_writer;
 
-use std::path::PathBuf;
+use std::{
+    io::Error as IoError,
+    path::{Path, PathBuf},
+};
 
 use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use tokio::sync::mpsc;
 use tokio_util::task::TaskTracker;
 
 use self::background_writer::{BackgroundWriter, Result};
@@ -27,7 +31,7 @@ impl WriteSession {
         let live_writer = LiveDatasetWriter::new(schema.clone());
 
         // Channel for chunk completed notifications
-        let (chunk_completed_sender, mut chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let (chunk_completed_sender, mut chunk_completed_receiver) = mpsc::channel(16);
 
         let writer = BackgroundWriter::new(tracker, dir_path, schema, chunk_completed_sender);
 
@@ -49,14 +53,11 @@ impl WriteSession {
         }
     }
 
-    fn handle_chunk_completion(
-        live_writer: &LiveDatasetWriter,
-        chunk_path: &std::path::Path,
-    ) -> Result<()> {
+    fn handle_chunk_completion(live_writer: &LiveDatasetWriter, chunk_path: &Path) -> Result<()> {
         // Read the completed chunk using memory-mapped reading and replace the
         // sequential front in live dataset
         let batches = read_ipc_file_mmap(chunk_path)
-            .map_err(|e| background_writer::Error::Io(std::io::Error::other(e)))?;
+            .map_err(|e| background_writer::Error::Io(IoError::other(e)))?;
 
         if !batches.is_empty()
             && let Err(e) = live_writer.replace_sequential_front(&batches)

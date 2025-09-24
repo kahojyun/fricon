@@ -15,7 +15,6 @@ use tokio::sync::broadcast;
 /// - Ability to replace a sequential front segment (used by future compaction /
 ///   reordering)
 #[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub struct LiveDatasetWriter {
     inner: Arc<LiveInner>,
 }
@@ -25,7 +24,6 @@ pub struct LiveDatasetWriter {
 /// Cloning is cheap (Arc clone). Mutation APIs are exposed only via
 /// `LiveDatasetWriter` ensuring clearer ownership around who may append.
 #[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub struct LiveDataset {
     inner: Arc<LiveInner>,
 }
@@ -40,7 +38,6 @@ struct LiveInner {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub enum LiveEvent {
     Appended { new_rows: usize, total_rows: usize },
     SequentialFrontReplaced { replaced_rows: usize, cursor: usize },

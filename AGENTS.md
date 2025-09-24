@@ -133,13 +133,15 @@ python3 scripts/setup-dev.py
 ### Code Style
 
 - Rust: Follows standard Rust patterns with clippy pedantic mode
+    - Enforce self named module files
+    - Ignoring lints with `#[expect(..., reason="...")]` if not applicable
 - Python: Uses ruff for formatting and linting
 - Frontend: Uses ESLint and Prettier
 
 ### Testing
 
 - Rust tests: `cargo test`
-- Python tests: `uv run pytest`
+- Python tests: `uv run pytest` (`uv run maturin develop` required if Rust code changed)
 
 ### Compatibility
 

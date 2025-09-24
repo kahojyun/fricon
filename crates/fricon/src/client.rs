@@ -10,7 +10,11 @@ use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use semver::Version;
-use tokio::{io, sync::mpsc, task::JoinHandle};
+use tokio::{
+    io,
+    sync::mpsc,
+    task::{JoinHandle, spawn_blocking},
+};
 use tokio_util::io::{ReaderStream, SyncIoBridge};
 use tonic::{Request, transport::Channel};
 use tower::service_fn;
@@ -19,6 +23,7 @@ use uuid::Uuid;
 
 use crate::{
     VERSION,
+    database::DatasetStatus,
     dataset_manager::DatasetRecord,
     ipc,
     proto::{
@@ -110,7 +115,7 @@ impl DatasetWriter {
 
         let request_stream = build_request_stream(name, description, tags, ReaderStream::new(drx));
 
-        let writer_handle = tokio::task::spawn_blocking(move || {
+        let writer_handle = spawn_blocking(move || {
             let Some(batch) = rx.blocking_recv() else {
                 bail!("No record batch received.")
             };
@@ -197,7 +202,7 @@ fn build_request_stream(
             })
         }
     });
-    futures::stream::once(async move { first_message })
+    stream::once(async move { first_message })
         .chain(payload_stream)
         .map(|msg| CreateRequest {
             create_message: Some(msg),
@@ -266,7 +271,7 @@ impl Dataset {
     }
 
     #[must_use]
-    pub fn status(&self) -> crate::database::DatasetStatus {
+    pub fn status(&self) -> DatasetStatus {
         self.record.metadata.status
     }
 

@@ -5,7 +5,7 @@
 //! instead of a broad `AppState`, implementing the core business logic for
 //! dataset management with minimal dependencies.
 
-use std::{fs, path::Path};
+use std::{error::Error as StdError, fs, path::Path};
 
 use arrow::array::RecordBatch;
 use deadpool_diesel::sqlite::Pool;
@@ -23,6 +23,7 @@ use crate::{
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManagerError, DatasetRecord, DatasetUpdate,
     },
+    reader::{CompletedDataset, DatasetReader},
     write_registry::WriteSessionRegistry,
 };
 
@@ -35,9 +36,7 @@ pub async fn do_create_dataset(
     tracker: &TaskTracker,
     request: CreateDatasetRequest,
     mut stream: Box<
-        dyn Stream<Item = Result<RecordBatch, Box<dyn std::error::Error + Send + Sync>>>
-            + Send
-            + Unpin,
+        dyn Stream<Item = Result<RecordBatch, Box<dyn StdError + Send + Sync>>> + Send + Unpin,
     >,
 ) -> Result<DatasetRecord, DatasetManagerError> {
     let uuid = Uuid::new_v4();
@@ -253,26 +252,26 @@ pub async fn do_get_dataset_reader(
     root: &WorkspaceRoot,
     write_sessions: &WriteSessionRegistry,
     id: DatasetId,
-) -> Result<crate::reader::DatasetReader, DatasetManagerError> {
+) -> Result<DatasetReader, DatasetManagerError> {
     let record = do_get_dataset(database, id).await?;
     match record.metadata.status {
         DatasetStatus::Completed | DatasetStatus::Aborted => {
             // Aborted datasets may still have partially written chunk files (valid up to
             // last flush).
             let dataset_path = root.paths().dataset_path_from_uuid(record.metadata.uuid);
-            let completed = crate::reader::CompletedDataset::open(&dataset_path)?;
-            Ok(crate::reader::DatasetReader::Completed(completed))
+            let completed = CompletedDataset::open(&dataset_path)?;
+            Ok(DatasetReader::Completed(completed))
         }
         DatasetStatus::Writing => {
             if let Some(session) = write_sessions.get(record.id) {
-                return Ok(crate::reader::DatasetReader::Live(session.live().clone()));
+                return Ok(DatasetReader::Live(session.live().clone()));
             }
             // Fallback: if writer already dropped but directory exists, expose as Completed
             // view.
             let dataset_path = root.paths().dataset_path_from_uuid(record.metadata.uuid);
             if dataset_path.exists() {
-                let completed = crate::reader::CompletedDataset::open(&dataset_path)?;
-                return Ok(crate::reader::DatasetReader::Completed(completed));
+                let completed = CompletedDataset::open(&dataset_path)?;
+                return Ok(DatasetReader::Completed(completed));
             }
             Err(DatasetManagerError::io_invalid_data(
                 "Dataset in Writing state has no active session and no file yet",
@@ -353,9 +352,7 @@ async fn perform_write_async(
     dataset_id: i32,
     path: &Path,
     stream: &mut Box<
-        dyn Stream<Item = Result<RecordBatch, Box<dyn std::error::Error + Send + Sync>>>
-            + Send
-            + Unpin,
+        dyn Stream<Item = Result<RecordBatch, Box<dyn StdError + Send + Sync>>> + Send + Unpin,
     >,
 ) -> Result<(), DatasetManagerError> {
     let first_batch = match stream.next().await {
