@@ -1,14 +1,19 @@
 use std::{
     fs::File,
-    io::{BufWriter, Seek},
+    io::{BufWriter, Error as IoError, Seek},
     path::{Path, PathBuf},
+    result::Result as StdResult,
 };
 
 use arrow::{
-    array::RecordBatch, compute::BatchCoalescer, datatypes::SchemaRef, ipc::writer::FileWriter,
+    array::RecordBatch, compute::BatchCoalescer, datatypes::SchemaRef, error::ArrowError,
+    ipc::writer::FileWriter,
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::mpsc,
+    task::{JoinError, JoinHandle},
+};
 use tokio_util::task::TaskTracker;
 use tracing::{error, info};
 
@@ -17,15 +22,15 @@ use crate::utils::chunk_path;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Arrow error: {0}")]
-    ArrowError(#[from] arrow::error::ArrowError),
+    ArrowError(#[from] ArrowError),
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] IoError),
     #[error("Send error: {0}")]
     Send(String),
     #[error("Task join error: {0}")]
-    JoinError(#[from] tokio::task::JoinError),
+    JoinError(#[from] JoinError),
 }
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 /// Background writer that persists incoming batches to chunked Arrow IPC files.
 ///
@@ -170,7 +175,7 @@ fn blocking_write_task(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{fs, sync::Arc};
 
     use arrow::{
         array::Int32Array,
@@ -197,7 +202,7 @@ mod tests {
         let tracker = TaskTracker::new();
 
         // Create channels for testing
-        let (chunk_completed_sender, mut chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let (chunk_completed_sender, mut chunk_completed_receiver) = mpsc::channel(16);
 
         let writer = BackgroundWriter::new(
             &tracker,
@@ -216,7 +221,7 @@ mod tests {
 
         // File should exist and be non-empty (data_chunk_0.arrow)
         let chunk_path = chunk_path(dir.path(), 0);
-        let meta = std::fs::metadata(&chunk_path).expect("file metadata");
+        let meta = fs::metadata(&chunk_path).expect("file metadata");
         assert!(meta.len() > 0, "arrow file should have content");
     }
 
@@ -228,7 +233,7 @@ mod tests {
         let tracker = TaskTracker::new();
 
         // Create channels for testing
-        let (chunk_completed_sender, _chunk_completed_receiver) = tokio::sync::mpsc::channel(16);
+        let (chunk_completed_sender, _chunk_completed_receiver) = mpsc::channel(16);
 
         let writer = BackgroundWriter::new(
             &tracker,
@@ -249,7 +254,7 @@ mod tests {
         // Check that at least the first chunk file exists
         let chunk0_path = chunk_path(dir.path(), 0);
         assert!(chunk0_path.exists(), "data_chunk_0.arrow should exist");
-        let meta = std::fs::metadata(&chunk0_path).expect("chunk 0 metadata");
+        let meta = fs::metadata(&chunk0_path).expect("chunk 0 metadata");
         assert!(meta.len() > 0, "chunk 0 should have content");
     }
 }

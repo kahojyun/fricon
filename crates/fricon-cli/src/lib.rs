@@ -8,6 +8,7 @@ use std::{
 use anyhow::Result;
 pub use clap;
 use clap::{Parser, Subcommand};
+use tracing_subscriber::fmt;
 
 pub trait Main {
     fn main(self) -> Result<()>;
@@ -42,7 +43,7 @@ impl Main for Cli {
     fn main(self) -> Result<()> {
         match self.command {
             Commands::Init { path } => {
-                tracing_subscriber::fmt::init();
+                fmt::init();
                 let path = path::absolute(path)?;
                 fricon::WorkspaceRoot::create_new(path)?;
             }

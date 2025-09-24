@@ -38,7 +38,7 @@ pub fn start(
                 info!("Received shutdown signal");
             })
             .await
-            .expect("Server failed");
+            .expect("Server should run successfully until shutdown signal is received");
         info!("Server shutdown complete");
     });
 

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::needless_pass_by_value,
+    clippy::used_underscore_binding,
+    reason = "Tauri command handlers require specific parameter signatures"
+)]
+
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use tauri::{State, ipc::Invoke};

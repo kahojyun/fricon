@@ -15,7 +15,6 @@ use tokio::sync::broadcast;
 /// - Ability to replace a sequential front segment (used by future compaction /
 ///   reordering)
 #[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub struct LiveDatasetWriter {
     inner: Arc<LiveInner>,
 }
@@ -25,7 +24,6 @@ pub struct LiveDatasetWriter {
 /// Cloning is cheap (Arc clone). Mutation APIs are exposed only via
 /// `LiveDatasetWriter` ensuring clearer ownership around who may append.
 #[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub struct LiveDataset {
     inner: Arc<LiveInner>,
 }
@@ -40,7 +38,6 @@ struct LiveInner {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub enum LiveEvent {
     Appended { new_rows: usize, total_rows: usize },
     SequentialFrontReplaced { replaced_rows: usize, cursor: usize },
@@ -67,8 +64,16 @@ impl LiveDatasetWriter {
             return;
         }
         let rows = batch.num_rows();
-        let mut total = self.inner.total_rows.write().unwrap();
-        let mut vec = self.inner.batches.write().unwrap();
+        let mut total = self
+            .inner
+            .total_rows
+            .write()
+            .expect("Lock should not be poisoned as the critical section doesn't panic");
+        let mut vec = self
+            .inner
+            .batches
+            .write()
+            .expect("Lock should not be poisoned as the critical section doesn't panic");
         vec.push_back(batch);
         *total += rows;
         let _ = self.inner.event_tx.send(LiveEvent::Appended {
@@ -159,11 +164,19 @@ impl LiveDataset {
         self.inner.event_tx.subscribe()
     }
     pub fn total_rows(&self) -> usize {
-        *self.inner.total_rows.read().unwrap()
+        *self
+            .inner
+            .total_rows
+            .read()
+            .expect("Read lock should not be poisoned as the critical section doesn't panic")
     }
     pub fn tail(&self, n: usize) -> Option<RecordBatch> {
         use arrow::compute::concat_batches;
-        let vec = self.inner.batches.read().unwrap();
+        let vec = self
+            .inner
+            .batches
+            .read()
+            .expect("Read lock should not be poisoned as the critical section doesn't panic");
         if vec.is_empty() || n == 0 {
             return None;
         }

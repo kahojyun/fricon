@@ -1,14 +1,27 @@
 #![allow(
     clippy::missing_errors_doc,
+    reason = "Python bindings don't require complete error documentation"
+)]
+#![allow(
     clippy::missing_panics_doc,
+    reason = "Python bindings don't require complete panic documentation"
+)]
+#![allow(
     clippy::doc_markdown,
+    reason = "Markdown in docs is acceptable for Python documentation"
+)]
+#![allow(
     clippy::must_use_candidate,
-    clippy::significant_drop_tightening,
-    clippy::needless_pass_by_value
+    reason = "Not all functions need to be marked with must_use in Python bindings"
+)]
+#![allow(
+    clippy::needless_pass_by_value,
+    reason = "Python bindings may require specific parameter patterns"
 )]
 
 use std::{
     collections::HashMap,
+    env,
     path::PathBuf,
     sync::{Arc, LazyLock},
 };
@@ -61,7 +74,6 @@ impl Workspace {
     /// Returns:
     ///     A workspace client.
     #[staticmethod]
-    #[expect(clippy::needless_pass_by_value)]
     pub fn connect(path: PathBuf) -> Result<Self> {
         let client = get_runtime().block_on(Client::connect(&path))?;
         Ok(Self { client })
@@ -747,7 +759,6 @@ impl DatasetWriter {
     ///
     /// Parameters:
     ///     values: A dictionary of names and values in the row.
-    #[expect(clippy::needless_pass_by_value)]
     pub fn write_dict(&mut self, py: Python<'_>, values: HashMap<String, PyObject>) -> Result<()> {
         if values.is_empty() {
             bail!("No data to write.")
@@ -856,7 +867,10 @@ pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<Data
     PyArrowType(get_trace_type(item.0, fixed_step))
 }
 
-pub fn main_impl<T: fricon_cli::clap::Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
+use fricon_cli::clap::Parser;
+
+#[expect(clippy::print_stderr, reason = "Error messages for CLI tool")]
+pub fn main_impl<T: Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
     fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
         let signal = py.import("signal")?;
         let sigint = signal.getattr("SIGINT")?;
@@ -871,7 +885,7 @@ pub fn main_impl<T: fricon_cli::clap::Parser + fricon_cli::Main>(py: Python<'_>)
     }
 
     // Skip python executable
-    let argv = std::env::args_os().skip(1);
+    let argv = env::args_os().skip(1);
     let cli = T::parse_from(argv);
     match cli.main() {
         Ok(()) => 0,

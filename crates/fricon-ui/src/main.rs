@@ -7,7 +7,7 @@ use anyhow::Result;
 use dotenvy::dotenv;
 
 fn main() -> Result<()> {
-    dotenv().ok();
+    let _ = dotenv();
     let workspace_path = env::var("FRICON_WORKSPACE").expect("FRICON_WORKSPACE not set");
     let workspace_path =
         fs::canonicalize(workspace_path).expect("FRICON_WORKSPACE is not a valid path");

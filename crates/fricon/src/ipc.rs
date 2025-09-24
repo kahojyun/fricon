@@ -4,6 +4,8 @@ mod unix;
 #[cfg(windows)]
 mod win;
 
+use std::io::Error as IoError;
+
 use thiserror::Error;
 
 #[cfg(unix)]
@@ -14,9 +16,9 @@ pub use self::win::{connect, listen};
 #[derive(Debug, Error)]
 pub enum ConnectError {
     #[error("Connect target not found: {0}")]
-    NotFound(#[source] std::io::Error),
+    NotFound(#[source] IoError),
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] IoError),
 }
 
 #[cfg(test)]

@@ -1,10 +1,12 @@
 mod models;
 #[rustfmt::skip]
-#[allow(clippy::module_name_repetitions)]
 pub mod schema;
 mod types;
 
-use std::path::{Path, PathBuf};
+use std::{
+    error::Error as StdError,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, anyhow};
 use deadpool_diesel::{
@@ -13,7 +15,7 @@ use deadpool_diesel::{
 };
 use diesel::{
     QueryResult, RunQueryDsl, SqliteConnection, connection::SimpleConnection,
-    migration::MigrationSource, sqlite::Sqlite,
+    migration::MigrationSource, result::Error as DieselError, sql_types::Text, sqlite::Sqlite,
 };
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use futures::FutureExt;
@@ -31,10 +33,10 @@ pub enum DatabaseError {
     Pool(#[from] deadpool_diesel::PoolError),
 
     #[error(transparent)]
-    Migration(#[from] Box<dyn std::error::Error + Send + Sync>),
+    Migration(#[from] Box<dyn StdError + Send + Sync>),
 
     #[error(transparent)]
-    Query(#[from] diesel::result::Error),
+    Query(#[from] DieselError),
 
     #[error(transparent)]
     General(#[from] anyhow::Error),
@@ -55,7 +57,9 @@ pub async fn connect(
             async move {
                 obj.interact(initialize_connection)
                     .await
-                    .unwrap()
+                    .expect(
+                        "Database connection should initialize successfully on connection creation",
+                    )
                     .map_err(|e| HookError::message(e.to_string()))
             }
             .boxed()
@@ -73,7 +77,7 @@ fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()
         .to_str()
         .context("Invalid backup path encoding")?;
     diesel::sql_query("VACUUM INTO ?")
-        .bind::<diesel::sql_types::Text, _>(backup_path_str)
+        .bind::<Text, _>(backup_path_str)
         .execute(conn)?;
     Ok(())
 }

@@ -4,16 +4,26 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
+use std::{
+    error::Error as StdError,
+    io::{Error as IoError, ErrorKind},
+    path::Path,
+};
+
 use arrow::{array::RecordBatch, error::ArrowError};
 use chrono::{DateTime, Utc};
+use diesel::result::Error as DieselError;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
+use tokio::task::JoinError;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    app::AppHandle,
+    app::{AppError, AppHandle},
     database::{self, DatabaseError, DatasetStatus},
+    dataset_tasks,
+    reader::DatasetReader,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -28,51 +38,45 @@ pub enum DatasetManagerError {
     Database(#[from] DatabaseError),
 
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] IoError),
 
     #[error("Arrow error: {0}")]
     Arrow(#[from] ArrowError),
 
     #[error("Task join error: {0}")]
-    TaskJoin(#[from] tokio::task::JoinError),
+    TaskJoin(#[from] JoinError),
 
     #[error("App error: {0}")]
-    App(#[from] crate::app::AppError),
+    App(#[from] AppError),
 }
 
 impl DatasetManagerError {
     pub(crate) fn io_invalid_data(message: impl Into<String>) -> Self {
-        Self::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            message.into(),
-        ))
+        Self::Io(IoError::new(ErrorKind::InvalidData, message.into()))
     }
 
-    pub fn stream_error(error: impl std::error::Error) -> Self {
+    pub fn stream_error(error: impl StdError) -> Self {
         Self::io_invalid_data(format!("Stream error: {error}"))
     }
 
     #[must_use]
     pub fn empty_stream() -> Self {
-        Self::Io(std::io::Error::new(
-            std::io::ErrorKind::UnexpectedEof,
-            "Stream is empty",
-        ))
+        Self::Io(IoError::new(ErrorKind::UnexpectedEof, "Stream is empty"))
     }
 
     #[must_use]
-    pub fn path_already_exists(path: &std::path::Path) -> Self {
-        Self::Io(std::io::Error::new(
-            std::io::ErrorKind::AlreadyExists,
+    pub fn path_already_exists(path: &Path) -> Self {
+        Self::Io(IoError::new(
+            ErrorKind::AlreadyExists,
             format!("Dataset path already exists: {}", path.display()),
         ))
     }
 }
 
-impl From<diesel::result::Error> for DatasetManagerError {
-    fn from(error: diesel::result::Error) -> Self {
+impl From<DieselError> for DatasetManagerError {
+    fn from(error: DieselError) -> Self {
         match error {
-            diesel::result::Error::NotFound => Self::NotFound {
+            DieselError::NotFound => Self::NotFound {
                 id: "unknown".to_string(),
             },
             other => Self::Database(other.into()),
@@ -135,16 +139,14 @@ impl DatasetManager {
     ) -> Result<DatasetRecord, DatasetManagerError>
     where
         S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
-        E: std::error::Error + Send + Sync + 'static,
+        E: StdError + Send + Sync + 'static,
     {
         let stream: Box<
-            dyn Stream<Item = Result<RecordBatch, Box<dyn std::error::Error + Send + Sync>>>
-                + Send
-                + Unpin,
-        > = Box::new(stream.map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>));
+            dyn Stream<Item = Result<RecordBatch, Box<dyn StdError + Send + Sync>>> + Send + Unpin,
+        > = Box::new(stream.map_err(|e| Box::new(e) as Box<dyn StdError + Send + Sync>));
 
         let join_handle = self.app.spawn(move |state| async move {
-            let result = crate::dataset_tasks::do_create_dataset(
+            let result = dataset_tasks::do_create_dataset(
                 &state.database,
                 &state.root,
                 &state.event_sender,
@@ -165,7 +167,7 @@ impl DatasetManager {
 
     pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
         let join_handle = self.app.spawn(move |state| async move {
-            crate::dataset_tasks::do_get_dataset(&state.database, id).await
+            dataset_tasks::do_get_dataset(&state.database, id).await
         })?;
 
         join_handle.await?
@@ -173,7 +175,7 @@ impl DatasetManager {
 
     pub async fn list_datasets(&self) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
         let join_handle = self.app.spawn(move |state| async move {
-            crate::dataset_tasks::do_list_datasets(&state.database).await
+            dataset_tasks::do_list_datasets(&state.database).await
         })?;
 
         join_handle.await?
@@ -185,7 +187,7 @@ impl DatasetManager {
         update: DatasetUpdate,
     ) -> Result<(), DatasetManagerError> {
         let join_handle = self.app.spawn(move |state| async move {
-            crate::dataset_tasks::do_update_dataset(&state.database, id, update).await
+            dataset_tasks::do_update_dataset(&state.database, id, update).await
         })?;
 
         join_handle.await?
@@ -193,7 +195,7 @@ impl DatasetManager {
 
     pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
         let join_handle = self.app.spawn(move |state| async move {
-            crate::dataset_tasks::do_add_tags(&state.database, id, tags).await
+            dataset_tasks::do_add_tags(&state.database, id, tags).await
         })?;
 
         join_handle.await?
@@ -201,7 +203,7 @@ impl DatasetManager {
 
     pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
         let join_handle = self.app.spawn(move |state| async move {
-            crate::dataset_tasks::do_remove_tags(&state.database, id, tags).await
+            dataset_tasks::do_remove_tags(&state.database, id, tags).await
         })?;
 
         join_handle.await?
@@ -209,8 +211,7 @@ impl DatasetManager {
 
     pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
         let join_handle = self.app.spawn(move |state| async move {
-            let result =
-                crate::dataset_tasks::do_delete_dataset(&state.database, &state.root, id).await;
+            let result = dataset_tasks::do_delete_dataset(&state.database, &state.root, id).await;
             if let Err(e) = &result {
                 error!("Dataset deletion failed: {}", e);
             }
@@ -224,9 +225,9 @@ impl DatasetManager {
     pub async fn get_dataset_reader(
         &self,
         id: DatasetId,
-    ) -> Result<crate::reader::DatasetReader, DatasetManagerError> {
+    ) -> Result<DatasetReader, DatasetManagerError> {
         let join_handle = self.app.spawn(move |state| async move {
-            crate::dataset_tasks::do_get_dataset_reader(
+            dataset_tasks::do_get_dataset_reader(
                 &state.database,
                 &state.root,
                 &state.write_sessions,

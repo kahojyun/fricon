@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{Context as _, Result};
@@ -29,6 +30,8 @@ pub fn chunk_path(dir_path: &Path, chunk_index: usize) -> PathBuf {
 /// Read Arrow IPC batches from a file using memory-mapped zero-copy reading
 pub fn read_ipc_file_mmap(file_path: &Path) -> Result<Vec<RecordBatch>> {
     let ipc_file = File::open(file_path).context("Failed to open IPC file")?;
+    // SAFETY: Safe because we're only reading from the memory-mapped file and not
+    // modifying it
     let mmap = unsafe { memmap2::Mmap::map(&ipc_file) }.context("Failed to create memory map")?;
 
     // Convert the mmap region to an Arrow `Buffer`
@@ -60,18 +63,30 @@ struct IPCBufferDecoder {
     batches: Vec<Block>,
 }
 
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Casts from FlatBuffer types are safe within the context of Arrow file format"
+)]
 impl IPCBufferDecoder {
     fn new(buffer: Buffer) -> Result<Self> {
         let trailer_start = buffer.len() - 10;
-        let footer_len = read_footer_length(buffer[trailer_start..].try_into().unwrap())
-            .context("Failed to read footer length")?;
+        let footer_len = read_footer_length(
+            buffer[trailer_start..]
+                .try_into()
+                .expect("10-byte trailer should be available at the end of Arrow IPC file"),
+        )
+        .context("Failed to read footer length")?;
         let footer = root_as_footer(&buffer[trailer_start - footer_len..trailer_start])
             .map_err(|e| anyhow::anyhow!("Failed to parse footer: {:?}", e))?;
 
-        let schema = fb_to_schema(footer.schema().unwrap());
+        let schema = fb_to_schema(
+            footer
+                .schema()
+                .expect("Footer should always contain schema in valid Arrow IPC file"),
+        );
 
-        let mut decoder = FileDecoder::new(std::sync::Arc::new(schema), footer.version());
+        let mut decoder = FileDecoder::new(Arc::new(schema), footer.version());
 
         // Read dictionaries
         for block in footer.dictionaries().iter().flatten() {
@@ -104,7 +119,11 @@ impl IPCBufferDecoder {
     /// Return the [`RecordBatch`] at message index `i`.
     ///
     /// This may return `None` if the IPC message was None
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Casts from FlatBuffer types are safe within the context of Arrow file format"
+    )]
     fn get_batch(&self, i: usize) -> Result<Option<RecordBatch>> {
         let block = &self.batches[i];
         let block_len = block.bodyLength() as usize + block.metaDataLength() as usize;
@@ -157,7 +176,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let lock_path = dir.path().join("test.lock");
         {
-            let _lock = FileLock::new(&lock_path).expect("Should create lock");
+            let _lock = FileLock::new(&lock_path)
+                .expect("Lock file should be creatable in test environment");
             assert!(lock_path.exists());
         }
         // File should be removed after drop
@@ -168,7 +188,8 @@ mod tests {
     fn cannot_acquire_lock_twice() {
         let dir = tempdir().unwrap();
         let lock_path = dir.path().join("double.lock");
-        let _first_lock = FileLock::new(&lock_path).expect("Should acquire first lock");
+        let _first_lock = FileLock::new(&lock_path)
+            .expect("First lock should be acquired successfully in test environment");
         // Attempting to acquire the same lock again should fail
         let second_lock = FileLock::new(&lock_path);
         assert!(

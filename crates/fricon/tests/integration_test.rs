@@ -26,7 +26,7 @@ fn create_test_batch() -> RecordBatch {
             Arc::new(value_array),
         ],
     )
-    .unwrap()
+    .expect("Failed to create record batch")
 }
 
 #[tokio::test]
