@@ -3,7 +3,8 @@
     clippy::missing_panics_doc,
     clippy::doc_markdown,
     clippy::must_use_candidate,
-    clippy::significant_drop_tightening
+    clippy::significant_drop_tightening,
+    clippy::needless_pass_by_value
 )]
 
 use std::{
@@ -38,8 +39,8 @@ use pyo3_async_runtimes::tokio::get_runtime;
 pub mod _core {
     #[pymodule_export]
     pub use super::{
-        Dataset, DatasetManager, DatasetWriter, Trace, Workspace, complex128, main, main_gui,
-        trace_,
+        Dataset, DatasetManager, DatasetWriter, ServerHandle, Trace, Workspace, complex128, main,
+        main_gui, serve_workspace, trace_,
     };
 }
 
@@ -90,31 +91,36 @@ impl DatasetManager {
     ///     name: Name of the dataset.
     ///     description: Description of the dataset.
     ///     tags: Tags of the dataset. Duplicate tags will be add only once.
-    ///     schema: Schema of the underlying arrow table. Can be only a subset of all columns,
-    ///         other fields will be inferred from first row.
-    ///     index: Names of index columns.
+    ///     schema: Schema of the underlying arrow table. Can be only a subset
+    /// of all columns,         other fields will be inferred from first
+    /// row.     index_columns: Names of index columns.
     ///
     /// Returns:
     ///     A writer of the newly created dataset.
-    #[pyo3(signature = (name, *, description=None, tags=None, schema=None, index=None))]
+    #[pyo3(signature = (name, *, description=None, tags=None, schema=None, index_columns=None))]
     pub fn create(
         &self,
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
         schema: Option<PyArrowType<Schema>>,
-        index: Option<Vec<String>>,
+        index_columns: Option<Vec<String>>,
     ) -> Result<DatasetWriter> {
+        let _ = index_columns; // TODO: support index columns
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
         let schema = schema.map_or_else(Schema::empty, |s| s.0);
-        let index = index.unwrap_or_default();
-        let writer = get_runtime().block_on(self.workspace.client.create_dataset(
-            name,
-            description,
-            tags,
-            index,
-        ))?;
+
+        // Enter Tokio runtime context to handle tokio::spawn calls in
+        // DatasetWriter::new
+        let runtime = get_runtime();
+        let _guard = runtime.enter();
+
+        let writer = self
+            .workspace
+            .client
+            .create_dataset(name, description, tags)?;
+
         Ok(DatasetWriter::new(writer, Arc::new(schema)))
     }
 
@@ -157,7 +163,6 @@ impl DatasetManager {
                          name,
                          description,
                          favorite,
-                         index_columns,
                          created_at,
                          tags,
                          ..
@@ -165,16 +170,7 @@ impl DatasetManager {
                  ..
              }| {
                 let uuid = uuid.simple().to_string();
-                (
-                    id,
-                    uuid,
-                    name,
-                    description,
-                    favorite,
-                    index_columns,
-                    created_at,
-                    tags,
-                )
+                (id, uuid, name, description, favorite, created_at, tags)
             },
         );
         let py_records = PyList::new(py, py_records)?;
@@ -188,7 +184,6 @@ impl DatasetManager {
                 "name",
                 "description",
                 "favorite",
-                "index",
                 "created_at",
                 "tags",
             ],
@@ -334,7 +329,8 @@ impl Trace {
 
 /// A dataset.
 ///
-/// Datasets can be created and opened using the [`DatasetManager`][fricon.DatasetManager].
+/// Datasets can be created and opened using the
+/// [`DatasetManager`][fricon.DatasetManager].
 #[pyclass(module = "fricon._core")]
 pub struct Dataset {
     inner: fricon::Dataset,
@@ -347,12 +343,13 @@ fn helper_module(py: Python<'_>) -> PyResult<&PyObject> {
 
 #[pymethods]
 impl Dataset {
-    /// Load the dataset as a polars DataFrame.
+    /// Load the dataset as a polars LazyFrame.
     ///
     /// Returns:
-    ///     A polars DataFrame.
+    ///     A polars LazyFrame.
     pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
-        helper_module(py)?.call_method1(py, "read_polars", (self.inner.arrow_file(),))
+        // Pass dataset directory; helper will gather chunk files.
+        helper_module(py)?.call_method1(py, "read_polars", (self.inner.path(),))
     }
 
     /// Load the dataset as an Arrow Table.
@@ -360,7 +357,7 @@ impl Dataset {
     /// Returns:
     ///     An Arrow Table.
     pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
-        helper_module(py)?.call_method1(py, "read_arrow", (self.inner.arrow_file(),))
+        helper_module(py)?.call_method1(py, "read_arrow", (self.inner.path(),))
     }
 
     #[pyo3(signature = (*tag))]
@@ -431,17 +428,10 @@ impl Dataset {
         self.inner.created_at()
     }
 
-    /// Index columns of the dataset.
-    #[getter]
-    pub fn index_columns(&self) -> &[String] {
-        self.inner.index_columns()
-    }
-
     /// Status of the dataset.
     #[getter]
     pub fn status(&self) -> String {
         match self.inner.status() {
-            fricon::DatasetStatus::Pending => "pending".to_string(),
             fricon::DatasetStatus::Writing => "writing".to_string(),
             fricon::DatasetStatus::Completed => "completed".to_string(),
             fricon::DatasetStatus::Aborted => "aborted".to_string(),
@@ -449,9 +439,49 @@ impl Dataset {
     }
 }
 
+/// A handle to manage the lifecycle of a fricon server.
+///
+/// This handle keeps the server alive and allows for graceful shutdown.
+/// When this handle is dropped, the server will be automatically shut down.
+#[pyclass(module = "fricon._core")]
+pub struct ServerHandle {
+    manager: Option<fricon::AppManager>,
+}
+
+#[pymethods]
+impl ServerHandle {
+    /// Shutdown the server gracefully.
+    ///
+    /// This will stop the server and release all resources.
+    /// After calling this method, the handle cannot be used again.
+    pub fn shutdown(&mut self, _py: Python<'_>) {
+        if let Some(manager) = self.manager.take() {
+            get_runtime().block_on(manager.shutdown());
+        }
+    }
+
+    /// Check if the server is still running.
+    ///
+    /// Returns:
+    ///     True if the server is running, False if it has been shut down.
+    #[getter]
+    pub fn is_running(&self) -> bool {
+        self.manager.is_some()
+    }
+}
+
+impl Drop for ServerHandle {
+    fn drop(&mut self) {
+        if let Some(manager) = self.manager.take() {
+            get_runtime().block_on(manager.shutdown());
+        }
+    }
+}
+
 /// Writer for newly created dataset.
 ///
-/// Writers are constructed by calling [`DatasetManager.create`][fricon.DatasetManager.create].
+/// Writers are constructed by calling
+/// [`DatasetManager.create`][fricon.DatasetManager.create].
 #[pyclass(module = "fricon._core")]
 pub struct DatasetWriter {
     writer: Option<fricon::DatasetWriter>,
@@ -870,4 +900,40 @@ pub fn main(py: Python<'_>) -> i32 {
 #[must_use]
 pub fn main_gui(py: Python<'_>) -> i32 {
     main_impl::<fricon_cli::Gui>(py)
+}
+
+/// Create a workspace for integration testing.
+///
+/// This function creates a new workspace at the given path and starts a server.
+/// The server will run in the background and the workspace client is returned.
+/// It's not exported to the public API and should only be used for testing.
+///
+/// Note: The server runs in the background. When the workspace client is
+/// dropped, the connection is closed but the server continues running. For
+/// proper cleanup, you may need to manually stop the server process.
+///
+/// Parameters:
+///     path: The path where to create the workspace.
+///
+/// Returns:
+///     A tuple containing (workspace_client, server_handle) where:
+///     - workspace_client: A workspace client connected to the newly created
+///       workspace
+///     - server_handle: A handle to manage the server lifecycle
+#[pyfunction]
+pub fn serve_workspace(path: PathBuf) -> Result<(Workspace, ServerHandle)> {
+    let runtime = get_runtime();
+
+    // Create the workspace first
+    let root = fricon::WorkspaceRoot::create_new(&path)?;
+
+    // Start the server in the background and keep the manager
+    let manager = runtime.block_on(fricon::AppManager::serve(root))?;
+
+    // Connect to the workspace
+    let workspace = Workspace::connect(path.clone())?;
+    let server_handle = ServerHandle {
+        manager: Some(manager),
+    };
+    Ok((workspace, server_handle))
 }

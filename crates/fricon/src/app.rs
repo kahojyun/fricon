@@ -1,26 +1,24 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Weak},
+    time::Duration,
+};
 
 use anyhow::Result;
 use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast;
+use thiserror::Error;
+use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::info;
 
-use crate::{database, dataset_manager::DatasetManager, server, workspace::WorkspaceRoot};
-
-pub async fn init(path: impl Into<PathBuf>) -> Result<()> {
-    let path = path.into();
-    info!("Initialize workspace: {}", path.display());
-    let root = WorkspaceRoot::init(path)?;
-    let db_path = root.paths().database_file();
-    let backup_path = root
-        .paths()
-        .database_backup_file(Local::now().naive_local());
-    database::connect(db_path, backup_path).await?;
-    Ok(())
-}
+use crate::{
+    database,
+    dataset_manager::DatasetManager,
+    server,
+    workspace::{WorkspacePaths, WorkspaceRoot},
+    write_registry::WriteSessionRegistry,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AppEvent {
@@ -33,25 +31,23 @@ pub enum AppEvent {
     },
 }
 
-/// `AppState` contains only data - no business logic
-/// This struct is cheaply cloneable and holds all the shared state
-/// Internal-only, not exposed in public API
-#[derive(Clone)]
-struct AppState {
-    inner: Arc<AppStateInner>,
+#[derive(Debug, Error)]
+pub enum AppError {
+    #[error("AppState has been dropped")]
+    StateDropped,
 }
 
-struct AppStateInner {
-    root: WorkspaceRoot,
-    database: Pool,
-    shutdown_token: CancellationToken,
-    tracker: TaskTracker,
-    event_sender: broadcast::Sender<AppEvent>,
+pub struct AppState {
+    pub root: WorkspaceRoot,
+    pub database: Pool,
+    pub shutdown_token: CancellationToken,
+    pub tracker: TaskTracker,
+    pub event_sender: broadcast::Sender<AppEvent>,
+    pub write_sessions: WriteSessionRegistry,
 }
 
 impl AppState {
-    async fn new(path: impl Into<PathBuf>) -> Result<Self> {
-        let root = WorkspaceRoot::open(path)?;
+    async fn new(root: WorkspaceRoot) -> Result<Arc<Self>> {
         let db_path = root.paths().database_file();
         let backup_path = root
             .paths()
@@ -61,116 +57,101 @@ impl AppState {
         let tracker = TaskTracker::new();
         let (event_sender, _) = broadcast::channel(1000);
 
-        Ok(Self {
-            inner: Arc::new(AppStateInner {
-                root,
-                database,
-                shutdown_token,
-                tracker,
-                event_sender,
-            }),
-        })
-    }
-
-    #[must_use]
-    fn root(&self) -> &WorkspaceRoot {
-        &self.inner.root
-    }
-
-    #[must_use]
-    fn database(&self) -> &Pool {
-        &self.inner.database
-    }
-
-    #[must_use]
-    fn tracker(&self) -> &TaskTracker {
-        &self.inner.tracker
-    }
-
-    #[must_use]
-    fn shutdown_token(&self) -> &CancellationToken {
-        &self.inner.shutdown_token
-    }
-
-    #[must_use]
-    fn event_sender(&self) -> &broadcast::Sender<AppEvent> {
-        &self.inner.event_sender
-    }
-
-    fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
-        self.inner.event_sender.subscribe()
+        let write_sessions = WriteSessionRegistry::new();
+        Ok(Arc::new(Self {
+            root,
+            database,
+            shutdown_token,
+            tracker,
+            event_sender,
+            write_sessions,
+        }))
     }
 }
 
-/// `AppHandle` provides business logic methods
-/// All dataset operations are implemented here
 #[derive(Clone)]
 pub struct AppHandle {
-    state: AppState,
+    state: Weak<AppState>,
 }
 
 impl AppHandle {
-    fn new(state: AppState) -> Self {
+    pub(crate) fn new(state: Weak<AppState>) -> Self {
         Self { state }
     }
 
-    #[must_use]
-    pub fn root(&self) -> &WorkspaceRoot {
-        self.state.root()
+    pub(crate) fn get_state(&self) -> Result<Arc<AppState>, AppError> {
+        self.state.upgrade().ok_or(AppError::StateDropped)
     }
 
-    #[must_use]
-    pub fn database(&self) -> &Pool {
-        self.state.database()
+    pub fn paths(&self) -> Result<WorkspacePaths, AppError> {
+        Ok(self.get_state()?.root.paths().clone())
     }
 
-    #[must_use]
-    pub fn tracker(&self) -> &TaskTracker {
-        self.state.tracker()
+    pub fn subscribe_to_events(&self) -> Result<broadcast::Receiver<AppEvent>, AppError> {
+        Ok(self.get_state()?.event_sender.subscribe())
     }
 
-    #[must_use]
-    pub fn subscribe_to_events(&self) -> broadcast::Receiver<AppEvent> {
-        self.state.subscribe_to_events()
-    }
-
-    /// Create a `DatasetManager` for this app instance
     #[must_use]
     pub fn dataset_manager(&self) -> DatasetManager {
         DatasetManager::new(self.clone())
     }
 
-    /// Send an event to all subscribers
-    pub fn send_event(&self, event: AppEvent) {
-        // Ignore send errors (no receivers)
-        let _ = self.state.event_sender().send(event);
+    pub fn spawn<F, Fut, T>(&self, f: F) -> Result<JoinHandle<T>, AppError>
+    where
+        F: FnOnce(Arc<AppState>) -> Fut + Send + 'static,
+        Fut: Future<Output = T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let state = self.get_state()?;
+        let tracker = state.tracker.clone();
+        Ok(tracker.spawn(f(state)))
+    }
+
+    pub fn spawn_blocking<F, T>(&self, f: F) -> Result<JoinHandle<T>, AppError>
+    where
+        F: FnOnce(Arc<AppState>) -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        let state = self.get_state()?;
+        let tracker = state.tracker.clone();
+        Ok(tracker.spawn_blocking(move || f(state)))
     }
 }
 
-/// `AppManager` manages the application lifecycle
-/// Responsible for initialization, server management, and shutdown
 pub struct AppManager {
-    state: AppState,
+    state: Arc<AppState>,
     handle: AppHandle,
 }
 
 impl AppManager {
-    pub async fn serve(path: impl Into<PathBuf>) -> Result<Self> {
-        let state = AppState::new(path).await?;
-        let handle = AppHandle::new(state.clone());
+    pub async fn serve(root: WorkspaceRoot) -> Result<Self> {
+        let state = AppState::new(root).await?;
+        let handle = AppHandle::new(Arc::downgrade(&state));
 
-        // Start the server
-        state
-            .tracker()
-            .spawn(server::run(handle.clone(), state.shutdown_token().clone()));
+        let ipc_file = handle.paths()?.ipc_file();
+        server::start(
+            ipc_file,
+            handle.clone(),
+            &state.tracker,
+            state.shutdown_token.clone(),
+        )?;
 
         Ok(Self { state, handle })
     }
 
-    pub async fn shutdown(&self) {
-        self.state.shutdown_token().cancel();
-        self.state.tracker().close();
-        self.state.tracker().wait().await;
+    /// Creates a new `AppManager` with workspace creation.
+    pub async fn serve_with_path(path: impl Into<PathBuf>) -> Result<Self> {
+        let root = WorkspaceRoot::create(path)?;
+        Self::serve(root).await
+    }
+
+    pub async fn shutdown(self) {
+        self.state.shutdown_token.cancel();
+        self.state.tracker.close();
+        self.state.tracker.wait().await;
+        drop(self.state);
+        // TODO: remove this after migrating to r2d2 pool
+        sleep(Duration::from_millis(200)).await;
     }
 
     #[must_use]

@@ -12,10 +12,9 @@ keywords.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 arrow = { workspace = true }
-async-stream = { workspace = true }
+arrow-schema = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-clap = { workspace = true, features = ["derive"] }
 deadpool-diesel = { workspace = true, features = ["sqlite", "tracing"] }
 diesel = { workspace = true, features = [
     "sqlite",
@@ -28,6 +27,8 @@ diesel_migrations = { workspace = true }
 futures = { workspace = true }
 hyper-util = { workspace = true }
 libsqlite3-sys = { workspace = true, features = ["bundled"] }
+memmap2 = { workspace = true }
+num = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
@@ -37,7 +38,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true, features = ["full"] }
-toml = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
 tower = { workspace = true }

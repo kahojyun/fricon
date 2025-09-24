@@ -6,10 +6,8 @@ use std::{
 };
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
-use tokio::runtime::Runtime;
-
 pub use clap;
+use clap::{Parser, Subcommand};
 
 pub trait Main {
     fn main(self) -> Result<()>;
@@ -46,7 +44,7 @@ impl Main for Cli {
             Commands::Init { path } => {
                 tracing_subscriber::fmt::init();
                 let path = path::absolute(path)?;
-                Runtime::new()?.block_on(fricon::init_workspace(path))?;
+                fricon::WorkspaceRoot::create_new(path)?;
             }
             Commands::Gui(gui) => {
                 gui.main()?;

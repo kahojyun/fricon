@@ -21,13 +21,15 @@ struct AppState(Mutex<Option<(fricon::AppManager, WorkerGuard)>>);
 impl AppState {
     async fn new(workspace_path: PathBuf) -> Result<Self> {
         let log_guard = setup_logging(workspace_path.clone())?;
-        let app_manager = fricon::AppManager::serve(&workspace_path).await?;
+        let app_manager = fricon::AppManager::serve_with_path(&workspace_path).await?;
         Ok(Self(Mutex::new(Some((app_manager, log_guard)))))
     }
 
     fn start_event_listener(&self, app_handle: tauri::AppHandle) {
         let app = self.app();
-        let mut event_rx = app.subscribe_to_events();
+        let mut event_rx = app
+            .subscribe_to_events()
+            .expect("Failed to subscribe to events");
 
         async_runtime::spawn(async move {
             while let Ok(event) = event_rx.recv().await {

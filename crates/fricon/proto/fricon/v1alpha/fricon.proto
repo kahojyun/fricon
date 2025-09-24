@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package fricon.v1;
+package fricon.v1alpha;
 
 service FriconService {
   /*

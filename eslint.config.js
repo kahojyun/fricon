@@ -6,7 +6,16 @@ import globals from "globals";
 import typescriptEslint from "typescript-eslint";
 
 export default typescriptEslint.config(
-  { ignores: ["*.d.ts", "**/coverage", "**/dist", "**/.venv", "**/target"] },
+  {
+    ignores: [
+      "*.d.ts",
+      "**/coverage",
+      "**/dist",
+      "**/.venv",
+      "**/target",
+      "**/site",
+    ],
+  },
   {
     extends: [
       eslint.configs.recommended,

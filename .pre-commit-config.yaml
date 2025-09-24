@@ -15,15 +15,15 @@ repos:
       - id: check-added-large-files
         exclude: crates/fricon-ui/icons/.*
   - repo: https://github.com/crate-ci/typos
-    rev: 7fb6e0951ad91e4772a2470012fc1ae621016b80  # frozen: v1
+    rev: edb4e206047e89b93ebe08f1a2ccc3d581a70cc7  # frozen: v1
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 2d951338ec8cdf4fc958b42681c5e1b5ccda7b30  # frozen: 0.8.13
+    rev: 80fe261104b5578bc533ff3a10efb10449677b90  # frozen: 0.8.19
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 0acff885bcb16381b67930fefb91e460202f172c  # frozen: v0.12.10
+    rev: a113f03edeabb71305f025e6e14bd2cd68660e29  # frozen: v0.13.1
     hooks:
       - id: ruff
         args: [--fix]
@@ -38,7 +38,7 @@ repos:
     hooks:
       - id: cargo-fmt # rustup component add rustfmt
         name: cargo fmt
-        entry: cargo fmt --all --
+        entry: cargo +nightly fmt --all --
         language: system
         types: [rust]
         pass_filenames: false

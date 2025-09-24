@@ -4,11 +4,6 @@ mod models;
 pub mod schema;
 mod types;
 
-pub use self::{
-    models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
-    types::{DatasetStatus, JsonValue, SimpleUuid},
-};
-
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, anyhow};
@@ -24,6 +19,11 @@ use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use futures::FutureExt;
 use thiserror::Error;
 use tracing::{error, info};
+
+pub use self::{
+    models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
+    types::{DatasetStatus, SimpleUuid},
+};
 
 #[derive(Debug, Error)]
 pub enum DatabaseError {

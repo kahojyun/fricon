@@ -6,7 +6,6 @@ CREATE TABLE datasets (
     favorite BOOLEAN NOT NULL DEFAULT FALSE,
     -- 'pending', 'writing', 'completed', 'aborted'
     status TEXT NOT NULL DEFAULT 'pending',
-    index_columns TEXT NOT NULL, -- JSON: Vec<String>
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
