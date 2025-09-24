@@ -231,13 +231,12 @@ impl DatasetService for Storage {
 
             match result {
                 Ok(Err(e)) => {
-                    batch_tx.send(Err(e)).await.ok();
+                    let _ = batch_tx.send(Err(e)).await;
                 }
                 Err(err) => {
-                    batch_tx
+                    let _ = batch_tx
                         .send(Err(ArrowError::ExternalError(Box::new(err))))
-                        .await
-                        .ok();
+                        .await;
                 }
                 _ => {}
             }

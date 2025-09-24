@@ -64,7 +64,7 @@ impl Drop for IpcListenerStream {
         if let Ok(metadata) = fs::metadata(&self.path) {
             if metadata.ino() == self.inode {
                 debug!("Removing IPC socket at {}", self.path.display());
-                fs::remove_file(&self.path).ok();
+                let _ = fs::remove_file(&self.path);
             } else {
                 debug!(
                     "Socket file at {} has different inode, not removing",

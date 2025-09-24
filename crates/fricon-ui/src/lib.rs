@@ -121,7 +121,7 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
             let window = app
                 .get_webview_window(&label)
                 .expect("Failed to get webview window");
-            window.hide().ok();
+            let _ = window.hide();
         }
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => {
@@ -135,9 +135,9 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
-        w.unminimize().ok();
-        w.show().ok();
-        w.set_focus().ok();
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
     }
 }
 

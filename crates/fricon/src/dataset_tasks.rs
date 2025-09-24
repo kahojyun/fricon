@@ -63,7 +63,7 @@ pub async fn do_create_dataset(
         description: request.description.clone(),
         tags: request.tags.clone(),
     };
-    event_sender.send(event).ok();
+    let _ = event_sender.send(event);
 
     info!(
         "Created dataset with UUID: {} at path: {:?}",
