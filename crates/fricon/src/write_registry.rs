@@ -63,7 +63,7 @@ impl Deref for WriteSessionGuard {
     fn deref(&self) -> &Self::Target {
         self.session
             .as_ref()
-            .expect("session already taken in finish()")
+            .expect("Session should be available as finish() hasn't been called yet")
     }
 }
 impl Drop for WriteSessionGuard {

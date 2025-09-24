@@ -135,6 +135,7 @@ python3 scripts/setup-dev.py
 - Rust: Follows standard Rust patterns with clippy pedantic mode
     - Enforce self named module files
     - Ignoring lints with `#[expect(..., reason="...")]` if not applicable
+    - Use reason as message in `expect`
 - Python: Uses ruff for formatting and linting
 - Frontend: Uses ESLint and Prettier
 

@@ -153,7 +153,10 @@ impl DatasetWriter {
         if tx.send(data).await == Ok(()) {
             Ok(())
         } else {
-            let WriterHandle { handle, .. } = self.handle.take().expect("Not none here.");
+            let WriterHandle { handle, .. } = self
+                .handle
+                .take()
+                .expect("Handle should be available since tx.send failed");
             let writer_result = handle.await.context("Writer panicked.")?;
             writer_result.context("Writer failed.")
         }

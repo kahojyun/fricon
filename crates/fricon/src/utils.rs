@@ -71,12 +71,20 @@ struct IPCBufferDecoder {
 impl IPCBufferDecoder {
     fn new(buffer: Buffer) -> Result<Self> {
         let trailer_start = buffer.len() - 10;
-        let footer_len = read_footer_length(buffer[trailer_start..].try_into().unwrap())
-            .context("Failed to read footer length")?;
+        let footer_len = read_footer_length(
+            buffer[trailer_start..]
+                .try_into()
+                .expect("10-byte trailer should be available at the end of Arrow IPC file"),
+        )
+        .context("Failed to read footer length")?;
         let footer = root_as_footer(&buffer[trailer_start - footer_len..trailer_start])
             .map_err(|e| anyhow::anyhow!("Failed to parse footer: {:?}", e))?;
 
-        let schema = fb_to_schema(footer.schema().unwrap());
+        let schema = fb_to_schema(
+            footer
+                .schema()
+                .expect("Footer should always contain schema in valid Arrow IPC file"),
+        );
 
         let mut decoder = FileDecoder::new(Arc::new(schema), footer.version());
 
@@ -168,7 +176,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let lock_path = dir.path().join("test.lock");
         {
-            let _lock = FileLock::new(&lock_path).expect("Should create lock");
+            let _lock = FileLock::new(&lock_path)
+                .expect("Lock file should be creatable in test environment");
             assert!(lock_path.exists());
         }
         // File should be removed after drop
@@ -179,7 +188,8 @@ mod tests {
     fn cannot_acquire_lock_twice() {
         let dir = tempdir().unwrap();
         let lock_path = dir.path().join("double.lock");
-        let _first_lock = FileLock::new(&lock_path).expect("Should acquire first lock");
+        let _first_lock = FileLock::new(&lock_path)
+            .expect("First lock should be acquired successfully in test environment");
         // Attempting to acquire the same lock again should fail
         let second_lock = FileLock::new(&lock_path);
         assert!(

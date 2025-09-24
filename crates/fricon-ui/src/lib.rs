@@ -60,7 +60,7 @@ impl AppState {
     fn app(&self) -> fricon::AppHandle {
         self.0
             .lock()
-            .unwrap()
+            .expect("Failed to acquire lock on app state")
             .as_ref()
             .expect("App should be running")
             .0
@@ -73,7 +73,7 @@ impl AppState {
             let (app_manager, _guard) = self
                 .0
                 .lock()
-                .unwrap()
+                .expect("Failed to acquire lock on app state")
                 .take()
                 .expect("App should be running");
             app_manager.shutdown().await;
@@ -118,7 +118,9 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
             ..
         } if label == "main" => {
             api.prevent_close();
-            let window = app.get_webview_window(&label).unwrap();
+            let window = app
+                .get_webview_window(&label)
+                .expect("Failed to get webview window");
             window.hide().ok();
         }
         #[cfg(target_os = "macos")]
@@ -142,7 +144,11 @@ fn show_main_window(app: &tauri::AppHandle) {
 fn build_system_tray(app: &mut tauri::App) -> Result<()> {
     let menu = MenuBuilder::new(app).text("quit", "Quit").build()?;
     let _tray = TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(
+            app.default_window_icon()
+                .expect("Failed to get default window icon")
+                .clone(),
+        )
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| {

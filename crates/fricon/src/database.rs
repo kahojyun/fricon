@@ -57,7 +57,9 @@ pub async fn connect(
             async move {
                 obj.interact(initialize_connection)
                     .await
-                    .unwrap()
+                    .expect(
+                        "Database connection should initialize successfully on connection creation",
+                    )
                     .map_err(|e| HookError::message(e.to_string()))
             }
             .boxed()

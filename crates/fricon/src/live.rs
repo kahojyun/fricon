@@ -64,8 +64,16 @@ impl LiveDatasetWriter {
             return;
         }
         let rows = batch.num_rows();
-        let mut total = self.inner.total_rows.write().unwrap();
-        let mut vec = self.inner.batches.write().unwrap();
+        let mut total = self
+            .inner
+            .total_rows
+            .write()
+            .expect("Lock should not be poisoned as the critical section doesn't panic");
+        let mut vec = self
+            .inner
+            .batches
+            .write()
+            .expect("Lock should not be poisoned as the critical section doesn't panic");
         vec.push_back(batch);
         *total += rows;
         let _ = self.inner.event_tx.send(LiveEvent::Appended {
@@ -156,11 +164,19 @@ impl LiveDataset {
         self.inner.event_tx.subscribe()
     }
     pub fn total_rows(&self) -> usize {
-        *self.inner.total_rows.read().unwrap()
+        *self
+            .inner
+            .total_rows
+            .read()
+            .expect("Read lock should not be poisoned as the critical section doesn't panic")
     }
     pub fn tail(&self, n: usize) -> Option<RecordBatch> {
         use arrow::compute::concat_batches;
-        let vec = self.inner.batches.read().unwrap();
+        let vec = self
+            .inner
+            .batches
+            .read()
+            .expect("Read lock should not be poisoned as the critical section doesn't panic");
         if vec.is_empty() || n == 0 {
             return None;
         }

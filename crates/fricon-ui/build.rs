@@ -32,14 +32,25 @@ fn find_pnpm_executable() -> &'static str {
 fn main() {
     tauri_build::build();
     if !tauri_build::is_dev() {
-        let target_triple = env::var("TARGET").unwrap();
+        let target_triple = env::var("TARGET").expect("TARGET environment variable not set");
         let target = Target::from_triple(&target_triple);
-        let (config, _) = parse(target, env::current_dir().unwrap().join("tauri.conf.json"))
-            .expect("Failed to parse tauri config");
-        let Directory(frontend_dist) = config.build.frontend_dist.unwrap() else {
+        let (config, _) = parse(
+            target,
+            env::current_dir()
+                .expect("Failed to get current directory")
+                .join("tauri.conf.json"),
+        )
+        .expect("Failed to parse tauri config");
+        let Directory(frontend_dist) = config
+            .build
+            .frontend_dist
+            .expect("Frontend dist not configured")
+        else {
             panic!("Invalid frontend distribution type");
         };
-        let frontend_root = frontend_dist.parent().unwrap();
+        let frontend_root = frontend_dist
+            .parent()
+            .expect("Frontend dist has no parent directory");
         let need_watch = [
             "src",
             "index.html",
