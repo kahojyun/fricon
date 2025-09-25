@@ -31,7 +31,7 @@ def complex128() -> pa.DataType: ...
 def trace_(item: pa.DataType, fixed_step: bool) -> pa.DataType: ...
 @final
 class ServerHandle:
-    def shutdown(self) -> None: ...
+    def shutdown(self, timeout: float | None = None) -> None: ...
     @property
     def is_running(self) -> bool: ...
 
@@ -50,8 +50,6 @@ class DatasetManager:
         *,
         description: str | None = ...,
         tags: Iterable[str] | None = ...,
-        schema: pa.Schema | None = ...,
-        index_columns: Sequence[str] | None = ...,
     ) -> DatasetWriter: ...
     def open(
         self,
@@ -59,7 +57,7 @@ class DatasetManager:
     ) -> Dataset: ...
     def list_all(self) -> pd.DataFrame: ...
 
-_ScalarT_co = TypeVar("_ScalarT_co", str, bool, complex, covariant=True)
+_ScalarT_co = TypeVar("_ScalarT_co", float, complex, covariant=True)
 _ArrowAnyArray: TypeAlias = pa.Array[Any]  # pyright: ignore[reportExplicitAny]
 
 @final
@@ -80,14 +78,7 @@ class Trace:
     def to_arrow_array(self) -> _ArrowAnyArray: ...
 
 _ColumnType: TypeAlias = (
-    str
-    | bool
-    | complex
-    | Sequence[str]
-    | Sequence[bool]
-    | Sequence[complex]
-    | Trace
-    | _ArrowAnyArray
+    float | complex | Sequence[float] | Sequence[complex] | Trace | _ArrowAnyArray
 )
 
 @final

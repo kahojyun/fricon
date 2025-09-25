@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import pyarrow as pa
-from fricon import DatasetManager, Workspace, complex128
+from fricon import DatasetManager, Workspace
 
 
 def simple(manager: DatasetManager) -> None:
@@ -20,31 +19,25 @@ def simple(manager: DatasetManager) -> None:
     assert d.id is not None
 
 
-def with_schema(manager: DatasetManager) -> None:
-    """When a schema is provided, the schema is used.
+def complex_data_types(manager: DatasetManager) -> None:
+    """Example using complex data types and schema inference.
 
-    .. note::
-
-        Although arrow supports nested types, we should avoid using them in the
-        schema so that visualization tools can work with the data.
+    Demonstrates how to work with complex numbers and lists.
+    The schema is automatically inferred from the data types used.
     """
-    # Arrow doesn't have complex128, so we need to import it from fricon.
-    # complex128 is a struct with two float64 fields named "real" and "imag".
-    schema = pa.schema(
-        [
-            ("a", pa.int64()),
-            ("b", pa.int64()),
-            ("c", complex128()),
-            ("d", pa.list_(pa.int64())),
-        ]
-    )
-    with manager.create("example", schema=schema) as writer:
+    with manager.create("complex_example") as writer:
         for i in range(10):
-            writer.write(a=i, b=i * 2, c=1j, d=[1, 2])
+            # Write data with various types including complex numbers
+            writer.write(
+                a=i,  # int
+                b=i * 2,  # int
+                c=complex(i, i * 2),  # complex number
+                d=[1, 2, 3],  # list
+            )
 
 
 if __name__ == "__main__":
     ws = Workspace.connect(".dev/ws")
     manager = ws.dataset_manager
     simple(manager)
-    with_schema(manager)
+    complex_data_types(manager)

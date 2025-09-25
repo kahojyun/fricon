@@ -26,20 +26,21 @@ classes in the python binding of Arrow:
 ## How are datasets stored?
 
 A dataset is exactly one Arrow table stored in [Arrow IPC format]. When a dataset
-is created, the schema of the table must be determined first. In `fricon`,
-users can specify a partial schema in
-[`DatasetManager.create`][fricon.DatasetManager.create], and unspecified
-columns will be inferred from the first row of the dataset.
+is created, the schema of the table is automatically inferred from the first row
+of data written. This allows for flexible data collection without requiring
+manual schema definition.
 
 ## Type inference
 
-`fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
+`fricon` MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
 | Python type        | Dataset data type | Description                                  |
 | ------------------ | ----------------- | -------------------------------------------- |
 | [`float`][]        | `Float64`         | 64-bit floating point numbers                |
 | [`complex`][]      | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
 | [`fricon.Trace`][] | `Trace`           | Time series data with various x-axis formats |
+
+> **Note**: The MVP version intentionally limits type support to float and complex types for simplicity. Additional types (bool, int, str) will be supported in future releases.
 
 ### Supported trace variants
 
@@ -51,7 +52,7 @@ Trace data supports three different formats depending on how the x-axis (indepen
 
 ### Future extensions
 
-Additional data types (strings, booleans, integers, timestamps) may be supported in future versions. The current focus on scalar and trace types ensures optimal performance and correctness for the most common scientific use cases.
+Additional data types (bool, int, str, timestamps) will be supported in future versions. The current focus on float, complex, and trace types ensures optimal performance and correctness for the most common scientific use cases.
 
 <!-- TODO: `pyarrow` and `polars` tips -->
 
