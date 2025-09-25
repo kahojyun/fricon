@@ -68,13 +68,11 @@ class TestWorkspaceIntegration:
             workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
-            # Create dataset
-            writer = dm.create("test_dataset", description="Test dataset")
-            assert isinstance(writer, fricon._core.DatasetWriter)
-
-            # Write data and close
-            writer.write(id=1, value=42.0, name="test_item")
-            writer.close()
+            # Create dataset using context manager
+            with dm.create("test_dataset", description="Test dataset") as writer:
+                assert isinstance(writer, fricon._core.DatasetWriter)
+                # Write data
+                writer.write(id=1.0, value=42.0, measurement=3.14 + 2j)
 
             # Explicitly shutdown the server
             server_handle.shutdown()
@@ -91,10 +89,9 @@ class TestWorkspaceIntegration:
             datasets = dm.list_all()
             assert len(datasets) == 0
 
-            # Create a dataset
-            writer = dm.create("test_dataset", description="Test dataset")
-            writer.write(id=1, value=42.0, name="test_item")
-            writer.close()
+            # Create a dataset using context manager
+            with dm.create("test_dataset", description="Test dataset") as writer:
+                writer.write(id=1.0, value=42.0, measurement=3.14 + 2j)
 
             # Should have one dataset now
             datasets = dm.list_all()
@@ -116,8 +113,8 @@ class TestWorkspaceIntegration:
             with dm.create(
                 "context_test", description="Context manager test"
             ) as writer:
-                writer.write(id=1, value=100.0, name="context_item")
-                writer.write(id=2, value=200.0, name="context_item2")
+                writer.write(id=1.0, value=100.0, measurement=1.0 + 2j)
+                writer.write(id=2.0, value=200.0, measurement=2.0 + 3j)
 
             # Dataset should be automatically closed and completed
             datasets = dm.list_all()

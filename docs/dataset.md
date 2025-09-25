@@ -32,13 +32,15 @@ manual schema definition.
 
 ## Type inference
 
-`fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
+`fricon` MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
 | Python type        | Dataset data type | Description                                  |
 | ------------------ | ----------------- | -------------------------------------------- |
 | [`float`][]        | `Float64`         | 64-bit floating point numbers                |
 | [`complex`][]      | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
 | [`fricon.Trace`][] | `Trace`           | Time series data with various x-axis formats |
+
+> **Note**: The MVP version intentionally limits type support to float and complex types for simplicity. Additional types (bool, int, str) will be supported in future releases.
 
 ### Supported trace variants
 
@@ -50,7 +52,7 @@ Trace data supports three different formats depending on how the x-axis (indepen
 
 ### Future extensions
 
-Additional data types (strings, booleans, integers, timestamps) may be supported in future versions. The current focus on scalar and trace types ensures optimal performance and correctness for the most common scientific use cases.
+Additional data types (bool, int, str, timestamps) will be supported in future versions. The current focus on float, complex, and trace types ensures optimal performance and correctness for the most common scientific use cases.
 
 <!-- TODO: `pyarrow` and `polars` tips -->
 

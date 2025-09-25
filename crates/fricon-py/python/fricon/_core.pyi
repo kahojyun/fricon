@@ -57,7 +57,7 @@ class DatasetManager:
     ) -> Dataset: ...
     def list_all(self) -> pd.DataFrame: ...
 
-_ScalarT_co = TypeVar("_ScalarT_co", str, bool, complex, covariant=True)
+_ScalarT_co = TypeVar("_ScalarT_co", float, complex, covariant=True)
 _ArrowAnyArray: TypeAlias = pa.Array[Any]  # pyright: ignore[reportExplicitAny]
 
 @final
@@ -78,14 +78,7 @@ class Trace:
     def to_arrow_array(self) -> _ArrowAnyArray: ...
 
 _ColumnType: TypeAlias = (
-    str
-    | bool
-    | complex
-    | Sequence[str]
-    | Sequence[bool]
-    | Sequence[complex]
-    | Trace
-    | _ArrowAnyArray
+    float | complex | Sequence[float] | Sequence[complex] | Trace | _ArrowAnyArray
 )
 
 @final

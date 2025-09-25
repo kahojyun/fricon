@@ -24,13 +24,14 @@ use std::{
     env,
     path::PathBuf,
     sync::{Arc, LazyLock},
+    time::Duration,
 };
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow::{
     array::{
-        Array, ArrayData, ArrayRef, BooleanArray, Float64Array, Int64Array, ListArray, RecordBatch,
-        StringArray, StringBuilder, StructArray, downcast_array, make_array,
+        Array, ArrayData, ArrayRef, Float64Array, ListArray, RecordBatch, StructArray,
+        downcast_array, make_array,
     },
     buffer::OffsetBuffer,
     datatypes::{DataType, Field, Fields, Schema},
@@ -44,7 +45,7 @@ use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
 use pyo3::{
     prelude::*,
     sync::GILOnceCell,
-    types::{PyBool, PyComplex, PyDict, PyFloat, PyInt, PyList, PySequence, PyString},
+    types::{PyComplex, PyDict, PyFloat, PyInt, PyList, PySequence},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
 
@@ -229,9 +230,12 @@ fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
     if let Ok(PyArrowType(data)) = values.extract() {
         let arr = make_array(data);
         return match arr.data_type() {
-            DataType::Boolean | DataType::Int64 | DataType::Float64 | DataType::Utf8 => Ok(arr),
+            DataType::Float64 => Ok(arr),
             t @ DataType::Struct(_) if *t == get_complex_type() => Ok(arr),
-            _ => bail!("The data type of the given arrow array is not float64."),
+            _ => bail!(
+                "MVP currently only supports float64 and complex128 arrow array types, got {}.",
+                arr.data_type()
+            ),
         };
     }
     if let Ok(sequence) = values.downcast::<PySequence>() {
@@ -460,9 +464,17 @@ impl ServerHandle {
     ///
     /// This will stop the server and release all resources.
     /// After calling this method, the handle cannot be used again.
-    pub fn shutdown(&mut self, _py: Python<'_>) {
+    ///
+    /// Parameters:
+    ///     timeout: Optional timeout in seconds. Defaults to 10 seconds.
+    #[pyo3(signature = (timeout = None))]
+    pub fn shutdown(&mut self, _py: Python<'_>, timeout: Option<f64>) {
         if let Some(manager) = self.manager.take() {
-            get_runtime().block_on(manager.shutdown());
+            let timeout_duration = match timeout {
+                Some(secs) => Duration::from_secs_f64(secs),
+                None => Duration::from_secs(10),
+            };
+            get_runtime().block_on(manager.shutdown_with_timeout(timeout_duration));
         }
     }
 
@@ -479,7 +491,7 @@ impl ServerHandle {
 impl Drop for ServerHandle {
     fn drop(&mut self) {
         if let Some(manager) = self.manager.take() {
-            get_runtime().block_on(manager.shutdown());
+            get_runtime().block_on(manager.shutdown_with_timeout(Duration::from_secs(5)));
         }
     }
 }
@@ -508,20 +520,15 @@ impl DatasetWriter {
 }
 
 fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
-    // Check bool first because bool is a subclass of int.
-    if value.is_instance_of::<PyBool>() {
-        Ok(DataType::Boolean)
+    if value.is_instance_of::<PyFloat>() {
+        Ok(DataType::Float64)
     } else if value.is_instance_of::<PyInt>() {
-        Ok(DataType::Int64)
-    } else if value.is_instance_of::<PyFloat>() {
         Ok(DataType::Float64)
     } else if value.is_instance_of::<PyComplex>() {
         Ok(get_complex_type())
-    } else if value.is_instance_of::<PyString>() {
-        Ok(DataType::Utf8)
     } else {
         let py_type = value.get_type();
-        bail!("Cannot infer scalar arrow data type for python type '{py_type}'.");
+        bail!("MVP currently only supports float, int, and complex types, got '{py_type}'.");
     }
 }
 
@@ -542,14 +549,14 @@ fn infer_sequence_type(sequence: &Bound<'_, PySequence>) -> Result<DataType> {
 
 /// Infer [`arrow::datatypes::DataType`] from value in row.
 ///
-/// Currently supports:
+/// MVP currently supports:
 ///
-/// 1. Scalar types: bool, int, float, complex, str
+/// 1. Scalar types: float, int, complex
 /// 2. [`Trace`]
 /// 3. [`arrow::array::Array`]
 /// 4. Python Sequence protocol
 ///
-/// TODO: support numpy array
+/// TODO: support more types (bool, str), numpy array
 fn infer_data_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
     if let Ok(data_type) = infer_scalar_type(value) {
         Ok(data_type)
@@ -589,22 +596,6 @@ fn build_array_from_sequence(
     sequence: &Bound<'_, PySequence>,
 ) -> Result<ArrayRef> {
     match data_type {
-        DataType::Boolean => {
-            let mut builder = BooleanArray::builder(sequence.len()?);
-            for v in sequence.try_iter()? {
-                let v = v?.extract()?;
-                builder.append_value(v);
-            }
-            Ok(Arc::new(builder.finish()))
-        }
-        DataType::Int64 => {
-            let mut builder = Int64Array::builder(sequence.len()?);
-            for v in sequence.try_iter()? {
-                let v = v?.extract()?;
-                builder.append_value(v);
-            }
-            Ok(Arc::new(builder.finish()))
-        }
         DataType::Float64 => {
             let mut builder = Float64Array::builder(sequence.len()?);
             for v in sequence.try_iter()? {
@@ -613,15 +604,28 @@ fn build_array_from_sequence(
             }
             Ok(Arc::new(builder.finish()))
         }
-        DataType::Utf8 => {
-            let mut builder = StringBuilder::new();
+        t @ DataType::Struct(_) if *t == get_complex_type() => {
+            // Handle complex sequences
+            let mut real_builder = Float64Array::builder(sequence.len()?);
+            let mut imag_builder = Float64Array::builder(sequence.len()?);
             for v in sequence.try_iter()? {
-                let v = v?.extract::<String>()?;
-                builder.append_value(v);
+                let v = v?.extract::<Complex64>()?;
+                real_builder.append_value(v.re);
+                imag_builder.append_value(v.im);
             }
-            Ok(Arc::new(builder.finish()))
+            let real_array = Arc::new(real_builder.finish());
+            let imag_array = Arc::new(imag_builder.finish());
+            let fields = vec![
+                Field::new("real", DataType::Float64, false),
+                Field::new("imag", DataType::Float64, false),
+            ];
+            let struct_array = StructArray::new(fields.into(), vec![real_array, imag_array], None);
+            Ok(Arc::new(struct_array))
         }
-        _ => bail!("Unsupported data type."),
+        _ => bail!(
+            "MVP currently only supports float64 and complex128 sequence types, got {}.",
+            data_type
+        ),
     }
 }
 
@@ -641,32 +645,11 @@ fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRe
         return Ok(make_array(data));
     }
     match data_type {
-        DataType::Boolean => {
-            let Ok(value) = value.extract::<bool>() else {
-                bail!("Not a boolean value.")
-            };
-            let array = BooleanArray::new_scalar(value).into_inner();
-            Ok(Arc::new(array))
-        }
-        DataType::Int64 => {
-            let Ok(value) = value.extract::<i64>() else {
-                bail!("Failed to extract int64 value.")
-            };
-            let array = Int64Array::new_scalar(value).into_inner();
-            Ok(Arc::new(array))
-        }
         DataType::Float64 => {
             let Ok(value) = value.extract::<f64>() else {
                 bail!("Failed to extract float64 value.")
             };
             let array = Float64Array::new_scalar(value).into_inner();
-            Ok(Arc::new(array))
-        }
-        DataType::Utf8 => {
-            let Ok(value) = value.extract::<String>() else {
-                bail!("Failed to extract float64 value.")
-            };
-            let array = StringArray::new_scalar(value).into_inner();
             Ok(Arc::new(array))
         }
         // complex scalar
@@ -701,7 +684,7 @@ fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRe
             Ok(Arc::new(list))
         }
         _ => {
-            bail!("Unsupported data type {data_type}, please manually construct a `pyarrow.Array`.")
+            bail!("MVP currently only supports float64 and complex128 types, got {data_type}.")
         }
     }
 }

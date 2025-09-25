@@ -50,8 +50,9 @@ ws = Workspace.connect("path/to/workspace")
 writer = ws.dataset_manager.create("my_dataset", description="My test dataset")
 
 # Write data - schema is inferred from the first row
-writer.write(id=1, value=42.0, name="test", active=True)
-writer.write(id=2, value=84.0, name="test2", active=False)
+# MVP currently supports float and complex types only
+writer.write(id=1, value=42.0, measurement=3.14+2j)
+writer.write(id=2, value=84.0, measurement=1.618-1j)
 writer.close()
 
 # List all datasets

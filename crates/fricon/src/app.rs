@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tracing::{error, info};
 
 use crate::{
     database,
@@ -146,12 +147,34 @@ impl AppManager {
     }
 
     pub async fn shutdown(self) {
-        self.state.shutdown_token.cancel();
-        self.state.tracker.close();
-        self.state.tracker.wait().await;
-        drop(self.state);
-        // TODO: remove this after migrating to r2d2 pool
-        sleep(Duration::from_millis(200)).await;
+        self.shutdown_with_timeout(Duration::from_secs(10)).await
+    }
+
+    pub async fn shutdown_with_timeout(self, timeout: Duration) {
+        info!("Starting server shutdown with timeout: {:?}", timeout);
+
+        let result = tokio::time::timeout(timeout, async {
+            self.state.shutdown_token.cancel();
+            self.state.tracker.close();
+            self.state.tracker.wait().await;
+            drop(self.state);
+            // Wait for sqlite connection release
+            sleep(Duration::from_millis(200)).await;
+        })
+        .await;
+
+        match result {
+            Ok(_) => {
+                info!("Server shutdown completed successfully");
+            }
+            Err(_) => {
+                error!(
+                    "Server shutdown timed out after {:?}. Some resources may not have been \
+                     cleaned up properly.",
+                    timeout
+                );
+            }
+        }
     }
 
     #[must_use]
