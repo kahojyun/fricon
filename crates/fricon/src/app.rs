@@ -9,7 +9,7 @@ use chrono::Local;
 use deadpool_diesel::sqlite::Pool;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
+use tokio::{sync::broadcast, task::JoinHandle, time};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
@@ -147,24 +147,24 @@ impl AppManager {
     }
 
     pub async fn shutdown(self) {
-        self.shutdown_with_timeout(Duration::from_secs(10)).await
+        self.shutdown_with_timeout(Duration::from_secs(10)).await;
     }
 
     pub async fn shutdown_with_timeout(self, timeout: Duration) {
         info!("Starting server shutdown with timeout: {:?}", timeout);
 
-        let result = tokio::time::timeout(timeout, async {
+        let result = time::timeout(timeout, async {
             self.state.shutdown_token.cancel();
             self.state.tracker.close();
             self.state.tracker.wait().await;
             drop(self.state);
             // Wait for sqlite connection release
-            sleep(Duration::from_millis(200)).await;
+            time::sleep(Duration::from_millis(200)).await;
         })
         .await;
 
         match result {
-            Ok(_) => {
+            Ok(()) => {
                 info!("Server shutdown completed successfully");
             }
             Err(_) => {

@@ -520,9 +520,7 @@ impl DatasetWriter {
 }
 
 fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
-    if value.is_instance_of::<PyFloat>() {
-        Ok(DataType::Float64)
-    } else if value.is_instance_of::<PyInt>() {
+    if value.is_instance_of::<PyFloat>() || value.is_instance_of::<PyInt>() {
         Ok(DataType::Float64)
     } else if value.is_instance_of::<PyComplex>() {
         Ok(get_complex_type())
