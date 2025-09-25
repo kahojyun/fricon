@@ -566,16 +566,11 @@ classes in the python binding of Arrow:</p>
 </ul>
 <h2 id="how-are-datasets-stored">How are datasets stored?</h2>
 <p>A dataset is exactly one Arrow table stored in <a href="https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc">Arrow IPC format</a>. When a dataset
-is created, the schema of the table must be determined first. In <code>fricon</code>,
-users can specify a partial schema in
-<a class="autorefs autorefs-internal" title="            create(name, *, description=None, tags=None, schema=None, index_columns=None)
-
-  
-      method descriptor
-  " href="../api/#fricon.DatasetManager.create"><code>DatasetManager.create</code></a>, and unspecified
-columns will be inferred from the first row of the dataset.</p>
+is created, the schema of the table is automatically inferred from the first row
+of data written. This allows for flexible data collection without requiring
+manual schema definition.</p>
 <h2 id="type-inference">Type inference</h2>
-<p><code>fricon</code> currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:</p>
+<p><code>fricon</code> MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:</p>
 <table>
 <thead>
 <tr>
@@ -602,6 +597,9 @@ columns will be inferred from the first row of the dataset.</p>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Note</strong>: The MVP version intentionally limits type support to float and complex types for simplicity. Additional types (bool, int, str) will be supported in future releases.</p>
+</blockquote>
 <h3 id="supported-trace-variants">Supported trace variants</h3>
 <p>Trace data supports three different formats depending on how the x-axis (independent variable) is stored:</p>
 <ul>
@@ -610,7 +608,7 @@ columns will be inferred from the first row of the dataset.</p>
 <li><strong>VariableStep</strong>: Arbitrary x-values stored alongside y-values</li>
 </ul>
 <h3 id="future-extensions">Future extensions</h3>
-<p>Additional data types (strings, booleans, integers, timestamps) may be supported in future versions. The current focus on scalar and trace types ensures optimal performance and correctness for the most common scientific use cases.</p>
+<p>Additional data types (bool, int, str, timestamps) will be supported in future versions. The current focus on float, complex, and trace types ensures optimal performance and correctness for the most common scientific use cases.</p>
 <!-- TODO: `pyarrow` and `polars` tips -->
 
 
