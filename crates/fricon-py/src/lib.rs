@@ -28,15 +28,14 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail, ensure};
-use arrow::{
-    array::{
-        Array, ArrayData, ArrayRef, Float64Array, ListArray, RecordBatch, StructArray,
-        downcast_array, make_array,
-    },
-    buffer::OffsetBuffer,
-    datatypes::{DataType, Field, Fields, Schema},
-    pyarrow::PyArrowType,
+use arrow_array::{
+    Array, ArrayRef, Float64Array, ListArray, RecordBatch, StructArray, cast::downcast_array,
+    make_array,
 };
+use arrow_buffer::OffsetBuffer;
+use arrow_data::ArrayData;
+use arrow_pyarrow::PyArrowType;
+use arrow_schema::{DataType, Field, Fields, Schema};
 use chrono::{DateTime, Utc};
 use fricon::{Client, DatasetMetadata, DatasetRecord};
 use itertools::Itertools;

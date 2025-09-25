@@ -3,7 +3,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use arrow_array::RecordBatch;
+use arrow_schema::SchemaRef;
 use tokio::sync::broadcast;
 
 /// Live, in-memory representation of a dataset while it is being written.
@@ -171,7 +172,7 @@ impl LiveDataset {
             .expect("Read lock should not be poisoned as the critical section doesn't panic")
     }
     pub fn tail(&self, n: usize) -> Option<RecordBatch> {
-        use arrow::compute::concat_batches;
+        use arrow_select::concat::concat_batches;
         let vec = self
             .inner
             .batches
@@ -218,7 +219,7 @@ impl LiveDataset {
         indices: &[usize],
         column_indices: Option<&[usize]>,
     ) -> Result<RecordBatch, SelectError> {
-        use arrow::array::new_empty_array;
+        use arrow_array::new_empty_array;
         if !indices.is_empty() {
             return Err(SelectError::OutOfBounds);
         }
@@ -309,7 +310,7 @@ impl LiveDataset {
         mapping: &[(usize, usize)],
         cols: &[usize],
     ) -> Result<RecordBatch, SelectError> {
-        use arrow::compute::interleave_record_batch;
+        use arrow_select::interleave::interleave_record_batch;
         if mapping.is_empty() {
             return self.empty_selection(&[], Some(cols));
         }
@@ -377,10 +378,8 @@ pub enum SelectError {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::{
-        array::Int32Array,
-        datatypes::{DataType, Field, Schema},
-    };
+    use arrow_array::Int32Array;
+    use arrow_schema::{DataType, Field, Schema};
 
     use super::*;
     fn make_schema() -> SchemaRef {
@@ -475,7 +474,8 @@ mod tests {
     }
     #[test]
     fn select_by_indices_multi_column_subset() {
-        use arrow::{array::Int32Array, datatypes::Schema};
+        use arrow_array::Int32Array;
+        use arrow_schema::Schema;
         let schema: SchemaRef = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Int32, false),
             Field::new("b", DataType::Int32, false),

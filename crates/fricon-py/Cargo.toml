@@ -17,7 +17,11 @@ fricon = { path = "../fricon" }
 fricon-cli = { path = "../fricon-cli" }
 
 anyhow = { workspace = true }
-arrow = { workspace = true, features = ["pyarrow"] }
+arrow-array = { workspace = true }
+arrow-buffer = { workspace = true }
+arrow-data = { workspace = true }
+arrow-schema = { workspace = true }
+arrow-pyarrow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 indexmap = { workspace = true }
 itertools = { workspace = true }

@@ -10,7 +10,8 @@ use std::{
     path::Path,
 };
 
-use arrow::{array::RecordBatch, error::ArrowError};
+use arrow_array::RecordBatch;
+use arrow_schema::ArrowError;
 use chrono::{DateTime, Utc};
 use diesel::result::Error as DieselError;
 use futures::prelude::*;

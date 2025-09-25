@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use arrow::datatypes::SchemaRef;
+use arrow_schema::SchemaRef;
 use tokio_util::task::TaskTracker;
 
 use crate::write_session::{
