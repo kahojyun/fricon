@@ -50,8 +50,6 @@ class DatasetManager:
         *,
         description: str | None = ...,
         tags: Iterable[str] | None = ...,
-        schema: pa.Schema | None = ...,
-        index_columns: Sequence[str] | None = ...,
     ) -> DatasetWriter: ...
     def open(
         self,

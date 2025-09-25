@@ -103,25 +103,19 @@ impl DatasetManager {
     ///     name: Name of the dataset.
     ///     description: Description of the dataset.
     ///     tags: Tags of the dataset. Duplicate tags will be add only once.
-    ///     schema: Schema of the underlying arrow table. Can be only a subset
-    /// of all columns,         other fields will be inferred from first
-    /// row.     index_columns: Names of index columns.
     ///
     /// Returns:
     ///     A writer of the newly created dataset.
-    #[pyo3(signature = (name, *, description=None, tags=None, schema=None, index_columns=None))]
+    #[pyo3(signature = (name, *, description=None, tags=None))]
     pub fn create(
         &self,
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
-        schema: Option<PyArrowType<Schema>>,
-        index_columns: Option<Vec<String>>,
     ) -> Result<DatasetWriter> {
-        let _ = index_columns; // TODO: support index columns
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
-        let schema = schema.map_or_else(Schema::empty, |s| s.0);
+        let schema = Schema::empty();
 
         // Enter Tokio runtime context to handle tokio::spawn calls in
         // DatasetWriter::new

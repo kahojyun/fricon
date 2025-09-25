@@ -46,8 +46,17 @@ from fricon import Workspace
 # Connect to existing workspace
 ws = Workspace.connect("path/to/workspace")
 
-# Create and manipulate datasets
-dataset = ws.create_dataset(data)
+# Create a new dataset (schema is automatically inferred)
+writer = ws.dataset_manager.create("my_dataset", description="My test dataset")
+
+# Write data - schema is inferred from the first row
+writer.write(id=1, value=42.0, name="test", active=True)
+writer.write(id=2, value=84.0, name="test2", active=False)
+writer.close()
+
+# List all datasets
+datasets = ws.dataset_manager.list_all()
+print(datasets)
 ```
 
 ## Contributing
