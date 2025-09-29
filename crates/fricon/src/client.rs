@@ -1,11 +1,13 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow_array::RecordBatch;
 use arrow_ipc::writer::StreamWriter;
+use arrow_schema::SchemaRef;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
@@ -25,6 +27,7 @@ use uuid::Uuid;
 use crate::{
     VERSION,
     database::DatasetStatus,
+    dataset::{DatasetArray, DatasetRow, DatasetSchema},
     dataset_manager::DatasetRecord,
     ipc,
     proto::{
@@ -60,8 +63,15 @@ impl Client {
         name: String,
         description: String,
         tags: Vec<String>,
+        schema: DatasetSchema,
     ) -> Result<DatasetWriter> {
-        Ok(DatasetWriter::new(self.clone(), name, description, tags))
+        Ok(DatasetWriter::new(
+            self.clone(),
+            name,
+            description,
+            tags,
+            schema,
+        ))
     }
 
     pub async fn get_dataset_by_id(&self, id: i32) -> Result<Dataset> {
@@ -104,41 +114,51 @@ struct WriterHandle {
 }
 
 pub struct DatasetWriter {
-    handle: Option<WriterHandle>,
+    schema: DatasetSchema,
+    arrow_schema: SchemaRef,
+    writer_handle: Option<WriterHandle>,
     connection_handle: JoinHandle<Result<CreateResponse>>,
     client: Client,
 }
 
 impl DatasetWriter {
-    fn new(client: Client, name: String, description: String, tags: Vec<String>) -> Self {
+    fn new(
+        client: Client,
+        name: String,
+        description: String,
+        tags: Vec<String>,
+        schema: DatasetSchema,
+    ) -> Self {
         let (tx, mut rx) = mpsc::channel::<RecordBatch>(16);
         let (dtx, drx) = io::duplex(1024 * 1024);
 
-        let request_stream = build_request_stream(name, description, tags, ReaderStream::new(drx));
-
-        let writer_handle = spawn_blocking(move || {
-            let Some(batch) = rx.blocking_recv() else {
-                bail!("No record batch received.")
-            };
-            let dtx = SyncIoBridge::new(dtx);
-            let mut writer = StreamWriter::try_new(dtx, &batch.schema())?;
-            writer.write(&batch)?;
-            while let Some(batch) = rx.blocking_recv() {
-                writer.write(&batch)?;
+        let arrow_schema = Arc::new(schema.to_arrow_schema());
+        let writer_handle = spawn_blocking({
+            let arrow_schema = arrow_schema.clone();
+            move || {
+                let dtx = SyncIoBridge::new(dtx);
+                let mut writer = StreamWriter::try_new(dtx, &arrow_schema)?;
+                while let Some(batch) = rx.blocking_recv() {
+                    writer.write(&batch)?;
+                }
+                writer.finish()?;
+                Ok(())
             }
-            writer.finish()?;
-            Ok(())
         });
-        let connection_handle = {
+        let connection_handle = tokio::spawn({
             let client = client.clone();
-            tokio::spawn(async move {
+            let request_stream =
+                build_request_stream(name, description, tags, ReaderStream::new(drx));
+            async move {
                 let request = Request::new(request_stream);
                 let response = client.dataset_service().create(request).await?;
                 Ok(response.into_inner())
-            })
-        };
+            }
+        });
         Self {
-            handle: Some(WriterHandle {
+            schema,
+            arrow_schema,
+            writer_handle: Some(WriterHandle {
                 tx,
                 handle: writer_handle,
             }),
@@ -147,15 +167,31 @@ impl DatasetWriter {
         }
     }
 
-    pub async fn write(&mut self, data: RecordBatch) -> Result<()> {
-        let Some(WriterHandle { tx, .. }) = self.handle.as_mut() else {
+    pub async fn write(&mut self, row: DatasetRow) -> Result<()> {
+        let Some(WriterHandle { tx, .. }) = self.writer_handle.as_mut() else {
             bail!("Writer closed.");
         };
-        if tx.send(data).await == Ok(()) {
+        let row_schema = row.to_schema();
+        if row_schema != self.schema {
+            bail!(
+                "Schema mismatch. expected {:?}, got {:?}",
+                self.schema,
+                row_schema
+            );
+        }
+        let columns = self
+            .schema
+            .columns()
+            .iter()
+            .map(|(name, _)| DatasetArray::from(row.0[name].clone()).into())
+            .collect();
+        let batch = RecordBatch::try_new(self.arrow_schema.clone(), columns)
+            .context("Failed to create RecordBatch")?;
+        if tx.send(batch).await.is_ok() {
             Ok(())
         } else {
             let WriterHandle { handle, .. } = self
-                .handle
+                .writer_handle
                 .take()
                 .expect("Handle should be available since tx.send failed");
             let writer_result = handle.await.context("Writer panicked.")?;
@@ -164,7 +200,7 @@ impl DatasetWriter {
     }
 
     pub async fn finish(mut self) -> Result<Dataset> {
-        let WriterHandle { tx, handle } = self.handle.take().context("Already finished.")?;
+        let WriterHandle { tx, handle } = self.writer_handle.take().context("Already finished.")?;
         drop(tx);
         handle
             .await
@@ -183,6 +219,11 @@ impl DatasetWriter {
                 .try_into()
                 .context("Failed to convert dataset record")?,
         })
+    }
+
+    #[must_use]
+    pub fn schema(&self) -> &DatasetSchema {
+        &self.schema
     }
 }
 
@@ -214,7 +255,7 @@ fn build_request_stream(
 }
 
 async fn connect_ipc_channel(path: PathBuf) -> Result<Channel> {
-    let channel = Channel::from_static("http://ignored.com:50051")
+    let channel = Channel::from_static("https://ignored.com:50051")
         .connect_with_connector(service_fn(move |_| {
             let path = path.clone();
             async move {
