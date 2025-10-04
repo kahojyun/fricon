@@ -5,15 +5,13 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use arrow::{
-    array::RecordBatch,
-    buffer::Buffer,
-    ipc::{
-        Block,
-        convert::fb_to_schema,
-        reader::{FileDecoder, read_footer_length},
-        root_as_footer,
-    },
+use arrow_array::RecordBatch;
+use arrow_buffer::Buffer;
+use arrow_ipc::{
+    Block,
+    convert::fb_to_schema,
+    reader::{FileDecoder, read_footer_length},
+    root_as_footer,
 };
 use tracing::warn;
 

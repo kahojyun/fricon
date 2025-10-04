@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use arrow::{
-    array::{Array, Int32Array, RecordBatch, StringArray},
-    datatypes::{DataType, Field, Schema},
-};
+use arrow_array::{Array, Int32Array, RecordBatch, StringArray};
+use arrow_schema::{DataType, Field, Schema};
 use fricon::{AppManager, Client, DatasetId, WorkspaceRoot};
 use tempfile::TempDir;
 

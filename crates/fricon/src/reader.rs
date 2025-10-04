@@ -1,6 +1,8 @@
 use std::{path::Path, sync::Arc};
 
-use arrow::{array::RecordBatch, compute::concat_batches, datatypes::SchemaRef};
+use arrow_array::RecordBatch;
+use arrow_schema::SchemaRef;
+use arrow_select::concat::concat_batches;
 
 use crate::{
     dataset_manager::DatasetManagerError,
@@ -121,10 +123,8 @@ impl DatasetReader {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::{
-        array::Int32Array,
-        datatypes::{DataType, Field, Schema},
-    };
+    use arrow_array::Int32Array;
+    use arrow_schema::{DataType, Field, Schema};
     use tempfile::tempdir;
     use tokio::sync::mpsc;
     use tokio_util::task::TaskTracker;

@@ -7,7 +7,7 @@
 
 use std::{error::Error as StdError, fs, path::Path};
 
-use arrow::array::RecordBatch;
+use arrow_array::RecordBatch;
 use deadpool_diesel::sqlite::Pool;
 use diesel::prelude::*;
 use futures::prelude::*;

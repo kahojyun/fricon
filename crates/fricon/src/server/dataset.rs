@@ -1,7 +1,9 @@
 use std::io::{Error as IoError, ErrorKind};
 
 use anyhow::bail;
-use arrow::{array::RecordBatch, error::ArrowError, ipc::reader::StreamReader};
+use arrow_array::RecordBatch;
+use arrow_ipc::reader::StreamReader;
+use arrow_schema::ArrowError;
 use futures::prelude::*;
 use tokio::{sync::mpsc, task::spawn_blocking};
 use tokio_stream::wrappers::ReceiverStream;

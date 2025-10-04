@@ -5,10 +5,10 @@ use std::{
     result::Result as StdResult,
 };
 
-use arrow::{
-    array::RecordBatch, compute::BatchCoalescer, datatypes::SchemaRef, error::ArrowError,
-    ipc::writer::FileWriter,
-};
+use arrow_array::RecordBatch;
+use arrow_ipc::writer::FileWriter;
+use arrow_schema::{ArrowError, SchemaRef};
+use arrow_select::coalesce::BatchCoalescer;
 use thiserror::Error;
 use tokio::{
     sync::mpsc,
@@ -177,10 +177,8 @@ fn blocking_write_task(
 mod tests {
     use std::{fs, sync::Arc};
 
-    use arrow::{
-        array::Int32Array,
-        datatypes::{DataType, Field, Schema},
-    };
+    use arrow_array::Int32Array;
+    use arrow_schema::{DataType, Field, Schema};
     use tempfile::tempdir;
 
     use super::*;

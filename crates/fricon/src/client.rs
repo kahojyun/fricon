@@ -4,7 +4,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail, ensure};
-use arrow::{array::RecordBatch, ipc::writer::StreamWriter};
+use arrow_array::RecordBatch;
+use arrow_ipc::writer::StreamWriter;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::prelude::*;

@@ -5,7 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use arrow_array::RecordBatch;
+use arrow_schema::SchemaRef;
 use tokio::sync::mpsc;
 use tokio_util::task::TaskTracker;
 
@@ -101,10 +102,8 @@ impl WriteSessionHandle {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::{
-        array::Int32Array,
-        datatypes::{DataType, Field, Schema},
-    };
+    use arrow_array::Int32Array;
+    use arrow_schema::{DataType, Field, Schema};
     use tempfile::tempdir;
 
     use super::*;
