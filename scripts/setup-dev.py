@@ -23,7 +23,9 @@ class Project:
 
     def write_dotenv(self) -> None:
         database_path_resolved = self.database_path.resolve()
-        new_db_url_line = f"DATABASE_URL=sqlite://{database_path_resolved}\n"
+        # Convert Windows backslashes to forward slashes for better compatibility
+        database_path_unix = database_path_resolved.as_posix()
+        new_db_url_line = f"DATABASE_URL=sqlite://{database_path_unix}\n"
 
         lines: list[str] = []
         if self.dotenv_path.exists():

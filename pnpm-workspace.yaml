@@ -1,2 +1,6 @@
 packages:
-  - "crates/fricon-ui/frontend"
+  - crates/fricon-ui/frontend
+
+ignoredBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - esbuild
