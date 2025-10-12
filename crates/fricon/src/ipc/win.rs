@@ -45,7 +45,11 @@ fn read_uuid_from_socket_file(path: &Path) -> io::Result<Uuid> {
     let uuid_bytes = buffer.strip_prefix(HEADER).ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidData, "Invalid binary format header")
     })?;
-    Ok(Uuid::from_bytes(uuid_bytes.try_into().unwrap()))
+    Ok(Uuid::from_bytes(
+        uuid_bytes
+            .try_into()
+            .expect("Failed to convert UUID bytes to array"),
+    ))
 }
 
 fn get_pipe_name(server_uuid: Uuid) -> String {
@@ -122,7 +126,7 @@ impl Drop for SocketFile {
             Ok(file_uuid) => {
                 if file_uuid == self.server_uuid {
                     debug!("Removing socket file at {}", self.socket_path.display());
-                    fs::remove_file(&self.socket_path).ok();
+                    let _ = fs::remove_file(&self.socket_path);
                 } else {
                     debug!(
                         "Socket file at {} has different UUID, not removing",
