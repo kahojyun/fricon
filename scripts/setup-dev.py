@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 from typing import final
 
@@ -15,6 +16,7 @@ class Project:
         self.dev_folder = self.root / self.DEV_FOLDER
         self.dotenv_path = self.root / ".env"
         self.database_path = self.dev_folder / self.TEST_DB
+        self.cargo_config_path = self.root / ".cargo" / "config.toml"
 
     def _get_project_root(self) -> Path:
         """Find project root with __file__."""
@@ -85,6 +87,47 @@ class Project:
             print("Make sure you have SQLite3 development libraries installed.")
             raise
 
+    def get_venv_python_path(self) -> Path:
+        """Get the absolute path to the Python executable in uv venv."""
+        # uv venv creates .venv folder in project root
+        venv_path = self.root / ".venv"
+
+        # Check if venv exists
+        if not venv_path.exists():
+            print("Warning: .venv directory not found.")
+            print("Please run 'uv sync --dev' to create the virtual environment.")
+
+        # Determine python executable name based on platform
+        if sys.platform == "win32":
+            python_exe = "python.exe"
+            python_path = venv_path / "Scripts" / python_exe
+        else:
+            python_exe = "python"
+            python_path = venv_path / "bin" / python_exe
+
+        # Return the venv path, not the resolved system path
+        # This ensures PYO3_PYTHON points to the venv python executable
+        return python_path
+
+    def setup_cargo_config(self) -> None:
+        """Setup .cargo/config.toml with PYO3_PYTHON environment variable."""
+        python_path = self.get_venv_python_path()
+
+        # Ensure .cargo directory exists
+        cargo_dir = self.cargo_config_path.parent
+        cargo_dir.mkdir(exist_ok=True)
+
+        # Create config content
+        config_content = f"""[env]
+PYO3_PYTHON = "{python_path}"
+"""
+
+        # Write config file
+        with self.cargo_config_path.open("w") as f:
+            f.write(config_content)
+
+        print(f"Cargo config updated with PYO3_PYTHON = {python_path}")
+
 
 def main() -> None:
     print("Setting up Fricon development environment...")
@@ -96,15 +139,19 @@ def main() -> None:
     print("2. Creating development directory...")
     project.create_dev_folder()
 
-    print("3. Setting up database...")
+    print("3. Setting up Cargo configuration...")
+    project.setup_cargo_config()
+
+    print("4. Setting up database...")
     project.diesel_setup()
 
     print("\nDevelopment environment setup completed!")
     print(f"Database path: {project.database_path}")
     print(f"Environment file: {project.dotenv_path}")
+    print(f"Cargo config: {project.cargo_config_path}")
     print("\nNext steps:")
-    print("- Run 'cargo build' to build Rust components")
     print("- Run 'uv sync --dev' to set up Python environment")
+    print("- Run 'cargo build' to build Rust components")
     print("- See CONTRIBUTING.md for detailed development instructions")
 
 
