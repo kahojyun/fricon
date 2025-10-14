@@ -119,12 +119,12 @@ class Project:
 
         # Create config content
         config_content = f"""[env]
-PYO3_PYTHON = "{python_path}"
+PYO3_PYTHON = "{python_path.as_posix()}"
 """
 
         # Write config file
         with self.cargo_config_path.open("w") as f:
-            f.write(config_content)
+            _ = f.write(config_content)
 
         print(f"Cargo config updated with PYO3_PYTHON = {python_path}")
 
