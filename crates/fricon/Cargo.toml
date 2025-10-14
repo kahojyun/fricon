@@ -23,9 +23,7 @@ deadpool-diesel = { workspace = true, features = ["sqlite", "tracing"] }
 diesel = { workspace = true, features = [
     "sqlite",
     "returning_clauses_for_sqlite_3_35",
-    "uuid",
     "chrono",
-    "serde_json",
 ] }
 diesel_migrations = { workspace = true }
 futures = { workspace = true }
