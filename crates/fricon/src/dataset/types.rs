@@ -32,6 +32,7 @@ impl ScalarKind {
         }
     }
 
+    #[must_use]
     pub fn to_item_field(self) -> Field {
         self.to_field("item", false)
     }
@@ -117,6 +118,7 @@ pub enum TraceKind {
 }
 
 impl TraceKind {
+    #[must_use]
     pub fn to_data_type(self, item: FieldRef) -> DataType {
         match self {
             TraceKind::Simple => DataType::List(item),

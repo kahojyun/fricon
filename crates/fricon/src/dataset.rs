@@ -5,7 +5,7 @@ mod utils;
 
 pub use arrays::{DatasetArray, ScalarArray};
 pub use scalars::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace};
-pub use types::{DatasetDataType, DatasetSchema};
+pub use types::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind};
 pub use utils::downcast_array;
 
 #[derive(Debug, thiserror::Error)]

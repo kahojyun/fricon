@@ -19,6 +19,16 @@
     reason = "Python bindings may require specific parameter patterns"
 )]
 
+mod convert;
+#[pymodule]
+mod _core {
+    #[pymodule_export]
+    use super::{
+        Dataset, DatasetManager, DatasetWriter, ServerHandle, Trace, Workspace, main, main_gui,
+        serve_workspace,
+    };
+}
+
 use std::{env, mem, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result, bail};
@@ -34,17 +44,6 @@ use pyo3::{
     types::{PyDict, PyList},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
-
-mod convert;
-
-#[pymodule]
-mod _core {
-    #[pymodule_export]
-    use super::{
-        Dataset, DatasetManager, DatasetWriter, ServerHandle, Trace, Workspace, main, main_gui,
-        serve_workspace,
-    };
-}
 
 /// A client of fricon workspace server.
 #[pyclass(module = "fricon._core")]
