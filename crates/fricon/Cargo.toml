@@ -20,6 +20,7 @@ arrow-select = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 deadpool-diesel = { workspace = true, features = ["sqlite", "tracing"] }
+derive_more = { workspace = true, features = ["from"] }
 diesel = { workspace = true, features = [
     "sqlite",
     "returning_clauses_for_sqlite_3_35",
@@ -45,6 +46,7 @@ tonic-prost = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng", "serde"] }
+indexmap.workspace = true
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }

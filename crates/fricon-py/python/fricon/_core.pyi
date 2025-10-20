@@ -17,18 +17,14 @@ __all__ = [
     "ServerHandle",
     "Trace",
     "Workspace",
-    "complex128",
     "main",
     "main_gui",
     "serve_workspace",
-    "trace_",
 ]
 
 def main() -> int: ...
 def main_gui() -> int: ...
 def serve_workspace(path: StrPath) -> tuple[Workspace, ServerHandle]: ...
-def complex128() -> pa.DataType: ...
-def trace_(item: pa.DataType, fixed_step: bool) -> pa.DataType: ...
 @final
 class ServerHandle:
     def shutdown(self, timeout: float | None = None) -> None: ...
@@ -64,18 +60,15 @@ _ArrowAnyArray: TypeAlias = pa.Array[Any]  # pyright: ignore[reportExplicitAny]
 class Trace:
     @staticmethod
     def variable_step(
-        xs: Sequence[float] | npt.NDArray[float64],
-        ys: Sequence[_ScalarT_co] | _ArrowAnyArray,
+        x: Sequence[float] | npt.NDArray[float64],
+        y: Sequence[_ScalarT_co] | _ArrowAnyArray,
     ) -> Trace: ...
     @staticmethod
     def fixed_step(
         x0: float,
-        dx: float,
-        ys: Sequence[_ScalarT_co] | _ArrowAnyArray,
+        step: float,
+        y: Sequence[_ScalarT_co] | _ArrowAnyArray,
     ) -> Trace: ...
-    @property
-    def data_type(self) -> pa.DataType: ...
-    def to_arrow_array(self) -> _ArrowAnyArray: ...
 
 _ColumnType: TypeAlias = (
     float | complex | Sequence[float] | Sequence[complex] | Trace | _ArrowAnyArray

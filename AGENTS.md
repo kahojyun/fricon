@@ -1,149 +1,73 @@
-# AGENTS.md
+# Repository Guidelines
 
-## Development Commands
+## Project Structure & Module Organization
 
-### Rust Workspace (All crates)
+This is a multi-language workspace with Rust core components, Python bindings, and a Tauri-based UI. The main structure:
 
-```bash
-# Build all crates
-cargo build
+- `crates/` - Rust workspace with core modules:
+    - `fricon/` - Core library
+    - `fricon-py/` - Python bindings
+    - `fricon-ui/` - Tauri frontend
+    - `fricon-cli/` - Command-line interface
+- `examples/` - Usage examples
+- `scripts/` - Development and setup utilities
+- `docs/` - Documentation source
 
-# Run tests
-cargo test
+## Build, Test, and Development Commands
 
-# Check code
-cargo check
+Directly run in project root without cd
 
-# Format code
-cargo +nightly fmt
-
-# Lint with clippy
-cargo clippy --all-targets --all-features
-```
-
-### Python Package
+### Rust (workspace)
 
 ```bash
-# Install dependencies
-uv sync --all-groups
-
-# Build extension for development
-uv run maturin develop
-
-# Run tests
-uv run pytest
-
-# Format and lint
-uv run ruff format
-uv run ruff check
-uv run basedpyright
+cargo check          # Verify compilation
+cargo build          # Build all workspace members
+cargo test           # Run tests
+cargo +nightly fmt   # Format code
+cargo clippy --all-targets --all-features  # Lint
 ```
 
-### Frontend (Tauri UI)
+### Python
 
 ```bash
-# Install dependencies (run from project root)
-pnpm install
-
-# Development mode
-pnpm tauri dev
-
-# Check and lint
-pnpm run check
-pnpm run format
-pnpm run lint:fix
+uv run maturin develop   # Build Python extension for development
+uv run pytest            # Run tests
+uv run ruff format       # Format Python code
+uv run ruff check        # Lint Python code
 ```
 
-### Database Migrations
+### Frontend/UI
 
 ```bash
-# From crates/fricon directory
-diesel migration generate <name>
-diesel migration run
-diesel migration revert
+pnpm install         # Install workspace dependencies
+pnpm run check       # Type checking and linting
+pnpm run format      # Format code
+pnpm tauri dev       # Run development server
 ```
 
-## Architecture Overview
+## Coding Style & Naming Conventions
 
-Fricon is a data collection automation framework with multiple components:
+- **Rust**: Uses `rustfmt` and `clippy` with pedantic linting enabled. Follow Rust conventions, avoid `unwrap()`, `dbg_macro`, and `todo` macros.
+- **Python**: Uses `ruff` for formatting and linting. Follow PEP 8 conventions.
+- **Frontend**: Uses `prettier` and `eslint` with TypeScript.
+- All commits should follow conventional format: `type(scope): description`
 
-### Core Architecture
+## Testing Guidelines
 
-- **Workspace-based design**: Each workspace contains datasets and metadata
-- **Client-Server architecture**: gRPC-based communication between client and server
-- **Dataset storage**: Apache Arrow format with SQLite metadata tracking
-- **Multi-language support**: Rust core with Python bindings and Tauri frontend
+- **Testing Frameworks**: Rust (`cargo test`), Python (`pytest`)
+- **Coverage**: Write tests for new functionality when possible
+- **Test Location**:
+    - Rust unit tests in `mod tests`, integration tests in `<crate>/tests`
+    - Python tests in `crates/fricon-py/tests/`
+- **Running**: Use `cargo test` for Rust, `uv run pytest` for Python
 
-### Key Components
+## Commit & Pull Request Guidelines
 
-1. **crates/fricon**: Core Rust library
-    - `Workspace`: Workspace management and initialization
-    - `DatasetManager`: Centralized dataset CRUD operations
-    - `Client/Server`: gRPC communication layer
-    - Database models and migrations (Diesel + SQLite)
-
-2. **crates/fricon-py**: Python bindings
-    - PyO3-based Python extension module
-    - Provides Workspace, Dataset, DatasetWriter, and Trace classes
-    - Handles conversion between Python and Arrow data types
-    - IPC client
-
-3. **crates/fricon-ui**: Tauri desktop application
-    - Vue3 frontend with PrimeVue components
-    - Cross-platform desktop GUI
-    - IPC server
-
-4. **crates/fricon-cli**: Command-line interface
-    - Workspace initialization
-    - Start GUI
-
-### Data Flow
-
-1. User creates/connects to workspace
-2. DatasetManager handles dataset creation via gRPC
-3. Data written as Arrow files with metadata in SQLite
-4. Python bindings provide high-level interface
-5. Optional UI for desktop interaction
-
-### Important Implementation Details
-
-- **Dataset IDs**: Each dataset has both an integer ID and UUID
-- **Schema inference**: Automatic schema detection from first row written
-- **Write sessions**: Managed through write sessions with file locking
-- **Batch writing**: Data written in batches for performance
-- **Status tracking**: Datasets have writing/completed/aborted states
-
-## Development Notes
-
-### Setup Development Environment
-
-```bash
-python3 scripts/setup-dev.py
-```
-
-### Key Dependencies
-
-- **Data**: Apache Arrow, Polars, pandas
-- **Database**: SQLite with Diesel ORM
-- **Serialization**: serde, prost (protobuf)
-- **Async**: tokio, futures
-- **Python**: PyO3, maturin
-- **Frontend**: Vue3, Tauri, PrimeVue
-
-### Code Style
-
-- Rust: Follows standard Rust patterns with clippy pedantic mode
-    - Enforce self named module files
-    - Ignoring lints with `#[expect(..., reason="...")]` if not applicable
-    - Use reason as message in `expect`
-- Python: Uses ruff for formatting and linting
-- Frontend: Uses ESLint and Prettier
-
-### Testing
-
-- Rust tests: `cargo test`
-- Python tests: `uv run pytest` (`uv run maturin develop` required if Rust code changed)
-
-### Compatibility
-
-- Pre-1.0; breaking API/storage changes expected. Prioritize clean architecture over backward support.
+- **Conventional Commits**: Use `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore` prefixes
+- **Branch Strategy**: Feature/bugfix branches from `main`
+- **PR Requirements**:
+    - Pass all linters and tests
+    - Include tests for new features
+    - Update documentation if behavior changes
+    - Clear description of changes
+- **Pre-commit**: Automatic formatting and linting checks enforced via CI

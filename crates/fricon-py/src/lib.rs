@@ -19,43 +19,31 @@
     reason = "Python bindings may require specific parameter patterns"
 )]
 
-use std::{
-    collections::HashMap,
-    env,
-    path::PathBuf,
-    sync::{Arc, LazyLock},
-    time::Duration,
-};
+mod convert;
+#[pymodule]
+mod _core {
+    #[pymodule_export]
+    use super::{
+        Dataset, DatasetManager, DatasetWriter, ServerHandle, Trace, Workspace, main, main_gui,
+        serve_workspace,
+    };
+}
 
-use anyhow::{Context, Result, bail, ensure};
-use arrow_array::{
-    Array, ArrayRef, Float64Array, ListArray, RecordBatch, StructArray, cast::downcast_array,
-    make_array,
-};
-use arrow_buffer::OffsetBuffer;
-use arrow_data::ArrayData;
-use arrow_pyarrow::PyArrowType;
-use arrow_schema::{DataType, Field, Fields, Schema};
+use std::{env, mem, path::PathBuf, time::Duration};
+
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
-use fricon::{Client, DatasetMetadata, DatasetRecord};
-use itertools::Itertools;
-use num::complex::Complex64;
-use numpy::{AllowTypeChange, PyArrayLike1, PyArrayMethods};
+use fricon::{
+    Client, DatasetMetadata, DatasetRecord, DatasetScalar, FixedStepTrace, VariableStepTrace,
+};
+use fricon_cli::clap::Parser;
+use indexmap::IndexMap;
 use pyo3::{
     prelude::*,
     sync::GILOnceCell,
-    types::{PyComplex, PyDict, PyFloat, PyInt, PyList, PySequence},
+    types::{PyDict, PyList},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
-
-#[pymodule]
-pub mod _core {
-    #[pymodule_export]
-    pub use super::{
-        Dataset, DatasetManager, DatasetWriter, ServerHandle, Trace, Workspace, complex128, main,
-        main_gui, serve_workspace, trace_,
-    };
-}
 
 /// A client of fricon workspace server.
 #[pyclass(module = "fricon._core")]
@@ -102,7 +90,7 @@ impl DatasetManager {
     /// Parameters:
     ///     name: Name of the dataset.
     ///     description: Description of the dataset.
-    ///     tags: Tags of the dataset. Duplicate tags will be add only once.
+    ///     tags: Tags of the dataset. Duplicate tags will be added only once.
     ///
     /// Returns:
     ///     A writer of the newly created dataset.
@@ -115,19 +103,13 @@ impl DatasetManager {
     ) -> Result<DatasetWriter> {
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
-        let schema = Schema::empty();
 
-        // Enter Tokio runtime context to handle tokio::spawn calls in
-        // DatasetWriter::new
-        let runtime = get_runtime();
-        let _guard = runtime.enter();
-
-        let writer = self
-            .workspace
-            .client
-            .create_dataset(name, description, tags)?;
-
-        Ok(DatasetWriter::new(writer, Arc::new(schema)))
+        Ok(DatasetWriter::new(
+            self.workspace.client.clone(),
+            name,
+            description,
+            tags,
+        ))
     }
 
     /// Open a dataset by id.
@@ -207,132 +189,43 @@ impl DatasetManager {
     }
 }
 
-fn extract_float_array(values: &Bound<'_, PyAny>) -> Result<Float64Array> {
-    if let Ok(PyArrowType(data)) = values.extract() {
-        let arr = make_array(data);
-        if *arr.data_type() == DataType::Float64 {
-            return Ok(downcast_array(&arr));
-        }
-        bail!("The data type of the given arrow array is not float64.");
-    }
-    if let Ok(arr) = values.extract::<PyArrayLike1<'_, f64, AllowTypeChange>>() {
-        let arr = arr.readonly();
-        let arr = arr.as_array().into_iter().copied();
-        let arr = Float64Array::from_iter_values(arr);
-        return Ok(arr);
-    }
-    let py_type = values.get_type();
-    bail!("Cannot convert values with type {py_type} to float64 array.");
-}
-
-fn extract_scalar_array(values: &Bound<'_, PyAny>) -> Result<ArrayRef> {
-    if let Ok(PyArrowType(data)) = values.extract() {
-        let arr = make_array(data);
-        return match arr.data_type() {
-            DataType::Float64 => Ok(arr),
-            t @ DataType::Struct(_) if *t == get_complex_type() => Ok(arr),
-            _ => bail!(
-                "MVP currently only supports float64 and complex128 arrow array types, got {}.",
-                arr.data_type()
-            ),
-        };
-    }
-    if let Ok(sequence) = values.downcast::<PySequence>() {
-        let data_type =
-            infer_sequence_item_type(sequence).context("Inferring sequence item data type.")?;
-        return build_array_from_sequence(&data_type, sequence);
-    }
-    let py_type = values.get_type();
-    bail!("Cannot convert {py_type} to scalar array.");
-}
-
-fn wrap_as_list_array(array: ArrayRef) -> ListArray {
-    ListArray::new(
-        Arc::new(Field::new_list_field(array.data_type().clone(), false)),
-        OffsetBuffer::from_lengths([array.len()]),
-        array,
-        None,
-    )
-}
-
 /// 1-D list of values with optional x-axis values.
 #[pyclass(module = "fricon._core")]
-pub struct Trace {
-    array: StructArray,
-}
+#[derive(Debug, Clone)]
+pub struct Trace(DatasetScalar);
 
 #[pymethods]
 impl Trace {
     /// Create a new trace with variable x steps.
     ///
     /// Parameters:
-    ///     xs: List of x-axis values.
-    ///     ys: List of y-axis values.
+    ///     x: List of x-axis values.
+    ///     y: List of y-axis values.
     ///
     /// Returns:
     ///     A variable-step trace.
     #[staticmethod]
-    pub fn variable_step(xs: &Bound<'_, PyAny>, ys: &Bound<'_, PyAny>) -> Result<Self> {
-        let xs = extract_float_array(xs)?;
-        let ys = extract_scalar_array(ys)?;
-        ensure!(
-            xs.len() == ys.len(),
-            "Length of `xs` and `ys` should be equal."
-        );
-        let xs_list = wrap_as_list_array(Arc::new(xs));
-        let ys_list = wrap_as_list_array(ys);
-        let fields = vec![
-            Field::new("xs", xs_list.data_type().clone(), false),
-            Field::new("ys", ys_list.data_type().clone(), false),
-        ];
-        let array = StructArray::new(
-            fields.into(),
-            vec![Arc::new(xs_list), Arc::new(ys_list)],
-            None,
-        );
-        Ok(Self { array })
+    pub fn variable_step(x: &Bound<'_, PyAny>, y: &Bound<'_, PyAny>) -> Result<Self> {
+        let x = convert::extract_float_array(x)?;
+        let y = convert::extract_scalar_array(y)?;
+        let inner = VariableStepTrace::new(x, y)?.into();
+        Ok(Self(inner))
     }
 
     /// Create a new trace with fixed x steps.
     ///
     /// Parameters:
     ///     x0: Starting x-axis value.
-    ///     dx: Step size of x-axis values.
-    ///     ys: List of y-axis values.
+    ///     step: Step size of x-axis values.
+    ///     y: List of y-axis values.
     ///
     /// Returns:
     ///     A fixed-step trace.
     #[staticmethod]
-    pub fn fixed_step(x0: f64, dx: f64, ys: &Bound<'_, PyAny>) -> Result<Self> {
-        let x0 = Float64Array::new_scalar(x0).into_inner();
-        let dx = Float64Array::new_scalar(dx).into_inner();
-        let ys = extract_scalar_array(ys)?;
-        let ys_list = wrap_as_list_array(ys);
-        let fields = vec![
-            Field::new("x0", DataType::Float64, false),
-            Field::new("dx", DataType::Float64, false),
-            Field::new("ys", ys_list.data_type().clone(), false),
-        ];
-        let array = StructArray::new(
-            fields.into(),
-            vec![Arc::new(x0), Arc::new(dx), Arc::new(ys_list)],
-            None,
-        );
-        Ok(Self { array })
-    }
-
-    /// Arrow data type of the trace.
-    #[getter]
-    pub fn data_type(&self) -> PyArrowType<DataType> {
-        PyArrowType(self.array.data_type().clone())
-    }
-
-    /// Convert to an arrow array.
-    ///
-    /// Returns:
-    ///     Arrow array.
-    pub fn to_arrow_array(&self) -> PyArrowType<ArrayData> {
-        PyArrowType(self.array.to_data())
+    pub fn fixed_step(x0: f64, step: f64, y: &Bound<'_, PyAny>) -> Result<Self> {
+        let y = convert::extract_scalar_array(y)?;
+        let inner = FixedStepTrace::new(x0, step, y).into();
+        Ok(Self(inner))
     }
 }
 
@@ -413,7 +306,7 @@ impl Dataset {
         self.inner.tags()
     }
 
-    /// Id of the dataset.
+    /// ID of the dataset.
     #[getter]
     pub const fn id(&self) -> i32 {
         self.inner.id()
@@ -495,220 +388,39 @@ impl Drop for ServerHandle {
     }
 }
 
+enum WriterState {
+    NotStarted {
+        client: Client,
+        name: String,
+        description: String,
+        tags: Vec<String>,
+    },
+    Writing(fricon::DatasetWriter),
+    Finished,
+}
+
 /// Writer for newly created dataset.
 ///
 /// Writers are constructed by calling
 /// [`DatasetManager.create`][fricon.DatasetManager.create].
 #[pyclass(module = "fricon._core")]
 pub struct DatasetWriter {
-    writer: Option<fricon::DatasetWriter>,
+    state: WriterState,
     dataset: Option<Py<Dataset>>,
-    first_row: bool,
-    schema: Arc<Schema>,
 }
 
 impl DatasetWriter {
-    const fn new(writer: fricon::DatasetWriter, schema: Arc<Schema>) -> Self {
+    const fn new(client: Client, name: String, description: String, tags: Vec<String>) -> Self {
         Self {
-            writer: Some(writer),
+            state: WriterState::NotStarted {
+                client,
+                name,
+                description,
+                tags,
+            },
             dataset: None,
-            first_row: true,
-            schema,
         }
     }
-}
-
-fn infer_scalar_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
-    if value.is_instance_of::<PyFloat>() || value.is_instance_of::<PyInt>() {
-        Ok(DataType::Float64)
-    } else if value.is_instance_of::<PyComplex>() {
-        Ok(get_complex_type())
-    } else {
-        let py_type = value.get_type();
-        bail!("MVP currently only supports float, int, and complex types, got '{py_type}'.");
-    }
-}
-
-fn infer_sequence_item_type(sequence: &Bound<'_, PySequence>) -> Result<DataType> {
-    ensure!(
-        sequence.len()? > 0,
-        "Cannot infer data type for empty sequence."
-    );
-    let first_item = sequence.get_item(0)?;
-    infer_scalar_type(&first_item)
-}
-
-fn infer_sequence_type(sequence: &Bound<'_, PySequence>) -> Result<DataType> {
-    let item_type = infer_sequence_item_type(sequence)?;
-    let data_type = DataType::new_list(item_type, false);
-    Ok(data_type)
-}
-
-/// Infer [`arrow::datatypes::DataType`] from value in row.
-///
-/// MVP currently supports:
-///
-/// 1. Scalar types: float, int, complex
-/// 2. [`Trace`]
-/// 3. [`arrow::array::Array`]
-/// 4. Python Sequence protocol
-///
-/// TODO: support more types (bool, str), numpy array
-fn infer_data_type(value: &Bound<'_, PyAny>) -> Result<DataType> {
-    if let Ok(data_type) = infer_scalar_type(value) {
-        Ok(data_type)
-    } else if let Ok(trace) = value.downcast_exact::<Trace>() {
-        Ok(trace.borrow().data_type().0)
-    } else if let Ok(PyArrowType(data)) = value.extract() {
-        let arr = make_array(data);
-        Ok(arr.data_type().clone())
-    } else if let Ok(sequence) = value.downcast::<PySequence>() {
-        infer_sequence_type(sequence)
-    } else {
-        let py_type = value.get_type();
-        bail!("Cannot infer arrow data type for python type '{py_type}'.");
-    }
-}
-
-fn infer_schema(
-    py: Python<'_>,
-    initial_schema: &Schema,
-    values: &HashMap<String, PyObject>,
-) -> Result<Schema> {
-    let new_fields: Vec<Field> = values
-        .iter()
-        .filter(|(name, _)| initial_schema.field_with_name(name).is_err())
-        .map(|(name, value)| {
-            let datatype = infer_data_type(value.bind(py))
-                .with_context(|| format!("Inferring data type for column '{name}'."))?;
-            anyhow::Ok(Field::new(name, datatype, false))
-        })
-        .try_collect()?;
-    Schema::try_merge([initial_schema.clone(), Schema::new(new_fields)])
-        .context("Failed to merge initial schema with inferred schema.")
-}
-
-fn build_array_from_sequence(
-    data_type: &DataType,
-    sequence: &Bound<'_, PySequence>,
-) -> Result<ArrayRef> {
-    match data_type {
-        DataType::Float64 => {
-            let mut builder = Float64Array::builder(sequence.len()?);
-            for v in sequence.try_iter()? {
-                let v = v?.extract()?;
-                builder.append_value(v);
-            }
-            Ok(Arc::new(builder.finish()))
-        }
-        t @ DataType::Struct(_) if *t == get_complex_type() => {
-            // Handle complex sequences
-            let mut real_builder = Float64Array::builder(sequence.len()?);
-            let mut imag_builder = Float64Array::builder(sequence.len()?);
-            for v in sequence.try_iter()? {
-                let v = v?.extract::<Complex64>()?;
-                real_builder.append_value(v.re);
-                imag_builder.append_value(v.im);
-            }
-            let real_array = Arc::new(real_builder.finish());
-            let imag_array = Arc::new(imag_builder.finish());
-            let fields = vec![
-                Field::new("real", DataType::Float64, false),
-                Field::new("imag", DataType::Float64, false),
-            ];
-            let struct_array = StructArray::new(fields.into(), vec![real_array, imag_array], None);
-            Ok(Arc::new(struct_array))
-        }
-        _ => bail!(
-            "MVP currently only supports float64 and complex128 sequence types, got {}.",
-            data_type
-        ),
-    }
-}
-
-fn build_list(field: Arc<Field>, sequence: &Bound<'_, PySequence>) -> Result<ListArray> {
-    let values = build_array_from_sequence(field.data_type(), sequence)?;
-    let offsets = OffsetBuffer::from_lengths([values.len()]);
-    Ok(ListArray::try_new(field, offsets, values, None)?)
-}
-
-fn build_array(value: &Bound<'_, PyAny>, data_type: &DataType) -> Result<ArrayRef> {
-    if let Ok(PyArrowType(data)) = value.extract::<PyArrowType<ArrayData>>() {
-        ensure!(
-            data.data_type() == data_type,
-            "Different data type: schema: {data_type}, value: {}",
-            data.data_type()
-        );
-        return Ok(make_array(data));
-    }
-    match data_type {
-        DataType::Float64 => {
-            let Ok(value) = value.extract::<f64>() else {
-                bail!("Failed to extract float64 value.")
-            };
-            let array = Float64Array::new_scalar(value).into_inner();
-            Ok(Arc::new(array))
-        }
-        // complex scalar
-        t @ DataType::Struct(fields) if *t == get_complex_type() => {
-            let Ok(value) = value.extract::<Complex64>() else {
-                bail!("Failed to extract complex value.")
-            };
-            let real = Float64Array::new_scalar(value.re).into_inner();
-            let imag = Float64Array::new_scalar(value.im).into_inner();
-            let array =
-                StructArray::new(fields.clone(), vec![Arc::new(real), Arc::new(imag)], None);
-            Ok(Arc::new(array))
-        }
-        // Trace
-        t @ DataType::Struct(_fields) => {
-            let Ok(value) = value.downcast_exact::<Trace>() else {
-                bail!("Failed to extract `Trace` value.")
-            };
-            let value = value.borrow();
-            if *t != value.data_type().0 {
-                bail!("Incompatible data type.")
-            }
-            let array = value.to_arrow_array().0;
-            Ok(make_array(array))
-        }
-        // Sequence
-        DataType::List(field) => {
-            let Ok(value) = value.downcast() else {
-                bail!("Value is not a python `Sequence`");
-            };
-            let list = build_list(field.clone(), value)?;
-            Ok(Arc::new(list))
-        }
-        _ => {
-            bail!("MVP currently only supports float64 and complex128 types, got {data_type}.")
-        }
-    }
-}
-
-fn build_record_batch(
-    py: Python<'_>,
-    schema: Arc<Schema>,
-    values: &HashMap<String, PyObject>,
-) -> Result<RecordBatch> {
-    ensure!(
-        schema.fields().len() == values.len(),
-        "Values not compatible with schema."
-    );
-    let columns = schema
-        .fields()
-        .into_iter()
-        .map(|field| {
-            let name = field.name();
-            let value = values
-                .get(name)
-                .with_context(|| format!("Missing value {name}"))?
-                .bind(py);
-            build_array(value, field.data_type())
-                .with_context(|| format!("Building array for column {name}"))
-        })
-        .try_collect()?;
-    Ok(RecordBatch::try_new(schema, columns)?)
 }
 
 #[pymethods]
@@ -721,7 +433,7 @@ impl DatasetWriter {
     pub fn write(
         &mut self,
         py: Python<'_>,
-        kwargs: Option<HashMap<String, PyObject>>,
+        kwargs: Option<IndexMap<String, PyObject>>,
     ) -> Result<()> {
         let Some(values) = kwargs else {
             bail!("No data to write.")
@@ -733,23 +445,39 @@ impl DatasetWriter {
     ///
     /// Parameters:
     ///     values: A dictionary of names and values in the row.
-    pub fn write_dict(&mut self, py: Python<'_>, values: HashMap<String, PyObject>) -> Result<()> {
+    pub fn write_dict(&mut self, py: Python<'_>, values: IndexMap<String, PyObject>) -> Result<()> {
         if values.is_empty() {
             bail!("No data to write.")
         }
-        let Some(writer) = &mut self.writer else {
-            bail!("Writer closed.");
-        };
-        if self.first_row {
-            self.schema = Arc::new(infer_schema(py, &self.schema, &values)?);
-            self.first_row = false;
+
+        match mem::replace(&mut self.state, WriterState::Finished) {
+            WriterState::NotStarted {
+                client,
+                name,
+                description,
+                tags,
+            } => {
+                let row = convert::build_row(py, values)?;
+                let schema = row.to_schema();
+                let _guard = get_runtime().enter();
+                let mut writer = client.create_dataset(name, description, tags, schema)?;
+                get_runtime().block_on(writer.write(row))?;
+                self.state = WriterState::Writing(writer);
+            }
+            WriterState::Writing(mut writer) => {
+                let row = convert::build_row(py, values)?;
+                get_runtime().block_on(writer.write(row))?;
+                self.state = WriterState::Writing(writer);
+            }
+            WriterState::Finished => {
+                bail!("Writer closed.")
+            }
         }
-        let batch = build_record_batch(py, self.schema.clone(), &values)?;
-        get_runtime().block_on(writer.write(batch))?;
+
         Ok(())
     }
 
-    /// Id of the dataset.
+    /// ID of the dataset.
     ///
     /// Raises:
     ///     RuntimeError: Writer is not closed yet.
@@ -765,8 +493,7 @@ impl DatasetWriter {
 
     /// Finish writing to dataset.
     pub fn close(&mut self, py: Python<'_>) -> Result<()> {
-        let writer = self.writer.take();
-        if let Some(writer) = writer {
+        if let WriterState::Writing(writer) = mem::replace(&mut self.state, WriterState::Finished) {
             let inner = get_runtime().block_on(writer.finish())?;
             self.dataset = Some(Py::new(py, Dataset { inner })?);
         }
@@ -791,57 +518,6 @@ impl DatasetWriter {
         self.close(py)
     }
 }
-
-fn get_complex_type() -> DataType {
-    static COMPLEX: LazyLock<DataType> = LazyLock::new(|| {
-        let fields = vec![
-            Field::new("real", DataType::Float64, false),
-            Field::new("imag", DataType::Float64, false),
-        ];
-        DataType::Struct(Fields::from(fields))
-    });
-    COMPLEX.clone()
-}
-
-fn get_trace_type(item: DataType, fixed_step: bool) -> DataType {
-    let y_field = Field::new("ys", DataType::new_list(item, false), false);
-    if fixed_step {
-        let fields = vec![
-            Field::new("x0", DataType::Float64, false),
-            Field::new("dx", DataType::Float64, false),
-            y_field,
-        ];
-        DataType::Struct(Fields::from(fields))
-    } else {
-        let x_field = Field::new("xs", DataType::new_list(DataType::Float64, false), false);
-        let fields = vec![x_field, y_field];
-        DataType::Struct(Fields::from(fields))
-    }
-}
-
-/// Get a pyarrow data type representing 128 bit compelex number.
-///
-/// Returns:
-///     A pyarrow data type.
-#[pyfunction]
-pub fn complex128() -> PyArrowType<DataType> {
-    PyArrowType(get_complex_type())
-}
-
-/// Get a pyarrow data type representing [`Trace`][fricon.Trace].
-///
-/// Parameters:
-///     item: Data type of the y values.
-///     fixed_step: Whether the trace has fixed x steps.
-///
-/// Returns:
-///     A pyarrow data type.
-#[pyfunction]
-pub fn trace_(item: PyArrowType<DataType>, fixed_step: bool) -> PyArrowType<DataType> {
-    PyArrowType(get_trace_type(item.0, fixed_step))
-}
-
-use fricon_cli::clap::Parser;
 
 #[expect(clippy::print_stderr, reason = "Error messages for CLI tool")]
 pub fn main_impl<T: Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {

@@ -9,6 +9,7 @@
 mod app;
 mod client;
 mod database;
+mod dataset;
 mod dataset_manager;
 mod dataset_tasks;
 mod ipc;
@@ -25,6 +26,10 @@ pub use self::{
     app::{AppEvent, AppHandle, AppManager},
     client::{Client, Dataset, DatasetWriter},
     database::DatasetStatus,
+    dataset::{
+        DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
+        ScalarArray, ScalarKind, TraceKind, VariableStepTrace, downcast_array,
+    },
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
     },
