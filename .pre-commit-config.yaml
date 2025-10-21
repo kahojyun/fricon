@@ -19,13 +19,13 @@ repos:
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 34caa24c9623d336f140bafe8c7f3d341e02f5c8  # frozen: 0.9.4
+    rev: 571189337017c8bdbf22a0977b9e44d33b5e5ae9  # frozen: 0.9.5
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 3b4bc031619cde2e0a9f3c4441ac7cc8227245a4  # frozen: v0.14.1
+    rev: 3db93a2be6f214ed722bf7bce095ec1b1715422a  # frozen: v0.14.2
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/sqlfluff/sqlfluff
