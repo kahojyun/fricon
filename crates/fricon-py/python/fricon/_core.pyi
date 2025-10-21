@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
-from typing import Any, Literal, TypeAlias, TypeVar, final
+from typing import Any, TypeVar, final
 
 import numpy.typing as npt
 import pandas as pd
@@ -8,7 +8,7 @@ import polars as pl
 import pyarrow as pa
 from _typeshed import StrPath
 from numpy import float64
-from typing_extensions import Self
+from typing_extensions import Literal, Self, TypeAlias
 
 __all__ = [
     "Dataset",
