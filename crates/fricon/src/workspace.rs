@@ -31,9 +31,8 @@ fn check_version(version: &Version) -> Result<VersionCheckResult> {
         Ordering::Less => Ok(VersionCheckResult::NeedsMigration),
         Ordering::Greater => {
             bail!(
-                "Workspace version {} is newer than supported version {}. Please update fricon.",
-                version,
-                WORKSPACE_VERSION
+                "Workspace version {version} is newer than supported version {WORKSPACE_VERSION}. \
+                 Please update fricon."
             );
         }
     }
