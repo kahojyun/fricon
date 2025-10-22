@@ -3,6 +3,9 @@ import { useTemplateRef, onUnmounted, watch } from "vue";
 import * as echarts from "echarts";
 import { useDark } from "@vueuse/core";
 
+const props = defineProps<{
+  datasetId: number | null;
+}>();
 const isDark = useDark();
 const chart = useTemplateRef("chart");
 let chartInstance: echarts.ECharts | null = null;
@@ -54,6 +57,10 @@ watch(chart, () => {
   cleanup();
   initChart();
 });
+watch(
+  () => props.datasetId,
+  () => console.log(`log from child: ${props.datasetId}`),
+);
 
 onUnmounted(cleanup);
 </script>

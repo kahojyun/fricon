@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, type Ref } from "vue";
-import { DataTable, Column, Tag } from "primevue";
+import { Column, DataTable, Tag } from "primevue";
 import {
+  type DatasetCreatedEvent,
+  type DatasetInfo,
   listDatasets,
   onDatasetCreated,
-  type DatasetInfo,
-  type DatasetCreatedEvent,
 } from "./backend";
 
+const emit = defineEmits<{
+  datasetSelected: [id: number];
+}>();
 const value: Ref<DatasetInfo[]> = ref([]);
 
 let unsubscribe: (() => void) | null = null;
 
 const loadDatasets = async () => {
-  const datasets = await listDatasets();
-  value.value = datasets;
+  value.value = await listDatasets();
 };
 
 const handleDatasetCreated = (event: DatasetCreatedEvent) => {
@@ -37,13 +39,18 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (unsubscribe) {
-    unsubscribe();
-  }
+  unsubscribe?.();
 });
 </script>
 <template>
-  <DataTable :value="value" removable-sort>
+  <DataTable
+    :value="value"
+    size="small"
+    data-key="id"
+    selection-mode="single"
+    removable-sort
+    @row-select="emit('datasetSelected', $event.data.id)"
+  >
     <Column field="id" header="ID" />
     <Column field="name" header="Name" />
     <Column field="tags" header="Tags">

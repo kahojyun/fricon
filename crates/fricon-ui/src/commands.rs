@@ -22,13 +22,6 @@ struct DatasetInfo {
 #[derive(Serialize)]
 struct WorkspaceInfo {
     path: String,
-    is_ready: bool,
-}
-
-#[derive(Serialize)]
-struct ServerStatus {
-    is_running: bool,
-    ipc_path: String,
 }
 
 #[tauri::command]
@@ -41,19 +34,6 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 
     Ok(WorkspaceInfo {
         path: workspace_path.to_string_lossy().to_string(),
-        is_ready: true,
-    })
-}
-
-#[tauri::command]
-fn get_server_status(state: State<'_, AppState>) -> Result<ServerStatus, String> {
-    let app = state.app();
-    let workspace_paths = app
-        .paths()
-        .map_err(|e| format!("Failed to get paths: {e}"))?;
-    Ok(ServerStatus {
-        is_running: true,
-        ipc_path: workspace_paths.ipc_file().to_string_lossy().to_string(),
     })
 }
 
@@ -81,5 +61,5 @@ async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, S
 }
 
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
-    tauri::generate_handler![get_workspace_info, get_server_status, list_datasets]
+    tauri::generate_handler![get_workspace_info, list_datasets]
 }

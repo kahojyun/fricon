@@ -13,6 +13,7 @@ use std::{
 use arrow_array::RecordBatch;
 use arrow_schema::ArrowError;
 use chrono::{DateTime, Utc};
+use derive_more::From;
 use diesel::result::Error as DieselError;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -116,7 +117,7 @@ pub struct DatasetUpdate {
     pub favorite: Option<bool>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, From)]
 pub enum DatasetId {
     Id(i32),
     Uid(Uuid),

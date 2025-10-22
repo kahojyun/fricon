@@ -3,12 +3,6 @@ import { listen } from "@tauri-apps/api/event";
 
 export interface WorkspaceInfo {
   path: string;
-  is_ready: boolean;
-}
-
-export interface ServerStatus {
-  is_running: boolean;
-  ipc_path: string;
 }
 
 export interface DatasetInfo {
@@ -19,23 +13,19 @@ export interface DatasetInfo {
   created_at: Date;
 }
 
-interface RawDatasetInfo {
-  id: number;
-  name: string;
-  description: string;
-  tags: string[];
-  created_at: string;
-}
-
-export async function getWorkspaceInfo(): Promise<WorkspaceInfo> {
-  return await invoke<WorkspaceInfo>("get_workspace_info");
-}
-
-export async function getServerStatus(): Promise<ServerStatus> {
-  return await invoke<ServerStatus>("get_server_status");
+export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
+  return invoke<WorkspaceInfo>("get_workspace_info");
 }
 
 export async function listDatasets(): Promise<DatasetInfo[]> {
+  interface RawDatasetInfo {
+    id: number;
+    name: string;
+    description: string;
+    tags: string[];
+    created_at: string;
+  }
+
   const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets");
   return rawDatasets.map((dataset) => ({
     ...dataset,

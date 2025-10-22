@@ -1468,6 +1468,9 @@ name = "fricon-ui"
 version = "0.1.0-alpha"
 dependencies = [
  "anyhow",
+ "arrow-array",
+ "arrow-ipc",
+ "arrow-schema",
  "chrono",
  "dotenvy",
  "fricon",

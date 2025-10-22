@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Button from "primevue/button";
+import { getWorkspaceInfo } from "@/backend.ts";
 
 // Try to read workspace path from Tauri (if available at runtime)
 const workspacePath = ref<string>("(no workspace)");
@@ -12,6 +13,10 @@ const route = useRoute();
 function goTo(name: string) {
   void router.push({ name });
 }
+
+onMounted(async () => {
+  workspacePath.value = (await getWorkspaceInfo()).path;
+});
 </script>
 
 <template>

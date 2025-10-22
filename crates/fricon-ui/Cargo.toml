@@ -12,6 +12,9 @@ keywords.workspace = true
 [dependencies]
 fricon = { path = "../fricon" }
 
+arrow-array = { workspace = true }
+arrow-ipc = { workspace = true }
+arrow-schema = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 dotenvy = { workspace = true }
