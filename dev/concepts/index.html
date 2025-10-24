@@ -537,8 +537,8 @@ the data files and metadata. You can create a workspace using the CLI:</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├──<span class="w"> </span>📄<span class="w"> </span>.fricon_version
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├──<span class="w"> </span>📄<span class="w"> </span>fricon.sqlite3
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├──<span class="w"> </span>📁<span class="w"> </span>data/
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│<span class="w">   </span>└──<span class="w"> </span>📁<span class="w"> </span>&lt;uuid<span class="o">[</span><span class="m">0</span>:2<span class="o">]</span>&gt;/
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│<span class="w">       </span>└──<span class="w"> </span>📁<span class="w"> </span>&lt;uuid&gt;/
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│<span class="w">   </span>└──<span class="w"> </span>📁<span class="w"> </span>&lt;uid<span class="o">[</span><span class="m">0</span>:2<span class="o">]</span>&gt;/
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│<span class="w">       </span>└──<span class="w"> </span>📁<span class="w"> </span>&lt;uid&gt;/
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│<span class="w">           </span>├──<span class="w"> </span>📄<span class="w"> </span>data_chunk_0.arrow
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│<span class="w">           </span>└──<span class="w"> </span>📄<span class="w"> </span>data_chunk_1.arrow<span class="w"> </span><span class="o">(</span>optional,<span class="w"> </span>written<span class="w"> </span>when<span class="w"> </span>first<span class="w"> </span>exceeds<span class="w"> </span>chunk<span class="w"> </span>size<span class="o">)</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>├──<span class="w"> </span>📁<span class="w"> </span>backup/
@@ -561,13 +561,13 @@ one data table based on the Arrow format with additional metadata.</p>
 <h3 id="identifiers">Identifiers</h3>
 <p>Each dataset will be given two unique identifiers:</p>
 <ul>
-<li><code>uuid</code>: A UUID that is practically unique across all workspaces. This is
+<li><code>uid</code>: A UUID that is practically unique across all workspaces. This is
   useful when users want to export a dataset to other places.</li>
 <li><code>id</code>: A self-incremental ID that is unique in the current workspace. This is
   more human-readable and can be used to reference a dataset in a given
   workspace.</li>
 </ul>
-<p>Users can open a dataset by either <code>uuid</code> or <code>id</code>.</p>
+<p>Users can open a dataset by either <code>uid</code> or <code>id</code>.</p>
 
 
 
