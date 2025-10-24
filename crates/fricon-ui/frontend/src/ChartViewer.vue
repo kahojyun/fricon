@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useTemplateRef, onUnmounted, watch } from "vue";
 import * as echarts from "echarts";
+import { useDark } from "@vueuse/core";
 
+const isDark = useDark();
 const chart = useTemplateRef("chart");
 let chartInstance: echarts.ECharts | null = null;
 const observer = new ResizeObserver(() => {
@@ -9,6 +11,7 @@ const observer = new ResizeObserver(() => {
     chartInstance?.resize();
   });
 });
+
 const option = {
   animation: false,
   xAxis: {
@@ -38,6 +41,13 @@ function initChart() {
   chartInstance = echarts.init(chartDiv);
   chartInstance.setOption(option);
   observer.observe(chartDiv);
+  watch(
+    isDark,
+    () => {
+      chartInstance?.setTheme(isDark.value ? "dark" : "default");
+    },
+    { immediate: true },
+  );
 }
 
 watch(chart, () => {

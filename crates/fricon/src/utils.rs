@@ -76,7 +76,7 @@ impl IPCBufferDecoder {
         )
         .context("Failed to read footer length")?;
         let footer = root_as_footer(&buffer[trailer_start - footer_len..trailer_start])
-            .map_err(|e| anyhow::anyhow!("Failed to parse footer: {:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse footer: {e:?}"))?;
 
         let schema = fb_to_schema(
             footer

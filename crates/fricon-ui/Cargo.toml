@@ -20,7 +20,6 @@ serde_json = { workspace = true }
 tauri = { workspace = true, features = ["tray-icon"] }
 tauri-plugin-opener = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["json", "env-filter"] }
 tracing-appender = { workspace = true }

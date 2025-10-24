@@ -12,11 +12,11 @@ use numpy::{
     PyUntypedArrayMethods,
 };
 use pyo3::{
-    Bound, PyAny, PyErr, PyObject, PyResult, Python,
+    Bound, Py, PyAny, PyErr, PyResult, Python,
     exceptions::{PyTypeError, PyValueError},
     intern,
     prelude::PyAnyMethods,
-    sync::GILOnceCell,
+    sync::PyOnceLock,
 };
 
 use crate::Trace;
@@ -93,7 +93,7 @@ fn extract_scalar(value: &Bound<'_, PyAny>) -> PyResult<DatasetScalar> {
     }
 }
 
-pub fn build_row(py: Python<'_>, values: IndexMap<String, PyObject>) -> PyResult<DatasetRow> {
+pub fn build_row(py: Python<'_>, values: IndexMap<String, Py<PyAny>>) -> PyResult<DatasetRow> {
     let row = values
         .into_iter()
         .map(|(name, value)| {
@@ -109,8 +109,8 @@ pub fn build_row(py: Python<'_>, values: IndexMap<String, PyObject>) -> PyResult
     Ok(DatasetRow(row))
 }
 
-fn numpy_module(py: Python<'_>) -> PyResult<&PyObject> {
-    static MODULE: GILOnceCell<PyObject> = GILOnceCell::new();
+fn numpy_module(py: Python<'_>) -> PyResult<&Py<PyAny>> {
+    static MODULE: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
     MODULE.get_or_try_init(py, || py.import("numpy").map(Into::into))
 }
 

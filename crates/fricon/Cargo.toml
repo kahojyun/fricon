@@ -13,7 +13,6 @@ keywords.workspace = true
 anyhow = { workspace = true }
 arrow-array = { workspace = true }
 arrow-buffer = { workspace = true }
-arrow-data = { workspace = true }
 arrow-schema = { workspace = true }
 arrow-ipc = { workspace = true }
 arrow-select = { workspace = true }
@@ -46,7 +45,7 @@ tonic-prost = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng", "serde"] }
-indexmap.workspace = true
+indexmap = { workspace = true }
 
 [build-dependencies]
 tonic-prost-build = { workspace = true }

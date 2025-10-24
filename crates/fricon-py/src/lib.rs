@@ -40,7 +40,7 @@ use fricon_cli::clap::Parser;
 use indexmap::IndexMap;
 use pyo3::{
     prelude::*,
-    sync::GILOnceCell,
+    sync::PyOnceLock,
     types::{PyDict, PyList},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
@@ -138,8 +138,8 @@ impl DatasetManager {
     ///
     /// Returns:
     ///     A pandas dataframe containing information of all datasets.
-    pub fn list_all(&self, py: Python<'_>) -> PyResult<PyObject> {
-        static FROM_RECORDS: GILOnceCell<PyObject> = GILOnceCell::new();
+    pub fn list_all(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        static FROM_RECORDS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
         let records = get_runtime().block_on(self.workspace.client.list_all_datasets())?;
         let py_records = records.into_iter().map(
@@ -238,8 +238,8 @@ pub struct Dataset {
     inner: fricon::Dataset,
 }
 
-fn helper_module(py: Python<'_>) -> PyResult<&PyObject> {
-    static IO_MODULE: GILOnceCell<PyObject> = GILOnceCell::new();
+fn helper_module(py: Python<'_>) -> PyResult<&Py<PyAny>> {
+    static IO_MODULE: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
     IO_MODULE.get_or_try_init(py, || py.import("fricon._helper").map(Into::into))
 }
 
@@ -249,7 +249,7 @@ impl Dataset {
     ///
     /// Returns:
     ///     A polars LazyFrame.
-    pub fn to_polars(&self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn to_polars(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         // Pass dataset directory; helper will gather chunk files.
         helper_module(py)?.call_method1(py, "read_polars", (self.inner.path(),))
     }
@@ -258,7 +258,7 @@ impl Dataset {
     ///
     /// Returns:
     ///     An Arrow Table.
-    pub fn to_arrow(&self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn to_arrow(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         helper_module(py)?.call_method1(py, "read_arrow", (self.inner.path(),))
     }
 
@@ -433,7 +433,7 @@ impl DatasetWriter {
     pub fn write(
         &mut self,
         py: Python<'_>,
-        kwargs: Option<IndexMap<String, PyObject>>,
+        kwargs: Option<IndexMap<String, Py<PyAny>>>,
     ) -> Result<()> {
         let Some(values) = kwargs else {
             bail!("No data to write.")
@@ -445,7 +445,11 @@ impl DatasetWriter {
     ///
     /// Parameters:
     ///     values: A dictionary of names and values in the row.
-    pub fn write_dict(&mut self, py: Python<'_>, values: IndexMap<String, PyObject>) -> Result<()> {
+    pub fn write_dict(
+        &mut self,
+        py: Python<'_>,
+        values: IndexMap<String, Py<PyAny>>,
+    ) -> Result<()> {
         if values.is_empty() {
             bail!("No data to write.")
         }
@@ -511,9 +515,9 @@ impl DatasetWriter {
     pub fn __exit__(
         &mut self,
         py: Python<'_>,
-        _exc_type: PyObject,
-        _exc_value: PyObject,
-        _traceback: PyObject,
+        _exc_type: Py<PyAny>,
+        _exc_value: Py<PyAny>,
+        _traceback: Py<PyAny>,
     ) -> Result<()> {
         self.close(py)
     }
