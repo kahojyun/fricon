@@ -2,7 +2,7 @@
 name = "fricon"
 dynamic = ["version", "description", "license", "keywords", "authors"]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python",

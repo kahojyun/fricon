@@ -28,7 +28,7 @@ pyo3 = { workspace = true, features = [
     "anyhow",
     "chrono",
     "num-complex",
-    "abi3-py39",
+    "abi3-py310",
     "generate-import-lib",
     "indexmap",
 ] }

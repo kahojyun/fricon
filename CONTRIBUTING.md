@@ -7,7 +7,7 @@ Thanks for helping improve Fricon. This document gives a concise, practical guid
 Prerequisites (install the package manager or tooling appropriate for your OS):
 
 - Rust: use the workspace toolchain (rust-toolchain.toml).
-- Python: 3.9+
+- Python: 3.10+
 - Node.js: 22+ (frontend development)
 - Tools: uv (Python package manager), pnpm (Node package manager), diesel_cli (optional for DB migrations)
 
