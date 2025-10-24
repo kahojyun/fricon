@@ -74,9 +74,9 @@ class TestDatasetOperations:
             # Verify dataset was created with tags
             datasets = dm.list_all()
             assert len(datasets) == 1
-            dataset_info = datasets.iloc[0]  # pyright: ignore[reportUnknownVariableType]
+            dataset_info = datasets.iloc[0]
             assert dataset_info["name"] == "tagged_test"
-            tags = dataset_info["tags"]  # pyright: ignore[reportUnknownVariableType]
+            tags = dataset_info["tags"]  # pyright: ignore[reportAny]
             assert "test" in tags
             assert "integration" in tags
 
@@ -138,7 +138,7 @@ class TestDatasetOperations:
             assert len(datasets) == expected_dataset_count
 
             # Verify dataset names
-            names = datasets["name"].tolist()  # pyright: ignore[reportUnknownVariableType]
+            names = datasets["name"].tolist()
             assert "dataset1" in names
             assert "dataset2" in names
             assert "dataset3" in names
@@ -162,8 +162,8 @@ class TestDatasetOperations:
 
             # Get dataset and verify metadata
             datasets = dm.list_all()
-            dataset_id = datasets.index[0]  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType]
-            dataset = dm.open(dataset_id)  # pyright: ignore[reportUnknownArgumentType]
+            dataset_id = datasets.index[0]  # pyright: ignore[reportAny]
+            dataset = dm.open(dataset_id)  # pyright: ignore[reportAny]
 
             assert dataset.name == "metadata_test"
             assert dataset.description == "Original description"
