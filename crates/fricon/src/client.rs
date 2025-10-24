@@ -78,8 +78,8 @@ impl Client {
         self.get_dataset_by_id_enum(IdEnum::Id(id)).await
     }
 
-    pub async fn get_dataset_by_uuid(&self, uuid: String) -> Result<Dataset> {
-        self.get_dataset_by_id_enum(IdEnum::Uuid(uuid)).await
+    pub async fn get_dataset_by_uid(&self, uid: String) -> Result<Dataset> {
+        self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
     }
 
     pub async fn list_all_datasets(&self) -> Result<Vec<DatasetRecord>> {
@@ -277,7 +277,7 @@ impl Dataset {
     pub fn path(&self) -> PathBuf {
         self.client
             .workspace_paths
-            .dataset_path_from_uuid(self.record.metadata.uuid)
+            .dataset_path_from_uid(self.record.metadata.uid)
     }
 
     #[must_use]
@@ -286,8 +286,8 @@ impl Dataset {
     }
 
     #[must_use]
-    pub fn uuid(&self) -> Uuid {
-        self.record.metadata.uuid
+    pub fn uid(&self) -> Uuid {
+        self.record.metadata.uid
     }
 
     #[must_use]

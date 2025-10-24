@@ -25,7 +25,7 @@ use crate::{
 pub enum AppEvent {
     DatasetCreated {
         id: i32,
-        uuid: String,
+        uid: String,
         name: String,
         description: String,
         tags: Vec<String>,

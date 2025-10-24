@@ -115,7 +115,7 @@ impl DatasetManager {
     /// Open a dataset by id.
     ///
     /// Parameters:
-    ///     dataset_id: An integer `id` or UUID `uuid`
+    ///     dataset_id: An integer `id` or UUID `uid`
     ///
     /// Returns:
     ///     The requested dataset.
@@ -126,8 +126,8 @@ impl DatasetManager {
         if let Ok(id) = dataset_id.extract::<i32>() {
             let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_id(id))?;
             Ok(Dataset { inner })
-        } else if let Ok(uuid) = dataset_id.extract::<String>() {
-            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_uuid(uuid))?;
+        } else if let Ok(uid) = dataset_id.extract::<String>() {
+            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_uid(uid))?;
             Ok(Dataset { inner })
         } else {
             bail!("Invalid dataset id.")
@@ -147,7 +147,7 @@ impl DatasetManager {
                  id,
                  metadata:
                      DatasetMetadata {
-                         uuid,
+                         uid,
                          name,
                          description,
                          favorite,
@@ -157,8 +157,8 @@ impl DatasetManager {
                      },
                  ..
              }| {
-                let uuid = uuid.simple().to_string();
-                (id, uuid, name, description, favorite, created_at, tags)
+                let uid = uid.simple().to_string();
+                (id, uid, name, description, favorite, created_at, tags)
             },
         );
         let py_records = PyList::new(py, py_records)?;
@@ -168,7 +168,7 @@ impl DatasetManager {
             "columns",
             [
                 "id",
-                "uuid",
+                "uid",
                 "name",
                 "description",
                 "favorite",
@@ -312,10 +312,10 @@ impl Dataset {
         self.inner.id()
     }
 
-    /// UUID of the dataset.
+    /// UID of the dataset.
     #[getter]
-    pub fn uuid(&self) -> String {
-        self.inner.uuid().simple().to_string()
+    pub fn uid(&self) -> String {
+        self.inner.uid().simple().to_string()
     }
 
     /// Path of the dataset.

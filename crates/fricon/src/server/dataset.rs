@@ -64,7 +64,7 @@ impl From<DatasetMetadata> for proto::DatasetMetadata {
             nanos: metadata.created_at.timestamp_subsec_nanos() as i32,
         };
         Self {
-            uuid: metadata.uuid.simple().to_string(),
+            uid: metadata.uid.simple().to_string(),
             name: metadata.name,
             description: metadata.description,
             favorite: metadata.favorite,
@@ -82,7 +82,7 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
         use anyhow::{Context, bail};
         use chrono::DateTime;
 
-        let uuid = metadata.uuid.parse()?;
+        let uid = metadata.uid.parse()?;
         let created_at = metadata.created_at.context("created_at is required")?;
         let seconds = created_at.seconds;
         #[expect(
@@ -100,7 +100,7 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
         let status = DatasetStatus::try_from(proto_status)?;
 
         Ok(Self {
-            uuid,
+            uid,
             name: metadata.name,
             description: metadata.description,
             favorite: metadata.favorite,
@@ -268,40 +268,19 @@ impl DatasetService for Storage {
         }))
     }
 
-    async fn search(
-        &self,
-        _request: tonic::Request<SearchRequest>,
-    ) -> Result<tonic::Response<SearchResponse>, tonic::Status> {
-        let records = self.manager.list_datasets().await.map_err(|e| {
-            error!("Failed to list datasets: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
-        let datasets = records
-            .into_iter()
-            .map(Into::<proto::Dataset>::into)
-            .collect();
-        Ok(Response::new(SearchResponse {
-            datasets,
-            ..Default::default()
-        }))
-    }
-
-    async fn get(
-        &self,
-        request: tonic::Request<GetRequest>,
-    ) -> Result<tonic::Response<GetResponse>, tonic::Status> {
+    async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         let id = request.into_inner().id_enum.ok_or_else(|| {
             error!("id_enum is required");
             Status::invalid_argument("id_enum is required")
         })?;
         let dataset_id = match id {
             IdEnum::Id(id) => DatasetId::Id(id),
-            IdEnum::Uuid(uuid) => {
-                let uuid: Uuid = uuid.parse().map_err(|e| {
-                    error!("Failed to parse uuid: {:?}", e);
-                    Status::invalid_argument("invalid uuid")
+            IdEnum::Uid(uid) => {
+                let uid: Uuid = uid.parse().map_err(|e| {
+                    error!("Failed to parse uid: {:?}", e);
+                    Status::invalid_argument("invalid uid")
                 })?;
-                DatasetId::Uuid(uuid)
+                DatasetId::Uid(uid)
             }
         };
         let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
@@ -366,5 +345,23 @@ impl DatasetService for Storage {
             Status::internal(e.to_string())
         })?;
         Ok(Response::new(DeleteResponse {}))
+    }
+
+    async fn search(
+        &self,
+        _request: Request<SearchRequest>,
+    ) -> Result<Response<SearchResponse>, Status> {
+        let records = self.manager.list_datasets().await.map_err(|e| {
+            error!("Failed to list datasets: {:?}", e);
+            Status::internal(e.to_string())
+        })?;
+        let datasets = records
+            .into_iter()
+            .map(Into::<proto::Dataset>::into)
+            .collect();
+        Ok(Response::new(SearchResponse {
+            datasets,
+            ..Default::default()
+        }))
     }
 }

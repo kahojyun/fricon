@@ -93,7 +93,7 @@ pub struct DatasetRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatasetMetadata {
-    pub uuid: Uuid,
+    pub uid: Uuid,
     pub name: String,
     pub description: String,
     pub favorite: bool,
@@ -119,7 +119,7 @@ pub struct DatasetUpdate {
 #[derive(Debug, Clone, Copy)]
 pub enum DatasetId {
     Id(i32),
-    Uuid(Uuid),
+    Uid(Uuid),
 }
 
 #[derive(Clone)]
@@ -245,7 +245,7 @@ impl DatasetRecord {
     #[must_use]
     pub fn from_database_models(dataset: database::Dataset, tags: Vec<database::Tag>) -> Self {
         let metadata = DatasetMetadata {
-            uuid: dataset.uuid.0,
+            uid: dataset.uid.0,
             name: dataset.name,
             description: dataset.description,
             favorite: dataset.favorite,

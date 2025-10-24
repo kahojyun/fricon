@@ -39,26 +39,23 @@ pub async fn do_create_dataset(
         dyn Stream<Item = Result<RecordBatch, Box<dyn StdError + Send + Sync>>> + Send + Unpin,
     >,
 ) -> Result<DatasetRecord, DatasetManagerError> {
-    let uuid = Uuid::new_v4();
-    let dataset_path = root.paths().dataset_path_from_uuid(uuid);
+    let uid = Uuid::new_v4();
+    let dataset_path = root.paths().dataset_path_from_uid(uid);
 
     if dataset_path.exists() {
         warn!("Dataset path already exists: {}", dataset_path.display());
         return Err(DatasetManagerError::path_already_exists(&dataset_path));
     }
 
-    info!(
-        "Creating new dataset '{}' with UUID: {}",
-        request.name, uuid
-    );
+    info!("Creating new dataset '{}' with uid: {}", request.name, uid);
 
-    let (dataset, tags) = create_dataset_db_record(database, &request, uuid).await?;
+    let (dataset, tags) = create_dataset_db_record(database, &request, uid).await?;
 
     fs::create_dir_all(&dataset_path)?;
 
     let event = AppEvent::DatasetCreated {
         id: dataset.id,
-        uuid: uuid.to_string(),
+        uid: uid.to_string(),
         name: request.name.clone(),
         description: request.description.clone(),
         tags: request.tags.clone(),
@@ -67,7 +64,7 @@ pub async fn do_create_dataset(
 
     info!(
         "Created dataset with UUID: {} at path: {:?}",
-        uuid, dataset_path
+        uid, dataset_path
     );
 
     let dataset_record = DatasetRecord::from_database_models(dataset, tags);
@@ -102,7 +99,7 @@ pub async fn do_delete_dataset(
     id: i32,
 ) -> Result<(), DatasetManagerError> {
     let record = do_get_dataset(database, DatasetId::Id(id)).await?;
-    let dataset_path = root.paths().dataset_path_from_uuid(record.metadata.uuid);
+    let dataset_path = root.paths().dataset_path_from_uid(record.metadata.uid);
 
     delete_dataset_from_db(database, id).await?;
 
@@ -122,13 +119,13 @@ pub async fn do_get_dataset(
         .interact(move |conn| {
             let dataset = match id {
                 DatasetId::Id(dataset_id) => database::Dataset::find_by_id(conn, dataset_id)?,
-                DatasetId::Uuid(uuid) => database::Dataset::find_by_uuid(conn, uuid)?,
+                DatasetId::Uid(uid) => database::Dataset::find_by_uid(conn, uid)?,
             };
 
             let Some(dataset) = dataset else {
                 let id_str = match id {
                     DatasetId::Id(i) => i.to_string(),
-                    DatasetId::Uuid(u) => u.to_string(),
+                    DatasetId::Uid(u) => u.to_string(),
                 };
                 return Err(DatasetManagerError::NotFound { id: id_str });
             };
@@ -258,7 +255,7 @@ pub async fn do_get_dataset_reader(
         DatasetStatus::Completed | DatasetStatus::Aborted => {
             // Aborted datasets may still have partially written chunk files (valid up to
             // last flush).
-            let dataset_path = root.paths().dataset_path_from_uuid(record.metadata.uuid);
+            let dataset_path = root.paths().dataset_path_from_uid(record.metadata.uid);
             let completed = CompletedDataset::open(&dataset_path)?;
             Ok(DatasetReader::Completed(completed))
         }
@@ -268,7 +265,7 @@ pub async fn do_get_dataset_reader(
             }
             // Fallback: if writer already dropped but directory exists, expose as Completed
             // view.
-            let dataset_path = root.paths().dataset_path_from_uuid(record.metadata.uuid);
+            let dataset_path = root.paths().dataset_path_from_uid(record.metadata.uid);
             if dataset_path.exists() {
                 let completed = CompletedDataset::open(&dataset_path)?;
                 return Ok(DatasetReader::Completed(completed));
@@ -285,14 +282,14 @@ pub async fn do_get_dataset_reader(
 async fn create_dataset_db_record(
     database: &Pool,
     request: &CreateDatasetRequest,
-    uuid: Uuid,
+    uid: Uuid,
 ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError> {
     let request = request.clone();
     let res = database
         .interact(move |conn| {
             conn.immediate_transaction::<_, DatasetManagerError, _>(|conn| {
                 let new_dataset = NewDataset {
-                    uuid: SimpleUuid(uuid),
+                    uid: SimpleUuid(uid),
                     name: &request.name,
                     description: &request.description,
                     status: DatasetStatus::Writing,

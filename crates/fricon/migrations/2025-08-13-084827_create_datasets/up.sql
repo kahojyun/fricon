@@ -1,6 +1,6 @@
 CREATE TABLE datasets (
     id INTEGER NOT NULL PRIMARY KEY,
-    uuid TEXT NOT NULL UNIQUE,
+    uid TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     description TEXT NOT NULL,
     favorite BOOLEAN NOT NULL DEFAULT FALSE,
