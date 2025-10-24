@@ -11,7 +11,7 @@ use super::{DatasetStatus, SimpleUuid, schema};
 #[diesel(table_name = schema::datasets, check_for_backend(Sqlite))]
 pub struct Dataset {
     pub id: i32,
-    pub uuid: SimpleUuid,
+    pub uid: SimpleUuid,
     pub name: String,
     pub description: String,
     pub favorite: bool,
@@ -30,14 +30,14 @@ impl Dataset {
             .optional()
     }
 
-    pub fn find_by_uuid(
+    pub fn find_by_uid(
         conn: &mut SqliteConnection,
-        dataset_uuid: Uuid,
+        dataset_uid: Uuid,
     ) -> QueryResult<Option<Self>> {
-        use schema::datasets::dsl::{datasets, uuid};
+        use schema::datasets::dsl::{datasets, uid};
 
         datasets
-            .filter(uuid.eq(SimpleUuid(dataset_uuid)))
+            .filter(uid.eq(SimpleUuid(dataset_uid)))
             .select(Self::as_select())
             .first(conn)
             .optional()
@@ -102,7 +102,7 @@ pub struct DatasetUpdate {
 #[derive(Debug, Insertable)]
 #[diesel(table_name = schema::datasets)]
 pub struct NewDataset<'a> {
-    pub uuid: SimpleUuid,
+    pub uid: SimpleUuid,
     pub name: &'a str,
     pub description: &'a str,
     pub status: DatasetStatus,

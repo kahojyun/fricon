@@ -60,7 +60,7 @@ message CreateResponse {
 message GetRequest {
   oneof id_enum {
     int32 id = 1;
-    string uuid = 2;
+    string uid = 2;
   }
 }
 
@@ -113,7 +113,7 @@ message Dataset {
 }
 
 message DatasetMetadata {
-  string uuid = 1;
+  string uid = 1;
   string name = 2;
   string description = 3;
   bool favorite = 4;

@@ -36,7 +36,7 @@ impl AppState {
                 match event {
                     fricon::AppEvent::DatasetCreated {
                         id,
-                        uuid,
+                        uid,
                         name,
                         description,
                         tags,
@@ -45,7 +45,7 @@ impl AppState {
                             "dataset-created",
                             serde_json::json!({
                                 "id": id,
-                                "uuid": uuid,
+                                "uid": uid,
                                 "name": name,
                                 "description": description,
                                 "tags": tags

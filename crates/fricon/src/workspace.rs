@@ -131,9 +131,9 @@ impl WorkspacePaths {
     }
 
     #[must_use]
-    pub fn dataset_path_from_uuid(&self, uuid: Uuid) -> PathBuf {
+    pub fn dataset_path_from_uid(&self, uid: Uuid) -> PathBuf {
         let mut data_dir = self.data_dir();
-        data_dir.push(dataset_path_from_uuid(uuid));
+        data_dir.push(dataset_path_from_uid(uid));
         data_dir
     }
 }
@@ -146,10 +146,10 @@ fn init_workspace_dirs(paths: &WorkspacePaths) -> Result<()> {
 }
 
 #[must_use]
-fn dataset_path_from_uuid(uuid: Uuid) -> String {
-    let uuid = uuid.to_string();
-    let prefix = &uuid[..2];
-    format!("{prefix}/{uuid}")
+fn dataset_path_from_uid(uid: Uuid) -> String {
+    let uid = uid.to_string();
+    let prefix = &uid[..2];
+    format!("{prefix}/{uid}")
 }
 
 /// An opened and validated workspace root directory with exclusive access lock.

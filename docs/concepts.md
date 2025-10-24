@@ -16,8 +16,8 @@ workspace/
   .fricon_version
   fricon.sqlite3
   data/
-    <uuid[0:2]>/
-      <uuid>/
+    <uid[0:2]>/
+      <uid>/
         data_chunk_0.arrow
         data_chunk_1.arrow (optional, written when first exceeds chunk size)
   backup/
@@ -51,10 +51,10 @@ one data table based on the Arrow format with additional metadata.
 
 Each dataset will be given two unique identifiers:
 
-- `uuid`: A UUID that is practically unique across all workspaces. This is
+- `uid`: A UUID that is practically unique across all workspaces. This is
   useful when users want to export a dataset to other places.
 - `id`: A self-incremental ID that is unique in the current workspace. This is
   more human-readable and can be used to reference a dataset in a given
   workspace.
 
-Users can open a dataset by either `uuid` or `id`.
+Users can open a dataset by either `uid` or `id`.

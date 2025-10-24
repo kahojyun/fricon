@@ -45,7 +45,7 @@ export async function listDatasets(): Promise<DatasetInfo[]> {
 
 export interface DatasetCreatedEvent {
   id: number;
-  uuid: string;
+  uid: string;
   name: string;
   description: string;
   tags: string[];

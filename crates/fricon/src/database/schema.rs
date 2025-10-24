@@ -3,7 +3,7 @@
 diesel::table! {
     datasets (id) {
         id -> Integer,
-        uuid -> Text,
+        uid -> Text,
         name -> Text,
         description -> Text,
         favorite -> Bool,
