@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - name: Ruff format
         run: uv run --only-group fmt ruff format --check
       - name: Ruff lint
@@ -75,7 +75,7 @@ jobs:
           node-version: "22.x"
           cache: "pnpm"
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - name: Cargo build
         run: cargo build --workspace --verbose --locked
       - name: Cargo test
