@@ -13,9 +13,7 @@ mod dataset;
 mod dataset_manager;
 mod dataset_tasks;
 mod ipc;
-mod live;
 mod proto;
-mod reader;
 mod server;
 mod utils;
 mod workspace;
@@ -33,7 +31,6 @@ pub use self::{
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
     },
-    reader::DatasetReader,
     server::DatasetRecord,
     workspace::{WorkspaceRoot, get_log_dir},
 };

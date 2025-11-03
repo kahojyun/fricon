@@ -23,7 +23,6 @@ use crate::{
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManagerError, DatasetRecord, DatasetUpdate,
     },
-    reader::{CompletedDataset, DatasetReader},
     write_registry::WriteSessionRegistry,
 };
 
@@ -256,7 +255,7 @@ pub async fn do_get_dataset_reader(
             // Aborted datasets may still have partially written chunk files (valid up to
             // last flush).
             let dataset_path = root.paths().dataset_path_from_uid(record.metadata.uid);
-            let completed = CompletedDataset::open(&dataset_path)?;
+            let completed = CompletedDataset::open(dataset_path)?;
             Ok(DatasetReader::Completed(completed))
         }
         DatasetStatus::Writing => {
@@ -267,7 +266,7 @@ pub async fn do_get_dataset_reader(
             // view.
             let dataset_path = root.paths().dataset_path_from_uid(record.metadata.uid);
             if dataset_path.exists() {
-                let completed = CompletedDataset::open(&dataset_path)?;
+                let completed = CompletedDataset::open(dataset_path)?;
                 return Ok(DatasetReader::Completed(completed));
             }
             Err(DatasetManagerError::io_invalid_data(

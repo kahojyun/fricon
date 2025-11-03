@@ -112,6 +112,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
+name = "arrow-arith"
+version = "57.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1a640186d3bd30a24cb42264c2dafb30e236a6f50d510e56d40b708c9582491"
+dependencies = [
+ "arrow-array",
+ "arrow-buffer",
+ "arrow-data",
+ "arrow-schema",
+ "chrono",
+ "num-traits",
+]
+
+[[package]]
 name = "arrow-array"
 version = "57.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1399,6 +1413,7 @@ name = "fricon"
 version = "0.1.0-alpha"
 dependencies = [
  "anyhow",
+ "arrow-arith",
  "arrow-array",
  "arrow-buffer",
  "arrow-ipc",
@@ -1413,6 +1428,7 @@ dependencies = [
  "futures",
  "hyper-util",
  "indexmap 2.12.0",
+ "itertools",
  "libsqlite3-sys",
  "memmap2",
  "num",

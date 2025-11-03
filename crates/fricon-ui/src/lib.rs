@@ -1,6 +1,10 @@
 mod commands;
 
-use std::{io, path::PathBuf, sync::Mutex};
+use std::{
+    io,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::{Context as _, Result};
 use tauri::{
@@ -16,13 +20,19 @@ use tracing_appender::{
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-struct AppState(Mutex<Option<(fricon::AppManager, WorkerGuard)>>);
+struct AppState {
+    manager: Mutex<Option<(fricon::AppManager, WorkerGuard)>>,
+    current_dataset: Mutex<Option<(i32, Arc<fricon::DatasetReader>)>>,
+}
 
 impl AppState {
     async fn new(workspace_path: PathBuf) -> Result<Self> {
         let log_guard = setup_logging(workspace_path.clone())?;
         let app_manager = fricon::AppManager::serve_with_path(&workspace_path).await?;
-        Ok(Self(Mutex::new(Some((app_manager, log_guard)))))
+        Ok(Self {
+            manager: Mutex::new(Some((app_manager, log_guard))),
+            current_dataset: Mutex::new(None),
+        })
     }
 
     fn start_event_listener(&self, app_handle: tauri::AppHandle) {
@@ -58,7 +68,7 @@ impl AppState {
     }
 
     fn app(&self) -> fricon::AppHandle {
-        self.0
+        self.manager
             .lock()
             .expect("Failed to acquire lock on app state")
             .as_ref()
@@ -71,13 +81,37 @@ impl AppState {
     fn shutdown(&self) {
         async_runtime::block_on(async {
             let (app_manager, _guard) = self
-                .0
+                .manager
                 .lock()
                 .expect("Failed to acquire lock on app state")
                 .take()
                 .expect("App should be running");
             app_manager.shutdown().await;
         });
+    }
+
+    async fn dataset(&self, id: i32) -> Result<Arc<fricon::DatasetReader>> {
+        if let Some((current_id, current_dataset)) = self
+            .current_dataset
+            .lock()
+            .expect("Should not be poisoned.")
+            .clone()
+            && current_id == id
+        {
+            Ok(current_dataset)
+        } else {
+            let dataset = self
+                .app()
+                .dataset_manager()
+                .get_dataset_reader(id.into())
+                .await?;
+            let dataset = Arc::new(dataset);
+            *self
+                .current_dataset
+                .lock()
+                .expect("Should not be poisoned.") = Some((id, dataset.clone()));
+            Ok(dataset)
+        }
     }
 }
 

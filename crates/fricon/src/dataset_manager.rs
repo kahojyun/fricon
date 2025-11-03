@@ -11,7 +11,6 @@ use std::{
 };
 
 use arrow_array::RecordBatch;
-use arrow_schema::ArrowError;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use diesel::result::Error as DieselError;
@@ -24,55 +23,25 @@ use uuid::Uuid;
 use crate::{
     app::{AppError, AppHandle},
     database::{self, DatabaseError, DatasetStatus},
-    dataset_tasks,
-    reader::DatasetReader,
+    dataset, dataset_fs, dataset_tasks,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatasetManagerError {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
-
     #[error("Schema validation failed: {message}")]
     SchemaError { message: String },
-
-    #[error("Database error: {0}")]
+    #[error(transparent)]
     Database(#[from] DatabaseError),
-
-    #[error("IO error: {0}")]
-    Io(#[from] IoError),
-
-    #[error("Arrow error: {0}")]
-    Arrow(#[from] ArrowError),
-
-    #[error("Task join error: {0}")]
+    #[error(transparent)]
+    Dataset(#[from] dataset::Error),
+    #[error(transparent)]
+    DatasetFs(#[from] dataset_fs::Error),
+    #[error(transparent)]
     TaskJoin(#[from] JoinError),
-
-    #[error("App error: {0}")]
+    #[error(transparent)]
     App(#[from] AppError),
-}
-
-impl DatasetManagerError {
-    pub(crate) fn io_invalid_data(message: impl Into<String>) -> Self {
-        Self::Io(IoError::new(ErrorKind::InvalidData, message.into()))
-    }
-
-    pub fn stream_error(error: impl StdError) -> Self {
-        Self::io_invalid_data(format!("Stream error: {error}"))
-    }
-
-    #[must_use]
-    pub fn empty_stream() -> Self {
-        Self::Io(IoError::new(ErrorKind::UnexpectedEof, "Stream is empty"))
-    }
-
-    #[must_use]
-    pub fn path_already_exists(path: &Path) -> Self {
-        Self::Io(IoError::new(
-            ErrorKind::AlreadyExists,
-            format!("Dataset path already exists: {}", path.display()),
-        ))
-    }
 }
 
 impl From<DieselError> for DatasetManagerError {

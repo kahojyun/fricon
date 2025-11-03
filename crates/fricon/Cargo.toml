@@ -11,6 +11,7 @@ keywords.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+arrow-arith = { workspace = true }
 arrow-array = { workspace = true }
 arrow-buffer = { workspace = true }
 arrow-schema = { workspace = true }
@@ -28,6 +29,7 @@ diesel = { workspace = true, features = [
 diesel_migrations = { workspace = true }
 futures = { workspace = true }
 hyper-util = { workspace = true }
+itertools = { workspace = true }
 libsqlite3-sys = { workspace = true, features = ["bundled"] }
 memmap2 = { workspace = true }
 num = { workspace = true }
