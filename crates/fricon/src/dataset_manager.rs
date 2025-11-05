@@ -4,17 +4,10 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
-use std::{
-    error::Error as StdError,
-    io::{Error as IoError, ErrorKind},
-    path::Path,
-};
-
-use arrow_array::RecordBatch;
+use arrow_array::{RecordBatch, RecordBatchReader};
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use diesel::result::Error as DieselError;
-use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinError;
 use tracing::error;
@@ -32,6 +25,8 @@ pub enum DatasetManagerError {
     NotFound { id: String },
     #[error("Schema validation failed: {message}")]
     SchemaError { message: String },
+    #[error("Dataset write stream error: {message}")]
+    BatchStreamError { message: String },
     #[error(transparent)]
     Database(#[from] DatabaseError),
     #[error(transparent)]
@@ -103,53 +98,49 @@ impl DatasetManager {
         Self { app }
     }
 
-    pub async fn create_dataset<S, E>(
+    pub async fn create_dataset<F, I>(
         &self,
         request: CreateDatasetRequest,
-        stream: S,
+        reader: F,
     ) -> Result<DatasetRecord, DatasetManagerError>
     where
-        S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
-        E: StdError + Send + Sync + 'static,
+        F: FnOnce() -> Result<I, DatasetManagerError> + Send + 'static,
+        I: RecordBatchReader,
     {
-        let stream: Box<
-            dyn Stream<Item = Result<RecordBatch, Box<dyn StdError + Send + Sync>>> + Send + Unpin,
-        > = Box::new(stream.map_err(|e| Box::new(e) as Box<dyn StdError + Send + Sync>));
-
-        let join_handle = self.app.spawn(move |state| async move {
-            let result = dataset_tasks::do_create_dataset(
-                &state.database,
-                &state.root,
-                &state.event_sender,
-                &state.write_sessions,
-                &state.tracker,
-                request,
-                stream,
-            )
-            .await;
-            if let Err(e) = &result {
-                error!("Dataset creation failed: {}", e);
-            }
-            result
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                reader()
+                    .and_then(|batches| {
+                        dataset_tasks::do_create_dataset(
+                            &state.database,
+                            &state.root,
+                            &state.event_sender,
+                            &state.write_sessions,
+                            request,
+                            batches,
+                        )
+                    })
+                    .inspect_err(|e| {
+                        error!("Dataset creation failed: {e}");
+                    })
+            })?
+            .await?
     }
 
     pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_get_dataset(&state.database, id).await
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                dataset_tasks::do_get_dataset(&mut *state.database.get()?, id)
+            })?
+            .await?
     }
 
     pub async fn list_datasets(&self) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_list_datasets(&state.database).await
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                dataset_tasks::do_list_datasets(&mut *state.database.get()?)
+            })?
+            .await?
     }
 
     pub async fn update_dataset(
@@ -157,39 +148,39 @@ impl DatasetManager {
         id: i32,
         update: DatasetUpdate,
     ) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_update_dataset(&state.database, id, update).await
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                dataset_tasks::do_update_dataset(&mut *state.database.get()?, id, update)
+            })?
+            .await?
     }
 
     pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_add_tags(&state.database, id, tags).await
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                dataset_tasks::do_add_tags(&mut *state.database.get()?, id, &tags)
+            })?
+            .await?
     }
 
     pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_remove_tags(&state.database, id, tags).await
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                dataset_tasks::do_remove_tags(&mut *state.database.get()?, id, &tags)
+            })?
+            .await?
     }
 
     pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            let result = dataset_tasks::do_delete_dataset(&state.database, &state.root, id).await;
-            if let Err(e) = &result {
-                error!("Dataset deletion failed: {}", e);
-            }
-            result
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                dataset_tasks::do_delete_dataset(&state.database, &state.root, id).inspect_err(
+                    |e| {
+                        error!("Dataset deletion failed: {e}");
+                    },
+                )
+            })?
+            .await?
     }
 
     /// Return a unified dataset reader (Completed or Live/Writing).
@@ -197,17 +188,16 @@ impl DatasetManager {
         &self,
         id: DatasetId,
     ) -> Result<DatasetReader, DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_get_dataset_reader(
-                &state.database,
-                &state.root,
-                &state.write_sessions,
-                id,
-            )
-            .await
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                dataset_tasks::do_get_dataset_reader(
+                    &state.database,
+                    &state.root,
+                    &state.write_sessions,
+                    id,
+                )
+            })?
+            .await?
     }
 }
 
@@ -228,5 +218,14 @@ impl DatasetRecord {
             id: dataset.id,
             metadata,
         }
+    }
+}
+
+// TODO: implement
+pub struct DatasetReader;
+
+impl DatasetReader {
+    pub fn batches(&self) -> Result<Vec<RecordBatch>, DatasetManagerError> {
+        todo!()
     }
 }

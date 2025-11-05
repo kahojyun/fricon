@@ -23,13 +23,13 @@ pub struct ChunkWriter {
 }
 
 impl ChunkWriter {
-    pub fn new(schema: SchemaRef, dir_path: PathBuf) -> Result<Self, Error> {
-        Ok(Self {
+    pub fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
+        Self {
             dir_path,
             schema,
             next_chunk_index: 0,
             current_writer: None,
-        })
+        }
     }
 
     /// Write a [`RecordBatch`], return true if current chunk file is completed.
@@ -52,7 +52,7 @@ impl ChunkWriter {
         if self.current_writer.is_none() {
             self.current_writer = Some(self.create_writer()?);
         }
-        Ok(self.current_writer.as_mut().unwrap())
+        Ok(self.current_writer.as_mut().expect("Not none here."))
     }
 
     fn create_writer(&mut self) -> Result<InnerWriter, Error> {

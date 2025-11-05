@@ -9,33 +9,23 @@ use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
 
 use crate::{
-    DatasetManagerError, dataset_fs::ChunkWriter, write_registry::WriteSessionRegistry,
-    write_session::in_progress::InProgressTable,
+    DatasetManagerError, dataset_fs::ChunkWriter, write_session::in_progress::InProgressTable,
 };
 
 pub struct WriteSession {
-    id: i32,
-    registry: WriteSessionRegistry,
     writer: ChunkWriter,
     in_progress_table: Arc<Mutex<InProgressTable>>,
 }
 
 impl WriteSession {
-    pub fn new(
-        id: i32,
-        registry: WriteSessionRegistry,
-        schema: SchemaRef,
-        dir_path: PathBuf,
-    ) -> Result<Self, DatasetManagerError> {
-        let writer = ChunkWriter::new(schema.clone(), dir_path.clone())?;
+    pub fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
+        let writer = ChunkWriter::new(schema.clone(), dir_path.clone());
         let in_progress_table = InProgressTable::new(schema, dir_path);
         let in_progress_table = Arc::new(Mutex::new(in_progress_table));
-        Ok(Self {
-            id,
-            registry,
+        Self {
             writer,
             in_progress_table,
-        })
+        }
     }
 
     pub fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError> {

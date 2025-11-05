@@ -19,12 +19,12 @@ arrow-ipc = { workspace = true }
 arrow-select = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-deadpool-diesel = { workspace = true, features = ["sqlite", "tracing"] }
 derive_more = { workspace = true, features = ["from"] }
 diesel = { workspace = true, features = [
     "sqlite",
     "returning_clauses_for_sqlite_3_35",
     "chrono",
+    "r2d2"
 ] }
 diesel_migrations = { workspace = true }
 futures = { workspace = true }

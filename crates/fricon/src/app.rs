@@ -6,7 +6,6 @@ use std::{
 
 use anyhow::Result;
 use chrono::Local;
-use deadpool_diesel::sqlite::Pool;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{sync::broadcast, task::JoinHandle, time};
@@ -15,6 +14,7 @@ use tracing::{error, info};
 
 use crate::{
     database,
+    database::Pool,
     dataset_manager::DatasetManager,
     server,
     workspace::{WorkspacePaths, WorkspaceRoot},
@@ -48,12 +48,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    async fn new(root: WorkspaceRoot) -> Result<Arc<Self>> {
+    fn new(root: WorkspaceRoot) -> Result<Arc<Self>> {
         let db_path = root.paths().database_file();
         let backup_path = root
             .paths()
             .database_backup_file(Local::now().naive_local());
-        let database = database::connect(db_path, backup_path).await?;
+        let database = database::connect(db_path, backup_path)?;
         let shutdown_token = CancellationToken::new();
         let tracker = TaskTracker::new();
         let (event_sender, _) = broadcast::channel(1000);
@@ -125,8 +125,8 @@ pub struct AppManager {
 }
 
 impl AppManager {
-    pub async fn serve(root: WorkspaceRoot) -> Result<Self> {
-        let state = AppState::new(root).await?;
+    pub fn serve(root: WorkspaceRoot) -> Result<Self> {
+        let state = AppState::new(root)?;
         let handle = AppHandle::new(Arc::downgrade(&state));
 
         let ipc_file = handle.paths()?.ipc_file();
@@ -141,9 +141,9 @@ impl AppManager {
     }
 
     /// Creates a new `AppManager` with workspace creation.
-    pub async fn serve_with_path(path: impl Into<PathBuf>) -> Result<Self> {
+    pub fn serve_with_path(path: impl Into<PathBuf>) -> Result<Self> {
         let root = WorkspaceRoot::create(path)?;
-        Self::serve(root).await
+        Self::serve(root)
     }
 
     pub async fn shutdown(self) {
@@ -157,9 +157,6 @@ impl AppManager {
             self.state.shutdown_token.cancel();
             self.state.tracker.close();
             self.state.tracker.wait().await;
-            drop(self.state);
-            // Wait for sqlite connection release
-            time::sleep(Duration::from_millis(200)).await;
         })
         .await;
 

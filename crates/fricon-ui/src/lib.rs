@@ -26,9 +26,10 @@ struct AppState {
 }
 
 impl AppState {
-    async fn new(workspace_path: PathBuf) -> Result<Self> {
+    fn new(workspace_path: PathBuf) -> Result<Self> {
+        let _runtime_guard = async_runtime::handle().inner().enter();
         let log_guard = setup_logging(workspace_path.clone())?;
-        let app_manager = fricon::AppManager::serve_with_path(&workspace_path).await?;
+        let app_manager = fricon::AppManager::serve_with_path(workspace_path)?;
         Ok(Self {
             manager: Mutex::new(Some((app_manager, log_guard))),
             current_dataset: Mutex::new(None),
@@ -116,8 +117,7 @@ impl AppState {
 }
 
 pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
-    let app_state = async_runtime::block_on(AppState::new(workspace_path))
-        .context("Failed to open workspace")?;
+    let app_state = AppState::new(workspace_path).context("Failed to open workspace")?;
 
     #[expect(clippy::exit, reason = "Required by Tauri framework")]
     let tauri_app = tauri::Builder::default()

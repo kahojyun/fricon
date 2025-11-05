@@ -172,7 +172,7 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
     WorkspaceRoot::create_new(workspace_path)?;
 
     // Start the server
-    let app_manager = AppManager::serve_with_path(workspace_path).await?;
+    let app_manager = AppManager::serve_with_path(workspace_path)?;
 
     // Connect the client
     let client = Client::connect(workspace_path).await?;

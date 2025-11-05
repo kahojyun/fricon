@@ -591,12 +591,13 @@ pub fn main_gui(py: Python<'_>) -> i32 {
 #[pyfunction]
 pub fn serve_workspace(path: PathBuf) -> Result<(Workspace, ServerHandle)> {
     let runtime = get_runtime();
+    let _guard = runtime.enter();
 
     // Create the workspace first
     let root = fricon::WorkspaceRoot::create_new(&path)?;
 
     // Start the server in the background and keep the manager
-    let manager = runtime.block_on(fricon::AppManager::serve(root))?;
+    let manager = fricon::AppManager::serve(root)?;
 
     // Connect to the workspace
     let workspace = Workspace::connect(path.clone())?;
