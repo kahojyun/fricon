@@ -4,13 +4,36 @@
     reason = "Tauri command handlers require specific parameter signatures"
 )]
 
+use std::ops::Bound;
+
+use anyhow::Context;
+use arrow_ipc::{reader::StreamReader, writer::FileWriter};
+use base64::prelude::*;
 use chrono::{DateTime, Utc};
-use serde::Serialize;
-use tauri::{State, ipc::Invoke};
+use fricon::{DatasetDataType, ScalarKind, SelectOptions};
+use serde::{Deserialize, Serialize, Serializer};
+use tauri::{
+    State,
+    ipc::{Invoke, Response},
+};
 
 use super::AppState;
 
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+struct Error(#[from] anyhow::Error);
+
+impl Serialize for Error {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0.to_string())
+    }
+}
+
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DatasetInfo {
     id: i32,
     name: String,
@@ -20,16 +43,39 @@ struct DatasetInfo {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct WorkspaceInfo {
     path: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ColumnInfo {
+    name: String,
+    is_complex: bool,
+    is_trace: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DatasetDetail {
+    columns: Vec<ColumnInfo>,
+    index: Option<Vec<usize>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DatasetDataOptions {
+    start: Option<usize>,
+    end: Option<usize>,
+    index_filters: Option<String>,
+    columns: Option<Vec<usize>>,
+}
+
 #[tauri::command]
-async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, String> {
+async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, Error> {
     let app = state.app();
-    let workspace_paths = app
-        .paths()
-        .map_err(|e| format!("Failed to get paths: {e}"))?;
+    let workspace_paths = app.paths().context("Failed to retrieve workspace paths.")?;
     let workspace_path = workspace_paths.root();
 
     Ok(WorkspaceInfo {
@@ -38,13 +84,13 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 }
 
 #[tauri::command]
-async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, String> {
+async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, Error> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
     let datasets = dataset_manager
         .list_datasets()
         .await
-        .map_err(|e| e.to_string())?;
+        .context("Failed to list datasets.")?;
 
     let dataset_info: Vec<DatasetInfo> = datasets
         .into_iter()
@@ -60,6 +106,73 @@ async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, S
     Ok(dataset_info)
 }
 
+#[tauri::command]
+async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDetail, Error> {
+    let reader = state.dataset(id).await?;
+    let schema = reader.schema();
+    let columns = schema
+        .columns()
+        .iter()
+        .map(|(name, data_type)| ColumnInfo {
+            name: name.to_owned(),
+            is_complex: matches!(
+                data_type,
+                DatasetDataType::Scalar(ScalarKind::Complex)
+                    | DatasetDataType::Trace(_, ScalarKind::Complex)
+            ),
+            is_trace: matches!(data_type, DatasetDataType::Trace(_, _)),
+        })
+        .collect();
+    let index = reader.index_columns();
+    Ok(DatasetDetail { columns, index })
+}
+
+#[tauri::command]
+async fn dataset_data(
+    state: State<'_, AppState>,
+    id: i32,
+    options: DatasetDataOptions,
+) -> Result<Response, Error> {
+    let dataset = state.dataset(id).await?;
+    let start = options
+        .start
+        .map(Bound::Included)
+        .unwrap_or(Bound::Unbounded);
+    let end = options.end.map(Bound::Excluded).unwrap_or(Bound::Unbounded);
+    let index_filters = options
+        .index_filters
+        .map(|t| -> Result<_, anyhow::Error> {
+            let buffer = BASE64_STANDARD
+                .decode(t)
+                .context("Failed to decode base64 string.")?;
+            let mut reader = StreamReader::try_new(buffer.as_slice(), None)?;
+            Ok(reader.next().context("No RecordBatch.")??)
+        })
+        .transpose()
+        .context("Failed to decode index filters.")?;
+    let (output_schema, batches) = dataset
+        .select_data(SelectOptions {
+            start,
+            end,
+            index_filters,
+            selected_columns: options.columns,
+        })
+        .context("Failed to select data.")?;
+    let buffer = vec![];
+    let mut writer =
+        FileWriter::try_new(buffer, &output_schema).context("Failed to create writer")?;
+    for batch in batches {
+        writer.write(&batch).context("Failed to write batch")?;
+    }
+    let buffer = writer.into_inner().context("Failed to finish writer")?;
+    Ok(Response::new(buffer))
+}
+
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
-    tauri::generate_handler![get_workspace_info, list_datasets]
+    tauri::generate_handler![
+        get_workspace_info,
+        list_datasets,
+        dataset_detail,
+        dataset_data
+    ]
 }

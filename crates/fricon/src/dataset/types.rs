@@ -8,6 +8,7 @@ use arrow_schema::{
     ArrowError, DataType, Field, FieldRef, Fields, Schema, extension::ExtensionType,
 };
 use indexmap::IndexMap;
+use itertools::Itertools;
 
 use super::Error;
 
@@ -144,76 +145,37 @@ impl TraceKind {
         Field::new(name, self.to_data_type(item), nullable).with_extension_type(self)
     }
 
-    fn mismatch<T>(self, data_type: &DataType) -> Result<T, ArrowError> {
-        Err(ArrowError::InvalidArgumentError(format!(
-            "{} trace: expected {}, found {}",
-            self,
-            match self {
-                TraceKind::Simple => "list<...>",
-                TraceKind::FixedStep => {
-                    "struct<x0: non-null Float64, step: non-null Float64, y: non-null list<...>>"
+    fn parse_data_type(data_type: &DataType) -> Option<(Self, &FieldRef)> {
+        fn parse_fixed_step(fields: &[FieldRef]) -> Option<(TraceKind, &FieldRef)> {
+            (fields.iter().map(|f| f.name()).eq(["x0", "step", "y"])
+                && fields.iter().all(|f| !f.is_nullable()))
+            .then(|| match [0, 1, 2].map(|i| fields[i].data_type()) {
+                [DataType::Float64, DataType::Float64, DataType::List(y)] => {
+                    Some((TraceKind::FixedStep, y))
                 }
-                TraceKind::VariableStep => {
-                    "struct<x: non-null list<non-null Float64>, y: non-null list<...>>"
-                }
-            },
-            data_type
-        )))
-    }
+                _ => None,
+            })
+            .flatten()
+        }
 
-    fn validate_simple(self, data_type: &DataType) -> Result<(), ArrowError> {
+        fn parse_variable_step(fields: &[FieldRef]) -> Option<(TraceKind, &FieldRef)> {
+            (fields.iter().map(|f| f.name()).eq(["x", "y"])
+                && fields.iter().all(|f| !f.is_nullable()))
+            .then(|| match [0, 1].map(|i| fields[i].data_type()) {
+                [DataType::List(x), DataType::List(y)]
+                    if matches!(x.data_type(), DataType::Float64) && !x.is_nullable() =>
+                {
+                    Some((TraceKind::VariableStep, y))
+                }
+                _ => None,
+            })
+            .flatten()
+        }
+
         match data_type {
-            DataType::List(_) => Ok(()),
-            _ => self.mismatch(data_type),
-        }
-    }
-
-    fn validate_fixed_step(self, data_type: &DataType) -> Result<(), ArrowError> {
-        let DataType::Struct(fields) = data_type else {
-            return self.mismatch(data_type);
-        };
-
-        let [x0, step, y] = fields.as_ref() else {
-            return self.mismatch(data_type);
-        };
-        let valid = x0.name() == "x0"
-            && x0.data_type() == &DataType::Float64
-            && !x0.is_nullable()
-            && step.name() == "step"
-            && step.data_type() == &DataType::Float64
-            && !step.is_nullable()
-            && y.name() == "y"
-            && matches!(y.data_type(), DataType::List(_))
-            && !y.is_nullable();
-
-        if valid {
-            Ok(())
-        } else {
-            self.mismatch(data_type)
-        }
-    }
-
-    fn validate_variable_step(self, data_type: &DataType) -> Result<(), ArrowError> {
-        let DataType::Struct(fields) = data_type else {
-            return self.mismatch(data_type);
-        };
-
-        let [x, y] = fields.as_ref() else {
-            return self.mismatch(data_type);
-        };
-        let valid_x = x.name() == "x"
-            && !x.is_nullable()
-            && matches!(x.data_type(), DataType::List(inner) if {
-                let inner = inner.as_ref();
-                !inner.is_nullable() && inner.data_type() == &DataType::Float64
-            });
-        let valid_y =
-            y.name() == "y" && !y.is_nullable() && matches!(y.data_type(), DataType::List(_));
-
-        if valid_x && valid_y {
-            Ok(())
-        } else {
-            self.mismatch(data_type)
+            DataType::List(f) => Some((TraceKind::Simple, f)),
+            DataType::Struct(fs) => parse_fixed_step(fs).or_else(|| parse_variable_step(fs)),
+            _ => None,
         }
     }
 }
@@ -265,10 +227,12 @@ impl ExtensionType for TraceKind {
     }
 
     fn supports_data_type(&self, data_type: &DataType) -> Result<(), ArrowError> {
-        match self {
-            TraceKind::Simple => self.validate_simple(data_type),
-            TraceKind::FixedStep => self.validate_fixed_step(data_type),
-            TraceKind::VariableStep => self.validate_variable_step(data_type),
+        if TraceKind::parse_data_type(data_type).is_some_and(|(kind, _)| *self == kind) {
+            Ok(())
+        } else {
+            Err(ArrowError::InvalidArgumentError(format!(
+                "Trace {self} doesn't support data type {data_type}"
+            )))
         }
     }
 
@@ -291,6 +255,18 @@ impl DatasetDataType {
             DatasetDataType::Trace(trace_kind, scalar_kind) => {
                 trace_kind.to_field(name, Arc::new(scalar_kind.to_item_field()), nullable)
             }
+        }
+    }
+}
+
+impl TryFrom<&DataType> for DatasetDataType {
+    type Error = Error;
+
+    fn try_from(value: &DataType) -> Result<Self, Self::Error> {
+        if let Some((trace, field)) = TraceKind::parse_data_type(value) {
+            Ok(DatasetDataType::Trace(trace, field.data_type().try_into()?))
+        } else {
+            Ok(DatasetDataType::Scalar(value.try_into()?))
         }
     }
 }
@@ -319,5 +295,23 @@ impl DatasetSchema {
             .map(|(name, data_type)| Arc::new(data_type.to_field(name, false)))
             .collect();
         Schema::new(fields)
+    }
+}
+
+impl TryFrom<&Schema> for DatasetSchema {
+    type Error = Error;
+
+    fn try_from(value: &Schema) -> Result<Self, Self::Error> {
+        let columns = value
+            .fields
+            .iter()
+            .map(|x| {
+                Ok::<_, Error>((
+                    x.name().to_owned(),
+                    DatasetDataType::try_from(x.data_type())?,
+                ))
+            })
+            .try_collect()?;
+        Ok(Self { columns })
     }
 }

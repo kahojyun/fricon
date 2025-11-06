@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{borrow::Cow, collections::Bound, ops::RangeBounds, path::PathBuf};
 
 use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
@@ -19,6 +19,10 @@ impl InProgressTable {
         }
     }
 
+    pub fn schema(&self) -> &SchemaRef {
+        self.in_memory.schema()
+    }
+
     pub fn push(&mut self, batch: RecordBatch) -> Result<(), Error> {
         self.in_memory.push_back(batch)?;
         Ok(())
@@ -28,5 +32,27 @@ impl InProgressTable {
         self.reader.read_all()?;
         self.in_memory.release_front(self.reader.num_rows());
         Ok(())
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.in_memory.last_offset()
+    }
+
+    pub fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.range_impl(range.start_bound().cloned(), range.end_bound().cloned())
+    }
+
+    fn range_impl(
+        &self,
+        start: Bound<usize>,
+        end: Bound<usize>,
+    ) -> impl Iterator<Item = Cow<'_, RecordBatch>> {
+        let mid = self.in_memory.first_offset();
+        self.reader
+            .range((start, Bound::Excluded(mid)))
+            .chain(self.in_memory.range((Bound::Included(mid), end)))
     }
 }

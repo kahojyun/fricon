@@ -56,7 +56,7 @@ impl WriteSession {
 pub struct WriteSessionHandle(Arc<Mutex<InProgressTable>>);
 
 impl WriteSessionHandle {
-    pub fn live(&self) -> &Arc<Mutex<InProgressTable>> {
-        &self.0
+    pub fn inner(&self) -> MutexGuard<'_, InProgressTable> {
+        self.0.lock().expect("Should be poisoned")
     }
 }

@@ -22,6 +22,8 @@ pub enum Error {
     TraceLengthMismatch,
     #[error("Schema mismatch.")]
     SchemaMismatch,
+    #[error("Invalid filter table.")]
+    InvalidFilter,
     #[error(transparent)]
     Arrow(#[from] ArrowError),
 }

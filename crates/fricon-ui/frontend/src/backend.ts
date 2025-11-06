@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { type Table, tableFromIPC } from "apache-arrow";
 
 export interface WorkspaceInfo {
   path: string;
@@ -10,7 +11,24 @@ export interface DatasetInfo {
   name: string;
   description: string;
   tags: string[];
-  created_at: Date;
+  createdAt: Date;
+}
+
+export interface ColumnInfo {
+  name: string;
+  isComplex: boolean;
+  isTrace: boolean;
+}
+
+export interface DatasetDetail {
+  columns: ColumnInfo[];
+  index?: number[];
+}
+
+export interface DatasetDataOptions {
+  start?: number;
+  end?: number;
+  columns?: number[];
 }
 
 export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
@@ -23,14 +41,26 @@ export async function listDatasets(): Promise<DatasetInfo[]> {
     name: string;
     description: string;
     tags: string[];
-    created_at: string;
+    createdAt: string;
   }
 
   const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets");
   return rawDatasets.map((dataset) => ({
     ...dataset,
-    created_at: new Date(dataset.created_at),
+    createdAt: new Date(dataset.createdAt),
   }));
+}
+
+export async function fetchData(
+  id: number,
+  options: DatasetDataOptions,
+): Promise<Table> {
+  const buffer = await invoke<ArrayBuffer>("dataset_data", { id, options });
+  return tableFromIPC(buffer);
+}
+
+export function datasetDetail(id: number): Promise<DatasetDetail> {
+  return invoke<DatasetDetail>("dataset_detail", { id });
 }
 
 export interface DatasetCreatedEvent {

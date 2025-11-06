@@ -26,7 +26,7 @@ const handleDatasetCreated = (event: DatasetCreatedEvent) => {
     name: event.name,
     description: event.description,
     tags: event.tags,
-    created_at: new Date(),
+    createdAt: new Date(),
   };
   value.value.unshift(newDataset);
 };
@@ -49,6 +49,8 @@ onUnmounted(() => {
     data-key="id"
     selection-mode="single"
     removable-sort
+    scrollable
+    scroll-height="flex"
     @row-select="emit('datasetSelected', $event.data.id)"
   >
     <Column field="id" header="ID" />
@@ -64,9 +66,9 @@ onUnmounted(() => {
         </Tag>
       </template>
     </Column>
-    <Column field="created_at" header="Created At" sortable>
+    <Column field="createdAt" header="Created At" sortable>
       <template #body="slotProps">
-        {{ slotProps.data.created_at.toLocaleString() }}
+        {{ slotProps.data.createdAt.toLocaleString() }}
       </template>
     </Column>
   </DataTable>

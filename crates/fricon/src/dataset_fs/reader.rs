@@ -1,6 +1,8 @@
 use std::{
+    borrow::Cow,
     fs::File,
     io,
+    ops::RangeBounds,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -37,6 +39,10 @@ impl ChunkReader {
         }
     }
 
+    pub fn schema(&self) -> Option<&SchemaRef> {
+        self.batches.as_ref().map(ChunkedTable::schema)
+    }
+
     pub fn read_next(&mut self) -> Result<bool, Error> {
         let chunk_path = chunk_path(&self.dir_path, self.current_chunk);
         let chunk_batches = match read_ipc_file_mmap(&chunk_path) {
@@ -58,6 +64,13 @@ impl ChunkReader {
     pub fn read_all(&mut self) -> Result<(), Error> {
         while self.read_next()? {}
         Ok(())
+    }
+
+    pub fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>
+    where
+        R: RangeBounds<usize> + Copy,
+    {
+        self.batches.iter().flat_map(move |x| x.range(range))
     }
 
     pub fn num_rows(&self) -> usize {

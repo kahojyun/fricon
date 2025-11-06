@@ -199,7 +199,14 @@ pub fn do_get_dataset_reader(
     write_sessions: &WriteSessionRegistry,
     id: DatasetId,
 ) -> Result<DatasetReader, Error> {
-    todo!()
+    let mut conn = database.get()?;
+    let dataset = do_get_dataset(&mut conn, id)?;
+    if let Some(handle) = write_sessions.get(dataset.id) {
+        Ok(DatasetReader::from_handle(handle)?)
+    } else {
+        let path = root.paths().dataset_path_from_uid(dataset.metadata.uid);
+        Ok(DatasetReader::open_dir(path)?)
+    }
 }
 
 // Helper functions

@@ -9,10 +9,23 @@ mod tasks;
 mod write_registry;
 mod write_session;
 
-use arrow_array::{RecordBatch, RecordBatchReader};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    ops::{Bound, RangeBounds},
+    path::PathBuf,
+    sync::Arc,
+};
+
+use arrow_arith::boolean::and;
+use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchReader, Scalar};
+use arrow_ord::ord::make_comparator;
+use arrow_schema::{Schema, SchemaRef, SortOptions};
+use arrow_select::{concat::concat_batches, filter::FilterBuilder};
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use diesel::result::Error as DieselError;
+use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinError;
 use tracing::error;
@@ -20,17 +33,20 @@ use uuid::Uuid;
 
 pub use self::write_registry::WriteSessionRegistry;
 use crate::{
+    DatasetDataType, DatasetSchema,
     app::{AppError, AppHandle},
     database::{self, DatabaseError, DatasetStatus},
     dataset, dataset_fs,
+    dataset_fs::ChunkReader,
+    dataset_manager::write_session::WriteSessionHandle,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
-    #[error("Schema validation failed: {message}")]
-    SchemaError { message: String },
+    #[error("No dataset file found.")]
+    EmptyDataset,
     #[error("Dataset write stream error: {message}")]
     BatchStreamError { message: String },
     #[error(transparent)]
@@ -179,7 +195,6 @@ impl DatasetManager {
             .await?
     }
 
-    /// Return a unified dataset reader (Completed or Live/Writing).
     pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, Error> {
         self.app
             .spawn_blocking(move |state| {
@@ -214,11 +229,229 @@ impl DatasetRecord {
     }
 }
 
-// TODO: implement
-pub struct DatasetReader;
+enum DatasetSource {
+    WriteSession(WriteSessionHandle),
+    File(ChunkReader),
+}
+
+impl DatasetSource {
+    fn num_rows(&self) -> usize {
+        match self {
+            DatasetSource::WriteSession(h) => h.inner().num_rows(),
+            DatasetSource::File(r) => r.num_rows(),
+        }
+    }
+    fn range<R>(&self, range: R) -> Vec<RecordBatch>
+    where
+        R: RangeBounds<usize> + Copy,
+    {
+        match self {
+            DatasetSource::WriteSession(h) => {
+                h.inner().range(range).map(|x| x.into_owned()).collect()
+            }
+            DatasetSource::File(r) => r.range(range).map(|x| x.into_owned()).collect(),
+        }
+    }
+    pub fn select_data(
+        &self,
+        options: SelectOptions,
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+        let index_filters = options.index_filters.as_ref();
+        let selected_columns = options.selected_columns.as_deref();
+        let result = match self {
+            DatasetSource::WriteSession(h) => {
+                let inner = h.inner();
+                select_data(
+                    inner.range((options.start, options.end)),
+                    inner.schema(),
+                    index_filters,
+                    selected_columns,
+                )
+            }
+            DatasetSource::File(r) => select_data(
+                r.range((options.start, options.end)),
+                r.schema().ok_or(Error::EmptyDataset)?,
+                index_filters,
+                selected_columns,
+            ),
+        }?;
+        Ok(result)
+    }
+}
+
+pub struct DatasetReader {
+    source: DatasetSource,
+    schema: DatasetSchema,
+    arrow_schema: SchemaRef,
+}
+
+pub struct SelectOptions {
+    pub start: Bound<usize>,
+    pub end: Bound<usize>,
+    pub index_filters: Option<RecordBatch>,
+    pub selected_columns: Option<Vec<usize>>,
+}
+
+#[derive(Debug, Default)]
+struct Filter {
+    filters: Vec<(usize, Scalar<ArrayRef>)>,
+}
+
+impl Filter {
+    fn new(schema: &Schema, filters: &RecordBatch) -> Result<Self, dataset::Error> {
+        if filters.schema().fields.is_empty() {
+            Ok(Self { filters: vec![] })
+        } else if filters.num_rows() != 1 {
+            Err(dataset::Error::InvalidFilter)
+        } else {
+            let filters = filters
+                .schema_ref()
+                .fields
+                .iter()
+                .zip(filters.columns())
+                .map(|(field, column)| {
+                    let column_index = schema
+                        .column_with_name(field.name())
+                        .ok_or(dataset::Error::InvalidFilter)?
+                        .0;
+                    Ok::<_, dataset::Error>((column_index, Scalar::new(column.clone())))
+                })
+                .try_collect()?;
+            Ok(Self { filters })
+        }
+    }
+
+    fn build_predicate(&self, batch: &RecordBatch) -> Result<Option<BooleanArray>, dataset::Error> {
+        Ok(self
+            .filters
+            .iter()
+            .map(|(i, v)| arrow_ord::cmp::eq(batch.column(*i), v))
+            .reduce(|x, y| x.and_then(|x| y.and_then(|y| and(&x, &y))))
+            .transpose()?)
+    }
+}
+
+fn select_data<'a>(
+    source: impl Iterator<Item = Cow<'a, RecordBatch>>,
+    source_schema: &SchemaRef,
+    index_filters: Option<&RecordBatch>,
+    selected_columns: Option<&[usize]>,
+) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::Error> {
+    let filter = if let Some(f) = index_filters {
+        Filter::new(source_schema, &f)?
+    } else {
+        Filter::default()
+    };
+    let (output_schema, selected_columns) = if let Some(c) = selected_columns {
+        (
+            Arc::new(source_schema.project(c)?),
+            Either::Left(c.iter().copied()),
+        )
+    } else {
+        (
+            source_schema.clone(),
+            Either::Right(0..source_schema.fields.len()),
+        )
+    };
+    let results = source
+        .map(|batch| -> Result<_, dataset::Error> {
+            let mask = filter.build_predicate(&batch)?;
+            let predicate = mask.map(|m| {
+                let mut builder = FilterBuilder::new(&m);
+                if output_schema.fields.len() > 1 {
+                    builder = builder.optimize()
+                }
+                builder.build()
+            });
+            if let Some(p) = &predicate
+                && p.count() == 0
+            {
+                Ok(None)
+            } else {
+                let arrays = selected_columns
+                    .clone()
+                    .into_iter()
+                    .map(|x| {
+                        let array = batch.column(x);
+                        if let Some(p) = &predicate {
+                            p.filter(array).unwrap()
+                        } else {
+                            array.clone()
+                        }
+                    })
+                    .collect();
+                Ok(Some(RecordBatch::try_new(output_schema.clone(), arrays)?))
+            }
+        })
+        .flatten_ok()
+        .try_collect()?;
+    Ok((output_schema, results))
+}
 
 impl DatasetReader {
-    pub fn batches(&self) -> Result<Vec<RecordBatch>, Error> {
-        todo!()
+    fn from_handle(source: WriteSessionHandle) -> Result<Self, Error> {
+        let arrow_schema = source.inner().schema().clone();
+        let schema = arrow_schema.as_ref().try_into()?;
+        Ok(Self {
+            source: DatasetSource::WriteSession(source),
+            schema,
+            arrow_schema,
+        })
+    }
+    fn open_dir(path: PathBuf) -> Result<Self, Error> {
+        let mut reader = ChunkReader::new(path, None);
+        reader.read_all()?;
+        let schema = reader
+            .schema()
+            .ok_or(Error::EmptyDataset)?
+            .as_ref()
+            .try_into()?;
+        let arrow_schema = reader.schema().unwrap().clone();
+        Ok(Self {
+            source: DatasetSource::File(reader),
+            schema,
+            arrow_schema,
+        })
+    }
+    pub fn schema(&self) -> &DatasetSchema {
+        &self.schema
+    }
+    pub fn arrow_schema(&self) -> &SchemaRef {
+        &self.arrow_schema
+    }
+    pub fn batches(&self) -> Vec<RecordBatch> {
+        self.source.range(..)
+    }
+    pub fn select_data(
+        &self,
+        options: SelectOptions,
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+        self.source.select_data(options)
+    }
+    pub fn index_columns(&self) -> Option<Vec<usize>> {
+        if self.source.num_rows() < 2 {
+            None
+        } else {
+            let sample = self.source.range(..2);
+            let sample = concat_batches(&sample[0].schema(), &sample).unwrap();
+            let mut result = vec![];
+            for (i, (sample_array, column_type)) in sample
+                .columns()
+                .iter()
+                .zip(self.schema.columns().values())
+                .enumerate()
+            {
+                if !matches!(column_type, DatasetDataType::Scalar(_)) {
+                    break;
+                }
+                result.push(i);
+                let cmp =
+                    make_comparator(sample_array, sample_array, SortOptions::default()).unwrap();
+                if cmp(0, 1) != Ordering::Equal {
+                    break;
+                }
+            }
+            Some(result)
+        }
     }
 }

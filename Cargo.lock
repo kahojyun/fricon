@@ -183,6 +183,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-ord"
+version = "57.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "141c05298b21d03e88062317a1f1a73f5ba7b6eb041b350015b1cd6aabc0519b"
+dependencies = [
+ "arrow-array",
+ "arrow-buffer",
+ "arrow-data",
+ "arrow-schema",
+ "arrow-select",
+]
+
+[[package]]
 name = "arrow-pyarrow"
 version = "57.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1376,6 +1389,7 @@ dependencies = [
  "arrow-array",
  "arrow-buffer",
  "arrow-ipc",
+ "arrow-ord",
  "arrow-schema",
  "arrow-select",
  "bytes",
@@ -1442,9 +1456,8 @@ name = "fricon-ui"
 version = "0.1.0-alpha"
 dependencies = [
  "anyhow",
- "arrow-array",
  "arrow-ipc",
- "arrow-schema",
+ "base64 0.22.1",
  "chrono",
  "dotenvy",
  "fricon",
@@ -1454,6 +1467,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-opener",
  "tauri-utils",
+ "thiserror 2.0.17",
  "tokio",
  "tracing",
  "tracing-appender",

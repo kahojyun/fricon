@@ -1,7 +1,10 @@
-use std::collections::VecDeque;
+use std::{
+    borrow::Cow,
+    collections::{Bound, VecDeque},
+    ops::{Range, RangeBounds},
+};
 
-use arrow_arith::boolean::and;
-use arrow_array::{BooleanArray, Datum, RecordBatch};
+use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
 
 use crate::dataset::Error;
@@ -24,6 +27,10 @@ impl ChunkedTable {
         }
     }
 
+    pub fn schema(&self) -> &SchemaRef {
+        &self.schema
+    }
+
     pub fn last_offset(&self) -> usize {
         *self.offsets.back().expect("At least one offset exists.")
     }
@@ -44,7 +51,7 @@ impl ChunkedTable {
         Ok(())
     }
 
-    /// Release all batches covered by row range `..target_row`
+    /// Release all batches fully covered by row range `..target_row`
     pub fn release_front(&mut self, target_row: usize) {
         let remove_count = self
             .offsets
@@ -53,50 +60,68 @@ impl ChunkedTable {
         self.batches.drain(..remove_count);
         self.offsets.drain(..remove_count);
     }
-}
 
-struct Filter {
-    column: usize,
-    filter: Box<dyn Fn(&dyn Datum) -> BooleanArray>,
-}
-
-impl Filter {
-    fn apply(&self, batch: &RecordBatch) -> BooleanArray {
-        (self.filter)(batch.column(self.column))
+    pub fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.range_impl(range.start_bound().cloned(), range.end_bound().cloned())
     }
-}
 
-struct Filters(Vec<Filter>);
+    fn range_impl(
+        &self,
+        start: Bound<usize>,
+        end: Bound<usize>,
+    ) -> impl Iterator<Item = Cow<'_, RecordBatch>> {
+        let start = match start {
+            Bound::Included(v) => v,
+            Bound::Excluded(v) => v.saturating_add(1),
+            Bound::Unbounded => 0,
+        }
+        .max(self.first_offset());
+        let end = match end {
+            Bound::Included(v) => v.checked_add(1),
+            Bound::Excluded(v) => Some(v),
+            Bound::Unbounded => None,
+        }
+        .unwrap_or(self.last_offset())
+        .min(self.last_offset());
+        let start_batch = self.offsets.binary_search(&start).unwrap_or_else(|i| i - 1);
+        let end_batch = self.offsets.binary_search(&end).unwrap_or_else(|i| i);
+        (start_batch..end_batch).filter_map(move |i| self.slice_batch(i, start..end))
+    }
 
-impl Filters {
-    fn apply(&self, batch: &RecordBatch) -> Option<BooleanArray> {
-        self.0
-            .iter()
-            .map(|x| x.apply(batch))
-            .reduce(|acc, x| and(&acc, &x).expect("Should have same length."))
+    fn slice_batch(&self, batch_index: usize, range: Range<usize>) -> Option<Cow<'_, RecordBatch>> {
+        let batch = self.batches.get(batch_index)?;
+        let start = self.offsets[batch_index].max(range.start);
+        let end = self.offsets[batch_index + 1].min(range.end);
+        (start < end).then(|| {
+            if end - start < batch.num_rows() {
+                Cow::Owned(batch.slice(start - self.offsets[batch_index], end - start))
+            } else {
+                Cow::Borrowed(batch)
+            }
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{slice::SliceIndex, sync::Arc};
 
-    use arrow_array::RecordBatchOptions;
-    use arrow_schema::Schema;
+    use arrow_array::{ArrayRef, Int32Array, cast::AsArray, types::Int32Type};
+    use arrow_select::concat::concat_batches;
 
     use super::*;
 
-    fn make_empty_batches(lengths: &[usize]) -> Vec<RecordBatch> {
-        let schema = Arc::new(Schema::empty());
+    fn make_batches(lengths: &[i32]) -> Vec<RecordBatch> {
+        let mut start = 0;
         lengths
             .iter()
             .map(|&l| {
-                RecordBatch::try_new_with_options(
-                    schema.clone(),
-                    vec![],
-                    &RecordBatchOptions::new().with_row_count(Some(l)),
-                )
-                .unwrap()
+                let array = Int32Array::from_iter_values(start..start + l);
+                start += l;
+                RecordBatch::try_from_iter([("a", Arc::new(array) as ArrayRef)]).unwrap()
             })
             .collect()
     }
@@ -104,7 +129,7 @@ mod tests {
     #[test]
     fn chunked_table_push_back() {
         let lengths = [1, 2, 3, 4];
-        let batches = make_empty_batches(&lengths);
+        let batches = make_batches(&lengths);
 
         let mut chunked_table = ChunkedTable::new(batches[0].schema());
         for batch in batches {
@@ -118,7 +143,7 @@ mod tests {
     #[test]
     fn chunked_table_release_front() {
         let lengths = [3, 3, 3, 3];
-        let batches = make_empty_batches(&lengths);
+        let batches = make_batches(&lengths);
         let mut chunked_table = ChunkedTable::new(batches[0].schema());
         for batch in batches {
             chunked_table.push_back(batch).unwrap();
@@ -147,5 +172,54 @@ mod tests {
         chunked_table.release_front(15);
         assert_eq!(chunked_table.batches.len(), 0);
         assert_eq!(chunked_table.offsets.len(), 1);
+    }
+
+    fn check_slice<R>(chunked_table: &ChunkedTable, reference: &[i32], r: R)
+    where
+        R: RangeBounds<usize> + Clone + SliceIndex<[i32], Output = [i32]>,
+    {
+        let offset = chunked_table.first_offset();
+        let start = r.start_bound().cloned().map(|x| x - offset);
+        let end = r.end_bound().cloned().map(|x| x - offset);
+        let reference = &reference[offset..];
+        let batches: Vec<_> = chunked_table.range(r).collect();
+        let batch =
+            concat_batches(chunked_table.schema(), batches.iter().map(|x| x.as_ref())).unwrap();
+        let arr = batch.column(0).as_primitive::<Int32Type>();
+        assert_eq!(arr.values(), &reference[(start, end)]);
+    }
+
+    #[test]
+    fn chunked_table_get_range() {
+        let lengths = [3, 3, 3, 3];
+        let batches = make_batches(&lengths);
+        let mut chunked_table = ChunkedTable::new(batches[0].schema());
+        for batch in batches {
+            chunked_table.push_back(batch).unwrap();
+        }
+        let reference = (0..lengths.iter().sum()).collect::<Vec<_>>();
+
+        check_slice(&chunked_table, &reference, ..);
+        for i in 0..4 {
+            for j in i..i + 4 {
+                check_slice(&chunked_table, &reference, i..j);
+                check_slice(&chunked_table, &reference, i..=j);
+            }
+            check_slice(&chunked_table, &reference, i..);
+            check_slice(&chunked_table, &reference, ..i);
+            check_slice(&chunked_table, &reference, ..=i);
+        }
+
+        chunked_table.release_front(4);
+
+        for i in 4..8 {
+            for j in i + 1..i + 4 {
+                check_slice(&chunked_table, &reference, i..j);
+                check_slice(&chunked_table, &reference, i..=j);
+            }
+            check_slice(&chunked_table, &reference, i..);
+            check_slice(&chunked_table, &reference, ..i);
+            check_slice(&chunked_table, &reference, ..=i);
+        }
     }
 }
