@@ -4,6 +4,11 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
+mod in_progress;
+mod tasks;
+mod write_registry;
+mod write_session;
+
 use arrow_array::{RecordBatch, RecordBatchReader};
 use chrono::{DateTime, Utc};
 use derive_more::From;
@@ -13,14 +18,15 @@ use tokio::task::JoinError;
 use tracing::error;
 use uuid::Uuid;
 
+pub use self::write_registry::WriteSessionRegistry;
 use crate::{
     app::{AppError, AppHandle},
     database::{self, DatabaseError, DatasetStatus},
-    dataset, dataset_fs, dataset_tasks,
+    dataset, dataset_fs,
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum DatasetManagerError {
+pub enum Error {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
     #[error("Schema validation failed: {message}")]
@@ -39,7 +45,7 @@ pub enum DatasetManagerError {
     App(#[from] AppError),
 }
 
-impl From<DieselError> for DatasetManagerError {
+impl From<DieselError> for Error {
     fn from(error: DieselError) -> Self {
         match error {
             DieselError::NotFound => Self::NotFound {
@@ -102,16 +108,16 @@ impl DatasetManager {
         &self,
         request: CreateDatasetRequest,
         reader: F,
-    ) -> Result<DatasetRecord, DatasetManagerError>
+    ) -> Result<DatasetRecord, Error>
     where
-        F: FnOnce() -> Result<I, DatasetManagerError> + Send + 'static,
+        F: FnOnce() -> Result<I, Error> + Send + 'static,
         I: RecordBatchReader,
     {
         self.app
             .spawn_blocking(move |state| {
                 reader()
                     .and_then(|batches| {
-                        dataset_tasks::do_create_dataset(
+                        tasks::do_create_dataset(
                             &state.database,
                             &state.root,
                             &state.event_sender,
@@ -127,70 +133,57 @@ impl DatasetManager {
             .await?
     }
 
-    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
+    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error> {
+        self.app
+            .spawn_blocking(move |state| tasks::do_get_dataset(&mut *state.database.get()?, id))?
+            .await?
+    }
+
+    pub async fn list_datasets(&self) -> Result<Vec<DatasetRecord>, Error> {
+        self.app
+            .spawn_blocking(move |state| tasks::do_list_datasets(&mut *state.database.get()?))?
+            .await?
+    }
+
+    pub async fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                dataset_tasks::do_get_dataset(&mut *state.database.get()?, id)
+                tasks::do_update_dataset(&mut *state.database.get()?, id, update)
             })?
             .await?
     }
 
-    pub async fn list_datasets(&self) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
+    pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                dataset_tasks::do_list_datasets(&mut *state.database.get()?)
+                tasks::do_add_tags(&mut *state.database.get()?, id, &tags)
             })?
             .await?
     }
 
-    pub async fn update_dataset(
-        &self,
-        id: i32,
-        update: DatasetUpdate,
-    ) -> Result<(), DatasetManagerError> {
+    pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                dataset_tasks::do_update_dataset(&mut *state.database.get()?, id, update)
+                tasks::do_remove_tags(&mut *state.database.get()?, id, &tags)
             })?
             .await?
     }
 
-    pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
+    pub async fn delete_dataset(&self, id: i32) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                dataset_tasks::do_add_tags(&mut *state.database.get()?, id, &tags)
-            })?
-            .await?
-    }
-
-    pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
-        self.app
-            .spawn_blocking(move |state| {
-                dataset_tasks::do_remove_tags(&mut *state.database.get()?, id, &tags)
-            })?
-            .await?
-    }
-
-    pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
-        self.app
-            .spawn_blocking(move |state| {
-                dataset_tasks::do_delete_dataset(&state.database, &state.root, id).inspect_err(
-                    |e| {
-                        error!("Dataset deletion failed: {e}");
-                    },
-                )
+                tasks::do_delete_dataset(&state.database, &state.root, id).inspect_err(|e| {
+                    error!("Dataset deletion failed: {e}");
+                })
             })?
             .await?
     }
 
     /// Return a unified dataset reader (Completed or Live/Writing).
-    pub async fn get_dataset_reader(
-        &self,
-        id: DatasetId,
-    ) -> Result<DatasetReader, DatasetManagerError> {
+    pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, Error> {
         self.app
             .spawn_blocking(move |state| {
-                dataset_tasks::do_get_dataset_reader(
+                tasks::do_get_dataset_reader(
                     &state.database,
                     &state.root,
                     &state.write_sessions,
@@ -225,7 +218,7 @@ impl DatasetRecord {
 pub struct DatasetReader;
 
 impl DatasetReader {
-    pub fn batches(&self) -> Result<Vec<RecordBatch>, DatasetManagerError> {
+    pub fn batches(&self) -> Result<Vec<RecordBatch>, Error> {
         todo!()
     }
 }

@@ -6,8 +6,8 @@ use std::{
 
 use arrow_schema::SchemaRef;
 
-use crate::{
-    DatasetManagerError,
+use crate::dataset_manager::{
+    Error,
     write_session::{WriteSession, WriteSessionHandle},
 };
 
@@ -25,8 +25,8 @@ impl WriteSessionRegistry {
         id: i32,
         path: PathBuf,
         schema: SchemaRef,
-        f: impl FnOnce(&mut WriteSession) -> Result<(), DatasetManagerError>,
-    ) -> Result<(), DatasetManagerError> {
+        f: impl FnOnce(&mut WriteSession) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         struct Guard(i32, WriteSessionRegistry);
         impl Drop for Guard {
             fn drop(&mut self) {

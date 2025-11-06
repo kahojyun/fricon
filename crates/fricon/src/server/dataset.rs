@@ -12,8 +12,8 @@ use crate::{
     app::AppHandle,
     database::DatasetStatus,
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
-        DatasetRecord, DatasetUpdate,
+        CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetRecord,
+        DatasetUpdate, Error,
     },
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateAbort, CreateMetadata, CreateRequest,
@@ -202,10 +202,8 @@ impl DatasetService for Storage {
         });
         let sync_reader = SyncIoBridge::new(TokioStreamReader::new(bytes_stream));
         let batch_reader = || {
-            StreamReader::try_new(sync_reader, None).map_err(|e| {
-                DatasetManagerError::BatchStreamError {
-                    message: e.to_string(),
-                }
+            StreamReader::try_new(sync_reader, None).map_err(|e| Error::BatchStreamError {
+                message: e.to_string(),
             })
         };
         let create_request = CreateDatasetRequest {
@@ -244,7 +242,7 @@ impl DatasetService for Storage {
         let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
             error!("Failed to get dataset: {:?}", e);
             match e {
-                DatasetManagerError::NotFound { .. } => Status::not_found("dataset not found"),
+                Error::NotFound { .. } => Status::not_found("dataset not found"),
                 _ => Status::internal(e.to_string()),
             }
         })?;

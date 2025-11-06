@@ -1,5 +1,3 @@
-mod in_progress;
-
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex, MutexGuard},
@@ -9,7 +7,8 @@ use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
 
 use crate::{
-    DatasetManagerError, dataset_fs::ChunkWriter, write_session::in_progress::InProgressTable,
+    dataset_fs::ChunkWriter,
+    dataset_manager::{Error, in_progress::InProgressTable},
 };
 
 pub struct WriteSession {
@@ -28,7 +27,7 @@ impl WriteSession {
         }
     }
 
-    pub fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError> {
+    pub fn write(&mut self, batch: RecordBatch) -> Result<(), Error> {
         self.in_progress_table_mut().push(batch.clone())?;
         if self.writer.write(batch)? {
             self.in_progress_table_mut().continue_read_chunks()?;
@@ -40,7 +39,7 @@ impl WriteSession {
         WriteSessionHandle(self.in_progress_table.clone())
     }
 
-    pub fn finish(self) -> Result<(), DatasetManagerError> {
+    pub fn finish(self) -> Result<(), Error> {
         self.writer.finish()?;
         Ok(())
     }

@@ -17,10 +17,9 @@ use crate::{
     database::{self, DatasetStatus, NewDataset, Pool, SimpleUuid, schema},
     dataset_fs,
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetManagerError, DatasetReader, DatasetRecord,
-        DatasetUpdate,
+        CreateDatasetRequest, DatasetId, DatasetReader, DatasetRecord, DatasetUpdate, Error,
+        write_registry::WriteSessionRegistry,
     },
-    write_registry::WriteSessionRegistry,
 };
 
 /// Create a new dataset with the given request and data stream
@@ -31,7 +30,7 @@ pub fn do_create_dataset(
     write_sessions: &WriteSessionRegistry,
     request: CreateDatasetRequest,
     batches: impl RecordBatchReader,
-) -> Result<DatasetRecord, DatasetManagerError> {
+) -> Result<DatasetRecord, Error> {
     let uid = Uuid::new_v4();
     let dataset_path = root.paths().dataset_path_from_uid(uid);
 
@@ -61,7 +60,7 @@ pub fn do_create_dataset(
         batches.schema(),
         move |session| {
             for batch in batches {
-                session.write(batch.map_err(|e| DatasetManagerError::BatchStreamError {
+                session.write(batch.map_err(|e| Error::BatchStreamError {
                     message: e.to_string(),
                 })?)?;
             }
@@ -91,11 +90,7 @@ pub fn do_create_dataset(
 }
 
 /// Delete a dataset by ID
-pub fn do_delete_dataset(
-    database: &Pool,
-    root: &WorkspaceRoot,
-    id: i32,
-) -> Result<(), DatasetManagerError> {
+pub fn do_delete_dataset(database: &Pool, root: &WorkspaceRoot, id: i32) -> Result<(), Error> {
     let mut conn = database.get()?;
     let record = do_get_dataset(&mut conn, DatasetId::Id(id))?;
     let dataset_path = root.paths().dataset_path_from_uid(record.metadata.uid);
@@ -108,10 +103,7 @@ pub fn do_delete_dataset(
 }
 
 /// Get a dataset by ID or UUID
-pub fn do_get_dataset(
-    conn: &mut SqliteConnection,
-    id: DatasetId,
-) -> Result<DatasetRecord, DatasetManagerError> {
+pub fn do_get_dataset(conn: &mut SqliteConnection, id: DatasetId) -> Result<DatasetRecord, Error> {
     let dataset = match id {
         DatasetId::Id(dataset_id) => database::Dataset::find_by_id(conn, dataset_id)?,
         DatasetId::Uid(uid) => database::Dataset::find_by_uid(conn, uid)?,
@@ -122,7 +114,7 @@ pub fn do_get_dataset(
             DatasetId::Id(i) => i.to_string(),
             DatasetId::Uid(u) => u.to_string(),
         };
-        return Err(DatasetManagerError::NotFound { id: id_str });
+        return Err(Error::NotFound { id: id_str });
     };
 
     let tags = dataset.load_tags(conn)?;
@@ -131,9 +123,7 @@ pub fn do_get_dataset(
 }
 
 /// List all datasets
-pub fn do_list_datasets(
-    conn: &mut SqliteConnection,
-) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
+pub fn do_list_datasets(conn: &mut SqliteConnection) -> Result<Vec<DatasetRecord>, Error> {
     let all_datasets = database::Dataset::list_all_ordered(conn)?;
 
     let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
@@ -167,7 +157,7 @@ pub fn do_update_dataset(
     conn: &mut SqliteConnection,
     id: i32,
     update: DatasetUpdate,
-) -> Result<(), DatasetManagerError> {
+) -> Result<(), Error> {
     let db_update = database::DatasetUpdate {
         name: update.name,
         description: update.description,
@@ -179,11 +169,7 @@ pub fn do_update_dataset(
 }
 
 /// Add tags to a dataset
-pub fn do_add_tags(
-    conn: &mut SqliteConnection,
-    id: i32,
-    tags: &[String],
-) -> Result<(), DatasetManagerError> {
+pub fn do_add_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> Result<(), Error> {
     conn.immediate_transaction(|conn| {
         let created_tags = database::Tag::find_or_create_batch(conn, tags)?;
         let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
@@ -194,11 +180,7 @@ pub fn do_add_tags(
 }
 
 /// Remove tags from a dataset
-pub fn do_remove_tags(
-    conn: &mut SqliteConnection,
-    id: i32,
-    tags: &[String],
-) -> Result<(), DatasetManagerError> {
+pub fn do_remove_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> Result<(), Error> {
     conn.immediate_transaction(|conn| {
         let tag_ids_to_delete = schema::tags::table
             .filter(schema::tags::name.eq_any(tags))
@@ -216,7 +198,7 @@ pub fn do_get_dataset_reader(
     root: &WorkspaceRoot,
     write_sessions: &WriteSessionRegistry,
     id: DatasetId,
-) -> Result<DatasetReader, DatasetManagerError> {
+) -> Result<DatasetReader, Error> {
     todo!()
 }
 
@@ -226,7 +208,7 @@ fn create_dataset_db_record(
     conn: &mut SqliteConnection,
     request: &CreateDatasetRequest,
     uid: Uuid,
-) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError> {
+) -> Result<(database::Dataset, Vec<database::Tag>), Error> {
     conn.immediate_transaction(|conn| {
         let new_dataset = NewDataset {
             uid: SimpleUuid(uid),

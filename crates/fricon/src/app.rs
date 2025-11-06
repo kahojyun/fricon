@@ -15,10 +15,9 @@ use tracing::{error, info};
 use crate::{
     database,
     database::Pool,
-    dataset_manager::DatasetManager,
+    dataset_manager::{DatasetManager, WriteSessionRegistry},
     server,
     workspace::{WorkspacePaths, WorkspaceRoot},
-    write_registry::WriteSessionRegistry,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -76,20 +75,20 @@ pub struct AppHandle {
 }
 
 impl AppHandle {
-    pub(crate) fn new(state: Weak<AppState>) -> Self {
+    fn new(state: Weak<AppState>) -> Self {
         Self { state }
     }
 
-    pub(crate) fn get_state(&self) -> Result<Arc<AppState>, AppError> {
+    fn state(&self) -> Result<Arc<AppState>, AppError> {
         self.state.upgrade().ok_or(AppError::StateDropped)
     }
 
     pub fn paths(&self) -> Result<WorkspacePaths, AppError> {
-        Ok(self.get_state()?.root.paths().clone())
+        Ok(self.state()?.root.paths().clone())
     }
 
     pub fn subscribe_to_events(&self) -> Result<broadcast::Receiver<AppEvent>, AppError> {
-        Ok(self.get_state()?.event_sender.subscribe())
+        Ok(self.state()?.event_sender.subscribe())
     }
 
     #[must_use]
@@ -103,7 +102,7 @@ impl AppHandle {
         Fut: Future<Output = T> + Send + 'static,
         T: Send + 'static,
     {
-        let state = self.get_state()?;
+        let state = self.state()?;
         let tracker = state.tracker.clone();
         Ok(tracker.spawn(f(state)))
     }
@@ -113,7 +112,7 @@ impl AppHandle {
         F: FnOnce(Arc<AppState>) -> T + Send + 'static,
         T: Send + 'static,
     {
-        let state = self.get_state()?;
+        let state = self.state()?;
         let tracker = state.tracker.clone();
         Ok(tracker.spawn_blocking(move || f(state)))
     }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
 
-use crate::{DatasetManagerError, dataset::ChunkedTable, dataset_fs::ChunkReader};
+use crate::{dataset::ChunkedTable, dataset_fs::ChunkReader, dataset_manager::Error};
 
 #[derive(Debug)]
 pub struct InProgressTable {
@@ -19,12 +19,12 @@ impl InProgressTable {
         }
     }
 
-    pub fn push(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError> {
+    pub fn push(&mut self, batch: RecordBatch) -> Result<(), Error> {
         self.in_memory.push_back(batch)?;
         Ok(())
     }
 
-    pub fn continue_read_chunks(&mut self) -> Result<(), DatasetManagerError> {
+    pub fn continue_read_chunks(&mut self) -> Result<(), Error> {
         self.reader.read_all()?;
         self.in_memory.release_front(self.reader.num_rows());
         Ok(())
