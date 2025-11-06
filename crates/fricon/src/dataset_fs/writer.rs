@@ -1,5 +1,4 @@
 use std::{
-    fs::File,
     io::{BufWriter, Seek},
     path::{Path, PathBuf},
 };
@@ -8,6 +7,7 @@ use arrow_array::RecordBatch;
 use arrow_ipc::writer::FileWriter;
 use arrow_schema::{Schema, SchemaRef};
 use arrow_select::concat::concat_batches;
+use tempfile::NamedTempFile;
 use tracing::{error, warn};
 
 use crate::dataset_fs::{Error, chunk_path};
@@ -81,22 +81,23 @@ impl Drop for ChunkWriter {
 }
 
 struct InnerWriter {
-    inner: FileWriter<BufWriter<File>>,
+    inner: FileWriter<BufWriter<NamedTempFile>>,
     buffered_batches: Vec<RecordBatch>,
     buffered_size: usize,
     written_size: u64,
+    final_path: PathBuf,
 }
 
 impl InnerWriter {
     fn new(dir_path: &Path, chunk_index: usize, schema: &Schema) -> Result<InnerWriter, Error> {
-        let chunk_path = chunk_path(dir_path, chunk_index);
-        let file = File::create(chunk_path)?;
+        let file = NamedTempFile::new_in(dir_path)?;
         let writer = FileWriter::try_new(BufWriter::new(file), schema)?;
         Ok(InnerWriter {
             inner: writer,
             buffered_batches: vec![],
             buffered_size: 0,
             written_size: 0,
+            final_path: chunk_path(dir_path, chunk_index),
         })
     }
 
@@ -110,7 +111,12 @@ impl InnerWriter {
 
     fn finish(mut self) -> Result<(), Error> {
         self.flush()?;
-        self.inner.finish()?;
+        let file = self
+            .inner
+            .into_inner()?
+            .into_inner()
+            .map_err(|e| e.into_error())?;
+        file.persist(self.final_path).map_err(|e| e.error)?;
         Ok(())
     }
 

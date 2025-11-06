@@ -38,6 +38,7 @@ prost-types = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
@@ -54,6 +55,3 @@ tonic-prost-build = { workspace = true }
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-tempfile = { workspace = true }
