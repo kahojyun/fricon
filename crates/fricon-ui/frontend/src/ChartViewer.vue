@@ -1,105 +1,203 @@
 <script setup lang="ts">
-import { useTemplateRef, onUnmounted, watch, ref } from "vue";
-import * as echarts from "echarts";
-import { useDark } from "@vueuse/core";
-import { type DatasetDetail, datasetDetail, fetchData } from "@/backend.ts";
-import type { Table } from "apache-arrow";
-import { DataTable, Column, Splitter, SplitterPanel } from "primevue";
+import { computed, onWatcherCleanup, ref, shallowRef, watch } from "vue";
+import {
+  type ColumnInfo,
+  type DatasetDetail,
+  datasetDetail,
+  fetchData,
+} from "@/backend.ts";
+import { type StructRowProxy, type Table, tableToIPC } from "apache-arrow";
+import { watchThrottled, computedAsync } from "@vueuse/core";
+import type { TypedArray } from "apache-arrow/interfaces";
+import ChartWrapper from "./components/ChartWrapper.vue";
 
 const props = defineProps<{
-  datasetId: number | null;
+  datasetId: number;
 }>();
-const isDark = useDark();
-const chart = useTemplateRef("chart");
-const detail = ref<DatasetDetail | null>(null);
-const indexTable = ref<Table | null>(null);
-let chartInstance: echarts.ECharts | null = null;
-const observer = new ResizeObserver(() => {
-  requestAnimationFrame(() => {
-    chartInstance?.resize();
-  });
-});
 
-const option = {
-  animation: false,
-  xAxis: {
-    type: "category",
-    data: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-  },
-  yAxis: {
-    type: "value",
-  },
-  series: [
-    {
-      data: [150, 230, 224, 218, 135, 147, 260],
-      type: "line",
-    },
-  ],
-};
-
-function cleanup() {
-  observer.disconnect();
-  chartInstance?.dispose();
-  chartInstance = null;
-}
-
-function initChart() {
-  const chartDiv = chart.value;
-  if (!chartDiv) return;
-  chartInstance = echarts.init(chartDiv);
-  chartInstance.setOption(option);
-  observer.observe(chartDiv);
-  watch(
-    isDark,
-    () => {
-      chartInstance?.setTheme(isDark.value ? "dark" : "default");
-    },
-    { immediate: true },
-  );
-}
-
-watch(chart, () => {
-  cleanup();
-  initChart();
-});
-watch(
+const detail = shallowRef<DatasetDetail | null>(null);
+const indexTable = shallowRef<Table | null>(null);
+watchThrottled(
   () => props.datasetId,
-  async () => {
-    const datasetId = props.datasetId;
-    if (datasetId != null) {
-      detail.value = await datasetDetail(datasetId);
-      const index_columns = detail.value.index;
-      if (index_columns != null) {
-        indexTable.value = await fetchData(datasetId, {
-          columns: index_columns,
-        });
-      }
-    }
-  },
-);
+  async (newId) => {
+    let aborted = false;
+    onWatcherCleanup(() => (aborted = true));
 
-onUnmounted(cleanup);
+    const newDetail = await datasetDetail(newId);
+    if (aborted) return;
+
+    const index_columns = newDetail.columns.reduce((acc, c, i) => {
+      if (c.isIndex) acc.push(i);
+      return acc;
+    }, [] as number[]);
+    const newIndexTable = await fetchData(newId, {
+      columns: index_columns,
+    });
+    if (aborted) return;
+
+    detail.value = newDetail;
+    indexTable.value = newIndexTable;
+    selectedRowIndex.value = undefined;
+  },
+  { throttle: 100, immediate: true },
+);
+const nonIndexColumns = computed(
+  () => detail.value?.columns.filter((c) => !c.isIndex) ?? [],
+);
+function updateSelection(
+  newOptions: ColumnInfo[],
+  currentOption: ColumnInfo | undefined,
+): ColumnInfo | undefined {
+  const currentName = currentOption?.name;
+  return newOptions.find((col) => col.name === currentName) ?? newOptions[0];
+}
+
+const selectedSeries = ref<ColumnInfo>();
+watch(nonIndexColumns, (newOptions) => {
+  selectedSeries.value = updateSelection(newOptions, selectedSeries.value);
+});
+
+const chartType = ref("line");
+const chartTypes = ref([
+  { name: "Line", value: "line" },
+  { name: "Scatter", value: "scatter" },
+  { name: "Heatmap", value: "heatmap" },
+]);
+
+const xColumn = ref<ColumnInfo>();
+const xColumnOptions = computed(
+  () => detail.value?.columns.filter((c) => c.isIndex) ?? [],
+);
+watch(xColumnOptions, (newOptions) => {
+  xColumn.value = updateSelection(newOptions, xColumn.value);
+});
+
+const indexSelectionTable = computed(() => {
+  const indexTableValue = indexTable.value;
+  const xColumnName = xColumn.value?.name;
+  if (!indexTableValue) return null;
+  const columnsExceptX = indexTableValue.schema.fields
+    .filter((c) => c.name !== xColumnName)
+    .map((c) => c.name);
+
+  const filteredTable = indexTableValue.select(columnsExceptX);
+
+  // Get unique combinations of index values
+  const rows = filteredTable.toArray() as StructRowProxy[];
+  const uniqueRows = Array.from(
+    new Map(
+      rows.map((row, index) => [JSON.stringify(row), { row, index }]),
+    ).values(),
+  );
+
+  return {
+    table: filteredTable,
+    rows: uniqueRows,
+    fields: filteredTable.schema.fields,
+  };
+});
+const selectedRowIndex = shallowRef<{ row: StructRowProxy; index: number }>();
+const data = computedAsync(async () => {
+  const detailValue = detail.value;
+  const indexRow = selectedRowIndex.value;
+  const indexTableValue = indexSelectionTable.value;
+  const datasetId = props.datasetId;
+  const xColumnValue = xColumn.value;
+  const yColumn = selectedSeries.value;
+
+  const columns = detailValue?.columns;
+  const indexTable = indexTableValue?.table;
+
+  if (
+    !columns ||
+    !indexTable ||
+    !((indexTable.numCols > 0 && indexRow) || indexTable.numCols == 0) ||
+    !datasetId ||
+    !xColumnValue ||
+    !yColumn
+  )
+    return undefined;
+
+  const xIndex = columns.findIndex((c) => c.name === xColumnValue.name);
+  const yIndex = columns.findIndex((c) => c.name === yColumn.name);
+  let newData: Table;
+  if (indexTable.numCols > 0 && indexRow) {
+    const indexRowTable = indexTable.slice(indexRow.index, indexRow.index + 1);
+    const buf = tableToIPC(indexRowTable);
+    const buf_base64 = btoa(String.fromCharCode(...buf));
+    newData = await fetchData(datasetId, {
+      indexFilters: buf_base64,
+      columns: [xIndex, yIndex],
+    });
+  } else {
+    newData = await fetchData(datasetId, {
+      columns: [xIndex, yIndex],
+    });
+  }
+  const x = newData.getChildAt(0)!.toArray() as TypedArray;
+  const y = newData.getChildAt(1)!.toArray() as TypedArray;
+  return {
+    x,
+    xName: xColumnValue.name,
+    series: [{ name: yColumn.name, data: y }],
+  };
+}, undefined);
 </script>
 
 <template>
-  <Splitter class="w-full h-full" layout="vertical">
-    <SplitterPanel>
-      <div ref="chart" class="w-full h-full"></div>
-    </SplitterPanel>
-    <SplitterPanel>
-      <DataTable
-        size="small"
-        :value="indexTable?.toArray()"
-        scrollable
-        scroll-height="flex"
-      >
-        <Column
-          v-for="col in indexTable?.schema.fields"
-          :key="col.name"
-          :field="col.name"
-          :header="col.name"
+  <div class="size-full flex flex-col">
+    <div class="p-2 flex">
+      <Select
+        v-model="chartType"
+        :options="chartTypes"
+        option-label="name"
+        option-value="value"
+        placeholder="Select a Chart Type"
+        class="mr-2"
+      />
+      <IftaLabel>
+        <Select
+          v-model="selectedSeries"
+          :options="nonIndexColumns"
+          option-label="name"
+          input-id="main-series-select"
+          fluid
         />
-      </DataTable>
-    </SplitterPanel>
-  </Splitter>
+        <label for="main-series-select">Select Series</label>
+      </IftaLabel>
+      <IftaLabel>
+        <Select
+          v-model="xColumn"
+          :options="xColumnOptions"
+          option-label="name"
+          input-id="x-column-select"
+          fluid
+        />
+        <label for="x-column-select">X</label>
+      </IftaLabel>
+    </div>
+    <Splitter class="flex-1 min-h-0" layout="vertical">
+      <SplitterPanel>
+        <ChartWrapper :data />
+      </SplitterPanel>
+      <SplitterPanel>
+        <DataTable
+          v-model:selection="selectedRowIndex"
+          size="small"
+          :value="indexSelectionTable?.rows"
+          data-key="index"
+          scrollable
+          scroll-height="flex"
+          selection-mode="single"
+        >
+          <Column
+            v-for="col in indexSelectionTable?.fields"
+            :key="col.name"
+            :field="(x) => x.row[col.name]"
+            :header="col.name"
+          />
+        </DataTable>
+      </SplitterPanel>
+    </Splitter>
+  </div>
 </template>

@@ -32,14 +32,14 @@ impl Serialize for Error {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct DatasetInfo {
-    id: i32,
-    name: String,
-    description: String,
-    tags: Vec<String>,
-    created_at: DateTime<Utc>,
+pub struct DatasetInfo {
+    pub id: i32,
+    pub name: String,
+    pub description: String,
+    pub tags: Vec<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Serialize)]
@@ -54,13 +54,13 @@ struct ColumnInfo {
     name: String,
     is_complex: bool,
     is_trace: bool,
+    is_index: bool,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DatasetDetail {
     columns: Vec<ColumnInfo>,
-    index: Option<Vec<usize>>,
 }
 
 #[derive(Deserialize)]
@@ -110,10 +110,12 @@ async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, E
 async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDetail, Error> {
     let reader = state.dataset(id).await?;
     let schema = reader.schema();
+    let index = reader.index_columns();
     let columns = schema
         .columns()
         .iter()
-        .map(|(name, data_type)| ColumnInfo {
+        .enumerate()
+        .map(|(i, (name, data_type))| ColumnInfo {
             name: name.to_owned(),
             is_complex: matches!(
                 data_type,
@@ -121,10 +123,10 @@ async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDe
                     | DatasetDataType::Trace(_, ScalarKind::Complex)
             ),
             is_trace: matches!(data_type, DatasetDataType::Trace(_, _)),
+            is_index: index.as_ref().is_some_and(|index| index.contains(&i)),
         })
         .collect();
-    let index = reader.index_columns();
-    Ok(DatasetDetail { columns, index })
+    Ok(DatasetDetail { columns })
 }
 
 #[tauri::command]

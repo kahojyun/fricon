@@ -40,10 +40,10 @@ pub fn do_create_dataset(
 
     let event = AppEvent::DatasetCreated {
         id: dataset.id,
-        uid: uid.to_string(),
         name: request.name,
         description: request.description,
         tags: request.tags,
+        created_at: dataset.created_at.and_utc(),
     };
     let _ = event_sender.send(event);
 

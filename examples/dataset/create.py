@@ -45,12 +45,22 @@ def multi_index(manager: DatasetManager) -> None:
                 writer.write(i=i, j=j, k=i + 1j * j)
 
 
+def special_name(manager: DatasetManager) -> None:
+    with manager.create("Special name") as writer:
+        for i in range(10):
+            for j in range(10):
+                writer.write_dict(
+                    {"Name with space": i, "∆J": j, "$x^2$": i**2, "©ˆ˙¬ƒ˚∆˜": j**0.5}
+                )
+
+
 def main():
     ws = Workspace.connect(".dev/ws")
     manager = ws.dataset_manager
     simple(manager)
     complex_data_types(manager)
     multi_index(manager)
+    special_name(manager)
 
 
 if __name__ == "__main__":

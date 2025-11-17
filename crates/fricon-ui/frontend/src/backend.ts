@@ -6,6 +6,14 @@ export interface WorkspaceInfo {
   path: string;
 }
 
+interface RawDatasetInfo {
+  id: number;
+  name: string;
+  description: string;
+  tags: string[];
+  createdAt: string;
+}
+
 export interface DatasetInfo {
   id: number;
   name: string;
@@ -18,16 +26,18 @@ export interface ColumnInfo {
   name: string;
   isComplex: boolean;
   isTrace: boolean;
+  isIndex: boolean;
 }
 
 export interface DatasetDetail {
   columns: ColumnInfo[];
-  index?: number[];
 }
 
 export interface DatasetDataOptions {
   start?: number;
   end?: number;
+  /** Single row arrow table encoded with BASE64 */
+  indexFilters?: string;
   columns?: number[];
 }
 
@@ -36,14 +46,6 @@ export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
 }
 
 export async function listDatasets(): Promise<DatasetInfo[]> {
-  interface RawDatasetInfo {
-    id: number;
-    name: string;
-    description: string;
-    tags: string[];
-    createdAt: string;
-  }
-
   const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets");
   return rawDatasets.map((dataset) => ({
     ...dataset,
@@ -63,18 +65,11 @@ export function datasetDetail(id: number): Promise<DatasetDetail> {
   return invoke<DatasetDetail>("dataset_detail", { id });
 }
 
-export interface DatasetCreatedEvent {
-  id: number;
-  uid: string;
-  name: string;
-  description: string;
-  tags: string[];
-}
-
-export function onDatasetCreated(
-  callback: (event: DatasetCreatedEvent) => void,
-) {
-  return listen<DatasetCreatedEvent>("dataset-created", (event) => {
-    callback(event.payload);
+export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
+  return listen<RawDatasetInfo>("dataset-created", (event) => {
+    callback({
+      ...event.payload,
+      createdAt: new Date(event.payload.createdAt),
+    });
   });
 }

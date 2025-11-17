@@ -18,7 +18,9 @@ use std::{
 };
 
 use arrow_arith::boolean::and;
-use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchReader, Scalar};
+use arrow_array::{
+    ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, RecordBatchReader, Scalar,
+};
 use arrow_ord::ord::make_comparator;
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -368,7 +370,7 @@ fn select_data<'a>(
             {
                 Ok(None)
             } else {
-                let arrays = selected_columns
+                let arrays: Vec<_> = selected_columns
                     .clone()
                     .into_iter()
                     .map(|x| {
@@ -380,7 +382,13 @@ fn select_data<'a>(
                         }
                     })
                     .collect();
-                Ok(Some(RecordBatch::try_new(output_schema.clone(), arrays)?))
+                let length = predicate.map_or_else(|| batch.num_rows(), |p| p.count());
+                let output_batch = RecordBatch::try_new_with_options(
+                    output_schema.clone(),
+                    arrays,
+                    &RecordBatchOptions::new().with_row_count(Some(length)),
+                )?;
+                Ok(Some(output_batch))
             }
         })
         .flatten_ok()

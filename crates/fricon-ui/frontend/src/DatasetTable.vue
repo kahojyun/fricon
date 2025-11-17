@@ -1,34 +1,21 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, type Ref } from "vue";
-import { Column, DataTable, Tag } from "primevue";
-import {
-  type DatasetCreatedEvent,
-  type DatasetInfo,
-  listDatasets,
-  onDatasetCreated,
-} from "./backend";
+import { onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { type DatasetInfo, listDatasets, onDatasetCreated } from "./backend";
 
 const emit = defineEmits<{
   datasetSelected: [id: number];
 }>();
-const value: Ref<DatasetInfo[]> = ref([]);
+const datasets = ref<DatasetInfo[]>([]);
+const selectedDataset = shallowRef<DatasetInfo>();
 
 let unsubscribe: (() => void) | null = null;
 
 const loadDatasets = async () => {
-  value.value = await listDatasets();
+  datasets.value = await listDatasets();
 };
 
-const handleDatasetCreated = (event: DatasetCreatedEvent) => {
-  // Add the new dataset to the list
-  const newDataset: DatasetInfo = {
-    id: event.id,
-    name: event.name,
-    description: event.description,
-    tags: event.tags,
-    createdAt: new Date(),
-  };
-  value.value.unshift(newDataset);
+const handleDatasetCreated = (event: DatasetInfo) => {
+  datasets.value.unshift(event);
 };
 
 onMounted(async () => {
@@ -44,7 +31,8 @@ onUnmounted(() => {
 </script>
 <template>
   <DataTable
-    :value="value"
+    v-model:selection="selectedDataset"
+    :value="datasets"
     size="small"
     data-key="id"
     selection-mode="single"

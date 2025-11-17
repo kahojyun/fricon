@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use chrono::Local;
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{sync::broadcast, task::JoinHandle, time};
@@ -24,10 +24,10 @@ use crate::{
 pub enum AppEvent {
     DatasetCreated {
         id: i32,
-        uid: String,
         name: String,
         description: String,
         tags: Vec<String>,
+        created_at: DateTime<Utc>,
     },
 }
 

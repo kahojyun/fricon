@@ -20,6 +20,8 @@ use tracing_appender::{
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+use crate::commands::DatasetInfo;
+
 struct AppState {
     manager: Mutex<Option<(fricon::AppManager, WorkerGuard)>>,
     current_dataset: Mutex<Option<(i32, Arc<fricon::DatasetReader>)>>,
@@ -47,20 +49,20 @@ impl AppState {
                 match event {
                     fricon::AppEvent::DatasetCreated {
                         id,
-                        uid,
                         name,
                         description,
                         tags,
+                        created_at,
                     } => {
                         let _ = app_handle.emit(
                             "dataset-created",
-                            serde_json::json!({
-                                "id": id,
-                                "uid": uid,
-                                "name": name,
-                                "description": description,
-                                "tags": tags
-                            }),
+                            DatasetInfo {
+                                id,
+                                name,
+                                description,
+                                tags,
+                                created_at,
+                            },
                         );
                     }
                 }
