@@ -14,6 +14,12 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2.9.1
         version: 2.9.1
+      '@tsconfig/node24':
+        specifier: ^24.0.2
+        version: 24.0.2
+      '@types/node':
+        specifier: ^24.9.1
+        version: 24.9.1
       eslint:
         specifier: ^9.38.0
         version: 9.38.0(jiti@2.6.1)
@@ -81,9 +87,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.1.16
         version: 4.1.16(vite@7.1.12(@types/node@24.9.1)(jiti@2.6.1)(lightningcss@1.30.2))
-      '@tsconfig/node22':
-        specifier: ^22.0.2
-        version: 22.0.2
+      '@tsconfig/node24':
+        specifier: ^24.0.2
+        version: 24.0.2
       '@types/node':
         specifier: ^24.9.1
         version: 24.9.1
@@ -816,8 +822,8 @@ packages:
   '@tauri-apps/plugin-opener@2.5.0':
     resolution: {integrity: sha512-B0LShOYae4CZjN8leiNDbnfjSrTwoZakqKaWpfoH6nXiJwt6Rgj6RnVIffG3DoJiKsffRhMkjmBV9VeilSb4TA==}
 
-  '@tsconfig/node22@22.0.2':
-    resolution: {integrity: sha512-Kmwj4u8sDRDrMYRoN9FDEcXD8UpBSaPQQ24Gz+Gamqfm7xxn+GBR7ge/Z7pK8OXNGyUzbSwJj+TH6B+DS/epyA==}
+  '@tsconfig/node24@24.0.2':
+    resolution: {integrity: sha512-CNeOLUPI9PjbBc1DSIqb3GF/u+3kX/TDe9DKCzoI62mYI4dEDrMQ0r/9+SfYACP4UNMbiTlz7n8H7Rx/xTisQg==}
 
   '@types/command-line-args@5.2.3':
     resolution: {integrity: sha512-uv0aG6R0Y8WHZLTamZwtfsDLVRnOa+n+n5rEvFWL5Na5gZ8V2Teab/duDPFzIIIhs9qizDpcavCusCLJZu62Kw==}
@@ -2598,7 +2604,7 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.9.0
 
-  '@tsconfig/node22@22.0.2': {}
+  '@tsconfig/node24@24.0.2': {}
 
   '@types/command-line-args@5.2.3': {}
 
