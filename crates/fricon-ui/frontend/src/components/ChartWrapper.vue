@@ -30,7 +30,7 @@ type EChartsOption = echarts.ComposeOption<
   | LineSeriesOption
 >;
 
-interface LineSeries {
+export interface LineSeries {
   name: string;
   data: number[] | TypedArray;
 }

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from fricon import DatasetManager, Workspace
+import numpy as np
+from fricon import DatasetManager, Trace, Workspace
 
 
 def simple(manager: DatasetManager) -> None:
@@ -35,6 +36,9 @@ def complex_data_types(manager: DatasetManager) -> None:
                 b=i * 2,  # int
                 c=complex(i, i * 2),  # complex number
                 d=[1, 2, 3],  # list
+                e=Trace.fixed_step(
+                    0.1, 0.5, np.exp(1j * np.linspace(0, i * np.pi, 20))
+                ),
             )
 
 

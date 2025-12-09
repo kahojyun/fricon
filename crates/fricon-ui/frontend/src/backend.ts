@@ -61,7 +61,7 @@ export async function fetchData(
   return tableFromIPC(buffer);
 }
 
-export function datasetDetail(id: number): Promise<DatasetDetail> {
+export function getDatasetDetail(id: number): Promise<DatasetDetail> {
   return invoke<DatasetDetail>("dataset_detail", { id });
 }
 
