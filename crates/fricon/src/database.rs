@@ -20,7 +20,7 @@ use diesel::{
 };
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::info;
 
 pub use self::{
     models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
