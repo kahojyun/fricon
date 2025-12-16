@@ -1,23 +1,21 @@
 use std::io::{Error as IoError, ErrorKind};
 
 use anyhow::bail;
-use arrow_array::RecordBatch;
 use arrow_ipc::reader::StreamReader;
-use arrow_schema::ArrowError;
 use futures::prelude::*;
-use tokio::{sync::mpsc, task::spawn_blocking};
-use tokio_stream::wrappers::ReceiverStream;
-use tokio_util::io::{StreamReader as TokioStreamReader, SyncIoBridge};
+use tokio_util::{
+    io::{StreamReader as TokioStreamReader, SyncIoBridge},
+    sync::CancellationToken,
+};
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace, warn};
 use uuid::Uuid;
 
 use crate::{
-    app::AppHandle,
     database::DatasetStatus,
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
-        DatasetRecord, DatasetUpdate,
+        CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetRecord,
+        DatasetUpdate, Error,
     },
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateAbort, CreateMetadata, CreateRequest,
@@ -113,12 +111,14 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
 
 pub struct Storage {
     manager: DatasetManager,
+    shutdown_token: CancellationToken,
 }
 
 impl Storage {
-    pub fn new(app: AppHandle) -> Self {
+    pub fn new(manager: DatasetManager, shutdown_token: CancellationToken) -> Self {
         Self {
-            manager: DatasetManager::new(app),
+            manager,
+            shutdown_token,
         }
     }
 }
@@ -148,11 +148,6 @@ impl TryFrom<proto::DatasetStatus> for DatasetStatus {
 
 #[tonic::async_trait]
 impl DatasetService for Storage {
-    #[expect(
-        clippy::too_many_lines,
-        reason = "The create method handles a complex gRPC streaming operation with many \
-                  validation steps"
-    )]
     async fn create(
         &self,
         request: Request<Streaming<CreateRequest>>,
@@ -196,7 +191,7 @@ impl DatasetService for Storage {
                 Some(CreateMessage::Abort(CreateAbort { reason })) => {
                     warn!("Client aborted the upload: {}", reason);
                     Err(IoError::new(
-                        ErrorKind::Interrupted,
+                        ErrorKind::UnexpectedEof,
                         format!("client aborted the upload: {reason}"),
                     ))
                 }
@@ -209,60 +204,48 @@ impl DatasetService for Storage {
                 }
             }
         });
-        let async_reader = TokioStreamReader::new(bytes_stream);
-        let sync_reader = SyncIoBridge::new(async_reader);
 
-        let (batch_tx, batch_rx) = mpsc::channel::<Result<RecordBatch, ArrowError>>(16);
-        let batch_stream = ReceiverStream::new(batch_rx);
+        let abortable_stream = stream::unfold(
+            (bytes_stream, self.shutdown_token.clone(), false),
+            |(mut stream, token, cancelled)| async move {
+                if cancelled {
+                    return None;
+                }
 
-        let read_task = tokio::spawn(async move {
-            let result = {
-                let batch_tx = batch_tx.clone();
-                spawn_blocking(move || {
-                    let reader = StreamReader::try_new(sync_reader, None)?;
-                    for batch_result in reader {
-                        let batch = batch_result?;
-                        if batch_tx.blocking_send(Ok(batch)).is_err() {
-                            break;
-                        }
+                tokio::select! {
+                    item = stream.next() => {
+                        item.map(|item| (item, (stream, token, false)))
                     }
-                    Ok::<_, ArrowError>(())
-                })
-                .await
-            };
-
-            match result {
-                Ok(Err(e)) => {
-                    let _ = batch_tx.send(Err(e)).await;
+                    () = token.cancelled() => {
+                        Some((
+                            Err(IoError::other(
+                                "Stream aborted because server is shutting down.")),
+                            (stream, token, true),
+                        ))
+                    }
                 }
-                Err(err) => {
-                    let _ = batch_tx
-                        .send(Err(ArrowError::ExternalError(Box::new(err))))
-                        .await;
-                }
-                _ => {}
-            }
-        });
-
+            },
+        )
+        .boxed();
+        let sync_reader = SyncIoBridge::new(TokioStreamReader::new(abortable_stream));
+        let batch_reader = || {
+            StreamReader::try_new(sync_reader, None).map_err(|e| Error::BatchStream {
+                message: e.to_string(),
+            })
+        };
         let create_request = CreateDatasetRequest {
             name,
             description,
             tags,
         };
-        let write_result = self
+        let record = self
             .manager
-            .create_dataset(create_request, batch_stream)
-            .await;
-
-        if let Err(e) = read_task.await {
-            error!("Read task failed: {:?}", e);
-        }
-
-        let record = write_result.map_err(|e| {
-            error!("Failed to write dataset: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
-
+            .create_dataset(create_request, batch_reader)
+            .await
+            .map_err(|e| {
+                error!("Failed to write dataset: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
         Ok(Response::new(CreateResponse {
             dataset: Some(record.into()),
         }))
@@ -286,7 +269,7 @@ impl DatasetService for Storage {
         let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
             error!("Failed to get dataset: {:?}", e);
             match e {
-                DatasetManagerError::NotFound { .. } => Status::not_found("dataset not found"),
+                Error::NotFound { .. } => Status::not_found("dataset not found"),
                 _ => Status::internal(e.to_string()),
             }
         })?;

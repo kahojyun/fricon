@@ -4,77 +4,67 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
+mod in_progress;
+mod tasks;
+mod write_registry;
+mod write_session;
+
 use std::{
-    error::Error as StdError,
-    io::{Error as IoError, ErrorKind},
-    path::Path,
+    borrow::Cow,
+    cmp::Ordering,
+    ops::{Bound, RangeBounds},
+    path::PathBuf,
+    sync::Arc,
 };
 
-use arrow_array::RecordBatch;
-use arrow_schema::ArrowError;
+use arrow_arith::boolean::and;
+use arrow_array::{
+    ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, RecordBatchReader, Scalar,
+};
+use arrow_ord::{cmp::eq, ord::make_comparator};
+use arrow_schema::{Schema, SchemaRef, SortOptions};
+use arrow_select::{concat::concat_batches, filter::FilterBuilder};
 use chrono::{DateTime, Utc};
+use derive_more::From;
 use diesel::result::Error as DieselError;
-use futures::prelude::*;
+use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
-use tokio::task::JoinError;
+use tokio::{sync::watch, task::JoinError};
 use tracing::error;
 use uuid::Uuid;
 
+use self::in_progress::WriteProgress;
+pub use self::write_registry::WriteSessionRegistry;
 use crate::{
+    DatasetDataType, DatasetSchema,
     app::{AppError, AppHandle},
     database::{self, DatabaseError, DatasetStatus},
-    dataset_tasks,
-    reader::DatasetReader,
+    dataset, dataset_fs,
+    dataset_fs::ChunkReader,
+    dataset_manager::write_session::WriteSessionHandle,
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum DatasetManagerError {
+pub enum Error {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
-
-    #[error("Schema validation failed: {message}")]
-    SchemaError { message: String },
-
-    #[error("Database error: {0}")]
+    #[error("No dataset file found.")]
+    EmptyDataset,
+    #[error("Dataset write stream error: {message}")]
+    BatchStream { message: String },
+    #[error(transparent)]
     Database(#[from] DatabaseError),
-
-    #[error("IO error: {0}")]
-    Io(#[from] IoError),
-
-    #[error("Arrow error: {0}")]
-    Arrow(#[from] ArrowError),
-
-    #[error("Task join error: {0}")]
+    #[error(transparent)]
+    Dataset(#[from] dataset::Error),
+    #[error(transparent)]
+    DatasetFs(#[from] dataset_fs::Error),
+    #[error(transparent)]
     TaskJoin(#[from] JoinError),
-
-    #[error("App error: {0}")]
+    #[error(transparent)]
     App(#[from] AppError),
 }
 
-impl DatasetManagerError {
-    pub(crate) fn io_invalid_data(message: impl Into<String>) -> Self {
-        Self::Io(IoError::new(ErrorKind::InvalidData, message.into()))
-    }
-
-    pub fn stream_error(error: impl StdError) -> Self {
-        Self::io_invalid_data(format!("Stream error: {error}"))
-    }
-
-    #[must_use]
-    pub fn empty_stream() -> Self {
-        Self::Io(IoError::new(ErrorKind::UnexpectedEof, "Stream is empty"))
-    }
-
-    #[must_use]
-    pub fn path_already_exists(path: &Path) -> Self {
-        Self::Io(IoError::new(
-            ErrorKind::AlreadyExists,
-            format!("Dataset path already exists: {}", path.display()),
-        ))
-    }
-}
-
-impl From<DieselError> for DatasetManagerError {
+impl From<DieselError> for Error {
     fn from(error: DieselError) -> Self {
         match error {
             DieselError::NotFound => Self::NotFound {
@@ -116,7 +106,7 @@ pub struct DatasetUpdate {
     pub favorite: Option<bool>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, From)]
 pub enum DatasetId {
     Id(i32),
     Uid(Uuid),
@@ -133,111 +123,92 @@ impl DatasetManager {
         Self { app }
     }
 
-    pub async fn create_dataset<S, E>(
+    pub async fn create_dataset<F, I>(
         &self,
         request: CreateDatasetRequest,
-        stream: S,
-    ) -> Result<DatasetRecord, DatasetManagerError>
+        reader: F,
+    ) -> Result<DatasetRecord, Error>
     where
-        S: Stream<Item = Result<RecordBatch, E>> + Send + 'static + Unpin,
-        E: StdError + Send + Sync + 'static,
+        F: FnOnce() -> Result<I, Error> + Send + 'static,
+        I: RecordBatchReader,
     {
-        let stream: Box<
-            dyn Stream<Item = Result<RecordBatch, Box<dyn StdError + Send + Sync>>> + Send + Unpin,
-        > = Box::new(stream.map_err(|e| Box::new(e) as Box<dyn StdError + Send + Sync>));
-
-        let join_handle = self.app.spawn(move |state| async move {
-            let result = dataset_tasks::do_create_dataset(
-                &state.database,
-                &state.root,
-                &state.event_sender,
-                &state.write_sessions,
-                &state.tracker,
-                request,
-                stream,
-            )
-            .await;
-            if let Err(e) = &result {
-                error!("Dataset creation failed: {}", e);
-            }
-            result
-        })?;
-
-        join_handle.await?
+        self.app
+            .spawn_blocking(move |state| {
+                reader()
+                    .and_then(|batches| {
+                        tasks::do_create_dataset(
+                            &state.database,
+                            &state.root,
+                            &state.event_sender,
+                            &state.write_sessions,
+                            request,
+                            batches,
+                        )
+                    })
+                    .inspect_err(|e| {
+                        error!("Dataset creation failed: {e}");
+                    })
+            })?
+            .await?
     }
 
-    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_get_dataset(&state.database, id).await
-        })?;
-
-        join_handle.await?
+    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error> {
+        self.app
+            .spawn_blocking(move |state| tasks::do_get_dataset(&mut *state.database.get()?, id))?
+            .await?
     }
 
-    pub async fn list_datasets(&self) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_list_datasets(&state.database).await
-        })?;
-
-        join_handle.await?
+    pub async fn list_datasets(&self) -> Result<Vec<DatasetRecord>, Error> {
+        self.app
+            .spawn_blocking(move |state| tasks::do_list_datasets(&mut *state.database.get()?))?
+            .await?
     }
 
-    pub async fn update_dataset(
-        &self,
-        id: i32,
-        update: DatasetUpdate,
-    ) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_update_dataset(&state.database, id, update).await
-        })?;
-
-        join_handle.await?
+    pub async fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), Error> {
+        self.app
+            .spawn_blocking(move |state| {
+                tasks::do_update_dataset(&mut *state.database.get()?, id, update)
+            })?
+            .await?
     }
 
-    pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_add_tags(&state.database, id, tags).await
-        })?;
-
-        join_handle.await?
+    pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
+        self.app
+            .spawn_blocking(move |state| {
+                tasks::do_add_tags(&mut *state.database.get()?, id, &tags)
+            })?
+            .await?
     }
 
-    pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_remove_tags(&state.database, id, tags).await
-        })?;
-
-        join_handle.await?
+    pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
+        self.app
+            .spawn_blocking(move |state| {
+                tasks::do_remove_tags(&mut *state.database.get()?, id, &tags)
+            })?
+            .await?
     }
 
-    pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            let result = dataset_tasks::do_delete_dataset(&state.database, &state.root, id).await;
-            if let Err(e) = &result {
-                error!("Dataset deletion failed: {}", e);
-            }
-            result
-        })?;
-
-        join_handle.await?
+    pub async fn delete_dataset(&self, id: i32) -> Result<(), Error> {
+        self.app
+            .spawn_blocking(move |state| {
+                tasks::do_delete_dataset(&state.database, &state.root, id).inspect_err(|e| {
+                    error!("Dataset deletion failed: {e}");
+                })
+            })?
+            .await?
     }
 
-    /// Return a unified dataset reader (Completed or Live/Writing).
-    pub async fn get_dataset_reader(
-        &self,
-        id: DatasetId,
-    ) -> Result<DatasetReader, DatasetManagerError> {
-        let join_handle = self.app.spawn(move |state| async move {
-            dataset_tasks::do_get_dataset_reader(
-                &state.database,
-                &state.root,
-                &state.write_sessions,
-                id,
-            )
-            .await
-        })?;
-
-        join_handle.await?
+    pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, Error> {
+        self.app
+            .spawn_blocking(move |state| {
+                tasks::do_get_dataset_reader(
+                    &state.database,
+                    &state.root,
+                    &state.write_sessions,
+                    id,
+                )
+            })?
+            .await?
     }
 }
 
@@ -257,6 +228,249 @@ impl DatasetRecord {
         Self {
             id: dataset.id,
             metadata,
+        }
+    }
+}
+
+enum DatasetSource {
+    WriteSession(WriteSessionHandle),
+    File(ChunkReader),
+}
+
+impl DatasetSource {
+    fn num_rows(&self) -> usize {
+        match self {
+            DatasetSource::WriteSession(h) => h.inner().num_rows(),
+            DatasetSource::File(r) => r.num_rows(),
+        }
+    }
+    fn subscribe(&self) -> Option<watch::Receiver<WriteProgress>> {
+        match self {
+            DatasetSource::WriteSession(h) => Some(h.inner().subscribe()),
+            DatasetSource::File(_) => None,
+        }
+    }
+    fn range<R>(&self, range: R) -> Vec<RecordBatch>
+    where
+        R: RangeBounds<usize> + Copy,
+    {
+        match self {
+            DatasetSource::WriteSession(h) => h
+                .inner()
+                .range(range)
+                .map(std::borrow::Cow::into_owned)
+                .collect(),
+            DatasetSource::File(r) => r.range(range).map(std::borrow::Cow::into_owned).collect(),
+        }
+    }
+    fn select_data(&self, options: &SelectOptions) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+        let index_filters = options.index_filters.as_ref();
+        let selected_columns = options.selected_columns.as_deref();
+        let result = match self {
+            DatasetSource::WriteSession(h) => {
+                let inner = h.inner();
+                select_data(
+                    inner.range((options.start, options.end)),
+                    inner.schema(),
+                    index_filters,
+                    selected_columns,
+                )
+            }
+            DatasetSource::File(r) => select_data(
+                r.range((options.start, options.end)),
+                r.schema().ok_or(Error::EmptyDataset)?,
+                index_filters,
+                selected_columns,
+            ),
+        }?;
+        Ok(result)
+    }
+}
+
+pub struct DatasetReader {
+    source: DatasetSource,
+    schema: DatasetSchema,
+    arrow_schema: SchemaRef,
+}
+
+pub struct SelectOptions {
+    pub start: Bound<usize>,
+    pub end: Bound<usize>,
+    pub index_filters: Option<RecordBatch>,
+    pub selected_columns: Option<Vec<usize>>,
+}
+
+#[derive(Debug, Default)]
+struct Filter {
+    filters: Vec<(usize, Scalar<ArrayRef>)>,
+}
+
+impl Filter {
+    fn new(schema: &Schema, filters: &RecordBatch) -> Result<Self, dataset::Error> {
+        if filters.schema().fields.is_empty() {
+            Ok(Self { filters: vec![] })
+        } else if filters.num_rows() != 1 {
+            Err(dataset::Error::InvalidFilter)
+        } else {
+            let filters = filters
+                .schema_ref()
+                .fields
+                .iter()
+                .zip(filters.columns())
+                .map(|(field, column)| {
+                    let column_index = schema
+                        .column_with_name(field.name())
+                        .ok_or(dataset::Error::InvalidFilter)?
+                        .0;
+                    Ok::<_, dataset::Error>((column_index, Scalar::new(column.clone())))
+                })
+                .try_collect()?;
+            Ok(Self { filters })
+        }
+    }
+
+    fn build_predicate(&self, batch: &RecordBatch) -> Result<Option<BooleanArray>, dataset::Error> {
+        Ok(self
+            .filters
+            .iter()
+            .map(|(i, v)| eq(batch.column(*i), v))
+            .reduce(|x, y| x.and_then(|x| y.and_then(|y| and(&x, &y))))
+            .transpose()?)
+    }
+}
+
+fn select_data<'a>(
+    source: impl Iterator<Item = Cow<'a, RecordBatch>>,
+    source_schema: &SchemaRef,
+    index_filters: Option<&RecordBatch>,
+    selected_columns: Option<&[usize]>,
+) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::Error> {
+    let filter = if let Some(f) = index_filters {
+        Filter::new(source_schema, f)?
+    } else {
+        Filter::default()
+    };
+    let (output_schema, selected_columns) = if let Some(c) = selected_columns {
+        (
+            Arc::new(source_schema.project(c)?),
+            Either::Left(c.iter().copied()),
+        )
+    } else {
+        (
+            source_schema.clone(),
+            Either::Right(0..source_schema.fields.len()),
+        )
+    };
+    let results = source
+        .map(|batch| -> Result<_, dataset::Error> {
+            let mask = filter.build_predicate(&batch)?;
+            let predicate = mask.map(|m| {
+                let mut builder = FilterBuilder::new(&m);
+                if output_schema.fields.len() > 1 {
+                    builder = builder.optimize();
+                }
+                builder.build()
+            });
+            if let Some(p) = &predicate
+                && p.count() == 0
+            {
+                Ok(None)
+            } else {
+                let arrays: Vec<_> = selected_columns
+                    .clone()
+                    .into_iter()
+                    .map(|x| {
+                        let array = batch.column(x);
+                        if let Some(p) = &predicate {
+                            p.filter(array).expect("Should have correct length")
+                        } else {
+                            array.clone()
+                        }
+                    })
+                    .collect();
+                let length = predicate.map_or_else(|| batch.num_rows(), |p| p.count());
+                let output_batch = RecordBatch::try_new_with_options(
+                    output_schema.clone(),
+                    arrays,
+                    &RecordBatchOptions::new().with_row_count(Some(length)),
+                )?;
+                Ok(Some(output_batch))
+            }
+        })
+        .flatten_ok()
+        .try_collect()?;
+    Ok((output_schema, results))
+}
+
+impl DatasetReader {
+    fn from_handle(source: WriteSessionHandle) -> Result<Self, Error> {
+        let arrow_schema = source.inner().schema().clone();
+        let schema = arrow_schema.as_ref().try_into()?;
+        Ok(Self {
+            source: DatasetSource::WriteSession(source),
+            schema,
+            arrow_schema,
+        })
+    }
+    fn open_dir(path: PathBuf) -> Result<Self, Error> {
+        let mut reader = ChunkReader::new(path, None);
+        reader.read_all()?;
+        let arrow_schema = reader.schema().ok_or(Error::EmptyDataset)?.clone();
+        let schema = arrow_schema.as_ref().try_into()?;
+        Ok(Self {
+            source: DatasetSource::File(reader),
+            schema,
+            arrow_schema,
+        })
+    }
+    #[must_use]
+    pub fn schema(&self) -> &DatasetSchema {
+        &self.schema
+    }
+    #[must_use]
+    pub fn arrow_schema(&self) -> &SchemaRef {
+        &self.arrow_schema
+    }
+    #[must_use]
+    pub fn subscribe(&self) -> Option<watch::Receiver<WriteProgress>> {
+        self.source.subscribe()
+    }
+    #[must_use]
+    pub fn batches(&self) -> Vec<RecordBatch> {
+        self.source.range(..)
+    }
+    pub fn select_data(
+        &self,
+        options: &SelectOptions,
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+        self.source.select_data(options)
+    }
+    #[must_use]
+    pub fn index_columns(&self) -> Option<Vec<usize>> {
+        if self.source.num_rows() < 2 {
+            None
+        } else {
+            let sample = self.source.range(..2);
+            let sample =
+                concat_batches(&sample[0].schema(), &sample).expect("Should have same schema");
+            let mut result = vec![];
+            for (i, (sample_array, column_type)) in sample
+                .columns()
+                .iter()
+                .zip(self.schema.columns().values())
+                .enumerate()
+            {
+                if !matches!(column_type, DatasetDataType::Scalar(_)) {
+                    break;
+                }
+                result.push(i);
+                let cmp = make_comparator(sample_array, sample_array, SortOptions::default())
+                    .expect("Should be self comparable");
+                if cmp(0, 1) != Ordering::Equal {
+                    break;
+                }
+            }
+            Some(result)
         }
     }
 }

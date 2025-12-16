@@ -12,5 +12,6 @@ pnpm-lock.yaml
 .github/instructions
 .serena
 
+components.d.ts
 .pre-commit-config.yaml
 CHANGELOG.md

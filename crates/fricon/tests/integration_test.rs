@@ -172,7 +172,7 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
     WorkspaceRoot::create_new(workspace_path)?;
 
     // Start the server
-    let app_manager = AppManager::serve_with_path(workspace_path).await?;
+    let app_manager = AppManager::serve_with_path(workspace_path)?;
 
     // Connect the client
     let client = Client::connect(workspace_path).await?;
@@ -186,7 +186,7 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
         "test_dataset".to_string(),
         "Test dataset for integration test".to_string(),
         vec!["test".to_string(), "integration".to_string()],
-        test_schema,
+        test_schema.clone(),
     )?;
 
     // Write the test rows
@@ -206,12 +206,10 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
     let reader = dataset_manager
         .get_dataset_reader(DatasetId::Id(dataset.id()))
         .await?;
-    let loaded_batches: Vec<RecordBatch> = reader
-        .batches()
-        .expect("expected completed dataset")
-        .to_vec();
+    let loaded_batches: Vec<RecordBatch> = reader.batches();
 
     // Verify loaded data matches original
+    assert_eq!(reader.schema(), &test_schema);
     assert_eq!(loaded_batches.len(), 1);
     let loaded_batch = &loaded_batches[0];
 

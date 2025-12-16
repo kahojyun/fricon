@@ -1,17 +1,29 @@
 mod arrays;
 mod scalars;
+mod table;
 mod types;
 mod utils;
 
-pub use arrays::{DatasetArray, ScalarArray};
-pub use scalars::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace};
-pub use types::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind};
-pub use utils::downcast_array;
+use arrow_schema::ArrowError;
+
+pub use self::{
+    arrays::{DatasetArray, ScalarArray},
+    scalars::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace},
+    table::ChunkedTable,
+    types::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
+    utils::downcast_array,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Incompatible data type")]
+    #[error("Incompatible data type.")]
     IncompatibleType,
-    #[error("X and Y length mismatch")]
+    #[error("X and Y length of trace mismatch.")]
     TraceLengthMismatch,
+    #[error("Schema mismatch.")]
+    SchemaMismatch,
+    #[error("Invalid filter table.")]
+    InvalidFilter,
+    #[error(transparent)]
+    Arrow(#[from] ArrowError),
 }

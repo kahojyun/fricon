@@ -10,17 +10,13 @@ mod app;
 mod client;
 mod database;
 mod dataset;
+mod dataset_fs;
 mod dataset_manager;
-mod dataset_tasks;
 mod ipc;
-mod live;
 mod proto;
-mod reader;
 mod server;
 mod utils;
 mod workspace;
-mod write_registry;
-mod write_session;
 
 pub use self::{
     app::{AppEvent, AppHandle, AppManager},
@@ -31,9 +27,9 @@ pub use self::{
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace, downcast_array,
     },
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetManager, DatasetManagerError, DatasetMetadata,
+        CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetReader,
+        SelectOptions,
     },
-    reader::DatasetReader,
     server::DatasetRecord,
     workspace::{WorkspaceRoot, get_log_dir},
 };

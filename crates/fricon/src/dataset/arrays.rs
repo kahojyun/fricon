@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arrow_array::{Array, ArrayRef, Float64Array, ListArray, StructArray};
 use arrow_buffer::OffsetBuffer;
-use arrow_schema::{DataType, Field};
+use arrow_schema::{DataType, Field, extension::ExtensionType};
 use derive_more::From;
 use num::complex::Complex64;
 
@@ -151,6 +151,15 @@ impl From<ScalarListArray> for ArrayRef {
     }
 }
 
+impl TryFrom<ArrayRef> for ScalarListArray {
+    type Error = Error;
+    fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
+        let array: Arc<ListArray> = utils::downcast_array(value)?;
+        let scalar_kind = array.values().data_type().try_into()?;
+        Ok(Self { array, scalar_kind })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FixedStepTraceArray {
     array: Arc<StructArray>,
@@ -199,6 +208,16 @@ impl From<FixedStepTraceArray> for ArrayRef {
     }
 }
 
+impl TryFrom<ArrayRef> for FixedStepTraceArray {
+    type Error = Error;
+    fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
+        let array: Arc<StructArray> = utils::downcast_array(value)?;
+        TraceKind::FixedStep.supports_data_type(array.data_type())?;
+        let scalar_kind = array.column(2).data_type().try_into()?;
+        Ok(Self { array, scalar_kind })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VariableStepTraceArray {
     array: Arc<StructArray>,
@@ -241,6 +260,16 @@ impl From<VariableStepTrace> for VariableStepTraceArray {
 impl From<VariableStepTraceArray> for ArrayRef {
     fn from(value: VariableStepTraceArray) -> Self {
         value.array
+    }
+}
+
+impl TryFrom<ArrayRef> for VariableStepTraceArray {
+    type Error = Error;
+    fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
+        let array: Arc<StructArray> = utils::downcast_array(value)?;
+        TraceKind::VariableStep.supports_data_type(array.data_type())?;
+        let scalar_kind = array.column(1).data_type().try_into()?;
+        Ok(Self { array, scalar_kind })
     }
 }
 

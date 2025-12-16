@@ -55,23 +55,30 @@ class DatasetManager:
 
 _ScalarT_co = TypeVar("_ScalarT_co", float, complex, covariant=True)
 _ArrowAnyArray: TypeAlias = pa.Array[Any]  # pyright: ignore[reportExplicitAny]
+_NumpyAnyArray: TypeAlias = npt.NDArray[Any]  # pyright: ignore[reportExplicitAny]
 
 @final
 class Trace:
     @staticmethod
     def variable_step(
         x: Sequence[float] | npt.NDArray[float64],
-        y: Sequence[_ScalarT_co] | _ArrowAnyArray,
+        y: Sequence[_ScalarT_co] | _ArrowAnyArray | _NumpyAnyArray,
     ) -> Trace: ...
     @staticmethod
     def fixed_step(
         x0: float,
         step: float,
-        y: Sequence[_ScalarT_co] | _ArrowAnyArray,
+        y: Sequence[_ScalarT_co] | _ArrowAnyArray | _NumpyAnyArray,
     ) -> Trace: ...
 
 _ColumnType: TypeAlias = (
-    float | complex | Sequence[float] | Sequence[complex] | Trace | _ArrowAnyArray
+    float
+    | complex
+    | Sequence[float]
+    | Sequence[complex]
+    | Trace
+    | _ArrowAnyArray
+    | _NumpyAnyArray
 )
 
 @final

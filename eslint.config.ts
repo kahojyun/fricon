@@ -1,11 +1,12 @@
 // https://eslint.vuejs.org/user-guide/#example-configuration-with-typescript-eslint-and-prettier
+import { defineConfig } from "eslint/config";
 import eslint from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import eslintPluginVue from "eslint-plugin-vue";
 import globals from "globals";
 import typescriptEslint from "typescript-eslint";
 
-export default typescriptEslint.config(
+export default defineConfig(
   {
     ignores: [
       "*.d.ts",

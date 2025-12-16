@@ -1,22 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { type Table, tableFromIPC } from "apache-arrow";
 
 export interface WorkspaceInfo {
   path: string;
-  is_ready: boolean;
-}
-
-export interface ServerStatus {
-  is_running: boolean;
-  ipc_path: string;
-}
-
-export interface DatasetInfo {
-  id: number;
-  name: string;
-  description: string;
-  tags: string[];
-  created_at: Date;
 }
 
 interface RawDatasetInfo {
@@ -24,37 +11,81 @@ interface RawDatasetInfo {
   name: string;
   description: string;
   tags: string[];
-  created_at: string;
+  createdAt: string;
 }
 
-export async function getWorkspaceInfo(): Promise<WorkspaceInfo> {
-  return await invoke<WorkspaceInfo>("get_workspace_info");
+export interface DatasetInfo {
+  id: number;
+  name: string;
+  description: string;
+  tags: string[];
+  createdAt: Date;
 }
 
-export async function getServerStatus(): Promise<ServerStatus> {
-  return await invoke<ServerStatus>("get_server_status");
+export interface ColumnInfo {
+  name: string;
+  isComplex: boolean;
+  isTrace: boolean;
+  isIndex: boolean;
+}
+
+export interface DatasetDetail {
+  columns: ColumnInfo[];
+}
+
+export interface DatasetDataOptions {
+  start?: number;
+  end?: number;
+  /** Single row arrow table encoded with BASE64 */
+  indexFilters?: string;
+  columns?: number[];
+}
+
+export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
+  return invoke<WorkspaceInfo>("get_workspace_info");
 }
 
 export async function listDatasets(): Promise<DatasetInfo[]> {
   const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets");
   return rawDatasets.map((dataset) => ({
     ...dataset,
-    created_at: new Date(dataset.created_at),
+    createdAt: new Date(dataset.createdAt),
   }));
 }
 
-export interface DatasetCreatedEvent {
-  id: number;
-  uid: string;
-  name: string;
-  description: string;
-  tags: string[];
+export async function fetchData(
+  id: number,
+  options: DatasetDataOptions,
+): Promise<Table> {
+  const buffer = await invoke<ArrayBuffer>("dataset_data", { id, options });
+  return tableFromIPC(buffer);
 }
 
-export function onDatasetCreated(
-  callback: (event: DatasetCreatedEvent) => void,
-) {
-  return listen<DatasetCreatedEvent>("dataset-created", (event) => {
-    callback(event.payload);
+export function getDatasetDetail(id: number): Promise<DatasetDetail> {
+  return invoke<DatasetDetail>("dataset_detail", { id });
+}
+
+export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
+  return listen<RawDatasetInfo>("dataset-created", (event) => {
+    callback({
+      ...event.payload,
+      createdAt: new Date(event.payload.createdAt),
+    });
   });
+}
+
+export interface DatasetWriteProgress {
+  rowCount: number;
+}
+
+export async function subscribeDatasetUpdate(
+  id: number,
+  callback: (e: DatasetWriteProgress) => unknown,
+) {
+  const onUpdate = new Channel<DatasetWriteProgress>();
+  onUpdate.onmessage = callback;
+  await invoke("subscribe_dataset_update", { id, onUpdate });
+  return async () => {
+    await invoke("unsubscribe_dataset_update", { channelId: onUpdate.id });
+  };
 }

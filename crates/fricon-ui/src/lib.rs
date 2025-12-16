@@ -1,6 +1,10 @@
 mod commands;
 
-use std::{io, path::PathBuf, sync::Mutex};
+use std::{
+    io,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::{Context as _, Result};
 use tauri::{
@@ -9,20 +13,29 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tokio::signal;
-use tracing::info;
+use tracing::{info, level_filters::LevelFilter};
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-struct AppState(Mutex<Option<(fricon::AppManager, WorkerGuard)>>);
+use crate::commands::DatasetInfo;
+
+struct AppState {
+    manager: Mutex<Option<(fricon::AppManager, WorkerGuard)>>,
+    current_dataset: Mutex<Option<(i32, Arc<fricon::DatasetReader>)>>,
+}
 
 impl AppState {
-    async fn new(workspace_path: PathBuf) -> Result<Self> {
+    fn new(workspace_path: PathBuf) -> Result<Self> {
+        let _runtime_guard = async_runtime::handle().inner().enter();
         let log_guard = setup_logging(workspace_path.clone())?;
-        let app_manager = fricon::AppManager::serve_with_path(&workspace_path).await?;
-        Ok(Self(Mutex::new(Some((app_manager, log_guard)))))
+        let app_manager = fricon::AppManager::serve_with_path(workspace_path)?;
+        Ok(Self {
+            manager: Mutex::new(Some((app_manager, log_guard))),
+            current_dataset: Mutex::new(None),
+        })
     }
 
     fn start_event_listener(&self, app_handle: tauri::AppHandle) {
@@ -36,20 +49,20 @@ impl AppState {
                 match event {
                     fricon::AppEvent::DatasetCreated {
                         id,
-                        uid,
                         name,
                         description,
                         tags,
+                        created_at,
                     } => {
                         let _ = app_handle.emit(
                             "dataset-created",
-                            serde_json::json!({
-                                "id": id,
-                                "uid": uid,
-                                "name": name,
-                                "description": description,
-                                "tags": tags
-                            }),
+                            DatasetInfo {
+                                id,
+                                name,
+                                description,
+                                tags,
+                                created_at,
+                            },
                         );
                     }
                 }
@@ -58,7 +71,7 @@ impl AppState {
     }
 
     fn app(&self) -> fricon::AppHandle {
-        self.0
+        self.manager
             .lock()
             .expect("Failed to acquire lock on app state")
             .as_ref()
@@ -71,7 +84,7 @@ impl AppState {
     fn shutdown(&self) {
         async_runtime::block_on(async {
             let (app_manager, _guard) = self
-                .0
+                .manager
                 .lock()
                 .expect("Failed to acquire lock on app state")
                 .take()
@@ -79,11 +92,34 @@ impl AppState {
             app_manager.shutdown().await;
         });
     }
+
+    async fn dataset(&self, id: i32) -> Result<Arc<fricon::DatasetReader>> {
+        if let Some((current_id, current_dataset)) = self
+            .current_dataset
+            .lock()
+            .expect("Should not be poisoned.")
+            .clone()
+            && current_id == id
+        {
+            Ok(current_dataset)
+        } else {
+            let dataset = self
+                .app()
+                .dataset_manager()
+                .get_dataset_reader(id.into())
+                .await?;
+            let dataset = Arc::new(dataset);
+            *self
+                .current_dataset
+                .lock()
+                .expect("Should not be poisoned.") = Some((id, dataset.clone()));
+            Ok(dataset)
+        }
+    }
 }
 
 pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
-    let app_state = async_runtime::block_on(AppState::new(workspace_path))
-        .context("Failed to open workspace")?;
+    let app_state = AppState::new(workspace_path).context("Failed to open workspace")?;
 
     #[expect(clippy::exit, reason = "Required by Tauri framework")]
     let tauri_app = tauri::Builder::default()
@@ -190,12 +226,19 @@ fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
     let rolling = RollingFileAppender::new(Rotation::DAILY, log_dir, "fricon.log");
     let (writer, guard) = tracing_appender::non_blocking(rolling);
     let file_layer = fmt::layer().json().with_writer(writer);
-
-    let registry = tracing_subscriber::registry().with(file_layer);
-
-    #[cfg(debug_assertions)]
-    let registry = registry.with(fmt::layer().with_writer(io::stdout));
-
-    registry.with(EnvFilter::from_default_env()).init();
+    let stdout_layer = if cfg!(debug_assertions) {
+        Some(fmt::layer().with_writer(io::stdout))
+    } else {
+        None
+    };
+    tracing_subscriber::registry()
+        .with(file_layer)
+        .with(stdout_layer)
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
     Ok(guard)
 }

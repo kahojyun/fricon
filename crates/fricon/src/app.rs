@@ -5,8 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use chrono::Local;
-use deadpool_diesel::sqlite::Pool;
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{sync::broadcast, task::JoinHandle, time};
@@ -15,20 +14,20 @@ use tracing::{error, info};
 
 use crate::{
     database,
-    dataset_manager::DatasetManager,
+    database::Pool,
+    dataset_manager::{DatasetManager, WriteSessionRegistry},
     server,
     workspace::{WorkspacePaths, WorkspaceRoot},
-    write_registry::WriteSessionRegistry,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AppEvent {
     DatasetCreated {
         id: i32,
-        uid: String,
         name: String,
         description: String,
         tags: Vec<String>,
+        created_at: DateTime<Utc>,
     },
 }
 
@@ -48,12 +47,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    async fn new(root: WorkspaceRoot) -> Result<Arc<Self>> {
+    fn new(root: WorkspaceRoot) -> Result<Arc<Self>> {
         let db_path = root.paths().database_file();
         let backup_path = root
             .paths()
             .database_backup_file(Local::now().naive_local());
-        let database = database::connect(db_path, backup_path).await?;
+        let database = database::connect(db_path, backup_path)?;
         let shutdown_token = CancellationToken::new();
         let tracker = TaskTracker::new();
         let (event_sender, _) = broadcast::channel(1000);
@@ -76,20 +75,20 @@ pub struct AppHandle {
 }
 
 impl AppHandle {
-    pub(crate) fn new(state: Weak<AppState>) -> Self {
+    fn new(state: Weak<AppState>) -> Self {
         Self { state }
     }
 
-    pub(crate) fn get_state(&self) -> Result<Arc<AppState>, AppError> {
+    fn state(&self) -> Result<Arc<AppState>, AppError> {
         self.state.upgrade().ok_or(AppError::StateDropped)
     }
 
     pub fn paths(&self) -> Result<WorkspacePaths, AppError> {
-        Ok(self.get_state()?.root.paths().clone())
+        Ok(self.state()?.root.paths().clone())
     }
 
     pub fn subscribe_to_events(&self) -> Result<broadcast::Receiver<AppEvent>, AppError> {
-        Ok(self.get_state()?.event_sender.subscribe())
+        Ok(self.state()?.event_sender.subscribe())
     }
 
     #[must_use]
@@ -103,7 +102,7 @@ impl AppHandle {
         Fut: Future<Output = T> + Send + 'static,
         T: Send + 'static,
     {
-        let state = self.get_state()?;
+        let state = self.state()?;
         let tracker = state.tracker.clone();
         Ok(tracker.spawn(f(state)))
     }
@@ -113,7 +112,7 @@ impl AppHandle {
         F: FnOnce(Arc<AppState>) -> T + Send + 'static,
         T: Send + 'static,
     {
-        let state = self.get_state()?;
+        let state = self.state()?;
         let tracker = state.tracker.clone();
         Ok(tracker.spawn_blocking(move || f(state)))
     }
@@ -125,14 +124,14 @@ pub struct AppManager {
 }
 
 impl AppManager {
-    pub async fn serve(root: WorkspaceRoot) -> Result<Self> {
-        let state = AppState::new(root).await?;
+    pub fn serve(root: WorkspaceRoot) -> Result<Self> {
+        let state = AppState::new(root)?;
         let handle = AppHandle::new(Arc::downgrade(&state));
 
         let ipc_file = handle.paths()?.ipc_file();
         server::start(
             ipc_file,
-            handle.clone(),
+            &handle,
             &state.tracker,
             state.shutdown_token.clone(),
         )?;
@@ -141,9 +140,9 @@ impl AppManager {
     }
 
     /// Creates a new `AppManager` with workspace creation.
-    pub async fn serve_with_path(path: impl Into<PathBuf>) -> Result<Self> {
+    pub fn serve_with_path(path: impl Into<PathBuf>) -> Result<Self> {
         let root = WorkspaceRoot::create(path)?;
-        Self::serve(root).await
+        Self::serve(root)
     }
 
     pub async fn shutdown(self) {
@@ -157,9 +156,6 @@ impl AppManager {
             self.state.shutdown_token.cancel();
             self.state.tracker.close();
             self.state.tracker.wait().await;
-            drop(self.state);
-            // Wait for sqlite connection release
-            time::sleep(Duration::from_millis(200)).await;
         })
         .await;
 

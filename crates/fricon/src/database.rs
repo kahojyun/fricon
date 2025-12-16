@@ -8,19 +8,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, anyhow};
-use deadpool_diesel::{
-    Runtime,
-    sqlite::{Hook, HookError, Manager, Pool},
-};
 use diesel::{
-    QueryResult, RunQueryDsl, SqliteConnection, connection::SimpleConnection,
-    migration::MigrationSource, result::Error as DieselError, sql_types::Text, sqlite::Sqlite,
+    RunQueryDsl, SqliteConnection,
+    connection::SimpleConnection,
+    migration::MigrationSource,
+    r2d2,
+    r2d2::{ConnectionManager, CustomizeConnection},
+    result::Error as DieselError,
+    sql_types::Text,
+    sqlite::Sqlite,
 };
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-use futures::FutureExt;
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::info;
 
 pub use self::{
     models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
@@ -29,109 +29,93 @@ pub use self::{
 
 #[derive(Debug, Error)]
 pub enum DatabaseError {
+    #[error("Invalid backup path encoding.")]
+    InvalidBackupPath,
+    #[error("Migration failed: {0}")]
+    Migration(Box<dyn StdError + Send + Sync>),
     #[error(transparent)]
-    Pool(#[from] deadpool_diesel::PoolError),
-
-    #[error(transparent)]
-    Migration(#[from] Box<dyn StdError + Send + Sync>),
-
+    Pool(#[from] r2d2::PoolError),
     #[error(transparent)]
     Query(#[from] DieselError),
-
     #[error(transparent)]
     General(#[from] anyhow::Error),
 }
 
-pub async fn connect(
+#[derive(Debug, Clone)]
+pub struct Pool(r2d2::Pool<ConnectionManager<SqliteConnection>>);
+
+impl Pool {
+    pub fn get(
+        &self,
+    ) -> Result<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>, DatabaseError> {
+        Ok(self.0.get()?)
+    }
+
+    fn build(database_url: String) -> Result<Self, DatabaseError> {
+        #[derive(Debug)]
+        struct Customizer;
+
+        impl CustomizeConnection<SqliteConnection, r2d2::Error> for Customizer {
+            fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), r2d2::Error> {
+                // https://docs.rs/diesel/2.2.12/diesel/sqlite/struct.SqliteConnection.html#concurrency
+                conn.batch_execute("PRAGMA busy_timeout = 5000;")?;
+                conn.batch_execute("PRAGMA journal_mode = WAL;")?;
+                conn.batch_execute("PRAGMA synchronous = NORMAL;")?;
+                conn.batch_execute("PRAGMA foreign_keys = ON;")?;
+                Ok(())
+            }
+        }
+
+        let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+        let pool = r2d2::Pool::builder()
+            .connection_customizer(Box::new(Customizer))
+            .build(manager)?;
+        Ok(Self(pool))
+    }
+}
+
+pub fn connect(
     path: impl AsRef<Path>,
     backup_path: impl Into<PathBuf>,
 ) -> Result<Pool, DatabaseError> {
     let path = path.as_ref();
     let backup_path = backup_path.into();
     info!("Connect to database at {}", path.display());
-
-    let manager = Manager::new(path.display().to_string(), Runtime::Tokio1);
-    let pool = Pool::builder(manager)
-        .max_size(8)
-        .post_create(Hook::async_fn(|obj, _| {
-            async move {
-                obj.interact(initialize_connection)
-                    .await
-                    .expect(
-                        "Database connection should initialize successfully on connection creation",
-                    )
-                    .map_err(|e| HookError::message(e.to_string()))
-            }
-            .boxed()
-        }))
-        .build()
-        .context("Failed to create database pool")?;
-    pool.interact(move |conn| run_migrations(conn, &backup_path))
-        .await?
-        .context("Migration execution failed during connection")?;
+    let pool = Pool::build(path.display().to_string())?;
+    let mut conn = pool.get()?;
+    run_migrations(&mut conn, &backup_path).map_err(DatabaseError::Migration)?;
     Ok(pool)
 }
 
-fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<(), DatabaseError> {
-    let backup_path_str = backup_path
-        .to_str()
-        .context("Invalid backup path encoding")?;
-    diesel::sql_query("VACUUM INTO ?")
-        .bind::<Text, _>(backup_path_str)
-        .execute(conn)?;
-    Ok(())
-}
+fn run_migrations(
+    conn: &mut SqliteConnection,
+    backup_path: &Path,
+) -> Result<(), Box<dyn StdError + Send + Sync>> {
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
-const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
-
-fn run_migrations(conn: &mut SqliteConnection, backup_path: &Path) -> Result<(), DatabaseError> {
     let applied_migrations = conn.applied_migrations()?;
     let available_migrations = MigrationSource::<Sqlite>::migrations(&MIGRATIONS)?;
 
     if applied_migrations.len() > available_migrations.len() {
-        return Err(DatabaseError::Migration(
-            anyhow!("Migration count mismatch").into(),
-        ));
+        return Err("Migration count mismatch".into());
     }
 
-    let has_pending = conn.has_pending_migration(MIGRATIONS)?;
-
-    if has_pending {
+    if conn.has_pending_migration(MIGRATIONS)? {
         info!("Running pending database migrations");
         backup_database(conn, backup_path)?;
-        let _result = conn.run_pending_migrations(MIGRATIONS)?;
+        let _applied = conn.run_pending_migrations(MIGRATIONS)?;
         info!("Database migrations completed");
     }
 
     Ok(())
 }
 
-fn initialize_connection(conn: &mut SqliteConnection) -> QueryResult<()> {
-    // https://docs.rs/diesel/2.2.12/diesel/sqlite/struct.SqliteConnection.html#concurrency
-    conn.batch_execute("PRAGMA busy_timeout = 5000;")?;
-    conn.batch_execute("PRAGMA journal_mode = WAL;")?;
-    conn.batch_execute("PRAGMA synchronous = NORMAL;")?;
-    conn.batch_execute("PRAGMA foreign_keys = ON;")?;
+fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<(), DatabaseError> {
+    let backup_path_str = backup_path
+        .to_str()
+        .ok_or(DatabaseError::InvalidBackupPath)?;
+    diesel::sql_query("VACUUM INTO ?")
+        .bind::<Text, _>(backup_path_str)
+        .execute(conn)?;
     Ok(())
-}
-
-pub trait PoolExt {
-    async fn interact<F, R>(&self, f: F) -> Result<R, DatabaseError>
-    where
-        F: FnOnce(&mut SqliteConnection) -> R + Send + 'static,
-        R: Send + 'static;
-}
-
-impl PoolExt for Pool {
-    async fn interact<F, R>(&self, f: F) -> Result<R, DatabaseError>
-    where
-        F: FnOnce(&mut SqliteConnection) -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        self.get()
-            .await?
-            .interact(f)
-            .await
-            .map_err(|e| DatabaseError::General(anyhow!("Interact error: {e}")))
-    }
 }

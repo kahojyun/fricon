@@ -7,6 +7,7 @@ use anyhow::{Context, Result, bail};
 use chrono::NaiveDateTime;
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 use uuid::Uuid;
 
 use crate::utils::FileLock;
@@ -46,10 +47,10 @@ pub struct WorkspaceMetadata {
 impl WorkspaceMetadata {
     pub fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();
-        let file = File::create(path)
+        let mut file = NamedTempFile::new_in(path.parent().expect("Should be workspace root."))?;
+        serde_json::to_writer_pretty(&mut file, self)
             .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
-        serde_json::to_writer_pretty(file, self)
-            .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
+        file.persist(path)?;
         Ok(())
     }
 
