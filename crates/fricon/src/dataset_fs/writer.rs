@@ -1,5 +1,5 @@
 use std::{
-    io::{BufWriter, Seek},
+    io::{BufWriter, IntoInnerError, Seek},
     path::{Path, PathBuf},
 };
 
@@ -115,7 +115,7 @@ impl InnerWriter {
             .inner
             .into_inner()?
             .into_inner()
-            .map_err(|e| e.into_error())?;
+            .map_err(IntoInnerError::into_error)?;
         file.persist(self.final_path).map_err(|e| e.error)?;
         Ok(())
     }

@@ -21,7 +21,7 @@ use arrow_arith::boolean::and;
 use arrow_array::{
     ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, RecordBatchReader, Scalar,
 };
-use arrow_ord::ord::make_comparator;
+use arrow_ord::{cmp::eq, ord::make_comparator};
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
 use chrono::{DateTime, Utc};
@@ -51,7 +51,7 @@ pub enum Error {
     #[error("No dataset file found.")]
     EmptyDataset,
     #[error("Dataset write stream error: {message}")]
-    BatchStreamError { message: String },
+    BatchStream { message: String },
     #[error(transparent)]
     Database(#[from] DatabaseError),
     #[error(transparent)]
@@ -255,13 +255,15 @@ impl DatasetSource {
         R: RangeBounds<usize> + Copy,
     {
         match self {
-            DatasetSource::WriteSession(h) => {
-                h.inner().range(range).map(|x| x.into_owned()).collect()
-            }
-            DatasetSource::File(r) => r.range(range).map(|x| x.into_owned()).collect(),
+            DatasetSource::WriteSession(h) => h
+                .inner()
+                .range(range)
+                .map(std::borrow::Cow::into_owned)
+                .collect(),
+            DatasetSource::File(r) => r.range(range).map(std::borrow::Cow::into_owned).collect(),
         }
     }
-    fn select_data(&self, options: SelectOptions) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+    fn select_data(&self, options: &SelectOptions) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
         let index_filters = options.index_filters.as_ref();
         let selected_columns = options.selected_columns.as_deref();
         let result = match self {
@@ -331,7 +333,7 @@ impl Filter {
         Ok(self
             .filters
             .iter()
-            .map(|(i, v)| arrow_ord::cmp::eq(batch.column(*i), v))
+            .map(|(i, v)| eq(batch.column(*i), v))
             .reduce(|x, y| x.and_then(|x| y.and_then(|y| and(&x, &y))))
             .transpose()?)
     }
@@ -344,7 +346,7 @@ fn select_data<'a>(
     selected_columns: Option<&[usize]>,
 ) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::Error> {
     let filter = if let Some(f) = index_filters {
-        Filter::new(source_schema, &f)?
+        Filter::new(source_schema, f)?
     } else {
         Filter::default()
     };
@@ -365,7 +367,7 @@ fn select_data<'a>(
             let predicate = mask.map(|m| {
                 let mut builder = FilterBuilder::new(&m);
                 if output_schema.fields.len() > 1 {
-                    builder = builder.optimize()
+                    builder = builder.optimize();
                 }
                 builder.build()
             });
@@ -380,7 +382,7 @@ fn select_data<'a>(
                     .map(|x| {
                         let array = batch.column(x);
                         if let Some(p) = &predicate {
-                            p.filter(array).unwrap()
+                            p.filter(array).expect("Should have correct length")
                         } else {
                             array.clone()
                         }
@@ -413,42 +415,44 @@ impl DatasetReader {
     fn open_dir(path: PathBuf) -> Result<Self, Error> {
         let mut reader = ChunkReader::new(path, None);
         reader.read_all()?;
-        let schema = reader
-            .schema()
-            .ok_or(Error::EmptyDataset)?
-            .as_ref()
-            .try_into()?;
-        let arrow_schema = reader.schema().unwrap().clone();
+        let arrow_schema = reader.schema().ok_or(Error::EmptyDataset)?.clone();
+        let schema = arrow_schema.as_ref().try_into()?;
         Ok(Self {
             source: DatasetSource::File(reader),
             schema,
             arrow_schema,
         })
     }
+    #[must_use]
     pub fn schema(&self) -> &DatasetSchema {
         &self.schema
     }
+    #[must_use]
     pub fn arrow_schema(&self) -> &SchemaRef {
         &self.arrow_schema
     }
+    #[must_use]
     pub fn subscribe(&self) -> Option<watch::Receiver<WriteProgress>> {
         self.source.subscribe()
     }
+    #[must_use]
     pub fn batches(&self) -> Vec<RecordBatch> {
         self.source.range(..)
     }
     pub fn select_data(
         &self,
-        options: SelectOptions,
+        options: &SelectOptions,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
         self.source.select_data(options)
     }
+    #[must_use]
     pub fn index_columns(&self) -> Option<Vec<usize>> {
         if self.source.num_rows() < 2 {
             None
         } else {
             let sample = self.source.range(..2);
-            let sample = concat_batches(&sample[0].schema(), &sample).unwrap();
+            let sample =
+                concat_batches(&sample[0].schema(), &sample).expect("Should have same schema");
             let mut result = vec![];
             for (i, (sample_array, column_type)) in sample
                 .columns()
@@ -460,8 +464,8 @@ impl DatasetReader {
                     break;
                 }
                 result.push(i);
-                let cmp =
-                    make_comparator(sample_array, sample_array, SortOptions::default()).unwrap();
+                let cmp = make_comparator(sample_array, sample_array, SortOptions::default())
+                    .expect("Should be self comparable");
                 if cmp(0, 1) != Ordering::Equal {
                     break;
                 }

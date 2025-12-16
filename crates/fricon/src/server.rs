@@ -20,7 +20,7 @@ use crate::{
 
 pub fn start(
     ipc_file: PathBuf,
-    app: AppHandle,
+    app: &AppHandle,
     task_tracker: &TaskTracker,
     cancellation_token: CancellationToken,
 ) -> Result<()> {

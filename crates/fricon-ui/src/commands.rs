@@ -7,7 +7,7 @@
 use std::{
     collections::HashMap,
     ops::Bound,
-    sync::{LazyLock, Mutex},
+    sync::{LazyLock, Mutex, MutexGuard},
     time::Duration,
 };
 
@@ -149,11 +149,8 @@ async fn dataset_data(
     options: DatasetDataOptions,
 ) -> Result<Response, Error> {
     let dataset = state.dataset(id).await?;
-    let start = options
-        .start
-        .map(Bound::Included)
-        .unwrap_or(Bound::Unbounded);
-    let end = options.end.map(Bound::Excluded).unwrap_or(Bound::Unbounded);
+    let start = options.start.map_or(Bound::Unbounded, Bound::Included);
+    let end = options.end.map_or(Bound::Unbounded, Bound::Excluded);
     let index_filters = options
         .index_filters
         .map(|t| -> Result<_, anyhow::Error> {
@@ -166,7 +163,7 @@ async fn dataset_data(
         .transpose()
         .context("Failed to decode index filters.")?;
     let (output_schema, batches) = dataset
-        .select_data(SelectOptions {
+        .select_data(&SelectOptions {
             start,
             end,
             index_filters,
@@ -183,8 +180,15 @@ async fn dataset_data(
     Ok(Response::new(buffer))
 }
 
-static DATASET_SUBSCRIPTION: LazyLock<Mutex<HashMap<u32, CancellationToken>>> =
+type SubscriptionRecords = HashMap<u32, CancellationToken>;
+static DATASET_SUBSCRIPTION: LazyLock<Mutex<SubscriptionRecords>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn subcriptions_mut() -> MutexGuard<'static, SubscriptionRecords> {
+    DATASET_SUBSCRIPTION
+        .lock()
+        .expect("Should never be poisoned")
+}
 
 #[tauri::command]
 async fn subscribe_dataset_update(
@@ -196,10 +200,7 @@ async fn subscribe_dataset_update(
     if let Some(mut watcher) = dataset.subscribe() {
         let token = CancellationToken::new();
         let channel_id = on_update.id();
-        DATASET_SUBSCRIPTION
-            .lock()
-            .unwrap()
-            .insert(channel_id, token.clone());
+        subcriptions_mut().insert(channel_id, token.clone());
         tokio::spawn(async move {
             token
                 .run_until_cancelled(async move {
@@ -214,7 +215,7 @@ async fn subscribe_dataset_update(
                     }
                 })
                 .await;
-            DATASET_SUBSCRIPTION.lock().unwrap().remove(&channel_id);
+            subcriptions_mut().remove(&channel_id);
         });
         Ok(true)
     } else {
@@ -224,11 +225,9 @@ async fn subscribe_dataset_update(
 
 #[tauri::command]
 async fn unsubscribe_dataset_update(channel_id: u32) -> Result<(), Error> {
-    DATASET_SUBSCRIPTION
-        .lock()
-        .unwrap()
-        .remove(&channel_id)
-        .map(|t| t.cancel());
+    if let Some(t) = subcriptions_mut().remove(&channel_id) {
+        t.cancel();
+    }
     Ok(())
 }
 

@@ -214,12 +214,9 @@ impl DatasetService for Storage {
 
                 tokio::select! {
                     item = stream.next() => {
-                        match item {
-                            Some(item) => Some((item, (stream, token, false))),
-                            None => None,
-                        }
+                        item.map(|item| (item, (stream, token, false)))
                     }
-                    _ = token.cancelled() => {
+                    () = token.cancelled() => {
                         Some((
                             Err(IoError::other(
                                 "Stream aborted because server is shutting down.")),
@@ -232,7 +229,7 @@ impl DatasetService for Storage {
         .boxed();
         let sync_reader = SyncIoBridge::new(TokioStreamReader::new(abortable_stream));
         let batch_reader = || {
-            StreamReader::try_new(sync_reader, None).map_err(|e| Error::BatchStreamError {
+            StreamReader::try_new(sync_reader, None).map_err(|e| Error::BatchStream {
                 message: e.to_string(),
             })
         };

@@ -131,7 +131,7 @@ impl AppManager {
         let ipc_file = handle.paths()?.ipc_file();
         server::start(
             ipc_file,
-            handle.clone(),
+            &handle,
             &state.tracker,
             state.shutdown_token.clone(),
         )?;

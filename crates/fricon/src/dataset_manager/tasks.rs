@@ -60,7 +60,7 @@ pub fn do_create_dataset(
         batches.schema(),
         move |session| {
             let write_result = batches.into_iter().try_for_each(|batch| {
-                let batch = batch.map_err(|e| Error::BatchStreamError {
+                let batch = batch.map_err(|e| Error::BatchStream {
                     message: e.to_string(),
                 })?;
                 session.write(batch)

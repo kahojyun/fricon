@@ -107,7 +107,7 @@ impl ChunkedTable {
 
 #[cfg(test)]
 mod tests {
-    use std::{slice::SliceIndex, sync::Arc};
+    use std::{convert::AsRef, slice::SliceIndex, sync::Arc};
 
     use arrow_array::{ArrayRef, Int32Array, cast::AsArray, types::Int32Type};
     use arrow_select::concat::concat_batches;
@@ -184,7 +184,7 @@ mod tests {
         let reference = &reference[offset..];
         let batches: Vec<_> = chunked_table.range(r).collect();
         let batch =
-            concat_batches(chunked_table.schema(), batches.iter().map(|x| x.as_ref())).unwrap();
+            concat_batches(chunked_table.schema(), batches.iter().map(AsRef::as_ref)).unwrap();
         let arr = batch.column(0).as_primitive::<Int32Type>();
         assert_eq!(arr.values(), &reference[(start, end)]);
     }
