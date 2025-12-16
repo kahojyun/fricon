@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { type Table, tableFromIPC } from "apache-arrow";
 
@@ -72,4 +72,20 @@ export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
       createdAt: new Date(event.payload.createdAt),
     });
   });
+}
+
+export interface DatasetWriteProgress {
+  rowCount: number;
+}
+
+export async function subscribeDatasetUpdate(
+  id: number,
+  callback: (e: DatasetWriteProgress) => unknown,
+) {
+  const onUpdate = new Channel<DatasetWriteProgress>();
+  onUpdate.onmessage = callback;
+  await invoke("subscribe_dataset_update", { id, onUpdate });
+  return async () => {
+    await invoke("unsubscribe_dataset_update", { channelId: onUpdate.id });
+  };
 }

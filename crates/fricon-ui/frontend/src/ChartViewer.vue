@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  onUnmounted,
   onWatcherCleanup,
   ref,
   shallowRef,
@@ -12,6 +13,7 @@ import {
   type DatasetDetail,
   getDatasetDetail,
   fetchData,
+  subscribeDatasetUpdate,
 } from "@/backend.ts";
 import {
   DataType,
@@ -22,7 +24,7 @@ import {
   tableToIPC,
   Vector,
 } from "apache-arrow";
-import { watchDebounced, watchThrottled } from "@vueuse/core";
+import { useThrottleFn, watchDebounced, watchThrottled } from "@vueuse/core";
 import type { TypedArray } from "apache-arrow/interfaces";
 import ChartWrapper, {
   type LinePlotOptions,
@@ -35,11 +37,14 @@ const props = defineProps<{
 
 const datasetDetail = shallowRef<DatasetDetail>();
 const indexTable = shallowRef<Table>();
+let unsubscribe: (() => Promise<void>) | undefined;
 watchThrottled(
   () => props.datasetId,
   async (newId) => {
     let aborted = false;
     onWatcherCleanup(() => (aborted = true));
+
+    await unsubscribe?.();
 
     const newDetail = await getDatasetDetail(newId);
     if (aborted) return;
@@ -53,11 +58,21 @@ watchThrottled(
     });
     if (aborted) return;
 
+    const updateCallback = useThrottleFn(async () => {
+      const v = await fetchData(newId, {
+        columns: indexColumns,
+      });
+      indexTable.value = v;
+    }, 1000);
+    unsubscribe = await subscribeDatasetUpdate(newId, updateCallback);
     datasetDetail.value = newDetail;
     indexTable.value = newIndexTable;
   },
   { throttle: 100, immediate: true },
 );
+onUnmounted(async () => {
+  await unsubscribe?.();
+});
 
 const seriesOptions = computed(
   () => datasetDetail.value?.columns.filter((c) => !c.isIndex) ?? [],
@@ -88,9 +103,9 @@ const isTraceSeries = computed(() => series.value?.isTrace ?? false);
 const isComplexSeries = computed(() => series.value?.isComplex ?? false);
 
 const filter = shallowRef<{ row: StructRowProxy; index: number }>();
-const filterTable = computed(buildFilterTable);
-watch(filterTable, (v) => {
-  filter.value = v?.rows[0];
+const filterTable = computed(() => buildFilterTable());
+watch(xColumn, () => {
+  filter.value = filterTable.value?.rows[0];
 });
 function buildFilterTable() {
   const indexTableValue = indexTable.value;
@@ -104,11 +119,20 @@ function buildFilterTable() {
 
   // Get unique combinations of index values
   const rows = filteredTable.toArray() as StructRowProxy[];
-  const uniqueRows = Array.from(
-    new Map(
-      rows.map((row, index) => [JSON.stringify(row), { row, index }]),
-    ).values(),
-  );
+  const uniqueRowsMap = new Map<
+    string,
+    { row: StructRowProxy; index: number }
+  >();
+  rows.forEach((row, i) => {
+    const key = JSON.stringify(row);
+    if (!uniqueRowsMap.has(key)) {
+      uniqueRowsMap.set(key, { row, index: i });
+    }
+  });
+  const uniqueRows = Array.from(uniqueRowsMap.values()) as {
+    row: StructRowProxy;
+    index: number;
+  }[];
   return {
     table: filteredTable,
     rows: uniqueRows,
@@ -118,7 +142,7 @@ function buildFilterTable() {
 
 const data = shallowRef<LinePlotOptions>();
 watchDebounced(
-  [datasetDetail, series, filter, selectedComplexView],
+  [datasetDetail, series, filter, filterTable, selectedComplexView],
   async () => {
     data.value = await getNewData();
   },
@@ -198,8 +222,6 @@ async function getNewData() {
         ).get(0)!;
         const x0 = firstRow.x0;
         const step = firstRow.step;
-        console.log(x0);
-        console.log(step);
         x = Float64Array.from(
           { length: rawYColumn.length },
           (_, i) => x0 + i * step,

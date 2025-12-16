@@ -1469,6 +1469,7 @@ dependencies = [
  "tauri-utils",
  "thiserror 2.0.17",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",

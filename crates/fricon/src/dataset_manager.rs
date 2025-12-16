@@ -29,10 +29,11 @@ use derive_more::From;
 use diesel::result::Error as DieselError;
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
-use tokio::task::JoinError;
+use tokio::{sync::watch, task::JoinError};
 use tracing::error;
 use uuid::Uuid;
 
+use self::in_progress::WriteProgress;
 pub use self::write_registry::WriteSessionRegistry;
 use crate::{
     DatasetDataType, DatasetSchema,
@@ -243,6 +244,12 @@ impl DatasetSource {
             DatasetSource::File(r) => r.num_rows(),
         }
     }
+    fn subscribe(&self) -> Option<watch::Receiver<WriteProgress>> {
+        match self {
+            DatasetSource::WriteSession(h) => Some(h.inner().subscribe()),
+            DatasetSource::File(_) => None,
+        }
+    }
     fn range<R>(&self, range: R) -> Vec<RecordBatch>
     where
         R: RangeBounds<usize> + Copy,
@@ -254,10 +261,7 @@ impl DatasetSource {
             DatasetSource::File(r) => r.range(range).map(|x| x.into_owned()).collect(),
         }
     }
-    pub fn select_data(
-        &self,
-        options: SelectOptions,
-    ) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+    fn select_data(&self, options: SelectOptions) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
         let index_filters = options.index_filters.as_ref();
         let selected_columns = options.selected_columns.as_deref();
         let result = match self {
@@ -426,6 +430,9 @@ impl DatasetReader {
     }
     pub fn arrow_schema(&self) -> &SchemaRef {
         &self.arrow_schema
+    }
+    pub fn subscribe(&self) -> Option<watch::Receiver<WriteProgress>> {
+        self.source.subscribe()
     }
     pub fn batches(&self) -> Vec<RecordBatch> {
         self.source.range(..)

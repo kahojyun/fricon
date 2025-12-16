@@ -4,7 +4,12 @@
     reason = "Tauri command handlers require specific parameter signatures"
 )]
 
-use std::ops::Bound;
+use std::{
+    collections::HashMap,
+    ops::Bound,
+    sync::{LazyLock, Mutex},
+    time::Duration,
+};
 
 use anyhow::Context;
 use arrow_ipc::{reader::StreamReader, writer::FileWriter};
@@ -14,8 +19,10 @@ use fricon::{DatasetDataType, ScalarKind, SelectOptions};
 use serde::{Deserialize, Serialize, Serializer};
 use tauri::{
     State,
-    ipc::{Invoke, Response},
+    ipc::{Channel, Invoke, Response},
 };
+use tokio::time;
+use tokio_util::sync::CancellationToken;
 
 use super::AppState;
 
@@ -70,6 +77,12 @@ struct DatasetDataOptions {
     end: Option<usize>,
     index_filters: Option<String>,
     columns: Option<Vec<usize>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DatasetWriteProgress {
+    row_count: usize,
 }
 
 #[tauri::command]
@@ -170,11 +183,62 @@ async fn dataset_data(
     Ok(Response::new(buffer))
 }
 
+static DATASET_SUBSCRIPTION: LazyLock<Mutex<HashMap<u32, CancellationToken>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+#[tauri::command]
+async fn subscribe_dataset_update(
+    state: State<'_, AppState>,
+    id: i32,
+    on_update: Channel<DatasetWriteProgress>,
+) -> Result<bool, Error> {
+    let dataset = state.dataset(id).await?;
+    if let Some(mut watcher) = dataset.subscribe() {
+        let token = CancellationToken::new();
+        let channel_id = on_update.id();
+        DATASET_SUBSCRIPTION
+            .lock()
+            .unwrap()
+            .insert(channel_id, token.clone());
+        tokio::spawn(async move {
+            token
+                .run_until_cancelled(async move {
+                    while watcher.changed().await.is_ok() {
+                        let msg = DatasetWriteProgress {
+                            row_count: watcher.borrow_and_update().row_count,
+                        };
+                        if on_update.send(msg).is_err() {
+                            break;
+                        }
+                        time::sleep(Duration::from_millis(200)).await;
+                    }
+                })
+                .await;
+            DATASET_SUBSCRIPTION.lock().unwrap().remove(&channel_id);
+        });
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+async fn unsubscribe_dataset_update(channel_id: u32) -> Result<(), Error> {
+    DATASET_SUBSCRIPTION
+        .lock()
+        .unwrap()
+        .remove(&channel_id)
+        .map(|t| t.cancel());
+    Ok(())
+}
+
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
     tauri::generate_handler![
         get_workspace_info,
         list_datasets,
         dataset_detail,
-        dataset_data
+        dataset_data,
+        subscribe_dataset_update,
+        unsubscribe_dataset_update
     ]
 }

@@ -2,13 +2,20 @@ use std::{borrow::Cow, collections::Bound, ops::RangeBounds, path::PathBuf};
 
 use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
+use tokio::sync::watch;
 
 use crate::{dataset::ChunkedTable, dataset_fs::ChunkReader, dataset_manager::Error};
+
+#[derive(Debug)]
+pub struct WriteProgress {
+    pub row_count: usize,
+}
 
 #[derive(Debug)]
 pub struct InProgressTable {
     in_memory: ChunkedTable,
     reader: ChunkReader,
+    sender: watch::Sender<WriteProgress>,
 }
 
 impl InProgressTable {
@@ -16,6 +23,7 @@ impl InProgressTable {
         Self {
             in_memory: ChunkedTable::new(schema.clone()),
             reader: ChunkReader::new(dir_path, Some(schema)),
+            sender: watch::Sender::new(WriteProgress { row_count: 0 }),
         }
     }
 
@@ -23,8 +31,15 @@ impl InProgressTable {
         self.in_memory.schema()
     }
 
+    pub fn subscribe(&self) -> watch::Receiver<WriteProgress> {
+        self.sender.subscribe()
+    }
+
     pub fn push(&mut self, batch: RecordBatch) -> Result<(), Error> {
         self.in_memory.push_back(batch)?;
+        self.sender.send_replace(WriteProgress {
+            row_count: self.num_rows(),
+        });
         Ok(())
     }
 

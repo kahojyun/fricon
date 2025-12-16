@@ -54,39 +54,40 @@ pub fn do_create_dataset(
 
     let dataset_record = DatasetRecord::from_database_models(dataset, tags);
 
-    let write_result = write_sessions.with_session(
+    write_sessions.with_session(
         dataset_record.id,
         dataset_path,
         batches.schema(),
         move |session| {
-            for batch in batches {
-                session.write(batch.map_err(|e| Error::BatchStreamError {
+            let write_result = batches.into_iter().try_for_each(|batch| {
+                let batch = batch.map_err(|e| Error::BatchStreamError {
                     message: e.to_string(),
-                })?)?;
+                })?;
+                session.write(batch)
+            });
+            let mut conn = database.get()?;
+            match write_result {
+                Ok(()) => {
+                    database::Dataset::update_status(
+                        &mut conn,
+                        dataset_record.id,
+                        DatasetStatus::Completed,
+                    )?;
+                    let updated_record =
+                        do_get_dataset(&mut conn, DatasetId::Id(dataset_record.id))?;
+                    Ok(updated_record)
+                }
+                Err(e) => {
+                    let _ = database::Dataset::update_status(
+                        &mut conn,
+                        dataset_record.id,
+                        DatasetStatus::Aborted,
+                    );
+                    Err(e)
+                }
             }
-            Ok(())
         },
-    );
-    let mut conn = database.get()?;
-    match write_result {
-        Ok(()) => {
-            database::Dataset::update_status(
-                &mut conn,
-                dataset_record.id,
-                DatasetStatus::Completed,
-            )?;
-            let updated_record = do_get_dataset(&mut conn, DatasetId::Id(dataset_record.id))?;
-            Ok(updated_record)
-        }
-        Err(e) => {
-            let _ = database::Dataset::update_status(
-                &mut conn,
-                dataset_record.id,
-                DatasetStatus::Aborted,
-            );
-            Err(e)
-        }
-    }
+    )
 }
 
 /// Delete a dataset by ID

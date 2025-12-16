@@ -24,7 +24,7 @@ pub fn start(
     task_tracker: &TaskTracker,
     cancellation_token: CancellationToken,
 ) -> Result<()> {
-    let storage = Storage::new(app);
+    let storage = Storage::new(app.dataset_manager(), cancellation_token.clone());
     let service = DatasetServiceServer::new(storage);
     let listener = ipc::listen(ipc_file)?;
 

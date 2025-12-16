@@ -3,13 +3,15 @@ use std::io::{Error as IoError, ErrorKind};
 use anyhow::bail;
 use arrow_ipc::reader::StreamReader;
 use futures::prelude::*;
-use tokio_util::io::{StreamReader as TokioStreamReader, SyncIoBridge};
+use tokio_util::{
+    io::{StreamReader as TokioStreamReader, SyncIoBridge},
+    sync::CancellationToken,
+};
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{error, trace, warn};
 use uuid::Uuid;
 
 use crate::{
-    app::AppHandle,
     database::DatasetStatus,
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetRecord,
@@ -109,12 +111,14 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
 
 pub struct Storage {
     manager: DatasetManager,
+    shutdown_token: CancellationToken,
 }
 
 impl Storage {
-    pub fn new(app: AppHandle) -> Self {
+    pub fn new(manager: DatasetManager, shutdown_token: CancellationToken) -> Self {
         Self {
-            manager: DatasetManager::new(app),
+            manager,
+            shutdown_token,
         }
     }
 }
@@ -200,7 +204,33 @@ impl DatasetService for Storage {
                 }
             }
         });
-        let sync_reader = SyncIoBridge::new(TokioStreamReader::new(bytes_stream));
+
+        let abortable_stream = stream::unfold(
+            (bytes_stream, self.shutdown_token.clone(), false),
+            |(mut stream, token, cancelled)| async move {
+                if cancelled {
+                    return None;
+                }
+
+                tokio::select! {
+                    item = stream.next() => {
+                        match item {
+                            Some(item) => Some((item, (stream, token, false))),
+                            None => None,
+                        }
+                    }
+                    _ = token.cancelled() => {
+                        Some((
+                            Err(IoError::other(
+                                "Stream aborted because server is shutting down.")),
+                            (stream, token, true),
+                        ))
+                    }
+                }
+            },
+        )
+        .boxed();
+        let sync_reader = SyncIoBridge::new(TokioStreamReader::new(abortable_stream));
         let batch_reader = || {
             StreamReader::try_new(sync_reader, None).map_err(|e| Error::BatchStreamError {
                 message: e.to_string(),
