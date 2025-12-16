@@ -2,6 +2,7 @@
 name = "fricon"
 dynamic = ["version", "description", "license", "keywords", "authors"]
 readme = "README.md"
+license-files = ["LICENSE-APACHE", "LICENSE-MIT", "LICENSES-THIRDPARTY.toml"]
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 3 - Alpha",
