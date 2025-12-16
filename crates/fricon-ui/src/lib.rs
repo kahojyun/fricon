@@ -13,7 +13,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tokio::signal;
-use tracing::info;
+use tracing::{info, level_filters::LevelFilter};
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
@@ -226,12 +226,19 @@ fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
     let rolling = RollingFileAppender::new(Rotation::DAILY, log_dir, "fricon.log");
     let (writer, guard) = tracing_appender::non_blocking(rolling);
     let file_layer = fmt::layer().json().with_writer(writer);
-
-    let registry = tracing_subscriber::registry().with(file_layer);
-
-    #[cfg(debug_assertions)]
-    let registry = registry.with(fmt::layer().with_writer(io::stdout));
-
-    registry.with(EnvFilter::from_default_env()).init();
+    let stdout_layer = if cfg!(debug_assertions) {
+        Some(fmt::layer().with_writer(io::stdout))
+    } else {
+        None
+    };
+    tracing_subscriber::registry()
+        .with(file_layer)
+        .with(stdout_layer)
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
     Ok(guard)
 }
