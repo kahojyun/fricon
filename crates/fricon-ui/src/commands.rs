@@ -184,7 +184,7 @@ type SubscriptionRecords = HashMap<u32, CancellationToken>;
 static DATASET_SUBSCRIPTION: LazyLock<Mutex<SubscriptionRecords>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn subcriptions_mut() -> MutexGuard<'static, SubscriptionRecords> {
+fn subscriptions_mut() -> MutexGuard<'static, SubscriptionRecords> {
     DATASET_SUBSCRIPTION
         .lock()
         .expect("Should never be poisoned")
@@ -200,7 +200,7 @@ async fn subscribe_dataset_update(
     if let Some(mut watcher) = dataset.subscribe() {
         let token = CancellationToken::new();
         let channel_id = on_update.id();
-        subcriptions_mut().insert(channel_id, token.clone());
+        subscriptions_mut().insert(channel_id, token.clone());
         tokio::spawn(async move {
             token
                 .run_until_cancelled(async move {
@@ -215,7 +215,7 @@ async fn subscribe_dataset_update(
                     }
                 })
                 .await;
-            subcriptions_mut().remove(&channel_id);
+            subscriptions_mut().remove(&channel_id);
         });
         Ok(true)
     } else {
@@ -225,7 +225,7 @@ async fn subscribe_dataset_update(
 
 #[tauri::command]
 async fn unsubscribe_dataset_update(channel_id: u32) -> Result<(), Error> {
-    if let Some(t) = subcriptions_mut().remove(&channel_id) {
+    if let Some(t) = subscriptions_mut().remove(&channel_id) {
         t.cancel();
     }
     Ok(())
