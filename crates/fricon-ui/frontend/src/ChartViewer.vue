@@ -338,6 +338,7 @@ async function getNewData() {
           scroll-height="flex"
           selection-mode="single"
           meta-key-selection
+          :virtual-scroller-options="{ itemSize: 35, lazy: true }"
         >
           <Column
             v-for="col in filterTable?.fields"
