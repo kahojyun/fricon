@@ -102,11 +102,58 @@ const selectedComplexView = ref(["real", "imag"]);
 const isTraceSeries = computed(() => series.value?.isTrace ?? false);
 const isComplexSeries = computed(() => series.value?.isComplex ?? false);
 
+// Toggle for individual vs combined filter mode
+const isIndividualFilterMode = ref(false);
+
+// Store individual column selections when in individual mode
+const individualColumnSelections = ref<Record<string, unknown[]>>({});
+
 const filter = shallowRef<{ row: StructRowProxy; index: number }>();
 const filterTable = computed(() => buildFilterTable());
 watch(xColumn, () => {
   filter.value = filterTable.value?.rows[0];
+  // Reset individual selections when x column changes
+  individualColumnSelections.value = {};
 });
+
+// Check if we have multiple columns to show toggle button
+const showFilterToggle = computed(() => {
+  return filterTable.value && filterTable.value.fields.length > 1;
+});
+
+// Define type for column unique values
+interface ColumnValueOption {
+  value: unknown;
+  displayValue: string;
+}
+
+// Compute unique values for each column when in individual mode
+const columnUniqueValues = computed<Record<string, ColumnValueOption[]>>(() => {
+  const filterTableValue = filterTable.value;
+  if (!filterTableValue || !isIndividualFilterMode.value) return {};
+
+  const uniqueValues: Record<string, ColumnValueOption[]> = {};
+
+  filterTableValue.fields.forEach((field) => {
+    const values = new Set<unknown>();
+    filterTableValue.rows.forEach((row) => {
+      const value = row.row[field.name] as unknown;
+      values.add(value);
+    });
+
+    uniqueValues[field.name] = Array.from(values).map((value) => {
+      let displayValue = "null";
+      if (value !== null && value !== undefined) {
+        displayValue =
+          typeof value === "object" ? JSON.stringify(value) : value.toString(); // eslint-disable-line @typescript-eslint/no-base-to-string
+      }
+      return { value, displayValue };
+    });
+  });
+
+  return uniqueValues;
+});
+
 function buildFilterTable() {
   const indexTableValue = indexTable.value;
   const xColumnName = xColumn.value?.name;
@@ -140,9 +187,72 @@ function buildFilterTable() {
   };
 }
 
+// Generate filter rows based on individual column selections
+function generateFilterFromIndividualSelections() {
+  if (!filterTable.value || !isIndividualFilterMode.value) return null;
+
+  const fieldNames = filterTable.value.fields.map((f) => f.name);
+  const selectedValues = fieldNames.map(
+    (fieldName) => individualColumnSelections.value[fieldName] ?? [],
+  );
+
+  // Check if any column has selections
+  if (selectedValues.every((values) => values.length === 0)) return null;
+
+  // Find all rows that match the selected values in each column
+  const matchingRows = filterTable.value.rows.filter((row) => {
+    return fieldNames.every((fieldName, idx) => {
+      const selectedForColumn = selectedValues[idx];
+      if (selectedForColumn!.length === 0) return true; // No filter for this column
+      return selectedForColumn!.includes(row.row[fieldName]);
+    });
+  });
+
+  // If we have matching rows, use the first one as filter
+  // In future, we might want to support multiple selections
+  if (matchingRows.length > 0) {
+    return matchingRows[0];
+  }
+
+  return null;
+}
+
+// Watch for individual selections and update filter when in individual mode
+watch(
+  [isIndividualFilterMode, individualColumnSelections],
+  () => {
+    if (isIndividualFilterMode.value && filterTable.value) {
+      const individualFilter = generateFilterFromIndividualSelections();
+      if (individualFilter) {
+        filter.value = individualFilter;
+      } else {
+        // If no individual filter, reset to first row
+        filter.value = filterTable.value.rows[0];
+      }
+    } else if (!isIndividualFilterMode.value && filterTable.value) {
+      // When switching back to combined view, ensure we have a valid filter
+      if (
+        !filter.value ||
+        !filterTable.value.rows.some((r) => r.index === filter.value?.index)
+      ) {
+        filter.value = filterTable.value.rows[0];
+      }
+    }
+  },
+  { deep: true },
+);
+
 const data = shallowRef<LinePlotOptions>();
 watchDebounced(
-  [datasetDetail, series, filter, filterTable, selectedComplexView],
+  [
+    datasetDetail,
+    series,
+    filter,
+    filterTable,
+    selectedComplexView,
+    isIndividualFilterMode,
+    individualColumnSelections,
+  ],
   async () => {
     data.value = await getNewData();
   },
@@ -150,7 +260,7 @@ watchDebounced(
 );
 async function getNewData() {
   const detailValue = datasetDetail.value;
-  const indexRow = filter.value;
+  let indexRow = filter.value;
   const indexTableValue = filterTable.value;
   const datasetId = props.datasetId;
   const xColumnValue = xColumn.value;
@@ -158,6 +268,14 @@ async function getNewData() {
 
   const columns = detailValue?.columns;
   const indexTable = indexTableValue?.table;
+
+  // If in individual mode, try to generate filter from individual selections
+  if (isIndividualFilterMode.value) {
+    const individualFilter = generateFilterFromIndividualSelections();
+    if (individualFilter) {
+      indexRow = individualFilter;
+    }
+  }
 
   if (
     !columns ||
@@ -329,7 +447,18 @@ async function getNewData() {
         <ChartWrapper :data />
       </SplitterPanel>
       <SplitterPanel>
+        <div v-if="showFilterToggle" class="p-2 flex gap-2 items-center">
+          <ToggleButton
+            v-model="isIndividualFilterMode"
+            on-label="Individual Columns"
+            off-label="Combined View"
+            size="small"
+          />
+        </div>
+
+        <!-- Combined view (default) -->
         <DataTable
+          v-if="!isIndividualFilterMode"
           v-model:selection="filter"
           size="small"
           :value="filterTable?.rows"
@@ -347,6 +476,49 @@ async function getNewData() {
             :header="col.name"
           />
         </DataTable>
+
+        <!-- Individual columns view -->
+        <div v-else-if="filterTable" class="flex flex-col h-full">
+          <div class="flex flex-1 overflow-hidden">
+            <template
+              v-for="(field, index) in filterTable.fields"
+              :key="field.name"
+            >
+              <div class="min-w-0 flex-1">
+                <DataTable
+                  :value="columnUniqueValues[field.name]"
+                  :selection="
+                    columnUniqueValues[field.name]?.filter((item) =>
+                      individualColumnSelections[field.name]?.includes(
+                        item.value,
+                      ),
+                    ) ?? []
+                  "
+                  data-key="value"
+                  scrollable
+                  scroll-height="flex"
+                  selection-mode="multiple"
+                  size="small"
+                  :meta-key-selection="true"
+                  :virtual-scroller-options="{ itemSize: 35, lazy: true }"
+                  @update:selection="
+                    (selection: ColumnValueOption[]) => {
+                      individualColumnSelections[field.name] = selection.map(
+                        (s) => s.value,
+                      );
+                    }
+                  "
+                >
+                  <Column field="displayValue" :header="field.name" />
+                </DataTable>
+              </div>
+              <Divider
+                v-if="index < filterTable.fields.length - 1"
+                layout="vertical"
+              />
+            </template>
+          </div>
+        </div>
       </SplitterPanel>
     </Splitter>
   </div>

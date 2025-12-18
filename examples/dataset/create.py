@@ -46,7 +46,10 @@ def multi_index(manager: DatasetManager) -> None:
     with manager.create("Multi indexing") as writer:
         for i in range(10):
             for j in range(10):
-                writer.write(i=i, j=j, k=i + 1j * j)
+                for k in range(10):
+                    writer.write(
+                        i=i, j=j, k=k, z=complex((i + 1j * j) * np.exp(1j * k))
+                    )
 
 
 def special_name(manager: DatasetManager) -> None:
