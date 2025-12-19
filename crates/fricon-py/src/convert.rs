@@ -17,6 +17,7 @@ use pyo3::{
     intern,
     prelude::PyAnyMethods,
     sync::PyOnceLock,
+    types::{PyComplex, PyFloat, PyInt},
 };
 
 use crate::Trace;
@@ -79,8 +80,12 @@ pub fn extract_scalar_array(values: &Bound<'_, PyAny>) -> anyhow::Result<ScalarA
 fn extract_scalar(value: &Bound<'_, PyAny>) -> PyResult<DatasetScalar> {
     if let Ok(trace) = value.extract::<Trace>() {
         Ok(trace.0)
-    } else if let Ok(v) = value.extract::<f64>() {
-        Ok(v.into())
+    } else if value.is_instance_of::<PyComplex>() {
+        let c: Complex64 = value.extract()?;
+        Ok(c.into())
+    } else if value.is_instance_of::<PyFloat>() || value.is_instance_of::<PyInt>() {
+        let f: f64 = value.extract()?;
+        Ok(f.into())
     } else if let Ok(v) = value.extract::<Complex64>() {
         Ok(v.into())
     } else if let Ok(arr) = extract_scalar_array(value) {

@@ -7,7 +7,7 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 from _typeshed import StrPath
-from numpy import float64
+from numpy import floating
 from typing_extensions import Self
 
 __all__ = [
@@ -61,7 +61,7 @@ _NumpyAnyArray: TypeAlias = npt.NDArray[Any]  # pyright: ignore[reportExplicitAn
 class Trace:
     @staticmethod
     def variable_step(
-        x: Sequence[float] | npt.NDArray[float64],
+        x: Sequence[float] | npt.NDArray[floating],
         y: Sequence[_ScalarT_co] | _ArrowAnyArray | _NumpyAnyArray,
     ) -> Trace: ...
     @staticmethod

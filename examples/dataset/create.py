@@ -46,7 +46,17 @@ def multi_index(manager: DatasetManager) -> None:
     with manager.create("Multi indexing") as writer:
         for i in range(10):
             for j in range(10):
-                writer.write(i=i, j=j, k=i + 1j * j)
+                for k in range(10):
+                    writer.write(
+                        i=i,
+                        j=j,
+                        k=k,
+                        xx=np.sin(i + j + k),  # pyright: ignore[reportAny]
+                        y=Trace.variable_step(
+                            np.logspace(0, 1, 10), np.sin(np.linspace(0, 2 * np.pi, 10))
+                        ),
+                        z=np.exp(1j * k) * (i + 1j * j),  # pyright: ignore[reportAny]
+                    )
 
 
 def special_name(manager: DatasetManager) -> None:
