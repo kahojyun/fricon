@@ -1,6 +1,5 @@
 {
   "bootstrap-sha": "09ce801a815580b4477737f3126f87e7c7b79648",
-  "plugins": ["cargo-workspace"],
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",
