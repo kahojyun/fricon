@@ -55,14 +55,14 @@ function makeOption(data?: LinePlotOptions): EChartsOption {
   }
   const { x, xName, series } = data;
   const source = {
-    x,
+    [xName]: x,
     ...Object.fromEntries(series.map((series) => [series.name, series.data])),
   };
   const seriesOption = series.map(
     (series): LineSeriesOption => ({
       name: series.name,
       type: "line",
-      encode: { x: "x", y: series.name },
+      encode: { x: xName, y: series.name },
     }),
   );
   return {

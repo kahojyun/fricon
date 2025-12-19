@@ -446,7 +446,7 @@ async function getNewData() {
       <SplitterPanel>
         <ChartWrapper :data />
       </SplitterPanel>
-      <SplitterPanel>
+      <SplitterPanel class="flex flex-col">
         <div v-if="showFilterToggle" class="p-2 flex gap-2 items-center">
           <ToggleButton
             v-model="isIndividualFilterMode"
