@@ -48,7 +48,14 @@ def multi_index(manager: DatasetManager) -> None:
             for j in range(10):
                 for k in range(10):
                     writer.write(
-                        i=i, j=j, k=k, z=complex((i + 1j * j) * np.exp(1j * k))
+                        i=i,
+                        j=j,
+                        k=k,
+                        xx=np.sin(i + j + k),  # pyright: ignore[reportAny]
+                        y=Trace.variable_step(
+                            np.logspace(0, 1, 10), np.sin(np.linspace(0, 2 * np.pi, 10))
+                        ),
+                        z=np.exp(1j * k) * (i + 1j * j),  # pyright: ignore[reportAny]
                     )
 
 
