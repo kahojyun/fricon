@@ -1,10 +1,14 @@
 {
+  "bootstrap-sha": "09ce801a815580b4477737f3126f87e7c7b79648",
+  "plugins": ["cargo-workspace"],
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",
       "release-type": "rust",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
+      "versioning": "prerelease",
+      "prerelease-type": "alpha",
       "draft": false,
       "prerelease": false
     }
