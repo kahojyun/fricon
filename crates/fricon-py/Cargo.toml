@@ -1,7 +1,7 @@
 [package]
 name = "fricon-py"
 publish = false
-version.workspace = true
+version = "0.1.0-alpha.1"
 edition.workspace = true
 license.workspace = true
 description.workspace = true
