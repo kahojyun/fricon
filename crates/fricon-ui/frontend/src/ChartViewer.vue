@@ -121,6 +121,11 @@ const showFilterToggle = computed(() => {
   return filterTable.value && filterTable.value.fields.length > 1;
 });
 
+// Check if filter table is empty
+const isFilterTableEmpty = computed(() => {
+  return !filterTable.value || filterTable.value.rows.length === 0;
+});
+
 // Define type for column unique values
 interface ColumnValueOption {
   value: unknown;
@@ -456,8 +461,14 @@ async function getNewData() {
         </div>
 
         <!-- Combined view (default) -->
+        <div
+          v-if="!isIndividualFilterMode && isFilterTableEmpty"
+          class="flex items-center justify-center h-full text-sm text-color-secondary"
+        >
+          No data available
+        </div>
         <DataTable
-          v-if="!isIndividualFilterMode"
+          v-else-if="!isIndividualFilterMode"
           v-model:selection="filter"
           size="small"
           :value="filterTable?.rows"
@@ -477,7 +488,16 @@ async function getNewData() {
         </DataTable>
 
         <!-- Individual columns view -->
-        <div v-else-if="filterTable" class="flex flex-col h-full">
+        <div
+          v-if="isIndividualFilterMode && isFilterTableEmpty"
+          class="flex items-center justify-center h-full text-sm text-color-secondary"
+        >
+          No data available
+        </div>
+        <div
+          v-else-if="isIndividualFilterMode && filterTable"
+          class="flex flex-col h-full"
+        >
           <div class="flex flex-1 overflow-hidden">
             <template
               v-for="(field, index) in filterTable.fields"
