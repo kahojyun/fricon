@@ -5,7 +5,6 @@ import type { StructRowProxy, Table } from "apache-arrow";
 interface Props {
   indexTable: Table | undefined;
   xColumnName?: string;
-  modelValue?: { row: StructRowProxy; index: number };
 }
 
 interface ColumnValueOption {
@@ -14,13 +13,7 @@ interface ColumnValueOption {
 }
 
 const props = defineProps<Props>();
-const emit =
-  defineEmits<
-    (
-      e: "update:modelValue",
-      value?: { row: StructRowProxy; index: number },
-    ) => void
-  >();
+const model = defineModel<{ row: StructRowProxy; index: number }>();
 
 // Toggle for individual vs combined filter mode
 const isIndividualFilterMode = ref(false);
@@ -125,7 +118,7 @@ function generateFilterFromIndividualSelections() {
 }
 
 watch(filterTable, () => {
-  emit("update:modelValue", filterTable.value?.rows[0]);
+  model.value = filterTable.value?.rows[0];
   individualColumnSelections.value = {};
 });
 
@@ -135,17 +128,17 @@ watch(
     if (isIndividualFilterMode.value && filterTable.value) {
       const individualFilter = generateFilterFromIndividualSelections();
       if (individualFilter) {
-        emit("update:modelValue", individualFilter);
+        model.value = individualFilter;
       } else {
-        emit("update:modelValue", filterTable.value.rows[0]);
+        model.value = filterTable.value.rows[0];
       }
     } else if (!isIndividualFilterMode.value && filterTable.value) {
-      const currentFilter = props.modelValue;
+      const currentFilter = model.value;
       if (
         !currentFilter ||
         !filterTable.value.rows.some((r) => r.index === currentFilter.index)
       ) {
-        emit("update:modelValue", filterTable.value.rows[0]);
+        model.value = filterTable.value.rows[0];
       }
     }
   },
@@ -172,7 +165,7 @@ watch(
     <DataTable
       v-else-if="!isIndividualFilterMode"
       :value="filterTable?.rows"
-      :selection="modelValue"
+      :selection="model"
       size="small"
       data-key="index"
       scrollable
@@ -181,10 +174,7 @@ watch(
       meta-key-selection
       :virtual-scroller-options="{ itemSize: 35, lazy: true }"
       @update:selection="
-        emit(
-          'update:modelValue',
-          $event as { row: StructRowProxy; index: number } | undefined,
-        )
+        model = $event as { row: StructRowProxy; index: number } | undefined
       "
     >
       <Column
