@@ -448,12 +448,11 @@ async function getNewData() {
       </SplitterPanel>
       <SplitterPanel class="flex flex-col">
         <div v-if="showFilterToggle" class="p-2 flex gap-2 items-center">
-          <ToggleButton
+          <ToggleSwitch
             v-model="isIndividualFilterMode"
-            on-label="Individual Columns"
-            off-label="Combined View"
-            size="small"
+            input-id="individual-filter-switch"
           />
+          <label for="individual-filter-switch">Split columns</label>
         </div>
 
         <!-- Combined view (default) -->
