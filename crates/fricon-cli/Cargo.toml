@@ -1,7 +1,7 @@
 [package]
 name = "fricon-cli"
 publish = false
-version = "0.1.0-alpha.1"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 description.workspace = true
