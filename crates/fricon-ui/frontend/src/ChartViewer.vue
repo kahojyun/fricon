@@ -260,8 +260,8 @@ async function getNewData() {
 </script>
 
 <template>
-  <div class="size-full flex flex-col">
-    <div class="p-2 flex gap-2 flex-wrap">
+  <div class="flex size-full flex-col">
+    <div class="flex flex-wrap gap-2 p-2">
       <IftaLabel>
         <Select
           v-model="series"
@@ -284,7 +284,7 @@ async function getNewData() {
         <label for="x-column-select">X</label>
       </IftaLabel>
     </div>
-    <div class="p-2 flex gap-2 items-center">
+    <div class="flex items-center gap-2 p-2">
       <span class="text-sm font-medium">Complex:</span>
       <div
         v-for="option in complexSeriesOptions"
@@ -301,7 +301,7 @@ async function getNewData() {
         <label :for="`complex-${option}`" class="text-sm">{{ option }}</label>
       </div>
     </div>
-    <Splitter class="flex-1 min-h-0" layout="vertical">
+    <Splitter class="min-h-0 flex-1" layout="vertical">
       <SplitterPanel>
         <ChartWrapper :data />
       </SplitterPanel>

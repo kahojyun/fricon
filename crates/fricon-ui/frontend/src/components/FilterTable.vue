@@ -51,7 +51,7 @@ const columnUniqueValues = computed<Record<string, ColumnValueOption[]>>(() => {
       let displayValue = "null";
       if (value !== null && value !== undefined) {
         displayValue =
-          typeof value === "object" ? JSON.stringify(value) : value.toString(); // eslint-disable-line @typescript-eslint/no-base-to-string
+          typeof value === "object" ? JSON.stringify(value) : value.toString();
       }
       return { value, displayValue };
     });
@@ -147,8 +147,8 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
-    <div v-if="showFilterToggle" class="p-2 flex gap-2 items-center">
+  <div class="flex h-full flex-col">
+    <div v-if="showFilterToggle" class="flex items-center gap-2 p-2">
       <ToggleSwitch
         v-model="isIndividualFilterMode"
         input-id="individual-filter-switch"
@@ -158,7 +158,7 @@ watch(
 
     <div
       v-if="!isIndividualFilterMode && isFilterTableEmpty"
-      class="flex items-center justify-center h-full text-sm text-color-secondary"
+      class="text-color-secondary flex h-full items-center justify-center text-sm"
     >
       No data available
     </div>
@@ -187,13 +187,13 @@ watch(
 
     <div
       v-if="isIndividualFilterMode && isFilterTableEmpty"
-      class="flex items-center justify-center h-full text-sm text-color-secondary"
+      class="text-color-secondary flex h-full items-center justify-center text-sm"
     >
       No data available
     </div>
     <div
       v-else-if="isIndividualFilterMode && filterTable"
-      class="flex flex-col h-full"
+      class="flex h-full flex-col"
     >
       <div class="flex flex-1 overflow-hidden">
         <template

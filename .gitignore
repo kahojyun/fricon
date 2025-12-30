@@ -22,11 +22,15 @@ __pycache__/
 
 # Node
 node_modules
+*.d.ts
 
 # Python
 .mypy_cache
 .ruff_cache
 .pytest_cache
 .venv
+
+# Artifacts
+dist
 
 .claude
