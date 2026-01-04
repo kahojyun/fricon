@@ -12,22 +12,22 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col">
+  <div class="flex h-full flex-col">
     <div class="flex flex-1 overflow-hidden">
       <!-- Left sidebar (like VS Code) -->
-      <aside class="w-14 bg-surface-700 flex flex-col items-center py-2 gap-2">
+      <aside class="bg-surface-700 flex w-14 flex-col items-center gap-2 py-2">
         <AppLink to="/" icon="pi pi-database" label="Data" />
         <AppLink to="/credits" icon="pi pi-info-circle" label="Credits" />
       </aside>
 
       <!-- Main content -->
-      <main class="flex-1 relative overflow-hidden">
+      <main class="relative flex-1 overflow-hidden">
         <RouterView />
       </main>
     </div>
 
     <!-- Bottom status bar -->
-    <footer class="h-8 bg-surface-800 text-sm px-3 flex items-center">
+    <footer class="bg-surface-800 flex h-8 items-center px-3 text-sm">
       <div class="truncate">Workspace: {{ workspacePath }}</div>
     </footer>
   </div>
