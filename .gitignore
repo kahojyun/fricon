@@ -1,36 +1,62 @@
-# Rust
-/target
-.cargo
+# ===================================
+# Build & Artifacts
+# ===================================
+dist/
+target/
+site/
 
-# Development environment variables
-.env
+# ===================================
+# Dependencies
+# ===================================
+# Node
+node_modules/
 
-# Editors
-.vscode/
-.idea/
-.zed/
-.lazy.lua
-
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 
-# Mkdocs
-/site
+# ===================================
+# Development & Cache
+# ===================================
+# fricon test workspace
+.dev/
 
-# Node
-node_modules
-*.d.ts
+# Rust
+.cargo/
 
 # Python
-.mypy_cache
-.ruff_cache
-.pytest_cache
-.venv
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.venv/
 
-# Artifacts
-dist
+# Editor & Tool cache
+CLAUDE.md
+.claude/
+.serena/
+.qoder/
 
-.claude
+# ===================================
+# Configuration & Secrets
+# ===================================
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# ===================================
+# Editors & IDEs
+# ===================================
+.vscode/
+.idea/
+.zed/
+.lazy.lua
+.jj/
+
+# ===================================
+# Generated Files
+# ===================================
+components.d.ts
+**/gen/schemas/
