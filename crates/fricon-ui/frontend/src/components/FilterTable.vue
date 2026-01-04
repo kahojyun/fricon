@@ -5,6 +5,7 @@ import type { StructRowProxy, Table } from "apache-arrow";
 interface Props {
   indexTable: Table | undefined;
   xColumnName?: string;
+  datasetId: string;
 }
 
 interface ColumnValueOption {
@@ -20,6 +21,15 @@ const isIndividualFilterMode = ref(false);
 
 // Store individual column selections when in individual mode
 const individualColumnSelections = ref<Record<string, unknown[]>>({});
+
+// Track previous dataset ID and x column name for preservation logic
+const previousDatasetState = ref<{
+  datasetId: string | undefined;
+  xColumnName: string | undefined;
+}>({
+  datasetId: undefined,
+  xColumnName: undefined,
+});
 
 const filterTable = computed(() => buildFilterTable());
 
@@ -117,10 +127,54 @@ function generateFilterFromIndividualSelections() {
   return null;
 }
 
-watch(filterTable, () => {
-  model.value = filterTable.value?.rows[0];
-  individualColumnSelections.value = {};
-});
+watch(
+  filterTable,
+  (newFilterTable) => {
+    const datasetChanged =
+      previousDatasetState.value.datasetId !== props.datasetId;
+    const xColumnChanged =
+      previousDatasetState.value.xColumnName !== props.xColumnName;
+    const contextChanged = datasetChanged || xColumnChanged;
+
+    if (!newFilterTable || newFilterTable.rows.length === 0) {
+      model.value = undefined;
+      if (contextChanged) {
+        individualColumnSelections.value = {};
+      }
+      previousDatasetState.value = {
+        datasetId: props.datasetId,
+        xColumnName: props.xColumnName,
+      };
+      return;
+    }
+
+    if (contextChanged) {
+      model.value = newFilterTable.rows[0];
+      individualColumnSelections.value = {};
+    } else {
+      const currentSelection = model.value;
+      if (currentSelection) {
+        const preservedRow = newFilterTable.rows.find(
+          (row) => row.index === currentSelection.index,
+        );
+        if (preservedRow) {
+          model.value = preservedRow;
+        } else {
+          model.value = newFilterTable.rows[0];
+          individualColumnSelections.value = {};
+        }
+      } else {
+        model.value = newFilterTable.rows[0];
+      }
+    }
+
+    previousDatasetState.value = {
+      datasetId: props.datasetId,
+      xColumnName: props.xColumnName,
+    };
+  },
+  { immediate: true },
+);
 
 watch(
   [isIndividualFilterMode, individualColumnSelections],

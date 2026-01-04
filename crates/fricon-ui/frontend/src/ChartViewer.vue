@@ -310,6 +310,7 @@ async function getNewData() {
           v-model="filter"
           :index-table="indexTable"
           :x-column-name="xColumn?.name"
+          :dataset-id="String(datasetId)"
         />
       </SplitterPanel>
     </Splitter>
