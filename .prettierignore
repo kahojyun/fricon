@@ -1,17 +1,4 @@
-.venv
-.mypy_cache
-.ruff_cache
-.pytest_cache
-.dev
-.claude
-.qoder
-dist
-target
 pnpm-lock.yaml
-**/gen/schemas
 .github/instructions
-.serena
-
-components.d.ts
 .pre-commit-config.yaml
 CHANGELOG.md
