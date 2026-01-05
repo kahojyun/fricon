@@ -78,6 +78,8 @@ jobs:
         with:
           node-version: "24.x"
           cache: "pnpm"
+      - name: Install Node dependencies
+        run: pnpm install
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -94,6 +96,8 @@ jobs:
         run: uv sync --locked --group ci
       - name: Pytest
         run: uv run pytest
+      - name: Frontend Test
+        run: pnpm run test
       - name: Basedpyright
         run: uv run basedpyright
       - name: Stubtest

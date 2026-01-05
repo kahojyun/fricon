@@ -8,7 +8,9 @@
     "build": "vue-tsc --build && vite build",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "test": "vitest"
+    "test": "vitest run",
+    "lint": "pnpm -w run lint",
+    "format": "pnpm -w run format"
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.2",
