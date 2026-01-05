@@ -58,6 +58,11 @@ module-name = "fricon._core"
 python-source = "crates/fricon-py/python"
 manifest-path = "crates/fricon-py/Cargo.toml"
 features = ["pyo3/extension-module", "prod"]
+include = [
+    { path = "package.json", format = "sdist" },
+    { path = "pnpm-workspace.yaml", format = "sdist" },
+    { path = "pnpm-lock.yaml", format = "sdist" },
+]
 
 [tool.pytest.ini_options]
 testpaths = ["crates/fricon-py/tests"]
