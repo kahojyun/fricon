@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { StructRowProxy, Table } from "apache-arrow";
+import {
+  buildFilterTableData,
+  getColumnUniqueValues,
+  findMatchingRowFromSelections,
+  type ColumnValueOption,
+} from "../utils/filterTableUtils";
 
 interface Props {
   indexTable: Table | undefined;
   xColumnName?: string;
   datasetId: string;
-}
-
-interface ColumnValueOption {
-  value: unknown;
-  displayValue: string;
 }
 
 const props = defineProps<Props>();
@@ -31,7 +32,9 @@ const previousDatasetState = ref<{
   xColumnName: undefined,
 });
 
-const filterTable = computed(() => buildFilterTable());
+const filterTable = computed(() => {
+  return buildFilterTableData(props.indexTable, props.xColumnName);
+});
 
 // Check if we have multiple columns to show toggle button
 const showFilterToggle = computed(() => {
@@ -45,87 +48,9 @@ const isFilterTableEmpty = computed(() => {
 
 // Compute unique values for each column when in individual mode
 const columnUniqueValues = computed<Record<string, ColumnValueOption[]>>(() => {
-  const filterTableValue = filterTable.value;
-  if (!filterTableValue || !isIndividualFilterMode.value) return {};
-
-  const uniqueValues: Record<string, ColumnValueOption[]> = {};
-
-  filterTableValue.fields.forEach((field) => {
-    const values = new Set<unknown>();
-    filterTableValue.rows.forEach((row) => {
-      const value = row.row[field.name] as unknown;
-      values.add(value);
-    });
-
-    uniqueValues[field.name] = Array.from(values).map((value) => {
-      let displayValue = "null";
-      if (value !== null && value !== undefined) {
-        displayValue =
-          typeof value === "object" ? JSON.stringify(value) : value.toString();
-      }
-      return { value, displayValue };
-    });
-  });
-
-  return uniqueValues;
+  if (!isIndividualFilterMode.value) return {};
+  return getColumnUniqueValues(filterTable.value);
 });
-
-function buildFilterTable() {
-  const indexTableValue = props.indexTable;
-  const xColumnName = props.xColumnName;
-  if (!indexTableValue) return undefined;
-  const columnsExceptX = indexTableValue.schema.fields
-    .filter((c) => c.name !== xColumnName)
-    .map((c) => c.name);
-
-  const filteredTable = indexTableValue.select(columnsExceptX);
-
-  const rows = filteredTable.toArray() as StructRowProxy[];
-  const uniqueRowsMap = new Map<
-    string,
-    { row: StructRowProxy; index: number }
-  >();
-  rows.forEach((row, i) => {
-    const key = JSON.stringify(row);
-    if (!uniqueRowsMap.has(key)) {
-      uniqueRowsMap.set(key, { row, index: i });
-    }
-  });
-  const uniqueRows = Array.from(uniqueRowsMap.values()) as {
-    row: StructRowProxy;
-    index: number;
-  }[];
-  return {
-    table: filteredTable,
-    rows: uniqueRows,
-    fields: filteredTable.schema.fields,
-  };
-}
-
-function generateFilterFromIndividualSelections() {
-  if (!filterTable.value || !isIndividualFilterMode.value) return null;
-
-  const fieldNames = filterTable.value.fields.map((f) => f.name);
-  const selectedValues = fieldNames.map(
-    (fieldName) => individualColumnSelections.value[fieldName] ?? [],
-  );
-
-  if (selectedValues.every((values) => values.length === 0)) return null;
-
-  const matchingRows = filterTable.value.rows.filter((row) => {
-    return fieldNames.every((fieldName, idx) => {
-      const selectedForColumn = selectedValues[idx];
-      if (selectedForColumn!.length === 0) return true;
-      return selectedForColumn!.includes(row.row[fieldName]);
-    });
-  });
-
-  if (matchingRows.length > 0) {
-    return matchingRows[0];
-  }
-
-  return null;
-}
 
 watch(
   filterTable,
@@ -180,7 +105,10 @@ watch(
   [isIndividualFilterMode, individualColumnSelections],
   () => {
     if (isIndividualFilterMode.value && filterTable.value) {
-      const individualFilter = generateFilterFromIndividualSelections();
+      const individualFilter = findMatchingRowFromSelections(
+        filterTable.value,
+        individualColumnSelections.value,
+      );
       if (individualFilter) {
         model.value = individualFilter;
       } else {
