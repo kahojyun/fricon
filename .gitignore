@@ -4,6 +4,7 @@
 dist/
 target/
 site/
+coverage/
 
 # ===================================
 # Dependencies
@@ -31,6 +32,9 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .venv/
+
+# Node
+.eslintcache
 
 # Editor & Tool cache
 CLAUDE.md

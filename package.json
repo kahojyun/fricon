@@ -3,13 +3,13 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix --cache",
+    "format": "prettier --write --experimental-cli .",
+    "format:check": "prettier --check --experimental-cli .",
     "check": "pnpm run lint && pnpm run format:check"
   },
-  "packageManager": "pnpm@10.19.0",
+  "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
   "type": "module",
   "devDependencies": {
     "@eslint/compat": "^2.0.0",
@@ -17,6 +17,7 @@
     "@tauri-apps/cli": "^2.9.6",
     "@tsconfig/node24": "^24.0.3",
     "@types/node": "^25.0.2",
+    "@vitest/eslint-plugin": "^1.6.5",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.6.2",

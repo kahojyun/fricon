@@ -4,6 +4,7 @@ import { includeIgnoreFile } from "@eslint/compat";
 import eslint from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import eslintPluginVue from "eslint-plugin-vue";
+import pluginVitest from "@vitest/eslint-plugin";
 import globals from "globals";
 import typescriptEslint from "typescript-eslint";
 import { fileURLToPath } from "node:url";
@@ -16,6 +17,10 @@ export default defineConfig(
   typescriptEslint.configs.recommended,
   typescriptEslint.configs.stylistic,
   eslintPluginVue.configs["flat/recommended"],
+  {
+    extends: [pluginVitest.configs.recommended],
+    files: ["**/__tests__/*"],
+  },
   {
     files: ["**/*.vue"],
     languageOptions: {
