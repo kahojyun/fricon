@@ -8,7 +8,10 @@
     "format": "prettier --write --experimental-cli .",
     "format:check": "prettier --check --experimental-cli .",
     "test": "pnpm -r run test",
-    "check": "pnpm run lint && pnpm run format:check"
+    "check": "pnpm run lint && pnpm run format:check",
+    "bundle-licenses": "pnpm run bundle-licenses:rust && pnpm run bundle-licenses:npm",
+    "bundle-licenses:rust": "cd crates/fricon-py && cargo bundle-licenses --format toml --output ../../THIRD_PARTY_RUST.toml",
+    "bundle-licenses:npm": "generate-license-file --input crates/fricon-ui/frontend/package.json --output THIRD_PARTY_NPM.txt --overwrite"
   },
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
   "type": "module",
@@ -22,6 +25,7 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.6.2",
+    "generate-license-file": "^4.1.1",
     "globals": "^16.5.0",
     "prettier": "3.7.4",
     "prettier-plugin-tailwindcss": "^0.7.2",
