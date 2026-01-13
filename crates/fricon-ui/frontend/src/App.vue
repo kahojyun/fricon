@@ -21,7 +21,7 @@ onMounted(async () => {
       </aside>
 
       <!-- Main content -->
-      <main class="relative flex-1 overflow-hidden">
+      <main class="relative flex-1 overflow-y-auto">
         <RouterView />
       </main>
     </div>

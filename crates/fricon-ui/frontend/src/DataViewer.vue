@@ -6,7 +6,7 @@ import { ref } from "vue";
 const datasetId = ref<number>();
 </script>
 <template>
-  <Splitter class="size-full select-none">
+  <Splitter class="size-full overflow-hidden select-none">
     <SplitterPanel>
       <DatasetTable @dataset-selected="(id) => (datasetId = id)" />
     </SplitterPanel>

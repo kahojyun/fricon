@@ -15,34 +15,35 @@ This is a multi-language workspace with Rust core components, Python bindings, a
 
 ## Build, Test, and Development Commands
 
-Directly run in project root without cd
-
 ### Rust (workspace)
 
 ```bash
-cargo check          # Verify compilation
-cargo build          # Build all workspace members
-cargo test           # Run tests
-cargo +nightly fmt   # Format code
-cargo clippy --all-targets --all-features  # Lint
+cargo check
+cargo build
+cargo test
+cargo +nightly fmt
+cargo clippy --all-targets --all-features
 ```
 
 ### Python
 
 ```bash
-uv run maturin develop   # Build Python extension for development
-uv run pytest            # Run tests
-uv run ruff format       # Format Python code
-uv run ruff check        # Lint Python code
+# Run from repo root
+uv run maturin develop # Build Python extension for development
+uv run pytest
+uv run ruff format
+uv run ruff check
 ```
 
 ### Frontend/UI
 
 ```bash
-pnpm install         # Install workspace dependencies
-pnpm run check       # Type checking and linting
-pnpm run format      # Format code
-pnpm tauri dev       # Run development server
+# Run from repo root
+pnpm install
+pnpm run check # Type checking and linting
+pnpm run fix # Fix auto-fixable issues
+pnpm run test
+pnpm run bench
 ```
 
 ## Coding Style & Naming Conventions
@@ -54,12 +55,13 @@ pnpm tauri dev       # Run development server
 
 ## Testing Guidelines
 
-- **Testing Frameworks**: Rust (`cargo test`), Python (`pytest`)
+- **Testing Frameworks**: Rust (`cargo test`), Python (`pytest`), Frontend (`vitest`)
 - **Coverage**: Write tests for new functionality when possible
 - **Test Location**:
     - Rust unit tests in `mod tests`, integration tests in `<crate>/tests`
     - Python tests in `crates/fricon-py/tests/`
-- **Running**: Use `cargo test` for Rust, `uv run pytest` for Python
+    - Frontend tests in `crates/fricon-ui/frontend/src/**/__tests__`
+- **Running**: Use `cargo test` for Rust, `uv run pytest` for Python, `pnpm run test` for Frontend
 
 ## Commit & Pull Request Guidelines
 
