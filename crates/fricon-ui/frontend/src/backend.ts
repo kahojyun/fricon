@@ -36,8 +36,8 @@ export interface DatasetDetail {
 export interface DatasetDataOptions {
   start?: number;
   end?: number;
-  /** Single row arrow table encoded with BASE64 */
-  indexFilters?: string;
+  /** JSON object mapping field names to filter values */
+  indexFilters?: Record<string, unknown>;
   columns?: number[];
 }
 
@@ -88,4 +88,32 @@ export async function subscribeDatasetUpdate(
   return async () => {
     await invoke("unsubscribe_dataset_update", { channelId: onUpdate.id });
   };
+}
+
+export interface FilterTableRow {
+  values: unknown[];
+  displayValues: string[];
+  index: number;
+}
+
+export interface ColumnUniqueValue {
+  value: unknown;
+  displayValue: string;
+}
+
+export interface FilterTableData {
+  fields: string[];
+  rows: FilterTableRow[];
+  columnUniqueValues: Record<string, ColumnUniqueValue[]>;
+}
+
+export interface FilterTableOptions {
+  xColumnName?: string;
+}
+
+export function getFilterTableData(
+  id: number,
+  options: FilterTableOptions,
+): Promise<FilterTableData> {
+  return invoke<FilterTableData>("get_filter_table_data", { id, options });
 }

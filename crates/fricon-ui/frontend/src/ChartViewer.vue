@@ -11,19 +11,14 @@ import {
 import {
   type ColumnInfo,
   type DatasetDetail,
+  type FilterTableData,
+  type FilterTableRow,
   getDatasetDetail,
+  getFilterTableData,
   fetchData,
   subscribeDatasetUpdate,
 } from "@/backend.ts";
-import {
-  DataType,
-  Float64,
-  Struct,
-  type StructRowProxy,
-  type Table,
-  tableToIPC,
-  Vector,
-} from "apache-arrow";
+import { DataType, Float64, Struct, Vector } from "apache-arrow";
 import { useThrottleFn, watchDebounced, watchThrottled } from "@vueuse/core";
 import type { TypedArray } from "apache-arrow/interfaces";
 import ChartWrapper, {
@@ -37,8 +32,10 @@ const props = defineProps<{
 }>();
 
 const datasetDetail = shallowRef<DatasetDetail>();
-const indexTable = shallowRef<Table>();
+const filterTableData = shallowRef<FilterTableData>();
+const xColumnName = ref<string | undefined>();
 let unsubscribe: (() => Promise<void>) | undefined;
+
 watchThrottled(
   () => props.datasetId,
   async (newId) => {
@@ -50,24 +47,21 @@ watchThrottled(
     const newDetail = await getDatasetDetail(newId);
     if (aborted) return;
 
-    const indexColumns = newDetail.columns.reduce((acc, c, i) => {
-      if (c.isIndex) acc.push(i);
-      return acc;
-    }, [] as number[]);
-    const newIndexTable = await fetchData(newId, {
-      columns: indexColumns,
+    // Get initial filter table data
+    const newFilterTableData = await getFilterTableData(newId, {
+      xColumnName: xColumnName.value,
     });
     if (aborted) return;
 
     const updateCallback = useThrottleFn(async () => {
-      const v = await fetchData(newId, {
-        columns: indexColumns,
+      const v = await getFilterTableData(newId, {
+        xColumnName: xColumnName.value,
       });
-      indexTable.value = v;
+      filterTableData.value = v;
     }, 1000);
     unsubscribe = await subscribeDatasetUpdate(newId, updateCallback);
     datasetDetail.value = newDetail;
-    indexTable.value = newIndexTable;
+    filterTableData.value = newFilterTableData;
   },
   { throttle: 100, immediate: true },
 );
@@ -89,6 +83,17 @@ const xColumnOptions = computed(() =>
 const xColumn = ref<ColumnInfo>();
 watch(xColumnOptions, updateSelectionFn(xColumn));
 
+// Update xColumnName when xColumn changes, and refetch filter table data
+watch(xColumn, async (newXColumn) => {
+  xColumnName.value = newXColumn?.name;
+  if (datasetDetail.value && props.datasetId) {
+    const newFilterTableData = await getFilterTableData(props.datasetId, {
+      xColumnName: newXColumn?.name,
+    });
+    filterTableData.value = newFilterTableData;
+  }
+});
+
 function updateSelectionFn(optionRef: Ref<ColumnInfo | undefined>) {
   return (newOptions: ColumnInfo[]) => {
     const currentName = optionRef.value?.name;
@@ -103,7 +108,7 @@ const selectedComplexView = ref(["real", "imag"]);
 const isTraceSeries = computed(() => series.value?.isTrace ?? false);
 const isComplexSeries = computed(() => series.value?.isComplex ?? false);
 
-const filter = shallowRef<{ row: StructRowProxy; index: number }>();
+const filter = shallowRef<FilterTableRow>();
 
 const data = shallowRef<LinePlotOptions>();
 watchDebounced(
@@ -116,40 +121,33 @@ watchDebounced(
 async function getNewData() {
   const detailValue = datasetDetail.value;
   const indexRow = filter.value;
-  const indexTableValue = indexTable.value;
+  const filterTableDataValue = filterTableData.value;
   const datasetId = props.datasetId;
   const xColumnValue = xColumn.value;
   const seriesValue = series.value;
 
   const columns = detailValue?.columns;
-  if (!indexTableValue) return undefined;
+  if (!filterTableDataValue) return undefined;
 
-  const xColumnName = xColumnValue?.name;
-  const columnsExceptX = indexTableValue.schema.fields
-    .filter((c) => c.name !== xColumnName)
-    .map((c) => c.name);
-
-  const indexTableForFilter = indexTableValue.select(columnsExceptX);
+  // Build filter fields from filterTableData (columns except X)
+  const filterFields = filterTableDataValue.fields;
 
   if (
     !columns ||
-    !(
-      (indexTableForFilter.numCols > 0 && indexRow) ||
-      indexTableForFilter.numCols == 0
-    ) ||
+    !((filterFields.length > 0 && indexRow) || filterFields.length == 0) ||
     !datasetId ||
     !seriesValue
   )
     return undefined;
 
-  let indexFilters: string | undefined;
-  if (indexTableForFilter.numCols > 0 && indexRow) {
-    const indexRowTable = indexTableForFilter.slice(
-      indexRow.index,
-      indexRow.index + 1,
-    );
-    const buf = tableToIPC(indexRowTable);
-    indexFilters = btoa(String.fromCharCode(...buf));
+  let indexFilters: Record<string, unknown> | undefined;
+  if (filterFields.length > 0 && indexRow) {
+    // Build a simple JSON object mapping field names to filter values
+    indexFilters = {};
+    for (let i = 0; i < filterFields.length; i++) {
+      const fieldName = filterFields[i]!;
+      indexFilters[fieldName] = indexRow.values[i];
+    }
   }
 
   const seriesIndex = columns.findIndex((c) => c.name === seriesValue.name);
@@ -308,8 +306,7 @@ async function getNewData() {
       <SplitterPanel>
         <FilterTable
           v-model="filter"
-          :index-table="indexTable"
-          :x-column-name="xColumn?.name"
+          :filter-table-data="filterTableData"
           :dataset-id="String(datasetId)"
         />
       </SplitterPanel>
