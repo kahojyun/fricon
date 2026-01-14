@@ -89,6 +89,7 @@ struct DatasetWriteProgress {
 #[serde(rename_all = "camelCase")]
 struct FilterTableRow {
     values: Vec<serde_json::Value>,
+    display_values: Vec<String>,
     index: usize,
 }
 
@@ -293,6 +294,12 @@ async fn get_filter_table_data(
     let mut column_values: HashMap<String, Vec<ColumnUniqueValue>> =
         fields.iter().map(|f| (f.clone(), Vec::new())).collect();
 
+    let format_json_value = |value: &serde_json::Value| match value {
+        serde_json::Value::Null => "null".to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string(),
+    };
+
     for (global_row_idx, json_row) in json_rows.into_iter().enumerate() {
         // Extract values in field order
         let values: Vec<serde_json::Value> = fields
@@ -310,19 +317,17 @@ async fn get_filter_table_data(
 
         if !seen_keys.contains(&key) {
             seen_keys.insert(key);
+            let display_values = values.iter().map(format_json_value).collect();
             unique_rows.push(FilterTableRow {
                 values: values.clone(),
+                display_values,
                 index: global_row_idx,
             });
 
             // Collect unique values per column
             for (col_idx, value) in values.iter().enumerate() {
                 if let Some(field_name) = fields.get(col_idx) {
-                    let display_value = match value {
-                        serde_json::Value::Null => "null".to_string(),
-                        serde_json::Value::String(s) => s.clone(),
-                        other => other.to_string(),
-                    };
+                    let display_value = format_json_value(value);
                     let unique_value = ColumnUniqueValue {
                         value: value.clone(),
                         display_value,

@@ -39,11 +39,6 @@ const columnUniqueValues = computed<Record<string, ColumnUniqueValue[]>>(() => {
   return props.filterTableData.columnUniqueValues;
 });
 
-// Helper to get row value by field index
-function getRowValue(row: FilterTableRow, fieldIndex: number): unknown {
-  return row.values[fieldIndex];
-}
-
 // Find matching row from individual column selections
 function findMatchingRowFromSelections(
   filterTableData: FilterTableData,
@@ -172,7 +167,7 @@ watch(
       <Column
         v-for="(field, fieldIndex) in filterTableData?.fields"
         :key="field"
-        :field="(x: FilterTableRow) => String(getRowValue(x, fieldIndex))"
+        :field="(x: FilterTableRow) => x.displayValues[fieldIndex]!"
         :header="field"
       />
     </DataTable>

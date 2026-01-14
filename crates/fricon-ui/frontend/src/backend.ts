@@ -92,6 +92,7 @@ export async function subscribeDatasetUpdate(
 
 export interface FilterTableRow {
   values: unknown[];
+  displayValues: string[];
   index: number;
 }
 
