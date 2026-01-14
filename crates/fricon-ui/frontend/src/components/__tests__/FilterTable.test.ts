@@ -32,8 +32,8 @@ describe("FilterTable.vue", () => {
     return {
       fields: ["colA", "colB"],
       rows: [
-        { values: [1, "a"], index: 0 },
-        { values: [2, "b"], index: 1 },
+        { values: [1, "a"], displayValues: ["1", "a"], index: 0 },
+        { values: [2, "b"], displayValues: ["2", "b"], index: 1 },
       ],
       columnUniqueValues: {
         colA: [

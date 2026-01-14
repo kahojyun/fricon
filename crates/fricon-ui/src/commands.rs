@@ -5,9 +5,10 @@
 )]
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
+    io::Cursor,
     ops::Bound,
-    sync::{LazyLock, Mutex, MutexGuard},
+    sync::{Arc, LazyLock, Mutex, MutexGuard},
     time::Duration,
 };
 
@@ -108,6 +109,68 @@ struct FilterTableData {
     column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
 }
 
+fn format_json_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "null".to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+fn process_filter_rows(
+    fields: &[String],
+    json_rows: Vec<serde_json::Map<String, serde_json::Value>>,
+) -> (Vec<FilterTableRow>, HashMap<String, Vec<ColumnUniqueValue>>) {
+    let mut unique_rows = Vec::new();
+    let mut seen_keys = HashSet::new();
+    let mut column_values: HashMap<String, Vec<ColumnUniqueValue>> =
+        fields.iter().map(|f| (f.clone(), Vec::new())).collect();
+
+    for (global_row_idx, json_row) in json_rows.into_iter().enumerate() {
+        // Extract values in field order
+        let values: Vec<serde_json::Value> = fields
+            .iter()
+            .map(|field| {
+                json_row
+                    .get(field)
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null)
+            })
+            .collect();
+
+        // Create key for deduplication
+        let key = serde_json::to_string(&values).unwrap_or_default();
+
+        if !seen_keys.contains(&key) {
+            seen_keys.insert(key);
+            let display_values = values.iter().map(format_json_value).collect();
+            unique_rows.push(FilterTableRow {
+                values: values.clone(),
+                display_values,
+                index: global_row_idx,
+            });
+
+            // Collect unique values per column
+            for (col_idx, value) in values.iter().enumerate() {
+                if let Some(field_name) = fields.get(col_idx) {
+                    let display_value = format_json_value(value);
+                    let unique_value = ColumnUniqueValue {
+                        value: value.clone(),
+                        display_value,
+                    };
+                    if let Some(col_values) = column_values
+                        .get_mut(field_name)
+                        .filter(|cv| !cv.contains(&unique_value))
+                    {
+                        col_values.push(unique_value);
+                    }
+                }
+            }
+        }
+    }
+    (unique_rows, column_values)
+}
+
 #[tauri::command]
 async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, Error> {
     let app = state.app();
@@ -184,10 +247,10 @@ async fn dataset_data(
                 .map(|field_name| {
                     arrow_schema
                         .index_of(field_name)
-                        .with_context(|| format!("Field '{}' not found in schema", field_name))
+                        .with_context(|| format!("Field '{field_name}' not found in schema"))
                 })
                 .collect::<Result<_, _>>()?;
-            let filter_schema = std::sync::Arc::new(arrow_schema.project(&indices)?);
+            let filter_schema = Arc::new(arrow_schema.project(&indices)?);
 
             // Convert HashMap to JSON array (single row)
             let json_row = serde_json::Value::Object(filter_map.into_iter().collect());
@@ -196,7 +259,7 @@ async fn dataset_data(
 
             // Use arrow_json::ReaderBuilder to decode with schema
             let mut reader = arrow_json::ReaderBuilder::new(filter_schema)
-                .build(std::io::Cursor::new(json_array))
+                .build(Cursor::new(json_array))
                 .context("Failed to create JSON reader")?;
             reader
                 .next()
@@ -250,15 +313,12 @@ async fn get_filter_table_data(
     let index_columns = dataset.index_columns();
 
     // Get index column indices
-    let index_col_indices = match index_columns {
-        Some(indices) => indices,
-        None => {
-            return Ok(FilterTableData {
-                fields: vec![],
-                rows: vec![],
-                column_unique_values: HashMap::new(),
-            });
-        }
+    let Some(index_col_indices) = index_columns else {
+        return Ok(FilterTableData {
+            fields: vec![],
+            rows: vec![],
+            column_unique_values: HashMap::new(),
+        });
     };
 
     // Filter out X column from index columns
@@ -309,58 +369,7 @@ async fn get_filter_table_data(
         serde_json::from_slice(&buf).context("Failed to parse JSON")?;
 
     // Process rows: deduplicate and compute unique values
-    let mut unique_rows: Vec<FilterTableRow> = Vec::new();
-    let mut seen_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut column_values: HashMap<String, Vec<ColumnUniqueValue>> =
-        fields.iter().map(|f| (f.clone(), Vec::new())).collect();
-
-    let format_json_value = |value: &serde_json::Value| match value {
-        serde_json::Value::Null => "null".to_string(),
-        serde_json::Value::String(s) => s.clone(),
-        other => other.to_string(),
-    };
-
-    for (global_row_idx, json_row) in json_rows.into_iter().enumerate() {
-        // Extract values in field order
-        let values: Vec<serde_json::Value> = fields
-            .iter()
-            .map(|field| {
-                json_row
-                    .get(field)
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null)
-            })
-            .collect();
-
-        // Create key for deduplication
-        let key = serde_json::to_string(&values).unwrap_or_default();
-
-        if !seen_keys.contains(&key) {
-            seen_keys.insert(key);
-            let display_values = values.iter().map(format_json_value).collect();
-            unique_rows.push(FilterTableRow {
-                values: values.clone(),
-                display_values,
-                index: global_row_idx,
-            });
-
-            // Collect unique values per column
-            for (col_idx, value) in values.iter().enumerate() {
-                if let Some(field_name) = fields.get(col_idx) {
-                    let display_value = format_json_value(value);
-                    let unique_value = ColumnUniqueValue {
-                        value: value.clone(),
-                        display_value,
-                    };
-                    if let Some(col_values) = column_values.get_mut(field_name) {
-                        if !col_values.contains(&unique_value) {
-                            col_values.push(unique_value);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let (unique_rows, column_values) = process_filter_rows(&fields, json_rows);
 
     Ok(FilterTableData {
         fields,
