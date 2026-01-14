@@ -89,3 +89,30 @@ export async function subscribeDatasetUpdate(
     await invoke("unsubscribe_dataset_update", { channelId: onUpdate.id });
   };
 }
+
+export interface FilterTableRow {
+  values: unknown[];
+  index: number;
+}
+
+export interface ColumnUniqueValue {
+  value: unknown;
+  displayValue: string;
+}
+
+export interface FilterTableData {
+  fields: string[];
+  rows: FilterTableRow[];
+  columnUniqueValues: Record<string, ColumnUniqueValue[]>;
+}
+
+export interface FilterTableOptions {
+  xColumnName?: string;
+}
+
+export function getFilterTableData(
+  id: number,
+  options: FilterTableOptions,
+): Promise<FilterTableData> {
+  return invoke<FilterTableData>("get_filter_table_data", { id, options });
+}

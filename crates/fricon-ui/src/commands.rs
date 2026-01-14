@@ -85,6 +85,28 @@ struct DatasetWriteProgress {
     row_count: usize,
 }
 
+#[derive(Serialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct FilterTableRow {
+    values: Vec<serde_json::Value>,
+    index: usize,
+}
+
+#[derive(Serialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct ColumnUniqueValue {
+    value: serde_json::Value,
+    display_value: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FilterTableData {
+    fields: Vec<String>,
+    rows: Vec<FilterTableRow>,
+    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+}
+
 #[tauri::command]
 async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, Error> {
     let app = state.app();
@@ -190,6 +212,138 @@ fn subscriptions_mut() -> MutexGuard<'static, SubscriptionRecords> {
         .expect("Should never be poisoned")
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FilterTableOptions {
+    x_column_name: Option<String>,
+}
+
+#[tauri::command]
+async fn get_filter_table_data(
+    state: State<'_, AppState>,
+    id: i32,
+    options: FilterTableOptions,
+) -> Result<FilterTableData, Error> {
+    let dataset = state.dataset(id).await?;
+    let schema = dataset.schema();
+    let index_columns = dataset.index_columns();
+
+    // Get index column indices
+    let index_col_indices = match index_columns {
+        Some(indices) => indices,
+        None => {
+            return Ok(FilterTableData {
+                fields: vec![],
+                rows: vec![],
+                column_unique_values: HashMap::new(),
+            });
+        }
+    };
+
+    // Filter out X column from index columns
+    let x_column_name = options.x_column_name.as_deref();
+    let filtered_indices: Vec<usize> = index_col_indices
+        .iter()
+        .filter(|&&i| {
+            let col_name = schema.columns().keys().nth(i).map(String::as_str);
+            col_name != x_column_name
+        })
+        .copied()
+        .collect();
+
+    if filtered_indices.is_empty() {
+        return Ok(FilterTableData {
+            fields: vec![],
+            rows: vec![],
+            column_unique_values: HashMap::new(),
+        });
+    }
+
+    // Get field names
+    let fields: Vec<String> = filtered_indices
+        .iter()
+        .filter_map(|&i| schema.columns().keys().nth(i).cloned())
+        .collect();
+
+    // Fetch index column data
+    let (_, batches) = dataset
+        .select_data(&SelectOptions {
+            start: Bound::Unbounded,
+            end: Bound::Unbounded,
+            index_filters: None,
+            selected_columns: Some(filtered_indices.clone()),
+        })
+        .context("Failed to select index data.")?;
+
+    // Convert batches to JSON rows using arrow_json ArrayWriter
+    let mut buf = Vec::new();
+    {
+        let mut writer = arrow_json::ArrayWriter::new(&mut buf);
+        for batch in &batches {
+            writer.write(batch).context("Failed to write batch")?;
+        }
+        writer.finish().context("Failed to finish JSON writer")?;
+    }
+    let json_rows: Vec<serde_json::Map<String, serde_json::Value>> =
+        serde_json::from_slice(&buf).context("Failed to parse JSON")?;
+
+    // Process rows: deduplicate and compute unique values
+    let mut unique_rows: Vec<FilterTableRow> = Vec::new();
+    let mut seen_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut column_values: HashMap<String, Vec<ColumnUniqueValue>> =
+        fields.iter().map(|f| (f.clone(), Vec::new())).collect();
+
+    for (global_row_idx, json_row) in json_rows.into_iter().enumerate() {
+        // Extract values in field order
+        let values: Vec<serde_json::Value> = fields
+            .iter()
+            .map(|field| {
+                json_row
+                    .get(field)
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null)
+            })
+            .collect();
+
+        // Create key for deduplication
+        let key = serde_json::to_string(&values).unwrap_or_default();
+
+        if !seen_keys.contains(&key) {
+            seen_keys.insert(key);
+            unique_rows.push(FilterTableRow {
+                values: values.clone(),
+                index: global_row_idx,
+            });
+
+            // Collect unique values per column
+            for (col_idx, value) in values.iter().enumerate() {
+                if let Some(field_name) = fields.get(col_idx) {
+                    let display_value = match value {
+                        serde_json::Value::Null => "null".to_string(),
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    };
+                    let unique_value = ColumnUniqueValue {
+                        value: value.clone(),
+                        display_value,
+                    };
+                    if let Some(col_values) = column_values.get_mut(field_name) {
+                        if !col_values.contains(&unique_value) {
+                            col_values.push(unique_value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(FilterTableData {
+        fields,
+        rows: unique_rows,
+        column_unique_values: column_values,
+    })
+}
+
 #[tauri::command]
 async fn subscribe_dataset_update(
     state: State<'_, AppState>,
@@ -237,6 +391,7 @@ pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
         list_datasets,
         dataset_detail,
         dataset_data,
+        get_filter_table_data,
         subscribe_dataset_update,
         unsubscribe_dataset_update
     ]

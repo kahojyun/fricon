@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import FilterTable from "../FilterTable.vue";
-import { tableFromArrays } from "apache-arrow";
 import PrimeVue from "primevue/config";
+import type { FilterTableData } from "@/backend";
 
 // Mock sub-components to avoid PrimeVue dependency issues in unit tests
 const DataTable = {
@@ -28,19 +28,30 @@ const ToggleSwitch = {
 const Divider = { template: '<hr class="p-divider" />' };
 
 describe("FilterTable.vue", () => {
-  const createTestTable = () => {
-    return tableFromArrays({
-      colA: [1, 2, 1],
-      colB: ["a", "b", "a"],
-      x: [10, 20, 30],
-    });
+  const createTestFilterTableData = (): FilterTableData => {
+    return {
+      fields: ["colA", "colB"],
+      rows: [
+        { values: [1, "a"], index: 0 },
+        { values: [2, "b"], index: 1 },
+      ],
+      columnUniqueValues: {
+        colA: [
+          { value: 1, displayValue: "1" },
+          { value: 2, displayValue: "2" },
+        ],
+        colB: [
+          { value: "a", displayValue: "a" },
+          { value: "b", displayValue: "b" },
+        ],
+      },
+    };
   };
 
   it("renders correctly with data", () => {
     const wrapper = mount(FilterTable, {
       props: {
-        indexTable: createTestTable(),
-        xColumnName: "x",
+        filterTableData: createTestFilterTableData(),
         datasetId: "test-ds",
       },
       global: {
