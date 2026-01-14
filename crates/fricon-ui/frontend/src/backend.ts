@@ -36,8 +36,8 @@ export interface DatasetDetail {
 export interface DatasetDataOptions {
   start?: number;
   end?: number;
-  /** Single row arrow table encoded with BASE64 */
-  indexFilters?: string;
+  /** JSON object mapping field names to filter values */
+  indexFilters?: Record<string, unknown>;
   columns?: number[];
 }
 

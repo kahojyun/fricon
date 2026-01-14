@@ -18,14 +18,7 @@ import {
   fetchData,
   subscribeDatasetUpdate,
 } from "@/backend.ts";
-import {
-  DataType,
-  Float64,
-  Struct,
-  tableToIPC,
-  Vector,
-  tableFromArrays,
-} from "apache-arrow";
+import { DataType, Float64, Struct, Vector } from "apache-arrow";
 import { useThrottleFn, watchDebounced, watchThrottled } from "@vueuse/core";
 import type { TypedArray } from "apache-arrow/interfaces";
 import ChartWrapper, {
@@ -147,18 +140,14 @@ async function getNewData() {
   )
     return undefined;
 
-  let indexFilters: string | undefined;
+  let indexFilters: Record<string, unknown> | undefined;
   if (filterFields.length > 0 && indexRow) {
-    // Reconstruct a single-row Arrow table from the filter row for the backend
-    // The backend expects the index filter as a base64-encoded Arrow IPC stream
-    const filterData: Record<string, unknown[]> = {};
+    // Build a simple JSON object mapping field names to filter values
+    indexFilters = {};
     for (let i = 0; i < filterFields.length; i++) {
       const fieldName = filterFields[i]!;
-      filterData[fieldName] = [indexRow.values[i]];
+      indexFilters[fieldName] = indexRow.values[i];
     }
-    const filterTable = tableFromArrays(filterData);
-    const buf = tableToIPC(filterTable);
-    indexFilters = btoa(String.fromCharCode(...buf));
   }
 
   const seriesIndex = columns.findIndex((c) => c.name === seriesValue.name);

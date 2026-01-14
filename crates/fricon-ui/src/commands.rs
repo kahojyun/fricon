@@ -12,8 +12,7 @@ use std::{
 };
 
 use anyhow::Context;
-use arrow_ipc::{reader::StreamReader, writer::FileWriter};
-use base64::prelude::*;
+use arrow_ipc::writer::FileWriter;
 use chrono::{DateTime, Utc};
 use fricon::{DatasetDataType, ScalarKind, SelectOptions};
 use serde::{Deserialize, Serialize, Serializer};
@@ -75,7 +74,8 @@ struct DatasetDetail {
 struct DatasetDataOptions {
     start: Option<usize>,
     end: Option<usize>,
-    index_filters: Option<String>,
+    /// JSON object mapping field names to filter values
+    index_filters: Option<HashMap<String, serde_json::Value>>,
     columns: Option<Vec<usize>>,
 }
 
@@ -176,12 +176,32 @@ async fn dataset_data(
     let end = options.end.map_or(Bound::Unbounded, Bound::Excluded);
     let index_filters = options
         .index_filters
-        .map(|t| -> Result<_, anyhow::Error> {
-            let buffer = BASE64_STANDARD
-                .decode(t)
-                .context("Failed to decode base64 string.")?;
-            let mut reader = StreamReader::try_new(buffer.as_slice(), None)?;
-            Ok(reader.next().context("No RecordBatch.")??)
+        .map(|filter_map| -> Result<_, anyhow::Error> {
+            // Build filter schema from the dataset schema (only include filter fields)
+            let arrow_schema = dataset.arrow_schema();
+            let indices: Vec<usize> = filter_map
+                .keys()
+                .map(|field_name| {
+                    arrow_schema
+                        .index_of(field_name)
+                        .with_context(|| format!("Field '{}' not found in schema", field_name))
+                })
+                .collect::<Result<_, _>>()?;
+            let filter_schema = std::sync::Arc::new(arrow_schema.project(&indices)?);
+
+            // Convert HashMap to JSON array (single row)
+            let json_row = serde_json::Value::Object(filter_map.into_iter().collect());
+            // serialize as single object (NDJSON style) for arrow_json Reader
+            let json_array = serde_json::to_vec(&json_row)?;
+
+            // Use arrow_json::ReaderBuilder to decode with schema
+            let mut reader = arrow_json::ReaderBuilder::new(filter_schema)
+                .build(std::io::Cursor::new(json_array))
+                .context("Failed to create JSON reader")?;
+            reader
+                .next()
+                .context("No batch returned")?
+                .context("Failed to decode filter batch")
         })
         .transpose()
         .context("Failed to decode index filters.")?;
