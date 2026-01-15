@@ -156,6 +156,12 @@ watch(
   },
   { deep: true },
 );
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.metaKey || event.ctrlKey) {
+    event.stopPropagation();
+  }
+}
 </script>
 
 <template>
@@ -183,9 +189,13 @@ watch(
       scrollable
       scroll-height="flex"
       selection-mode="single"
-      meta-key-selection
       :virtual-scroller-options="{ itemSize: 35, lazy: true }"
-      @update:selection="model = $event as FilterTableRow | undefined"
+      @keydown.capture="handleKeydown"
+      @update:selection="
+        (val) => {
+          if (val) model = val;
+        }
+      "
     >
       <Column
         v-for="(field, fieldIndex) in filterTableData?.fields"
@@ -222,13 +232,15 @@ watch(
               scroll-height="flex"
               selection-mode="multiple"
               size="small"
-              :meta-key-selection="true"
               :virtual-scroller-options="{ itemSize: 35, lazy: true }"
+              @keydown.capture="handleKeydown"
               @update:selection="
                 (selection: ColumnUniqueValue[]) => {
-                  individualColumnSelections[field] = selection.map(
-                    (s) => s.value,
-                  );
+                  if (selection.length > 0) {
+                    individualColumnSelections[field] = selection.map(
+                      (s) => s.value,
+                    );
+                  }
                 }
               "
             >

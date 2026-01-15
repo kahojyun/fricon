@@ -28,6 +28,12 @@ onMounted(async () => {
 onUnmounted(() => {
   unsubscribe?.();
 });
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.metaKey || event.ctrlKey) {
+    event.stopPropagation();
+  }
+}
 </script>
 <template>
   <DataTable
@@ -39,6 +45,7 @@ onUnmounted(() => {
     removable-sort
     scrollable
     scroll-height="flex"
+    @keydown.capture="handleKeydown"
     @row-select="emit('datasetSelected', $event.data.id)"
   >
     <Column field="id" header="ID" />
