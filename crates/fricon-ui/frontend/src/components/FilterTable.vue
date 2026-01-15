@@ -69,6 +69,29 @@ function findMatchingRowFromSelections(
   return null;
 }
 
+// Helper to sync model -> individual selections
+function syncIndividualSelectionsFromModel() {
+  if (!props.filterTableData || !model.value) return;
+  const row = model.value;
+  const fieldNames = props.filterTableData.fields;
+  const newSelections: Record<string, unknown[]> = {};
+  fieldNames.forEach((fieldName, idx) => {
+    newSelections[fieldName] = [row.values[idx]];
+  });
+  individualColumnSelections.value = newSelections;
+}
+
+watch(
+  model,
+  (newModel) => {
+    // Only sync from model to individual selections when NOT in individual mode
+    if (!isIndividualFilterMode.value && newModel) {
+      syncIndividualSelectionsFromModel();
+    }
+  },
+  { deep: true, immediate: true },
+);
+
 watch(
   () => props.filterTableData,
   (newFilterTableData) => {
@@ -110,8 +133,8 @@ watch(
 
 watch(
   [isIndividualFilterMode, individualColumnSelections],
-  () => {
-    if (isIndividualFilterMode.value && props.filterTableData) {
+  ([isIndividual]) => {
+    if (isIndividual && props.filterTableData) {
       const individualFilter = findMatchingRowFromSelections(
         props.filterTableData,
         individualColumnSelections.value,
@@ -121,7 +144,7 @@ watch(
       } else {
         model.value = props.filterTableData.rows[0];
       }
-    } else if (!isIndividualFilterMode.value && props.filterTableData) {
+    } else if (!isIndividual && props.filterTableData) {
       const currentFilter = model.value;
       if (
         !currentFilter ||
