@@ -75,8 +75,9 @@ struct DatasetDetail {
 struct DatasetDataOptions {
     start: Option<usize>,
     end: Option<usize>,
-    /// JSON object mapping field names to filter values
-    index_filters: Option<HashMap<String, serde_json::Value>>,
+    /// Indices of chosen values for each filter field
+    index_filters: Option<Vec<usize>>,
+    x_column_name: Option<String>,
     columns: Option<Vec<usize>>,
 }
 
@@ -89,15 +90,15 @@ struct DatasetWriteProgress {
 #[derive(Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct FilterTableRow {
-    values: Vec<serde_json::Value>,
     display_values: Vec<String>,
+    value_indices: Vec<usize>,
     index: usize,
 }
 
 #[derive(Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct ColumnUniqueValue {
-    value: serde_json::Value,
+    index: usize,
     display_value: String,
 }
 
@@ -107,6 +108,19 @@ struct FilterTableData {
     fields: Vec<String>,
     rows: Vec<FilterTableRow>,
     column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+}
+
+struct ProcessedFilterRows {
+    unique_rows: Vec<FilterTableRow>,
+    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+    column_raw_values: HashMap<String, Vec<serde_json::Value>>,
+}
+
+struct FilterDataInternal {
+    fields: Vec<String>,
+    unique_rows: Vec<FilterTableRow>,
+    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+    column_raw_values: HashMap<String, Vec<serde_json::Value>>,
 }
 
 fn format_json_value(value: &serde_json::Value) -> String {
@@ -120,10 +134,12 @@ fn format_json_value(value: &serde_json::Value) -> String {
 fn process_filter_rows(
     fields: &[String],
     json_rows: Vec<serde_json::Map<String, serde_json::Value>>,
-) -> (Vec<FilterTableRow>, HashMap<String, Vec<ColumnUniqueValue>>) {
+) -> ProcessedFilterRows {
     let mut unique_rows = Vec::new();
     let mut seen_keys = HashSet::new();
-    let mut column_values: HashMap<String, Vec<ColumnUniqueValue>> =
+    let mut column_unique_values: HashMap<String, Vec<ColumnUniqueValue>> =
+        fields.iter().map(|f| (f.clone(), Vec::new())).collect();
+    let mut column_raw_values: HashMap<String, Vec<serde_json::Value>> =
         fields.iter().map(|f| (f.clone(), Vec::new())).collect();
 
     for (global_row_idx, json_row) in json_rows.into_iter().enumerate() {
@@ -144,31 +160,47 @@ fn process_filter_rows(
         if !seen_keys.contains(&key) {
             seen_keys.insert(key);
             let display_values = values.iter().map(format_json_value).collect();
-            unique_rows.push(FilterTableRow {
-                values: values.clone(),
-                display_values,
-                index: global_row_idx,
-            });
+            let mut value_indices = Vec::with_capacity(values.len());
 
-            // Collect unique values per column
+            // Collect unique values per column and track indices
             for (col_idx, value) in values.iter().enumerate() {
                 if let Some(field_name) = fields.get(col_idx) {
-                    let display_value = format_json_value(value);
-                    let unique_value = ColumnUniqueValue {
-                        value: value.clone(),
-                        display_value,
-                    };
-                    if let Some(col_values) = column_values
+                    let raw_values = column_raw_values
                         .get_mut(field_name)
-                        .filter(|cv| !cv.contains(&unique_value))
-                    {
-                        col_values.push(unique_value);
-                    }
+                        .expect("Field should exist in column_raw_values");
+
+                    let index = if let Some(pos) = raw_values.iter().position(|v| v == value) {
+                        pos
+                    } else {
+                        let new_index = raw_values.len();
+                        raw_values.push(value.clone());
+
+                        let display_value = format_json_value(value);
+                        column_unique_values
+                            .get_mut(field_name)
+                            .expect("Field should exist in column_unique_values")
+                            .push(ColumnUniqueValue {
+                                index: new_index,
+                                display_value,
+                            });
+                        new_index
+                    };
+                    value_indices.push(index);
                 }
             }
+
+            unique_rows.push(FilterTableRow {
+                display_values,
+                value_indices,
+                index: global_row_idx,
+            });
         }
     }
-    (unique_rows, column_values)
+    ProcessedFilterRows {
+        unique_rows,
+        column_unique_values,
+        column_raw_values,
+    }
 }
 
 #[tauri::command]
@@ -228,64 +260,6 @@ async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDe
     Ok(DatasetDetail { columns })
 }
 
-#[tauri::command]
-async fn dataset_data(
-    state: State<'_, AppState>,
-    id: i32,
-    options: DatasetDataOptions,
-) -> Result<Response, Error> {
-    let dataset = state.dataset(id).await?;
-    let start = options.start.map_or(Bound::Unbounded, Bound::Included);
-    let end = options.end.map_or(Bound::Unbounded, Bound::Excluded);
-    let index_filters = options
-        .index_filters
-        .map(|filter_map| -> Result<_, anyhow::Error> {
-            // Build filter schema from the dataset schema (only include filter fields)
-            let arrow_schema = dataset.arrow_schema();
-            let indices: Vec<usize> = filter_map
-                .keys()
-                .map(|field_name| {
-                    arrow_schema
-                        .index_of(field_name)
-                        .with_context(|| format!("Field '{field_name}' not found in schema"))
-                })
-                .collect::<Result<_, _>>()?;
-            let filter_schema = Arc::new(arrow_schema.project(&indices)?);
-
-            // Convert HashMap to JSON array (single row)
-            let json_row = serde_json::Value::Object(filter_map.into_iter().collect());
-            // serialize as single object (NDJSON style) for arrow_json Reader
-            let json_array = serde_json::to_vec(&json_row)?;
-
-            // Use arrow_json::ReaderBuilder to decode with schema
-            let mut reader = arrow_json::ReaderBuilder::new(filter_schema)
-                .build(Cursor::new(json_array))
-                .context("Failed to create JSON reader")?;
-            reader
-                .next()
-                .context("No batch returned")?
-                .context("Failed to decode filter batch")
-        })
-        .transpose()
-        .context("Failed to decode index filters.")?;
-    let (output_schema, batches) = dataset
-        .select_data(&SelectOptions {
-            start,
-            end,
-            index_filters,
-            selected_columns: options.columns,
-        })
-        .context("Failed to select data.")?;
-    let buffer = vec![];
-    let mut writer =
-        FileWriter::try_new(buffer, &output_schema).context("Failed to create writer")?;
-    for batch in batches {
-        writer.write(&batch).context("Failed to write batch")?;
-    }
-    let buffer = writer.into_inner().context("Failed to finish writer")?;
-    Ok(Response::new(buffer))
-}
-
 type SubscriptionRecords = HashMap<u32, CancellationToken>;
 static DATASET_SUBSCRIPTION: LazyLock<Mutex<SubscriptionRecords>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -302,41 +276,41 @@ struct FilterTableOptions {
     x_column_name: Option<String>,
 }
 
-#[tauri::command]
-async fn get_filter_table_data(
-    state: State<'_, AppState>,
+async fn get_filter_data_internal(
+    state: &AppState,
     id: i32,
-    options: FilterTableOptions,
-) -> Result<FilterTableData, Error> {
+    x_column_name: Option<String>,
+) -> Result<FilterDataInternal, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let index_columns = dataset.index_columns();
 
     // Get index column indices
     let Some(index_col_indices) = index_columns else {
-        return Ok(FilterTableData {
+        return Ok(FilterDataInternal {
             fields: vec![],
-            rows: vec![],
+            unique_rows: vec![],
             column_unique_values: HashMap::new(),
+            column_raw_values: HashMap::new(),
         });
     };
 
     // Filter out X column from index columns
-    let x_column_name = options.x_column_name.as_deref();
     let filtered_indices: Vec<usize> = index_col_indices
         .iter()
         .filter(|&&i| {
             let col_name = schema.columns().keys().nth(i).map(String::as_str);
-            col_name != x_column_name
+            col_name != x_column_name.as_deref()
         })
         .copied()
         .collect();
 
     if filtered_indices.is_empty() {
-        return Ok(FilterTableData {
+        return Ok(FilterDataInternal {
             fields: vec![],
-            rows: vec![],
+            unique_rows: vec![],
             column_unique_values: HashMap::new(),
+            column_raw_values: HashMap::new(),
         });
     }
 
@@ -368,13 +342,129 @@ async fn get_filter_table_data(
     let json_rows: Vec<serde_json::Map<String, serde_json::Value>> =
         serde_json::from_slice(&buf).context("Failed to parse JSON")?;
 
-    // Process rows: deduplicate and compute unique values
-    let (unique_rows, column_values) = process_filter_rows(&fields, json_rows);
+    // Process rows: deduplicate and compute unique values and raw values for
+    // indexing
+    let processed = process_filter_rows(&fields, json_rows);
+    Ok(FilterDataInternal {
+        fields,
+        unique_rows: processed.unique_rows,
+        column_unique_values: processed.column_unique_values,
+        column_raw_values: processed.column_raw_values,
+    })
+}
+
+async fn build_filter_batch(
+    state: &AppState,
+    id: i32,
+    x_column_name: Option<String>,
+    indices: &[usize],
+    arrow_schema: Arc<arrow_schema::Schema>,
+) -> Result<Option<arrow_array::RecordBatch>, Error> {
+    let filter_data = get_filter_data_internal(state, id, x_column_name).await?;
+    let fields = filter_data.fields;
+    let raw_values_map = filter_data.column_raw_values;
+
+    let mut filter_map = serde_json::Map::new();
+    for (idx, &value_idx) in indices.iter().enumerate() {
+        if let Some(field_name) = fields.get(idx)
+            && let Some(val) = raw_values_map
+                .get(field_name)
+                .and_then(|values| values.get(value_idx))
+        {
+            filter_map.insert(field_name.clone(), val.clone());
+        }
+    }
+
+    if filter_map.is_empty() {
+        return Ok(None);
+    }
+
+    // Build filter schema from the dataset schema (only include filter fields)
+    let projection_indices: Vec<usize> = filter_map
+        .keys()
+        .map(|field_name| {
+            arrow_schema
+                .index_of(field_name)
+                .with_context(|| format!("Field '{field_name}' not found in schema"))
+        })
+        .collect::<Result<_, _>>()?;
+    let filter_schema = Arc::new(
+        arrow_schema
+            .project(&projection_indices)
+            .context("Failed to project arrow schema")?,
+    );
+
+    // Convert HashMap to JSON array (single row)
+    let json_row = serde_json::Value::Object(filter_map);
+    // serialize as single object (NDJSON style) for arrow_json Reader
+    let json_array = serde_json::to_vec(&json_row).context("Failed to serialize filter to JSON")?;
+
+    // Use arrow_json::ReaderBuilder to decode with schema
+    let mut reader = arrow_json::ReaderBuilder::new(filter_schema)
+        .build(Cursor::new(json_array))
+        .context("Failed to create JSON reader")?;
+
+    let batch = reader
+        .next()
+        .context("No batch returned")?
+        .context("Failed to decode filter batch")?;
+
+    Ok(Some(batch))
+}
+
+#[tauri::command]
+async fn dataset_data(
+    state: State<'_, AppState>,
+    id: i32,
+    options: DatasetDataOptions,
+) -> Result<Response, Error> {
+    let dataset = state.dataset(id).await?;
+    let start = options.start.map_or(Bound::Unbounded, Bound::Included);
+    let end = options.end.map_or(Bound::Unbounded, Bound::Excluded);
+
+    let index_filters = if let Some(indices) = options.index_filters {
+        build_filter_batch(
+            &state,
+            id,
+            options.x_column_name,
+            &indices,
+            dataset.arrow_schema().clone(),
+        )
+        .await?
+    } else {
+        None
+    };
+
+    let (output_schema, batches) = dataset
+        .select_data(&SelectOptions {
+            start,
+            end,
+            index_filters,
+            selected_columns: options.columns,
+        })
+        .context("Failed to select data.")?;
+    let buffer = vec![];
+    let mut writer =
+        FileWriter::try_new(buffer, &output_schema).context("Failed to create writer")?;
+    for batch in batches {
+        writer.write(&batch).context("Failed to write batch")?;
+    }
+    let buffer = writer.into_inner().context("Failed to finish writer")?;
+    Ok(Response::new(buffer))
+}
+
+#[tauri::command]
+async fn get_filter_table_data(
+    state: State<'_, AppState>,
+    id: i32,
+    options: FilterTableOptions,
+) -> Result<FilterTableData, Error> {
+    let filter_data = get_filter_data_internal(&state, id, options.x_column_name).await?;
 
     Ok(FilterTableData {
-        fields,
-        rows: unique_rows,
-        column_unique_values: column_values,
+        fields: filter_data.fields,
+        rows: filter_data.unique_rows,
+        column_unique_values: filter_data.column_unique_values,
     })
 }
 

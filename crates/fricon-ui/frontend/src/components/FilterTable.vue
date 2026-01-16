@@ -51,10 +51,9 @@ function findMatchingRowFromSelections(
 
   const matchingRows = filterTableData.rows.filter((row) => {
     return fieldNames.every((fieldName, idx) => {
-      const selection = selections[fieldName];
-      if (selection === undefined) return true;
-      const rowValue = row.values[idx];
-      return JSON.stringify(selection) === JSON.stringify(rowValue);
+      const selectionIndex = selections[fieldName];
+      if (selectionIndex === undefined) return true;
+      return row.valueIndices[idx] === selectionIndex;
     });
   });
 
@@ -72,7 +71,7 @@ function syncIndividualSelectionsFromModel() {
   const fieldNames = props.filterTableData.fields;
   const newSelections: Record<string, unknown> = {};
   fieldNames.forEach((fieldName, idx) => {
-    newSelections[fieldName] = row.values[idx];
+    newSelections[fieldName] = row.valueIndices[idx];
   });
   individualColumnSelections.value = newSelections;
 }
@@ -218,12 +217,10 @@ function handleKeydown(event: KeyboardEvent) {
               :value="columnUniqueValues[field]"
               :selection="
                 columnUniqueValues[field]?.find(
-                  (item) =>
-                    JSON.stringify(individualColumnSelections[field]) ===
-                    JSON.stringify(item.value),
+                  (item) => individualColumnSelections[field] === item.index,
                 )
               "
-              data-key="displayValue"
+              data-key="index"
               scrollable
               scroll-height="flex"
               selection-mode="single"
@@ -233,7 +230,7 @@ function handleKeydown(event: KeyboardEvent) {
               @update:selection="
                 (selection: ColumnUniqueValue | null) => {
                   if (selection) {
-                    individualColumnSelections[field] = selection.value;
+                    individualColumnSelections[field] = selection.index;
                   }
                 }
               "
