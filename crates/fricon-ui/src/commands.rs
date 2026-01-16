@@ -301,7 +301,7 @@ async fn get_filter_data_internal(
         .filter(|&&i| {
             let col_name = schema.columns().keys().nth(i).map(String::as_str);
             if let Some(exclude) = &exclude_columns {
-                col_name.map_or(true, |name| !exclude.iter().any(|e| e == name))
+                col_name.is_none_or(|name| !exclude.iter().any(|e| e == name))
             } else {
                 true
             }
