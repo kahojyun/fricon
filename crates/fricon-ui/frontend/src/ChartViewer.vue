@@ -95,7 +95,7 @@ const yColumnOptions = computed(
   () => datasetDetail.value?.columns.filter((c) => c.isIndex) ?? [],
 );
 const yColumn = ref<ColumnInfo>();
-watch(yColumnOptions, updateSelectionFn(yColumn));
+watch(yColumnOptions, updateSelectionFn(yColumn, 1));
 
 // Update excludeColumns when X or Y or ChartType changes
 watch(
@@ -126,11 +126,19 @@ watch(
   },
 );
 
-function updateSelectionFn(optionRef: Ref<ColumnInfo | undefined>) {
+function updateSelectionFn(
+  optionRef: Ref<ColumnInfo | undefined>,
+  defaultIndex = 0,
+) {
   return (newOptions: ColumnInfo[]) => {
     const currentName = optionRef.value?.name;
-    optionRef.value =
-      newOptions.find((col) => col.name === currentName) ?? newOptions[0];
+    const found = newOptions.find((col) => col.name === currentName);
+    if (found) {
+      optionRef.value = found;
+    } else {
+      optionRef.value =
+        newOptions[defaultIndex] ?? newOptions[0] ?? newOptions[0];
+    }
   };
 }
 
