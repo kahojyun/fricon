@@ -38,7 +38,7 @@ export interface DatasetDataOptions {
   end?: number;
   /** Indices of chosen values for each filter field */
   indexFilters?: number[];
-  xColumnName?: string;
+  excludeColumns?: string[];
   columns?: number[];
 }
 
@@ -109,7 +109,7 @@ export interface FilterTableData {
 }
 
 export interface FilterTableOptions {
-  xColumnName?: string;
+  excludeColumns?: string[];
 }
 
 export function getFilterTableData(

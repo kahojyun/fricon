@@ -18,56 +18,59 @@ import {
   fetchData,
   subscribeDatasetUpdate,
 } from "@/backend.ts";
-import { DataType, Float64, Struct, Vector } from "apache-arrow";
+import { Vector } from "apache-arrow";
 import { useThrottleFn, watchDebounced, watchThrottled } from "@vueuse/core";
 import type { TypedArray } from "apache-arrow/interfaces";
 import ChartWrapper, {
-  type LinePlotOptions,
-  type LineSeries,
+  type ChartOptions,
+  type ChartSeries,
 } from "./components/ChartWrapper.vue";
 import FilterTable from "./components/FilterTable.vue";
+import RadioButton from "primevue/radiobutton";
+import {
+  extractTraceXAxis,
+  getColumnIndices,
+  extractComplexComponents,
+  transformComplexView,
+  createMockVector,
+  type ComplexViewOption,
+} from "@/composables/chartDataHelpers";
 
 const props = defineProps<{
   datasetId: number;
 }>();
 
+// ============================================================================
+// Dataset and Filter State
+// ============================================================================
+
 const datasetDetail = shallowRef<DatasetDetail>();
 const filterTableData = shallowRef<FilterTableData>();
-const xColumnName = ref<string | undefined>();
+const excludeColumns = ref<string[]>([]);
 let unsubscribe: (() => Promise<void>) | undefined;
 
-watchThrottled(
-  () => props.datasetId,
-  async (newId) => {
-    let aborted = false;
-    onWatcherCleanup(() => (aborted = true));
+// ============================================================================
+// Chart Configuration
+// ============================================================================
 
-    await unsubscribe?.();
-
-    const newDetail = await getDatasetDetail(newId);
-    if (aborted) return;
-
-    // Get initial filter table data
-    const newFilterTableData = await getFilterTableData(newId, {
-      xColumnName: xColumnName.value,
-    });
-    if (aborted) return;
-
-    const updateCallback = useThrottleFn(async () => {
-      const v = await getFilterTableData(newId, {
-        xColumnName: xColumnName.value,
-      });
-      filterTableData.value = v;
-    }, 1000);
-    unsubscribe = await subscribeDatasetUpdate(newId, updateCallback);
-    datasetDetail.value = newDetail;
-    filterTableData.value = newFilterTableData;
-  },
-  { throttle: 100, immediate: true },
-);
-onUnmounted(async () => {
-  await unsubscribe?.();
+const chartType = ref<"line" | "heatmap">("line");
+const availableChartTypes = computed(() => {
+  if (!series.value) return [];
+  return ["line", "heatmap"];
 });
+
+const complexSeriesOptions: ComplexViewOption[] = [
+  "real",
+  "imag",
+  "mag",
+  "arg",
+];
+const selectedComplexView = ref<ComplexViewOption[]>(["real", "imag"]);
+const selectedComplexViewSingle = ref<ComplexViewOption>("mag");
+
+// ============================================================================
+// Column Selection
+// ============================================================================
 
 const seriesOptions = computed(
   () => datasetDetail.value?.columns.filter((c) => !c.isIndex) ?? [],
@@ -83,171 +86,312 @@ const xColumnOptions = computed(() =>
 const xColumn = ref<ColumnInfo>();
 watch(xColumnOptions, updateSelectionFn(xColumn));
 
-// Update xColumnName when xColumn changes, and refetch filter table data
-watch(xColumn, async (newXColumn) => {
-  xColumnName.value = newXColumn?.name;
-  if (datasetDetail.value && props.datasetId) {
-    const newFilterTableData = await getFilterTableData(props.datasetId, {
-      xColumnName: newXColumn?.name,
-    });
-    filterTableData.value = newFilterTableData;
-  }
-});
-
-function updateSelectionFn(optionRef: Ref<ColumnInfo | undefined>) {
-  return (newOptions: ColumnInfo[]) => {
-    const currentName = optionRef.value?.name;
-    optionRef.value =
-      newOptions.find((col) => col.name === currentName) ?? newOptions[0];
-  };
-}
-
-const complexSeriesOptions = ["real", "imag", "mag", "arg"];
-const selectedComplexView = ref(["real", "imag"]);
+const yColumnOptions = computed(
+  () => datasetDetail.value?.columns.filter((c) => c.isIndex) ?? [],
+);
+const yColumn = ref<ColumnInfo>();
+watch(yColumnOptions, updateSelectionFn(yColumn, 1));
 
 const isTraceSeries = computed(() => series.value?.isTrace ?? false);
 const isComplexSeries = computed(() => series.value?.isComplex ?? false);
 
-const filter = shallowRef<FilterTableRow>();
+/** Updates a column selection ref when options change */
+function updateSelectionFn(
+  optionRef: Ref<ColumnInfo | undefined>,
+  defaultIndex = 0,
+) {
+  return (newOptions: ColumnInfo[]) => {
+    const currentName = optionRef.value?.name;
+    const found = newOptions.find((col) => col.name === currentName);
+    optionRef.value = found ?? newOptions[defaultIndex] ?? newOptions[0];
+  };
+}
 
-const data = shallowRef<LinePlotOptions>();
+// ============================================================================
+// Data Subscription
+// ============================================================================
+
+watchThrottled(
+  () => props.datasetId,
+  async (newId) => {
+    let aborted = false;
+    onWatcherCleanup(() => (aborted = true));
+
+    await unsubscribe?.();
+
+    const newDetail = await getDatasetDetail(newId);
+    if (aborted) return;
+
+    const newFilterTableData = await getFilterTableData(newId, {
+      excludeColumns: excludeColumns.value,
+    });
+    if (aborted) return;
+
+    const updateCallback = useThrottleFn(async () => {
+      const v = await getFilterTableData(newId, {
+        excludeColumns: excludeColumns.value,
+      });
+      filterTableData.value = v;
+    }, 1000);
+
+    unsubscribe = await subscribeDatasetUpdate(newId, updateCallback);
+    datasetDetail.value = newDetail;
+    filterTableData.value = newFilterTableData;
+  },
+  { throttle: 100, immediate: true },
+);
+
+onUnmounted(async () => {
+  await unsubscribe?.();
+});
+
+// Update excludeColumns when axis or chart type changes
+watch(
+  [xColumn, yColumn, chartType, series],
+  async ([newX, newY, newType, newSeries]) => {
+    const excludes: string[] = [];
+    if (newType === "line") {
+      if (newX) excludes.push(newX.name);
+    } else if (newSeries?.isTrace) {
+      if (newY) excludes.push(newY.name);
+    } else {
+      if (newX) excludes.push(newX.name);
+      if (newY) excludes.push(newY.name);
+    }
+    excludeColumns.value = excludes;
+
+    if (datasetDetail.value && props.datasetId) {
+      filterTableData.value = await getFilterTableData(props.datasetId, {
+        excludeColumns: excludes,
+      });
+    }
+  },
+);
+
+// ============================================================================
+// Chart Data Processing
+// ============================================================================
+
+const filter = shallowRef<FilterTableRow>();
+const data = shallowRef<ChartOptions>();
+
 watchDebounced(
-  [datasetDetail, series, filter, selectedComplexView],
+  [
+    datasetDetail,
+    series,
+    filter,
+    selectedComplexView,
+    selectedComplexViewSingle,
+    chartType,
+    xColumn,
+    yColumn,
+  ],
   async () => {
     data.value = await getNewData();
   },
   { debounce: 50 },
 );
-async function getNewData() {
+
+/** Determines which column indices to fetch based on chart type */
+function buildSelectColumns(
+  columns: ColumnInfo[],
+  seriesValue: ColumnInfo,
+  type: "line" | "heatmap",
+  xName: string | undefined,
+  yName: string | undefined,
+): number[] | null {
+  const seriesIndex = columns.findIndex((c) => c.name === seriesValue.name);
+  if (seriesIndex === -1) return null;
+
+  if (type === "line") {
+    if (seriesValue.isTrace) {
+      return [seriesIndex];
+    }
+    const indices = getColumnIndices(columns, [xName]);
+    return indices ? [...indices, seriesIndex] : null;
+  }
+
+  // Heatmap
+  if (seriesValue.isTrace) {
+    const indices = getColumnIndices(columns, [yName]);
+    return indices ? [...indices, seriesIndex] : null;
+  }
+  const indices = getColumnIndices(columns, [xName, yName]);
+  return indices ? [...indices, seriesIndex] : null;
+}
+
+/** Processes data for line charts */
+function processLineChartData(
+  newData: import("apache-arrow").Table,
+  seriesValue: ColumnInfo,
+  seriesVector: Vector,
+): { x: number[] | TypedArray; rawY: Vector } | null {
+  if (seriesValue.isTrace) {
+    if (newData.numRows !== 1) {
+      console.error(
+        "Trace series should fetch exactly 1 row, actual:",
+        newData.numRows,
+      );
+      return null;
+    }
+    const result = extractTraceXAxis(seriesVector, 0);
+    if (!result) return null;
+    return { x: result.x, rawY: result.y };
+  }
+
+  return {
+    x: newData.getChildAt(0)!.toArray() as TypedArray,
+    rawY: seriesVector,
+  };
+}
+
+/** Processes data for heatmap charts */
+function processHeatmapData(
+  newData: import("apache-arrow").Table,
+  seriesValue: ColumnInfo,
+  seriesVector: Vector,
+): { x: number[] | TypedArray; y: number[] | TypedArray; rawY: Vector } | null {
+  if (seriesValue.isTrace) {
+    const yVector = newData.getChildAt(0)!;
+    const flatX: number[] = [];
+    const flatY: number[] = [];
+    const accumulatedZ: (number | { real: number; imag: number })[] = [];
+
+    for (let r = 0; r < newData.numRows; r++) {
+      const rowY = yVector.get(r);
+      if (rowY === null) continue;
+
+      const result = extractTraceXAxis(seriesVector, r);
+      if (!result) continue;
+
+      for (let i = 0; i < result.y.length; i++) {
+        flatX.push(result.x[i]!);
+        flatY.push(rowY);
+        accumulatedZ.push(result.y.get(i));
+      }
+    }
+
+    return {
+      x: Float64Array.from(flatX),
+      y: Float64Array.from(flatY),
+      rawY: createMockVector(accumulatedZ) as unknown as Vector,
+    };
+  }
+
+  // Scalar Heatmap
+  return {
+    x: newData.getChildAt(0)!.toArray() as TypedArray,
+    y: newData.getChildAt(1)!.toArray() as TypedArray,
+    rawY: seriesVector,
+  };
+}
+
+/** Builds chart series with optional complex number transformation */
+function buildChartSeries(
+  rawY: Vector,
+  seriesName: string,
+  isComplex: boolean,
+  type: "line" | "heatmap",
+  complexViewOptions: ComplexViewOption[],
+  complexViewSingle: ComplexViewOption,
+): ChartSeries[] {
+  if (!isComplex) {
+    return [{ name: seriesName, data: rawY.toArray() as TypedArray }];
+  }
+
+  const components = extractComplexComponents(rawY);
+  const options = type === "heatmap" ? [complexViewSingle] : complexViewOptions;
+
+  return options.map((option) => ({
+    name: `${seriesName} (${option})`,
+    data: transformComplexView(components, option),
+  }));
+}
+
+/** Main data fetching and processing function */
+async function getNewData(): Promise<ChartOptions | undefined> {
   const detailValue = datasetDetail.value;
   const indexRow = filter.value;
   const filterTableDataValue = filterTableData.value;
   const datasetId = props.datasetId;
   const xColumnValue = xColumn.value;
+  const yColumnValue = yColumn.value;
   const seriesValue = series.value;
+  const type = chartType.value;
 
+  // Validation
   const columns = detailValue?.columns;
-  if (!filterTableDataValue) return undefined;
-
-  // Build filter fields from filterTableData (columns except X)
-  const filterFields = filterTableDataValue.fields;
-
-  if (
-    !columns ||
-    !((filterFields.length > 0 && indexRow) || filterFields.length == 0) ||
-    !datasetId ||
-    !seriesValue
-  )
+  if (!filterTableDataValue || !columns || !datasetId || !seriesValue) {
     return undefined;
-
-  let indexFilters: number[] | undefined;
-  if (filterFields.length > 0 && indexRow) {
-    indexFilters = indexRow.valueIndices;
   }
 
-  const seriesIndex = columns.findIndex((c) => c.name === seriesValue.name);
-  if (seriesIndex === -1) return undefined;
-  let selectColumns: number[];
-  if (seriesValue.isTrace) {
-    selectColumns = [seriesIndex];
-  } else {
-    if (!xColumnValue) return undefined;
-    const xIndex = columns.findIndex((c) => c.name === xColumnValue.name);
-    if (xIndex === -1) return undefined;
-    selectColumns = [xIndex, seriesIndex];
+  const filterFields = filterTableDataValue.fields;
+  const hasFilters = filterFields.length > 0;
+  if (hasFilters && !indexRow) {
+    return undefined;
   }
 
+  // Build column selection
+  const selectColumns = buildSelectColumns(
+    columns,
+    seriesValue,
+    type,
+    xColumnValue?.name,
+    yColumnValue?.name,
+  );
+  if (!selectColumns) return undefined;
+
+  // Fetch data
   const newData = await fetchData(datasetId, {
-    indexFilters,
-    xColumnName: xColumnValue?.name,
+    indexFilters: hasFilters ? indexRow!.valueIndices : undefined,
+    excludeColumns: excludeColumns.value,
     columns: selectColumns,
   });
 
   const seriesVector = newData.getChild(seriesValue.name);
-  if (seriesVector == null) {
+  if (!seriesVector) {
     console.error("No series column returned", seriesValue);
     return undefined;
   }
-  let x: number[] | TypedArray;
+
+  // Process based on chart type
+  let finalX: number[] | TypedArray;
+  let finalY: number[] | TypedArray | undefined;
   let rawYColumn: Vector;
-  if (seriesValue.isTrace) {
-    if (newData.numRows !== 1) {
-      console.error(
-        "Trace series should fetch exactly 1 row, actual: ",
-        newData.numRows,
-      );
-      return undefined;
-    }
-    if (DataType.isList(seriesVector.type)) {
-      rawYColumn = seriesVector.get(0) as Vector;
-      x = Int32Array.from({ length: rawYColumn.length }, (_, i) => i);
-    } else {
-      rawYColumn = seriesVector.getChild("y")!.get(0) as Vector;
-      if (seriesVector.numChildren === 2) {
-        x = (
-          seriesVector.getChild("x")!.get(0) as Vector
-        ).toArray() as TypedArray;
-      } else {
-        const firstRow = (
-          seriesVector as Vector<Struct<{ x0: Float64; step: Float64 }>>
-        ).get(0)!;
-        const x0 = firstRow.x0;
-        const step = firstRow.step;
-        x = Float64Array.from(
-          { length: rawYColumn.length },
-          (_, i) => x0 + i * step,
-        );
-      }
-    }
+
+  if (type === "line") {
+    const result = processLineChartData(newData, seriesValue, seriesVector);
+    if (!result) return undefined;
+    finalX = result.x;
+    rawYColumn = result.rawY;
   } else {
-    x = newData.getChildAt(0)!.toArray() as TypedArray;
-    rawYColumn = seriesVector;
+    const result = processHeatmapData(newData, seriesValue, seriesVector);
+    if (!result) return undefined;
+    finalX = result.x;
+    finalY = result.y;
+    rawYColumn = result.rawY;
   }
 
-  // Handle complex data if needed
-  let seriesData: LineSeries[];
-  if (isComplexSeries.value) {
-    seriesData = [];
-    const complexYColumn = rawYColumn as Vector<
-      Struct<{ real: Float64; imag: Float64 }>
-    >;
-
-    for (const option of selectedComplexView.value) {
-      let transformedY: number[] | TypedArray;
-      switch (option) {
-        case "real":
-          transformedY = complexYColumn.getChildAt(0)?.toArray() as TypedArray;
-          break;
-        case "imag":
-          transformedY = complexYColumn.getChildAt(1)?.toArray() as TypedArray;
-          break;
-        case "mag":
-          transformedY = complexYColumn
-            .toArray()
-            .map(({ real, imag }) => Math.sqrt(real * real + imag * imag));
-          break;
-        case "arg":
-          transformedY = complexYColumn
-            .toArray()
-            .map(({ real, imag }) => Math.atan2(imag, real));
-          break;
-        default:
-          console.warn("Unexpected complex view", option);
-          continue;
-      }
-      seriesData.push({
-        name: `${seriesValue.name} (${option})`,
-        data: transformedY,
-      });
-    }
-  } else {
-    const rawY = rawYColumn.toArray() as TypedArray;
-    seriesData = [{ name: seriesValue.name, data: rawY }];
-  }
+  // Build series
+  const seriesData = buildChartSeries(
+    rawYColumn,
+    seriesValue.name,
+    isComplexSeries.value,
+    type,
+    selectedComplexView.value,
+    selectedComplexViewSingle.value,
+  );
 
   return {
-    x,
-    xName: xColumnValue?.name ?? `${seriesValue.name} - X`,
+    type,
+    x: finalX,
+    xName:
+      xColumnValue?.name ??
+      (seriesValue.isTrace && type === "line"
+        ? `${seriesValue.name} - X`
+        : "X"),
+    y: finalY,
+    yName: yColumnValue?.name,
     series: seriesData,
   };
 }
@@ -268,32 +412,72 @@ async function getNewData() {
       </IftaLabel>
       <IftaLabel>
         <Select
+          v-model="chartType"
+          :options="availableChartTypes"
+          input-id="chart-type-select"
+          fluid
+        />
+        <label for="chart-type-select">Chart Type</label>
+      </IftaLabel>
+      <IftaLabel
+        v-if="
+          chartType === 'line' || (chartType === 'heatmap' && !series?.isTrace)
+        "
+      >
+        <Select
           v-model="xColumn"
           :options="xColumnOptions"
-          :disabled="isTraceSeries"
+          :disabled="isTraceSeries && chartType === 'line'"
           option-label="name"
           input-id="x-column-select"
           fluid
         />
         <label for="x-column-select">X</label>
       </IftaLabel>
+      <IftaLabel v-if="chartType === 'heatmap'">
+        <Select
+          v-model="yColumn"
+          :options="yColumnOptions"
+          option-label="name"
+          input-id="y-column-select"
+          fluid
+        />
+        <label for="y-column-select">Y</label>
+      </IftaLabel>
     </div>
     <div class="flex items-center gap-2 p-2">
       <span class="text-sm font-medium">Complex:</span>
-      <div
-        v-for="option in complexSeriesOptions"
-        :key="option"
-        class="flex items-center gap-1"
-      >
-        <Checkbox
-          v-model="selectedComplexView"
-          :input-id="`complex-${option}`"
-          :disabled="!isComplexSeries"
-          name="selectedComplexView"
-          :value="option"
-        />
-        <label :for="`complex-${option}`" class="text-sm">{{ option }}</label>
-      </div>
+      <template v-if="chartType === 'heatmap'">
+        <div
+          v-for="option in complexSeriesOptions"
+          :key="option"
+          class="flex items-center gap-1"
+        >
+          <RadioButton
+            v-model="selectedComplexViewSingle"
+            :input-id="`complex-${option}`"
+            :disabled="!isComplexSeries"
+            :value="option"
+          />
+          <label :for="`complex-${option}`" class="text-sm">{{ option }}</label>
+        </div>
+      </template>
+      <template v-else>
+        <div
+          v-for="option in complexSeriesOptions"
+          :key="option"
+          class="flex items-center gap-1"
+        >
+          <Checkbox
+            v-model="selectedComplexView"
+            :input-id="`complex-${option}`"
+            :disabled="!isComplexSeries"
+            name="selectedComplexView"
+            :value="option"
+          />
+          <label :for="`complex-${option}`" class="text-sm">{{ option }}</label>
+        </div>
+      </template>
     </div>
     <Splitter class="min-h-0 flex-1" layout="vertical">
       <SplitterPanel>

@@ -77,7 +77,7 @@ struct DatasetDataOptions {
     end: Option<usize>,
     /// Indices of chosen values for each filter field
     index_filters: Option<Vec<usize>>,
-    x_column_name: Option<String>,
+    exclude_columns: Option<Vec<String>>,
     columns: Option<Vec<usize>>,
 }
 
@@ -273,13 +273,13 @@ fn subscriptions_mut() -> MutexGuard<'static, SubscriptionRecords> {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FilterTableOptions {
-    x_column_name: Option<String>,
+    exclude_columns: Option<Vec<String>>,
 }
 
 async fn get_filter_data_internal(
     state: &AppState,
     id: i32,
-    x_column_name: Option<String>,
+    exclude_columns: Option<Vec<String>>,
 ) -> Result<FilterDataInternal, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
@@ -300,7 +300,11 @@ async fn get_filter_data_internal(
         .iter()
         .filter(|&&i| {
             let col_name = schema.columns().keys().nth(i).map(String::as_str);
-            col_name != x_column_name.as_deref()
+            if let Some(exclude) = &exclude_columns {
+                col_name.is_none_or(|name| !exclude.iter().any(|e| e == name))
+            } else {
+                true
+            }
         })
         .copied()
         .collect();
@@ -356,11 +360,11 @@ async fn get_filter_data_internal(
 async fn build_filter_batch(
     state: &AppState,
     id: i32,
-    x_column_name: Option<String>,
+    exclude_columns: Option<Vec<String>>,
     indices: &[usize],
     arrow_schema: Arc<arrow_schema::Schema>,
 ) -> Result<Option<arrow_array::RecordBatch>, Error> {
-    let filter_data = get_filter_data_internal(state, id, x_column_name).await?;
+    let filter_data = get_filter_data_internal(state, id, exclude_columns).await?;
     let fields = filter_data.fields;
     let raw_values_map = filter_data.column_raw_values;
 
@@ -426,7 +430,7 @@ async fn dataset_data(
         build_filter_batch(
             &state,
             id,
-            options.x_column_name,
+            options.exclude_columns,
             &indices,
             dataset.arrow_schema().clone(),
         )
@@ -459,7 +463,7 @@ async fn get_filter_table_data(
     id: i32,
     options: FilterTableOptions,
 ) -> Result<FilterTableData, Error> {
-    let filter_data = get_filter_data_internal(&state, id, options.x_column_name).await?;
+    let filter_data = get_filter_data_internal(&state, id, options.exclude_columns).await?;
 
     Ok(FilterTableData {
         fields: filter_data.fields,
