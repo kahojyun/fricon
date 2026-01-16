@@ -110,6 +110,19 @@ struct FilterTableData {
     column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
 }
 
+struct ProcessedFilterRows {
+    unique_rows: Vec<FilterTableRow>,
+    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+    column_raw_values: HashMap<String, Vec<serde_json::Value>>,
+}
+
+struct FilterDataInternal {
+    fields: Vec<String>,
+    unique_rows: Vec<FilterTableRow>,
+    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+    column_raw_values: HashMap<String, Vec<serde_json::Value>>,
+}
+
 fn format_json_value(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::Null => "null".to_string(),
@@ -121,11 +134,7 @@ fn format_json_value(value: &serde_json::Value) -> String {
 fn process_filter_rows(
     fields: &[String],
     json_rows: Vec<serde_json::Map<String, serde_json::Value>>,
-) -> (
-    Vec<FilterTableRow>,
-    HashMap<String, Vec<ColumnUniqueValue>>,
-    HashMap<String, Vec<serde_json::Value>>,
-) {
+) -> ProcessedFilterRows {
     let mut unique_rows = Vec::new();
     let mut seen_keys = HashSet::new();
     let mut column_unique_values: HashMap<String, Vec<ColumnUniqueValue>> =
@@ -156,7 +165,9 @@ fn process_filter_rows(
             // Collect unique values per column and track indices
             for (col_idx, value) in values.iter().enumerate() {
                 if let Some(field_name) = fields.get(col_idx) {
-                    let raw_values = column_raw_values.get_mut(field_name).unwrap();
+                    let raw_values = column_raw_values
+                        .get_mut(field_name)
+                        .expect("Field should exist in column_raw_values");
 
                     let index = if let Some(pos) = raw_values.iter().position(|v| v == value) {
                         pos
@@ -167,7 +178,7 @@ fn process_filter_rows(
                         let display_value = format_json_value(value);
                         column_unique_values
                             .get_mut(field_name)
-                            .unwrap()
+                            .expect("Field should exist in column_unique_values")
                             .push(ColumnUniqueValue {
                                 index: new_index,
                                 display_value,
@@ -185,7 +196,11 @@ fn process_filter_rows(
             });
         }
     }
-    (unique_rows, column_unique_values, column_raw_values)
+    ProcessedFilterRows {
+        unique_rows,
+        column_unique_values,
+        column_raw_values,
+    }
 }
 
 #[tauri::command]
@@ -265,22 +280,19 @@ async fn get_filter_data_internal(
     state: &AppState,
     id: i32,
     x_column_name: Option<String>,
-) -> Result<
-    (
-        Vec<String>,
-        Vec<FilterTableRow>,
-        HashMap<String, Vec<ColumnUniqueValue>>,
-        HashMap<String, Vec<serde_json::Value>>,
-    ),
-    Error,
-> {
+) -> Result<FilterDataInternal, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let index_columns = dataset.index_columns();
 
     // Get index column indices
     let Some(index_col_indices) = index_columns else {
-        return Ok((vec![], vec![], HashMap::new(), HashMap::new()));
+        return Ok(FilterDataInternal {
+            fields: vec![],
+            unique_rows: vec![],
+            column_unique_values: HashMap::new(),
+            column_raw_values: HashMap::new(),
+        });
     };
 
     // Filter out X column from index columns
@@ -294,7 +306,12 @@ async fn get_filter_data_internal(
         .collect();
 
     if filtered_indices.is_empty() {
-        return Ok((vec![], vec![], HashMap::new(), HashMap::new()));
+        return Ok(FilterDataInternal {
+            fields: vec![],
+            unique_rows: vec![],
+            column_unique_values: HashMap::new(),
+            column_raw_values: HashMap::new(),
+        });
     }
 
     // Get field names
@@ -327,9 +344,13 @@ async fn get_filter_data_internal(
 
     // Process rows: deduplicate and compute unique values and raw values for
     // indexing
-    let (unique_rows, column_unique_values, column_raw_values) =
-        process_filter_rows(&fields, json_rows);
-    Ok((fields, unique_rows, column_unique_values, column_raw_values))
+    let processed = process_filter_rows(&fields, json_rows);
+    Ok(FilterDataInternal {
+        fields,
+        unique_rows: processed.unique_rows,
+        column_unique_values: processed.column_unique_values,
+        column_raw_values: processed.column_raw_values,
+    })
 }
 
 async fn build_filter_batch(
@@ -339,16 +360,18 @@ async fn build_filter_batch(
     indices: &[usize],
     arrow_schema: Arc<arrow_schema::Schema>,
 ) -> Result<Option<arrow_array::RecordBatch>, Error> {
-    let (fields, _, _, raw_values_map) = get_filter_data_internal(state, id, x_column_name).await?;
+    let filter_data = get_filter_data_internal(state, id, x_column_name).await?;
+    let fields = filter_data.fields;
+    let raw_values_map = filter_data.column_raw_values;
 
     let mut filter_map = serde_json::Map::new();
     for (idx, &value_idx) in indices.iter().enumerate() {
-        if let Some(field_name) = fields.get(idx) {
-            if let Some(values) = raw_values_map.get(field_name) {
-                if let Some(val) = values.get(value_idx) {
-                    filter_map.insert(field_name.clone(), val.clone());
-                }
-            }
+        if let Some(field_name) = fields.get(idx)
+            && let Some(val) = raw_values_map
+                .get(field_name)
+                .and_then(|values| values.get(value_idx))
+        {
+            filter_map.insert(field_name.clone(), val.clone());
         }
     }
 
@@ -436,13 +459,12 @@ async fn get_filter_table_data(
     id: i32,
     options: FilterTableOptions,
 ) -> Result<FilterTableData, Error> {
-    let (fields, unique_rows, column_unique_values, _) =
-        get_filter_data_internal(&state, id, options.x_column_name).await?;
+    let filter_data = get_filter_data_internal(&state, id, options.x_column_name).await?;
 
     Ok(FilterTableData {
-        fields,
-        rows: unique_rows,
-        column_unique_values,
+        fields: filter_data.fields,
+        rows: filter_data.unique_rows,
+        column_unique_values: filter_data.column_unique_values,
     })
 }
 
