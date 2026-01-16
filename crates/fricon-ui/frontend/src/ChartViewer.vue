@@ -140,14 +140,9 @@ async function getNewData() {
   )
     return undefined;
 
-  let indexFilters: Record<string, unknown> | undefined;
+  let indexFilters: number[] | undefined;
   if (filterFields.length > 0 && indexRow) {
-    // Build a simple JSON object mapping field names to filter values
-    indexFilters = {};
-    for (let i = 0; i < filterFields.length; i++) {
-      const fieldName = filterFields[i]!;
-      indexFilters[fieldName] = indexRow.values[i];
-    }
+    indexFilters = indexRow.valueIndices;
   }
 
   const seriesIndex = columns.findIndex((c) => c.name === seriesValue.name);
@@ -164,6 +159,7 @@ async function getNewData() {
 
   const newData = await fetchData(datasetId, {
     indexFilters,
+    xColumnName: xColumnValue?.name,
     columns: selectColumns,
   });
 

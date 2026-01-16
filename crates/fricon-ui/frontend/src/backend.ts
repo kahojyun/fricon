@@ -36,8 +36,9 @@ export interface DatasetDetail {
 export interface DatasetDataOptions {
   start?: number;
   end?: number;
-  /** JSON object mapping field names to filter values */
-  indexFilters?: Record<string, unknown>;
+  /** Indices of chosen values for each filter field */
+  indexFilters?: number[];
+  xColumnName?: string;
   columns?: number[];
 }
 
@@ -91,13 +92,13 @@ export async function subscribeDatasetUpdate(
 }
 
 export interface FilterTableRow {
-  values: unknown[];
   displayValues: string[];
+  valueIndices: number[];
   index: number;
 }
 
 export interface ColumnUniqueValue {
-  value: unknown;
+  index: number;
   displayValue: string;
 }
 
