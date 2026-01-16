@@ -332,6 +332,63 @@ async fn get_filter_data_internal(
     Ok((fields, unique_rows, column_unique_values, column_raw_values))
 }
 
+async fn build_filter_batch(
+    state: &AppState,
+    id: i32,
+    x_column_name: Option<String>,
+    indices: &[usize],
+    arrow_schema: Arc<arrow_schema::Schema>,
+) -> Result<Option<arrow_array::RecordBatch>, Error> {
+    let (fields, _, _, raw_values_map) = get_filter_data_internal(state, id, x_column_name).await?;
+
+    let mut filter_map = serde_json::Map::new();
+    for (idx, &value_idx) in indices.iter().enumerate() {
+        if let Some(field_name) = fields.get(idx) {
+            if let Some(values) = raw_values_map.get(field_name) {
+                if let Some(val) = values.get(value_idx) {
+                    filter_map.insert(field_name.clone(), val.clone());
+                }
+            }
+        }
+    }
+
+    if filter_map.is_empty() {
+        return Ok(None);
+    }
+
+    // Build filter schema from the dataset schema (only include filter fields)
+    let projection_indices: Vec<usize> = filter_map
+        .keys()
+        .map(|field_name| {
+            arrow_schema
+                .index_of(field_name)
+                .with_context(|| format!("Field '{field_name}' not found in schema"))
+        })
+        .collect::<Result<_, _>>()?;
+    let filter_schema = Arc::new(
+        arrow_schema
+            .project(&projection_indices)
+            .context("Failed to project arrow schema")?,
+    );
+
+    // Convert HashMap to JSON array (single row)
+    let json_row = serde_json::Value::Object(filter_map);
+    // serialize as single object (NDJSON style) for arrow_json Reader
+    let json_array = serde_json::to_vec(&json_row).context("Failed to serialize filter to JSON")?;
+
+    // Use arrow_json::ReaderBuilder to decode with schema
+    let mut reader = arrow_json::ReaderBuilder::new(filter_schema)
+        .build(Cursor::new(json_array))
+        .context("Failed to create JSON reader")?;
+
+    let batch = reader
+        .next()
+        .context("No batch returned")?
+        .context("Failed to decode filter batch")?;
+
+    Ok(Some(batch))
+}
+
 #[tauri::command]
 async fn dataset_data(
     state: State<'_, AppState>,
@@ -343,56 +400,14 @@ async fn dataset_data(
     let end = options.end.map_or(Bound::Unbounded, Bound::Excluded);
 
     let index_filters = if let Some(indices) = options.index_filters {
-        let (fields, _, _, raw_values_map) =
-            get_filter_data_internal(&state, id, options.x_column_name).await?;
-
-        let mut filter_map = serde_json::Map::new();
-        for (idx, &value_idx) in indices.iter().enumerate() {
-            if let Some(field_name) = fields.get(idx) {
-                if let Some(values) = raw_values_map.get(field_name) {
-                    if let Some(val) = values.get(value_idx) {
-                        filter_map.insert(field_name.clone(), val.clone());
-                    }
-                }
-            }
-        }
-
-        if filter_map.is_empty() {
-            None
-        } else {
-            // Build filter schema from the dataset schema (only include filter fields)
-            let arrow_schema = dataset.arrow_schema();
-            let indices: Vec<usize> = filter_map
-                .keys()
-                .map(|field_name| {
-                    arrow_schema
-                        .index_of(field_name)
-                        .with_context(|| format!("Field '{field_name}' not found in schema"))
-                })
-                .collect::<Result<_, _>>()?;
-            let filter_schema = Arc::new(
-                arrow_schema
-                    .project(&indices)
-                    .context("Failed to project arrow schema")?,
-            );
-
-            // Convert HashMap to JSON array (single row)
-            let json_row = serde_json::Value::Object(filter_map);
-            // serialize as single object (NDJSON style) for arrow_json Reader
-            let json_array =
-                serde_json::to_vec(&json_row).context("Failed to serialize filter to JSON")?;
-
-            // Use arrow_json::ReaderBuilder to decode with schema
-            let mut reader = arrow_json::ReaderBuilder::new(filter_schema)
-                .build(Cursor::new(json_array))
-                .context("Failed to create JSON reader")?;
-            Some(
-                reader
-                    .next()
-                    .context("No batch returned")?
-                    .context("Failed to decode filter batch")?,
-            )
-        }
+        build_filter_batch(
+            &state,
+            id,
+            options.x_column_name,
+            &indices,
+            dataset.arrow_schema().clone(),
+        )
+        .await?
     } else {
         None
     };
