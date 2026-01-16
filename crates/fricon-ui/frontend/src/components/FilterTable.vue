@@ -18,7 +18,7 @@ const model = defineModel<FilterTableRow>();
 const isIndividualFilterMode = ref(false);
 
 // Store individual column selections when in individual mode
-const individualColumnSelections = ref<Record<string, unknown[]>>({});
+const individualColumnSelections = ref<Record<string, unknown>>({});
 
 // Track previous dataset ID for preservation logic
 const previousDatasetId = ref<string | undefined>(undefined);
@@ -42,23 +42,19 @@ const columnUniqueValues = computed<Record<string, ColumnUniqueValue[]>>(() => {
 // Find matching row from individual column selections
 function findMatchingRowFromSelections(
   filterTableData: FilterTableData,
-  selections: Record<string, unknown[]>,
+  selections: Record<string, unknown>,
 ): FilterTableRow | null {
   const fieldNames = filterTableData.fields;
-  const selectedValues = fieldNames.map(
-    (fieldName) => selections[fieldName] ?? [],
-  );
 
-  if (selectedValues.every((values) => values.length === 0)) return null;
+  // If no selections, return null
+  if (Object.keys(selections).length === 0) return null;
 
   const matchingRows = filterTableData.rows.filter((row) => {
     return fieldNames.every((fieldName, idx) => {
-      const selectedForColumn = selectedValues[idx];
-      if (selectedForColumn!.length === 0) return true;
+      const selection = selections[fieldName];
+      if (selection === undefined) return true;
       const rowValue = row.values[idx];
-      return selectedForColumn!.some(
-        (sel) => JSON.stringify(sel) === JSON.stringify(rowValue),
-      );
+      return JSON.stringify(selection) === JSON.stringify(rowValue);
     });
   });
 
@@ -74,9 +70,9 @@ function syncIndividualSelectionsFromModel() {
   if (!props.filterTableData || !model.value) return;
   const row = model.value;
   const fieldNames = props.filterTableData.fields;
-  const newSelections: Record<string, unknown[]> = {};
+  const newSelections: Record<string, unknown> = {};
   fieldNames.forEach((fieldName, idx) => {
-    newSelections[fieldName] = [row.values[idx]];
+    newSelections[fieldName] = row.values[idx];
   });
   individualColumnSelections.value = newSelections;
 }
@@ -221,25 +217,23 @@ function handleKeydown(event: KeyboardEvent) {
             <DataTable
               :value="columnUniqueValues[field]"
               :selection="
-                columnUniqueValues[field]?.filter((item) =>
-                  individualColumnSelections[field]?.some(
-                    (sel) => JSON.stringify(sel) === JSON.stringify(item.value),
-                  ),
-                ) ?? []
+                columnUniqueValues[field]?.find(
+                  (item) =>
+                    JSON.stringify(individualColumnSelections[field]) ===
+                    JSON.stringify(item.value),
+                )
               "
               data-key="displayValue"
               scrollable
               scroll-height="flex"
-              selection-mode="multiple"
+              selection-mode="single"
               size="small"
               :virtual-scroller-options="{ itemSize: 35, lazy: true }"
               @keydown.capture="handleKeydown"
               @update:selection="
-                (selection: ColumnUniqueValue[]) => {
-                  if (selection.length > 0) {
-                    individualColumnSelections[field] = selection.map(
-                      (s) => s.value,
-                    );
+                (selection: ColumnUniqueValue | null) => {
+                  if (selection) {
+                    individualColumnSelections[field] = selection.value;
                   }
                 }
               "
