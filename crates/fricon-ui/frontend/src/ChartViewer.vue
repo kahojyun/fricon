@@ -136,8 +136,7 @@ function updateSelectionFn(
     if (found) {
       optionRef.value = found;
     } else {
-      optionRef.value =
-        newOptions[defaultIndex] ?? newOptions[0] ?? newOptions[0];
+      optionRef.value = newOptions[defaultIndex] ?? newOptions[0];
     }
   };
 }
@@ -181,7 +180,6 @@ async function getNewData() {
   const columns = detailValue?.columns;
   if (!filterTableDataValue) return undefined;
 
-  // Build filter fields from filterTableData (columns except excluded ones)
   const filterFields = filterTableDataValue.fields;
 
   if (
@@ -218,7 +216,6 @@ async function getNewData() {
       const yIndex = columns.findIndex((c) => c.name === yColumnValue.name);
       if (yIndex === -1) return undefined;
       selectColumns = [yIndex, seriesIndex];
-      // Logic for excluded columns handled in watcher, here just fetching
     } else {
       // Scalar Heatmap
       if (!xColumnValue || !yColumnValue) return undefined;
@@ -284,31 +281,12 @@ async function getNewData() {
   } else {
     // Heatmap
     if (seriesValue.isTrace) {
-      // Y column is column 0 (selectColumns=[y, series])
       const yVector = newData.getChildAt(0)!;
       const traceVector = seriesVector;
-
       const numRows = newData.numRows;
-      // Flatten
       const flatX: number[] = [];
       const flatY: number[] = [];
-      // For Complex Trace, rawYColumn will be composed later
-      // But here we need to extract from Trace Vector
-
-      // We need to know Trace length. Assuming uniform?
-      // Apache Arrow Lists?
-      // Just iterate.
-      // Wait, for Complex support, we need to extract "Real" or "Imag" from Trace.
-      // So rawYColumn needs to be the flattened Z values.
-
-      // Let's build flatZ array(s) depending on complexity later.
-      // Here just build X and Y.
-      // And build a "virtual" rawYColumn which is the concatenation of all traces.
-
-      // We can't easily concatenate Vectors in JS if they are Structs/Lists efficiently without copying?
-      // Actually, if we just push to array.
-
-      const accumulatedZ: (number | { real: number; imag: number })[] = []; // Temporary holding
+      const accumulatedZ: (number | { real: number; imag: number })[] = [];
 
       for (let r = 0; r < numRows; r++) {
         const rowY = yVector.get(r);
@@ -369,21 +347,7 @@ async function getNewData() {
       finalX = Float64Array.from(flatX);
       finalY = Float64Array.from(flatY);
 
-      // Reconstruct rawYColumn from accumulatedZ
-      // This is slow. But necessary for "ChartWrapper" which expects Arrays.
-
-      // If "isComplex", accumulatedZ contains Objects {real, imag}.
-      // If scalar, numbers.
-
-      if (isComplexSeries.value) {
-        // Mock a Vector-like object or just process accumulatedZ
-        // Line 211 uses `rawYColumn as Vector`.
-        // We can just skip 'rawYColumn' usage and build seriesData directly?
-        // But existing logic uses existing complex logic.
-        // Let's adapt.
-      }
-
-      // To reuse logic, let's make rawYColumn an array-like object
+      // Create a mock Vector-like object from the accumulated Z values
       rawYColumn = {
         toArray: () => accumulatedZ,
         length: accumulatedZ.length,
@@ -397,13 +361,11 @@ async function getNewData() {
     }
   }
 
-  // Handle complex data
   let seriesData: ChartSeries[];
 
   if (isComplexSeries.value) {
     seriesData = [];
-    const complexYColumn = rawYColumn as any; // Vector or Array
-
+    const complexYColumn = rawYColumn as any;
     const options =
       type === "heatmap"
         ? [selectedComplexViewSingle.value]
@@ -412,14 +374,12 @@ async function getNewData() {
     for (const option of options) {
       let transformedY: number[] | TypedArray;
 
-      // We need to handle if complexYColumn is Vector or Array (from Heatmap Trace flattening)
       let reals: any;
       let imags: any;
+      const rawArray = complexYColumn.toArray();
 
-      if (Array.isArray(complexYColumn.toArray())) {
-        // If we mocked it as above "toArray() => accumulatedZ"
-        // actually Vector.toArray() returns array of struct/values
-        const arr = complexYColumn.toArray() as {
+      if (Array.isArray(rawArray)) {
+        const arr = rawArray as {
           real: number;
           imag: number;
         }[];
@@ -430,7 +390,6 @@ async function getNewData() {
           imags[i] = arr[i]!.imag;
         }
       } else {
-        // It's a proper Arrow Vector
         reals = complexYColumn.getChild("real")!.toArray();
         imags = complexYColumn.getChild("imag")!.toArray();
       }
@@ -464,7 +423,6 @@ async function getNewData() {
       });
     }
   } else {
-    // Scalar
     const rawY = rawYColumn.toArray() as TypedArray; // works for Arrow Vector and my Mock
     seriesData = [{ name: seriesValue.name, data: rawY }];
   }
