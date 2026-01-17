@@ -275,6 +275,10 @@ fn extract_trace_row(
                 return Ok(None);
             }
             let values = list_array.value(row);
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "Trace indices are bounded by record batch sizes"
+            )]
             let x = (0..values.len()).map(|i| i as f64).collect();
             Ok(Some((x, values)))
         }
@@ -301,6 +305,10 @@ fn extract_trace_row(
                 let y_values = y_array.value(row);
                 let x0 = x0_array.value(row);
                 let step = step_array.value(row);
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "Trace indices are bounded by record batch sizes"
+                )]
                 let x = (0..y_values.len())
                     .map(|i| x0 + (i as f64) * step)
                     .collect();
@@ -320,10 +328,10 @@ fn extract_trace_row(
                 let x = collect_float_values(&x_values)?;
                 Ok(Some((x, y_values)))
             } else {
-                return Err(Error(anyhow::anyhow!("Unsupported trace struct layout")));
+                Err(Error(anyhow::anyhow!("Unsupported trace struct layout")))
             }
         }
-        _ => return Err(Error(anyhow::anyhow!("Unsupported trace data type"))),
+        _ => Err(Error(anyhow::anyhow!("Unsupported trace data type"))),
     }
 }
 
@@ -505,14 +513,14 @@ fn build_line_series(
         let y_values = collect_float_values(&y_values_array)?;
         let len = x_values.len().min(y_values.len());
         vec![ChartSeries {
-            name: series_name.to_string(),
+            name: series_name.clone(),
             data: (0..len).map(|i| vec![x_values[i], y_values[i]]).collect(),
         }]
     };
 
     Ok(ChartDataResponse {
         r#type: ChartType::Line,
-        x_name: x_name.to_string(),
+        x_name,
         y_name: None,
         series,
     })
@@ -578,7 +586,7 @@ fn build_heatmap_series(
         let name = if is_complex {
             format!("{series_name} ({})", complex_view_label(view_option))
         } else {
-            series_name.to_string()
+            series_name.clone()
         };
         vec![ChartSeries { name, data }]
     } else {
@@ -613,19 +621,20 @@ fn build_heatmap_series(
         let name = if is_complex {
             format!("{series_name} ({})", complex_view_label(view_option))
         } else {
-            series_name.to_string()
+            series_name.clone()
         };
         vec![ChartSeries { name, data }]
     };
 
     Ok(ChartDataResponse {
         r#type: ChartType::Heatmap,
-        x_name: x_name.to_string(),
-        y_name: Some(y_column.to_string()),
+        x_name,
+        y_name: Some(y_column.clone()),
         series,
     })
 }
 
+#[expect(clippy::too_many_lines, reason = "Chart series assembly is verbose")]
 fn build_scatter_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -665,7 +674,7 @@ fn build_scatter_series(
                     data.push(vec![reals[i], imags[i]]);
                 }
             }
-            series_map.insert(series_name.to_string(), data);
+            series_map.insert(series_name.clone(), data);
             (
                 format!("{series_name} (real)"),
                 format!("{series_name} (imag)"),
@@ -705,7 +714,7 @@ fn build_scatter_series(
             }
             let series_name = format!("{trace_x} vs {trace_y}");
             series_map.insert(series_name.clone(), data);
-            (trace_x.to_string(), trace_y.to_string())
+            (trace_x.clone(), trace_y.clone())
         }
         ScatterMode::Xy => {
             let x_column = options
@@ -732,7 +741,7 @@ fn build_scatter_series(
                 .collect::<Vec<_>>();
             let series_name = format!("{x_column} vs {y_column}");
             series_map.insert(series_name.clone(), data);
-            (x_column.to_string(), y_column.to_string())
+            (x_column.clone(), y_column.clone())
         }
     };
 
