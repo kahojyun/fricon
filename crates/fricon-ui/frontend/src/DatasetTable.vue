@@ -1,12 +1,24 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef } from "vue";
-import { type DatasetInfo, listDatasets, onDatasetCreated } from "./backend";
+import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
+import {
+  type DatasetInfo,
+  listDatasets,
+  onDatasetCreated,
+  updateDatasetFavorite,
+} from "./backend";
 
 const emit = defineEmits<{
   datasetSelected: [id: number];
 }>();
 const datasets = ref<DatasetInfo[]>([]);
 const selectedDataset = shallowRef<DatasetInfo>();
+const favoritesOnly = ref(false);
+
+const filteredDatasets = computed(() =>
+  favoritesOnly.value
+    ? datasets.value.filter((dataset) => dataset.favorite)
+    : datasets.value,
+);
 
 let unsubscribe: (() => void) | null = null;
 
@@ -34,37 +46,69 @@ function handleKeydown(event: KeyboardEvent) {
     event.stopPropagation();
   }
 }
+
+const toggleFavorite = async (dataset: DatasetInfo) => {
+  const nextFavorite = !dataset.favorite;
+  dataset.favorite = nextFavorite;
+  try {
+    await updateDatasetFavorite(dataset.id, nextFavorite);
+  } catch (error) {
+    dataset.favorite = !nextFavorite;
+    throw error;
+  }
+};
 </script>
 <template>
-  <DataTable
-    v-model:selection="selectedDataset"
-    :value="datasets"
-    size="small"
-    data-key="id"
-    selection-mode="single"
-    removable-sort
-    scrollable
-    scroll-height="flex"
-    @keydown.capture="handleKeydown"
-    @row-select="emit('datasetSelected', $event.data.id)"
-  >
-    <Column field="id" header="ID" />
-    <Column field="name" header="Name" />
-    <Column field="tags" header="Tags">
-      <template #body="slotProps">
-        <Tag
-          v-for="(tag, index) in slotProps.data.tags"
-          :key="index"
-          class="mr-1 mb-1"
-        >
-          {{ tag }}
-        </Tag>
-      </template>
-    </Column>
-    <Column field="createdAt" header="Created At" sortable>
-      <template #body="slotProps">
-        {{ slotProps.data.createdAt.toLocaleString() }}
-      </template>
-    </Column>
-  </DataTable>
+  <div class="flex h-full flex-col">
+    <div class="flex items-center gap-2 p-2">
+      <ToggleSwitch v-model="favoritesOnly" input-id="favorites-only" />
+      <label for="favorites-only">Favorites only</label>
+    </div>
+    <DataTable
+      v-model:selection="selectedDataset"
+      :value="filteredDatasets"
+      size="small"
+      data-key="id"
+      selection-mode="single"
+      removable-sort
+      scrollable
+      scroll-height="flex"
+      @keydown.capture="handleKeydown"
+      @row-select="emit('datasetSelected', $event.data.id)"
+    >
+      <Column header="Favorite" class="w-24">
+        <template #body="slotProps">
+          <Button
+            :icon="slotProps.data.favorite ? 'pi pi-star-fill' : 'pi pi-star'"
+            :aria-label="
+              slotProps.data.favorite
+                ? 'Unfavorite dataset'
+                : 'Favorite dataset'
+            "
+            text
+            rounded
+            @click.stop="toggleFavorite(slotProps.data)"
+          />
+        </template>
+      </Column>
+      <Column field="id" header="ID" />
+      <Column field="name" header="Name" />
+      <Column field="tags" header="Tags">
+        <template #body="slotProps">
+          <Tag
+            v-for="(tag, index) in slotProps.data.tags"
+            :key="index"
+            class="mr-1 mb-1"
+          >
+            {{ tag }}
+          </Tag>
+        </template>
+      </Column>
+      <Column field="createdAt" header="Created At" sortable>
+        <template #body="slotProps">
+          {{ slotProps.data.createdAt.toLocaleString() }}
+        </template>
+      </Column>
+    </DataTable>
+  </div>
 </template>

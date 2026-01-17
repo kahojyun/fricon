@@ -42,6 +42,7 @@ pub fn do_create_dataset(
         id: dataset.id,
         name: request.name,
         description: request.description,
+        favorite: dataset.favorite,
         tags: request.tags,
         created_at: dataset.created_at.and_utc(),
     };

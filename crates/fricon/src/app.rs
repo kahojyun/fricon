@@ -26,6 +26,7 @@ pub enum AppEvent {
         id: i32,
         name: String,
         description: String,
+        favorite: bool,
         tags: Vec<String>,
         created_at: DateTime<Utc>,
     },

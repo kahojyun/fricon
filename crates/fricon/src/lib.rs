@@ -28,7 +28,7 @@ pub use self::{
     },
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetReader,
-        SelectOptions,
+        DatasetUpdate, SelectOptions,
     },
     server::DatasetRecord,
     workspace::{WorkspaceRoot, get_log_dir},

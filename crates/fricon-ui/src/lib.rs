@@ -51,6 +51,7 @@ impl AppState {
                         id,
                         name,
                         description,
+                        favorite,
                         tags,
                         created_at,
                     } => {
@@ -60,6 +61,7 @@ impl AppState {
                                 id,
                                 name,
                                 description,
+                                favorite,
                                 tags,
                                 created_at,
                             },
