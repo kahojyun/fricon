@@ -124,22 +124,61 @@ pub fn do_get_dataset(conn: &mut SqliteConnection, id: DatasetId) -> Result<Data
     Ok(DatasetRecord::from_database_models(dataset, tags))
 }
 
-/// List datasets, optionally filtered by name
+/// List datasets, optionally filtered by name and tags
 pub fn do_list_datasets(
     conn: &mut SqliteConnection,
     search: Option<&str>,
+    tags: Option<&[String]>,
 ) -> Result<Vec<DatasetRecord>, Error> {
-    let all_datasets = match search.and_then(|value| {
+    let search = search.and_then(|value| {
         let trimmed = value.trim();
         if trimmed.is_empty() {
             None
         } else {
             Some(trimmed)
         }
-    }) {
-        Some(trimmed) => database::Dataset::list_by_name_ordered(conn, trimmed)?,
-        None => database::Dataset::list_all_ordered(conn)?,
+    });
+    let tag_filters = tags.and_then(|tags| {
+        let cleaned: Vec<String> = tags
+            .iter()
+            .map(|tag| tag.trim())
+            .filter(|tag| !tag.is_empty())
+            .map(str::to_string)
+            .collect();
+        if cleaned.is_empty() {
+            None
+        } else {
+            Some(cleaned)
+        }
+    });
+    let tagged_dataset_ids = if let Some(tag_filters) = tag_filters.as_ref() {
+        let ids = schema::datasets_tags::table
+            .inner_join(schema::tags::table)
+            .filter(schema::tags::name.eq_any(tag_filters))
+            .select(schema::datasets_tags::dataset_id)
+            .distinct()
+            .load::<i32>(conn)?;
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        Some(ids)
+    } else {
+        None
     };
+
+    let mut query = schema::datasets::table.into_boxed();
+    if let Some(search) = search {
+        let pattern = format!("%{search}%");
+        query = query.filter(schema::datasets::name.like(pattern));
+    }
+    if let Some(ids) = tagged_dataset_ids {
+        query = query.filter(schema::datasets::id.eq_any(ids));
+    }
+
+    let all_datasets = query
+        .order(schema::datasets::id.desc())
+        .select(database::Dataset::as_select())
+        .load(conn)?;
 
     let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
         .inner_join(schema::tags::table)

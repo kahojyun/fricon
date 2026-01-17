@@ -48,9 +48,15 @@ export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
   return invoke<WorkspaceInfo>("get_workspace_info");
 }
 
-export async function listDatasets(search?: string): Promise<DatasetInfo[]> {
+export async function listDatasets(
+  search?: string,
+  tags?: string[],
+): Promise<DatasetInfo[]> {
   const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets", {
-    options: { search: search?.trim() || undefined },
+    options: {
+      search: search?.trim() || undefined,
+      tags: tags && tags.length > 0 ? tags : undefined,
+    },
   });
   return rawDatasets.map((dataset) => ({
     ...dataset,

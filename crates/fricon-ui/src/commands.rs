@@ -219,6 +219,7 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 #[serde(rename_all = "camelCase")]
 struct DatasetListOptions {
     search: Option<String>,
+    tags: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -228,9 +229,11 @@ async fn list_datasets(
 ) -> Result<Vec<DatasetInfo>, Error> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
-    let search = options.and_then(|options| options.search);
+    let (search, tags) = options
+        .map(|options| (options.search, options.tags))
+        .unwrap_or_default();
     let datasets = dataset_manager
-        .list_datasets(search.as_deref())
+        .list_datasets(search.as_deref(), tags.as_deref())
         .await
         .context("Failed to list datasets.")?;
 
