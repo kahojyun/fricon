@@ -114,11 +114,16 @@ function makeOption(data?: ChartOptions): EChartsOption {
         max,
         dimension: 2, // Index 2 is the first series value (x: 0, y: 1, series: 2)
         calculable: true,
-        orient: "horizontal",
-        left: "center",
-        top: 0,
+        orient: "vertical",
+        right: 12,
+        top: "middle",
+        itemWidth: 14,
+        itemHeight: 120,
+        inRange: {
+          color: ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"],
+        },
       },
-      grid: { top: "15%" }, // Make room for visualMap
+      grid: { right: "18%" }, // Make room for visualMap
       tooltip: {
         position: "top",
       },
