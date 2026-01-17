@@ -47,6 +47,7 @@ const props = defineProps<{
 const datasetDetail = shallowRef<DatasetDetail>();
 const filterTableData = shallowRef<FilterTableData>();
 const excludeColumns = ref<string[]>([]);
+const datasetUpdateTick = ref(0);
 let unsubscribe: (() => Promise<void>) | undefined;
 
 // ============================================================================
@@ -132,6 +133,7 @@ watchThrottled(
         excludeColumns: excludeColumns.value,
       });
       filterTableData.value = v;
+      datasetUpdateTick.value += 1;
     }, 1000);
 
     unsubscribe = await subscribeDatasetUpdate(newId, updateCallback);
@@ -185,6 +187,7 @@ watchDebounced(
     chartType,
     xColumn,
     yColumn,
+    datasetUpdateTick,
   ],
   async () => {
     data.value = await getNewData();
