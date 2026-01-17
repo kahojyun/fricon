@@ -215,12 +215,22 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
     })
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DatasetListOptions {
+    search: Option<String>,
+}
+
 #[tauri::command]
-async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, Error> {
+async fn list_datasets(
+    state: State<'_, AppState>,
+    options: Option<DatasetListOptions>,
+) -> Result<Vec<DatasetInfo>, Error> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
+    let search = options.and_then(|options| options.search);
     let datasets = dataset_manager
-        .list_datasets()
+        .list_datasets(search.as_deref())
         .await
         .context("Failed to list datasets.")?;
 

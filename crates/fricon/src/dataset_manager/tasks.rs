@@ -124,9 +124,22 @@ pub fn do_get_dataset(conn: &mut SqliteConnection, id: DatasetId) -> Result<Data
     Ok(DatasetRecord::from_database_models(dataset, tags))
 }
 
-/// List all datasets
-pub fn do_list_datasets(conn: &mut SqliteConnection) -> Result<Vec<DatasetRecord>, Error> {
-    let all_datasets = database::Dataset::list_all_ordered(conn)?;
+/// List datasets, optionally filtered by name
+pub fn do_list_datasets(
+    conn: &mut SqliteConnection,
+    search: Option<&str>,
+) -> Result<Vec<DatasetRecord>, Error> {
+    let all_datasets = match search.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    }) {
+        Some(trimmed) => database::Dataset::list_by_name_ordered(conn, trimmed)?,
+        None => database::Dataset::list_all_ordered(conn)?,
+    };
 
     let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
         .inner_join(schema::tags::table)

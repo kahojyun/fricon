@@ -48,8 +48,10 @@ export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
   return invoke<WorkspaceInfo>("get_workspace_info");
 }
 
-export async function listDatasets(): Promise<DatasetInfo[]> {
-  const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets");
+export async function listDatasets(search?: string): Promise<DatasetInfo[]> {
+  const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets", {
+    options: { search: search?.trim() || undefined },
+  });
   return rawDatasets.map((dataset) => ({
     ...dataset,
     createdAt: new Date(dataset.createdAt),
