@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2](https://github.com/kahojyun/fricon/compare/v0.1.0-alpha.1...v0.1.0-alpha.2) - 2026-01-17
+
+### Added
+
+- filter by tags ([#138](https://github.com/kahojyun/fricon/pull/138))
+- search by name ([#137](https://github.com/kahojyun/fricon/pull/137))
+- edit and filter favorite dataset ([#136](https://github.com/kahojyun/fricon/pull/136))
+
+### Other
+
+- process chart data in the backend ([#139](https://github.com/kahojyun/fricon/pull/139))
+
 ## [0.1.0-alpha.1](https://github.com/kahojyun/fricon/compare/v0.1.0-alpha...v0.1.0-alpha.1) - 2025-12-16
 
 ### Added
