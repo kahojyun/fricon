@@ -1512,6 +1512,7 @@ dependencies = [
  "arrow-ipc",
  "arrow-json",
  "arrow-schema",
+ "arrow-select",
  "base64 0.22.1",
  "chrono",
  "dotenvy",

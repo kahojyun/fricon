@@ -15,26 +15,23 @@ import {
   type FilterTableRow,
   getDatasetDetail,
   getFilterTableData,
-  fetchData,
+  fetchChartData,
   subscribeDatasetUpdate,
 } from "@/backend.ts";
-import { Vector } from "apache-arrow";
 import { useThrottleFn, watchDebounced, watchThrottled } from "@vueuse/core";
-import type { TypedArray } from "apache-arrow/interfaces";
-import ChartWrapper, {
-  type ChartOptions,
-  type ChartSeries,
-} from "./components/ChartWrapper.vue";
+import ChartWrapper from "./components/ChartWrapper.vue";
 import FilterTable from "./components/FilterTable.vue";
+import Checkbox from "primevue/checkbox";
 import RadioButton from "primevue/radiobutton";
-import {
-  extractTraceXAxis,
-  getColumnIndices,
-  extractComplexComponents,
-  transformComplexView,
-  createMockVector,
-  type ComplexViewOption,
-} from "@/composables/chartDataHelpers";
+import Select from "primevue/select";
+import Splitter from "primevue/splitter";
+import SplitterPanel from "primevue/splitterpanel";
+import type {
+  ChartOptions,
+  ChartType,
+  ComplexViewOption,
+  ScatterMode,
+} from "@/types/chart";
 
 const props = defineProps<{
   datasetId: number;
@@ -53,9 +50,6 @@ let unsubscribe: (() => Promise<void>) | undefined;
 // ============================================================================
 // Chart Configuration
 // ============================================================================
-
-type ChartType = "line" | "heatmap" | "scatter";
-type ScatterMode = "complex" | "trace_xy" | "xy";
 
 const chartType = ref<ChartType>("line");
 const availableChartTypes = computed(() => {
@@ -244,50 +238,6 @@ function updateSelectionFn(
   };
 }
 
-function buildScatterSelectColumns(
-  columns: ColumnInfo[],
-  mode: ScatterMode,
-  seriesValue: ColumnInfo | undefined,
-  xValue: ColumnInfo | undefined,
-  yValue: ColumnInfo | undefined,
-  traceXValue: ColumnInfo | undefined,
-  traceYValue: ColumnInfo | undefined,
-  binColumnValue: ColumnInfo | undefined,
-): number[] | null {
-  const indices: number[] = [];
-  const isTraceBased =
-    mode === "trace_xy" || (mode === "complex" && seriesValue?.isTrace);
-  if (mode === "complex") {
-    if (!seriesValue) return null;
-    const seriesIndex = columns.findIndex((c) => c.name === seriesValue.name);
-    if (seriesIndex === -1) return null;
-    indices.push(seriesIndex);
-  } else if (mode === "trace_xy") {
-    const columnIndices = getColumnIndices(columns, [
-      traceXValue?.name,
-      traceYValue?.name,
-    ]);
-    if (!columnIndices) return null;
-    indices.push(...columnIndices);
-  } else {
-    const columnIndices = getColumnIndices(columns, [
-      xValue?.name,
-      yValue?.name,
-    ]);
-    if (!columnIndices) return null;
-    indices.push(...columnIndices);
-  }
-
-  if (!isTraceBased && binColumnValue) {
-    const binIndex = columns.findIndex((c) => c.name === binColumnValue.name);
-    if (binIndex === -1) return null;
-    if (!indices.includes(binIndex)) {
-      indices.push(binIndex);
-    }
-  }
-  return indices;
-}
-
 // ============================================================================
 // Data Subscription
 // ============================================================================
@@ -389,241 +339,6 @@ watchDebounced(
   { debounce: 50 },
 );
 
-/** Determines which column indices to fetch based on chart type */
-function buildSelectColumns(
-  columns: ColumnInfo[],
-  seriesValue: ColumnInfo,
-  type: "line" | "heatmap",
-  xName: string | undefined,
-  yName: string | undefined,
-): number[] | null {
-  const seriesIndex = columns.findIndex((c) => c.name === seriesValue.name);
-  if (seriesIndex === -1) return null;
-
-  if (type === "line") {
-    if (seriesValue.isTrace) {
-      return [seriesIndex];
-    }
-    const indices = getColumnIndices(columns, [xName]);
-    return indices ? [...indices, seriesIndex] : null;
-  }
-
-  // Heatmap
-  if (seriesValue.isTrace) {
-    const indices = getColumnIndices(columns, [yName]);
-    return indices ? [...indices, seriesIndex] : null;
-  }
-  const indices = getColumnIndices(columns, [xName, yName]);
-  return indices ? [...indices, seriesIndex] : null;
-}
-
-/** Processes data for line charts */
-function processLineChartData(
-  newData: import("apache-arrow").Table,
-  seriesValue: ColumnInfo,
-  seriesVector: Vector,
-): { x: number[] | TypedArray; rawY: Vector } | null {
-  if (seriesValue.isTrace) {
-    if (newData.numRows !== 1) {
-      console.error(
-        "Trace series should fetch exactly 1 row, actual:",
-        newData.numRows,
-      );
-      return null;
-    }
-    const result = extractTraceXAxis(seriesVector, 0);
-    if (!result) return null;
-    return { x: result.x, rawY: result.y };
-  }
-
-  return {
-    x: newData.getChildAt(0)!.toArray() as TypedArray,
-    rawY: seriesVector,
-  };
-}
-
-/** Processes data for heatmap charts */
-function processHeatmapData(
-  newData: import("apache-arrow").Table,
-  seriesValue: ColumnInfo,
-  seriesVector: Vector,
-): { x: number[] | TypedArray; y: number[] | TypedArray; rawY: Vector } | null {
-  if (seriesValue.isTrace) {
-    const yVector = newData.getChildAt(0)!;
-    const flatX: number[] = [];
-    const flatY: number[] = [];
-    const accumulatedZ: (number | { real: number; imag: number })[] = [];
-
-    for (let r = 0; r < newData.numRows; r++) {
-      const rowY = yVector.get(r);
-      if (rowY === null) continue;
-
-      const result = extractTraceXAxis(seriesVector, r);
-      if (!result) continue;
-
-      for (let i = 0; i < result.y.length; i++) {
-        flatX.push(result.x[i]!);
-        flatY.push(rowY);
-        accumulatedZ.push(result.y.get(i));
-      }
-    }
-
-    return {
-      x: Float64Array.from(flatX),
-      y: Float64Array.from(flatY),
-      rawY: createMockVector(accumulatedZ) as unknown as Vector,
-    };
-  }
-
-  // Scalar Heatmap
-  return {
-    x: newData.getChildAt(0)!.toArray() as TypedArray,
-    y: newData.getChildAt(1)!.toArray() as TypedArray,
-    rawY: seriesVector,
-  };
-}
-
-/** Builds chart series with optional complex number transformation */
-function buildChartSeries(
-  rawY: Vector,
-  seriesName: string,
-  isComplex: boolean,
-  type: "line" | "heatmap",
-  complexViewOptions: ComplexViewOption[],
-  complexViewSingle: ComplexViewOption,
-): ChartSeries[] {
-  if (!isComplex) {
-    return [{ name: seriesName, data: rawY.toArray() as TypedArray }];
-  }
-
-  const components = extractComplexComponents(rawY);
-  const options = type === "heatmap" ? [complexViewSingle] : complexViewOptions;
-
-  return options.map((option) => ({
-    name: `${seriesName} (${option})`,
-    data: transformComplexView(components, option),
-  }));
-}
-
-function pushScatterPoint(
-  map: Map<string, [number, number][]>,
-  key: string,
-  point: [number, number],
-) {
-  const bucket = map.get(key);
-  if (bucket) {
-    bucket.push(point);
-    return;
-  }
-  map.set(key, [point]);
-}
-
-function buildScatterSeriesFromMap(
-  map: Map<string, [number, number][]>,
-): ChartSeries[] {
-  return Array.from(map.entries()).map(([name, points]) => ({
-    name,
-    data: points,
-  }));
-}
-
-function processScatterData(
-  newData: import("apache-arrow").Table,
-  mode: ScatterMode,
-  seriesValue: ColumnInfo | undefined,
-  xValue: ColumnInfo | undefined,
-  yValue: ColumnInfo | undefined,
-  traceXValue: ColumnInfo | undefined,
-  traceYValue: ColumnInfo | undefined,
-): { xName: string; yName: string; series: ChartSeries[] } | null {
-  const seriesMap = new Map<string, [number, number][]>();
-
-  if (mode === "complex") {
-    if (!seriesValue) return null;
-    const seriesVector = newData.getChild(seriesValue.name);
-    if (!seriesVector) return null;
-
-    if (seriesValue.isTrace) {
-      for (let r = 0; r < newData.numRows; r++) {
-        const traceResult = extractTraceXAxis(seriesVector, r);
-        if (!traceResult) continue;
-        const components = extractComplexComponents(traceResult.y);
-        const { reals, imags } = components;
-        const binKey = seriesValue.name;
-
-        for (let i = 0; i < reals.length; i++) {
-          pushScatterPoint(seriesMap, binKey, [reals[i]!, imags[i]!]);
-        }
-      }
-    } else {
-      const components = extractComplexComponents(seriesVector);
-      const { reals, imags } = components;
-      for (let i = 0; i < reals.length; i++) {
-        const binKey = seriesValue.name;
-        pushScatterPoint(seriesMap, binKey, [reals[i]!, imags[i]!]);
-      }
-    }
-
-    return {
-      xName: `${seriesValue.name} (real)`,
-      yName: `${seriesValue.name} (imag)`,
-      series: buildScatterSeriesFromMap(seriesMap),
-    };
-  }
-
-  if (mode === "trace_xy") {
-    if (!traceXValue || !traceYValue) return null;
-    const xVector = newData.getChild(traceXValue.name);
-    const yVector = newData.getChild(traceYValue.name);
-    if (!xVector || !yVector) return null;
-
-    for (let r = 0; r < newData.numRows; r++) {
-      const xTrace = extractTraceXAxis(xVector, r);
-      const yTrace = extractTraceXAxis(yVector, r);
-      if (!xTrace || !yTrace) continue;
-      if (xTrace.y.length !== yTrace.y.length) {
-        throw new Error(
-          `Trace length mismatch at row ${r + 1}: ${traceXValue.name} (${xTrace.y.length}) vs ${traceYValue.name} (${yTrace.y.length})`,
-        );
-      }
-      const binKey = `${traceXValue.name} vs ${traceYValue.name}`;
-      for (let i = 0; i < xTrace.y.length; i++) {
-        const xPoint = xTrace.y.get(i);
-        const yPoint = yTrace.y.get(i);
-        if (xPoint === null || yPoint === null) continue;
-        pushScatterPoint(seriesMap, binKey, [xPoint, yPoint]);
-      }
-    }
-
-    return {
-      xName: traceXValue.name,
-      yName: traceYValue.name,
-      series: buildScatterSeriesFromMap(seriesMap),
-    };
-  }
-
-  if (!xValue || !yValue) return null;
-  const xVector = newData.getChild(xValue.name);
-  const yVector = newData.getChild(yValue.name);
-  if (!xVector || !yVector) return null;
-  const xArray = xVector.toArray() as TypedArray;
-  const yArray = yVector.toArray() as TypedArray;
-
-  for (let i = 0; i < xArray.length; i++) {
-    const xPoint = xArray[i];
-    const yPoint = yArray[i];
-    if (xPoint === undefined || yPoint === undefined) continue;
-    const binKey = `${xValue.name} vs ${yValue.name}`;
-    pushScatterPoint(seriesMap, binKey, [xPoint, yPoint]);
-  }
-
-  return {
-    xName: xValue.name,
-    yName: yValue.name,
-    series: buildScatterSeriesFromMap(seriesMap),
-  };
-}
-
 /** Main data fetching and processing function */
 async function getNewData(): Promise<ChartOptions | undefined> {
   const detailValue = datasetDetail.value;
@@ -654,137 +369,62 @@ async function getNewData(): Promise<ChartOptions | undefined> {
     return undefined;
   }
 
-  // Build column selection
-  if (type === "scatter") {
-    scatterError.value = null;
-    const selectColumns = buildScatterSelectColumns(
-      columns,
-      scatterModeValue,
-      scatterSeriesValue,
-      scatterXValue,
-      scatterYValue,
-      scatterTraceXValue,
-      scatterTraceYValue,
-      scatterBinColumnValue,
-    );
-    if (!selectColumns) return undefined;
+  scatterError.value = null;
 
-    const newData = await fetchData(datasetId, {
+  if (type === "scatter") {
+    if (!scatterModeValue) return undefined;
+    if (scatterModeValue === "complex" && !scatterSeriesValue) return undefined;
+    if (
+      scatterModeValue === "trace_xy" &&
+      (!scatterTraceXValue || !scatterTraceYValue)
+    ) {
+      return undefined;
+    }
+    if (scatterModeValue === "xy" && (!scatterXValue || !scatterYValue)) {
+      return undefined;
+    }
+  } else {
+    if (!seriesValue) return undefined;
+    if (type === "line") {
+      if (!seriesValue.isTrace && !xColumnValue) return undefined;
+    } else if (type === "heatmap") {
+      if (!yColumnValue) return undefined;
+      if (!seriesValue.isTrace && !xColumnValue) return undefined;
+    }
+  }
+
+  try {
+    return await fetchChartData(datasetId, {
+      chartType: type,
+      series: seriesValue?.name,
+      xColumn: xColumnValue?.name,
+      yColumn: yColumnValue?.name,
+      scatterMode: scatterModeValue,
+      scatterSeries: scatterSeriesValue?.name,
+      scatterXColumn: scatterXValue?.name,
+      scatterYColumn: scatterYValue?.name,
+      scatterTraceXColumn: scatterTraceXValue?.name,
+      scatterTraceYColumn: scatterTraceYValue?.name,
+      scatterBinColumn: scatterBinColumnValue?.name,
+      complexViews: selectedComplexView.value,
+      complexViewSingle: selectedComplexViewSingle.value,
       indexFilters: hasFilters ? indexRow!.valueIndices : undefined,
       excludeColumns: excludeColumns.value,
-      columns: selectColumns,
     });
-
-    let scatterResult: {
-      xName: string;
-      yName: string;
-      series: ChartSeries[];
-    } | null;
-    try {
-      scatterResult = processScatterData(
-        newData,
-        scatterModeValue,
-        scatterSeriesValue,
-        scatterXValue,
-        scatterYValue,
-        scatterTraceXValue,
-        scatterTraceYValue,
-      );
-    } catch (error) {
+  } catch (error) {
+    if (type === "scatter") {
       scatterError.value =
         error instanceof Error
           ? error.message
           : "Scatter data error. Please check trace lengths.";
-      return undefined;
     }
-    if (!scatterResult) return undefined;
-
-    return {
-      type: "scatter",
-      xName: scatterResult.xName,
-      yName: scatterResult.yName,
-      series: scatterResult.series,
-    };
-  }
-
-  if (!seriesValue) {
     return undefined;
   }
-
-  const selectColumns = buildSelectColumns(
-    columns,
-    seriesValue,
-    type,
-    xColumnValue?.name,
-    yColumnValue?.name,
-  );
-  if (!selectColumns) return undefined;
-
-  // Fetch data
-  const newData = await fetchData(datasetId, {
-    indexFilters: hasFilters ? indexRow!.valueIndices : undefined,
-    excludeColumns: excludeColumns.value,
-    columns: selectColumns,
-  });
-
-  const seriesVector = newData.getChild(seriesValue.name);
-  if (!seriesVector) {
-    console.error("No series column returned", seriesValue);
-    return undefined;
-  }
-
-  // Process based on chart type
-  let finalX: number[] | TypedArray;
-  let finalY: number[] | TypedArray | undefined;
-  let rawYColumn: Vector;
-
-  if (type === "line") {
-    const result = processLineChartData(newData, seriesValue, seriesVector);
-    if (!result) return undefined;
-    finalX = result.x;
-    rawYColumn = result.rawY;
-  } else {
-    const result = processHeatmapData(newData, seriesValue, seriesVector);
-    if (!result) return undefined;
-    finalX = result.x;
-    finalY = result.y;
-    rawYColumn = result.rawY;
-  }
-
-  // Build series
-  const seriesData = buildChartSeries(
-    rawYColumn,
-    seriesValue.name,
-    isComplexSeries.value,
-    type,
-    selectedComplexView.value,
-    selectedComplexViewSingle.value,
-  );
-
-  if (type === "line") {
-    return {
-      type: "line",
-      x: finalX,
-      xName:
-        xColumnValue?.name ??
-        (seriesValue.isTrace ? `${seriesValue.name} - X` : "X"),
-      series: seriesData,
-    };
-  }
-
-  if (!finalY || !yColumnValue?.name) {
-    return undefined;
-  }
-
-  return {
-    type: "heatmap",
-    x: finalX,
-    xName: xColumnValue?.name ?? "X",
-    y: finalY,
-    yName: yColumnValue.name,
-    series: seriesData,
-  };
 }
+
+// ============================================================================
+// Template
+// ============================================================================
 </script>
 
 <template>
@@ -948,7 +588,7 @@ async function getNewData(): Promise<ChartOptions | undefined> {
     </div>
     <Splitter class="min-h-0 flex-1" layout="vertical">
       <SplitterPanel>
-        <ChartWrapper :data />
+        <ChartWrapper :data="data" />
       </SplitterPanel>
       <SplitterPanel>
         <FilterTable

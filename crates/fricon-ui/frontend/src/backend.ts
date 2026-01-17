@@ -1,6 +1,11 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { type Table, tableFromIPC } from "apache-arrow";
+import type {
+  ChartOptions,
+  ChartType,
+  ComplexViewOption,
+  ScatterMode,
+} from "@/types/chart";
 
 export interface WorkspaceInfo {
   path: string;
@@ -35,13 +40,25 @@ export interface DatasetDetail {
   columns: ColumnInfo[];
 }
 
-export interface DatasetDataOptions {
+export interface ChartDataOptions {
+  chartType: ChartType;
+  series?: string;
+  xColumn?: string;
+  yColumn?: string;
+  scatterMode?: ScatterMode;
+  scatterSeries?: string;
+  scatterXColumn?: string;
+  scatterYColumn?: string;
+  scatterTraceXColumn?: string;
+  scatterTraceYColumn?: string;
+  scatterBinColumn?: string;
+  complexViews?: ComplexViewOption[];
+  complexViewSingle?: ComplexViewOption;
   start?: number;
   end?: number;
   /** Indices of chosen values for each filter field */
   indexFilters?: number[];
   excludeColumns?: string[];
-  columns?: number[];
 }
 
 export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
@@ -71,12 +88,11 @@ export async function updateDatasetFavorite(
   await invoke("update_dataset_favorite", { id, update: { favorite } });
 }
 
-export async function fetchData(
+export async function fetchChartData(
   id: number,
-  options: DatasetDataOptions,
-): Promise<Table> {
-  const buffer = await invoke<ArrayBuffer>("dataset_data", { id, options });
-  return tableFromIPC(buffer);
+  options: ChartDataOptions,
+): Promise<ChartOptions> {
+  return invoke<ChartOptions>("dataset_chart_data", { id, options });
 }
 
 export function getDatasetDetail(id: number): Promise<DatasetDetail> {

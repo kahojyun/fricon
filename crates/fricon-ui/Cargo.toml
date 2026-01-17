@@ -15,6 +15,7 @@ fricon = { path = "../fricon" }
 arrow-ipc = { workspace = true }
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
+arrow-select = { workspace = true }
 arrow-json = { workspace = true }
 anyhow = { workspace = true }
 base64 = { workspace = true }

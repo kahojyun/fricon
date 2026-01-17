@@ -4,13 +4,13 @@ use arrow_array::{Array, ArrayRef};
 
 use crate::dataset::Error;
 
-pub fn downcast_array<T: Array + Any + Send + Sync>(array: ArrayRef) -> Result<Arc<T>, Error> {
-    if array.as_any().is::<T>() {
-        let raw = Arc::into_raw(array);
-        let ptr = raw.cast();
-        // SAFETY: Type checked
-        Ok(unsafe { Arc::from_raw(ptr) })
-    } else {
-        Err(Error::IncompatibleType)
-    }
+#[expect(clippy::needless_pass_by_value, reason = "Compatibility")]
+pub fn downcast_array<T: Array + Any + Send + Sync + Clone>(
+    array: ArrayRef,
+) -> Result<Arc<T>, Error> {
+    array
+        .as_any()
+        .downcast_ref::<T>()
+        .map(|typed| Arc::new(typed.clone()))
+        .ok_or(Error::IncompatibleType)
 }
