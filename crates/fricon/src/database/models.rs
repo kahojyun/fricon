@@ -52,6 +52,20 @@ impl Dataset {
             .load(conn)
     }
 
+    pub fn list_by_name_ordered(
+        conn: &mut SqliteConnection,
+        search: &str,
+    ) -> QueryResult<Vec<Self>> {
+        use schema::datasets::dsl::{datasets, id, name};
+
+        let pattern = format!("%{search}%");
+        datasets
+            .filter(name.like(pattern))
+            .order(id.desc())
+            .select(Self::as_select())
+            .load(conn)
+    }
+
     pub fn update_status(
         conn: &mut SqliteConnection,
         dataset_id: i32,

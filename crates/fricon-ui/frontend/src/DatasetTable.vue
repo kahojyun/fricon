@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import {
   type DatasetInfo,
   listDatasets,
@@ -13,6 +13,7 @@ const emit = defineEmits<{
 const datasets = ref<DatasetInfo[]>([]);
 const selectedDataset = shallowRef<DatasetInfo>();
 const favoritesOnly = ref(false);
+const searchQuery = ref("");
 
 const filteredDatasets = computed(() =>
   favoritesOnly.value
@@ -21,13 +22,17 @@ const filteredDatasets = computed(() =>
 );
 
 let unsubscribe: (() => void) | null = null;
+let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 
 const loadDatasets = async () => {
-  datasets.value = await listDatasets();
+  datasets.value = await listDatasets(searchQuery.value);
 };
 
 const handleDatasetCreated = (event: DatasetInfo) => {
   datasets.value.unshift(event);
+  if (searchQuery.value.trim()) {
+    void loadDatasets();
+  }
 };
 
 onMounted(async () => {
@@ -39,6 +44,18 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unsubscribe?.();
+  if (searchDebounce) {
+    clearTimeout(searchDebounce);
+  }
+});
+
+watch(searchQuery, () => {
+  if (searchDebounce) {
+    clearTimeout(searchDebounce);
+  }
+  searchDebounce = setTimeout(() => {
+    void loadDatasets();
+  }, 300);
 });
 
 function handleKeydown(event: KeyboardEvent) {
@@ -63,6 +80,11 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
     <div class="flex items-center gap-2 p-2">
       <ToggleSwitch v-model="favoritesOnly" input-id="favorites-only" />
       <label for="favorites-only">Favorites only</label>
+      <InputText
+        v-model="searchQuery"
+        placeholder="Search by name"
+        class="h-8 w-full max-w-64"
+      />
     </div>
     <DataTable
       v-model:selection="selectedDataset"
