@@ -15,7 +15,7 @@ use std::{
 use anyhow::Context;
 use arrow_ipc::writer::FileWriter;
 use chrono::{DateTime, Utc};
-use fricon::{DatasetDataType, ScalarKind, SelectOptions};
+use fricon::{DatasetDataType, DatasetUpdate, ScalarKind, SelectOptions};
 use serde::{Deserialize, Serialize, Serializer};
 use tauri::{
     State,
@@ -45,6 +45,7 @@ pub struct DatasetInfo {
     pub id: i32,
     pub name: String,
     pub description: String,
+    pub favorite: bool,
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
 }
@@ -229,6 +230,7 @@ async fn list_datasets(state: State<'_, AppState>) -> Result<Vec<DatasetInfo>, E
             id: record.id,
             name: record.metadata.name,
             description: record.metadata.description,
+            favorite: record.metadata.favorite,
             tags: record.metadata.tags,
             created_at: record.metadata.created_at,
         })
@@ -258,6 +260,34 @@ async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDe
         })
         .collect();
     Ok(DatasetDetail { columns })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DatasetFavoriteUpdate {
+    favorite: bool,
+}
+
+#[tauri::command]
+async fn update_dataset_favorite(
+    state: State<'_, AppState>,
+    id: i32,
+    update: DatasetFavoriteUpdate,
+) -> Result<(), Error> {
+    let app = state.app();
+    let dataset_manager = app.dataset_manager();
+    dataset_manager
+        .update_dataset(
+            id,
+            DatasetUpdate {
+                name: None,
+                description: None,
+                favorite: Some(update.favorite),
+            },
+        )
+        .await
+        .context("Failed to update dataset favorite status.")?;
+    Ok(())
 }
 
 type SubscriptionRecords = HashMap<u32, CancellationToken>;
@@ -520,6 +550,7 @@ pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
         dataset_detail,
         dataset_data,
         get_filter_table_data,
+        update_dataset_favorite,
         subscribe_dataset_update,
         unsubscribe_dataset_update
     ]

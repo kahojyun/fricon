@@ -10,6 +10,7 @@ interface RawDatasetInfo {
   id: number;
   name: string;
   description: string;
+  favorite: boolean;
   tags: string[];
   createdAt: string;
 }
@@ -18,6 +19,7 @@ export interface DatasetInfo {
   id: number;
   name: string;
   description: string;
+  favorite: boolean;
   tags: string[];
   createdAt: Date;
 }
@@ -52,6 +54,13 @@ export async function listDatasets(): Promise<DatasetInfo[]> {
     ...dataset,
     createdAt: new Date(dataset.createdAt),
   }));
+}
+
+export async function updateDatasetFavorite(
+  id: number,
+  favorite: boolean,
+): Promise<void> {
+  await invoke("update_dataset_favorite", { id, update: { favorite } });
 }
 
 export async function fetchData(
