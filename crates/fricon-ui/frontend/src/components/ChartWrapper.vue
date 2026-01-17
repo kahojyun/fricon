@@ -7,6 +7,8 @@ import {
   type GridComponentOption,
   LegendComponent,
   type LegendComponentOption,
+  TooltipComponent,
+  type TooltipComponentOption,
 } from "echarts/components";
 import {
   HeatmapChart,
@@ -20,7 +22,7 @@ import { CanvasRenderer } from "echarts/renderers";
 import { computed, onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useDark } from "@vueuse/core";
 import { vResizeObserver } from "@vueuse/components";
-import type { TypedArray } from "apache-arrow/interfaces";
+import type { ChartOptions } from "@/types/chart";
 import {
   VisualMapComponent,
   type VisualMapComponentOption,
@@ -30,6 +32,7 @@ echarts.use([
   DatasetComponent,
   GridComponent,
   LegendComponent,
+  TooltipComponent,
   VisualMapComponent,
   LineChart,
   HeatmapChart,
@@ -41,44 +44,14 @@ type EChartsOption = echarts.ComposeOption<
   | DatasetComponentOption
   | GridComponentOption
   | LegendComponentOption
+  | TooltipComponentOption
   | VisualMapComponentOption
   | LineSeriesOption
   | HeatmapSeriesOption
   | ScatterSeriesOption
 >;
 
-export type ChartSeriesData = number[] | TypedArray | [number, number][];
-
-export interface ChartSeries {
-  name: string;
-  data: ChartSeriesData;
-}
-
-export type ChartOptions =
-  | {
-      type: "line";
-      x: number[] | TypedArray;
-      xName: string;
-      series: ChartSeries[];
-    }
-  | {
-      type: "heatmap";
-      x: number[] | TypedArray;
-      xName: string;
-      y: number[] | TypedArray;
-      yName: string;
-      series: ChartSeries[];
-    }
-  | {
-      type: "scatter";
-      xName: string;
-      yName: string;
-      series: ChartSeries[];
-    };
-
-const { data = undefined } = defineProps<{
-  data?: ChartOptions;
-}>();
+const { data = undefined } = defineProps<{ data?: ChartOptions }>();
 const chartDiv = useTemplateRef("chartDiv");
 const isDark = useDark();
 const colorTheme = computed(() => (isDark.value ? "dark" : "default"));
@@ -89,55 +62,55 @@ function makeOption(data?: ChartOptions): EChartsOption {
     return {};
   }
   const { type, series } = data;
-  let source: Record<string, number[] | TypedArray>;
-
   if (type === "heatmap") {
-    const { x, xName, y, yName } = data;
-    if (!y || !yName) {
-      console.warn("Heatmap requires y axis data");
-      return {};
+    const { xName, yName } = data;
+    const xCategories: number[] = [];
+    const yCategories: number[] = [];
+    const xSet = new Set<number>();
+    const ySet = new Set<number>();
+    for (const s of series) {
+      for (const point of s.data) {
+        const xValue = point[0];
+        const yValue = point[1];
+        if (xValue !== undefined && !xSet.has(xValue)) {
+          xSet.add(xValue);
+          xCategories.push(xValue);
+        }
+        if (yValue !== undefined && !ySet.has(yValue)) {
+          ySet.add(yValue);
+          yCategories.push(yValue);
+        }
+      }
     }
-    source = {
-      [xName]: x,
-      [yName]: y,
-      ...Object.fromEntries(
-        series.map((series) => [
-          series.name,
-          series.data as number[] | TypedArray,
-        ]),
-      ),
-    };
+    const seriesOption = series.map(
+      (series): HeatmapSeriesOption => ({
+        name: series.name,
+        type: "heatmap",
+        data: series.data,
+        progressive: 5000,
+      }),
+    );
 
-    // Calculate min/max for visual map
     let min = Infinity;
     let max = -Infinity;
     for (const s of series) {
-      // Basic min/max - can be optimized
-      for (const v of s.data as number[] | TypedArray) {
-        if (v < min) min = v;
-        if (v > max) max = v;
+      for (const v of s.data) {
+        const value = v[2];
+        if (value === undefined) continue;
+        if (value < min) min = value;
+        if (value > max) max = value;
       }
     }
     if (!isFinite(min)) min = 0;
     if (!isFinite(max)) max = 1;
 
-    const seriesOption = series.map(
-      (series): HeatmapSeriesOption => ({
-        name: series.name,
-        type: "heatmap",
-        encode: { x: xName, y: yName, value: series.name },
-        progressive: 5000,
-      }),
-    );
     return {
-      dataset: { source },
       animation: false,
-      xAxis: { type: "category", name: xName },
-      yAxis: { type: "category", name: yName },
+      xAxis: { type: "category", name: xName, data: xCategories },
+      yAxis: { type: "category", name: yName, data: yCategories },
       visualMap: {
         min,
         max,
-        dimension: 2, // Index 2 is the first series value (x: 0, y: 1, series: 2)
         calculable: true,
         orient: "vertical",
         right: 12,
@@ -148,9 +121,9 @@ function makeOption(data?: ChartOptions): EChartsOption {
           color: ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"],
         },
       },
-      grid: { right: "18%" }, // Make room for visualMap
+      grid: { right: "18%" },
       tooltip: {
-        position: "top",
+        trigger: "item",
       },
       series: seriesOption,
     };
@@ -162,7 +135,7 @@ function makeOption(data?: ChartOptions): EChartsOption {
       (series): ScatterSeriesOption => ({
         name: series.name,
         type: "scatter",
-        data: series.data as [number, number][],
+        data: series.data,
         symbolSize: 6,
       }),
     );
@@ -176,26 +149,15 @@ function makeOption(data?: ChartOptions): EChartsOption {
     };
   }
 
-  const { x, xName } = data;
-  source = {
-    [xName]: x,
-    ...Object.fromEntries(
-      series.map((series) => [
-        series.name,
-        series.data as number[] | TypedArray,
-      ]),
-    ),
-  };
-  // Line chart
+  const { xName } = data;
   const seriesOption = series.map(
     (series): LineSeriesOption => ({
       name: series.name,
       type: "line",
-      encode: { x: xName, y: series.name },
+      data: series.data,
     }),
   );
   return {
-    dataset: { source },
     animation: false,
     xAxis: { type: "value", name: xName }, // Line chart usually value axis
     yAxis: { type: "value" },
