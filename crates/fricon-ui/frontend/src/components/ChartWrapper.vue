@@ -11,8 +11,10 @@ import {
 import {
   HeatmapChart,
   LineChart,
+  ScatterChart,
   type HeatmapSeriesOption,
   type LineSeriesOption,
+  type ScatterSeriesOption,
 } from "echarts/charts";
 import { CanvasRenderer } from "echarts/renderers";
 import { computed, onMounted, onUnmounted, useTemplateRef, watch } from "vue";
@@ -31,6 +33,7 @@ echarts.use([
   VisualMapComponent,
   LineChart,
   HeatmapChart,
+  ScatterChart,
   CanvasRenderer,
 ]);
 
@@ -41,21 +44,37 @@ type EChartsOption = echarts.ComposeOption<
   | VisualMapComponentOption
   | LineSeriesOption
   | HeatmapSeriesOption
+  | ScatterSeriesOption
 >;
+
+export type ChartSeriesData = number[] | TypedArray | [number, number][];
 
 export interface ChartSeries {
   name: string;
-  data: number[] | TypedArray;
+  data: ChartSeriesData;
 }
 
-export interface ChartOptions {
-  type: "line" | "heatmap";
-  x: number[] | TypedArray;
-  xName: string;
-  y?: number[] | TypedArray;
-  yName?: string;
-  series: ChartSeries[];
-}
+export type ChartOptions =
+  | {
+      type: "line";
+      x: number[] | TypedArray;
+      xName: string;
+      series: ChartSeries[];
+    }
+  | {
+      type: "heatmap";
+      x: number[] | TypedArray;
+      xName: string;
+      y: number[] | TypedArray;
+      yName: string;
+      series: ChartSeries[];
+    }
+  | {
+      type: "scatter";
+      xName: string;
+      yName: string;
+      series: ChartSeries[];
+    };
 
 const { data = undefined } = defineProps<{
   data?: ChartOptions;
@@ -69,10 +88,11 @@ function makeOption(data?: ChartOptions): EChartsOption {
   if (!data) {
     return {};
   }
-  const { type, x, xName, y, yName, series } = data;
+  const { type, series } = data;
   let source: Record<string, number[] | TypedArray>;
 
   if (type === "heatmap") {
+    const { x, xName, y, yName } = data;
     if (!y || !yName) {
       console.warn("Heatmap requires y axis data");
       return {};
@@ -80,7 +100,12 @@ function makeOption(data?: ChartOptions): EChartsOption {
     source = {
       [xName]: x,
       [yName]: y,
-      ...Object.fromEntries(series.map((series) => [series.name, series.data])),
+      ...Object.fromEntries(
+        series.map((series) => [
+          series.name,
+          series.data as number[] | TypedArray,
+        ]),
+      ),
     };
 
     // Calculate min/max for visual map
@@ -88,7 +113,7 @@ function makeOption(data?: ChartOptions): EChartsOption {
     let max = -Infinity;
     for (const s of series) {
       // Basic min/max - can be optimized
-      for (const v of s.data) {
+      for (const v of s.data as number[] | TypedArray) {
         if (v < min) min = v;
         if (v > max) max = v;
       }
@@ -129,29 +154,55 @@ function makeOption(data?: ChartOptions): EChartsOption {
       },
       series: seriesOption,
     };
-  } else {
-    source = {
-      [xName]: x,
-      ...Object.fromEntries(series.map((series) => [series.name, series.data])),
-    };
-    // Line chart
+  }
+
+  if (type === "scatter") {
+    const { xName, yName } = data;
     const seriesOption = series.map(
-      (series): LineSeriesOption => ({
+      (series): ScatterSeriesOption => ({
         name: series.name,
-        type: "line",
-        encode: { x: xName, y: series.name },
+        type: "scatter",
+        data: series.data as [number, number][],
+        symbolSize: 6,
       }),
     );
     return {
-      dataset: { source },
       animation: false,
-      xAxis: { type: "value", name: xName }, // Line chart usually value axis
-      yAxis: { type: "value" },
+      xAxis: { type: "value", name: xName },
+      yAxis: { type: "value", name: yName },
       legend: {},
-      tooltip: { trigger: "axis" },
+      tooltip: { trigger: "item" },
       series: seriesOption,
     };
   }
+
+  const { x, xName } = data;
+  source = {
+    [xName]: x,
+    ...Object.fromEntries(
+      series.map((series) => [
+        series.name,
+        series.data as number[] | TypedArray,
+      ]),
+    ),
+  };
+  // Line chart
+  const seriesOption = series.map(
+    (series): LineSeriesOption => ({
+      name: series.name,
+      type: "line",
+      encode: { x: xName, y: series.name },
+    }),
+  );
+  return {
+    dataset: { source },
+    animation: false,
+    xAxis: { type: "value", name: xName }, // Line chart usually value axis
+    yAxis: { type: "value" },
+    legend: {},
+    tooltip: { trigger: "axis" },
+    series: seriesOption,
+  };
 }
 
 onMounted(() => {
