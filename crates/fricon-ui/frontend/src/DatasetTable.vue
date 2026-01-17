@@ -14,6 +14,15 @@ const datasets = ref<DatasetInfo[]>([]);
 const selectedDataset = shallowRef<DatasetInfo>();
 const favoritesOnly = ref(false);
 const searchQuery = ref("");
+const selectedTags = ref<string[]>([]);
+
+const tagOptions = computed(() => {
+  const tagSet = new Set<string>();
+  datasets.value.forEach((dataset) => {
+    dataset.tags.forEach((tag) => tagSet.add(tag));
+  });
+  return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+});
 
 const filteredDatasets = computed(() =>
   favoritesOnly.value
@@ -25,12 +34,12 @@ let unsubscribe: (() => void) | null = null;
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 
 const loadDatasets = async () => {
-  datasets.value = await listDatasets(searchQuery.value);
+  datasets.value = await listDatasets(searchQuery.value, selectedTags.value);
 };
 
 const handleDatasetCreated = (event: DatasetInfo) => {
   datasets.value.unshift(event);
-  if (searchQuery.value.trim()) {
+  if (searchQuery.value.trim() || selectedTags.value.length > 0) {
     void loadDatasets();
   }
 };
@@ -49,7 +58,7 @@ onUnmounted(() => {
   }
 });
 
-watch(searchQuery, () => {
+watch([searchQuery, selectedTags], () => {
   if (searchDebounce) {
     clearTimeout(searchDebounce);
   }
@@ -77,13 +86,23 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
 </script>
 <template>
   <div class="flex h-full flex-col">
-    <div class="flex items-center gap-2 p-2">
-      <ToggleSwitch v-model="favoritesOnly" input-id="favorites-only" />
-      <label for="favorites-only">Favorites only</label>
+    <div class="flex flex-wrap items-center gap-2 p-2">
+      <div class="flex items-center gap-2">
+        <ToggleSwitch v-model="favoritesOnly" input-id="favorites-only" />
+        <label for="favorites-only">Favorites only</label>
+      </div>
       <InputText
         v-model="searchQuery"
         placeholder="Search by name"
-        class="h-8 w-full max-w-64"
+        class="h-8 w-full sm:max-w-64"
+      />
+      <MultiSelect
+        v-model="selectedTags"
+        :options="tagOptions"
+        placeholder="Filter by tags"
+        class="h-8 w-full sm:max-w-72"
+        display="chip"
+        filter
       />
     </div>
     <DataTable

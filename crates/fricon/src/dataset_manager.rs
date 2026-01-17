@@ -158,11 +158,20 @@ impl DatasetManager {
             .await?
     }
 
-    pub async fn list_datasets(&self, search: Option<&str>) -> Result<Vec<DatasetRecord>, Error> {
+    pub async fn list_datasets(
+        &self,
+        search: Option<&str>,
+        tags: Option<&[String]>,
+    ) -> Result<Vec<DatasetRecord>, Error> {
         let search = search.map(str::to_string);
+        let tags = tags.map(Vec::from);
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_list_datasets(&mut *state.database.get()?, search.as_deref())
+                tasks::do_list_datasets(
+                    &mut *state.database.get()?,
+                    search.as_deref(),
+                    tags.as_deref(),
+                )
             })?
             .await?
     }
