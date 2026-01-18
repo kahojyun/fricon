@@ -18,14 +18,12 @@ use crate::dataset::{
 pub struct ComplexArray(Arc<StructArray>);
 
 impl ComplexArray {
-    pub fn real(&self) -> Arc<Float64Array> {
-        let array = self.0.column(0).as_ref().as_primitive::<Float64Type>();
-        Arc::new(array.clone())
+    pub fn real(&self) -> &Float64Array {
+        self.0.column(0).as_ref().as_primitive::<Float64Type>()
     }
 
-    pub fn imag(&self) -> Arc<Float64Array> {
-        let array = self.0.column(1).as_ref().as_primitive::<Float64Type>();
-        Arc::new(array.clone())
+    pub fn imag(&self) -> &Float64Array {
+        self.0.column(1).as_ref().as_primitive::<Float64Type>()
     }
 }
 
@@ -177,14 +175,12 @@ impl FixedStepTraceArray {
         self.scalar_kind
     }
 
-    pub fn x0(&self) -> Arc<Float64Array> {
-        let array = self.array.column(0).as_ref().as_primitive::<Float64Type>();
-        Arc::new(array.clone())
+    pub fn x0(&self) -> &Float64Array {
+        self.array.column(0).as_ref().as_primitive::<Float64Type>()
     }
 
-    pub fn step(&self) -> Arc<Float64Array> {
-        let array = self.array.column(1).as_ref().as_primitive::<Float64Type>();
-        Arc::new(array.clone())
+    pub fn step(&self) -> &Float64Array {
+        self.array.column(1).as_ref().as_primitive::<Float64Type>()
     }
 
     pub fn y(&self) -> ScalarListArray {
@@ -240,9 +236,8 @@ impl VariableStepTraceArray {
         self.scalar_kind
     }
 
-    pub fn x(&self) -> Arc<ListArray> {
-        let array: &ListArray = self.array.column(0).as_ref().as_list::<i32>();
-        Arc::new(array.clone())
+    pub fn x(&self) -> &ListArray {
+        self.array.column(0).as_ref().as_list::<i32>()
     }
 
     pub fn y(&self) -> ScalarListArray {
