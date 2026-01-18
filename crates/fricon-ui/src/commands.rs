@@ -13,9 +13,8 @@ use std::{
 };
 
 use anyhow::Context;
-use arrow_array::{Array, ArrayRef, Float64Array, ListArray, RecordBatch, StructArray};
+use arrow_array::{Array, ArrayRef, Float64Array, ListArray, RecordBatch, cast::AsArray};
 use arrow_ipc::writer::FileWriter;
-use arrow_schema::DataType;
 use arrow_select::concat::concat_batches;
 use chrono::{DateTime, Utc};
 use fricon::{DatasetDataType, DatasetSchema, DatasetUpdate, ScalarKind, SelectOptions};
@@ -216,18 +215,24 @@ fn is_complex_type(data_type: DatasetDataType) -> bool {
 }
 
 fn collect_float_values(array: &ArrayRef) -> Result<Vec<f64>, Error> {
-    let float_array: Arc<Float64Array> =
-        fricon::downcast_array(array.clone()).context("Expected Float64 array")?;
+    let float_array: &Float64Array = array
+        .as_primitive_opt()
+        .ok_or_else(|| Error(anyhow::anyhow!("Expected Float64 array")))?;
     Ok(float_array.values().iter().copied().collect())
 }
 
 fn collect_complex_components(array: &ArrayRef) -> Result<(Vec<f64>, Vec<f64>), Error> {
-    let struct_array: Arc<StructArray> =
-        fricon::downcast_array(array.clone()).context("Expected complex struct array")?;
-    let real_array: Arc<Float64Array> = fricon::downcast_array(struct_array.column(0).clone())
-        .context("Expected real component array")?;
-    let imag_array: Arc<Float64Array> = fricon::downcast_array(struct_array.column(1).clone())
-        .context("Expected imag component array")?;
+    let struct_array = array
+        .as_struct_opt()
+        .ok_or_else(|| Error(anyhow::anyhow!("Expected complex struct array")))?;
+    let real_array: &Float64Array = struct_array
+        .column(0)
+        .as_primitive_opt()
+        .ok_or_else(|| Error(anyhow::anyhow!("Expected real component array")))?;
+    let imag_array: &Float64Array = struct_array
+        .column(1)
+        .as_primitive_opt()
+        .ok_or_else(|| Error(anyhow::anyhow!("Expected imag component array")))?;
     Ok((
         real_array.values().iter().copied().collect(),
         imag_array.values().iter().copied().collect(),
@@ -267,72 +272,77 @@ fn extract_trace_row(
     trace_array: &ArrayRef,
     row: usize,
 ) -> Result<Option<(Vec<f64>, ArrayRef)>, Error> {
-    match trace_array.data_type() {
-        DataType::List(_) => {
-            let list_array: Arc<ListArray> =
-                fricon::downcast_array(trace_array.clone()).context("Expected list array")?;
-            if list_array.is_null(row) {
+    if let Some(list_array) = trace_array.as_list_opt::<i32>() {
+        if list_array.is_null(row) {
+            return Ok(None);
+        }
+        let values = list_array.value(row);
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Trace indices are bounded by record batch sizes"
+        )]
+        let x = (0..values.len()).map(|i| i as f64).collect();
+        return Ok(Some((x, values)));
+    }
+
+    if let Some(struct_array) = trace_array.as_struct_opt() {
+        if struct_array.is_null(row) {
+            return Ok(None);
+        }
+        let names: Vec<&str> = struct_array
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .collect();
+        if names == ["x0", "step", "y"] {
+            let x0_array: &Float64Array = struct_array
+                .column(0)
+                .as_primitive_opt()
+                .ok_or_else(|| Error(anyhow::anyhow!("Expected x0 array")))?;
+            let step_array: &Float64Array = struct_array
+                .column(1)
+                .as_primitive_opt()
+                .ok_or_else(|| Error(anyhow::anyhow!("Expected step array")))?;
+            let y_array: &ListArray = struct_array
+                .column(2)
+                .as_list_opt()
+                .ok_or_else(|| Error(anyhow::anyhow!("Expected y list array")))?;
+            if y_array.is_null(row) {
                 return Ok(None);
             }
-            let values = list_array.value(row);
+            let y_values = y_array.value(row);
+            let x0 = x0_array.value(row);
+            let step = step_array.value(row);
             #[expect(
                 clippy::cast_precision_loss,
                 reason = "Trace indices are bounded by record batch sizes"
             )]
-            let x = (0..values.len()).map(|i| i as f64).collect();
-            Ok(Some((x, values)))
+            let x = (0..y_values.len())
+                .map(|i| x0 + (i as f64) * step)
+                .collect();
+            return Ok(Some((x, y_values)));
         }
-        DataType::Struct(fields) => {
-            let struct_array: Arc<StructArray> =
-                fricon::downcast_array(trace_array.clone()).context("Expected struct array")?;
-            if struct_array.is_null(row) {
+        if names == ["x", "y"] {
+            let x_array: &ListArray = struct_array
+                .column(0)
+                .as_list_opt()
+                .ok_or_else(|| Error(anyhow::anyhow!("Expected x list array")))?;
+            let y_array: &ListArray = struct_array
+                .column(1)
+                .as_list_opt()
+                .ok_or_else(|| Error(anyhow::anyhow!("Expected y list array")))?;
+            if x_array.is_null(row) || y_array.is_null(row) {
                 return Ok(None);
             }
-            let names: Vec<&str> = fields.iter().map(|f| f.name().as_str()).collect();
-            if names == ["x0", "step", "y"] {
-                let x0_array: Arc<Float64Array> =
-                    fricon::downcast_array(struct_array.column(0).clone())
-                        .context("Expected x0 array")?;
-                let step_array: Arc<Float64Array> =
-                    fricon::downcast_array(struct_array.column(1).clone())
-                        .context("Expected step array")?;
-                let y_array: Arc<ListArray> =
-                    fricon::downcast_array(struct_array.column(2).clone())
-                        .context("Expected y list array")?;
-                if y_array.is_null(row) {
-                    return Ok(None);
-                }
-                let y_values = y_array.value(row);
-                let x0 = x0_array.value(row);
-                let step = step_array.value(row);
-                #[expect(
-                    clippy::cast_precision_loss,
-                    reason = "Trace indices are bounded by record batch sizes"
-                )]
-                let x = (0..y_values.len())
-                    .map(|i| x0 + (i as f64) * step)
-                    .collect();
-                Ok(Some((x, y_values)))
-            } else if names == ["x", "y"] {
-                let x_array: Arc<ListArray> =
-                    fricon::downcast_array(struct_array.column(0).clone())
-                        .context("Expected x list array")?;
-                let y_array: Arc<ListArray> =
-                    fricon::downcast_array(struct_array.column(1).clone())
-                        .context("Expected y list array")?;
-                if x_array.is_null(row) || y_array.is_null(row) {
-                    return Ok(None);
-                }
-                let x_values = x_array.value(row);
-                let y_values = y_array.value(row);
-                let x = collect_float_values(&x_values)?;
-                Ok(Some((x, y_values)))
-            } else {
-                Err(Error(anyhow::anyhow!("Unsupported trace struct layout")))
-            }
+            let x_values = x_array.value(row);
+            let y_values = y_array.value(row);
+            let x = collect_float_values(&x_values)?;
+            return Ok(Some((x, y_values)));
         }
-        _ => Err(Error(anyhow::anyhow!("Unsupported trace data type"))),
+        return Err(Error(anyhow::anyhow!("Unsupported trace struct layout")));
     }
+
+    Err(Error(anyhow::anyhow!("Unsupported trace data type")))
 }
 
 fn complex_view_label(option: ComplexViewOption) -> &'static str {

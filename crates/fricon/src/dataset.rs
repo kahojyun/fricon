@@ -2,7 +2,6 @@ mod arrays;
 mod scalars;
 mod table;
 mod types;
-mod utils;
 
 use arrow_schema::ArrowError;
 
@@ -11,7 +10,6 @@ pub use self::{
     scalars::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace},
     table::ChunkedTable,
     types::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
-    utils::downcast_array,
 };
 
 #[derive(Debug, thiserror::Error)]
