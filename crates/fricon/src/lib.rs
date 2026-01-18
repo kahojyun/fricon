@@ -24,7 +24,7 @@ pub use self::{
     database::DatasetStatus,
     dataset::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
-        ScalarArray, ScalarKind, TraceKind, VariableStepTrace, downcast_array,
+        ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetReader,

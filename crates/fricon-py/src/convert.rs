@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Context, bail};
-use arrow_array::{Float64Array, make_array};
+use arrow_array::{Float64Array, cast::AsArray, make_array};
 use arrow_pyarrow::PyArrowType;
 use fricon::{DatasetRow, DatasetScalar, ScalarArray};
 use indexmap::IndexMap;
@@ -25,8 +25,10 @@ use crate::Trace;
 pub fn extract_float_array(values: &Bound<'_, PyAny>) -> anyhow::Result<Arc<Float64Array>> {
     if let Ok(PyArrowType(data)) = values.extract() {
         let arr = make_array(data);
-        return fricon::downcast_array(arr)
-            .context("The data type of the given arrow array is not float64.");
+        let arr = arr.as_primitive_opt().ok_or_else(|| {
+            anyhow::anyhow!("The data type of the given arrow array is not float64.")
+        })?;
+        return Ok(Arc::new(arr.clone()));
     }
     if let Ok(arr) = values.extract::<PyArrayLike1<'_, f64, AllowTypeChange>>() {
         let arr = arr.readonly();

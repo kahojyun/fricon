@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use arrow_array::{Array, ArrayRef, Float64Array, ListArray, StructArray};
+use arrow_array::{
+    Array, ArrayRef, Float64Array, ListArray, StructArray, cast::AsArray, types::Float64Type,
+};
 use arrow_buffer::OffsetBuffer;
 use arrow_schema::{DataType, Field, extension::ExtensionType};
 use derive_more::From;
@@ -10,7 +12,6 @@ use crate::dataset::{
     Error,
     scalars::{DatasetScalar, FixedStepTrace, VariableStepTrace},
     types::{ComplexType, DatasetDataType, ScalarKind, TraceKind},
-    utils,
 };
 
 #[derive(Debug, Clone)]
@@ -18,11 +19,13 @@ pub struct ComplexArray(Arc<StructArray>);
 
 impl ComplexArray {
     pub fn real(&self) -> Arc<Float64Array> {
-        utils::downcast_array(self.0.column(0).clone()).expect("Should be float64 array.")
+        let array = self.0.column(0).as_ref().as_primitive::<Float64Type>();
+        Arc::new(array.clone())
     }
 
     pub fn imag(&self) -> Arc<Float64Array> {
-        utils::downcast_array(self.0.column(1).clone()).expect("Should be float64 array.")
+        let array = self.0.column(1).as_ref().as_primitive::<Float64Type>();
+        Arc::new(array.clone())
     }
 }
 
@@ -37,8 +40,8 @@ impl TryFrom<ArrayRef> for ComplexArray {
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let scalar_kind: ScalarKind = value.data_type().try_into()?;
         if scalar_kind == ScalarKind::Complex {
-            let struct_array = utils::downcast_array(value).expect("Should be struct array.");
-            Ok(ComplexArray(struct_array))
+            let struct_array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
+            Ok(ComplexArray(Arc::new(struct_array.clone())))
         } else {
             Err(Error::IncompatibleType)
         }
@@ -154,9 +157,12 @@ impl From<ScalarListArray> for ArrayRef {
 impl TryFrom<ArrayRef> for ScalarListArray {
     type Error = Error;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
-        let array: Arc<ListArray> = utils::downcast_array(value)?;
+        let array: &ListArray = value.as_list_opt().ok_or(Error::IncompatibleType)?;
         let scalar_kind = array.values().data_type().try_into()?;
-        Ok(Self { array, scalar_kind })
+        Ok(Self {
+            array: Arc::new(array.clone()),
+            scalar_kind,
+        })
     }
 }
 
@@ -172,17 +178,19 @@ impl FixedStepTraceArray {
     }
 
     pub fn x0(&self) -> Arc<Float64Array> {
-        utils::downcast_array(self.array.column(0).clone()).expect("Should be float64 array.")
+        let array = self.array.column(0).as_ref().as_primitive::<Float64Type>();
+        Arc::new(array.clone())
     }
 
     pub fn step(&self) -> Arc<Float64Array> {
-        utils::downcast_array(self.array.column(1).clone()).expect("Should be float64 array.")
+        let array = self.array.column(1).as_ref().as_primitive::<Float64Type>();
+        Arc::new(array.clone())
     }
 
     pub fn y(&self) -> ScalarListArray {
-        let y = utils::downcast_array(self.array.column(2).clone()).expect("Should be list array.");
+        let y: &ListArray = self.array.column(2).as_ref().as_list::<i32>();
         ScalarListArray {
-            array: y,
+            array: Arc::new(y.clone()),
             scalar_kind: self.scalar_kind,
         }
     }
@@ -211,10 +219,13 @@ impl From<FixedStepTraceArray> for ArrayRef {
 impl TryFrom<ArrayRef> for FixedStepTraceArray {
     type Error = Error;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
-        let array: Arc<StructArray> = utils::downcast_array(value)?;
+        let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
         TraceKind::FixedStep.supports_data_type(array.data_type())?;
         let scalar_kind = array.column(2).data_type().try_into()?;
-        Ok(Self { array, scalar_kind })
+        Ok(Self {
+            array: Arc::new(array.clone()),
+            scalar_kind,
+        })
     }
 }
 
@@ -230,13 +241,14 @@ impl VariableStepTraceArray {
     }
 
     pub fn x(&self) -> Arc<ListArray> {
-        utils::downcast_array(self.array.column(0).clone()).expect("Should be list array.")
+        let array: &ListArray = self.array.column(0).as_ref().as_list::<i32>();
+        Arc::new(array.clone())
     }
 
     pub fn y(&self) -> ScalarListArray {
-        let y = utils::downcast_array(self.array.column(1).clone()).expect("Should be list array.");
+        let y: &ListArray = self.array.column(1).as_ref().as_list::<i32>();
         ScalarListArray {
-            array: y,
+            array: Arc::new(y.clone()),
             scalar_kind: self.scalar_kind,
         }
     }
@@ -266,10 +278,13 @@ impl From<VariableStepTraceArray> for ArrayRef {
 impl TryFrom<ArrayRef> for VariableStepTraceArray {
     type Error = Error;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
-        let array: Arc<StructArray> = utils::downcast_array(value)?;
+        let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
         TraceKind::VariableStep.supports_data_type(array.data_type())?;
         let scalar_kind = array.column(1).data_type().try_into()?;
-        Ok(Self { array, scalar_kind })
+        Ok(Self {
+            array: Arc::new(array.clone()),
+            scalar_kind,
+        })
     }
 }
 
