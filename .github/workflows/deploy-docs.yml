@@ -18,9 +18,6 @@ jobs:
   mike-deploy:
     name: Mike Deploy
     runs-on: ubuntu-latest
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
@@ -31,8 +28,8 @@ jobs:
             libxdo-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
       - name: Install build dependencies
         uses: taiki-e/install-action@v2
         with:
