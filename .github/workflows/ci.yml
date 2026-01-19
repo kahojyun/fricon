@@ -53,9 +53,6 @@ jobs:
     name: Test Python
     needs: [fmt]
     runs-on: ubuntu-24.04
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
@@ -66,8 +63,8 @@ jobs:
             libxdo-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
           tool: protoc
@@ -154,12 +151,14 @@ jobs:
         run: pnpm install
       - name: Bundle licenses
         run: pnpm run bundle-licenses
+      - name: Rust cache
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: Swatinem/rust-cache@v2
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: ${{ matrix.args }}
-          sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
         env:
           CFLAGS: ${{ matrix.cflags }}
