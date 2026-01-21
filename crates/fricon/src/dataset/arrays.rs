@@ -190,6 +190,25 @@ impl FixedStepTraceArray {
             scalar_kind: self.scalar_kind,
         }
     }
+
+    pub fn expand_row(&self, row: usize) -> Option<(Vec<f64>, ArrayRef)> {
+        if row >= self.array.len() || self.array.is_null(row) {
+            return None;
+        }
+
+        let x0 = self.x0().value(row);
+        let step = self.step().value(row);
+        let y_array = self.y().array;
+        if y_array.is_null(row) {
+            return None;
+        }
+        let y_values = y_array.value(row);
+
+        let x = (0..y_values.len())
+            .map(|i| x0 + (i as f64) * step)
+            .collect();
+        Some((x, y_values))
+    }
 }
 
 impl From<FixedStepTrace> for FixedStepTraceArray {
@@ -246,6 +265,26 @@ impl VariableStepTraceArray {
             array: Arc::new(y.clone()),
             scalar_kind: self.scalar_kind,
         }
+    }
+
+    pub fn expand_row(&self, row: usize) -> Result<Option<(Vec<f64>, ArrayRef)>, Error> {
+        if row >= self.array.len() || self.array.is_null(row) {
+            return Ok(None);
+        }
+
+        let x_array = self.x();
+        let y_array = self.y().array;
+
+        if x_array.is_null(row) || y_array.is_null(row) {
+            return Ok(None);
+        }
+
+        let x_values = x_array.value(row);
+        let y_values = y_array.value(row);
+
+        let x_f64: &Float64Array = x_values.as_primitive_opt().ok_or(Error::IncompatibleType)?;
+
+        Ok(Some((x_f64.values().to_vec(), y_values)))
     }
 }
 
@@ -309,6 +348,49 @@ impl DatasetArray {
             }
         }
     }
+
+    #[must_use] 
+    pub fn num_rows(&self) -> usize {
+        match self {
+            DatasetArray::Numeric(a) => a.len(),
+            DatasetArray::Complex(a) => a.0.len(),
+            DatasetArray::SimpleTrace(a) => a.array.len(),
+            DatasetArray::FixedStepTrace(a) => a.array.len(),
+            DatasetArray::VariableStepTrace(a) => a.array.len(),
+        }
+    }
+
+    #[must_use] 
+    pub fn as_numeric(&self) -> Option<&Float64Array> {
+        match self {
+            DatasetArray::Numeric(a) => Some(a.as_ref()),
+            _ => None,
+        }
+    }
+
+    #[must_use] 
+    pub fn as_complex(&self) -> Option<&ComplexArray> {
+        match self {
+            DatasetArray::Complex(a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub fn expand_trace(&self, row: usize) -> Result<Option<(Vec<f64>, ArrayRef)>, Error> {
+        match self {
+            DatasetArray::Numeric(_) | DatasetArray::Complex(_) => Err(Error::IncompatibleType),
+            DatasetArray::SimpleTrace(t) => {
+                if row >= t.array.len() || t.array.is_null(row) {
+                    return Ok(None);
+                }
+                let values = t.array.value(row);
+                let x = (0..values.len()).map(|i| i as f64).collect();
+                Ok(Some((x, values)))
+            }
+            DatasetArray::FixedStepTrace(t) => Ok(t.expand_row(row)),
+            DatasetArray::VariableStepTrace(t) => t.expand_row(row),
+        }
+    }
 }
 
 impl From<DatasetScalar> for DatasetArray {
@@ -319,6 +401,31 @@ impl From<DatasetScalar> for DatasetArray {
             DatasetScalar::SimpleTrace(v) => ScalarListArray::from_single_item(v).into(),
             DatasetScalar::FixedStepTrace(v) => FixedStepTraceArray::from(v).into(),
             DatasetScalar::VariableStepTrace(v) => VariableStepTraceArray::from(v).into(),
+        }
+    }
+}
+
+impl TryFrom<ArrayRef> for DatasetArray {
+    type Error = Error;
+
+    fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
+        let data_type = value.data_type();
+        if let Some((trace, _)) = TraceKind::parse_data_type(data_type) {
+            match trace {
+                TraceKind::Simple => Ok(DatasetArray::SimpleTrace(value.try_into()?)),
+                TraceKind::FixedStep => Ok(DatasetArray::FixedStepTrace(value.try_into()?)),
+                TraceKind::VariableStep => Ok(DatasetArray::VariableStepTrace(value.try_into()?)),
+            }
+        } else {
+            let scalar_kind: ScalarKind = data_type.try_into()?;
+            match scalar_kind {
+                ScalarKind::Numeric => {
+                    let array: &Float64Array =
+                        value.as_primitive_opt().ok_or(Error::IncompatibleType)?;
+                    Ok(DatasetArray::Numeric(Arc::new(array.clone())))
+                }
+                ScalarKind::Complex => Ok(DatasetArray::Complex(value.try_into()?)),
+            }
         }
     }
 }

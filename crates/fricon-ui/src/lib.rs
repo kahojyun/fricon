@@ -1,4 +1,5 @@
 mod commands;
+mod models;
 
 use std::{
     io,
