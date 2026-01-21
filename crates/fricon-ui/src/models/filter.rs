@@ -4,7 +4,7 @@ use serde::Serialize;
 
 #[derive(Serialize, Clone, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct FilterTableRow {
+pub struct Row {
     pub display_values: Vec<String>,
     pub value_indices: Vec<usize>,
     pub index: usize,
@@ -19,21 +19,21 @@ pub struct ColumnUniqueValue {
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct FilterTableData {
+pub struct TableData {
     pub fields: Vec<String>,
-    pub rows: Vec<FilterTableRow>,
+    pub rows: Vec<Row>,
     pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
 }
 
 pub struct ProcessedFilterRows {
-    pub unique_rows: Vec<FilterTableRow>,
+    pub unique_rows: Vec<Row>,
     pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
     pub column_raw_values: HashMap<String, Vec<serde_json::Value>>,
 }
 
-pub struct FilterDataInternal {
+pub struct DataInternal {
     pub fields: Vec<String>,
-    pub unique_rows: Vec<FilterTableRow>,
+    pub unique_rows: Vec<Row>,
     pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
     pub column_raw_values: HashMap<String, Vec<serde_json::Value>>,
 }
@@ -101,7 +101,7 @@ pub fn process_filter_rows(
                 }
             }
 
-            unique_rows.push(FilterTableRow {
+            unique_rows.push(Row {
                 display_values,
                 value_indices,
                 index: global_row_idx,

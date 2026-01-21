@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
@@ -7,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ChartType {
+pub enum Type {
     Line,
     Heatmap,
     Scatter,
@@ -32,8 +30,8 @@ pub enum ComplexViewOption {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChartDataOptions {
-    pub chart_type: ChartType,
+pub struct DataOptions {
+    pub chart_type: Type,
     pub series: Option<String>,
     pub x_column: Option<String>,
     pub y_column: Option<String>,
@@ -54,18 +52,18 @@ pub struct ChartDataOptions {
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ChartSeries {
+pub struct Series {
     pub name: String,
     pub data: Vec<Vec<f64>>,
 }
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ChartDataResponse {
-    pub r#type: ChartType,
+pub struct DataResponse {
+    pub r#type: Type,
     pub x_name: String,
     pub y_name: Option<String>,
-    pub series: Vec<ChartSeries>,
+    pub series: Vec<Series>,
 }
 
 pub fn transform_complex_values(
@@ -101,8 +99,8 @@ pub fn complex_view_label(option: ComplexViewOption) -> &'static str {
 pub fn build_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    options: &ChartDataOptions,
-) -> Result<ChartDataResponse> {
+    options: &DataOptions,
+) -> Result<DataResponse> {
     let series_name = options
         .series
         .as_ref()
@@ -169,7 +167,7 @@ pub fn build_line_series(
                 let y_values = transform_complex_values(reals, imags, option);
                 let len = x_values.len().min(y_values.len());
                 let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
-                ChartSeries {
+                Series {
                     name: format!("{series_name} ({})", complex_view_label(option)),
                     data,
                 }
@@ -182,14 +180,14 @@ pub fn build_line_series(
             .context("Expected numeric array")?
             .values();
         let len = x_values.len().min(y_values.len());
-        vec![ChartSeries {
+        vec![Series {
             name: series_name.clone(),
             data: (0..len).map(|i| vec![x_values[i], y_values[i]]).collect(),
         }]
     };
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Line,
+    Ok(DataResponse {
+        r#type: Type::Line,
         x_name,
         y_name: None,
         series,
@@ -199,8 +197,8 @@ pub fn build_line_series(
 pub fn build_heatmap_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    options: &ChartDataOptions,
-) -> Result<ChartDataResponse> {
+    options: &DataOptions,
+) -> Result<DataResponse> {
     let series_name = options
         .series
         .as_ref()
@@ -231,242 +229,307 @@ pub fn build_heatmap_series(
         .unwrap_or(ComplexViewOption::Mag);
 
     let series = if is_trace {
-        let y_array = batch
-            .column_by_name(y_column)
-            .cloned()
-            .context("Y column not found")?;
-        let ds_y: DatasetArray = y_array.try_into()?;
-        let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
-        let mut data = Vec::new();
-        for row in 0..batch.num_rows() {
-            let Some((x_values, trace_values)) = series_array.expand_trace(row)? else {
-                continue;
-            };
-            let y_value = *y_values.get(row).unwrap_or(&0.0);
-            let ds_trace: DatasetArray = trace_values.try_into()?;
-            if is_complex {
-                let complex_array = ds_trace.as_complex().context("Expected complex array")?;
-                let z_values = transform_complex_values(
-                    complex_array.real().values(),
-                    complex_array.imag().values(),
-                    view_option,
-                );
-                let len = x_values.len().min(z_values.len());
-                for i in 0..len {
-                    data.push(vec![x_values[i], y_value, z_values[i]]);
-                }
-            } else {
-                let z_values = ds_trace
-                    .as_numeric()
-                    .context("Expected numeric array")?
-                    .values();
-                let len = x_values.len().min(z_values.len());
-                for i in 0..len {
-                    data.push(vec![x_values[i], y_value, z_values[i]]);
-                }
-            }
-        }
-        let name = if is_complex {
-            format!("{series_name} ({})", complex_view_label(view_option))
-        } else {
-            series_name.clone()
-        };
-        vec![ChartSeries { name, data }]
+        process_trace_heatmap(
+            batch,
+            series_name,
+            y_column,
+            &series_array,
+            is_complex,
+            view_option,
+        )?
     } else {
-        let x_column = options
-            .x_column
-            .as_ref()
-            .context("Heatmap chart requires x column")?;
-        let x_array = batch
-            .column_by_name(x_column)
-            .cloned()
-            .context("X not found")?;
-        let y_array = batch
-            .column_by_name(y_column)
-            .cloned()
-            .context("Y not found")?;
-        let ds_x: DatasetArray = x_array.try_into()?;
-        let ds_y: DatasetArray = y_array.try_into()?;
-        let x_values = ds_x.as_numeric().context("X must be numeric")?.values();
-        let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
-
-        let data = if is_complex {
-            let complex_array = series_array
-                .as_complex()
-                .context("Expected complex array")?;
-            let z_values = transform_complex_values(
-                complex_array.real().values(),
-                complex_array.imag().values(),
-                view_option,
-            );
-            let len = x_values.len().min(y_values.len()).min(z_values.len());
-            (0..len)
-                .map(|i| vec![x_values[i], y_values[i], z_values[i]])
-                .collect()
-        } else {
-            let z_values = series_array
-                .as_numeric()
-                .context("Expected numeric array")?
-                .values();
-            let len = x_values.len().min(y_values.len()).min(z_values.len());
-            (0..len)
-                .map(|i| vec![x_values[i], y_values[i], z_values[i]])
-                .collect()
-        };
-        let name = if is_complex {
-            format!("{series_name} ({})", complex_view_label(view_option))
-        } else {
-            series_name.clone()
-        };
-        vec![ChartSeries { name, data }]
+        process_scalar_heatmap(
+            batch,
+            series_name,
+            options,
+            &series_array,
+            is_complex,
+            view_option,
+        )?
     };
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Heatmap,
+    Ok(DataResponse {
+        r#type: Type::Heatmap,
         x_name,
         y_name: Some(y_column.clone()),
         series,
     })
 }
 
+fn process_trace_heatmap(
+    batch: &RecordBatch,
+    series_name: &str,
+    y_column: &str,
+    series_array: &DatasetArray,
+    is_complex: bool,
+    view_option: ComplexViewOption,
+) -> Result<Vec<Series>> {
+    let y_array = batch
+        .column_by_name(y_column)
+        .cloned()
+        .context("Y column not found")?;
+    let ds_y: DatasetArray = y_array.try_into()?;
+    let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
+    let mut data = Vec::new();
+    for row in 0..batch.num_rows() {
+        let Some((x_values, trace_values)) = series_array.expand_trace(row)? else {
+            continue;
+        };
+        let y_value = *y_values.get(row).unwrap_or(&0.0);
+        let ds_trace: DatasetArray = trace_values.try_into()?;
+        if is_complex {
+            let complex_array = ds_trace.as_complex().context("Expected complex array")?;
+            let z_values = transform_complex_values(
+                complex_array.real().values(),
+                complex_array.imag().values(),
+                view_option,
+            );
+            let len = x_values.len().min(z_values.len());
+            for i in 0..len {
+                data.push(vec![x_values[i], y_value, z_values[i]]);
+            }
+        } else {
+            let z_values = ds_trace
+                .as_numeric()
+                .context("Expected numeric array")?
+                .values();
+            let len = x_values.len().min(z_values.len());
+            for i in 0..len {
+                data.push(vec![x_values[i], y_value, z_values[i]]);
+            }
+        }
+    }
+    let name = if is_complex {
+        format!("{series_name} ({})", complex_view_label(view_option))
+    } else {
+        series_name.to_string()
+    };
+    Ok(vec![Series { name, data }])
+}
+
+fn process_scalar_heatmap(
+    batch: &RecordBatch,
+    series_name: &str,
+    options: &DataOptions,
+    series_array: &DatasetArray,
+    is_complex: bool,
+    view_option: ComplexViewOption,
+) -> Result<Vec<Series>> {
+    let x_column = options
+        .x_column
+        .as_ref()
+        .context("Heatmap chart requires x column")?;
+    let x_array = batch
+        .column_by_name(x_column)
+        .cloned()
+        .context("X not found")?;
+    let y_column = options
+        .y_column
+        .as_ref()
+        .context("Heatmap chart requires y column")?;
+    let y_array = batch
+        .column_by_name(y_column)
+        .cloned()
+        .context("Y not found")?;
+    let ds_x: DatasetArray = x_array.try_into()?;
+    let ds_y: DatasetArray = y_array.try_into()?;
+    let x_values = ds_x.as_numeric().context("X must be numeric")?.values();
+    let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
+
+    let data = if is_complex {
+        let complex_array = series_array
+            .as_complex()
+            .context("Expected complex array")?;
+        let z_values = transform_complex_values(
+            complex_array.real().values(),
+            complex_array.imag().values(),
+            view_option,
+        );
+        let len = x_values.len().min(y_values.len()).min(z_values.len());
+        (0..len)
+            .map(|i| vec![x_values[i], y_values[i], z_values[i]])
+            .collect()
+    } else {
+        let z_values = series_array
+            .as_numeric()
+            .context("Expected numeric array")?
+            .values();
+        let len = x_values.len().min(y_values.len()).min(z_values.len());
+        (0..len)
+            .map(|i| vec![x_values[i], y_values[i], z_values[i]])
+            .collect()
+    };
+    let name = if is_complex {
+        format!("{series_name} ({})", complex_view_label(view_option))
+    } else {
+        series_name.to_string()
+    };
+    Ok(vec![Series { name, data }])
+}
+
 pub fn build_scatter_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    options: &ChartDataOptions,
-) -> Result<ChartDataResponse> {
+    options: &DataOptions,
+) -> Result<DataResponse> {
     let mode = options.scatter_mode.unwrap_or(ScatterMode::Complex);
-    let mut series_map: HashMap<String, Vec<Vec<f64>>> = HashMap::new();
-    let (x_name, y_name) = match mode {
-        ScatterMode::Complex => {
-            let series_name = options
-                .scatter_series
-                .as_ref()
-                .context("Scatter complex mode requires series column")?;
-            let data_type = *schema
-                .columns()
-                .get(series_name)
-                .context("Column not found")?;
-            let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
-            let series_array: DatasetArray = batch
-                .column_by_name(series_name)
-                .cloned()
-                .context("Column not found")?
-                .try_into()?;
-            let mut data = Vec::new();
-            if is_trace {
-                for row in 0..batch.num_rows() {
-                    let Some((_x_values, trace_values)) = series_array.expand_trace(row)? else {
-                        continue;
-                    };
-                    let ds_trace: DatasetArray = trace_values.try_into()?;
-                    let complex_array = ds_trace.as_complex().context("Expected complex array")?;
-                    let reals = complex_array.real().values();
-                    let imags = complex_array.imag().values();
-                    let len = reals.len().min(imags.len());
-                    for i in 0..len {
-                        data.push(vec![reals[i], imags[i]]);
-                    }
-                }
-            } else {
-                let complex_array = series_array
-                    .as_complex()
-                    .context("Expected complex array")?;
-                let reals = complex_array.real().values();
-                let imags = complex_array.imag().values();
-                let len = reals.len().min(imags.len());
-                for i in 0..len {
-                    data.push(vec![reals[i], imags[i]]);
-                }
-            }
-            series_map.insert(series_name.clone(), data);
-            (
-                format!("{series_name} (real)"),
-                format!("{series_name} (imag)"),
-            )
-        }
-        ScatterMode::TraceXy => {
-            let trace_x = options
-                .scatter_trace_x_column
-                .as_ref()
-                .context("Scatter trace_xy requires trace x column")?;
-            let trace_y = options
-                .scatter_trace_y_column
-                .as_ref()
-                .context("Scatter trace_xy requires trace y column")?;
-            let x_array: DatasetArray = batch
-                .column_by_name(trace_x)
-                .cloned()
-                .context("X not found")?
-                .try_into()?;
-            let y_array: DatasetArray = batch
-                .column_by_name(trace_y)
-                .cloned()
-                .context("Y not found")?
-                .try_into()?;
-
-            let mut data = Vec::new();
-            for row in 0..batch.num_rows() {
-                let Some((_x_axis, x_values_array)) = x_array.expand_trace(row)? else {
-                    continue;
-                };
-                let Some((_y_axis, y_values_array)) = y_array.expand_trace(row)? else {
-                    continue;
-                };
-                let ds_x: DatasetArray = x_values_array.try_into()?;
-                let ds_y: DatasetArray = y_values_array.try_into()?;
-                let x_values = ds_x.as_numeric().context("X must be numeric")?.values();
-                let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
-                let len = x_values.len().min(y_values.len());
-                for i in 0..len {
-                    data.push(vec![x_values[i], y_values[i]]);
-                }
-            }
-            let series_name = format!("{trace_x} vs {trace_y}");
-            series_map.insert(series_name.clone(), data);
-            (trace_x.clone(), trace_y.clone())
-        }
-        ScatterMode::Xy => {
-            let x_column = options
-                .scatter_x_column
-                .as_ref()
-                .context("Scatter xy requires x column")?;
-            let y_column = options
-                .scatter_y_column
-                .as_ref()
-                .context("Scatter xy requires y column")?;
-            let x_array: DatasetArray = batch
-                .column_by_name(x_column)
-                .cloned()
-                .context("X not found")?
-                .try_into()?;
-            let y_array: DatasetArray = batch
-                .column_by_name(y_column)
-                .cloned()
-                .context("Y not found")?
-                .try_into()?;
-            let x_values = x_array.as_numeric().context("X must be numeric")?.values();
-            let y_values = y_array.as_numeric().context("Y must be numeric")?.values();
-            let len = x_values.len().min(y_values.len());
-            let data = (0..len)
-                .map(|i| vec![x_values[i], y_values[i]])
-                .collect::<Vec<_>>();
-            let series_name = format!("{x_column} vs {y_column}");
-            series_map.insert(series_name.clone(), data);
-            (x_column.clone(), y_column.clone())
-        }
+    let (x_name, y_name, series) = match mode {
+        ScatterMode::Complex => process_complex_scatter(batch, schema, options)?,
+        ScatterMode::TraceXy => process_trace_xy_scatter(batch, options)?,
+        ScatterMode::Xy => process_xy_scatter(batch, options)?,
     };
 
-    let series = series_map
-        .into_iter()
-        .map(|(name, data)| ChartSeries { name, data })
-        .collect();
-
-    Ok(ChartDataResponse {
-        r#type: ChartType::Scatter,
+    Ok(DataResponse {
+        r#type: Type::Scatter,
         x_name,
         y_name: Some(y_name),
         series,
     })
+}
+
+fn process_complex_scatter(
+    batch: &RecordBatch,
+    schema: &DatasetSchema,
+    options: &DataOptions,
+) -> Result<(String, String, Vec<Series>)> {
+    let series_name = options
+        .scatter_series
+        .as_ref()
+        .context("Scatter complex mode requires series column")?;
+    let data_type = *schema
+        .columns()
+        .get(series_name)
+        .context("Column not found")?;
+    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let series_array: DatasetArray = batch
+        .column_by_name(series_name)
+        .cloned()
+        .context("Column not found")?
+        .try_into()?;
+    let mut data = Vec::new();
+    if is_trace {
+        for row in 0..batch.num_rows() {
+            let Some((_x_values, trace_values)) = series_array.expand_trace(row)? else {
+                continue;
+            };
+            let ds_trace: DatasetArray = trace_values.try_into()?;
+            let complex_array = ds_trace.as_complex().context("Expected complex array")?;
+            let reals = complex_array.real().values();
+            let imags = complex_array.imag().values();
+            let len = reals.len().min(imags.len());
+            for i in 0..len {
+                data.push(vec![reals[i], imags[i]]);
+            }
+        }
+    } else {
+        let complex_array = series_array
+            .as_complex()
+            .context("Expected complex array")?;
+        let reals = complex_array.real().values();
+        let imags = complex_array.imag().values();
+        let len = reals.len().min(imags.len());
+        for i in 0..len {
+            data.push(vec![reals[i], imags[i]]);
+        }
+    }
+    Ok((
+        format!("{series_name} (real)"),
+        format!("{series_name} (imag)"),
+        vec![Series {
+            name: series_name.clone(),
+            data,
+        }],
+    ))
+}
+
+fn process_trace_xy_scatter(
+    batch: &RecordBatch,
+    options: &DataOptions,
+) -> Result<(String, String, Vec<Series>)> {
+    let trace_x = options
+        .scatter_trace_x_column
+        .as_ref()
+        .context("Scatter trace_xy requires trace x column")?;
+    let trace_y = options
+        .scatter_trace_y_column
+        .as_ref()
+        .context("Scatter trace_xy requires trace y column")?;
+    let x_array: DatasetArray = batch
+        .column_by_name(trace_x)
+        .cloned()
+        .context("X not found")?
+        .try_into()?;
+    let y_array: DatasetArray = batch
+        .column_by_name(trace_y)
+        .cloned()
+        .context("Y not found")?
+        .try_into()?;
+
+    let mut data = Vec::new();
+    for row in 0..batch.num_rows() {
+        let Some((_x_axis, x_values_array)) = x_array.expand_trace(row)? else {
+            continue;
+        };
+        let Some((_y_axis, y_values_array)) = y_array.expand_trace(row)? else {
+            continue;
+        };
+        let ds_x: DatasetArray = x_values_array.try_into()?;
+        let ds_y: DatasetArray = y_values_array.try_into()?;
+        let x_values = ds_x.as_numeric().context("X must be numeric")?.values();
+        let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
+        let len = x_values.len().min(y_values.len());
+        for i in 0..len {
+            data.push(vec![x_values[i], y_values[i]]);
+        }
+    }
+    let series_name = format!("{trace_x} vs {trace_y}");
+    Ok((
+        trace_x.clone(),
+        trace_y.clone(),
+        vec![Series {
+            name: series_name,
+            data,
+        }],
+    ))
+}
+
+fn process_xy_scatter(
+    batch: &RecordBatch,
+    options: &DataOptions,
+) -> Result<(String, String, Vec<Series>)> {
+    let x_column = options
+        .scatter_x_column
+        .as_ref()
+        .context("Scatter xy requires x column")?;
+    let y_column = options
+        .scatter_y_column
+        .as_ref()
+        .context("Scatter xy requires y column")?;
+    let x_array: DatasetArray = batch
+        .column_by_name(x_column)
+        .cloned()
+        .context("X not found")?
+        .try_into()?;
+    let y_array: DatasetArray = batch
+        .column_by_name(y_column)
+        .cloned()
+        .context("Y not found")?
+        .try_into()?;
+    let x_values = x_array.as_numeric().context("X must be numeric")?.values();
+    let y_values = y_array.as_numeric().context("Y must be numeric")?.values();
+    let len = x_values.len().min(y_values.len());
+    let data = (0..len)
+        .map(|i| vec![x_values[i], y_values[i]])
+        .collect::<Vec<_>>();
+    let series_name = format!("{x_column} vs {y_column}");
+    Ok((
+        x_column.clone(),
+        y_column.clone(),
+        vec![Series {
+            name: series_name,
+            data,
+        }],
+    ))
 }
 
 #[cfg(test)]
@@ -503,8 +566,8 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = ChartDataOptions {
-            chart_type: ChartType::Line,
+        let options = DataOptions {
+            chart_type: Type::Line,
             series: Some("y".to_string()),
             x_column: Some("x".to_string()),
             y_column: None,
@@ -567,8 +630,8 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = ChartDataOptions {
-            chart_type: ChartType::Line,
+        let options = DataOptions {
+            chart_type: Type::Line,
             series: Some("y".to_string()),
             x_column: Some("x".to_string()),
             y_column: None,
@@ -624,8 +687,8 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = ChartDataOptions {
-            chart_type: ChartType::Heatmap,
+        let options = DataOptions {
+            chart_type: Type::Heatmap,
             series: Some("z".to_string()),
             x_column: Some("x".to_string()),
             y_column: Some("y".to_string()),
@@ -675,8 +738,8 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = ChartDataOptions {
-            chart_type: ChartType::Scatter,
+        let options = DataOptions {
+            chart_type: Type::Scatter,
             scatter_mode: Some(ScatterMode::Xy),
             scatter_x_column: Some("x".to_string()),
             scatter_y_column: Some("y".to_string()),

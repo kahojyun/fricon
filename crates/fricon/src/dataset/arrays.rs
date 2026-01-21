@@ -204,6 +204,10 @@ impl FixedStepTraceArray {
         }
         let y_values = y_array.value(row);
 
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Array index is unlikely to exceed 2^53"
+        )]
         let x = (0..y_values.len())
             .map(|i| x0 + (i as f64) * step)
             .collect();
@@ -349,7 +353,7 @@ impl DatasetArray {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn num_rows(&self) -> usize {
         match self {
             DatasetArray::Numeric(a) => a.len(),
@@ -360,7 +364,7 @@ impl DatasetArray {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn as_numeric(&self) -> Option<&Float64Array> {
         match self {
             DatasetArray::Numeric(a) => Some(a.as_ref()),
@@ -368,7 +372,7 @@ impl DatasetArray {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn as_complex(&self) -> Option<&ComplexArray> {
         match self {
             DatasetArray::Complex(a) => Some(a),
@@ -384,6 +388,10 @@ impl DatasetArray {
                     return Ok(None);
                 }
                 let values = t.array.value(row);
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "Array index is unlikely to exceed 2^53"
+                )]
                 let x = (0..values.len()).map(|i| i as f64).collect();
                 Ok(Some((x, values)))
             }

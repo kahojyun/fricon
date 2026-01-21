@@ -15,6 +15,7 @@ use std::{
 use anyhow::Context;
 use arrow_array::RecordBatch;
 use arrow_ipc::writer::FileWriter;
+use arrow_select::concat::concat_batches;
 use chrono::{DateTime, Utc};
 use fricon::{DatasetDataType, DatasetSchema, DatasetUpdate, SelectOptions};
 use serde::{Deserialize, Serialize};
@@ -28,10 +29,10 @@ use tokio_util::sync::CancellationToken;
 use super::AppState;
 use crate::models::{
     chart::{
-        ChartDataOptions, ChartDataResponse, ChartType, ScatterMode, build_heatmap_series,
-        build_line_series, build_scatter_series,
+        DataOptions, DataResponse, ScatterMode, Type, build_heatmap_series, build_line_series,
+        build_scatter_series,
     },
-    filter::{FilterDataInternal, FilterTableData, process_filter_rows},
+    filter::{DataInternal, TableData, process_filter_rows},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -112,11 +113,11 @@ fn push_column(columns: &mut Vec<usize>, index: usize) {
 
 fn build_chart_selected_columns(
     schema: &DatasetSchema,
-    options: &ChartDataOptions,
+    options: &DataOptions,
 ) -> Result<Vec<usize>, Error> {
     let mut selected = Vec::new();
     match options.chart_type {
-        ChartType::Line => {
+        Type::Line => {
             let series_name = options
                 .series
                 .as_ref()
@@ -136,7 +137,7 @@ fn build_chart_selected_columns(
                 push_column(&mut selected, x_index);
             }
         }
-        ChartType::Heatmap => {
+        Type::Heatmap => {
             let series_name = options
                 .series
                 .as_ref()
@@ -162,7 +163,7 @@ fn build_chart_selected_columns(
                 push_column(&mut selected, x_index);
             }
         }
-        ChartType::Scatter => {
+        Type::Scatter => {
             let mode = options.scatter_mode.unwrap_or(ScatterMode::Complex);
             match mode {
                 ScatterMode::Complex => {
@@ -210,8 +211,8 @@ fn build_chart_selected_columns(
 async fn dataset_chart_data(
     state: State<'_, AppState>,
     id: i32,
-    options: ChartDataOptions,
-) -> Result<ChartDataResponse, Error> {
+    options: DataOptions,
+) -> Result<DataResponse, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let start = options.start.map_or(Bound::Unbounded, Bound::Included);
@@ -242,14 +243,13 @@ async fn dataset_chart_data(
     let batch = if batches.is_empty() {
         RecordBatch::new_empty(output_schema)
     } else {
-        arrow_select::concat::concat_batches(&output_schema, &batches)
-            .context("Failed to concat batches")?
+        concat_batches(&output_schema, &batches).context("Failed to concat batches")?
     };
 
     match options.chart_type {
-        ChartType::Line => build_line_series(&batch, schema, &options).map_err(Error::from),
-        ChartType::Heatmap => build_heatmap_series(&batch, schema, &options).map_err(Error::from),
-        ChartType::Scatter => build_scatter_series(&batch, schema, &options).map_err(Error::from),
+        Type::Line => build_line_series(&batch, schema, &options).map_err(Error::from),
+        Type::Heatmap => build_heatmap_series(&batch, schema, &options).map_err(Error::from),
+        Type::Scatter => build_scatter_series(&batch, schema, &options).map_err(Error::from),
     }
 }
 
@@ -348,7 +348,6 @@ async fn update_dataset_favorite(
     Ok(())
 }
 
-#[expect(clippy::type_complexity)]
 type SubscriptionRecords = HashMap<u32, CancellationToken>;
 static DATASET_SUBSCRIPTION: LazyLock<Mutex<SubscriptionRecords>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -369,13 +368,13 @@ async fn get_filter_data_internal(
     state: &AppState,
     id: i32,
     exclude_columns: Option<Vec<String>>,
-) -> Result<FilterDataInternal, Error> {
+) -> Result<DataInternal, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let index_columns = dataset.index_columns();
 
     let Some(index_col_indices) = index_columns else {
-        return Ok(FilterDataInternal {
+        return Ok(DataInternal {
             fields: vec![],
             unique_rows: vec![],
             column_unique_values: HashMap::new(),
@@ -397,7 +396,7 @@ async fn get_filter_data_internal(
         .collect();
 
     if filtered_indices.is_empty() {
-        return Ok(FilterDataInternal {
+        return Ok(DataInternal {
             fields: vec![],
             unique_rows: vec![],
             column_unique_values: HashMap::new(),
@@ -431,7 +430,7 @@ async fn get_filter_data_internal(
         serde_json::from_slice(&buf).context("Failed to parse JSON")?;
 
     let processed = process_filter_rows(&fields, json_rows);
-    Ok(FilterDataInternal {
+    Ok(DataInternal {
         fields,
         unique_rows: processed.unique_rows,
         column_unique_values: processed.column_unique_values,
@@ -540,10 +539,10 @@ async fn get_filter_table_data(
     state: State<'_, AppState>,
     id: i32,
     options: FilterTableOptions,
-) -> Result<FilterTableData, Error> {
+) -> Result<TableData, Error> {
     let filter_data = get_filter_data_internal(&state, id, options.exclude_columns).await?;
 
-    Ok(FilterTableData {
+    Ok(TableData {
         fields: filter_data.fields,
         rows: filter_data.unique_rows,
         column_unique_values: filter_data.column_unique_values,

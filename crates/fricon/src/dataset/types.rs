@@ -145,7 +145,7 @@ impl TraceKind {
         Field::new(name, self.to_data_type(item), nullable).with_extension_type(self)
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn parse_data_type(data_type: &DataType) -> Option<(TraceKind, &Field)> {
         fn parse_fixed_step(fields: &[FieldRef]) -> Option<(TraceKind, &Field)> {
             (fields.iter().map(|f| f.name()).eq(["x0", "step", "y"])
@@ -259,7 +259,7 @@ impl DatasetDataType {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn is_complex(self) -> bool {
         matches!(
             self,
