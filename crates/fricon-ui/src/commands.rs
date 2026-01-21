@@ -5,7 +5,7 @@
 )]
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     io::Cursor,
     ops::Bound,
     sync::{Arc, LazyLock, Mutex, MutexGuard},
@@ -13,12 +13,12 @@ use std::{
 };
 
 use anyhow::Context;
-use arrow_array::{Array, ArrayRef, Float64Array, ListArray, RecordBatch, cast::AsArray};
+use arrow_array::RecordBatch;
 use arrow_ipc::writer::FileWriter;
 use arrow_select::concat::concat_batches;
 use chrono::{DateTime, Utc};
-use fricon::{DatasetDataType, DatasetSchema, DatasetUpdate, ScalarKind, SelectOptions};
-use serde::{Deserialize, Serialize, Serializer};
+use fricon::{DatasetDataType, DatasetSchema, DatasetUpdate, SelectOptions};
+use serde::{Deserialize, Serialize};
 use tauri::{
     State,
     ipc::{Channel, Invoke, Response},
@@ -27,6 +27,13 @@ use tokio::time;
 use tokio_util::sync::CancellationToken;
 
 use super::AppState;
+use crate::models::{
+    chart::{
+        DataOptions, DataResponse, ScatterMode, Type, build_heatmap_series, build_line_series,
+        build_scatter_series,
+    },
+    filter::{DataInternal, TableData, process_filter_rows},
+};
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
@@ -35,7 +42,7 @@ struct Error(#[from] anyhow::Error);
 impl Serialize for Error {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         serializer.serialize_str(&self.0.to_string())
     }
@@ -84,274 +91,10 @@ struct DatasetDataOptions {
     columns: Option<Vec<usize>>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum ChartType {
-    Line,
-    Heatmap,
-    Scatter,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum ScatterMode {
-    Complex,
-    TraceXy,
-    Xy,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-enum ComplexViewOption {
-    Real,
-    Imag,
-    Mag,
-    Arg,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ChartDataOptions {
-    chart_type: ChartType,
-    series: Option<String>,
-    x_column: Option<String>,
-    y_column: Option<String>,
-    scatter_mode: Option<ScatterMode>,
-    scatter_series: Option<String>,
-    scatter_x_column: Option<String>,
-    scatter_y_column: Option<String>,
-    scatter_trace_x_column: Option<String>,
-    scatter_trace_y_column: Option<String>,
-    scatter_bin_column: Option<String>,
-    complex_views: Option<Vec<ComplexViewOption>>,
-    complex_view_single: Option<ComplexViewOption>,
-    start: Option<usize>,
-    end: Option<usize>,
-    /// Indices of chosen values for each filter field
-    index_filters: Option<Vec<usize>>,
-    exclude_columns: Option<Vec<String>>,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct ChartSeries {
-    name: String,
-    data: Vec<Vec<f64>>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ChartDataResponse {
-    r#type: ChartType,
-    x_name: String,
-    y_name: Option<String>,
-    series: Vec<ChartSeries>,
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DatasetWriteProgress {
     row_count: usize,
-}
-
-#[derive(Serialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-struct FilterTableRow {
-    display_values: Vec<String>,
-    value_indices: Vec<usize>,
-    index: usize,
-}
-
-#[derive(Serialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-struct ColumnUniqueValue {
-    index: usize,
-    display_value: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct FilterTableData {
-    fields: Vec<String>,
-    rows: Vec<FilterTableRow>,
-    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
-}
-
-struct ProcessedFilterRows {
-    unique_rows: Vec<FilterTableRow>,
-    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
-    column_raw_values: HashMap<String, Vec<serde_json::Value>>,
-}
-
-struct FilterDataInternal {
-    fields: Vec<String>,
-    unique_rows: Vec<FilterTableRow>,
-    column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
-    column_raw_values: HashMap<String, Vec<serde_json::Value>>,
-}
-
-fn format_json_value(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::Null => "null".to_string(),
-        serde_json::Value::String(s) => s.clone(),
-        other => other.to_string(),
-    }
-}
-
-fn column_data_type(schema: &DatasetSchema, name: &str) -> Result<DatasetDataType, Error> {
-    let (_, _, data_type) = schema
-        .columns()
-        .get_full(name)
-        .with_context(|| format!("Column '{name}' not found"))?;
-    Ok(*data_type)
-}
-
-fn is_complex_type(data_type: DatasetDataType) -> bool {
-    matches!(
-        data_type,
-        DatasetDataType::Scalar(ScalarKind::Complex)
-            | DatasetDataType::Trace(_, ScalarKind::Complex)
-    )
-}
-
-fn collect_float_values(array: &ArrayRef) -> Result<Vec<f64>, Error> {
-    let float_array: &Float64Array = array
-        .as_primitive_opt()
-        .ok_or_else(|| Error(anyhow::anyhow!("Expected Float64 array")))?;
-    Ok(float_array.values().iter().copied().collect())
-}
-
-fn collect_complex_components(array: &ArrayRef) -> Result<(Vec<f64>, Vec<f64>), Error> {
-    let struct_array = array
-        .as_struct_opt()
-        .ok_or_else(|| Error(anyhow::anyhow!("Expected complex struct array")))?;
-    let real_array: &Float64Array = struct_array
-        .column(0)
-        .as_primitive_opt()
-        .ok_or_else(|| Error(anyhow::anyhow!("Expected real component array")))?;
-    let imag_array: &Float64Array = struct_array
-        .column(1)
-        .as_primitive_opt()
-        .ok_or_else(|| Error(anyhow::anyhow!("Expected imag component array")))?;
-    Ok((
-        real_array.values().iter().copied().collect(),
-        imag_array.values().iter().copied().collect(),
-    ))
-}
-
-fn transform_complex_values(reals: &[f64], imags: &[f64], option: ComplexViewOption) -> Vec<f64> {
-    match option {
-        ComplexViewOption::Real => reals.to_vec(),
-        ComplexViewOption::Imag => imags.to_vec(),
-        ComplexViewOption::Mag => reals
-            .iter()
-            .zip(imags)
-            .map(|(re, im)| (re * re + im * im).sqrt())
-            .collect(),
-        ComplexViewOption::Arg => reals
-            .iter()
-            .zip(imags)
-            .map(|(re, im)| im.atan2(*re))
-            .collect(),
-    }
-}
-
-fn concat_record_batches(
-    schema: &Arc<arrow_schema::Schema>,
-    batches: &[RecordBatch],
-) -> Result<RecordBatch, Error> {
-    if batches.is_empty() {
-        return Ok(RecordBatch::new_empty(schema.clone()));
-    }
-    concat_batches(schema, batches)
-        .context("Failed to concat batches")
-        .map_err(Error::from)
-}
-
-fn extract_trace_row(
-    trace_array: &ArrayRef,
-    row: usize,
-) -> Result<Option<(Vec<f64>, ArrayRef)>, Error> {
-    if let Some(list_array) = trace_array.as_list_opt::<i32>() {
-        if list_array.is_null(row) {
-            return Ok(None);
-        }
-        let values = list_array.value(row);
-        #[expect(
-            clippy::cast_precision_loss,
-            reason = "Trace indices are bounded by record batch sizes"
-        )]
-        let x = (0..values.len()).map(|i| i as f64).collect();
-        return Ok(Some((x, values)));
-    }
-
-    if let Some(struct_array) = trace_array.as_struct_opt() {
-        if struct_array.is_null(row) {
-            return Ok(None);
-        }
-        let names: Vec<&str> = struct_array
-            .fields()
-            .iter()
-            .map(|f| f.name().as_str())
-            .collect();
-        if names == ["x0", "step", "y"] {
-            let x0_array: &Float64Array = struct_array
-                .column(0)
-                .as_primitive_opt()
-                .ok_or_else(|| Error(anyhow::anyhow!("Expected x0 array")))?;
-            let step_array: &Float64Array = struct_array
-                .column(1)
-                .as_primitive_opt()
-                .ok_or_else(|| Error(anyhow::anyhow!("Expected step array")))?;
-            let y_array: &ListArray = struct_array
-                .column(2)
-                .as_list_opt()
-                .ok_or_else(|| Error(anyhow::anyhow!("Expected y list array")))?;
-            if y_array.is_null(row) {
-                return Ok(None);
-            }
-            let y_values = y_array.value(row);
-            let x0 = x0_array.value(row);
-            let step = step_array.value(row);
-            #[expect(
-                clippy::cast_precision_loss,
-                reason = "Trace indices are bounded by record batch sizes"
-            )]
-            let x = (0..y_values.len())
-                .map(|i| x0 + (i as f64) * step)
-                .collect();
-            return Ok(Some((x, y_values)));
-        }
-        if names == ["x", "y"] {
-            let x_array: &ListArray = struct_array
-                .column(0)
-                .as_list_opt()
-                .ok_or_else(|| Error(anyhow::anyhow!("Expected x list array")))?;
-            let y_array: &ListArray = struct_array
-                .column(1)
-                .as_list_opt()
-                .ok_or_else(|| Error(anyhow::anyhow!("Expected y list array")))?;
-            if x_array.is_null(row) || y_array.is_null(row) {
-                return Ok(None);
-            }
-            let x_values = x_array.value(row);
-            let y_values = y_array.value(row);
-            let x = collect_float_values(&x_values)?;
-            return Ok(Some((x, y_values)));
-        }
-        return Err(Error(anyhow::anyhow!("Unsupported trace struct layout")));
-    }
-
-    Err(Error(anyhow::anyhow!("Unsupported trace data type")))
-}
-
-fn complex_view_label(option: ComplexViewOption) -> &'static str {
-    match option {
-        ComplexViewOption::Real => "real",
-        ComplexViewOption::Imag => "imag",
-        ComplexViewOption::Mag => "mag",
-        ComplexViewOption::Arg => "arg",
-    }
 }
 
 fn column_index(schema: &DatasetSchema, name: &str) -> Result<usize, Error> {
@@ -370,17 +113,20 @@ fn push_column(columns: &mut Vec<usize>, index: usize) {
 
 fn build_chart_selected_columns(
     schema: &DatasetSchema,
-    options: &ChartDataOptions,
+    options: &DataOptions,
 ) -> Result<Vec<usize>, Error> {
     let mut selected = Vec::new();
     match options.chart_type {
-        ChartType::Line => {
+        Type::Line => {
             let series_name = options
                 .series
                 .as_ref()
                 .context("Line chart requires a series column")?;
             let series_index = column_index(schema, series_name)?;
-            let data_type = column_data_type(schema, series_name)?;
+            let data_type = *schema
+                .columns()
+                .get(series_name)
+                .context("Column not found")?;
             push_column(&mut selected, series_index);
             if !matches!(data_type, DatasetDataType::Trace(_, _)) {
                 let x_name = options
@@ -391,13 +137,16 @@ fn build_chart_selected_columns(
                 push_column(&mut selected, x_index);
             }
         }
-        ChartType::Heatmap => {
+        Type::Heatmap => {
             let series_name = options
                 .series
                 .as_ref()
                 .context("Heatmap chart requires a series column")?;
             let series_index = column_index(schema, series_name)?;
-            let data_type = column_data_type(schema, series_name)?;
+            let data_type = *schema
+                .columns()
+                .get(series_name)
+                .context("Column not found")?;
             push_column(&mut selected, series_index);
             let y_name = options
                 .y_column
@@ -414,7 +163,7 @@ fn build_chart_selected_columns(
                 push_column(&mut selected, x_index);
             }
         }
-        ChartType::Scatter => {
+        Type::Scatter => {
             let mode = options.scatter_mode.unwrap_or(ScatterMode::Complex);
             match mode {
                 ScatterMode::Complex => {
@@ -458,322 +207,12 @@ fn build_chart_selected_columns(
     Ok(selected)
 }
 
-fn build_line_series(
-    batch: &RecordBatch,
-    schema: &DatasetSchema,
-    options: &ChartDataOptions,
-) -> Result<ChartDataResponse, Error> {
-    let series_name = options
-        .series
-        .as_ref()
-        .context("Line chart requires a series column")?;
-    let data_type = column_data_type(schema, series_name)?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
-    let is_complex = is_complex_type(data_type);
-    let x_name = if is_trace {
-        format!("{series_name} - X")
-    } else {
-        options.x_column.clone().unwrap_or_else(|| "X".to_string())
-    };
-
-    let series_array = batch
-        .column_by_name(series_name)
-        .cloned()
-        .with_context(|| format!("Series column '{series_name}' not found"))?;
-
-    let (x_values, y_values_array) = if is_trace {
-        if batch.num_rows() != 1 {
-            return Err(Error(anyhow::anyhow!(format!(
-                "Trace series should fetch exactly 1 row, actual: {}",
-                batch.num_rows()
-            ))));
-        }
-        extract_trace_row(&series_array, 0)?.context("Trace series row is null")?
-    } else {
-        let x_column = options
-            .x_column
-            .as_ref()
-            .context("Line chart requires x column")?;
-        let x_array = batch
-            .column_by_name(x_column)
-            .cloned()
-            .with_context(|| format!("X column '{x_column}' not found"))?;
-        (collect_float_values(&x_array)?, series_array)
-    };
-
-    let series = if is_complex {
-        let (reals, imags) = collect_complex_components(&y_values_array)?;
-        let view_options = options
-            .complex_views
-            .clone()
-            .unwrap_or_else(|| vec![ComplexViewOption::Real, ComplexViewOption::Imag]);
-        view_options
-            .into_iter()
-            .map(|option| {
-                let y_values = transform_complex_values(&reals, &imags, option);
-                let len = x_values.len().min(y_values.len());
-                let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
-                ChartSeries {
-                    name: format!("{series_name} ({})", complex_view_label(option)),
-                    data,
-                }
-            })
-            .collect()
-    } else {
-        let y_values = collect_float_values(&y_values_array)?;
-        let len = x_values.len().min(y_values.len());
-        vec![ChartSeries {
-            name: series_name.clone(),
-            data: (0..len).map(|i| vec![x_values[i], y_values[i]]).collect(),
-        }]
-    };
-
-    Ok(ChartDataResponse {
-        r#type: ChartType::Line,
-        x_name,
-        y_name: None,
-        series,
-    })
-}
-
-fn build_heatmap_series(
-    batch: &RecordBatch,
-    schema: &DatasetSchema,
-    options: &ChartDataOptions,
-) -> Result<ChartDataResponse, Error> {
-    let series_name = options
-        .series
-        .as_ref()
-        .context("Heatmap chart requires a series column")?;
-    let y_column = options
-        .y_column
-        .as_ref()
-        .context("Heatmap chart requires y column")?;
-    let data_type = column_data_type(schema, series_name)?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
-    let is_complex = is_complex_type(data_type);
-    let x_name = if is_trace {
-        format!("{series_name} - X")
-    } else {
-        options.x_column.clone().unwrap_or_else(|| "X".to_string())
-    };
-
-    let series_array = batch
-        .column_by_name(series_name)
-        .cloned()
-        .with_context(|| format!("Series column '{series_name}' not found"))?;
-    let view_option = options
-        .complex_view_single
-        .unwrap_or(ComplexViewOption::Mag);
-
-    let series = if is_trace {
-        let y_array = batch
-            .column_by_name(y_column)
-            .cloned()
-            .with_context(|| format!("Y column '{y_column}' not found"))?;
-        let y_values = collect_float_values(&y_array)?;
-        let mut data = Vec::new();
-        for row in 0..batch.num_rows() {
-            let Some((x_values, trace_values)) = extract_trace_row(&series_array, row)? else {
-                continue;
-            };
-            let y_value = *y_values.get(row).unwrap_or(&0.0);
-            if is_complex {
-                let (reals, imags) = collect_complex_components(&trace_values)?;
-                let z_values = transform_complex_values(&reals, &imags, view_option);
-                let len = x_values.len().min(z_values.len());
-                for i in 0..len {
-                    data.push(vec![x_values[i], y_value, z_values[i]]);
-                }
-            } else {
-                let z_values = collect_float_values(&trace_values)?;
-                let len = x_values.len().min(z_values.len());
-                for i in 0..len {
-                    data.push(vec![x_values[i], y_value, z_values[i]]);
-                }
-            }
-        }
-        let name = if is_complex {
-            format!("{series_name} ({})", complex_view_label(view_option))
-        } else {
-            series_name.clone()
-        };
-        vec![ChartSeries { name, data }]
-    } else {
-        let x_column = options
-            .x_column
-            .as_ref()
-            .context("Heatmap chart requires x column")?;
-        let x_array = batch
-            .column_by_name(x_column)
-            .cloned()
-            .with_context(|| format!("X column '{x_column}' not found"))?;
-        let y_array = batch
-            .column_by_name(y_column)
-            .cloned()
-            .with_context(|| format!("Y column '{y_column}' not found"))?;
-        let x_values = collect_float_values(&x_array)?;
-        let y_values = collect_float_values(&y_array)?;
-        let data = if is_complex {
-            let (reals, imags) = collect_complex_components(&series_array)?;
-            let z_values = transform_complex_values(&reals, &imags, view_option);
-            let len = x_values.len().min(y_values.len()).min(z_values.len());
-            (0..len)
-                .map(|i| vec![x_values[i], y_values[i], z_values[i]])
-                .collect()
-        } else {
-            let z_values = collect_float_values(&series_array)?;
-            let len = x_values.len().min(y_values.len()).min(z_values.len());
-            (0..len)
-                .map(|i| vec![x_values[i], y_values[i], z_values[i]])
-                .collect()
-        };
-        let name = if is_complex {
-            format!("{series_name} ({})", complex_view_label(view_option))
-        } else {
-            series_name.clone()
-        };
-        vec![ChartSeries { name, data }]
-    };
-
-    Ok(ChartDataResponse {
-        r#type: ChartType::Heatmap,
-        x_name,
-        y_name: Some(y_column.clone()),
-        series,
-    })
-}
-
-#[expect(clippy::too_many_lines, reason = "Chart series assembly is verbose")]
-fn build_scatter_series(
-    batch: &RecordBatch,
-    schema: &DatasetSchema,
-    options: &ChartDataOptions,
-) -> Result<ChartDataResponse, Error> {
-    let mode = options.scatter_mode.unwrap_or(ScatterMode::Complex);
-    let mut series_map: HashMap<String, Vec<Vec<f64>>> = HashMap::new();
-    let (x_name, y_name) = match mode {
-        ScatterMode::Complex => {
-            let series_name = options
-                .scatter_series
-                .as_ref()
-                .context("Scatter complex mode requires series column")?;
-            let data_type = column_data_type(schema, series_name)?;
-            let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
-            let series_array = batch
-                .column_by_name(series_name)
-                .cloned()
-                .with_context(|| format!("Series column '{series_name}' not found"))?;
-            let mut data = Vec::new();
-            if is_trace {
-                for row in 0..batch.num_rows() {
-                    let Some((_x_values, trace_values)) = extract_trace_row(&series_array, row)?
-                    else {
-                        continue;
-                    };
-                    let (reals, imags) = collect_complex_components(&trace_values)?;
-                    let len = reals.len().min(imags.len());
-                    for i in 0..len {
-                        data.push(vec![reals[i], imags[i]]);
-                    }
-                }
-            } else {
-                let (reals, imags) = collect_complex_components(&series_array)?;
-                let len = reals.len().min(imags.len());
-                for i in 0..len {
-                    data.push(vec![reals[i], imags[i]]);
-                }
-            }
-            series_map.insert(series_name.clone(), data);
-            (
-                format!("{series_name} (real)"),
-                format!("{series_name} (imag)"),
-            )
-        }
-        ScatterMode::TraceXy => {
-            let trace_x = options
-                .scatter_trace_x_column
-                .as_ref()
-                .context("Scatter trace_xy requires trace x column")?;
-            let trace_y = options
-                .scatter_trace_y_column
-                .as_ref()
-                .context("Scatter trace_xy requires trace y column")?;
-            let x_array = batch
-                .column_by_name(trace_x)
-                .cloned()
-                .with_context(|| format!("Trace x column '{trace_x}' not found"))?;
-            let y_array = batch
-                .column_by_name(trace_y)
-                .cloned()
-                .with_context(|| format!("Trace y column '{trace_y}' not found"))?;
-            let mut data = Vec::new();
-            for row in 0..batch.num_rows() {
-                let Some((_x_axis, x_values_array)) = extract_trace_row(&x_array, row)? else {
-                    continue;
-                };
-                let Some((_y_axis, y_values_array)) = extract_trace_row(&y_array, row)? else {
-                    continue;
-                };
-                let x_values = collect_float_values(&x_values_array)?;
-                let y_values = collect_float_values(&y_values_array)?;
-                let len = x_values.len().min(y_values.len());
-                for i in 0..len {
-                    data.push(vec![x_values[i], y_values[i]]);
-                }
-            }
-            let series_name = format!("{trace_x} vs {trace_y}");
-            series_map.insert(series_name.clone(), data);
-            (trace_x.clone(), trace_y.clone())
-        }
-        ScatterMode::Xy => {
-            let x_column = options
-                .scatter_x_column
-                .as_ref()
-                .context("Scatter xy requires x column")?;
-            let y_column = options
-                .scatter_y_column
-                .as_ref()
-                .context("Scatter xy requires y column")?;
-            let x_array = batch
-                .column_by_name(x_column)
-                .cloned()
-                .with_context(|| format!("X column '{x_column}' not found"))?;
-            let y_array = batch
-                .column_by_name(y_column)
-                .cloned()
-                .with_context(|| format!("Y column '{y_column}' not found"))?;
-            let x_values = collect_float_values(&x_array)?;
-            let y_values = collect_float_values(&y_array)?;
-            let len = x_values.len().min(y_values.len());
-            let data = (0..len)
-                .map(|i| vec![x_values[i], y_values[i]])
-                .collect::<Vec<_>>();
-            let series_name = format!("{x_column} vs {y_column}");
-            series_map.insert(series_name.clone(), data);
-            (x_column.clone(), y_column.clone())
-        }
-    };
-
-    let series = series_map
-        .into_iter()
-        .map(|(name, data)| ChartSeries { name, data })
-        .collect();
-
-    Ok(ChartDataResponse {
-        r#type: ChartType::Scatter,
-        x_name,
-        y_name: Some(y_name),
-        series,
-    })
-}
-
 #[tauri::command]
 async fn dataset_chart_data(
     state: State<'_, AppState>,
     id: i32,
-    options: ChartDataOptions,
-) -> Result<ChartDataResponse, Error> {
+    options: DataOptions,
+) -> Result<DataResponse, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let start = options.start.map_or(Bound::Unbounded, Bound::Included);
@@ -800,84 +239,17 @@ async fn dataset_chart_data(
             selected_columns: Some(selected_columns),
         })
         .context("Failed to select data.")?;
-    let batch = concat_record_batches(&output_schema, &batches)?;
+
+    let batch = if batches.is_empty() {
+        RecordBatch::new_empty(output_schema)
+    } else {
+        concat_batches(&output_schema, &batches).context("Failed to concat batches")?
+    };
 
     match options.chart_type {
-        ChartType::Line => build_line_series(&batch, schema, &options),
-        ChartType::Heatmap => build_heatmap_series(&batch, schema, &options),
-        ChartType::Scatter => build_scatter_series(&batch, schema, &options),
-    }
-}
-
-fn process_filter_rows(
-    fields: &[String],
-    json_rows: Vec<serde_json::Map<String, serde_json::Value>>,
-) -> ProcessedFilterRows {
-    let mut unique_rows = Vec::new();
-    let mut seen_keys = HashSet::new();
-    let mut column_unique_values: HashMap<String, Vec<ColumnUniqueValue>> =
-        fields.iter().map(|f| (f.clone(), Vec::new())).collect();
-    let mut column_raw_values: HashMap<String, Vec<serde_json::Value>> =
-        fields.iter().map(|f| (f.clone(), Vec::new())).collect();
-
-    for (global_row_idx, json_row) in json_rows.into_iter().enumerate() {
-        // Extract values in field order
-        let values: Vec<serde_json::Value> = fields
-            .iter()
-            .map(|field| {
-                json_row
-                    .get(field)
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null)
-            })
-            .collect();
-
-        // Create key for deduplication
-        let key = serde_json::to_string(&values).unwrap_or_default();
-
-        if !seen_keys.contains(&key) {
-            seen_keys.insert(key);
-            let display_values = values.iter().map(format_json_value).collect();
-            let mut value_indices = Vec::with_capacity(values.len());
-
-            // Collect unique values per column and track indices
-            for (col_idx, value) in values.iter().enumerate() {
-                if let Some(field_name) = fields.get(col_idx) {
-                    let raw_values = column_raw_values
-                        .get_mut(field_name)
-                        .expect("Field should exist in column_raw_values");
-
-                    let index = if let Some(pos) = raw_values.iter().position(|v| v == value) {
-                        pos
-                    } else {
-                        let new_index = raw_values.len();
-                        raw_values.push(value.clone());
-
-                        let display_value = format_json_value(value);
-                        column_unique_values
-                            .get_mut(field_name)
-                            .expect("Field should exist in column_unique_values")
-                            .push(ColumnUniqueValue {
-                                index: new_index,
-                                display_value,
-                            });
-                        new_index
-                    };
-                    value_indices.push(index);
-                }
-            }
-
-            unique_rows.push(FilterTableRow {
-                display_values,
-                value_indices,
-                index: global_row_idx,
-            });
-        }
-    }
-    ProcessedFilterRows {
-        unique_rows,
-        column_unique_values,
-        column_raw_values,
+        Type::Line => build_line_series(&batch, schema, &options).map_err(Error::from),
+        Type::Heatmap => build_heatmap_series(&batch, schema, &options).map_err(Error::from),
+        Type::Scatter => build_scatter_series(&batch, schema, &options).map_err(Error::from),
     }
 }
 
@@ -940,11 +312,7 @@ async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDe
         .enumerate()
         .map(|(i, (name, data_type))| ColumnInfo {
             name: name.to_owned(),
-            is_complex: matches!(
-                data_type,
-                DatasetDataType::Scalar(ScalarKind::Complex)
-                    | DatasetDataType::Trace(_, ScalarKind::Complex)
-            ),
+            is_complex: data_type.is_complex(),
             is_trace: matches!(data_type, DatasetDataType::Trace(_, _)),
             is_index: index.as_ref().is_some_and(|index| index.contains(&i)),
         })
@@ -1000,14 +368,13 @@ async fn get_filter_data_internal(
     state: &AppState,
     id: i32,
     exclude_columns: Option<Vec<String>>,
-) -> Result<FilterDataInternal, Error> {
+) -> Result<DataInternal, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let index_columns = dataset.index_columns();
 
-    // Get index column indices
     let Some(index_col_indices) = index_columns else {
-        return Ok(FilterDataInternal {
+        return Ok(DataInternal {
             fields: vec![],
             unique_rows: vec![],
             column_unique_values: HashMap::new(),
@@ -1015,7 +382,6 @@ async fn get_filter_data_internal(
         });
     };
 
-    // Filter out X column from index columns
     let filtered_indices: Vec<usize> = index_col_indices
         .iter()
         .filter(|&&i| {
@@ -1030,7 +396,7 @@ async fn get_filter_data_internal(
         .collect();
 
     if filtered_indices.is_empty() {
-        return Ok(FilterDataInternal {
+        return Ok(DataInternal {
             fields: vec![],
             unique_rows: vec![],
             column_unique_values: HashMap::new(),
@@ -1038,13 +404,11 @@ async fn get_filter_data_internal(
         });
     }
 
-    // Get field names
     let fields: Vec<String> = filtered_indices
         .iter()
         .filter_map(|&i| schema.columns().keys().nth(i).cloned())
         .collect();
 
-    // Fetch index column data
     let (_, batches) = dataset
         .select_data(&SelectOptions {
             start: Bound::Unbounded,
@@ -1054,7 +418,6 @@ async fn get_filter_data_internal(
         })
         .context("Failed to select index data.")?;
 
-    // Convert batches to JSON rows using arrow_json ArrayWriter
     let mut buf = Vec::new();
     {
         let mut writer = arrow_json::ArrayWriter::new(&mut buf);
@@ -1066,10 +429,8 @@ async fn get_filter_data_internal(
     let json_rows: Vec<serde_json::Map<String, serde_json::Value>> =
         serde_json::from_slice(&buf).context("Failed to parse JSON")?;
 
-    // Process rows: deduplicate and compute unique values and raw values for
-    // indexing
     let processed = process_filter_rows(&fields, json_rows);
-    Ok(FilterDataInternal {
+    Ok(DataInternal {
         fields,
         unique_rows: processed.unique_rows,
         column_unique_values: processed.column_unique_values,
@@ -1103,7 +464,6 @@ async fn build_filter_batch(
         return Ok(None);
     }
 
-    // Build filter schema from the dataset schema (only include filter fields)
     let projection_indices: Vec<usize> = filter_map
         .keys()
         .map(|field_name| {
@@ -1118,12 +478,9 @@ async fn build_filter_batch(
             .context("Failed to project arrow schema")?,
     );
 
-    // Convert HashMap to JSON array (single row)
     let json_row = serde_json::Value::Object(filter_map);
-    // serialize as single object (NDJSON style) for arrow_json Reader
     let json_array = serde_json::to_vec(&json_row).context("Failed to serialize filter to JSON")?;
 
-    // Use arrow_json::ReaderBuilder to decode with schema
     let mut reader = arrow_json::ReaderBuilder::new(filter_schema)
         .build(Cursor::new(json_array))
         .context("Failed to create JSON reader")?;
@@ -1182,10 +539,10 @@ async fn get_filter_table_data(
     state: State<'_, AppState>,
     id: i32,
     options: FilterTableOptions,
-) -> Result<FilterTableData, Error> {
+) -> Result<TableData, Error> {
     let filter_data = get_filter_data_internal(&state, id, options.exclude_columns).await?;
 
-    Ok(FilterTableData {
+    Ok(TableData {
         fields: filter_data.fields,
         rows: filter_data.unique_rows,
         column_unique_values: filter_data.column_unique_values,
@@ -1204,7 +561,7 @@ async fn subscribe_dataset_update(
         let channel_id = on_update.id();
         subscriptions_mut().insert(channel_id, token.clone());
         tokio::spawn(async move {
-            token
+            let _ = token
                 .run_until_cancelled(async move {
                     while watcher.changed().await.is_ok() {
                         let msg = DatasetWriteProgress {

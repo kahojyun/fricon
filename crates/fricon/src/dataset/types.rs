@@ -145,27 +145,28 @@ impl TraceKind {
         Field::new(name, self.to_data_type(item), nullable).with_extension_type(self)
     }
 
-    fn parse_data_type(data_type: &DataType) -> Option<(Self, &FieldRef)> {
-        fn parse_fixed_step(fields: &[FieldRef]) -> Option<(TraceKind, &FieldRef)> {
+    #[must_use]
+    pub fn parse_data_type(data_type: &DataType) -> Option<(TraceKind, &Field)> {
+        fn parse_fixed_step(fields: &[FieldRef]) -> Option<(TraceKind, &Field)> {
             (fields.iter().map(|f| f.name()).eq(["x0", "step", "y"])
                 && fields.iter().all(|f| !f.is_nullable()))
             .then(|| match [0, 1, 2].map(|i| fields[i].data_type()) {
                 [DataType::Float64, DataType::Float64, DataType::List(y)] => {
-                    Some((TraceKind::FixedStep, y))
+                    Some((TraceKind::FixedStep, y.as_ref()))
                 }
                 _ => None,
             })
             .flatten()
         }
 
-        fn parse_variable_step(fields: &[FieldRef]) -> Option<(TraceKind, &FieldRef)> {
+        fn parse_variable_step(fields: &[FieldRef]) -> Option<(TraceKind, &Field)> {
             (fields.iter().map(|f| f.name()).eq(["x", "y"])
                 && fields.iter().all(|f| !f.is_nullable()))
             .then(|| match [0, 1].map(|i| fields[i].data_type()) {
                 [DataType::List(x), DataType::List(y)]
                     if matches!(x.data_type(), DataType::Float64) && !x.is_nullable() =>
                 {
-                    Some((TraceKind::VariableStep, y))
+                    Some((TraceKind::VariableStep, y.as_ref()))
                 }
                 _ => None,
             })
@@ -173,7 +174,7 @@ impl TraceKind {
         }
 
         match data_type {
-            DataType::List(f) => Some((TraceKind::Simple, f)),
+            DataType::List(f) => Some((TraceKind::Simple, f.as_ref())),
             DataType::Struct(fs) => parse_fixed_step(fs).or_else(|| parse_variable_step(fs)),
             _ => None,
         }
@@ -256,6 +257,15 @@ impl DatasetDataType {
                 trace_kind.to_field(name, Arc::new(scalar_kind.to_item_field()), nullable)
             }
         }
+    }
+
+    #[must_use]
+    pub fn is_complex(self) -> bool {
+        matches!(
+            self,
+            DatasetDataType::Scalar(ScalarKind::Complex)
+                | DatasetDataType::Trace(_, ScalarKind::Complex)
+        )
     }
 }
 
