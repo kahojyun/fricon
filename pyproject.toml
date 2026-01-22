@@ -58,6 +58,9 @@ docs = [
     "mkdocstrings-python>=1.12.2",
 ]
 
+[tool.uv]
+config-settings = { build-args = "--profile=dev" }
+
 [tool.maturin]
 module-name = "fricon._core"
 python-source = "crates/fricon-py/python"
