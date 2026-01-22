@@ -1,4 +1,4 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
   ChartOptions,
@@ -108,20 +108,13 @@ export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
   });
 }
 
-export interface DatasetWriteProgress {
+export interface DatasetWriteStatus {
   rowCount: number;
+  isComplete: boolean;
 }
 
-export async function subscribeDatasetUpdate(
-  id: number,
-  callback: (e: DatasetWriteProgress) => unknown,
-) {
-  const onUpdate = new Channel<DatasetWriteProgress>();
-  onUpdate.onmessage = callback;
-  await invoke("subscribe_dataset_update", { id, onUpdate });
-  return async () => {
-    await invoke("unsubscribe_dataset_update", { channelId: onUpdate.id });
-  };
+export function getDatasetWriteStatus(id: number): Promise<DatasetWriteStatus> {
+  return invoke<DatasetWriteStatus>("get_dataset_write_status", { id });
 }
 
 export interface FilterTableRow {

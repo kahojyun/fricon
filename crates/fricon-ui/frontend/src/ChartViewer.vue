@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   computed,
-  onUnmounted,
   onWatcherCleanup,
   ref,
   shallowRef,
@@ -16,9 +15,9 @@ import {
   getDatasetDetail,
   getFilterTableData,
   fetchChartData,
-  subscribeDatasetUpdate,
+  getDatasetWriteStatus,
 } from "@/backend.ts";
-import { useThrottleFn, watchDebounced, watchThrottled } from "@vueuse/core";
+import { watchDebounced, watchThrottled } from "@vueuse/core";
 import ChartWrapper from "./components/ChartWrapper.vue";
 import FilterTable from "./components/FilterTable.vue";
 import Checkbox from "primevue/checkbox";
@@ -45,7 +44,6 @@ const datasetDetail = shallowRef<DatasetDetail>();
 const filterTableData = shallowRef<FilterTableData>();
 const excludeColumns = ref<string[]>([]);
 const datasetUpdateTick = ref(0);
-let unsubscribe: (() => Promise<void>) | undefined;
 
 // ============================================================================
 // Chart Configuration
@@ -248,8 +246,6 @@ watchThrottled(
     let aborted = false;
     onWatcherCleanup(() => (aborted = true));
 
-    await unsubscribe?.();
-
     const newDetail = await getDatasetDetail(newId);
     if (aborted) return;
 
@@ -258,24 +254,44 @@ watchThrottled(
     });
     if (aborted) return;
 
-    const updateCallback = useThrottleFn(async () => {
-      const v = await getFilterTableData(newId, {
-        excludeColumns: excludeColumns.value,
-      });
-      filterTableData.value = v;
-      datasetUpdateTick.value += 1;
-    }, 1000);
-
-    unsubscribe = await subscribeDatasetUpdate(newId, updateCallback);
     datasetDetail.value = newDetail;
     filterTableData.value = newFilterTableData;
+
+    // Start polling for updates if dataset is still being written
+    const poll = async () => {
+      while (!aborted) {
+        const { isComplete } = await getDatasetWriteStatus(newId);
+        if (aborted) return;
+
+        if (isComplete) {
+          // Final refresh and stop polling
+          const pollDetail = await getDatasetDetail(newId);
+          if (aborted) return;
+          const pollFilter = await getFilterTableData(newId, {
+            excludeColumns: excludeColumns.value,
+          });
+          if (aborted) return;
+          datasetDetail.value = pollDetail;
+          filterTableData.value = pollFilter;
+          datasetUpdateTick.value += 1;
+          break;
+        }
+
+        // Refresh data and continue polling
+        const pollFilter = await getFilterTableData(newId, {
+          excludeColumns: excludeColumns.value,
+        });
+        if (aborted) return;
+        filterTableData.value = pollFilter;
+        datasetUpdateTick.value += 1;
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    };
+    poll();
   },
   { throttle: 100, immediate: true },
 );
-
-onUnmounted(async () => {
-  await unsubscribe?.();
-});
 
 // Update excludeColumns when axis or chart type changes
 watch(

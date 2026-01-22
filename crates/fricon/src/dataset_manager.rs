@@ -440,6 +440,10 @@ impl DatasetReader {
         &self.schema
     }
     #[must_use]
+    pub fn num_rows(&self) -> usize {
+        self.source.num_rows()
+    }
+    #[must_use]
     pub fn arrow_schema(&self) -> &SchemaRef {
         &self.arrow_schema
     }
