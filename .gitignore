@@ -38,8 +38,6 @@ __pycache__/
 .eslintcache
 
 # Editor & Tool cache
-CLAUDE.md
-.claude/
 .serena/
 .qoder/
 
