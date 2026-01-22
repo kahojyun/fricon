@@ -40,6 +40,7 @@ impl WriteSession {
     }
 
     pub fn finish(self) -> Result<(), Error> {
+        self.in_progress_table_mut().mark_complete();
         self.writer.finish()?;
         Ok(())
     }
@@ -58,5 +59,9 @@ pub struct WriteSessionHandle(Arc<Mutex<InProgressTable>>);
 impl WriteSessionHandle {
     pub fn inner(&self) -> MutexGuard<'_, InProgressTable> {
         self.0.lock().expect("Should be poisoned")
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.0.lock().expect("Should not be poisoned").is_complete()
     }
 }

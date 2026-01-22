@@ -538,13 +538,7 @@ async fn get_dataset_write_status(
     id: i32,
 ) -> Result<DatasetWriteStatus, Error> {
     let dataset = state.dataset(id).await?;
-    let watcher = dataset.subscribe();
-    let is_complete = watcher.is_none();
-    let row_count = if let Some(w) = watcher {
-        w.borrow().row_count
-    } else {
-        dataset.num_rows()
-    };
+    let (row_count, is_complete) = dataset.write_status();
     Ok(DatasetWriteStatus {
         row_count,
         is_complete,
