@@ -15,21 +15,21 @@ repos:
       - id: check-added-large-files
         exclude: crates/fricon-ui/icons/.*
   - repo: https://github.com/crate-ci/typos
-    rev: 90356c2064dddca5f04a5ee3deaecb1784ba692d  # frozen: v1
+    rev: 65120634e79d8374d1aa2f27e54baa0c364fff5a  # frozen: typos-v0.10.40
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: e5ef0574ef824f2a51084062e6506068e458126e  # frozen: 0.9.24
+    rev: 8afdb18d56d3bd3edea0c4ddde96965d6894f5f3  # frozen: 0.9.26
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 6ce4b4fc349b8881cbce40207dac3bf78824a88e  # frozen: v0.14.11
+    rev: 9b1e9a33f1b33f6ecc2fdbb8d7cc894e951106e4  # frozen: v0.14.13
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: ef33b2d7a105065b31aedaec9a74ed6f5cb6877b  # frozen: 4.0.0a2
+    rev: 30e0e576b9d8e7e53fb02677bbd4ba1a49decc6b  # frozen: 4.0.0
     hooks:
       - id: sqlfluff-lint
       - id: sqlfluff-fix
