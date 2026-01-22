@@ -29,11 +29,10 @@ use derive_more::From;
 use diesel::result::Error as DieselError;
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
-use tokio::{sync::watch, task::JoinError};
+use tokio::task::JoinError;
 use tracing::error;
 use uuid::Uuid;
 
-use self::in_progress::WriteProgress;
 pub use self::write_registry::WriteSessionRegistry;
 use crate::{
     DatasetDataType, DatasetSchema,
@@ -250,16 +249,25 @@ enum DatasetSource {
 }
 
 impl DatasetSource {
+    fn is_complete(&self) -> bool {
+        match self {
+            DatasetSource::WriteSession(h) => h.is_complete(),
+            DatasetSource::File(_) => true,
+        }
+    }
+    fn write_status(&self) -> (usize, bool) {
+        match self {
+            DatasetSource::WriteSession(h) => {
+                let inner = h.inner();
+                (inner.num_rows(), inner.is_complete())
+            }
+            DatasetSource::File(r) => (r.num_rows(), true),
+        }
+    }
     fn num_rows(&self) -> usize {
         match self {
             DatasetSource::WriteSession(h) => h.inner().num_rows(),
             DatasetSource::File(r) => r.num_rows(),
-        }
-    }
-    fn subscribe(&self) -> Option<watch::Receiver<WriteProgress>> {
-        match self {
-            DatasetSource::WriteSession(h) => Some(h.inner().subscribe()),
-            DatasetSource::File(_) => None,
         }
     }
     fn range<R>(&self, range: R) -> Vec<RecordBatch>
@@ -444,12 +452,16 @@ impl DatasetReader {
         self.source.num_rows()
     }
     #[must_use]
-    pub fn arrow_schema(&self) -> &SchemaRef {
-        &self.arrow_schema
+    pub fn is_complete(&self) -> bool {
+        self.source.is_complete()
     }
     #[must_use]
-    pub fn subscribe(&self) -> Option<watch::Receiver<WriteProgress>> {
-        self.source.subscribe()
+    pub fn write_status(&self) -> (usize, bool) {
+        self.source.write_status()
+    }
+    #[must_use]
+    pub fn arrow_schema(&self) -> &SchemaRef {
+        &self.arrow_schema
     }
     #[must_use]
     pub fn batches(&self) -> Vec<RecordBatch> {
