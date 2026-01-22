@@ -82,7 +82,6 @@ missing_errors_doc = "allow"
 ## style
 absolute_paths = "warn"
 mod_module_files = "warn"
-module_name_repetitions = "warn"
 unused_result_ok = "warn"
 ## quality
 allow_attributes = "warn"
