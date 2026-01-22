@@ -46,30 +46,12 @@ pnpm run test
 pnpm run bench
 ```
 
-## Coding Style & Naming Conventions
-
-- **Rust**: Uses `rustfmt` and `clippy` with pedantic linting enabled. Follow Rust conventions, avoid `unwrap()`, `dbg_macro`, and `todo` macros.
-- **Python**: Uses `ruff` for formatting and linting. Follow PEP 8 conventions.
-- **Frontend**: Uses `prettier` and `eslint` with TypeScript.
-- All commits should follow conventional format: `type(scope): description`
-
 ## Testing Guidelines
 
 - **Testing Frameworks**: Rust (`cargo test`), Python (`pytest`), Frontend (`vitest`)
-- **Coverage**: Write tests for new functionality when possible
+- **Coverage**: Write tests for critical paths
 - **Test Location**:
     - Rust unit tests in `mod tests`, integration tests in `<crate>/tests`
     - Python tests in `crates/fricon-py/tests/`
     - Frontend tests in `crates/fricon-ui/frontend/src/**/__tests__`
 - **Running**: Use `cargo test` for Rust, `uv run pytest` for Python, `pnpm run test` for Frontend
-
-## Commit & Pull Request Guidelines
-
-- **Conventional Commits**: Use `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore` prefixes
-- **Branch Strategy**: Feature/bugfix branches from `main`
-- **PR Requirements**:
-    - Pass all linters and tests
-    - Include tests for new features
-    - Update documentation if behavior changes
-    - Clear description of changes
-- **Pre-commit**: Automatic formatting and linting checks enforced via CI
