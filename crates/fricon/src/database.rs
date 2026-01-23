@@ -12,6 +12,7 @@ use diesel::{
     RunQueryDsl, SqliteConnection,
     connection::SimpleConnection,
     migration::MigrationSource,
+    prelude::*,
     r2d2,
     r2d2::{ConnectionManager, CustomizeConnection},
     result::Error as DieselError,
@@ -118,4 +119,24 @@ fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()
         .bind::<Text, _>(backup_path_str)
         .execute(conn)?;
     Ok(())
+}
+
+/// Updates all datasets with 'writing' status to 'aborted' status
+/// This should be called during service startup to handle interrupted writes
+pub fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, DatabaseError> {
+    use self::schema::datasets::dsl::{datasets, status};
+
+    let mut conn = pool.get()?;
+    let updated_count = diesel::update(datasets.filter(status.eq(DatasetStatus::Writing)))
+        .set(status.eq(DatasetStatus::Aborted))
+        .execute(&mut conn)?;
+
+    if updated_count > 0 {
+        info!(
+            "Updated {} datasets from 'writing' to 'aborted' status",
+            updated_count
+        );
+    }
+
+    Ok(updated_count)
 }

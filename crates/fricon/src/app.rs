@@ -54,6 +54,12 @@ impl AppState {
             .paths()
             .database_backup_file(Local::now().naive_local());
         let database = database::connect(db_path, backup_path)?;
+
+        // Clean up any datasets that were left in 'writing' state
+        if let Err(e) = database::cleanup_writing_datasets(&database) {
+            error!("Failed to cleanup writing datasets: {}", e);
+        }
+
         let shutdown_token = CancellationToken::new();
         let tracker = TaskTracker::new();
         let (event_sender, _) = broadcast::channel(1000);
