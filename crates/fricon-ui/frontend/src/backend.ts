@@ -11,12 +11,15 @@ export interface WorkspaceInfo {
   path: string;
 }
 
+export type DatasetStatus = "Writing" | "Completed" | "Aborted";
+
 interface RawDatasetInfo {
   id: number;
   name: string;
   description: string;
   favorite: boolean;
   tags: string[];
+  status: DatasetStatus;
   createdAt: string;
 }
 
@@ -26,6 +29,7 @@ export interface DatasetInfo {
   description: string;
   favorite: boolean;
   tags: string[];
+  status: DatasetStatus;
   createdAt: Date;
 }
 

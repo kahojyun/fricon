@@ -11,7 +11,7 @@ use arrow_array::RecordBatch;
 use arrow_ipc::writer::FileWriter;
 use arrow_select::concat::concat_batches;
 use chrono::{DateTime, Utc};
-use fricon::{DatasetDataType, DatasetSchema, DatasetUpdate, SelectOptions};
+use fricon::{DatasetDataType, DatasetSchema, DatasetStatus, DatasetUpdate, SelectOptions};
 use serde::{Deserialize, Serialize};
 use tauri::{
     State,
@@ -48,6 +48,7 @@ pub struct DatasetInfo {
     pub description: String,
     pub favorite: bool,
     pub tags: Vec<String>,
+    pub status: DatasetStatus,
     pub created_at: DateTime<Utc>,
 }
 
@@ -287,6 +288,7 @@ async fn list_datasets(
             description: record.metadata.description,
             favorite: record.metadata.favorite,
             tags: record.metadata.tags,
+            status: record.metadata.status,
             created_at: record.metadata.created_at,
         })
         .collect();
