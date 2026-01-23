@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import {
   type DatasetInfo,
+  type DatasetStatus,
   listDatasets,
   onDatasetCreated,
   updateDatasetFavorite,
@@ -32,9 +33,36 @@ const filteredDatasets = computed(() =>
 
 let unsubscribe: (() => void) | null = null;
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
+let statusRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const loadDatasets = async () => {
   datasets.value = await listDatasets(searchQuery.value, selectedTags.value);
+};
+
+const statusSeverity = (status: DatasetStatus) => {
+  switch (status) {
+    case "Writing":
+      return "info";
+    case "Completed":
+      return "success";
+    case "Aborted":
+      return "danger";
+    default:
+      return "secondary";
+  }
+};
+
+const startStatusPolling = () => {
+  if (statusRefreshTimer) return;
+  statusRefreshTimer = setInterval(() => {
+    void loadDatasets();
+  }, 2000);
+};
+
+const stopStatusPolling = () => {
+  if (!statusRefreshTimer) return;
+  clearInterval(statusRefreshTimer);
+  statusRefreshTimer = null;
 };
 
 const handleDatasetCreated = (event: DatasetInfo) => {
@@ -56,6 +84,7 @@ onUnmounted(() => {
   if (searchDebounce) {
     clearTimeout(searchDebounce);
   }
+  stopStatusPolling();
 });
 
 watch([searchQuery, selectedTags], () => {
@@ -66,6 +95,21 @@ watch([searchQuery, selectedTags], () => {
     void loadDatasets();
   }, 300);
 });
+
+watch(
+  datasets,
+  (nextDatasets) => {
+    const hasWriting = nextDatasets.some(
+      (dataset) => dataset.status === "Writing",
+    );
+    if (hasWriting) {
+      startStatusPolling();
+    } else {
+      stopStatusPolling();
+    }
+  },
+  { deep: true },
+);
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.metaKey || event.ctrlKey) {
@@ -134,6 +178,14 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
       </Column>
       <Column field="id" header="ID" />
       <Column field="name" header="Name" />
+      <Column field="status" header="Status" class="w-36">
+        <template #body="slotProps">
+          <Tag
+            :value="slotProps.data.status"
+            :severity="statusSeverity(slotProps.data.status)"
+          />
+        </template>
+      </Column>
       <Column field="tags" header="Tags">
         <template #body="slotProps">
           <Tag

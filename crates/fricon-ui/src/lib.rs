@@ -54,6 +54,7 @@ impl AppState {
                         description,
                         favorite,
                         tags,
+                        status,
                         created_at,
                     } => {
                         let _ = app_handle.emit(
@@ -64,6 +65,7 @@ impl AppState {
                                 description,
                                 favorite,
                                 tags,
+                                status,
                                 created_at,
                             },
                         );

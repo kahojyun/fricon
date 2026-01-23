@@ -13,8 +13,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info};
 
 use crate::{
-    database,
-    database::Pool,
+    database::{self, DatasetStatus, Pool},
     dataset_manager::{DatasetManager, WriteSessionRegistry},
     server,
     workspace::{WorkspacePaths, WorkspaceRoot},
@@ -28,6 +27,7 @@ pub enum AppEvent {
         description: String,
         favorite: bool,
         tags: Vec<String>,
+        status: DatasetStatus,
         created_at: DateTime<Utc>,
     },
 }

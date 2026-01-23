@@ -44,6 +44,7 @@ pub fn do_create_dataset(
         description: request.description,
         favorite: dataset.favorite,
         tags: request.tags,
+        status: dataset.status,
         created_at: dataset.created_at.and_utc(),
     };
     let _ = event_sender.send(event);
