@@ -72,11 +72,15 @@ export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
 export async function listDatasets(
   search?: string,
   tags?: string[],
+  limit?: number,
+  offset?: number,
 ): Promise<DatasetInfo[]> {
   const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets", {
     options: {
       search: search?.trim() || undefined,
       tags: tags && tags.length > 0 ? tags : undefined,
+      limit,
+      offset,
     },
   });
   return rawDatasets.map((dataset) => ({

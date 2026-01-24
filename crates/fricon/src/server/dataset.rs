@@ -334,10 +334,14 @@ impl DatasetService for Storage {
         &self,
         _request: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
-        let records = self.manager.list_datasets(None, None).await.map_err(|e| {
-            error!("Failed to list datasets: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
+        let records = self
+            .manager
+            .list_datasets(None, None, None, None)
+            .await
+            .map_err(|e| {
+                error!("Failed to list datasets: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
         let datasets = records
             .into_iter()
             .map(Into::<proto::Dataset>::into)
