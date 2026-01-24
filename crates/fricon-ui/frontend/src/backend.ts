@@ -44,6 +44,8 @@ export interface DatasetDetail {
   columns: ColumnInfo[];
 }
 
+export const DATASET_PAGE_SIZE = 200;
+
 export interface ChartDataOptions {
   chartType: ChartType;
   series?: string;

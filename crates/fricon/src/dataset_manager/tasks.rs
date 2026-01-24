@@ -12,7 +12,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    WorkspaceRoot,
+    DEFAULT_DATASET_LIST_LIMIT, WorkspaceRoot,
     app::AppEvent,
     database::{self, DatasetStatus, NewDataset, Pool, SimpleUuid, schema},
     dataset_fs,
@@ -21,8 +21,6 @@ use crate::{
         write_registry::WriteSessionRegistry,
     },
 };
-
-const DEFAULT_DATASET_LIST_LIMIT: i64 = 200;
 
 /// Create a new dataset with the given request and data stream
 pub fn do_create_dataset(

@@ -25,7 +25,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    VERSION,
+    DEFAULT_DATASET_LIST_LIMIT, VERSION,
     database::DatasetStatus,
     dataset::{DatasetArray, DatasetRow, DatasetSchema},
     dataset_manager::DatasetRecord,
@@ -82,9 +82,18 @@ impl Client {
         self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
     }
 
-    pub async fn list_all_datasets(&self) -> Result<Vec<DatasetRecord>> {
-        // TODO: Implement pagination
-        let request = SearchRequest::default();
+    pub async fn list_all_datasets(
+        &self,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> Result<Vec<DatasetRecord>> {
+        let limit = limit.unwrap_or(DEFAULT_DATASET_LIST_LIMIT).max(0);
+        let page_size = i32::try_from(limit).unwrap_or(i32::MAX);
+        let page_token = offset.unwrap_or(0).max(0).to_string();
+        let request = SearchRequest {
+            page_size,
+            page_token,
+        };
         let response = self.dataset_service().search(request).await?;
         let records = response.into_inner().datasets;
         records.into_iter().map(TryInto::try_into).collect()

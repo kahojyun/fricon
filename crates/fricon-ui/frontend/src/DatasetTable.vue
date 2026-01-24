@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import {
   type DatasetInfo,
   type DatasetStatus,
+  DATASET_PAGE_SIZE,
   listDatasets,
   onDatasetCreated,
   updateDatasetFavorite,
@@ -17,8 +18,6 @@ const favoritesOnly = ref(false);
 const searchQuery = ref("");
 const selectedTags = ref<string[]>([]);
 const isLoading = ref(false);
-
-const PAGE_SIZE = 200;
 
 const tagOptions = computed(() => {
   const tagSet = new Set<string>();
@@ -46,7 +45,7 @@ const loadDatasets = async ({ append = false } = {}) => {
     const next = await listDatasets(
       searchQuery.value,
       selectedTags.value,
-      PAGE_SIZE,
+      DATASET_PAGE_SIZE,
       offset,
     );
     datasets.value = append ? [...datasets.value, ...next] : next;
@@ -59,7 +58,7 @@ const refreshDatasets = async () => {
   if (isLoading.value) return;
   isLoading.value = true;
   try {
-    const limit = Math.max(datasets.value.length, PAGE_SIZE);
+    const limit = Math.max(datasets.value.length, DATASET_PAGE_SIZE);
     datasets.value = await listDatasets(
       searchQuery.value,
       selectedTags.value,
