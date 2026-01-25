@@ -51,7 +51,12 @@ class DatasetManager:
         self,
         dataset_id: str | int,
     ) -> Dataset: ...
-    def list_all(self) -> pd.DataFrame: ...
+    def list_all(
+        self,
+        *,
+        limit: int | None = ...,
+        offset: int | None = ...,
+    ) -> pd.DataFrame: ...
 
 _ScalarT_co = TypeVar("_ScalarT_co", float, complex, covariant=True)
 _ArrowAnyArray: TypeAlias = pa.Array[Any]  # pyright: ignore[reportExplicitAny]

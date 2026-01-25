@@ -332,19 +332,48 @@ impl DatasetService for Storage {
 
     async fn search(
         &self,
-        _request: Request<SearchRequest>,
+        request: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
-        let records = self.manager.list_datasets(None, None).await.map_err(|e| {
-            error!("Failed to list datasets: {:?}", e);
-            Status::internal(e.to_string())
-        })?;
+        let request = request.into_inner();
+        let limit = if request.page_size > 0 {
+            Some(i64::from(request.page_size))
+        } else {
+            None
+        };
+        let offset = if request.page_token.trim().is_empty() {
+            None
+        } else {
+            Some(
+                request
+                    .page_token
+                    .parse::<i64>()
+                    .map_err(|_| Status::invalid_argument("invalid page_token"))?,
+            )
+        };
+        let records = self
+            .manager
+            .list_datasets(None, None, limit, offset)
+            .await
+            .map_err(|e| {
+                error!("Failed to list datasets: {:?}", e);
+                Status::internal(e.to_string())
+            })?;
+        let next_page_token = limit.and_then(|limit| {
+            let record_len = i64::try_from(records.len()).unwrap_or(i64::MAX);
+
+            if record_len < limit {
+                None
+            } else {
+                Some(offset.unwrap_or(0).saturating_add(limit).to_string())
+            }
+        });
         let datasets = records
             .into_iter()
             .map(Into::<proto::Dataset>::into)
             .collect();
         Ok(Response::new(SearchResponse {
             datasets,
-            ..Default::default()
+            next_page_token: next_page_token.unwrap_or_default(),
         }))
     }
 }

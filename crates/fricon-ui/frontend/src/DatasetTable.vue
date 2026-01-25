@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import {
   type DatasetInfo,
   type DatasetStatus,
+  DATASET_PAGE_SIZE,
   listDatasets,
   onDatasetCreated,
   updateDatasetFavorite,
@@ -16,6 +17,7 @@ const selectedDataset = shallowRef<DatasetInfo>();
 const favoritesOnly = ref(false);
 const searchQuery = ref("");
 const selectedTags = ref<string[]>([]);
+const isLoading = ref(false);
 
 const tagOptions = computed(() => {
   const tagSet = new Set<string>();
@@ -35,8 +37,37 @@ let unsubscribe: (() => void) | null = null;
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 let statusRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
-const loadDatasets = async () => {
-  datasets.value = await listDatasets(searchQuery.value, selectedTags.value);
+const loadDatasets = async ({ append = false } = {}) => {
+  if (isLoading.value) return;
+  isLoading.value = true;
+  try {
+    const offset = append ? datasets.value.length : 0;
+    const next = await listDatasets(
+      searchQuery.value,
+      selectedTags.value,
+      DATASET_PAGE_SIZE,
+      offset,
+    );
+    datasets.value = append ? [...datasets.value, ...next] : next;
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const refreshDatasets = async () => {
+  if (isLoading.value) return;
+  isLoading.value = true;
+  try {
+    const limit = Math.max(datasets.value.length, DATASET_PAGE_SIZE);
+    datasets.value = await listDatasets(
+      searchQuery.value,
+      selectedTags.value,
+      limit,
+      0,
+    );
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 const statusSeverity = (status: DatasetStatus) => {
@@ -55,7 +86,7 @@ const statusSeverity = (status: DatasetStatus) => {
 const startStatusPolling = () => {
   if (statusRefreshTimer) return;
   statusRefreshTimer = setInterval(() => {
-    void loadDatasets();
+    void refreshDatasets();
   }, 2000);
 };
 
@@ -95,6 +126,11 @@ watch([searchQuery, selectedTags], () => {
     void loadDatasets();
   }, 300);
 });
+
+const handleLazyLoad = (event: { first: number; last: number }) => {
+  if (event.last <= datasets.value.length) return;
+  void loadDatasets({ append: true });
+};
 
 watch(
   datasets,
@@ -158,6 +194,11 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
       removable-sort
       scrollable
       scroll-height="flex"
+      :virtual-scroller-options="{
+        itemSize: 40,
+        lazy: true,
+        onLazyLoad: handleLazyLoad,
+      }"
       @keydown.capture="handleKeydown"
       @row-select="emit('datasetSelected', $event.data.id)"
     >

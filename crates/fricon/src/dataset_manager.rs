@@ -161,6 +161,8 @@ impl DatasetManager {
         &self,
         search: Option<&str>,
         tags: Option<&[String]>,
+        limit: Option<i64>,
+        offset: Option<i64>,
     ) -> Result<Vec<DatasetRecord>, Error> {
         let search = search.map(str::to_string);
         let tags = tags.map(Vec::from);
@@ -170,6 +172,8 @@ impl DatasetManager {
                     &mut *state.database.get()?,
                     search.as_deref(),
                     tags.as_deref(),
+                    limit,
+                    offset,
                 )
             })?
             .await?

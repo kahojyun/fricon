@@ -34,5 +34,7 @@ pub use self::{
     workspace::{WorkspaceRoot, get_log_dir},
 };
 
+const DEFAULT_DATASET_LIST_LIMIT: i64 = 200;
+
 /// Version of fricon crate.
 const VERSION: &str = env!("CARGO_PKG_VERSION");

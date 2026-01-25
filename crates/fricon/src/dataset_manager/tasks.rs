@@ -12,7 +12,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    WorkspaceRoot,
+    DEFAULT_DATASET_LIST_LIMIT, WorkspaceRoot,
     app::AppEvent,
     database::{self, DatasetStatus, NewDataset, Pool, SimpleUuid, schema},
     dataset_fs,
@@ -130,6 +130,8 @@ pub fn do_list_datasets(
     conn: &mut SqliteConnection,
     search: Option<&str>,
     tags: Option<&[String]>,
+    limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<Vec<DatasetRecord>, Error> {
     let search = search.and_then(|value| {
         let trimmed = value.trim();
@@ -176,8 +178,12 @@ pub fn do_list_datasets(
         query = query.filter(schema::datasets::id.eq_any(ids));
     }
 
+    let limit = limit.unwrap_or(DEFAULT_DATASET_LIST_LIMIT).max(0);
+    let offset = offset.unwrap_or(0).max(0);
     let all_datasets = query
         .order(schema::datasets::id.desc())
+        .limit(limit)
+        .offset(offset)
         .select(database::Dataset::as_select())
         .load(conn)?;
 

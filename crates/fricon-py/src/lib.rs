@@ -134,14 +134,25 @@ impl DatasetManager {
         }
     }
 
-    /// List all datasets in the workspace.
+    /// List datasets in the workspace.
+    ///
+    /// Parameters:
+    ///     limit: Optional max number of datasets to return.
+    ///     offset: Optional offset for pagination.
     ///
     /// Returns:
-    ///     A pandas dataframe containing information of all datasets.
-    pub fn list_all(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    ///     A pandas dataframe containing information of datasets.
+    #[pyo3(signature = (*, limit = None, offset = None))]
+    pub fn list_all(
+        &self,
+        py: Python<'_>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> PyResult<Py<PyAny>> {
         static FROM_RECORDS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
-        let records = get_runtime().block_on(self.workspace.client.list_all_datasets())?;
+        let records =
+            get_runtime().block_on(self.workspace.client.list_all_datasets(limit, offset))?;
         let py_records = records.into_iter().map(
             |DatasetRecord {
                  id,
