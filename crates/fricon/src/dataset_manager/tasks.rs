@@ -5,7 +5,10 @@
 //! instead of a broad `AppState`, implementing the core business logic for
 //! dataset management with minimal dependencies.
 
-use arrow_array::RecordBatchReader;
+use std::path::PathBuf;
+
+use arrow_array::{RecordBatch, RecordBatchReader};
+use arrow_schema::SchemaRef;
 use diesel::prelude::*;
 use tokio::sync::broadcast;
 use tracing::info;
@@ -18,25 +21,119 @@ use crate::{
     dataset_fs,
     dataset_manager::{
         CreateDatasetRequest, DatasetId, DatasetReader, DatasetRecord, DatasetUpdate, Error,
-        write_registry::WriteSessionRegistry,
+        write_registry::{WriteSessionGuard, WriteSessionRegistry},
     },
 };
 
-/// Create a new dataset with the given request and data stream
-pub fn do_create_dataset(
-    database: &Pool,
-    root: &WorkspaceRoot,
-    event_sender: &broadcast::Sender<AppEvent>,
-    write_sessions: &WriteSessionRegistry,
+#[cfg_attr(test, mockall::automock)]
+pub trait DatasetRepo {
+    fn create_dataset_record(
+        &self,
+        request: &CreateDatasetRequest,
+        uid: Uuid,
+    ) -> Result<(database::Dataset, Vec<database::Tag>), Error>;
+    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), Error>;
+    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error>;
+}
+
+impl DatasetRepo for Pool {
+    fn create_dataset_record(
+        &self,
+        request: &CreateDatasetRequest,
+        uid: Uuid,
+    ) -> Result<(database::Dataset, Vec<database::Tag>), Error> {
+        create_dataset_db_record(&mut *self.get()?, request, uid)
+    }
+
+    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), Error> {
+        let mut conn = self.get()?;
+        database::Dataset::update_status(&mut conn, id, status)?;
+        Ok(())
+    }
+
+    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error> {
+        let mut conn = self.get()?;
+        do_get_dataset(&mut conn, id)
+    }
+}
+
+#[cfg_attr(test, mockall::automock)]
+pub trait DatasetStore {
+    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, Error>;
+}
+
+impl DatasetStore for WorkspaceRoot {
+    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, Error> {
+        let path = self.paths().dataset_path_from_uid(uid);
+        dataset_fs::create_dataset(&path)?;
+        Ok(path)
+    }
+}
+
+#[cfg_attr(test, mockall::automock)]
+pub trait DatasetEvents {
+    fn send_dataset_created(&self, event: AppEvent);
+}
+
+impl DatasetEvents for broadcast::Sender<AppEvent> {
+    fn send_dataset_created(&self, event: AppEvent) {
+        let _ = self.send(event);
+    }
+}
+
+#[cfg_attr(test, mockall::automock)]
+pub trait WriteSessionGuardOps {
+    fn write(&mut self, batch: RecordBatch) -> Result<(), Error>;
+    fn commit(self) -> Result<(), Error>;
+    fn abort(self) -> Result<(), Error>;
+}
+
+impl WriteSessionGuardOps for WriteSessionGuard {
+    fn write(&mut self, batch: RecordBatch) -> Result<(), Error> {
+        Self::write(self, batch)
+    }
+
+    fn commit(self) -> Result<(), Error> {
+        Self::commit(self)
+    }
+
+    fn abort(self) -> Result<(), Error> {
+        Self::abort(self)
+    }
+}
+
+pub trait WriteSessions {
+    type Guard: WriteSessionGuardOps;
+    fn start_session(&self, id: i32, path: PathBuf, schema: SchemaRef) -> Self::Guard;
+}
+
+impl WriteSessions for WriteSessionRegistry {
+    type Guard = WriteSessionGuard;
+
+    fn start_session(&self, id: i32, path: PathBuf, schema: SchemaRef) -> Self::Guard {
+        WriteSessionRegistry::start_session(self, id, path, schema)
+    }
+}
+
+pub fn create_dataset_with<R, S, E, W>(
+    repo: &R,
+    store: &S,
+    events: &E,
+    write_sessions: &W,
     request: CreateDatasetRequest,
     batches: impl RecordBatchReader,
-) -> Result<DatasetRecord, Error> {
+) -> Result<DatasetRecord, Error>
+where
+    R: DatasetRepo,
+    S: DatasetStore,
+    E: DatasetEvents,
+    W: WriteSessions,
+{
     let uid = Uuid::new_v4();
-    let dataset_path = root.paths().dataset_path_from_uid(uid);
+    let dataset_path = store.create_dataset_dir(uid)?;
 
     info!("Creating new dataset '{}' with uid: {}", request.name, uid);
-    dataset_fs::create_dataset(&dataset_path)?;
-    let (dataset, tags) = create_dataset_db_record(&mut *database.get()?, &request, uid)?;
+    let (dataset, tags) = repo.create_dataset_record(&request, uid)?;
 
     let event = AppEvent::DatasetCreated {
         id: dataset.id,
@@ -47,7 +144,7 @@ pub fn do_create_dataset(
         status: dataset.status,
         created_at: dataset.created_at.and_utc(),
     };
-    let _ = event_sender.send(event);
+    events.send_dataset_created(event);
 
     info!(
         "Created dataset with UUID: {} at path: {:?}",
@@ -56,39 +153,47 @@ pub fn do_create_dataset(
 
     let dataset_record = DatasetRecord::from_database_models(dataset, tags);
 
-    write_sessions.with_session(
-        dataset_record.id,
-        dataset_path,
-        batches.schema(),
-        move |session| {
-            let write_result = batches.into_iter().try_for_each(|batch| {
-                let batch = batch.map_err(|e| Error::BatchStream {
-                    message: e.to_string(),
-                })?;
-                session.write(batch)
-            });
-            let mut conn = database.get()?;
-            match write_result {
-                Ok(()) => {
-                    database::Dataset::update_status(
-                        &mut conn,
-                        dataset_record.id,
-                        DatasetStatus::Completed,
-                    )?;
-                    let updated_record =
-                        do_get_dataset(&mut conn, DatasetId::Id(dataset_record.id))?;
-                    Ok(updated_record)
-                }
-                Err(e) => {
-                    let _ = database::Dataset::update_status(
-                        &mut conn,
-                        dataset_record.id,
-                        DatasetStatus::Aborted,
-                    );
-                    Err(e)
-                }
+    let mut session =
+        write_sessions.start_session(dataset_record.id, dataset_path, batches.schema());
+    let write_result = batches.into_iter().try_for_each(|batch| {
+        let batch = batch.map_err(|e| Error::BatchStream {
+            message: e.to_string(),
+        })?;
+        session.write(batch)
+    });
+    match write_result {
+        Ok(()) => {
+            if let Err(e) = session.commit() {
+                let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
+                return Err(e);
             }
-        },
+            repo.update_status(dataset_record.id, DatasetStatus::Completed)?;
+            repo.get_dataset(DatasetId::Id(dataset_record.id))
+        }
+        Err(e) => {
+            let _ = session.abort();
+            let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
+            Err(e)
+        }
+    }
+}
+
+/// Create a new dataset with the given request and data stream
+pub fn do_create_dataset(
+    database: &Pool,
+    root: &WorkspaceRoot,
+    event_sender: &broadcast::Sender<AppEvent>,
+    write_sessions: &WriteSessionRegistry,
+    request: CreateDatasetRequest,
+    batches: impl RecordBatchReader,
+) -> Result<DatasetRecord, Error> {
+    create_dataset_with(
+        database,
+        root,
+        event_sender,
+        write_sessions,
+        request,
+        batches,
     )
 }
 
@@ -301,4 +406,224 @@ fn create_dataset_db_record(
 
         Ok((dataset, tags))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::RefCell, sync::Arc};
+
+    use arrow_array::{Int32Array, RecordBatch, RecordBatchIterator};
+    use arrow_schema::{ArrowError, DataType, Field, Schema};
+    use chrono::Utc;
+    use mockall::{Sequence, predicate::eq};
+
+    use super::*;
+
+    struct FakeWriteSessions {
+        guard: RefCell<Option<MockWriteSessionGuardOps>>,
+    }
+
+    impl FakeWriteSessions {
+        fn new(guard: MockWriteSessionGuardOps) -> Self {
+            Self {
+                guard: RefCell::new(Some(guard)),
+            }
+        }
+    }
+
+    impl WriteSessions for FakeWriteSessions {
+        type Guard = MockWriteSessionGuardOps;
+
+        fn start_session(&self, _id: i32, _path: PathBuf, _schema: SchemaRef) -> Self::Guard {
+            self.guard.borrow_mut().take().expect("guard")
+        }
+    }
+
+    fn dataset_from_request(
+        request: &CreateDatasetRequest,
+        uid: Uuid,
+        id: i32,
+        status: DatasetStatus,
+    ) -> database::Dataset {
+        database::Dataset {
+            id,
+            uid: database::SimpleUuid(uid),
+            name: request.name.clone(),
+            description: request.description.clone(),
+            favorite: false,
+            status,
+            created_at: Utc::now().naive_utc(),
+        }
+    }
+
+    fn setup_common_mocks(
+        seq: &mut Sequence,
+        dataset_id: i32,
+    ) -> (MockDatasetStore, MockDatasetRepo, MockDatasetEvents) {
+        let mut store = MockDatasetStore::new();
+        store
+            .expect_create_dataset_dir()
+            .times(1)
+            .in_sequence(seq)
+            .returning(|_| Ok(PathBuf::from("/tmp/fricon_test_dataset")));
+
+        let mut repo = MockDatasetRepo::new();
+        repo.expect_create_dataset_record()
+            .times(1)
+            .in_sequence(seq)
+            .returning(move |request, uid| {
+                let dataset =
+                    dataset_from_request(request, uid, dataset_id, DatasetStatus::Writing);
+                Ok((dataset, vec![]))
+            });
+
+        let mut events = MockDatasetEvents::new();
+        events
+            .expect_send_dataset_created()
+            .times(1)
+            .in_sequence(seq)
+            .returning(|_| ());
+
+        (store, repo, events)
+    }
+
+    fn sample_batch() -> (SchemaRef, RecordBatch) {
+        let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
+        let array = Arc::new(Int32Array::from(vec![1, 2, 3]));
+        let batch = RecordBatch::try_new(schema.clone(), vec![array]).expect("batch");
+        (schema, batch)
+    }
+
+    #[test]
+    fn create_success_commits_before_completed() {
+        let mut seq = Sequence::new();
+        let dataset_id = 1;
+
+        let (store, mut repo, events) = setup_common_mocks(&mut seq, dataset_id);
+
+        let mut guard = MockWriteSessionGuardOps::new();
+        guard
+            .expect_write()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_| Ok(()));
+        guard
+            .expect_commit()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|| Ok(()));
+
+        repo.expect_update_status()
+            .with(eq(dataset_id), eq(DatasetStatus::Completed))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Ok(()));
+        repo.expect_get_dataset()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                let dataset = database::Dataset {
+                    id: dataset_id,
+                    uid: database::SimpleUuid(Uuid::new_v4()),
+                    name: "name".to_string(),
+                    description: "desc".to_string(),
+                    favorite: false,
+                    status: DatasetStatus::Completed,
+                    created_at: Utc::now().naive_utc(),
+                };
+                Ok(DatasetRecord::from_database_models(dataset, vec![]))
+            });
+
+        let sessions = FakeWriteSessions::new(guard);
+
+        let (schema, batch) = sample_batch();
+        let batches = RecordBatchIterator::new(vec![Ok(batch)], schema);
+        let request = CreateDatasetRequest {
+            name: "name".to_string(),
+            description: "desc".to_string(),
+            tags: vec!["t1".to_string()],
+        };
+
+        let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn create_commit_failure_marks_aborted() {
+        let mut seq = Sequence::new();
+        let dataset_id = 1;
+
+        let (store, mut repo, events) = setup_common_mocks(&mut seq, dataset_id);
+
+        let mut guard = MockWriteSessionGuardOps::new();
+        guard
+            .expect_write()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_| Ok(()));
+        guard
+            .expect_commit()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|| {
+                Err(Error::BatchStream {
+                    message: "commit failed".to_string(),
+                })
+            });
+
+        repo.expect_update_status()
+            .with(eq(dataset_id), eq(DatasetStatus::Aborted))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Ok(()));
+
+        let sessions = FakeWriteSessions::new(guard);
+
+        let (schema, batch) = sample_batch();
+        let batches = RecordBatchIterator::new(vec![Ok(batch)], schema);
+        let request = CreateDatasetRequest {
+            name: "name".to_string(),
+            description: "desc".to_string(),
+            tags: vec![],
+        };
+
+        let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn create_batch_error_aborts_and_marks_aborted() {
+        let mut seq = Sequence::new();
+        let dataset_id = 1;
+
+        let (store, mut repo, events) = setup_common_mocks(&mut seq, dataset_id);
+
+        let mut guard = MockWriteSessionGuardOps::new();
+        guard
+            .expect_abort()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|| Ok(()));
+
+        repo.expect_update_status()
+            .with(eq(dataset_id), eq(DatasetStatus::Aborted))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Ok(()));
+        let sessions = FakeWriteSessions::new(guard);
+
+        let (schema, _batch) = sample_batch();
+        let batches = RecordBatchIterator::new(
+            vec![Err(ArrowError::ParseError("stream error".to_string()))],
+            schema,
+        );
+        let request = CreateDatasetRequest {
+            name: "name".to_string(),
+            description: "desc".to_string(),
+            tags: vec![],
+        };
+
+        let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
+        assert!(result.is_err());
+    }
 }

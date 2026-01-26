@@ -1,27 +1,20 @@
-use std::io::{Error as IoError, ErrorKind};
-
 use anyhow::bail;
-use arrow_ipc::reader::StreamReader;
-use futures::prelude::*;
-use tokio_util::{
-    io::{StreamReader as TokioStreamReader, SyncIoBridge},
-    sync::CancellationToken,
-};
+use tokio_util::sync::CancellationToken;
 use tonic::{Request, Response, Result, Status, Streaming};
-use tracing::{error, trace, warn};
+use tracing::{error, trace};
 use uuid::Uuid;
 
+use super::create_stream;
 use crate::{
     database::DatasetStatus,
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetRecord,
-        DatasetUpdate, Error,
+        DatasetId, DatasetManager, DatasetMetadata, DatasetRecord, DatasetUpdate, Error,
     },
     proto::{
-        self, AddTagsRequest, AddTagsResponse, CreateAbort, CreateMetadata, CreateRequest,
-        CreateResponse, DeleteRequest, DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest,
-        RemoveTagsResponse, SearchRequest, SearchResponse, UpdateRequest, UpdateResponse,
-        create_request::CreateMessage, dataset_service_server::DatasetService, get_request::IdEnum,
+        self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
+        DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest, RemoveTagsResponse,
+        SearchRequest, SearchResponse, UpdateRequest, UpdateResponse,
+        dataset_service_server::DatasetService, get_request::IdEnum,
     },
 };
 
@@ -153,94 +146,12 @@ impl DatasetService for Storage {
         request: Request<Streaming<CreateRequest>>,
     ) -> Result<Response<CreateResponse>> {
         trace!("create: {:?}", request);
-        let mut stream = request.into_inner();
-        let first_message = stream
-            .next()
-            .await
-            .ok_or_else(|| Status::invalid_argument("request stream is empty"))?
-            .map_err(|e| {
-                error!("Failed to read first message: {:?}", e);
-                Status::internal("failed to read first message")
-            })?;
-        let Some(CreateMessage::Metadata(CreateMetadata {
-            name,
-            description,
-            tags,
-        })) = first_message.create_message
-        else {
-            error!("First message must be CreateMetadata");
-            return Err(Status::invalid_argument(
-                "first message must be CreateMetadata",
-            ));
-        };
-
-        let bytes_stream = stream.map(|request| {
-            let request = request.map_err(|e| {
-                error!("Client connection error: {e:?}");
-                IoError::other(e)
-            })?;
-            match request.create_message {
-                Some(CreateMessage::Payload(data)) => Ok(data),
-                Some(CreateMessage::Metadata(_)) => {
-                    error!("Unexpected CreateMetadata message after the first message");
-                    Err(IoError::new(
-                        ErrorKind::InvalidInput,
-                        "unexpected CreateMetadata message after the first message",
-                    ))
-                }
-                Some(CreateMessage::Abort(CreateAbort { reason })) => {
-                    warn!("Client aborted the upload: {}", reason);
-                    Err(IoError::new(
-                        ErrorKind::UnexpectedEof,
-                        format!("client aborted the upload: {reason}"),
-                    ))
-                }
-                None => {
-                    error!("Empty CreateRequest message");
-                    Err(IoError::new(
-                        ErrorKind::InvalidInput,
-                        "empty CreateRequest message",
-                    ))
-                }
-            }
-        });
-
-        let abortable_stream = stream::unfold(
-            (bytes_stream, self.shutdown_token.clone(), false),
-            |(mut stream, token, cancelled)| async move {
-                if cancelled {
-                    return None;
-                }
-
-                tokio::select! {
-                    item = stream.next() => {
-                        item.map(|item| (item, (stream, token, false)))
-                    }
-                    () = token.cancelled() => {
-                        Some((
-                            Err(IoError::other(
-                                "Stream aborted because server is shutting down.")),
-                            (stream, token, true),
-                        ))
-                    }
-                }
-            },
-        )
-        .boxed();
-        let sync_reader = SyncIoBridge::new(TokioStreamReader::new(abortable_stream));
-        let batch_reader = || {
-            StreamReader::try_new(sync_reader, None).map_err(|e| Error::BatchStream {
-                message: e.to_string(),
-            })
-        };
-        let create_request = CreateDatasetRequest {
-            name,
-            description,
-            tags,
-        };
+        let stream = request.into_inner();
+        let create =
+            create_stream::parse_create_stream(stream, self.shutdown_token.clone()).await?;
         let record = self
             .manager
-            .create_dataset(create_request, batch_reader)
+            .create_dataset(create.request, create.reader)
             .await
             .map_err(|e| {
                 error!("Failed to write dataset: {:?}", e);
