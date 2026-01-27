@@ -8,7 +8,11 @@ import {
   onDatasetCreated,
   updateDatasetFavorite,
 } from "./backend";
+import { useRouter } from "vue-router";
 
+const props = defineProps<{
+  selectedDatasetId?: number;
+}>();
 const emit = defineEmits<{
   datasetSelected: [id: number];
 }>();
@@ -18,6 +22,17 @@ const favoritesOnly = ref(false);
 const searchQuery = ref("");
 const selectedTags = ref<string[]>([]);
 const isLoading = ref(false);
+const router = useRouter();
+
+const syncSelectedDataset = () => {
+  if (props.selectedDatasetId == null) {
+    selectedDataset.value = undefined;
+    return;
+  }
+  selectedDataset.value = datasets.value.find(
+    (dataset) => dataset.id === props.selectedDatasetId,
+  );
+};
 
 const tagOptions = computed(() => {
   const tagSet = new Set<string>();
@@ -49,6 +64,7 @@ const loadDatasets = async ({ append = false } = {}) => {
       offset,
     );
     datasets.value = append ? [...datasets.value, ...next] : next;
+    syncSelectedDataset();
   } finally {
     isLoading.value = false;
   }
@@ -65,6 +81,7 @@ const refreshDatasets = async () => {
       limit,
       0,
     );
+    syncSelectedDataset();
   } finally {
     isLoading.value = false;
   }
@@ -101,6 +118,7 @@ const handleDatasetCreated = (event: DatasetInfo) => {
   if (searchQuery.value.trim() || selectedTags.value.length > 0) {
     void loadDatasets();
   }
+  syncSelectedDataset();
 };
 
 onMounted(async () => {
@@ -127,6 +145,14 @@ watch([searchQuery, selectedTags], () => {
   }, 300);
 });
 
+watch(
+  () => props.selectedDatasetId,
+  () => {
+    syncSelectedDataset();
+  },
+  { immediate: true },
+);
+
 const handleLazyLoad = (event: { first: number; last: number }) => {
   if (event.last <= datasets.value.length) return;
   void loadDatasets({ append: true });
@@ -152,6 +178,13 @@ function handleKeydown(event: KeyboardEvent) {
     event.stopPropagation();
   }
 }
+
+const selectDataset = (id: number) => {
+  emit("datasetSelected", id);
+  if (router.currentRoute.value.params.id !== String(id)) {
+    void router.push({ name: "dataset", params: { id } });
+  }
+};
 
 const toggleFavorite = async (dataset: DatasetInfo) => {
   const nextFavorite = !dataset.favorite;
@@ -200,7 +233,7 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
         onLazyLoad: handleLazyLoad,
       }"
       @keydown.capture="handleKeydown"
-      @row-select="emit('datasetSelected', $event.data.id)"
+      @row-select="selectDataset($event.data.id)"
     >
       <Column header="Favorite" class="w-24">
         <template #body="slotProps">

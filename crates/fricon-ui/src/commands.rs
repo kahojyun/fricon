@@ -11,7 +11,9 @@ use arrow_array::RecordBatch;
 use arrow_ipc::writer::FileWriter;
 use arrow_select::concat::concat_batches;
 use chrono::{DateTime, Utc};
-use fricon::{DatasetDataType, DatasetSchema, DatasetStatus, DatasetUpdate, SelectOptions};
+use fricon::{
+    DatasetDataType, DatasetId, DatasetSchema, DatasetStatus, DatasetUpdate, SelectOptions,
+};
 use serde::{Deserialize, Serialize};
 use tauri::{
     State,
@@ -70,6 +72,13 @@ struct ColumnInfo {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DatasetDetail {
+    id: i32,
+    name: String,
+    description: String,
+    favorite: bool,
+    tags: Vec<String>,
+    status: DatasetStatus,
+    created_at: DateTime<Utc>,
     columns: Vec<ColumnInfo>,
 }
 
@@ -300,6 +309,12 @@ async fn list_datasets(
 
 #[tauri::command]
 async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDetail, Error> {
+    let app = state.app();
+    let dataset_manager = app.dataset_manager();
+    let record = dataset_manager
+        .get_dataset(DatasetId::Id(id))
+        .await
+        .context("Failed to load dataset metadata.")?;
     let reader = state.dataset(id).await?;
     let schema = reader.schema();
     let index = reader.index_columns();
@@ -314,7 +329,16 @@ async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDe
             is_index: index.as_ref().is_some_and(|index| index.contains(&i)),
         })
         .collect();
-    Ok(DatasetDetail { columns })
+    Ok(DatasetDetail {
+        id: record.id,
+        name: record.metadata.name,
+        description: record.metadata.description,
+        favorite: record.metadata.favorite,
+        tags: record.metadata.tags,
+        status: record.metadata.status,
+        created_at: record.metadata.created_at,
+        columns,
+    })
 }
 
 #[derive(Deserialize)]
@@ -342,6 +366,85 @@ async fn update_dataset_favorite(
         )
         .await
         .context("Failed to update dataset favorite status.")?;
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DatasetInfoUpdate {
+    name: Option<String>,
+    description: Option<String>,
+    favorite: Option<bool>,
+    tags: Option<Vec<String>>,
+}
+
+fn normalize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut unique = std::collections::BTreeSet::new();
+    for tag in tags {
+        let trimmed = tag.trim();
+        if !trimmed.is_empty() {
+            unique.insert(trimmed.to_string());
+        }
+    }
+    unique.into_iter().collect()
+}
+
+#[tauri::command]
+async fn update_dataset_info(
+    state: State<'_, AppState>,
+    id: i32,
+    update: DatasetInfoUpdate,
+) -> Result<(), Error> {
+    let app = state.app();
+    let dataset_manager = app.dataset_manager();
+
+    let current = dataset_manager
+        .get_dataset(DatasetId::Id(id))
+        .await
+        .context("Failed to load current dataset metadata.")?;
+
+    dataset_manager
+        .update_dataset(
+            id,
+            DatasetUpdate {
+                name: update.name,
+                description: update.description,
+                favorite: update.favorite,
+            },
+        )
+        .await
+        .context("Failed to update dataset metadata.")?;
+
+    if let Some(next_tags_raw) = update.tags {
+        let next_tags = normalize_tags(next_tags_raw);
+        let current_tags: std::collections::BTreeSet<_> =
+            current.metadata.tags.into_iter().collect();
+        let next_tags_set: std::collections::BTreeSet<_> = next_tags.into_iter().collect();
+
+        let to_add: Vec<String> = next_tags_set
+            .difference(&current_tags)
+            .cloned()
+            .collect();
+        let to_remove: Vec<String> = current_tags
+            .difference(&next_tags_set)
+            .cloned()
+            .collect();
+
+        if !to_add.is_empty() {
+            dataset_manager
+                .add_tags(id, to_add)
+                .await
+                .context("Failed to add dataset tags.")?;
+        }
+
+        if !to_remove.is_empty() {
+            dataset_manager
+                .remove_tags(id, to_remove)
+                .await
+                .context("Failed to remove dataset tags.")?;
+        }
+    }
+
     Ok(())
 }
 
@@ -558,6 +661,7 @@ pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
         dataset_chart_data,
         get_filter_table_data,
         update_dataset_favorite,
+        update_dataset_info,
         get_dataset_write_status
     ]
 }

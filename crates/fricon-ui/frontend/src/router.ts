@@ -7,6 +7,11 @@ const routes = [
     component: () => import("./DataViewer.vue"),
   },
   {
+    path: "/datasets/:id(\\d+)",
+    name: "dataset",
+    component: () => import("./DataViewer.vue"),
+  },
+  {
     path: "/credits",
     name: "credits",
     component: () => import("./AppCredits.vue"),
