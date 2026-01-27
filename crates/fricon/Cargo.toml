@@ -54,5 +54,8 @@ indexmap = { workspace = true }
 [build-dependencies]
 tonic-prost-build = { workspace = true }
 
+[dev-dependencies]
+mockall = { workspace = true }
+
 [lints]
 workspace = true

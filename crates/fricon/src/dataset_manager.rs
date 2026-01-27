@@ -261,16 +261,13 @@ impl DatasetSource {
     }
     fn write_status(&self) -> (usize, bool) {
         match self {
-            DatasetSource::WriteSession(h) => {
-                let inner = h.inner();
-                (inner.num_rows(), inner.is_complete())
-            }
+            DatasetSource::WriteSession(h) => h.snapshot_status(),
             DatasetSource::File(r) => (r.num_rows(), true),
         }
     }
     fn num_rows(&self) -> usize {
         match self {
-            DatasetSource::WriteSession(h) => h.inner().num_rows(),
+            DatasetSource::WriteSession(h) => h.num_rows(),
             DatasetSource::File(r) => r.num_rows(),
         }
     }
@@ -279,11 +276,7 @@ impl DatasetSource {
         R: RangeBounds<usize> + Copy,
     {
         match self {
-            DatasetSource::WriteSession(h) => h
-                .inner()
-                .range(range)
-                .map(std::borrow::Cow::into_owned)
-                .collect(),
+            DatasetSource::WriteSession(h) => h.snapshot_range(range),
             DatasetSource::File(r) => r.range(range).map(std::borrow::Cow::into_owned).collect(),
         }
     }
@@ -292,13 +285,8 @@ impl DatasetSource {
         let selected_columns = options.selected_columns.as_deref();
         let result = match self {
             DatasetSource::WriteSession(h) => {
-                let inner = h.inner();
-                select_data(
-                    inner.range((options.start, options.end)),
-                    inner.schema(),
-                    index_filters,
-                    selected_columns,
-                )
+                let (schema, batches) = h.snapshot_range_with_schema((options.start, options.end));
+                select_data_owned(batches, &schema, index_filters, selected_columns)
             }
             DatasetSource::File(r) => select_data(
                 r.range((options.start, options.end)),
@@ -426,9 +414,19 @@ fn select_data<'a>(
     Ok((output_schema, results))
 }
 
+fn select_data_owned(
+    batches: Vec<RecordBatch>,
+    source_schema: &SchemaRef,
+    index_filters: Option<&RecordBatch>,
+    selected_columns: Option<&[usize]>,
+) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::Error> {
+    let source = batches.into_iter().map(Cow::Owned);
+    select_data(source, source_schema, index_filters, selected_columns)
+}
+
 impl DatasetReader {
     fn from_handle(source: WriteSessionHandle) -> Result<Self, Error> {
-        let arrow_schema = source.inner().schema().clone();
+        let arrow_schema = source.schema();
         let schema = arrow_schema.as_ref().try_into()?;
         Ok(Self {
             source: DatasetSource::WriteSession(source),

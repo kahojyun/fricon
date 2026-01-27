@@ -1,4 +1,6 @@
 use std::{
+    borrow::Cow,
+    ops::RangeBounds,
     path::PathBuf,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -45,6 +47,11 @@ impl WriteSession {
         Ok(())
     }
 
+    pub fn abort(self) -> Result<(), Error> {
+        self.writer.finish()?;
+        Ok(())
+    }
+
     fn in_progress_table_mut(&self) -> MutexGuard<'_, InProgressTable> {
         self.in_progress_table
             .lock()
@@ -63,5 +70,36 @@ impl WriteSessionHandle {
 
     pub fn is_complete(&self) -> bool {
         self.0.lock().expect("Should not be poisoned").is_complete()
+    }
+
+    pub fn schema(&self) -> SchemaRef {
+        self.inner().schema().clone()
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.inner().num_rows()
+    }
+
+    pub fn snapshot_status(&self) -> (usize, bool) {
+        let inner = self.inner();
+        (inner.num_rows(), inner.is_complete())
+    }
+
+    pub fn snapshot_range<R>(&self, range: R) -> Vec<RecordBatch>
+    where
+        R: RangeBounds<usize> + Copy,
+    {
+        let inner = self.inner();
+        inner.range(range).map(Cow::into_owned).collect()
+    }
+
+    pub fn snapshot_range_with_schema<R>(&self, range: R) -> (SchemaRef, Vec<RecordBatch>)
+    where
+        R: RangeBounds<usize> + Copy,
+    {
+        let inner = self.inner();
+        let schema = inner.schema().clone();
+        let batches = inner.range(range).map(Cow::into_owned).collect();
+        (schema, batches)
     }
 }
