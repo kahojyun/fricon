@@ -27,9 +27,11 @@ cargo clippy --all-targets --all-features
 
 ### Python
 
+ALWAYS run `maturin develop` before running `pytest` unless you are sure that the Python bindings are up to date.
+
 ```bash
 # Run from repo root
-uv run maturin develop # Build Python extension for development
+uv run maturin develop
 uv run pytest
 uv run ruff format
 uv run ruff check
