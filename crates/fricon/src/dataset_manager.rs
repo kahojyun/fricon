@@ -182,7 +182,21 @@ impl DatasetManager {
     pub async fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_update_dataset(&mut *state.database.get()?, id, update)
+                let mut conn = state.database.get()?;
+                tasks::do_update_dataset(&mut conn, id, update)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+
+                let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
+                    id: record.id,
+                    name: record.metadata.name,
+                    description: record.metadata.description,
+                    favorite: record.metadata.favorite,
+                    tags: record.metadata.tags,
+                    status: record.metadata.status,
+                    created_at: record.metadata.created_at,
+                });
+
+                Ok(())
             })?
             .await?
     }
@@ -190,7 +204,21 @@ impl DatasetManager {
     pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_add_tags(&mut *state.database.get()?, id, &tags)
+                let mut conn = state.database.get()?;
+                tasks::do_add_tags(&mut conn, id, &tags)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+
+                let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
+                    id: record.id,
+                    name: record.metadata.name,
+                    description: record.metadata.description,
+                    favorite: record.metadata.favorite,
+                    tags: record.metadata.tags,
+                    status: record.metadata.status,
+                    created_at: record.metadata.created_at,
+                });
+
+                Ok(())
             })?
             .await?
     }
@@ -198,7 +226,21 @@ impl DatasetManager {
     pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_remove_tags(&mut *state.database.get()?, id, &tags)
+                let mut conn = state.database.get()?;
+                tasks::do_remove_tags(&mut conn, id, &tags)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+
+                let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
+                    id: record.id,
+                    name: record.metadata.name,
+                    description: record.metadata.description,
+                    favorite: record.metadata.favorite,
+                    tags: record.metadata.tags,
+                    status: record.metadata.status,
+                    created_at: record.metadata.created_at,
+                });
+
+                Ok(())
             })?
             .await?
     }

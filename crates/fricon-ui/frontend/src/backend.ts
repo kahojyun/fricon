@@ -140,6 +140,15 @@ export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
   });
 }
 
+export function onDatasetUpdated(callback: (event: DatasetInfo) => void) {
+  return listen<RawDatasetInfo>("dataset-updated", (event) => {
+    callback({
+      ...event.payload,
+      createdAt: new Date(event.payload.createdAt),
+    });
+  });
+}
+
 export interface DatasetWriteStatus {
   rowCount: number;
   isComplete: boolean;

@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  shallowRef,
+  watch,
+} from "vue";
 import {
   type DatasetInfo,
   type DatasetStatus,
   DATASET_PAGE_SIZE,
   listDatasets,
   onDatasetCreated,
+  onDatasetUpdated,
   updateDatasetFavorite,
 } from "./backend";
 import { useRouter } from "vue-router";
@@ -23,6 +32,7 @@ const searchQuery = ref("");
 const selectedTags = ref<string[]>([]);
 const isLoading = ref(false);
 const router = useRouter();
+const dataTableRef = ref<any>(null);
 
 const syncSelectedDataset = () => {
   if (props.selectedDatasetId == null) {
@@ -48,7 +58,8 @@ const filteredDatasets = computed(() =>
     : datasets.value,
 );
 
-let unsubscribe: (() => void) | null = null;
+let unsubscribeCreated: (() => void) | null = null;
+let unsubscribeUpdated: (() => void) | null = null;
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 let statusRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -70,8 +81,20 @@ const loadDatasets = async ({ append = false } = {}) => {
   }
 };
 
-const refreshDatasets = async () => {
+const getScrollContainer = (): HTMLElement | null => {
+  const root = dataTableRef.value?.$el as HTMLElement | undefined;
+  if (!root) return null;
+  return (
+    root.querySelector(".p-datatable-wrapper .p-virtualscroller") ??
+    root.querySelector(".p-datatable-wrapper")
+  );
+};
+
+const refreshDatasets = async ({ preserveScroll = true } = {}) => {
   if (isLoading.value) return;
+  const previousScrollTop = preserveScroll
+    ? (getScrollContainer()?.scrollTop ?? 0)
+    : 0;
   isLoading.value = true;
   try {
     const limit = Math.max(datasets.value.length, DATASET_PAGE_SIZE);
@@ -85,6 +108,12 @@ const refreshDatasets = async () => {
   } finally {
     isLoading.value = false;
   }
+
+  if (!preserveScroll) return;
+  await nextTick();
+  const nextContainer = getScrollContainer();
+  if (!nextContainer) return;
+  nextContainer.scrollTop = previousScrollTop;
 };
 
 const statusSeverity = (status: DatasetStatus) => {
@@ -121,15 +150,31 @@ const handleDatasetCreated = (event: DatasetInfo) => {
   syncSelectedDataset();
 };
 
+const handleDatasetUpdated = (event: DatasetInfo) => {
+  const index = datasets.value.findIndex((dataset) => dataset.id === event.id);
+  if (index >= 0) {
+    datasets.value[index] = event;
+    syncSelectedDataset();
+    return;
+  }
+
+  if (!searchQuery.value.trim() && selectedTags.value.length === 0) {
+    datasets.value.unshift(event);
+    syncSelectedDataset();
+  }
+};
+
 onMounted(async () => {
   await loadDatasets();
 
-  // Listen for dataset created events
-  unsubscribe = await onDatasetCreated(handleDatasetCreated);
+  // Listen for dataset create/update events
+  unsubscribeCreated = await onDatasetCreated(handleDatasetCreated);
+  unsubscribeUpdated = await onDatasetUpdated(handleDatasetUpdated);
 });
 
 onUnmounted(() => {
-  unsubscribe?.();
+  unsubscribeCreated?.();
+  unsubscribeUpdated?.();
   if (searchDebounce) {
     clearTimeout(searchDebounce);
   }
@@ -196,6 +241,10 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
     throw error;
   }
 };
+
+defineExpose({
+  refreshDatasets,
+});
 </script>
 <template>
   <div class="flex h-full flex-col">
@@ -219,6 +268,7 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
       />
     </div>
     <DataTable
+      ref="dataTableRef"
       v-model:selection="selectedDataset"
       :value="filteredDatasets"
       size="small"

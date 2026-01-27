@@ -5,7 +5,6 @@ import { ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 const datasetId = ref<number>();
-const datasetTableKey = ref(0);
 const route = useRoute();
 const router = useRouter();
 
@@ -27,16 +26,11 @@ const handleDatasetSelected = (id: number) => {
     void router.push({ name: "dataset", params: { id } });
   }
 };
-
-const handleDatasetUpdated = () => {
-  datasetTableKey.value += 1;
-};
 </script>
 <template>
   <Splitter class="size-full overflow-hidden select-none">
     <SplitterPanel>
       <DatasetTable
-        :key="datasetTableKey"
         :selected-dataset-id="datasetId"
         @dataset-selected="handleDatasetSelected"
       />
@@ -46,7 +40,6 @@ const handleDatasetUpdated = () => {
       <DatasetDetailPage
         v-else
         :dataset-id="datasetId"
-        @dataset-updated="handleDatasetUpdated"
       />
     </SplitterPanel>
   </Splitter>

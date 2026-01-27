@@ -30,6 +30,15 @@ pub enum AppEvent {
         status: DatasetStatus,
         created_at: DateTime<Utc>,
     },
+    DatasetUpdated {
+        id: i32,
+        name: String,
+        description: String,
+        favorite: bool,
+        tags: Vec<String>,
+        status: DatasetStatus,
+        created_at: DateTime<Utc>,
+    },
 }
 
 #[derive(Debug, Error)]
