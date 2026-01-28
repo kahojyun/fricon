@@ -36,12 +36,35 @@ use uuid::Uuid;
 pub use self::write_registry::WriteSessionRegistry;
 use crate::{
     DatasetDataType, DatasetSchema,
-    app::{AppError, AppHandle},
+    app::{AppError, AppHandle, AppState},
     database::{self, DatabaseError, DatasetStatus},
     dataset, dataset_fs,
     dataset_fs::ChunkReader,
     dataset_manager::write_session::WriteSessionHandle,
 };
+
+fn emit_dataset_updated(state: &AppState, record: DatasetRecord) {
+    let DatasetRecord { id, metadata } = record;
+    let DatasetMetadata {
+        name,
+        description,
+        favorite,
+        tags,
+        status,
+        created_at,
+        ..
+    } = metadata;
+
+    let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
+        id,
+        name,
+        description,
+        favorite,
+        tags,
+        status,
+        created_at,
+    });
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -186,15 +209,7 @@ impl DatasetManager {
                 tasks::do_update_dataset(&mut conn, id, update)?;
                 let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
 
-                let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
-                    id: record.id,
-                    name: record.metadata.name,
-                    description: record.metadata.description,
-                    favorite: record.metadata.favorite,
-                    tags: record.metadata.tags,
-                    status: record.metadata.status,
-                    created_at: record.metadata.created_at,
-                });
+                emit_dataset_updated(&state, record);
 
                 Ok(())
             })?
@@ -208,15 +223,7 @@ impl DatasetManager {
                 tasks::do_add_tags(&mut conn, id, &tags)?;
                 let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
 
-                let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
-                    id: record.id,
-                    name: record.metadata.name,
-                    description: record.metadata.description,
-                    favorite: record.metadata.favorite,
-                    tags: record.metadata.tags,
-                    status: record.metadata.status,
-                    created_at: record.metadata.created_at,
-                });
+                emit_dataset_updated(&state, record);
 
                 Ok(())
             })?
@@ -230,15 +237,7 @@ impl DatasetManager {
                 tasks::do_remove_tags(&mut conn, id, &tags)?;
                 let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
 
-                let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
-                    id: record.id,
-                    name: record.metadata.name,
-                    description: record.metadata.description,
-                    favorite: record.metadata.favorite,
-                    tags: record.metadata.tags,
-                    status: record.metadata.status,
-                    created_at: record.metadata.created_at,
-                });
+                emit_dataset_updated(&state, record);
 
                 Ok(())
             })?

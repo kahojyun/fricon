@@ -6,6 +6,7 @@ import {
   onUnmounted,
   ref,
   shallowRef,
+  useTemplateRef,
   watch,
 } from "vue";
 import {
@@ -32,7 +33,7 @@ const searchQuery = ref("");
 const selectedTags = ref<string[]>([]);
 const isLoading = ref(false);
 const router = useRouter();
-const dataTableRef = ref<any>(null);
+const dataTableRef = useTemplateRef<HTMLElement>("dataTableRef");
 
 const syncSelectedDataset = () => {
   if (props.selectedDatasetId == null) {
@@ -82,7 +83,7 @@ const loadDatasets = async ({ append = false } = {}) => {
 };
 
 const getScrollContainer = (): HTMLElement | null => {
-  const root = dataTableRef.value?.$el as HTMLElement | undefined;
+  const root = dataTableRef.value;
   if (!root) return null;
   return (
     root.querySelector(".p-datatable-wrapper .p-virtualscroller") ??

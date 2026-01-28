@@ -389,6 +389,31 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
     unique.into_iter().collect()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::normalize_tags;
+
+    #[test]
+    fn normalize_tags_trims_dedupes_and_sorts() {
+        let input = vec![
+            " beta".to_string(),
+            "alpha".to_string(),
+            "alpha".to_string(),
+            String::new(),
+            "  ".to_string(),
+            "gamma".to_string(),
+            "beta".to_string(),
+        ];
+
+        let normalized = normalize_tags(input);
+
+        assert_eq!(
+            normalized,
+            vec!["alpha".to_string(), "beta".to_string(), "gamma".to_string()]
+        );
+    }
+}
+
 #[tauri::command]
 async fn update_dataset_info(
     state: State<'_, AppState>,
