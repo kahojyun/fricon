@@ -26,6 +26,7 @@ const formDescription = ref("");
 const formFavorite = ref(false);
 const formTagsText = ref("");
 const activeTab = ref("charts");
+let detailRequestToken = 0;
 
 function tagsToText(tags: string[]): string {
   return tags.join(", ");
@@ -49,17 +50,22 @@ function setFormFromDetail(next: DatasetDetail) {
 }
 
 async function loadDetail(id: number) {
+  const requestToken = ++detailRequestToken;
   isLoading.value = true;
   errorMessage.value = undefined;
   successMessage.value = undefined;
   try {
     const next = await getDatasetDetail(id);
+    if (requestToken !== detailRequestToken || props.datasetId !== id) return;
     detail.value = next;
     setFormFromDetail(next);
   } catch (error) {
+    if (requestToken !== detailRequestToken) return;
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
-    isLoading.value = false;
+    if (requestToken === detailRequestToken) {
+      isLoading.value = false;
+    }
   }
 }
 
