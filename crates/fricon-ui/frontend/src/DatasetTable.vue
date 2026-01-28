@@ -1,15 +1,5 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  shallowRef,
-  type ComponentPublicInstance,
-  useTemplateRef,
-  watch,
-} from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import {
   type DatasetInfo,
   type DatasetStatus,
@@ -34,7 +24,6 @@ const searchQuery = ref("");
 const selectedTags = ref<string[]>([]);
 const isLoading = ref(false);
 const router = useRouter();
-const dataTableRef = useTemplateRef<ComponentPublicInstance>("dataTableRef");
 
 const syncSelectedDataset = () => {
   if (props.selectedDatasetId == null) {
@@ -83,20 +72,8 @@ const loadDatasets = async ({ append = false } = {}) => {
   }
 };
 
-const getScrollContainer = (): HTMLElement | null => {
-  const root = dataTableRef.value?.$el as HTMLElement | undefined;
-  if (!root) return null;
-  return (
-    root.querySelector(".p-datatable-wrapper .p-virtualscroller") ??
-    root.querySelector(".p-datatable-wrapper")
-  );
-};
-
-const refreshDatasets = async ({ preserveScroll = true } = {}) => {
+const refreshDatasets = async () => {
   if (isLoading.value) return;
-  const previousScrollTop = preserveScroll
-    ? (getScrollContainer()?.scrollTop ?? 0)
-    : 0;
   isLoading.value = true;
   try {
     const limit = Math.max(datasets.value.length, DATASET_PAGE_SIZE);
@@ -110,12 +87,6 @@ const refreshDatasets = async ({ preserveScroll = true } = {}) => {
   } finally {
     isLoading.value = false;
   }
-
-  if (!preserveScroll) return;
-  await nextTick();
-  const nextContainer = getScrollContainer();
-  if (!nextContainer) return;
-  nextContainer.scrollTop = previousScrollTop;
 };
 
 const statusSeverity = (status: DatasetStatus) => {
@@ -270,7 +241,6 @@ defineExpose({
       />
     </div>
     <DataTable
-      ref="dataTableRef"
       v-model:selection="selectedDataset"
       :value="filteredDatasets"
       size="small"
