@@ -36,12 +36,35 @@ use uuid::Uuid;
 pub use self::write_registry::WriteSessionRegistry;
 use crate::{
     DatasetDataType, DatasetSchema,
-    app::{AppError, AppHandle},
+    app::{AppError, AppHandle, AppState},
     database::{self, DatabaseError, DatasetStatus},
     dataset, dataset_fs,
     dataset_fs::ChunkReader,
     dataset_manager::write_session::WriteSessionHandle,
 };
+
+fn emit_dataset_updated(state: &AppState, record: DatasetRecord) {
+    let DatasetRecord { id, metadata } = record;
+    let DatasetMetadata {
+        name,
+        description,
+        favorite,
+        tags,
+        status,
+        created_at,
+        ..
+    } = metadata;
+
+    let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
+        id,
+        name,
+        description,
+        favorite,
+        tags,
+        status,
+        created_at,
+    });
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -182,7 +205,13 @@ impl DatasetManager {
     pub async fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_update_dataset(&mut *state.database.get()?, id, update)
+                let mut conn = state.database.get()?;
+                tasks::do_update_dataset(&mut conn, id, update)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+
+                emit_dataset_updated(&state, record);
+
+                Ok(())
             })?
             .await?
     }
@@ -190,7 +219,13 @@ impl DatasetManager {
     pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_add_tags(&mut *state.database.get()?, id, &tags)
+                let mut conn = state.database.get()?;
+                tasks::do_add_tags(&mut conn, id, &tags)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+
+                emit_dataset_updated(&state, record);
+
+                Ok(())
             })?
             .await?
     }
@@ -198,7 +233,13 @@ impl DatasetManager {
     pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_remove_tags(&mut *state.database.get()?, id, &tags)
+                let mut conn = state.database.get()?;
+                tasks::do_remove_tags(&mut conn, id, &tags)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+
+                emit_dataset_updated(&state, record);
+
+                Ok(())
             })?
             .await?
     }

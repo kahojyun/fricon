@@ -40,7 +40,11 @@ export interface ColumnInfo {
   isIndex: boolean;
 }
 
-export interface DatasetDetail {
+interface RawDatasetDetail extends RawDatasetInfo {
+  columns: ColumnInfo[];
+}
+
+export interface DatasetDetail extends DatasetInfo {
   columns: ColumnInfo[];
 }
 
@@ -98,6 +102,20 @@ export async function updateDatasetFavorite(
   await invoke("update_dataset_favorite", { id, update: { favorite } });
 }
 
+export interface DatasetInfoUpdate {
+  name?: string;
+  description?: string;
+  favorite?: boolean;
+  tags?: string[];
+}
+
+export async function updateDatasetInfo(
+  id: number,
+  update: DatasetInfoUpdate,
+): Promise<void> {
+  await invoke("update_dataset_info", { id, update });
+}
+
 export async function fetchChartData(
   id: number,
   options: ChartDataOptions,
@@ -105,12 +123,25 @@ export async function fetchChartData(
   return invoke<ChartOptions>("dataset_chart_data", { id, options });
 }
 
-export function getDatasetDetail(id: number): Promise<DatasetDetail> {
-  return invoke<DatasetDetail>("dataset_detail", { id });
+export async function getDatasetDetail(id: number): Promise<DatasetDetail> {
+  const rawDetail = await invoke<RawDatasetDetail>("dataset_detail", { id });
+  return {
+    ...rawDetail,
+    createdAt: new Date(rawDetail.createdAt),
+  };
 }
 
 export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
   return listen<RawDatasetInfo>("dataset-created", (event) => {
+    callback({
+      ...event.payload,
+      createdAt: new Date(event.payload.createdAt),
+    });
+  });
+}
+
+export function onDatasetUpdated(callback: (event: DatasetInfo) => void) {
+  return listen<RawDatasetInfo>("dataset-updated", (event) => {
     callback({
       ...event.payload,
       createdAt: new Date(event.payload.createdAt),

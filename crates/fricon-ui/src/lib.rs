@@ -70,6 +70,28 @@ impl AppState {
                             },
                         );
                     }
+                    fricon::AppEvent::DatasetUpdated {
+                        id,
+                        name,
+                        description,
+                        favorite,
+                        tags,
+                        status,
+                        created_at,
+                    } => {
+                        let _ = app_handle.emit(
+                            "dataset-updated",
+                            DatasetInfo {
+                                id,
+                                name,
+                                description,
+                                favorite,
+                                tags,
+                                status,
+                                created_at,
+                            },
+                        );
+                    }
                 }
             }
         });

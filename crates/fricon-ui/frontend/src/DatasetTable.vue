@@ -6,9 +6,14 @@ import {
   DATASET_PAGE_SIZE,
   listDatasets,
   onDatasetCreated,
+  onDatasetUpdated,
   updateDatasetFavorite,
 } from "./backend";
+import { useRouter } from "vue-router";
 
+const props = defineProps<{
+  selectedDatasetId?: number;
+}>();
 const emit = defineEmits<{
   datasetSelected: [id: number];
 }>();
@@ -18,6 +23,17 @@ const favoritesOnly = ref(false);
 const searchQuery = ref("");
 const selectedTags = ref<string[]>([]);
 const isLoading = ref(false);
+const router = useRouter();
+
+const syncSelectedDataset = () => {
+  if (props.selectedDatasetId == null) {
+    selectedDataset.value = undefined;
+    return;
+  }
+  selectedDataset.value = datasets.value.find(
+    (dataset) => dataset.id === props.selectedDatasetId,
+  );
+};
 
 const tagOptions = computed(() => {
   const tagSet = new Set<string>();
@@ -33,7 +49,8 @@ const filteredDatasets = computed(() =>
     : datasets.value,
 );
 
-let unsubscribe: (() => void) | null = null;
+let unsubscribeCreated: (() => void) | null = null;
+let unsubscribeUpdated: (() => void) | null = null;
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 let statusRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -49,6 +66,7 @@ const loadDatasets = async ({ append = false } = {}) => {
       offset,
     );
     datasets.value = append ? [...datasets.value, ...next] : next;
+    syncSelectedDataset();
   } finally {
     isLoading.value = false;
   }
@@ -65,6 +83,7 @@ const refreshDatasets = async () => {
       limit,
       0,
     );
+    syncSelectedDataset();
   } finally {
     isLoading.value = false;
   }
@@ -101,17 +120,34 @@ const handleDatasetCreated = (event: DatasetInfo) => {
   if (searchQuery.value.trim() || selectedTags.value.length > 0) {
     void loadDatasets();
   }
+  syncSelectedDataset();
+};
+
+const handleDatasetUpdated = (event: DatasetInfo) => {
+  const index = datasets.value.findIndex((dataset) => dataset.id === event.id);
+  if (index >= 0) {
+    datasets.value[index] = event;
+    syncSelectedDataset();
+    return;
+  }
+
+  if (!searchQuery.value.trim() && selectedTags.value.length === 0) {
+    datasets.value.unshift(event);
+    syncSelectedDataset();
+  }
 };
 
 onMounted(async () => {
   await loadDatasets();
 
-  // Listen for dataset created events
-  unsubscribe = await onDatasetCreated(handleDatasetCreated);
+  // Listen for dataset create/update events
+  unsubscribeCreated = await onDatasetCreated(handleDatasetCreated);
+  unsubscribeUpdated = await onDatasetUpdated(handleDatasetUpdated);
 });
 
 onUnmounted(() => {
-  unsubscribe?.();
+  unsubscribeCreated?.();
+  unsubscribeUpdated?.();
   if (searchDebounce) {
     clearTimeout(searchDebounce);
   }
@@ -126,6 +162,14 @@ watch([searchQuery, selectedTags], () => {
     void loadDatasets();
   }, 300);
 });
+
+watch(
+  () => props.selectedDatasetId,
+  () => {
+    syncSelectedDataset();
+  },
+  { immediate: true },
+);
 
 const handleLazyLoad = (event: { first: number; last: number }) => {
   if (event.last <= datasets.value.length) return;
@@ -153,6 +197,13 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+const selectDataset = (id: number) => {
+  emit("datasetSelected", id);
+  if (router.currentRoute.value.params.id !== String(id)) {
+    void router.push({ name: "dataset", params: { id } });
+  }
+};
+
 const toggleFavorite = async (dataset: DatasetInfo) => {
   const nextFavorite = !dataset.favorite;
   dataset.favorite = nextFavorite;
@@ -163,6 +214,10 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
     throw error;
   }
 };
+
+defineExpose({
+  refreshDatasets,
+});
 </script>
 <template>
   <div class="flex h-full flex-col">
@@ -200,7 +255,7 @@ const toggleFavorite = async (dataset: DatasetInfo) => {
         onLazyLoad: handleLazyLoad,
       }"
       @keydown.capture="handleKeydown"
-      @row-select="emit('datasetSelected', $event.data.id)"
+      @row-select="selectDataset($event.data.id)"
     >
       <Column header="Favorite" class="w-24">
         <template #body="slotProps">
