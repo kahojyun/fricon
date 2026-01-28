@@ -421,14 +421,8 @@ async fn update_dataset_info(
             current.metadata.tags.into_iter().collect();
         let next_tags_set: std::collections::BTreeSet<_> = next_tags.into_iter().collect();
 
-        let to_add: Vec<String> = next_tags_set
-            .difference(&current_tags)
-            .cloned()
-            .collect();
-        let to_remove: Vec<String> = current_tags
-            .difference(&next_tags_set)
-            .cloned()
-            .collect();
+        let to_add: Vec<String> = next_tags_set.difference(&current_tags).cloned().collect();
+        let to_remove: Vec<String> = current_tags.difference(&next_tags_set).cloned().collect();
 
         if !to_add.is_empty() {
             dataset_manager

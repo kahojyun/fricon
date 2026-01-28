@@ -37,10 +37,7 @@ const handleDatasetSelected = (id: number) => {
     </SplitterPanel>
     <SplitterPanel>
       <p v-if="datasetId == null">No dataset selected</p>
-      <DatasetDetailPage
-        v-else
-        :dataset-id="datasetId"
-      />
+      <DatasetDetailPage v-else :dataset-id="datasetId" />
     </SplitterPanel>
   </Splitter>
 </template>
