@@ -1,0 +1,21 @@
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+end_of_line = lf
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.rs]
+max_line_length = 100
+
+[*.proto]
+indent_size = 2
+
+[*.{js,ts,jsx,tsx,mjs,mts,cjs,cts,html,css,vue,json,yaml,yml}]
+indent_size = 2
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
