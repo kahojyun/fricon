@@ -16,8 +16,6 @@ export default defineConfig([
     "target/**",
     "**/node_modules/**",
     "crates/fricon-ui/frontend-vue/**",
-    "crates/fricon-ui/frontend/.agents/**",
-    "react-template/**",
   ]),
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -41,10 +39,7 @@ export default defineConfig([
     },
   },
   {
-    files: [
-      "src/components/ui/*",
-      "crates/fricon-ui/frontend/src/components/ui/*",
-    ],
+    files: ["**/src/components/ui/*.tsx"],
     rules: {
       "react-refresh/only-export-components": "off",
     },
