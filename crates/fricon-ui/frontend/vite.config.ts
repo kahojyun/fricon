@@ -1,27 +1,25 @@
-import { defineConfig } from "vite";
+import path from "path";
 import tailwindcss from "@tailwindcss/vite";
-import vue from "@vitejs/plugin-vue";
-import vueDevTools from "vite-plugin-vue-devtools";
-import Components from "unplugin-vue-components/vite";
-import { PrimeVueResolver } from "@primevue/auto-import-resolver";
-import { fileURLToPath, URL } from "node:url";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
-// https://vitejs.dev/config/
+// https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    tailwindcss(),
-    vue(),
-    vueDevTools(),
-    Components({
-      dirs: [],
-      resolvers: [PrimeVueResolver()],
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react({
+      babel: {
+        plugins: [["babel-plugin-react-compiler"]],
+      },
     }),
+    tailwindcss(),
   ],
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

@@ -1,40 +1,68 @@
-// https://eslint.vuejs.org/user-guide/#example-configuration-with-typescript-eslint-and-prettier
-import { defineConfig } from "eslint/config";
-import { includeIgnoreFile } from "@eslint/compat";
-import eslint from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
-import eslintPluginVue from "eslint-plugin-vue";
-import pluginVitest from "@vitest/eslint-plugin";
+import js from "@eslint/js";
 import globals from "globals";
-import typescriptEslint from "typescript-eslint";
-import { fileURLToPath } from "node:url";
+import reactHooks from "eslint-plugin-react-hooks";
+import { reactRefresh } from "eslint-plugin-react-refresh";
+import tseslint from "typescript-eslint";
+import { defineConfig, globalIgnores } from "eslint/config";
+import reactX from "eslint-plugin-react-x";
+import reactDom from "eslint-plugin-react-dom";
+import prettier from "eslint-config-prettier";
 
-const gitignorePath = fileURLToPath(new URL(".gitignore", import.meta.url));
-
-export default defineConfig(
-  includeIgnoreFile(gitignorePath),
-  eslint.configs.recommended,
-  typescriptEslint.configs.recommended,
-  typescriptEslint.configs.stylistic,
-  eslintPluginVue.configs["flat/recommended"],
+export default defineConfig([
+  globalIgnores([
+    "dist",
+    ".venv/**",
+    "site/**",
+    "target/**",
+    "**/node_modules/**",
+    "crates/fricon-ui/frontend-vue/**",
+    "crates/fricon-ui/frontend/.agents/**",
+    "react-template/**",
+  ]),
+  js.configs.recommended,
+  tseslint.configs.recommendedTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
+  reactHooks.configs.flat.recommended,
+  reactRefresh.configs.vite({
+    extraHOCs: [
+      "createFileRoute",
+      "createRootRoute",
+      "createRootRouteWithContext",
+    ],
+  }),
+  reactX.configs["recommended-typescript"],
+  reactDom.configs.recommended,
   {
-    extends: [pluginVitest.configs.recommended],
-    files: ["**/__tests__/*"],
-  },
-  {
-    files: ["**/*.vue"],
     languageOptions: {
+      globals: globals.browser,
       parserOptions: {
-        parser: typescriptEslint.parser,
+        projectService: true,
       },
     },
   },
   {
-    languageOptions: {
-      ecmaVersion: "latest",
-      sourceType: "module",
-      globals: globals.browser,
+    files: [
+      "src/components/ui/*",
+      "crates/fricon-ui/frontend/src/components/ui/*",
+    ],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
-  eslintConfigPrettier,
-);
+  {
+    files: ["**/*.tsx"],
+    rules: {
+      "react-hooks/incompatible-library": "off",
+    },
+  },
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx", "src/test/**/*"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.vitest,
+      },
+    },
+  },
+  prettier,
+]);

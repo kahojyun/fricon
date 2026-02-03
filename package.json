@@ -24,15 +24,17 @@
     "@tauri-apps/cli": "^2.9.6",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "^25.0.10",
-    "@vitest/eslint-plugin": "^1.6.6",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-vue": "^10.7.0",
+    "eslint-plugin-react-dom": "^2.9.3",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.0",
+    "eslint-plugin-react-x": "^2.9.3",
     "generate-license-file": "^4.1.1",
-    "globals": "^17.0.0",
+    "globals": "^17.3.0",
     "npm-run-all2": "^8.0.4",
     "prettier": "3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
-    "typescript-eslint": "^8.53.1"
+    "typescript-eslint": "^8.54.0"
   }
 }
