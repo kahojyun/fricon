@@ -11,7 +11,6 @@
     "fix": "run-s -c lint:fix format",
     "type-check": "pnpm -r run type-check",
     "test": "pnpm -r run test",
-    "bench": "pnpm -r run bench",
     "bundle-licenses": "run-p -c bundle-licenses:rust bundle-licenses:npm",
     "bundle-licenses:rust": "cd crates/fricon-py && cargo bundle-licenses --format toml --output ../../THIRD_PARTY_RUST.toml",
     "bundle-licenses:npm": "generate-license-file --input crates/fricon-ui/frontend/package.json --output THIRD_PARTY_NPM.txt --overwrite"

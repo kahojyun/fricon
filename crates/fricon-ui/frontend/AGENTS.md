@@ -70,14 +70,6 @@ When working with TanStack Router's file-based routing, be aware of:
 5. **Utilities** - Shared utilities go in `src/lib/`, hooks in `src/hooks/`
 6. **Prefer shadcn components** - When a component is missing, first check if shadcn/ui has an existing component before creating custom ones. Use `pnpm shadcn add <component-name>` to add available components.
 
-### Autonomous Task Execution
-
-1. **Read before writing** - Always examine existing code structure before creating new files
-2. **Incremental changes** - Make small, focused changes rather than large rewrites
-3. **Validate changes** - After modifications, run the appropriate check commands
-4. **Handle errors** - If a command fails, analyze the error output and fix issues before proceeding
-5. **Document decisions** - Add comments for non-obvious code decisions
-
 ### Common Tasks
 
 - **Adding a new route**: Create file in `src/routes/` following naming conventions, then restart dev server if needed

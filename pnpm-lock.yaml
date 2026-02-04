@@ -108,6 +108,9 @@ importers:
       '@tanstack/react-router-devtools':
         specifier: ^1.158.0
         version: 1.158.0(@tanstack/react-router@1.158.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@tanstack/router-core@1.158.0)(csstype@3.2.3)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@tanstack/router-cli':
+        specifier: ^1.158.0
+        version: 1.158.0
       '@tanstack/router-plugin':
         specifier: ^1.158.0
         version: 1.158.0(@tanstack/react-router@1.158.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
@@ -1189,6 +1192,11 @@ packages:
     peerDependencies:
       react: '>=16.8'
       react-dom: '>=16.8'
+
+  '@tanstack/router-cli@1.158.0':
+    resolution: {integrity: sha512-HydE08MrYY93JQhoB377YOONmtNAhPUw/6pdIUmnRICUx2GV2EK+qXGJ67SDC4YIU/z9X0TDeoZjCO1MDFwiQQ==}
+    engines: {node: '>=12'}
+    hasBin: true
 
   '@tanstack/router-core@1.158.0':
     resolution: {integrity: sha512-dRMcWY0UB/6OZqSCx/7iUvom0ol18rHSQladygVT8mlth7uxYx3n5BNse8C03efIE8y1Bx+VDOBAKpAZ9BgKog==}
@@ -4943,6 +4951,14 @@ snapshots:
       '@tanstack/table-core': 8.21.3
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
+
+  '@tanstack/router-cli@1.158.0':
+    dependencies:
+      '@tanstack/router-generator': 1.158.0
+      chokidar: 3.6.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - supports-color
 
   '@tanstack/router-core@1.158.0':
     dependencies:
