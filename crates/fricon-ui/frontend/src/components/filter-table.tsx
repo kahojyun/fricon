@@ -41,6 +41,10 @@ export function FilterTable({
 
   const isFilterTableEmpty =
     !filterTableData || filterTableData.rows.length === 0;
+  const gridTemplate = useMemo(() => {
+    if (!filterTableData) return "none";
+    return `repeat(${filterTableData.fields.length}, minmax(120px, 1fr))`;
+  }, [filterTableData]);
 
   const columnUniqueValues = useMemo<
     Record<string, ColumnUniqueValue[]>
@@ -173,41 +177,35 @@ export function FilterTable({
 
       {!isIndividualFilterMode ? (
         <>
-          <Table className="text-xs">
-            <TableHeader className="bg-muted text-muted-foreground">
-              <TableRow>
-                {filterTableData.fields.map((field) => (
-                  <TableHead key={field} className="px-2 py-2">
-                    {field}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-          </Table>
+          <div
+            className="bg-muted text-muted-foreground grid border-b px-2 py-2 text-xs font-semibold"
+            style={{ gridTemplateColumns: gridTemplate }}
+          >
+            {filterTableData.fields.map((field) => (
+              <div key={field}>{field}</div>
+            ))}
+          </div>
           <ScrollArea className="min-h-0 flex-1">
-            <Table className="text-xs">
-              <TableBody>
-                {filterTableData.rows.map((row) => {
-                  const isSelected = value?.index === row.index;
-                  return (
-                    <TableRow
-                      key={row.index}
-                      className={cn(
-                        "cursor-pointer border-b",
-                        isSelected ? "bg-primary/10" : "hover:bg-muted/40",
-                      )}
-                      onClick={() => onChange(row)}
-                    >
-                      {filterTableData.fields.map((field, idx) => (
-                        <TableCell key={field} className="px-2 py-2">
-                          {row.displayValues[idx]}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="min-w-[640px]">
+              {filterTableData.rows.map((row) => {
+                const isSelected = value?.index === row.index;
+                return (
+                  <div
+                    key={row.index}
+                    className={cn(
+                      "grid cursor-pointer border-b px-2 py-2 text-xs",
+                      isSelected ? "bg-primary/10" : "hover:bg-muted/40",
+                    )}
+                    style={{ gridTemplateColumns: gridTemplate }}
+                    onClick={() => onChange(row)}
+                  >
+                    {filterTableData.fields.map((field, idx) => (
+                      <div key={field}>{row.displayValues[idx]}</div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </ScrollArea>
         </>
       ) : null}
