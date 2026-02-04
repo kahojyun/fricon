@@ -4,6 +4,11 @@ import { getWorkspaceInfo } from "@/lib/backend";
 import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
 import { DatasetTable } from "@/components/dataset-table";
 import { DatasetDetailPage } from "@/components/dataset-detail-page";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 
 interface DataViewerProps {
   datasetId?: string;
@@ -52,26 +57,29 @@ export function DataViewer({ datasetId }: DataViewerProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <section className="min-h-0 overflow-hidden border-r">
+      <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+        <ResizablePanel defaultSize={35} minSize={25}>
           <DatasetTable
             selectedDatasetId={selectedDatasetId}
             onDatasetSelected={handleDatasetSelected}
           />
-        </section>
-        <section className="min-h-0 overflow-hidden p-4">
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={65} minSize={35}>
           {selectedDatasetId ? (
-            <DatasetDetailPage datasetId={selectedDatasetId} />
+            <div className="h-full min-h-0 p-4">
+              <DatasetDetailPage datasetId={selectedDatasetId} />
+            </div>
           ) : (
-            <>
+            <div className="p-4">
               <h2 className="text-lg font-semibold">No dataset selected</h2>
               <p className="text-muted-foreground mt-1 text-sm">
                 Choose a dataset to view charts and metadata.
               </p>
-            </>
+            </div>
           )}
-        </section>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }

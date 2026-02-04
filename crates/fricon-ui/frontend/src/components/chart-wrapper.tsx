@@ -199,7 +199,7 @@ export function ChartWrapper({ data }: ChartWrapperProps) {
     <div className="relative size-full">
       <ReactEChartsCore
         echarts={echarts}
-        className="size-full"
+        style={{ width: "100%", height: "100%" }}
         option={option}
         notMerge
         lazyUpdate

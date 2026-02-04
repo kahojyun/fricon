@@ -27,6 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 
 interface ChartViewerProps {
@@ -824,18 +829,25 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2">
-        <div className="min-h-0 flex-1">
-          <ChartWrapper data={data} />
-        </div>
-        <div className="min-h-0 flex-1">
-          <FilterTable
-            value={filterRow}
-            onChange={setFilterRow}
-            filterTableData={filterTableData ?? undefined}
-            datasetId={String(datasetId)}
-          />
-        </div>
+      <div className="min-h-0 flex-1 overflow-hidden p-2">
+        <ResizablePanelGroup orientation="vertical" className="h-full min-h-0">
+          <ResizablePanel defaultSize={60} minSize={35} className="min-h-0">
+            <div className="h-full min-h-0">
+              <ChartWrapper data={data} />
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={40} minSize={25} className="min-h-0">
+            <div className="h-full min-h-0">
+              <FilterTable
+                value={filterRow}
+                onChange={setFilterRow}
+                filterTableData={filterTableData ?? undefined}
+                datasetId={String(datasetId)}
+              />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
   );
