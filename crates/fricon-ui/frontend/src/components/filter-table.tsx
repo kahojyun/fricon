@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type {
   ColumnUniqueValue,
   FilterTableData,
@@ -6,14 +7,6 @@ import type {
 } from "@/lib/backend";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 interface FilterTableProps {
@@ -21,6 +14,80 @@ interface FilterTableProps {
   onChange: (value: FilterTableRow | undefined) => void;
   filterTableData?: FilterTableData;
   datasetId: string;
+}
+
+interface FilterTableColumnProps {
+  field: string;
+  items: ColumnUniqueValue[];
+  selectedIndex?: number;
+  onSelect: (index: number) => void;
+}
+
+function FilterTableColumn({
+  field,
+  items,
+  selectedIndex,
+  onSelect,
+}: FilterTableColumnProps) {
+  const scrollRootRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!scrollRootRef.current) return;
+    const viewport = scrollRootRef.current.querySelector(
+      '[data-slot="scroll-area-viewport"]',
+    );
+    if (viewport instanceof HTMLDivElement) {
+      viewportRef.current = viewport;
+    }
+  }, []);
+
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => viewportRef.current,
+    estimateSize: () => 32,
+    overscan: 8,
+  });
+
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="bg-muted text-muted-foreground border-b px-2 py-2 text-xs font-semibold">
+        {field}
+      </div>
+      <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
+        <div
+          className="relative"
+          style={{ height: rowVirtualizer.getTotalSize() }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const item = items[virtualRow.index];
+            if (!item) return null;
+            const isSelected = selectedIndex === item.index;
+            return (
+              <div
+                key={item.index}
+                ref={rowVirtualizer.measureElement}
+                className={cn(
+                  "cursor-pointer border-b px-2 py-2 text-xs",
+                  isSelected ? "bg-primary/10" : "hover:bg-muted/40",
+                )}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+                onClick={() => onSelect(item.index)}
+              >
+                {item.displayValue}
+              </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    </div>
+  );
 }
 
 export function FilterTable({
@@ -53,6 +120,13 @@ export function FilterTable({
     const minWidth = Math.max(filterTableData.fields.length * 80, 320);
     return `${minWidth}px`;
   }, [filterTableData]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: filterTableData?.rows.length ?? 0,
+    getScrollElement: () => bodyViewportRef.current,
+    estimateSize: () => 32,
+    overscan: 8,
+  });
 
   useEffect(() => {
     if (isIndividualFilterMode) return;
@@ -222,17 +296,33 @@ export function FilterTable({
             </div>
           </div>
           <ScrollArea ref={bodyScrollRootRef} className="min-h-0 flex-1">
-            <div style={{ minWidth: minTableWidth }}>
-              {filterTableData.rows.map((row) => {
+            <div
+              className="relative"
+              style={{
+                minWidth: minTableWidth,
+                height: rowVirtualizer.getTotalSize(),
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const row = filterTableData.rows[virtualRow.index];
+                if (!row) return null;
                 const isSelected = value?.index === row.index;
                 return (
                   <div
                     key={row.index}
+                    ref={rowVirtualizer.measureElement}
                     className={cn(
                       "grid cursor-pointer border-b px-2 py-2 text-xs",
                       isSelected ? "bg-primary/10" : "hover:bg-muted/40",
                     )}
-                    style={{ gridTemplateColumns: gridTemplate }}
+                    style={{
+                      gridTemplateColumns: gridTemplate,
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                     onClick={() => onChange(row)}
                   >
                     {filterTableData.fields.map((field, idx) => (
@@ -256,48 +346,17 @@ export function FilterTable({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {filterTableData.fields.map((field, index) => (
             <div key={field} className="flex min-w-0 flex-1">
-              <div className="min-w-0 flex-1">
-                <Table className="text-xs">
-                  <TableHeader className="bg-muted text-muted-foreground text-xs">
-                    <TableRow>
-                      <TableHead className="h-8 px-2 py-2 font-semibold">
-                        {field}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                </Table>
-                <ScrollArea className="min-h-0 flex-1">
-                  <Table className="text-xs">
-                    <TableBody>
-                      {(columnUniqueValues[field] ?? []).map((item) => {
-                        const isSelected =
-                          individualColumnSelections[field] === item.index;
-                        return (
-                          <TableRow
-                            key={item.index}
-                            className={cn(
-                              "cursor-pointer border-b",
-                              isSelected
-                                ? "bg-primary/10"
-                                : "hover:bg-muted/40",
-                            )}
-                            onClick={() => {
-                              setIndividualColumnSelections((prev) => ({
-                                ...prev,
-                                [field]: item.index,
-                              }));
-                            }}
-                          >
-                            <TableCell className="px-2 py-2">
-                              {item.displayValue}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              </div>
+              <FilterTableColumn
+                field={field}
+                items={columnUniqueValues[field] ?? []}
+                selectedIndex={individualColumnSelections[field]}
+                onSelect={(selectedIndex) =>
+                  setIndividualColumnSelections((prev) => ({
+                    ...prev,
+                    [field]: selectedIndex,
+                  }))
+                }
+              />
               {index < filterTableData.fields.length - 1 ? (
                 <div className="bg-border/60 w-px shrink-0" />
               ) : null}

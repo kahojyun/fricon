@@ -86,6 +86,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   const [filterRow, setFilterRow] = useState<FilterTableRow | undefined>();
   const [data, setData] = useState<ChartOptions | undefined>();
   const [scatterError, setScatterError] = useState<string | null>(null);
+  const previousDatasetIdRef = useRef<number | null>(null);
 
   const columns = useMemo(() => datasetDetail?.columns ?? [], [datasetDetail]);
 
@@ -117,6 +118,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   );
   const isComplexSeries = Boolean(series?.isComplex);
   const complexControlsDisabled = !isComplexSeries;
+  const isTraceSeries = Boolean(series?.isTrace);
 
   const xColumnOptions = useMemo(() => {
     if (series?.isTrace) return [];
@@ -363,7 +365,16 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     void getFilterTableData(datasetId, { excludeColumns }).then((filter) => {
       if (!active) return;
       setFilterTableData(filter);
-      setFilterRow(filter.rows[0]);
+      setFilterRow((current) => {
+        const datasetChanged = previousDatasetIdRef.current !== datasetId;
+        previousDatasetIdRef.current = datasetId;
+        if (filter.rows.length === 0) return undefined;
+        if (datasetChanged || !current) return filter.rows[0];
+        const preserved = filter.rows.find(
+          (row) => row.index === current.index,
+        );
+        return preserved ?? filter.rows[0];
+      });
     });
     return () => {
       active = false;
@@ -562,12 +573,16 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
           <div className="min-w-[160px]">
             <Label className="mb-1 block text-xs">X</Label>
             <Select
+              disabled={effectiveChartType === "line" && isTraceSeries}
               value={effectiveXColumnName ?? ""}
               onValueChange={(value) =>
                 setXColumnName(value === "" ? null : value)
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger
+                className="w-full"
+                disabled={effectiveChartType === "line" && isTraceSeries}
+              >
                 <SelectValue placeholder="Select X" />
               </SelectTrigger>
               <SelectContent>

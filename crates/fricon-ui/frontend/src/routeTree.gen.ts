@@ -9,16 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UsersRouteImport } from './routes/users'
 import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DatasetsIdRouteImport } from './routes/datasets.$id'
 
-const UsersRoute = UsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const CreditsRoute = CreditsRouteImport.update({
   id: '/credits',
   path: '/credits',
@@ -38,46 +32,35 @@ const DatasetsIdRoute = DatasetsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
-  '/users': typeof UsersRoute
   '/datasets/$id': typeof DatasetsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
-  '/users': typeof UsersRoute
   '/datasets/$id': typeof DatasetsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
-  '/users': typeof UsersRoute
   '/datasets/$id': typeof DatasetsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/credits' | '/users' | '/datasets/$id'
+  fullPaths: '/' | '/credits' | '/datasets/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/credits' | '/users' | '/datasets/$id'
-  id: '__root__' | '/' | '/credits' | '/users' | '/datasets/$id'
+  to: '/' | '/credits' | '/datasets/$id'
+  id: '__root__' | '/' | '/credits' | '/datasets/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreditsRoute: typeof CreditsRoute
-  UsersRoute: typeof UsersRoute
   DatasetsIdRoute: typeof DatasetsIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/users': {
-      id: '/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/credits': {
       id: '/credits'
       path: '/credits'
@@ -105,7 +88,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreditsRoute: CreditsRoute,
-  UsersRoute: UsersRoute,
   DatasetsIdRoute: DatasetsIdRoute,
 }
 export const routeTree = rootRouteImport
