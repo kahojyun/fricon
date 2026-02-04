@@ -1,6 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { getWorkspaceInfo } from "@/lib/backend";
 import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
+import { DatasetTable } from "@/components/dataset-table";
 
 interface DataViewerProps {
   datasetId?: string;
@@ -8,6 +10,15 @@ interface DataViewerProps {
 
 export function DataViewer({ datasetId }: DataViewerProps) {
   const setPath = useWorkspaceStore((state) => state.setPath);
+  const navigate = useNavigate();
+  const parsedDatasetId = useMemo(() => {
+    if (!datasetId?.trim()) return undefined;
+    const parsed = Number.parseInt(datasetId, 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }, [datasetId]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<
+    number | undefined
+  >(parsedDatasetId);
 
   useEffect(() => {
     let isActive = true;
@@ -27,19 +38,32 @@ export function DataViewer({ datasetId }: DataViewerProps) {
     };
   }, [setPath]);
 
+  useEffect(() => {
+    setSelectedDatasetId(parsedDatasetId);
+  }, [parsedDatasetId]);
+
+  const handleDatasetSelected = (id: number) => {
+    setSelectedDatasetId(id);
+    if (datasetId !== String(id)) {
+      void navigate({ to: "/datasets/$id", params: { id: String(id) } });
+    }
+  };
+
   return (
     <div className="flex h-full min-h-[calc(100vh-2rem)] flex-col">
       <div className="grid h-full flex-1 grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <section className="border-r p-4">
-          <h1 className="text-lg font-semibold">Datasets</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Dataset table placeholder (search, tags, favorites, status).
-          </p>
+        <section className="border-r">
+          <DatasetTable
+            selectedDatasetId={selectedDatasetId}
+            onDatasetSelected={handleDatasetSelected}
+          />
         </section>
         <section className="p-4">
-          {datasetId ? (
+          {selectedDatasetId ? (
             <>
-              <h2 className="text-lg font-semibold">Dataset {datasetId}</h2>
+              <h2 className="text-lg font-semibold">
+                Dataset {selectedDatasetId}
+              </h2>
               <p className="text-muted-foreground mt-1 text-sm">
                 Detail + charts placeholder.
               </p>

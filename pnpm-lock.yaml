@@ -77,6 +77,9 @@ importers:
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@tanstack/react-virtual':
+        specifier: ^3.13.12
+        version: 3.13.18(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@tauri-apps/api':
         specifier: ^2.0.0
         version: 2.10.1
@@ -1196,6 +1199,12 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
+  '@tanstack/react-virtual@3.13.18':
+    resolution: {integrity: sha512-dZkhyfahpvlaV0rIKnvQiVoWPyURppl6w4m9IwMDpuIjcJ1sD9YGWrt0wISvgU7ewACXx2Ct46WPgI6qAD4v6A==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   '@tanstack/router-cli@1.158.0':
     resolution: {integrity: sha512-HydE08MrYY93JQhoB377YOONmtNAhPUw/6pdIUmnRICUx2GV2EK+qXGJ67SDC4YIU/z9X0TDeoZjCO1MDFwiQQ==}
     engines: {node: '>=12'}
@@ -1250,6 +1259,9 @@ packages:
   '@tanstack/table-core@8.21.3':
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
+
+  '@tanstack/virtual-core@3.13.18':
+    resolution: {integrity: sha512-Mx86Hqu1k39icq2Zusq+Ey2J6dDWTjDvEv43PJtRCoEYTLyfaPnxIQ6iy7YAOK0NV/qOEmZQ/uCufrppZxTgcg==}
 
   '@tanstack/virtual-file-routes@1.154.7':
     resolution: {integrity: sha512-cHHDnewHozgjpI+MIVp9tcib6lYEQK5MyUr0ChHpHFGBl8Xei55rohFK0I0ve/GKoHeioaK42Smd8OixPp6CTg==}
@@ -4958,6 +4970,12 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
+  '@tanstack/react-virtual@3.13.18(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@tanstack/virtual-core': 3.13.18
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
+
   '@tanstack/router-cli@1.158.0':
     dependencies:
       '@tanstack/router-generator': 1.158.0
@@ -5036,6 +5054,8 @@ snapshots:
   '@tanstack/store@0.8.0': {}
 
   '@tanstack/table-core@8.21.3': {}
+
+  '@tanstack/virtual-core@3.13.18': {}
 
   '@tanstack/virtual-file-routes@1.154.7': {}
 
