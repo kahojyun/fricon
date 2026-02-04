@@ -11,6 +11,7 @@ import prettier from "eslint-config-prettier";
 export default defineConfig([
   globalIgnores([
     "dist",
+    "**/dist/**",
     ".venv/**",
     "site/**",
     "target/**",

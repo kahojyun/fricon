@@ -55,28 +55,24 @@ export function FilterTable({
   }, [filterTableData]);
 
   useEffect(() => {
+    if (isIndividualFilterMode) return;
     if (!bodyScrollRootRef.current) return;
-    bodyViewportRef.current = bodyScrollRootRef.current.querySelector(
-      "[data-slot=\"scroll-area-viewport\"]",
+    const viewport = bodyScrollRootRef.current.querySelector(
+      '[data-slot="scroll-area-viewport"]',
     );
-    if (bodyViewportRef.current && headerScrollRef.current) {
-      headerScrollRef.current.scrollLeft = bodyViewportRef.current.scrollLeft;
-    }
-  }, []);
-
-  useEffect(() => {
-    const viewport = bodyViewportRef.current;
-    if (!viewport) return;
+    if (!(viewport instanceof HTMLDivElement)) return;
+    bodyViewportRef.current = viewport;
     const handleScroll = () => {
       if (headerScrollRef.current) {
         headerScrollRef.current.scrollLeft = viewport.scrollLeft;
       }
     };
+    handleScroll();
     viewport.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       viewport.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, [filterTableData?.fields.length, isIndividualFilterMode]);
 
   const columnUniqueValues = useMemo<
     Record<string, ColumnUniqueValue[]>
@@ -281,7 +277,9 @@ export function FilterTable({
                             key={item.index}
                             className={cn(
                               "cursor-pointer border-b",
-                              isSelected ? "bg-primary/10" : "hover:bg-muted/40",
+                              isSelected
+                                ? "bg-primary/10"
+                                : "hover:bg-muted/40",
                             )}
                             onClick={() => {
                               setIndividualColumnSelections((prev) => ({

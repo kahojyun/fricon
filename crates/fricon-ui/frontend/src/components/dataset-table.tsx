@@ -297,7 +297,7 @@ export function DatasetTable({
         <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
           <div className="min-w-[760px]">
             <div className="bg-muted sticky top-0 z-20">
-              <div className="grid grid-cols-[60px_70px_minmax(160px,1fr)_120px_minmax(140px,1fr)_160px] items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
+              <div className="text-muted-foreground grid grid-cols-[60px_70px_minmax(160px,1fr)_120px_minmax(140px,1fr)_160px] items-center gap-2 border-b px-3 py-2 text-xs">
                 <div>Favorite</div>
                 <div>ID</div>
                 <div>Name</div>

@@ -115,6 +115,8 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     () => columns.find((column) => column.name === effectiveSeriesName),
     [columns, effectiveSeriesName],
   );
+  const isComplexSeries = Boolean(series?.isComplex);
+  const complexControlsDisabled = !isComplexSeries;
 
   const xColumnOptions = useMemo(() => {
     if (series?.isTrace) return [];
@@ -344,12 +346,12 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     let aborted = false;
 
     const load = async () => {
-      const detail = await getDatasetDetail(datasetId);
-      if (aborted) return;
-
-      const filter = await getFilterTableData(datasetId, {
-        excludeColumns: excludeColumnsRef.current,
-      });
+      const [detail, filter] = await Promise.all([
+        getDatasetDetail(datasetId),
+        getFilterTableData(datasetId, {
+          excludeColumns: excludeColumnsRef.current,
+        }),
+      ]);
       if (aborted) return;
 
       setDatasetDetail(detail);
@@ -784,6 +786,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
               className="flex flex-wrap gap-2"
               value={selectedComplexViewSingle}
               onValueChange={(value: string) => {
+                if (complexControlsDisabled) return;
                 if (isComplexViewOption(value)) {
                   setSelectedComplexViewSingle(value);
                 }
@@ -791,8 +794,18 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
             >
               {complexSeriesOptions.map((option) => (
                 <label key={option} className="flex items-center gap-2">
-                  <RadioGroupItem value={option} />
-                  <span className="text-sm">{option}</span>
+                  <RadioGroupItem
+                    value={option}
+                    disabled={complexControlsDisabled}
+                  />
+                  <span
+                    className={cn(
+                      "text-sm",
+                      complexControlsDisabled && "opacity-50",
+                    )}
+                  >
+                    {option}
+                  </span>
                 </label>
               ))}
             </RadioGroup>
@@ -804,7 +817,9 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
                   <label key={option} className="flex items-center gap-2">
                     <Checkbox
                       checked={isChecked}
+                      disabled={complexControlsDisabled}
                       onCheckedChange={(checked) => {
+                        if (complexControlsDisabled) return;
                         const next = checked
                           ? [...selectedComplexView, option]
                           : selectedComplexView.filter(
@@ -816,7 +831,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
                     <span
                       className={cn(
                         "text-sm",
-                        !series?.isComplex && "opacity-50",
+                        complexControlsDisabled && "opacity-50",
                       )}
                     >
                       {option}
