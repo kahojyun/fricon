@@ -40,9 +40,40 @@ export function DatasetTable({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const datasetsRef = useRef<DatasetInfo[]>([]);
+  const searchRef = useRef("");
+  const selectedTagsRef = useRef<string[]>([]);
+  const isLoadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
   const searchDebounce = useRef<number | null>(null);
   const statusRefreshTimer = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const setDatasetsState = useCallback((next: DatasetInfo[]) => {
+    datasetsRef.current = next;
+    setDatasets(next);
+  }, []);
+
+  const setHasMoreState = useCallback((next: boolean) => {
+    hasMoreRef.current = next;
+    setHasMore(next);
+  }, []);
+
+  useEffect(() => {
+    searchRef.current = searchQuery;
+  }, [searchQuery]);
+
+  useEffect(() => {
+    selectedTagsRef.current = selectedTags;
+  }, [selectedTags]);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
 
   const tagOptions = useMemo(() => {
     const tagSet = new Set<string>();
@@ -60,37 +91,46 @@ export function DatasetTable({
 
   const loadDatasets = useCallback(
     async ({ append = false } = {}) => {
-      if (isLoading || (append && !hasMore)) return;
+      if (isLoadingRef.current || (append && !hasMoreRef.current)) return;
       setIsLoading(true);
       try {
-        const offset = append ? datasets.length : 0;
+        const offset = append ? datasetsRef.current.length : 0;
         const next = await listDatasets(
-          searchQuery,
-          selectedTags,
+          searchRef.current,
+          selectedTagsRef.current,
           DATASET_PAGE_SIZE,
           offset,
         );
-        setHasMore(next.length === DATASET_PAGE_SIZE);
-        setDatasets((prev) => (append ? [...prev, ...next] : next));
+        setHasMoreState(next.length === DATASET_PAGE_SIZE);
+        if (append) {
+          setDatasetsState([...datasetsRef.current, ...next]);
+        } else {
+          setDatasetsState(next);
+        }
       } finally {
         setIsLoading(false);
       }
     },
-    [datasets.length, hasMore, isLoading, searchQuery, selectedTags],
+    [setDatasetsState, setHasMoreState],
   );
 
   const refreshDatasets = useCallback(async () => {
-    if (isLoading) return;
+    if (isLoadingRef.current) return;
     setIsLoading(true);
     try {
-      const limit = Math.max(datasets.length, DATASET_PAGE_SIZE);
-      const next = await listDatasets(searchQuery, selectedTags, limit, 0);
-      setDatasets(next);
-      setHasMore(next.length >= limit);
+      const limit = Math.max(datasetsRef.current.length, DATASET_PAGE_SIZE);
+      const next = await listDatasets(
+        searchRef.current,
+        selectedTagsRef.current,
+        limit,
+        0,
+      );
+      setDatasetsState(next);
+      setHasMoreState(next.length >= limit);
     } finally {
       setIsLoading(false);
     }
-  }, [datasets.length, isLoading, searchQuery, selectedTags]);
+  }, [setDatasetsState, setHasMoreState]);
 
   useEffect(() => {
     void loadDatasets();
@@ -101,8 +141,8 @@ export function DatasetTable({
 
     void onDatasetCreated((event) => {
       if (!active) return;
-      setDatasets((prev) => [event, ...prev]);
-      if (searchQuery.trim() || selectedTags.length > 0) {
+      setDatasetsState([event, ...datasetsRef.current]);
+      if (searchRef.current.trim() || selectedTagsRef.current.length > 0) {
         void loadDatasets();
       }
     }).then((unlisten) => {
@@ -111,18 +151,16 @@ export function DatasetTable({
 
     void onDatasetUpdated((event) => {
       if (!active) return;
-      setDatasets((prev) => {
-        const index = prev.findIndex((dataset) => dataset.id === event.id);
-        if (index >= 0) {
-          const next = [...prev];
-          next[index] = event;
-          return next;
-        }
-        if (!searchQuery.trim() && selectedTags.length === 0) {
-          return [event, ...prev];
-        }
-        return prev;
-      });
+      const next = [...datasetsRef.current];
+      const index = next.findIndex((dataset) => dataset.id === event.id);
+      if (index >= 0) {
+        next[index] = event;
+        setDatasetsState(next);
+        return;
+      }
+      if (!searchRef.current.trim() && selectedTagsRef.current.length === 0) {
+        setDatasetsState([event, ...next]);
+      }
     }).then((unlisten) => {
       unlistenUpdated = unlisten;
     });
@@ -132,7 +170,7 @@ export function DatasetTable({
       unlistenCreated?.();
       unlistenUpdated?.();
     };
-  }, [loadDatasets, searchQuery, selectedTags]);
+  }, [loadDatasets, setDatasetsState]);
 
   useEffect(() => {
     if (searchDebounce.current) {
