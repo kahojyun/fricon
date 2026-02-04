@@ -48,6 +48,12 @@ When working with TanStack Router's file-based routing, be aware of:
 4. **Component structure** - Place reusable components in `src/components/`, Shadcn components in `src/components/ui/`
 5. **Utilities** - Shared utilities go in `src/lib/`, hooks in `src/hooks/`
 6. **Prefer shadcn components** - When a component is missing, first check if shadcn/ui has an existing component before creating custom ones.
+7. **Using Base UI patterns**: shadcn/ui now uses Base UI instead of Radix. Key differences:
+    - Replace `asChild` prop with render props pattern: `render={<MyComponent />}` or `render={(props) => <MyComponent {...props} />}`
+    - Slots use `render` prop for customization instead of composition with `asChild`
+    - Check Base UI documentation for component-specific APIs
+    - [Base UI](https://base-ui.com/llms.txt)
+    - [Shadcn UI](https://ui.shadcn.com/llms.txt)
 
 ### Common Tasks
 

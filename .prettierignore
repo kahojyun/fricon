@@ -3,5 +3,5 @@ pnpm-lock.yaml
 .pre-commit-config.yaml
 CHANGELOG.md
 .agents
-
+routeTree.gen.ts
 crates/fricon-ui/frontend-vue
