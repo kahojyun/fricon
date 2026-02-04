@@ -345,52 +345,13 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   useEffect(() => {
     let aborted = false;
 
-    const load = async () => {
-      const [detail, filter] = await Promise.all([
-        getDatasetDetail(datasetId),
-        getFilterTableData(datasetId, {
-          excludeColumns: excludeColumnsRef.current,
-        }),
-      ]);
+    const loadDetail = async () => {
+      const detail = await getDatasetDetail(datasetId);
       if (aborted) return;
-
       setDatasetDetail(detail);
-      setFilterTableData(filter);
-      setFilterRow(filter.rows[0]);
-
-      const poll = async () => {
-        while (!aborted) {
-          const { isComplete } = await getDatasetWriteStatus(datasetId);
-          if (aborted) return;
-
-          if (isComplete) {
-            const updatedDetail = await getDatasetDetail(datasetId);
-            if (aborted) return;
-            const updatedFilter = await getFilterTableData(datasetId, {
-              excludeColumns: excludeColumnsRef.current,
-            });
-            if (aborted) return;
-            setDatasetDetail(updatedDetail);
-            setFilterTableData(updatedFilter);
-            setDatasetUpdateTick((tick) => tick + 1);
-            break;
-          }
-
-          const updatedFilter = await getFilterTableData(datasetId, {
-            excludeColumns: excludeColumnsRef.current,
-          });
-          if (aborted) return;
-          setFilterTableData(updatedFilter);
-          setDatasetUpdateTick((tick) => tick + 1);
-
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      };
-
-      void poll();
     };
 
-    void load();
+    void loadDetail();
 
     return () => {
       aborted = true;
@@ -398,7 +359,6 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   }, [datasetId]);
 
   useEffect(() => {
-    if (!datasetDetail) return;
     let active = true;
     void getFilterTableData(datasetId, { excludeColumns }).then((filter) => {
       if (!active) return;
@@ -408,7 +368,47 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     return () => {
       active = false;
     };
-  }, [datasetDetail, datasetId, excludeColumns]);
+  }, [datasetId, excludeColumns]);
+
+  useEffect(() => {
+    if (datasetDetail?.status !== "Writing") return;
+    let aborted = false;
+
+    const poll = async () => {
+      while (!aborted) {
+        const { isComplete } = await getDatasetWriteStatus(datasetId);
+        if (aborted) return;
+
+        if (isComplete) {
+          const updatedDetail = await getDatasetDetail(datasetId);
+          if (aborted) return;
+          const updatedFilter = await getFilterTableData(datasetId, {
+            excludeColumns: excludeColumnsRef.current,
+          });
+          if (aborted) return;
+          setDatasetDetail(updatedDetail);
+          setFilterTableData(updatedFilter);
+          setDatasetUpdateTick((tick) => tick + 1);
+          break;
+        }
+
+        const updatedFilter = await getFilterTableData(datasetId, {
+          excludeColumns: excludeColumnsRef.current,
+        });
+        if (aborted) return;
+        setFilterTableData(updatedFilter);
+        setDatasetUpdateTick((tick) => tick + 1);
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    };
+
+    void poll();
+
+    return () => {
+      aborted = true;
+    };
+  }, [datasetDetail, datasetId]);
 
   const getNewData = useCallback(async (): Promise<
     ChartOptions | undefined
