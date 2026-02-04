@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Star, StarOff } from "lucide-react";
@@ -292,8 +293,9 @@ export function DatasetTable({
           <div>Tags</div>
           <div>Created At</div>
         </div>
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+        <ScrollArea className="min-h-0 flex-1">
           <div
+            ref={scrollRef}
             className="relative w-full"
             style={{ height: rowVirtualizer.getTotalSize() }}
           >
@@ -369,7 +371,7 @@ export function DatasetTable({
               );
             })}
           </div>
-        </div>
+        </ScrollArea>
       </div>
     </div>
   );

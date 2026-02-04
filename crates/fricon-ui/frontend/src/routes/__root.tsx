@@ -5,6 +5,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Database, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
@@ -14,6 +15,16 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   const workspacePath = useWorkspaceStore((state) => state.path);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = (isDark: boolean) => {
+      document.documentElement.classList.toggle("dark", isDark);
+    };
+    apply(media.matches);
+    const handler = (event: MediaQueryListEvent) => apply(event.matches);
+    media.addEventListener("change", handler);
+    return () => media.removeEventListener("change", handler);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

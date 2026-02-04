@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
+import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
 import {
   DatasetComponent,
@@ -158,44 +159,52 @@ function buildOption(data?: ChartOptions): EChartsOption {
 }
 
 export function ChartWrapper({ data }: ChartWrapperProps) {
-  const chartRef = useRef<HTMLDivElement | null>(null);
-  const instanceRef = useRef<echarts.ECharts | null>(null);
   const prefersDark = useMemo(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   }, []);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    const theme = document.documentElement.classList.contains("dark")
+  const [theme, setTheme] = useState<"dark" | "default">(() => {
+    if (typeof document === "undefined") return "default";
+    return document.documentElement.classList.contains("dark") || prefersDark
       ? "dark"
-      : prefersDark
-        ? "dark"
-        : "default";
-    const instance = echarts.init(chartRef.current, theme);
-    instanceRef.current = instance;
-
-    const resizeObserver = new ResizeObserver(() => {
-      instance.resize();
-    });
-    resizeObserver.observe(chartRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-      instance.dispose();
-      instanceRef.current = null;
-    };
-  }, [prefersDark]);
+      : "default";
+  });
 
   useEffect(() => {
-    const instance = instanceRef.current;
-    if (!instance) return;
-    instance.setOption(buildOption(data), { notMerge: true });
-  }, [data]);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateTheme = () => {
+      const next =
+        document.documentElement.classList.contains("dark") || media.matches
+          ? "dark"
+          : "default";
+      setTheme(next);
+    };
+    updateTheme();
+    const handler = () => updateTheme();
+    media.addEventListener("change", handler);
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => {
+      media.removeEventListener("change", handler);
+      observer.disconnect();
+    };
+  }, []);
+
+  const option = useMemo(() => buildOption(data), [data]);
 
   return (
     <div className="relative size-full">
-      <div ref={chartRef} className="size-full" />
+      <ReactEChartsCore
+        echarts={echarts}
+        className="size-full"
+        option={option}
+        notMerge
+        lazyUpdate
+        theme={theme}
+      />
       {!data ? (
         <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
           No chart data

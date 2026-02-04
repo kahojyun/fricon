@@ -4,6 +4,7 @@ import type {
   FilterTableData,
   FilterTableRow,
 } from "@/lib/backend";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
@@ -163,7 +164,7 @@ export function FilterTable({
       ) : null}
 
       {!isIndividualFilterMode ? (
-        <div className="min-h-0 flex-1 overflow-auto">
+        <ScrollArea className="min-h-0 flex-1">
           <table className="w-full text-xs">
             <thead className="bg-muted/40 text-muted-foreground sticky top-0">
               <tr>
@@ -196,7 +197,7 @@ export function FilterTable({
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollArea>
       ) : null}
 
       {isIndividualFilterMode && isFilterTableEmpty ? (
@@ -212,7 +213,7 @@ export function FilterTable({
               <div className="bg-muted/40 text-muted-foreground sticky top-0 px-2 py-2 text-xs font-semibold">
                 {field}
               </div>
-              <div className="min-h-0 flex-1 overflow-auto">
+              <ScrollArea className="min-h-0 flex-1">
                 <table className="w-full text-xs">
                   <tbody>
                     {(columnUniqueValues[field] ?? []).map((item) => {
@@ -238,7 +239,7 @@ export function FilterTable({
                     })}
                   </tbody>
                 </table>
-              </div>
+              </ScrollArea>
               {index < filterTableData.fields.length - 1 ? (
                 <div className="bg-border/60 h-full w-px" />
               ) : null}
