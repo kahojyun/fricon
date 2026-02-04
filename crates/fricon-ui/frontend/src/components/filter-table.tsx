@@ -259,45 +259,49 @@ export function FilterTable({
       {isIndividualFilterMode && filterTableData ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {filterTableData.fields.map((field, index) => (
-            <div key={field} className="min-w-0 flex-1">
-              <Table className="text-xs">
-                <TableHeader className="bg-muted text-muted-foreground">
-                  <TableRow>
-                    <TableHead className="px-2 py-2">{field}</TableHead>
-                  </TableRow>
-                </TableHeader>
-              </Table>
-              <ScrollArea className="min-h-0 flex-1">
+            <div key={field} className="flex min-w-0 flex-1">
+              <div className="min-w-0 flex-1">
                 <Table className="text-xs">
-                  <TableBody>
-                    {(columnUniqueValues[field] ?? []).map((item) => {
-                      const isSelected =
-                        individualColumnSelections[field] === item.index;
-                      return (
-                        <TableRow
-                          key={item.index}
-                          className={cn(
-                            "cursor-pointer border-b",
-                            isSelected ? "bg-primary/10" : "hover:bg-muted/40",
-                          )}
-                          onClick={() => {
-                            setIndividualColumnSelections((prev) => ({
-                              ...prev,
-                              [field]: item.index,
-                            }));
-                          }}
-                        >
-                          <TableCell className="px-2 py-2">
-                            {item.displayValue}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
+                  <TableHeader className="bg-muted text-muted-foreground text-xs">
+                    <TableRow>
+                      <TableHead className="h-8 px-2 py-2 font-semibold">
+                        {field}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
                 </Table>
-              </ScrollArea>
+                <ScrollArea className="min-h-0 flex-1">
+                  <Table className="text-xs">
+                    <TableBody>
+                      {(columnUniqueValues[field] ?? []).map((item) => {
+                        const isSelected =
+                          individualColumnSelections[field] === item.index;
+                        return (
+                          <TableRow
+                            key={item.index}
+                            className={cn(
+                              "cursor-pointer border-b",
+                              isSelected ? "bg-primary/10" : "hover:bg-muted/40",
+                            )}
+                            onClick={() => {
+                              setIndividualColumnSelections((prev) => ({
+                                ...prev,
+                                [field]: item.index,
+                              }));
+                            }}
+                          >
+                            <TableCell className="px-2 py-2">
+                              {item.displayValue}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
               {index < filterTableData.fields.length - 1 ? (
-                <div className="bg-border/60 h-full w-px" />
+                <div className="bg-border/60 w-px shrink-0" />
               ) : null}
             </div>
           ))}
