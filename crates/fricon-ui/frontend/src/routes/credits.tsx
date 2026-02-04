@@ -9,6 +9,7 @@ function CreditsComponent() {
   return (
     <div className="p-4">
       <Button
+        nativeButton={false}
         variant="link"
         render={(props) => (
           <a

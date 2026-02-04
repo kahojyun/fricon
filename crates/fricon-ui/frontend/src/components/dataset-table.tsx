@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   DATASET_PAGE_SIZE,
@@ -21,10 +21,13 @@ interface DatasetTableProps {
   onDatasetSelected: (id: number) => void;
 }
 
-const statusVariantMap: Record<DatasetStatus, "info" | "success" | "danger"> = {
-  Writing: "info",
-  Completed: "success",
-  Aborted: "danger",
+const statusVariantMap: Record<
+  DatasetStatus,
+  "default" | "secondary" | "destructive"
+> = {
+  Writing: "secondary",
+  Completed: "default",
+  Aborted: "destructive",
 };
 
 export function DatasetTable({
@@ -55,25 +58,28 @@ export function DatasetTable({
       : datasets;
   }, [datasets, favoritesOnly]);
 
-  const loadDatasets = async ({ append = false } = {}) => {
-    if (isLoading || (append && !hasMore)) return;
-    setIsLoading(true);
-    try {
-      const offset = append ? datasets.length : 0;
-      const next = await listDatasets(
-        searchQuery,
-        selectedTags,
-        DATASET_PAGE_SIZE,
-        offset,
-      );
-      setHasMore(next.length === DATASET_PAGE_SIZE);
-      setDatasets((prev) => (append ? [...prev, ...next] : next));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const loadDatasets = useCallback(
+    async ({ append = false } = {}) => {
+      if (isLoading || (append && !hasMore)) return;
+      setIsLoading(true);
+      try {
+        const offset = append ? datasets.length : 0;
+        const next = await listDatasets(
+          searchQuery,
+          selectedTags,
+          DATASET_PAGE_SIZE,
+          offset,
+        );
+        setHasMore(next.length === DATASET_PAGE_SIZE);
+        setDatasets((prev) => (append ? [...prev, ...next] : next));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [datasets.length, hasMore, isLoading, searchQuery, selectedTags],
+  );
 
-  const refreshDatasets = async () => {
+  const refreshDatasets = useCallback(async () => {
     if (isLoading) return;
     setIsLoading(true);
     try {
@@ -84,7 +90,7 @@ export function DatasetTable({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [datasets.length, isLoading, searchQuery, selectedTags]);
 
   useEffect(() => {
     void loadDatasets();
@@ -93,7 +99,7 @@ export function DatasetTable({
     let unlistenUpdated: (() => void) | undefined;
     let active = true;
 
-    onDatasetCreated((event) => {
+    void onDatasetCreated((event) => {
       if (!active) return;
       setDatasets((prev) => [event, ...prev]);
       if (searchQuery.trim() || selectedTags.length > 0) {
@@ -103,7 +109,7 @@ export function DatasetTable({
       unlistenCreated = unlisten;
     });
 
-    onDatasetUpdated((event) => {
+    void onDatasetUpdated((event) => {
       if (!active) return;
       setDatasets((prev) => {
         const index = prev.findIndex((dataset) => dataset.id === event.id);
@@ -126,8 +132,7 @@ export function DatasetTable({
       unlistenCreated?.();
       unlistenUpdated?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadDatasets, searchQuery, selectedTags]);
 
   useEffect(() => {
     if (searchDebounce.current) {
@@ -142,7 +147,7 @@ export function DatasetTable({
         window.clearTimeout(searchDebounce.current);
       }
     };
-  }, [searchQuery, selectedTags]);
+  }, [loadDatasets, searchQuery, selectedTags]);
 
   useEffect(() => {
     const hasWriting = datasets.some((dataset) => dataset.status === "Writing");
@@ -161,7 +166,7 @@ export function DatasetTable({
         statusRefreshTimer.current = null;
       }
     };
-  }, [datasets]);
+  }, [datasets, refreshDatasets]);
 
   const rowVirtualizer = useVirtualizer({
     count: filteredDatasets.length,
@@ -176,7 +181,7 @@ export function DatasetTable({
     if (hasMore && last.index >= filteredDatasets.length - 10) {
       void loadDatasets({ append: true });
     }
-  }, [filteredDatasets.length, hasMore, rowVirtualizer]);
+  }, [filteredDatasets.length, hasMore, loadDatasets, rowVirtualizer]);
 
   const toggleFavorite = async (dataset: DatasetInfo) => {
     const nextFavorite = !dataset.favorite;

@@ -24,6 +24,7 @@ function RootComponent() {
               variant="outline"
               size="icon"
               className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+              nativeButton={false}
               render={(props) => (
                 <Link
                   {...props}
@@ -39,6 +40,7 @@ function RootComponent() {
               variant="outline"
               size="icon"
               className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+              nativeButton={false}
               render={(props) => (
                 <Link
                   {...props}
