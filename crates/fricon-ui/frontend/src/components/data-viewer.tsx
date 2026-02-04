@@ -1,8 +1,32 @@
+import { useEffect } from "react";
+import { getWorkspaceInfo } from "@/lib/backend";
+import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
+
 interface DataViewerProps {
   datasetId?: string;
 }
 
 export function DataViewer({ datasetId }: DataViewerProps) {
+  const setPath = useWorkspaceStore((state) => state.setPath);
+
+  useEffect(() => {
+    let isActive = true;
+    getWorkspaceInfo()
+      .then((info) => {
+        if (isActive) {
+          setPath(info.path);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setPath("(no workspace)");
+        }
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [setPath]);
+
   return (
     <div className="flex h-full min-h-[calc(100vh-2rem)] flex-col">
       <div className="grid h-full flex-1 grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

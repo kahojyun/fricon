@@ -4,6 +4,7 @@ import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Database, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
 
 const queryClient = new QueryClient();
 
@@ -12,7 +13,7 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  const workspacePath = "(no workspace)";
+  const workspacePath = useWorkspaceStore((state) => state.path);
 
   return (
     <QueryClientProvider client={queryClient}>
