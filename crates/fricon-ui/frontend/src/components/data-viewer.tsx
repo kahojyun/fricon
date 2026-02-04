@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { getWorkspaceInfo } from "@/lib/backend";
 import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
 import { DatasetTable } from "@/components/dataset-table";
+import { DatasetDetailPage } from "@/components/dataset-detail-page";
 
 interface DataViewerProps {
   datasetId?: string;
@@ -60,14 +61,7 @@ export function DataViewer({ datasetId }: DataViewerProps) {
         </section>
         <section className="p-4">
           {selectedDatasetId ? (
-            <>
-              <h2 className="text-lg font-semibold">
-                Dataset {selectedDatasetId}
-              </h2>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Detail + charts placeholder.
-              </p>
-            </>
+            <DatasetDetailPage datasetId={selectedDatasetId} />
           ) : (
             <>
               <h2 className="text-lg font-semibold">No dataset selected</h2>
