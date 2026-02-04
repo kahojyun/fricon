@@ -34,6 +34,9 @@ export function FilterTable({
     Record<string, number | undefined>
   >({});
   const previousDatasetId = useRef<string | undefined>(undefined);
+  const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const bodyScrollRootRef = useRef<HTMLDivElement | null>(null);
+  const bodyViewportRef = useRef<HTMLDivElement | null>(null);
 
   const showFilterToggle = Boolean(
     filterTableData && filterTableData.fields.length > 1,
@@ -43,8 +46,37 @@ export function FilterTable({
     !filterTableData || filterTableData.rows.length === 0;
   const gridTemplate = useMemo(() => {
     if (!filterTableData) return "none";
-    return `repeat(${filterTableData.fields.length}, minmax(120px, 1fr))`;
+    return `repeat(${filterTableData.fields.length}, minmax(80px, 1fr))`;
   }, [filterTableData]);
+  const minTableWidth = useMemo(() => {
+    if (!filterTableData) return "0px";
+    const minWidth = Math.max(filterTableData.fields.length * 80, 320);
+    return `${minWidth}px`;
+  }, [filterTableData]);
+
+  useEffect(() => {
+    if (!bodyScrollRootRef.current) return;
+    bodyViewportRef.current = bodyScrollRootRef.current.querySelector(
+      "[data-slot=\"scroll-area-viewport\"]",
+    );
+    if (bodyViewportRef.current && headerScrollRef.current) {
+      headerScrollRef.current.scrollLeft = bodyViewportRef.current.scrollLeft;
+    }
+  }, []);
+
+  useEffect(() => {
+    const viewport = bodyViewportRef.current;
+    if (!viewport) return;
+    const handleScroll = () => {
+      if (headerScrollRef.current) {
+        headerScrollRef.current.scrollLeft = viewport.scrollLeft;
+      }
+    };
+    viewport.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      viewport.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   const columnUniqueValues = useMemo<
     Record<string, ColumnUniqueValue[]>
@@ -178,15 +210,23 @@ export function FilterTable({
       {!isIndividualFilterMode ? (
         <>
           <div
-            className="bg-muted text-muted-foreground grid border-b px-2 py-2 text-xs font-semibold"
-            style={{ gridTemplateColumns: gridTemplate }}
+            ref={headerScrollRef}
+            className="bg-muted overflow-hidden border-b"
           >
-            {filterTableData.fields.map((field) => (
-              <div key={field}>{field}</div>
-            ))}
+            <div
+              className="text-muted-foreground grid px-2 py-2 text-xs font-semibold"
+              style={{
+                gridTemplateColumns: gridTemplate,
+                minWidth: minTableWidth,
+              }}
+            >
+              {filterTableData.fields.map((field) => (
+                <div key={field}>{field}</div>
+              ))}
+            </div>
           </div>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="min-w-[640px]">
+          <ScrollArea ref={bodyScrollRootRef} className="min-h-0 flex-1">
+            <div style={{ minWidth: minTableWidth }}>
               {filterTableData.rows.map((row) => {
                 const isSelected = value?.index === row.index;
                 return (
