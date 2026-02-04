@@ -172,9 +172,9 @@ export function FilterTable({
       ) : null}
 
       {!isIndividualFilterMode ? (
-        <ScrollArea className="min-h-0 flex-1">
+        <>
           <Table className="text-xs">
-            <TableHeader className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
+            <TableHeader className="bg-muted text-muted-foreground">
               <TableRow>
                 {filterTableData.fields.map((field) => (
                   <TableHead key={field} className="px-2 py-2">
@@ -183,29 +183,33 @@ export function FilterTable({
                 ))}
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {filterTableData.rows.map((row) => {
-                const isSelected = value?.index === row.index;
-                return (
-                  <TableRow
-                    key={row.index}
-                    className={cn(
-                      "cursor-pointer border-b",
-                      isSelected ? "bg-primary/10" : "hover:bg-muted/40",
-                    )}
-                    onClick={() => onChange(row)}
-                  >
-                    {filterTableData.fields.map((field, idx) => (
-                      <TableCell key={field} className="px-2 py-2">
-                        {row.displayValues[idx]}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
           </Table>
-        </ScrollArea>
+          <ScrollArea className="min-h-0 flex-1">
+            <Table className="text-xs">
+              <TableBody>
+                {filterTableData.rows.map((row) => {
+                  const isSelected = value?.index === row.index;
+                  return (
+                    <TableRow
+                      key={row.index}
+                      className={cn(
+                        "cursor-pointer border-b",
+                        isSelected ? "bg-primary/10" : "hover:bg-muted/40",
+                      )}
+                      onClick={() => onChange(row)}
+                    >
+                      {filterTableData.fields.map((field, idx) => (
+                        <TableCell key={field} className="px-2 py-2">
+                          {row.displayValues[idx]}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </>
       ) : null}
 
       {isIndividualFilterMode && isFilterTableEmpty ? (
@@ -218,13 +222,15 @@ export function FilterTable({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {filterTableData.fields.map((field, index) => (
             <div key={field} className="min-w-0 flex-1">
+              <Table className="text-xs">
+                <TableHeader className="bg-muted text-muted-foreground">
+                  <TableRow>
+                    <TableHead className="px-2 py-2">{field}</TableHead>
+                  </TableRow>
+                </TableHeader>
+              </Table>
               <ScrollArea className="min-h-0 flex-1">
                 <Table className="text-xs">
-                  <TableHeader className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
-                    <TableRow>
-                      <TableHead className="px-2 py-2">{field}</TableHead>
-                    </TableRow>
-                  </TableHeader>
                   <TableBody>
                     {(columnUniqueValues[field] ?? []).map((item) => {
                       const isSelected =

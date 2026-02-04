@@ -222,6 +222,7 @@ export function DatasetTable({
     estimateSize: () => 56,
     overscan: 8,
   });
+  const headerHeight = 40;
 
   useEffect(() => {
     const last = rowVirtualizer.getVirtualItems().at(-1);
@@ -296,22 +297,27 @@ export function DatasetTable({
       <div className="flex min-h-0 flex-1 flex-col border-t">
         <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
           <div className="min-w-[760px]">
-            <Table className="table-fixed">
-              <TableHeader className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
-                <TableRow>
-                  <TableHead className="w-[60px]">Favorite</TableHead>
-                  <TableHead className="w-[70px]">ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="min-w-[140px]">Tags</TableHead>
-                  <TableHead className="w-[160px]">Created At</TableHead>
-                </TableRow>
-              </TableHeader>
-            </Table>
+            <div className="bg-muted sticky top-0 z-20">
+              <Table className="table-fixed">
+                <TableHeader className="text-muted-foreground">
+                  <TableRow>
+                    <TableHead className="w-[60px]">Favorite</TableHead>
+                    <TableHead className="w-[70px]">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="w-[120px]">Status</TableHead>
+                    <TableHead className="min-w-[140px]">Tags</TableHead>
+                    <TableHead className="w-[160px]">Created At</TableHead>
+                  </TableRow>
+                </TableHeader>
+              </Table>
+            </div>
             <div
               ref={scrollRef}
               className="relative w-full"
-              style={{ height: rowVirtualizer.getTotalSize() }}
+              style={{
+                height: rowVirtualizer.getTotalSize() + headerHeight,
+                paddingTop: headerHeight,
+              }}
             >
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const dataset = filteredDatasets[virtualRow.index];
