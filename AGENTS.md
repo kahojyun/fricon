@@ -45,6 +45,7 @@ pnpm install
 pnpm run check # Type checking and linting
 pnpm run fix # Fix auto-fixable issues
 pnpm run test --run
+pnpm --filter fricon-ui exec shadcn add <component>
 ```
 
 ## Testing Guidelines
