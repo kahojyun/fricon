@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChartViewer } from "@/components/chart-viewer";
 
 interface DatasetDetailPageProps {
   datasetId: number;
@@ -117,8 +118,8 @@ export function DatasetDetailPage({
         </TabsList>
 
         <TabsContent value="charts" className="flex-1">
-          <div className="text-muted-foreground text-sm">
-            Chart viewer placeholder.
+          <div className="min-h-[360px]">
+            <ChartViewer datasetId={datasetId} />
           </div>
         </TabsContent>
 
