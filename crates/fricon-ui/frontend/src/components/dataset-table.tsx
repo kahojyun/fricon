@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Star, StarOff } from "lucide-react";
 
@@ -48,6 +49,7 @@ export function DatasetTable({
   const hasMoreRef = useRef(true);
   const searchDebounce = useRef<number | null>(null);
   const statusRefreshTimer = useRef<number | null>(null);
+  const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const setDatasetsState = useCallback((next: DatasetInfo[]) => {
@@ -71,6 +73,13 @@ export function DatasetTable({
   useEffect(() => {
     isLoadingRef.current = isLoading;
   }, [isLoading]);
+
+  useEffect(() => {
+    if (!scrollRootRef.current) return;
+    scrollRef.current = scrollRootRef.current.querySelector(
+      '[data-slot="scroll-area-viewport"]',
+    );
+  }, []);
 
   useEffect(() => {
     hasMoreRef.current = hasMore;
@@ -210,7 +219,7 @@ export function DatasetTable({
   const rowVirtualizer = useVirtualizer({
     count: filteredDatasets.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 40,
+    estimateSize: () => 56,
     overscan: 8,
   });
 
@@ -285,91 +294,99 @@ export function DatasetTable({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col border-t">
-        <div className="bg-muted/40 text-muted-foreground grid grid-cols-[60px_70px_minmax(160px,1fr)_120px_minmax(140px,1fr)_160px] gap-2 border-b px-3 py-2 text-xs font-semibold">
-          <div>Favorite</div>
-          <div>ID</div>
-          <div>Name</div>
-          <div>Status</div>
-          <div>Tags</div>
-          <div>Created At</div>
-        </div>
-        <ScrollArea className="min-h-0 flex-1">
-          <div
-            ref={scrollRef}
-            className="relative w-full"
-            style={{ height: rowVirtualizer.getTotalSize() }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const dataset = filteredDatasets[virtualRow.index];
-              if (!dataset) return null;
-              const isSelected = dataset.id === selectedDatasetId;
-              return (
-                <div
-                  key={dataset.id}
-                  className={cn(
-                    "grid grid-cols-[60px_70px_minmax(160px,1fr)_120px_minmax(140px,1fr)_160px] items-center gap-2 border-b px-3 py-2 text-sm",
-                    isSelected ? "bg-primary/10" : "hover:bg-muted/50",
-                  )}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                  onClick={() => onDatasetSelected(dataset.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      onDatasetSelected(dataset.id);
-                    }
-                    if (event.metaKey || event.ctrlKey) {
-                      event.stopPropagation();
-                    }
-                  }}
-                >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void toggleFavorite(dataset);
+        <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
+          <div className="min-w-[760px]">
+            <Table className="table-fixed">
+              <TableHeader className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
+                <TableRow>
+                  <TableHead className="w-[60px]">Favorite</TableHead>
+                  <TableHead className="w-[70px]">ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-[120px]">Status</TableHead>
+                  <TableHead className="min-w-[140px]">Tags</TableHead>
+                  <TableHead className="w-[160px]">Created At</TableHead>
+                </TableRow>
+              </TableHeader>
+            </Table>
+            <div
+              ref={scrollRef}
+              className="relative w-full"
+              style={{ height: rowVirtualizer.getTotalSize() }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const dataset = filteredDatasets[virtualRow.index];
+                if (!dataset) return null;
+                const isSelected = dataset.id === selectedDatasetId;
+                return (
+                  <div
+                    key={dataset.id}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className={cn(
+                      "grid grid-cols-[60px_70px_minmax(160px,1fr)_120px_minmax(140px,1fr)_160px] items-center gap-2 border-b px-3 py-2 text-sm",
+                      isSelected ? "bg-primary/10" : "hover:bg-muted/50",
+                    )}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    onClick={() => onDatasetSelected(dataset.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        onDatasetSelected(dataset.id);
+                      }
+                      if (event.metaKey || event.ctrlKey) {
+                        event.stopPropagation();
+                      }
                     }}
                   >
-                    {dataset.favorite ? (
-                      <Star className="text-yellow-500" />
-                    ) : (
-                      <StarOff className="text-muted-foreground" />
-                    )}
-                  </Button>
-                  <div className="tabular-nums">{dataset.id}</div>
-                  <div className="truncate">{dataset.name}</div>
-                  <div>
-                    <Badge variant={statusVariantMap[dataset.status]}>
-                      {dataset.status}
-                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void toggleFavorite(dataset);
+                      }}
+                    >
+                      {dataset.favorite ? (
+                        <Star className="text-yellow-500" />
+                      ) : (
+                        <StarOff className="text-muted-foreground" />
+                      )}
+                    </Button>
+                    <div className="px-2 tabular-nums">{dataset.id}</div>
+                    <div className="truncate px-2">{dataset.name}</div>
+                    <div className="px-2">
+                      <Badge variant={statusVariantMap[dataset.status]}>
+                        {dataset.status}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-1 px-2">
+                      {dataset.tags.length > 0 ? (
+                        dataset.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-xs">
+                          No tags
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground px-2 text-xs">
+                      {dataset.createdAt.toLocaleString()}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {dataset.tags.length > 0 ? (
-                      dataset.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary">
-                          {tag}
-                        </Badge>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground text-xs">
-                        No tags
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-muted-foreground text-xs">
-                    {dataset.createdAt.toLocaleString()}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </ScrollArea>
       </div>

@@ -6,6 +6,14 @@ import type {
 } from "@/lib/backend";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 interface FilterTableProps {
@@ -165,21 +173,21 @@ export function FilterTable({
 
       {!isIndividualFilterMode ? (
         <ScrollArea className="min-h-0 flex-1">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40 text-muted-foreground sticky top-0">
-              <tr>
+          <Table className="text-xs">
+            <TableHeader className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
+              <TableRow>
                 {filterTableData.fields.map((field) => (
-                  <th key={field} className="px-2 py-2 text-left font-semibold">
+                  <TableHead key={field} className="px-2 py-2">
                     {field}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filterTableData.rows.map((row) => {
                 const isSelected = value?.index === row.index;
                 return (
-                  <tr
+                  <TableRow
                     key={row.index}
                     className={cn(
                       "cursor-pointer border-b",
@@ -188,15 +196,15 @@ export function FilterTable({
                     onClick={() => onChange(row)}
                   >
                     {filterTableData.fields.map((field, idx) => (
-                      <td key={field} className="px-2 py-2">
+                      <TableCell key={field} className="px-2 py-2">
                         {row.displayValues[idx]}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </ScrollArea>
       ) : null}
 
@@ -210,17 +218,19 @@ export function FilterTable({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {filterTableData.fields.map((field, index) => (
             <div key={field} className="min-w-0 flex-1">
-              <div className="bg-muted/40 text-muted-foreground sticky top-0 px-2 py-2 text-xs font-semibold">
-                {field}
-              </div>
               <ScrollArea className="min-h-0 flex-1">
-                <table className="w-full text-xs">
-                  <tbody>
+                <Table className="text-xs">
+                  <TableHeader className="bg-muted/40 text-muted-foreground sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead className="px-2 py-2">{field}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {(columnUniqueValues[field] ?? []).map((item) => {
                       const isSelected =
                         individualColumnSelections[field] === item.index;
                       return (
-                        <tr
+                        <TableRow
                           key={item.index}
                           className={cn(
                             "cursor-pointer border-b",
@@ -233,12 +243,14 @@ export function FilterTable({
                             }));
                           }}
                         >
-                          <td className="px-2 py-2">{item.displayValue}</td>
-                        </tr>
+                          <TableCell className="px-2 py-2">
+                            {item.displayValue}
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </ScrollArea>
               {index < filterTableData.fields.length - 1 ? (
                 <div className="bg-border/60 h-full w-px" />
