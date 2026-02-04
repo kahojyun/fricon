@@ -16,7 +16,6 @@ export default defineConfig([
     "site/**",
     "target/**",
     "**/node_modules/**",
-    "crates/fricon-ui/frontend-vue/**",
   ]),
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
