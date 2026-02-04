@@ -503,7 +503,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   }, [getNewData, datasetUpdateTick]);
 
   return (
-    <div className="flex size-full flex-col">
+    <div className="flex size-full min-h-0 flex-col overflow-hidden">
       <div className="flex flex-wrap gap-2 p-2">
         <div className="min-w-[160px]">
           <Label className="mb-1 block text-xs">Chart Type</Label>
@@ -824,11 +824,11 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
-        <div className="min-h-[260px] flex-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2">
+        <div className="min-h-0 flex-1">
           <ChartWrapper data={data} />
         </div>
-        <div className="min-h-[200px] flex-1">
+        <div className="min-h-0 flex-1">
           <FilterTable
             value={filterRow}
             onChange={setFilterRow}

@@ -249,7 +249,7 @@ export function DatasetTable({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex flex-wrap items-center gap-3 p-3">
         <div className="flex items-center gap-2">
           <Switch checked={favoritesOnly} onCheckedChange={setFavoritesOnly} />
@@ -283,7 +283,7 @@ export function DatasetTable({
         </div>
       ) : null}
 
-      <div className="border-t">
+      <div className="flex min-h-0 flex-1 flex-col border-t">
         <div className="bg-muted/40 text-muted-foreground grid grid-cols-[60px_70px_minmax(160px,1fr)_120px_minmax(140px,1fr)_160px] gap-2 border-b px-3 py-2 text-xs font-semibold">
           <div>Favorite</div>
           <div>ID</div>
@@ -292,7 +292,7 @@ export function DatasetTable({
           <div>Tags</div>
           <div>Created At</div>
         </div>
-        <div ref={scrollRef} className="h-[calc(100vh-190px)] overflow-auto">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
           <div
             className="relative w-full"
             style={{ height: rowVirtualizer.getTotalSize() }}

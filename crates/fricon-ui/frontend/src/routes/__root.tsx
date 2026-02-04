@@ -17,7 +17,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="bg-background text-foreground flex min-h-screen flex-col">
+      <div className="bg-background text-foreground flex h-full flex-col">
         <div className="flex flex-1 overflow-hidden">
           <aside className="bg-muted/40 flex w-14 flex-col items-center gap-2 border-r py-2">
             <Button
@@ -54,7 +54,7 @@ function RootComponent() {
             />
           </aside>
 
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-hidden">
             <Outlet />
           </main>
         </div>

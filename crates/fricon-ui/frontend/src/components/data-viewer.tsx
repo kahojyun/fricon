@@ -51,15 +51,15 @@ export function DataViewer({ datasetId }: DataViewerProps) {
   };
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-2rem)] flex-col">
-      <div className="grid h-full flex-1 grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <section className="border-r">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <section className="min-h-0 overflow-hidden border-r">
           <DatasetTable
             selectedDatasetId={selectedDatasetId}
             onDatasetSelected={handleDatasetSelected}
           />
         </section>
-        <section className="p-4">
+        <section className="min-h-0 overflow-hidden p-4">
           {selectedDatasetId ? (
             <DatasetDetailPage datasetId={selectedDatasetId} />
           ) : (

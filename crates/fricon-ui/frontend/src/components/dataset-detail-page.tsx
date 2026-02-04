@@ -110,21 +110,27 @@ export function DatasetDetailPage({
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <Tabs defaultValue="charts" className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <Tabs defaultValue="charts" className="flex h-full min-h-0 flex-col">
         <TabsList>
           <TabsTrigger value="charts">Charts</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="charts" className="flex-1">
-          <div className="min-h-[360px]">
+        <TabsContent
+          value="charts"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <div className="min-h-0 flex-1 overflow-hidden">
             <ChartViewer datasetId={datasetId} />
           </div>
         </TabsContent>
 
-        <TabsContent value="details" className="flex-1">
-          <div className="space-y-4">
+        <TabsContent
+          value="details"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <div className="min-h-0 flex-1 space-y-4 overflow-auto">
             {isLoading && !detail ? (
               <div className="text-muted-foreground text-xs">
                 Loading dataset...
