@@ -48,6 +48,9 @@ jobs:
           cargo +nightly fmt --all --check
       - name: Frontend check
         run: pnpm run check
+      - name: Check route tree is up-to-date
+        run: |
+          git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 
   test:
     name: Test Python

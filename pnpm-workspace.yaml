@@ -4,3 +4,4 @@ packages:
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild
+  - msw

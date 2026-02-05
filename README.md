@@ -12,7 +12,7 @@ Fricon is a data collection automation framework designed for managing datasets 
 
 - **Workspace Management**: Organized data storage with metadata tracking
 - **Dataset Operations**: Arrow-format data tables with UUID and incremental ID tracking
-- **Desktop UI**: Cross-platform Tauri application with Vue3 frontend
+- **Desktop UI**: Cross-platform Tauri application with React 19 frontend
 - **Server Architecture**: IPC-based server for workspace operations
 
 ## Quick Start

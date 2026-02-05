@@ -44,8 +44,8 @@ uv run ruff check
 pnpm install
 pnpm run check # Type checking and linting
 pnpm run fix # Fix auto-fixable issues
-pnpm run test
-pnpm run bench
+pnpm run test --run
+pnpm --filter fricon-ui exec shadcn add <component>
 ```
 
 ## Testing Guidelines
@@ -55,5 +55,5 @@ pnpm run bench
 - **Test Location**:
     - Rust unit tests in `mod tests`, integration tests in `<crate>/tests`
     - Python tests in `crates/fricon-py/tests/`
-    - Frontend tests in `crates/fricon-ui/frontend/src/**/__tests__`
+    - Frontend tests in `crates/fricon-ui/frontend/src/**/*.test.*`
 - **Running**: Use `cargo test` for Rust, `uv run pytest` for Python, `pnpm run test` for Frontend

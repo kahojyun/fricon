@@ -14,7 +14,7 @@ max_line_length = 100
 [*.proto]
 indent_size = 2
 
-[*.{js,ts,mjs,mts,cjs,cts,html,css,vue,json,yaml,yml}]
+[*.{js,ts,jsx,tsx,mjs,mts,cjs,cts,html,css,vue,json,yaml,yml}]
 indent_size = 2
 
 [*.{md,markdown}]
