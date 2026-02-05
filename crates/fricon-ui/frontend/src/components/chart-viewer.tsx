@@ -1,14 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  fetchChartData,
-  getDatasetDetail,
-  getDatasetWriteStatus,
-  getFilterTableData,
-  type ColumnInfo,
-  type DatasetDetail,
-  type FilterTableData,
-  type FilterTableRow,
-} from "@/lib/backend";
+import { useEffect, useState } from "react";
+import { type ChartDataOptions, type ColumnInfo } from "@/lib/backend";
 import type {
   ChartOptions,
   ChartType,
@@ -17,6 +8,11 @@ import type {
 } from "@/lib/chartTypes";
 import { ChartWrapper } from "@/components/chart-wrapper";
 import { FilterTable } from "@/components/filter-table";
+import { useCascadeSelection } from "@/hooks/useCascadeSelection";
+import { useChartDataQuery } from "@/hooks/useChartDataQuery";
+import { useDatasetDetailQuery } from "@/hooks/useDatasetDetailQuery";
+import { useDatasetWriteStatusQuery } from "@/hooks/useDatasetWriteStatusQuery";
+import { useFilterTableDataQuery } from "@/hooks/useFilterTableDataQuery";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -50,14 +46,6 @@ function isComplexViewOption(value: string): value is ComplexViewOption {
 }
 
 export function ChartViewer({ datasetId }: ChartViewerProps) {
-  const [datasetDetail, setDatasetDetail] = useState<DatasetDetail | null>(
-    null,
-  );
-  const [filterTableData, setFilterTableData] =
-    useState<FilterTableData | null>(null);
-  const excludeColumnsRef = useRef<string[]>([]);
-  const [datasetUpdateTick, setDatasetUpdateTick] = useState(0);
-
   const [chartType, setChartType] = useState<ChartType>("line");
   const [selectedComplexView, setSelectedComplexView] = useState<
     ComplexViewOption[]
@@ -83,157 +71,108 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   const [scatterYName, setScatterYName] = useState<string | null>(null);
   const [scatterBinName, setScatterBinName] = useState<string | null>(null);
 
-  const [filterRow, setFilterRow] = useState<FilterTableRow | undefined>();
-  const [data, setData] = useState<ChartOptions | undefined>();
-  const [scatterError, setScatterError] = useState<string | null>(null);
-  const previousDatasetIdRef = useRef<number | null>(null);
+  const datasetDetailQuery = useDatasetDetailQuery(datasetId);
+  const datasetDetail = datasetDetailQuery.data ?? null;
 
-  const columns = useMemo(() => datasetDetail?.columns ?? [], [datasetDetail]);
+  const columns = datasetDetail?.columns ?? [];
 
-  const pickSelection = useCallback(
-    (
-      options: ColumnInfo[],
-      current: string | null,
-      defaultIndex = 0,
-    ): string | null => {
-      if (options.length === 0) return null;
-      const found = options.find((option) => option.name === current);
-      if (found) return found.name;
-      return options[defaultIndex]?.name ?? options[0]?.name ?? null;
-    },
-    [],
-  );
+  const pickSelection = (
+    options: ColumnInfo[],
+    current: string | null,
+    defaultIndex = 0,
+  ): string | null => {
+    if (options.length === 0) return null;
+    const found = options.find((option) => option.name === current);
+    if (found) return found.name;
+    return options[defaultIndex]?.name ?? options[0]?.name ?? null;
+  };
 
-  const seriesOptions = useMemo(
-    () => columns.filter((column) => !column.isIndex),
-    [columns],
-  );
-  const effectiveSeriesName = useMemo(
-    () => pickSelection(seriesOptions, seriesName),
-    [pickSelection, seriesName, seriesOptions],
-  );
-  const series = useMemo(
-    () => columns.find((column) => column.name === effectiveSeriesName),
-    [columns, effectiveSeriesName],
-  );
+  const seriesOptions = columns.filter((column) => !column.isIndex);
+  const effectiveSeriesName = pickSelection(seriesOptions, seriesName);
+  const series = columns.find((column) => column.name === effectiveSeriesName);
   const isComplexSeries = Boolean(series?.isComplex);
   const complexControlsDisabled = !isComplexSeries;
   const isTraceSeries = Boolean(series?.isTrace);
 
-  const xColumnOptions = useMemo(() => {
-    if (series?.isTrace) return [];
-    return columns.filter((column) => column.isIndex);
-  }, [columns, series?.isTrace]);
-  const yColumnOptions = useMemo(
-    () => columns.filter((column) => column.isIndex),
-    [columns],
+  const xColumnOptions = series?.isTrace
+    ? []
+    : columns.filter((column) => column.isIndex);
+  const yColumnOptions = columns.filter((column) => column.isIndex);
+  const effectiveXColumnName = pickSelection(xColumnOptions, xColumnName);
+  const effectiveYColumnName = pickSelection(yColumnOptions, yColumnName, 1);
+  const xColumn = columns.find(
+    (column) => column.name === effectiveXColumnName,
   );
-  const effectiveXColumnName = useMemo(
-    () => pickSelection(xColumnOptions, xColumnName),
-    [pickSelection, xColumnName, xColumnOptions],
-  );
-  const effectiveYColumnName = useMemo(
-    () => pickSelection(yColumnOptions, yColumnName, 1),
-    [pickSelection, yColumnName, yColumnOptions],
-  );
-  const xColumn = useMemo(
-    () => columns.find((column) => column.name === effectiveXColumnName),
-    [columns, effectiveXColumnName],
-  );
-  const yColumn = useMemo(
-    () => columns.find((column) => column.name === effectiveYColumnName),
-    [columns, effectiveYColumnName],
+  const yColumn = columns.find(
+    (column) => column.name === effectiveYColumnName,
   );
 
-  const scatterComplexOptions = useMemo(
-    () => columns.filter((column) => !column.isIndex && column.isComplex),
-    [columns],
+  const scatterComplexOptions = columns.filter(
+    (column) => !column.isIndex && column.isComplex,
   );
-  const scatterTraceXYOptions = useMemo(
-    () =>
-      columns.filter(
-        (column) => !column.isIndex && !column.isComplex && column.isTrace,
-      ),
-    [columns],
+  const scatterTraceXYOptions = columns.filter(
+    (column) => !column.isIndex && !column.isComplex && column.isTrace,
   );
-  const scatterXYOptions = useMemo(
-    () =>
-      columns.filter(
-        (column) => !column.isIndex && !column.isComplex && !column.isTrace,
-      ),
-    [columns],
+  const scatterXYOptions = columns.filter(
+    (column) => !column.isIndex && !column.isComplex && !column.isTrace,
   );
 
-  const hasIndexColumn = useMemo(
-    () => columns.some((column) => column.isIndex),
-    [columns],
-  );
+  const hasIndexColumn = columns.some((column) => column.isIndex);
   const canUseScatterComplex = scatterComplexOptions.length > 0;
   const canUseScatterTraceXY = scatterTraceXYOptions.length >= 2;
   const canUseScatterXY = scatterXYOptions.length >= 2 && hasIndexColumn;
 
-  const effectiveScatterMode = useMemo(() => {
+  const effectiveScatterMode: ScatterMode = (() => {
     if (scatterMode === "complex" && canUseScatterComplex) return "complex";
     if (scatterMode === "trace_xy" && canUseScatterTraceXY) return "trace_xy";
     if (scatterMode === "xy" && canUseScatterXY) return "xy";
     if (canUseScatterComplex) return "complex";
     if (canUseScatterTraceXY) return "trace_xy";
     return "xy";
-  }, [
-    canUseScatterComplex,
-    canUseScatterTraceXY,
-    canUseScatterXY,
-    scatterMode,
-  ]);
+  })();
 
-  const effectiveScatterSeriesName = useMemo(
-    () => pickSelection(scatterComplexOptions, scatterSeriesName),
-    [pickSelection, scatterComplexOptions, scatterSeriesName],
+  const effectiveScatterSeriesName = pickSelection(
+    scatterComplexOptions,
+    scatterSeriesName,
   );
-  const effectiveScatterTraceXName = useMemo(
-    () => pickSelection(scatterTraceXYOptions, scatterTraceXName),
-    [pickSelection, scatterTraceXName, scatterTraceXYOptions],
+  const effectiveScatterTraceXName = pickSelection(
+    scatterTraceXYOptions,
+    scatterTraceXName,
   );
-  const effectiveScatterTraceYName = useMemo(
-    () => pickSelection(scatterTraceXYOptions, scatterTraceYName, 1),
-    [pickSelection, scatterTraceYName, scatterTraceXYOptions],
+  const effectiveScatterTraceYName = pickSelection(
+    scatterTraceXYOptions,
+    scatterTraceYName,
+    1,
   );
-  const effectiveScatterXName = useMemo(
-    () => pickSelection(scatterXYOptions, scatterXName),
-    [pickSelection, scatterXName, scatterXYOptions],
-  );
-  const effectiveScatterYName = useMemo(
-    () => pickSelection(scatterXYOptions, scatterYName, 1),
-    [pickSelection, scatterYName, scatterXYOptions],
+  const effectiveScatterXName = pickSelection(scatterXYOptions, scatterXName);
+  const effectiveScatterYName = pickSelection(
+    scatterXYOptions,
+    scatterYName,
+    1,
   );
 
-  const scatterSeries = useMemo(
-    () => columns.find((column) => column.name === effectiveScatterSeriesName),
-    [columns, effectiveScatterSeriesName],
+  const scatterSeries = columns.find(
+    (column) => column.name === effectiveScatterSeriesName,
   );
-  const scatterTraceXColumn = useMemo(
-    () => columns.find((column) => column.name === effectiveScatterTraceXName),
-    [columns, effectiveScatterTraceXName],
+  const scatterTraceXColumn = columns.find(
+    (column) => column.name === effectiveScatterTraceXName,
   );
-  const scatterTraceYColumn = useMemo(
-    () => columns.find((column) => column.name === effectiveScatterTraceYName),
-    [columns, effectiveScatterTraceYName],
+  const scatterTraceYColumn = columns.find(
+    (column) => column.name === effectiveScatterTraceYName,
   );
-  const scatterXColumn = useMemo(
-    () => columns.find((column) => column.name === effectiveScatterXName),
-    [columns, effectiveScatterXName],
+  const scatterXColumn = columns.find(
+    (column) => column.name === effectiveScatterXName,
   );
-  const scatterYColumn = useMemo(
-    () => columns.find((column) => column.name === effectiveScatterYName),
-    [columns, effectiveScatterYName],
+  const scatterYColumn = columns.find(
+    (column) => column.name === effectiveScatterYName,
   );
 
-  const scatterIsTraceBased = useMemo(() => {
+  const scatterIsTraceBased = (() => {
     if (effectiveScatterMode === "trace_xy") return true;
     return effectiveScatterMode === "complex" && scatterSeries?.isTrace;
-  }, [effectiveScatterMode, scatterSeries?.isTrace]);
+  })();
 
-  const scatterBinColumnOptions = useMemo(() => {
+  const scatterBinColumnOptions = (() => {
     const excludedNames = new Set(
       [
         scatterSeries?.name,
@@ -246,31 +185,17 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     return columns.filter(
       (column) => column.isIndex && !excludedNames.has(column.name),
     );
-  }, [
-    columns,
-    scatterSeries?.name,
-    scatterXColumn?.name,
-    scatterYColumn?.name,
-    scatterTraceXColumn?.name,
-    scatterTraceYColumn?.name,
-  ]);
+  })();
 
-  const effectiveScatterBinName = useMemo(() => {
+  const effectiveScatterBinName = (() => {
     if (effectiveScatterMode !== "xy" || scatterIsTraceBased) return null;
     return pickSelection(scatterBinColumnOptions, scatterBinName);
-  }, [
-    effectiveScatterMode,
-    pickSelection,
-    scatterBinColumnOptions,
-    scatterBinName,
-    scatterIsTraceBased,
-  ]);
-  const scatterBinColumn = useMemo(
-    () => columns.find((column) => column.name === effectiveScatterBinName),
-    [columns, effectiveScatterBinName],
+  })();
+  const scatterBinColumn = columns.find(
+    (column) => column.name === effectiveScatterBinName,
   );
 
-  const scatterModeOptions = useMemo(() => {
+  const scatterModeOptions = (() => {
     const options: { label: string; value: ScatterMode }[] = [];
     if (canUseScatterComplex) {
       options.push({ label: "Complex (real/imag)", value: "complex" });
@@ -282,9 +207,9 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
       options.push({ label: "X/Y columns", value: "xy" });
     }
     return options;
-  }, [canUseScatterComplex, canUseScatterTraceXY, canUseScatterXY]);
+  })();
 
-  const availableChartTypes = useMemo(() => {
+  const availableChartTypes = (() => {
     const cols = columns;
     if (cols.length === 0) return [];
     const hasSeries = cols.some((column) => !column.isIndex);
@@ -305,16 +230,16 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     if (hasSeries && hasIndex) types.push("heatmap");
     if (canScatter) types.push("scatter");
     return types;
-  }, [columns]);
+  })();
 
-  const effectiveChartType = useMemo(() => {
+  const effectiveChartType = (() => {
     if (availableChartTypes.length === 0) return chartType;
     return availableChartTypes.includes(chartType)
       ? chartType
       : (availableChartTypes[0] ?? chartType);
-  }, [availableChartTypes, chartType]);
+  })();
 
-  const excludeColumns = useMemo(() => {
+  const excludeColumns = (() => {
     const excludes: string[] = [];
     if (effectiveChartType === "line") {
       if (xColumn) excludes.push(xColumn.name);
@@ -331,194 +256,83 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
       }
     }
     return excludes;
-  }, [
-    effectiveChartType,
-    effectiveScatterMode,
-    scatterBinColumn,
-    series,
-    xColumn,
-    yColumn,
-  ]);
+  })();
+
+  const filterTableQuery = useFilterTableDataQuery(
+    datasetId,
+    excludeColumns,
+    Boolean(datasetDetail),
+  );
+  const filterTableData = filterTableQuery.data ?? null;
+  const { refetch: refetchFilterTable } = filterTableQuery;
 
   useEffect(() => {
-    excludeColumnsRef.current = excludeColumns;
-  }, [excludeColumns]);
+    if (!datasetDetail) return;
+    void refetchFilterTable();
+  }, [datasetDetail, refetchFilterTable]);
 
-  useEffect(() => {
-    let aborted = false;
+  const cascade = useCascadeSelection(filterTableData);
+  const filterRow = cascade.resolvedRow;
+  const hasFilters = (filterTableData?.fields.length ?? 0) > 0;
+  const indexFilters = hasFilters ? filterRow?.valueIndices : undefined;
 
-    const loadDetail = async () => {
-      const detail = await getDatasetDetail(datasetId);
-      if (aborted) return;
-      setDatasetDetail(detail);
-    };
+  useDatasetWriteStatusQuery(datasetId, datasetDetail?.status === "Writing");
 
-    void loadDetail();
-
-    return () => {
-      aborted = true;
-    };
-  }, [datasetId]);
-
-  useEffect(() => {
-    let active = true;
-    void getFilterTableData(datasetId, { excludeColumns }).then((filter) => {
-      if (!active) return;
-      setFilterTableData(filter);
-      setFilterRow((current) => {
-        const datasetChanged = previousDatasetIdRef.current !== datasetId;
-        previousDatasetIdRef.current = datasetId;
-        if (filter.rows.length === 0) return undefined;
-        if (datasetChanged || !current) return filter.rows[0];
-        const preserved = filter.rows.find(
-          (row) => row.index === current.index,
-        );
-        return preserved ?? filter.rows[0];
-      });
-    });
-    return () => {
-      active = false;
-    };
-  }, [datasetId, excludeColumns]);
-
-  useEffect(() => {
-    if (datasetDetail?.status !== "Writing") return;
-    let aborted = false;
-
-    const poll = async () => {
-      while (!aborted) {
-        const { isComplete } = await getDatasetWriteStatus(datasetId);
-        if (aborted) return;
-
-        if (isComplete) {
-          const updatedDetail = await getDatasetDetail(datasetId);
-          if (aborted) return;
-          const updatedFilter = await getFilterTableData(datasetId, {
-            excludeColumns: excludeColumnsRef.current,
-          });
-          if (aborted) return;
-          setDatasetDetail(updatedDetail);
-          setFilterTableData(updatedFilter);
-          setDatasetUpdateTick((tick) => tick + 1);
-          break;
-        }
-
-        const updatedFilter = await getFilterTableData(datasetId, {
-          excludeColumns: excludeColumnsRef.current,
-        });
-        if (aborted) return;
-        setFilterTableData(updatedFilter);
-        setDatasetUpdateTick((tick) => tick + 1);
-
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-    };
-
-    void poll();
-
-    return () => {
-      aborted = true;
-    };
-  }, [datasetDetail, datasetId]);
-
-  const getNewData = useCallback(async (): Promise<
-    ChartOptions | undefined
-  > => {
-    if (!datasetDetail || !filterTableData) return undefined;
-
-    const hasFilters = filterTableData.fields.length > 0;
-    if (hasFilters && !filterRow) return undefined;
-
-    setScatterError(null);
+  const chartRequest: ChartDataOptions | null = (() => {
+    if (!datasetDetail || !filterTableData) return null;
+    if (hasFilters && !filterRow) return null;
 
     if (effectiveChartType === "scatter") {
-      if (effectiveScatterMode === "complex" && !scatterSeries)
-        return undefined;
+      if (effectiveScatterMode === "complex" && !scatterSeries) return null;
       if (
         effectiveScatterMode === "trace_xy" &&
         (!scatterTraceXColumn || !scatterTraceYColumn)
       ) {
-        return undefined;
+        return null;
       }
       if (
         effectiveScatterMode === "xy" &&
         (!scatterXColumn || !scatterYColumn)
       ) {
-        return undefined;
+        return null;
       }
     } else {
-      if (!series) return undefined;
+      if (!series) return null;
       if (effectiveChartType === "line") {
-        if (!series.isTrace && !xColumn) return undefined;
+        if (!series.isTrace && !xColumn) return null;
       } else if (effectiveChartType === "heatmap") {
-        if (!yColumn) return undefined;
-        if (!series.isTrace && !xColumn) return undefined;
+        if (!yColumn) return null;
+        if (!series.isTrace && !xColumn) return null;
       }
     }
 
-    try {
-      return await fetchChartData(datasetId, {
-        chartType: effectiveChartType,
-        series: series?.name,
-        xColumn: xColumn?.name,
-        yColumn: yColumn?.name,
-        scatterMode: effectiveScatterMode,
-        scatterSeries: scatterSeries?.name,
-        scatterXColumn: scatterXColumn?.name,
-        scatterYColumn: scatterYColumn?.name,
-        scatterTraceXColumn: scatterTraceXColumn?.name,
-        scatterTraceYColumn: scatterTraceYColumn?.name,
-        scatterBinColumn: scatterBinColumn?.name,
-        complexViews: selectedComplexView,
-        complexViewSingle: selectedComplexViewSingle,
-        indexFilters: hasFilters ? filterRow?.valueIndices : undefined,
-        excludeColumns,
-      });
-    } catch (error) {
-      if (effectiveChartType === "scatter") {
-        setScatterError(
-          error instanceof Error
-            ? error.message
-            : "Scatter data error. Please check trace lengths.",
-        );
-      }
-      return undefined;
-    }
-  }, [
-    effectiveChartType,
-    datasetDetail,
-    datasetId,
-    excludeColumns,
-    filterRow,
-    filterTableData,
-    scatterBinColumn,
-    effectiveScatterMode,
-    scatterSeries,
-    scatterTraceXColumn,
-    scatterTraceYColumn,
-    scatterXColumn,
-    scatterYColumn,
-    selectedComplexView,
-    selectedComplexViewSingle,
-    series,
-    xColumn,
-    yColumn,
-  ]);
-
-  useEffect(() => {
-    let isActive = true;
-    const handle = window.setTimeout(() => {
-      void getNewData().then((next) => {
-        if (isActive) {
-          setData(next);
-        }
-      });
-    }, 50);
-    return () => {
-      isActive = false;
-      window.clearTimeout(handle);
+    return {
+      chartType: effectiveChartType,
+      series: series?.name,
+      xColumn: xColumn?.name,
+      yColumn: yColumn?.name,
+      scatterMode: effectiveScatterMode,
+      scatterSeries: scatterSeries?.name,
+      scatterXColumn: scatterXColumn?.name,
+      scatterYColumn: scatterYColumn?.name,
+      scatterTraceXColumn: scatterTraceXColumn?.name,
+      scatterTraceYColumn: scatterTraceYColumn?.name,
+      scatterBinColumn: scatterBinColumn?.name,
+      complexViews: selectedComplexView,
+      complexViewSingle: selectedComplexViewSingle,
+      indexFilters,
+      excludeColumns,
     };
-  }, [getNewData, datasetUpdateTick]);
+  })();
+
+  const chartQuery = useChartDataQuery(datasetId, chartRequest);
+  const data: ChartOptions | undefined = chartQuery.data;
+  const scatterError =
+    effectiveChartType === "scatter" && chartQuery.error
+      ? chartQuery.error instanceof Error
+        ? chartQuery.error.message
+        : "Scatter data error. Please check trace lengths."
+      : null;
 
   return (
     <div className="flex size-full min-h-0 flex-col overflow-hidden">
@@ -870,10 +684,20 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
           <ResizablePanel defaultSize={40} minSize={25} className="min-h-0">
             <div className="h-full min-h-0">
               <FilterTable
-                value={filterRow}
-                onChange={setFilterRow}
-                filterTableData={filterTableData ?? undefined}
-                datasetId={String(datasetId)}
+                data={filterTableData ?? undefined}
+                mode={cascade.state.mode}
+                onModeChange={cascade.setMode}
+                selectedRowIndex={filterRow?.index ?? null}
+                onSelectRow={cascade.selectRow}
+                selectedValueIndices={cascade.selectedValueIndices}
+                onSelectFieldValue={(fieldIndex, valueIndex) => {
+                  if (!filterTableData) return;
+                  cascade.selectFieldValue(
+                    fieldIndex,
+                    valueIndex,
+                    filterRow?.index ?? null,
+                  );
+                }}
               />
             </div>
           </ResizablePanel>

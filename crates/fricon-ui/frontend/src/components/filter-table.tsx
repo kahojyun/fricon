@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type {
-  ColumnUniqueValue,
-  FilterTableData,
-  FilterTableRow,
-} from "@/lib/backend";
+import type { ColumnUniqueValue, FilterTableData } from "@/lib/backend";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import type { CascadeMode } from "@/hooks/cascadeReducer";
 
 interface FilterTableProps {
-  value?: FilterTableRow;
-  onChange: (value: FilterTableRow | undefined) => void;
-  filterTableData?: FilterTableData;
-  datasetId: string;
+  data?: FilterTableData;
+  mode: CascadeMode;
+  onModeChange: (mode: CascadeMode) => void;
+  selectedRowIndex: number | null;
+  onSelectRow: (rowIndex: number) => void;
+  selectedValueIndices?: number[];
+  onSelectFieldValue: (fieldIndex: number, valueIndex: number) => void;
 }
 
 interface FilterTableColumnProps {
@@ -30,7 +30,9 @@ function FilterTableColumn({
   onSelect,
 }: FilterTableColumnProps) {
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!scrollRootRef.current) return;
@@ -38,13 +40,13 @@ function FilterTableColumn({
       '[data-slot="scroll-area-viewport"]',
     );
     if (viewport instanceof HTMLDivElement) {
-      viewportRef.current = viewport;
+      setViewportElement(viewport);
     }
   }, []);
 
   const rowVirtualizer = useVirtualizer({
     count: items.length,
-    getScrollElement: () => viewportRef.current,
+    getScrollElement: () => viewportElement,
     estimateSize: () => 32,
     overscan: 8,
   });
@@ -91,51 +93,47 @@ function FilterTableColumn({
 }
 
 export function FilterTable({
-  value,
-  onChange,
-  filterTableData,
-  datasetId,
+  data,
+  mode,
+  onModeChange,
+  selectedRowIndex,
+  onSelectRow,
+  selectedValueIndices,
+  onSelectFieldValue,
 }: FilterTableProps) {
-  const [isIndividualFilterMode, setIsIndividualFilterMode] = useState(false);
-  const [individualColumnSelections, setIndividualColumnSelections] = useState<
-    Record<string, number | undefined>
-  >({});
-  const previousDatasetId = useRef<string | undefined>(undefined);
   const headerScrollRef = useRef<HTMLDivElement | null>(null);
   const bodyScrollRootRef = useRef<HTMLDivElement | null>(null);
-  const bodyViewportRef = useRef<HTMLDivElement | null>(null);
+  const [bodyViewportElement, setBodyViewportElement] =
+    useState<HTMLDivElement | null>(null);
 
-  const showFilterToggle = Boolean(
-    filterTableData && filterTableData.fields.length > 1,
-  );
+  const showFilterToggle = Boolean(data && data.fields.length > 1);
 
-  const isFilterTableEmpty =
-    !filterTableData || filterTableData.rows.length === 0;
+  const isFilterTableEmpty = !data || data.rows.length === 0;
   const gridTemplate = useMemo(() => {
-    if (!filterTableData) return "none";
-    return `repeat(${filterTableData.fields.length}, minmax(80px, 1fr))`;
-  }, [filterTableData]);
+    if (!data) return "none";
+    return `repeat(${data.fields.length}, minmax(80px, 1fr))`;
+  }, [data]);
   const minTableWidth = useMemo(() => {
-    if (!filterTableData) return "0px";
-    const minWidth = Math.max(filterTableData.fields.length * 80, 320);
+    if (!data) return "0px";
+    const minWidth = Math.max(data.fields.length * 80, 320);
     return `${minWidth}px`;
-  }, [filterTableData]);
+  }, [data]);
 
   const rowVirtualizer = useVirtualizer({
-    count: filterTableData?.rows.length ?? 0,
-    getScrollElement: () => bodyViewportRef.current,
+    count: data?.rows.length ?? 0,
+    getScrollElement: () => bodyViewportElement,
     estimateSize: () => 32,
     overscan: 8,
   });
 
   useEffect(() => {
-    if (isIndividualFilterMode) return;
+    if (mode === "split") return;
     if (!bodyScrollRootRef.current) return;
     const viewport = bodyScrollRootRef.current.querySelector(
       '[data-slot="scroll-area-viewport"]',
     );
     if (!(viewport instanceof HTMLDivElement)) return;
-    bodyViewportRef.current = viewport;
+    setBodyViewportElement(viewport);
     const handleScroll = () => {
       if (headerScrollRef.current) {
         headerScrollRef.current.scrollLeft = viewport.scrollLeft;
@@ -146,112 +144,12 @@ export function FilterTable({
     return () => {
       viewport.removeEventListener("scroll", handleScroll);
     };
-  }, [filterTableData?.fields.length, isIndividualFilterMode]);
+  }, [data?.fields.length, mode]);
 
-  const columnUniqueValues = useMemo<
-    Record<string, ColumnUniqueValue[]>
-  >(() => {
-    if (!isIndividualFilterMode || !filterTableData) return {};
-    return filterTableData.columnUniqueValues;
-  }, [filterTableData, isIndividualFilterMode]);
+  const columnUniqueValues: Record<string, ColumnUniqueValue[]> =
+    mode === "split" && data ? data.columnUniqueValues : {};
 
-  const syncIndividualSelectionsFromModel = () => {
-    if (!filterTableData || !value) return;
-    const fieldNames = filterTableData.fields;
-    const next: Record<string, number | undefined> = {};
-    fieldNames.forEach((fieldName, idx) => {
-      next[fieldName] = value.valueIndices[idx];
-    });
-    setIndividualColumnSelections(next);
-  };
-
-  const findMatchingRowFromSelections = (
-    data: FilterTableData,
-    selections: Record<string, number | undefined>,
-  ): FilterTableRow | null => {
-    const fieldNames = data.fields;
-    if (Object.keys(selections).length === 0) return null;
-    const matching = data.rows.filter((row) =>
-      fieldNames.every((fieldName, idx) => {
-        const selectionIndex = selections[fieldName];
-        if (selectionIndex === undefined) return true;
-        return row.valueIndices[idx] === selectionIndex;
-      }),
-    );
-    return matching.length > 0 ? matching[0] : null;
-  };
-
-  useEffect(() => {
-    if (!isIndividualFilterMode && value) {
-      syncIndividualSelectionsFromModel();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, isIndividualFilterMode]);
-
-  useEffect(() => {
-    const datasetChanged = previousDatasetId.current !== datasetId;
-
-    if (!filterTableData || filterTableData.rows.length === 0) {
-      onChange(undefined);
-      if (datasetChanged) {
-        setIndividualColumnSelections({});
-      }
-      previousDatasetId.current = datasetId;
-      return;
-    }
-
-    if (datasetChanged) {
-      onChange(filterTableData.rows[0]);
-      setIndividualColumnSelections({});
-    } else {
-      if (value) {
-        const preservedRow = filterTableData.rows.find(
-          (row) => row.index === value.index,
-        );
-        if (preservedRow) {
-          onChange(preservedRow);
-        } else {
-          onChange(filterTableData.rows[0]);
-          setIndividualColumnSelections({});
-        }
-      } else {
-        onChange(filterTableData.rows[0]);
-      }
-    }
-
-    previousDatasetId.current = datasetId;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetId, filterTableData]);
-
-  useEffect(() => {
-    if (!filterTableData) return;
-    if (isIndividualFilterMode) {
-      const row = findMatchingRowFromSelections(
-        filterTableData,
-        individualColumnSelections,
-      );
-      if (row) {
-        onChange(row);
-      } else {
-        onChange(filterTableData.rows[0]);
-      }
-    } else {
-      if (
-        !value ||
-        !filterTableData.rows.some((row) => row.index === value.index)
-      ) {
-        onChange(filterTableData.rows[0]);
-      }
-    }
-  }, [
-    filterTableData,
-    individualColumnSelections,
-    isIndividualFilterMode,
-    onChange,
-    value,
-  ]);
-
-  if (!filterTableData || filterTableData.rows.length === 0) {
+  if (!data || data.rows.length === 0) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
         No data available
@@ -264,20 +162,22 @@ export function FilterTable({
       {showFilterToggle ? (
         <div className="flex items-center gap-2 px-2 pb-2">
           <Switch
-            checked={isIndividualFilterMode}
-            onCheckedChange={setIsIndividualFilterMode}
+            checked={mode === "split"}
+            onCheckedChange={(checked) =>
+              onModeChange(checked ? "split" : "row")
+            }
           />
           <span className="text-sm">Split columns</span>
         </div>
       ) : null}
 
-      {!isIndividualFilterMode && isFilterTableEmpty ? (
+      {mode === "row" && isFilterTableEmpty ? (
         <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
           No data available
         </div>
       ) : null}
 
-      {!isIndividualFilterMode ? (
+      {mode === "row" ? (
         <>
           <div
             ref={headerScrollRef}
@@ -290,7 +190,7 @@ export function FilterTable({
                 minWidth: minTableWidth,
               }}
             >
-              {filterTableData.fields.map((field) => (
+              {data.fields.map((field) => (
                 <div key={field}>{field}</div>
               ))}
             </div>
@@ -304,9 +204,9 @@ export function FilterTable({
               }}
             >
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const row = filterTableData.rows[virtualRow.index];
+                const row = data.rows[virtualRow.index];
                 if (!row) return null;
-                const isSelected = value?.index === row.index;
+                const isSelected = selectedRowIndex === row.index;
                 return (
                   <div
                     key={row.index}
@@ -323,9 +223,9 @@ export function FilterTable({
                       width: "100%",
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
-                    onClick={() => onChange(row)}
+                    onClick={() => onSelectRow(row.index)}
                   >
-                    {filterTableData.fields.map((field, idx) => (
+                    {data.fields.map((field, idx) => (
                       <div key={field}>{row.displayValues[idx]}</div>
                     ))}
                   </div>
@@ -336,28 +236,25 @@ export function FilterTable({
         </>
       ) : null}
 
-      {isIndividualFilterMode && isFilterTableEmpty ? (
+      {mode === "split" && isFilterTableEmpty ? (
         <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
           No data available
         </div>
       ) : null}
 
-      {isIndividualFilterMode && filterTableData ? (
+      {mode === "split" && data ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {filterTableData.fields.map((field, index) => (
+          {data.fields.map((field, index) => (
             <div key={field} className="flex min-w-0 flex-1">
               <FilterTableColumn
                 field={field}
                 items={columnUniqueValues[field] ?? []}
-                selectedIndex={individualColumnSelections[field]}
+                selectedIndex={selectedValueIndices?.[index]}
                 onSelect={(selectedIndex) =>
-                  setIndividualColumnSelections((prev) => ({
-                    ...prev,
-                    [field]: selectedIndex,
-                  }))
+                  onSelectFieldValue(index, selectedIndex)
                 }
               />
-              {index < filterTableData.fields.length - 1 ? (
+              {index < data.fields.length - 1 ? (
                 <div className="bg-border/60 w-px shrink-0" />
               ) : null}
             </div>
