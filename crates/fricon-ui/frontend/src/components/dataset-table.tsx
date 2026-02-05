@@ -228,16 +228,16 @@ export function DatasetTable({
 
   const toggleFavorite = async (dataset: DatasetInfo) => {
     const nextFavorite = !dataset.favorite;
-    setDatasets((prev) =>
-      prev.map((item) =>
+    setDatasetsState(
+      datasetsRef.current.map((item) =>
         item.id === dataset.id ? { ...item, favorite: nextFavorite } : item,
       ),
     );
     try {
       await updateDatasetFavorite(dataset.id, nextFavorite);
     } catch (error) {
-      setDatasets((prev) =>
-        prev.map((item) =>
+      setDatasetsState(
+        datasetsRef.current.map((item) =>
           item.id === dataset.id
             ? { ...item, favorite: dataset.favorite }
             : item,

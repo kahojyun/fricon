@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { getWorkspaceInfo } from "@/lib/backend";
 import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
 import { DatasetTable } from "@/components/dataset-table";
@@ -16,7 +15,6 @@ interface DataViewerProps {
 
 export function DataViewer({ datasetId }: DataViewerProps) {
   const setPath = useWorkspaceStore((state) => state.setPath);
-  const navigate = useNavigate();
   const parsedDatasetId = (() => {
     if (!datasetId?.trim()) return undefined;
     const parsed = Number.parseInt(datasetId, 10);
@@ -50,9 +48,6 @@ export function DataViewer({ datasetId }: DataViewerProps) {
 
   const handleDatasetSelected = (id: number) => {
     setSelectedDatasetId(id);
-    if (datasetId !== String(id)) {
-      void navigate({ to: "/datasets/$id", params: { id: String(id) } });
-    }
   };
 
   return (

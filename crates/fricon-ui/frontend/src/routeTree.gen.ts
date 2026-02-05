@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DatasetsIdRouteImport } from './routes/datasets.$id'
 
 const CreditsRoute = CreditsRouteImport.update({
   id: '/credits',
@@ -23,40 +22,31 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DatasetsIdRoute = DatasetsIdRouteImport.update({
-  id: '/datasets/$id',
-  path: '/datasets/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
-  '/datasets/$id': typeof DatasetsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
-  '/datasets/$id': typeof DatasetsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
-  '/datasets/$id': typeof DatasetsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/credits' | '/datasets/$id'
+  fullPaths: '/' | '/credits'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/credits' | '/datasets/$id'
-  id: '__root__' | '/' | '/credits' | '/datasets/$id'
+  to: '/' | '/credits'
+  id: '__root__' | '/' | '/credits'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreditsRoute: typeof CreditsRoute
-  DatasetsIdRoute: typeof DatasetsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -75,20 +65,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/datasets/$id': {
-      id: '/datasets/$id'
-      path: '/datasets/$id'
-      fullPath: '/datasets/$id'
-      preLoaderRoute: typeof DatasetsIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreditsRoute: CreditsRoute,
-  DatasetsIdRoute: DatasetsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
