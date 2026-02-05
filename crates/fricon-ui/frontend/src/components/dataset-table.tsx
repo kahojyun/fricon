@@ -39,7 +39,6 @@ export function DatasetTable({
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const datasetsRef = useRef<DatasetInfo[]>([]);
   const searchRef = useRef("");
@@ -49,7 +48,7 @@ export function DatasetTable({
   const searchDebounce = useRef<number | null>(null);
   const statusRefreshTimer = useRef<number | null>(null);
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
   const setDatasetsState = useCallback((next: DatasetInfo[]) => {
     datasetsRef.current = next;
@@ -61,6 +60,10 @@ export function DatasetTable({
     setHasMore(next);
   }, []);
 
+  const setIsLoadingState = useCallback((next: boolean) => {
+    isLoadingRef.current = next;
+  }, []);
+
   useEffect(() => {
     searchRef.current = searchQuery;
   }, [searchQuery]);
@@ -70,19 +73,11 @@ export function DatasetTable({
   }, [selectedTags]);
 
   useEffect(() => {
-    isLoadingRef.current = isLoading;
-  }, [isLoading]);
-
-  useEffect(() => {
     if (!scrollRootRef.current) return;
-    scrollRef.current = scrollRootRef.current.querySelector(
+    scrollViewportRef.current = scrollRootRef.current.querySelector(
       '[data-slot="scroll-area-viewport"]',
     );
   }, []);
-
-  useEffect(() => {
-    hasMoreRef.current = hasMore;
-  }, [hasMore]);
 
   const tagOptions = useMemo(() => {
     const tagSet = new Set<string>();
@@ -101,7 +96,7 @@ export function DatasetTable({
   const loadDatasets = useCallback(
     async ({ append = false } = {}) => {
       if (isLoadingRef.current || (append && !hasMoreRef.current)) return;
-      setIsLoading(true);
+      setIsLoadingState(true);
       try {
         const offset = append ? datasetsRef.current.length : 0;
         const next = await listDatasets(
@@ -117,15 +112,15 @@ export function DatasetTable({
           setDatasetsState(next);
         }
       } finally {
-        setIsLoading(false);
+        setIsLoadingState(false);
       }
     },
-    [setDatasetsState, setHasMoreState],
+    [setDatasetsState, setHasMoreState, setIsLoadingState],
   );
 
   const refreshDatasets = useCallback(async () => {
     if (isLoadingRef.current) return;
-    setIsLoading(true);
+    setIsLoadingState(true);
     try {
       const limit = Math.max(datasetsRef.current.length, DATASET_PAGE_SIZE);
       const next = await listDatasets(
@@ -137,9 +132,9 @@ export function DatasetTable({
       setDatasetsState(next);
       setHasMoreState(next.length >= limit);
     } finally {
-      setIsLoading(false);
+      setIsLoadingState(false);
     }
-  }, [setDatasetsState, setHasMoreState]);
+  }, [setDatasetsState, setHasMoreState, setIsLoadingState]);
 
   useEffect(() => {
     void loadDatasets();
@@ -186,7 +181,7 @@ export function DatasetTable({
       window.clearTimeout(searchDebounce.current);
     }
     searchDebounce.current = window.setTimeout(() => {
-      setHasMore(true);
+      setHasMoreState(true);
       void loadDatasets();
     }, 300);
     return () => {
@@ -194,7 +189,7 @@ export function DatasetTable({
         window.clearTimeout(searchDebounce.current);
       }
     };
-  }, [loadDatasets, searchQuery, selectedTags]);
+  }, [loadDatasets, searchQuery, selectedTags, setHasMoreState]);
 
   useEffect(() => {
     const hasWriting = datasets.some((dataset) => dataset.status === "Writing");
@@ -217,7 +212,7 @@ export function DatasetTable({
 
   const rowVirtualizer = useVirtualizer({
     count: filteredDatasets.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollViewportRef.current,
     estimateSize: () => 56,
     overscan: 8,
   });
@@ -307,7 +302,6 @@ export function DatasetTable({
               </div>
             </div>
             <div
-              ref={scrollRef}
               className="relative w-full"
               style={{
                 height: rowVirtualizer.getTotalSize() + headerHeight,
