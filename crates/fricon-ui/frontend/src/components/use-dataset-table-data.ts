@@ -103,6 +103,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   const sortingRef = useRef<SortingState>([{ id: "id", desc: true }]);
   const isLoadingRef = useRef(false);
   const hasMoreRef = useRef(true);
+  const pendingRefreshRef = useRef(false);
   const searchDebounce = useRef<number | null>(null);
   const statusRefreshTimer = useRef<number | null>(null);
 
@@ -156,6 +157,35 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     setAllTags(tags);
   }, []);
 
+  const refreshDatasets = useCallback(async () => {
+    if (isLoadingRef.current) {
+      pendingRefreshRef.current = true;
+      return;
+    }
+    do {
+      pendingRefreshRef.current = false;
+      setIsLoadingState(true);
+      try {
+        const limit = Math.max(datasetsRef.current.length, DATASET_PAGE_SIZE);
+        const next = await listDatasets(
+          buildDatasetListOptions({
+            search: searchRef.current,
+            tags: selectedTagsRef.current,
+            favoriteOnly: favoriteOnlyRef.current,
+            statuses: selectedStatusesRef.current,
+            sorting: sortingRef.current,
+            limit,
+            offset: 0,
+          }),
+        );
+        setDatasetsState(next);
+        setHasMoreState(deriveHasMore(next.length, limit));
+      } finally {
+        setIsLoadingState(false);
+      }
+    } while (pendingRefreshRef.current);
+  }, [setDatasetsState, setHasMoreState, setIsLoadingState]);
+
   const loadDatasets = useCallback(
     async ({ append = false } = {}) => {
       if (isLoadingRef.current || (append && !hasMoreRef.current)) return;
@@ -181,33 +211,13 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
         }
       } finally {
         setIsLoadingState(false);
+        if (pendingRefreshRef.current) {
+          void refreshDatasets();
+        }
       }
     },
-    [setDatasetsState, setHasMoreState, setIsLoadingState],
+    [refreshDatasets, setDatasetsState, setHasMoreState, setIsLoadingState],
   );
-
-  const refreshDatasets = useCallback(async () => {
-    if (isLoadingRef.current) return;
-    setIsLoadingState(true);
-    try {
-      const limit = Math.max(datasetsRef.current.length, DATASET_PAGE_SIZE);
-      const next = await listDatasets(
-        buildDatasetListOptions({
-          search: searchRef.current,
-          tags: selectedTagsRef.current,
-          favoriteOnly: favoriteOnlyRef.current,
-          statuses: selectedStatusesRef.current,
-          sorting: sortingRef.current,
-          limit,
-          offset: 0,
-        }),
-      );
-      setDatasetsState(next);
-      setHasMoreState(deriveHasMore(next.length, limit));
-    } finally {
-      setIsLoadingState(false);
-    }
-  }, [setDatasetsState, setHasMoreState, setIsLoadingState]);
 
   useEffect(() => {
     void loadDatasets();
@@ -219,6 +229,9 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
 
     void onDatasetCreated(() => {
       if (!active) return;
+      if (isLoadingRef.current) {
+        pendingRefreshRef.current = true;
+      }
       void refreshDatasets();
       void loadTags();
     }).then((unlisten) => {
@@ -231,6 +244,9 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
 
     void onDatasetUpdated(() => {
       if (!active) return;
+      if (isLoadingRef.current) {
+        pendingRefreshRef.current = true;
+      }
       void refreshDatasets();
       void loadTags();
     }).then((unlisten) => {
@@ -300,7 +316,6 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       );
       try {
         await updateDatasetFavorite(dataset.id, nextFavorite);
-        await refreshDatasets();
       } catch {
         setDatasetsState(
           datasetsRef.current.map((item) =>
@@ -309,6 +324,12 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
               : item,
           ),
         );
+        return;
+      }
+      try {
+        await refreshDatasets();
+      } catch {
+        // Keep optimistic state if backend write succeeded but refresh failed.
       }
     },
     [refreshDatasets, setDatasetsState],
