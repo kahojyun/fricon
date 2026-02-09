@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type ColumnDef,
-  type ColumnFiltersState,
-  type SortingState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -10,15 +8,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  DATASET_PAGE_SIZE,
-  type DatasetInfo,
-  type DatasetStatus,
-  listDatasets,
-  onDatasetCreated,
-  onDatasetUpdated,
-  updateDatasetFavorite,
-} from "@/lib/backend";
+import { type DatasetInfo, type DatasetStatus } from "@/lib/backend";
+import { useDatasetTableData } from "@/components/use-dataset-table-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,53 +48,35 @@ const statusVariantMap: Record<
   Aborted: "destructive",
 };
 
-const headerHeight = 96;
-
 export function DatasetTable({
   selectedDatasetId,
   onDatasetSelected,
 }: DatasetTableProps) {
-  const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagFilterQuery, setTagFilterQuery] = useState("");
-  const [hasMore, setHasMore] = useState(true);
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "createdAt", desc: true },
-  ]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const {
+    datasets,
+    searchQuery,
+    setSearchQuery,
+    selectedTags,
+    tagFilterQuery,
+    setTagFilterQuery,
+    sorting,
+    setSorting,
+    columnFilters,
+    setColumnFilters,
+    filteredTagOptions,
+    favoriteOnly,
+    hasMore,
+    hasActiveFilters,
+    toggleFavorite,
+    handleTagToggle,
+    clearFilters,
+    loadNextPage,
+  } = useDatasetTableData();
 
-  const datasetsRef = useRef<DatasetInfo[]>([]);
-  const searchRef = useRef("");
-  const selectedTagsRef = useRef<string[]>([]);
-  const isLoadingRef = useRef(false);
-  const hasMoreRef = useRef(true);
-  const searchDebounce = useRef<number | null>(null);
-  const statusRefreshTimer = useRef<number | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const headerRef = useRef<HTMLDivElement | null>(null);
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
-
-  const setDatasetsState = useCallback((next: DatasetInfo[]) => {
-    datasetsRef.current = next;
-    setDatasets(next);
-  }, []);
-
-  const setHasMoreState = useCallback((next: boolean) => {
-    hasMoreRef.current = next;
-    setHasMore(next);
-  }, []);
-
-  const setIsLoadingState = useCallback((next: boolean) => {
-    isLoadingRef.current = next;
-  }, []);
-
-  useEffect(() => {
-    searchRef.current = searchQuery;
-  }, [searchQuery]);
-
-  useEffect(() => {
-    selectedTagsRef.current = selectedTags;
-  }, [selectedTags]);
 
   useEffect(() => {
     if (!scrollRootRef.current) return;
@@ -112,159 +85,29 @@ export function DatasetTable({
     );
   }, []);
 
-  const loadDatasets = useCallback(
-    async ({ append = false } = {}) => {
-      if (isLoadingRef.current || (append && !hasMoreRef.current)) return;
-      setIsLoadingState(true);
-      try {
-        const offset = append ? datasetsRef.current.length : 0;
-        const next = await listDatasets(
-          searchRef.current,
-          selectedTagsRef.current,
-          DATASET_PAGE_SIZE,
-          offset,
-        );
-        setHasMoreState(next.length === DATASET_PAGE_SIZE);
-        if (append) {
-          setDatasetsState([...datasetsRef.current, ...next]);
-        } else {
-          setDatasetsState(next);
-        }
-      } finally {
-        setIsLoadingState(false);
-      }
-    },
-    [setDatasetsState, setHasMoreState, setIsLoadingState],
-  );
-
-  const refreshDatasets = useCallback(async () => {
-    if (isLoadingRef.current) return;
-    setIsLoadingState(true);
-    try {
-      const limit = Math.max(datasetsRef.current.length, DATASET_PAGE_SIZE);
-      const next = await listDatasets(
-        searchRef.current,
-        selectedTagsRef.current,
-        limit,
-        0,
-      );
-      setDatasetsState(next);
-      setHasMoreState(next.length >= limit);
-    } finally {
-      setIsLoadingState(false);
-    }
-  }, [setDatasetsState, setHasMoreState, setIsLoadingState]);
-
   useEffect(() => {
-    void loadDatasets();
+    const header = headerRef.current;
+    if (!header) return;
 
-    let unlistenCreated: (() => void) | undefined;
-    let unlistenUpdated: (() => void) | undefined;
-    let active = true;
+    const measure = () => {
+      setHeaderHeight(header.getBoundingClientRect().height);
+    };
 
-    void onDatasetCreated((event) => {
-      if (!active) return;
-      setDatasetsState([event, ...datasetsRef.current]);
-      if (searchRef.current.trim() || selectedTagsRef.current.length > 0) {
-        void loadDatasets();
-      }
-    }).then((unlisten) => {
-      unlistenCreated = unlisten;
+    measure();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      measure();
     });
-
-    void onDatasetUpdated((event) => {
-      if (!active) return;
-      const next = [...datasetsRef.current];
-      const index = next.findIndex((dataset) => dataset.id === event.id);
-      if (index >= 0) {
-        next[index] = event;
-        setDatasetsState(next);
-        return;
-      }
-      if (!searchRef.current.trim() && selectedTagsRef.current.length === 0) {
-        setDatasetsState([event, ...next]);
-      }
-    }).then((unlisten) => {
-      unlistenUpdated = unlisten;
-    });
+    observer.observe(header);
 
     return () => {
-      active = false;
-      unlistenCreated?.();
-      unlistenUpdated?.();
+      observer.disconnect();
     };
-  }, [loadDatasets, setDatasetsState]);
-
-  useEffect(() => {
-    if (searchDebounce.current) {
-      window.clearTimeout(searchDebounce.current);
-    }
-    searchDebounce.current = window.setTimeout(() => {
-      setHasMoreState(true);
-      void loadDatasets();
-    }, 300);
-    return () => {
-      if (searchDebounce.current) {
-        window.clearTimeout(searchDebounce.current);
-      }
-    };
-  }, [loadDatasets, searchQuery, selectedTags, setHasMoreState]);
-
-  useEffect(() => {
-    const hasWriting = datasets.some((dataset) => dataset.status === "Writing");
-    if (hasWriting && statusRefreshTimer.current == null) {
-      statusRefreshTimer.current = window.setInterval(() => {
-        void refreshDatasets();
-      }, 2000);
-    }
-    if (!hasWriting && statusRefreshTimer.current != null) {
-      window.clearInterval(statusRefreshTimer.current);
-      statusRefreshTimer.current = null;
-    }
-    return () => {
-      if (statusRefreshTimer.current != null) {
-        window.clearInterval(statusRefreshTimer.current);
-        statusRefreshTimer.current = null;
-      }
-    };
-  }, [datasets, refreshDatasets]);
-
-  const toggleFavorite = useCallback(
-    async (dataset: DatasetInfo) => {
-      const nextFavorite = !dataset.favorite;
-      setDatasetsState(
-        datasetsRef.current.map((item) =>
-          item.id === dataset.id ? { ...item, favorite: nextFavorite } : item,
-        ),
-      );
-      try {
-        await updateDatasetFavorite(dataset.id, nextFavorite);
-      } catch {
-        setDatasetsState(
-          datasetsRef.current.map((item) =>
-            item.id === dataset.id
-              ? { ...item, favorite: dataset.favorite }
-              : item,
-          ),
-        );
-      }
-    },
-    [setDatasetsState],
-  );
-
-  const tagOptions = useMemo(() => {
-    const tagSet = new Set<string>();
-    datasets.forEach((dataset) => {
-      dataset.tags.forEach((tag) => tagSet.add(tag));
-    });
-    return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
-  }, [datasets]);
-
-  const filteredTagOptions = useMemo(() => {
-    const normalized = tagFilterQuery.trim().toLowerCase();
-    if (!normalized) return tagOptions;
-    return tagOptions.filter((tag) => tag.toLowerCase().includes(normalized));
-  }, [tagFilterQuery, tagOptions]);
+  }, []);
 
   const columns = useMemo<ColumnDef<DatasetInfo>[]>(
     () => [
@@ -406,11 +249,6 @@ export function DatasetTable({
     })
     .join(" ");
 
-  const favoriteOnly =
-    columnFilters.find((filter) => filter.id === "favorite")?.value === true;
-  const hasActiveFilters =
-    searchQuery.trim().length > 0 || favoriteOnly || selectedTags.length > 0;
-
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollViewportRef.current,
@@ -422,24 +260,9 @@ export function DatasetTable({
     const last = rowVirtualizer.getVirtualItems().at(-1);
     if (!last) return;
     if (hasMore && last.index >= rows.length - 10) {
-      void loadDatasets({ append: true });
+      void loadNextPage();
     }
-  }, [hasMore, loadDatasets, rowVirtualizer, rows.length]);
-
-  const handleTagToggle = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag],
-    );
-  };
-
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedTags([]);
-    setTagFilterQuery("");
-    setColumnFilters((prev) =>
-      prev.filter((filter) => filter.id !== "favorite"),
-    );
-  };
+  }, [hasMore, loadNextPage, rowVirtualizer, rows.length]);
 
   return (
     <TooltipProvider>
@@ -471,7 +294,10 @@ export function DatasetTable({
         <div className="flex min-h-0 flex-1 flex-col border-t">
           <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
             <div className="min-w-[760px]">
-              <div className="bg-muted sticky top-0 z-20 border-b">
+              <div
+                ref={headerRef}
+                className="bg-muted sticky top-0 z-20 border-b"
+              >
                 <div
                   className="text-muted-foreground grid items-center gap-2 px-3 py-2 text-xs"
                   style={{ gridTemplateColumns }}
