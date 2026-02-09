@@ -3,6 +3,7 @@ import type { SortingState } from "@tanstack/react-table";
 import {
   DATASET_PAGE_SIZE,
   type DatasetInfo,
+  type ListDatasetsOptions,
   type DatasetListSortBy,
   type DatasetStatus,
   listDatasetTags,
@@ -32,6 +33,28 @@ function sortingToBackend(sorting: SortingState): {
   return {
     sortBy: current.id,
     sortDir: current.desc ? "desc" : "asc",
+  };
+}
+
+function buildDatasetListOptions(params: {
+  search: string;
+  tags: string[];
+  favoriteOnly: boolean;
+  statuses: DatasetStatus[];
+  sorting: SortingState;
+  limit: number;
+  offset: number;
+}): ListDatasetsOptions {
+  const { sortBy, sortDir } = sortingToBackend(params.sorting);
+  return {
+    search: params.search,
+    tags: params.tags,
+    favoriteOnly: params.favoriteOnly,
+    statuses: params.statuses,
+    sortBy,
+    sortDir,
+    limit: params.limit,
+    offset: params.offset,
   };
 }
 
@@ -139,17 +162,17 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       setIsLoadingState(true);
       try {
         const offset = append ? datasetsRef.current.length : 0;
-        const { sortBy, sortDir } = sortingToBackend(sortingRef.current);
-        const next = await listDatasets({
-          search: searchRef.current,
-          tags: selectedTagsRef.current,
-          favoriteOnly: favoriteOnlyRef.current,
-          statuses: selectedStatusesRef.current,
-          sortBy,
-          sortDir,
-          limit: DATASET_PAGE_SIZE,
-          offset,
-        });
+        const next = await listDatasets(
+          buildDatasetListOptions({
+            search: searchRef.current,
+            tags: selectedTagsRef.current,
+            favoriteOnly: favoriteOnlyRef.current,
+            statuses: selectedStatusesRef.current,
+            sorting: sortingRef.current,
+            limit: DATASET_PAGE_SIZE,
+            offset,
+          }),
+        );
         setHasMoreState(deriveHasMore(next.length, DATASET_PAGE_SIZE));
         if (append) {
           setDatasetsState([...datasetsRef.current, ...next]);
@@ -168,17 +191,17 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     setIsLoadingState(true);
     try {
       const limit = Math.max(datasetsRef.current.length, DATASET_PAGE_SIZE);
-      const { sortBy, sortDir } = sortingToBackend(sortingRef.current);
-      const next = await listDatasets({
-        search: searchRef.current,
-        tags: selectedTagsRef.current,
-        favoriteOnly: favoriteOnlyRef.current,
-        statuses: selectedStatusesRef.current,
-        sortBy,
-        sortDir,
-        limit,
-        offset: 0,
-      });
+      const next = await listDatasets(
+        buildDatasetListOptions({
+          search: searchRef.current,
+          tags: selectedTagsRef.current,
+          favoriteOnly: favoriteOnlyRef.current,
+          statuses: selectedStatusesRef.current,
+          sorting: sortingRef.current,
+          limit,
+          offset: 0,
+        }),
+      );
       setDatasetsState(next);
       setHasMoreState(deriveHasMore(next.length, limit));
     } finally {

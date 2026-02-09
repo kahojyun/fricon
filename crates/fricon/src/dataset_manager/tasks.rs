@@ -231,24 +231,19 @@ pub fn do_get_dataset(conn: &mut SqliteConnection, id: DatasetId) -> Result<Data
     Ok(DatasetRecord::from_database_models(dataset, tags))
 }
 
-/// List datasets with filtering, sorting, and pagination options.
-#[expect(
-    clippy::too_many_lines,
-    reason = "Query construction and eager-loading tags are intentionally kept together."
-)]
-pub fn do_list_datasets(
-    conn: &mut SqliteConnection,
-    query_options: &DatasetListQuery,
-) -> Result<Vec<DatasetRecord>, Error> {
-    let search = query_options.search.as_deref().and_then(|value| {
+fn normalize_search(search: Option<&str>) -> Option<&str> {
+    search.and_then(|value| {
         let trimmed = value.trim();
         if trimmed.is_empty() {
             None
         } else {
             Some(trimmed)
         }
-    });
-    let tag_filters = query_options.tags.as_deref().and_then(|tags| {
+    })
+}
+
+fn normalize_tag_filters(tags: Option<&[String]>) -> Option<Vec<String>> {
+    tags.and_then(|tags| {
         let cleaned: Vec<String> = tags
             .iter()
             .map(|tag| tag.trim())
@@ -260,23 +255,34 @@ pub fn do_list_datasets(
         } else {
             Some(cleaned)
         }
-    });
-    let tagged_dataset_ids = if let Some(tag_filters) = tag_filters.as_ref() {
-        let ids = schema::datasets_tags::table
-            .inner_join(schema::tags::table)
-            .filter(schema::tags::name.eq_any(tag_filters))
-            .select(schema::datasets_tags::dataset_id)
-            .distinct()
-            .load::<i32>(conn)?;
-        if ids.is_empty() {
-            return Ok(Vec::new());
-        }
-        Some(ids)
-    } else {
-        None
+    })
+}
+
+fn resolve_tagged_dataset_ids(
+    conn: &mut SqliteConnection,
+    tag_filters: Option<&[String]>,
+) -> Result<Option<Vec<i32>>, Error> {
+    let Some(tag_filters) = tag_filters else {
+        return Ok(None);
     };
-    let statuses = query_options.statuses.as_ref().and_then(|statuses| {
-        let mut deduped = statuses.clone();
+
+    let ids = schema::datasets_tags::table
+        .inner_join(schema::tags::table)
+        .filter(schema::tags::name.eq_any(tag_filters))
+        .select(schema::datasets_tags::dataset_id)
+        .distinct()
+        .load::<i32>(conn)?;
+
+    if ids.is_empty() {
+        Ok(Some(Vec::new()))
+    } else {
+        Ok(Some(ids))
+    }
+}
+
+fn normalize_statuses(statuses: Option<&[DatasetStatus]>) -> Option<Vec<DatasetStatus>> {
+    statuses.and_then(|statuses| {
+        let mut deduped = statuses.to_vec();
         deduped.sort_unstable_by_key(|status| *status as u8);
         deduped.dedup();
         if deduped.is_empty() {
@@ -284,7 +290,51 @@ pub fn do_list_datasets(
         } else {
             Some(deduped)
         }
-    });
+    })
+}
+
+fn map_datasets_with_tags(
+    conn: &mut SqliteConnection,
+    all_datasets: Vec<database::Dataset>,
+) -> Result<Vec<DatasetRecord>, Error> {
+    let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
+        .inner_join(schema::tags::table)
+        .select((
+            database::DatasetTag::as_select(),
+            database::Tag::as_select(),
+        ))
+        .load::<(database::DatasetTag, database::Tag)>(conn)?;
+
+    let datasets_with_tags: Vec<(database::Dataset, Vec<database::Tag>)> = dataset_tags
+        .grouped_by(&all_datasets)
+        .into_iter()
+        .zip(all_datasets)
+        .map(|(dataset_tags, dataset)| {
+            (
+                dataset,
+                dataset_tags.into_iter().map(|(_, tag)| tag).collect(),
+            )
+        })
+        .collect();
+
+    Ok(datasets_with_tags
+        .into_iter()
+        .map(|(dataset, tags)| DatasetRecord::from_database_models(dataset, tags))
+        .collect())
+}
+
+/// List datasets with filtering, sorting, and pagination options.
+pub fn do_list_datasets(
+    conn: &mut SqliteConnection,
+    query_options: &DatasetListQuery,
+) -> Result<Vec<DatasetRecord>, Error> {
+    let search = normalize_search(query_options.search.as_deref());
+    let tag_filters = normalize_tag_filters(query_options.tags.as_deref());
+    let tagged_dataset_ids = resolve_tagged_dataset_ids(conn, tag_filters.as_deref())?;
+    if tagged_dataset_ids.as_ref().is_some_and(Vec::is_empty) {
+        return Ok(Vec::new());
+    }
+    let statuses = normalize_statuses(query_options.statuses.as_deref());
 
     let mut query = schema::datasets::table.into_boxed();
     if let Some(search) = search {
@@ -325,36 +375,12 @@ pub fn do_list_datasets(
         .unwrap_or(DEFAULT_DATASET_LIST_LIMIT)
         .max(0);
     let offset = query_options.offset.unwrap_or(0).max(0);
-    let all_datasets = query
+    let all_datasets: Vec<database::Dataset> = query
         .limit(limit)
         .offset(offset)
         .select(database::Dataset::as_select())
         .load(conn)?;
-
-    let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
-        .inner_join(schema::tags::table)
-        .select((
-            database::DatasetTag::as_select(),
-            database::Tag::as_select(),
-        ))
-        .load::<(database::DatasetTag, database::Tag)>(conn)?;
-
-    let datasets_with_tags: Vec<(database::Dataset, Vec<database::Tag>)> = dataset_tags
-        .grouped_by(&all_datasets)
-        .into_iter()
-        .zip(all_datasets)
-        .map(|(dataset_tags, dataset)| {
-            (
-                dataset,
-                dataset_tags.into_iter().map(|(_, tag)| tag).collect(),
-            )
-        })
-        .collect();
-
-    Ok(datasets_with_tags
-        .into_iter()
-        .map(|(dataset, tags)| DatasetRecord::from_database_models(dataset, tags))
-        .collect())
+    map_datasets_with_tags(conn, all_datasets)
 }
 
 /// List all known dataset tags in ascending name order.

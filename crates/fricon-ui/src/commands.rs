@@ -268,7 +268,7 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct DatasetListOptions {
     search: Option<String>,
@@ -295,16 +295,7 @@ async fn list_datasets(
 ) -> Result<Vec<DatasetInfo>, Error> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
-    let options = options.unwrap_or(DatasetListOptions {
-        search: None,
-        tags: None,
-        favorite_only: None,
-        statuses: None,
-        sort_by: None,
-        sort_dir: None,
-        limit: None,
-        offset: None,
-    });
+    let options = options.unwrap_or_default();
     let query = DatasetListQuery {
         search: options.search,
         tags: options.tags,
