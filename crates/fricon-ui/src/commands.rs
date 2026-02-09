@@ -12,7 +12,8 @@ use arrow_ipc::writer::FileWriter;
 use arrow_select::concat::concat_batches;
 use chrono::{DateTime, Utc};
 use fricon::{
-    DatasetDataType, DatasetId, DatasetSchema, DatasetStatus, DatasetUpdate, SelectOptions,
+    DatasetDataType, DatasetId, DatasetListQuery, DatasetSchema, DatasetSortBy, DatasetStatus,
+    DatasetUpdate, SelectOptions, SortDirection,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -272,8 +273,19 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 struct DatasetListOptions {
     search: Option<String>,
     tags: Option<Vec<String>>,
+    favorite_only: Option<bool>,
+    statuses: Option<Vec<DatasetStatus>>,
+    sort_by: Option<DatasetSortBy>,
+    sort_dir: Option<SortDirection>,
     limit: Option<i64>,
     offset: Option<i64>,
+}
+
+fn validate_non_negative(value: Option<i64>, field_name: &str) -> Result<Option<i64>, Error> {
+    match value {
+        Some(v) if v < 0 => Err(anyhow::anyhow!("{field_name} must be non-negative").into()),
+        _ => Ok(value),
+    }
 }
 
 #[tauri::command]
@@ -283,11 +295,28 @@ async fn list_datasets(
 ) -> Result<Vec<DatasetInfo>, Error> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
-    let (search, tags, limit, offset) = options
-        .map(|options| (options.search, options.tags, options.limit, options.offset))
-        .unwrap_or_default();
+    let options = options.unwrap_or(DatasetListOptions {
+        search: None,
+        tags: None,
+        favorite_only: None,
+        statuses: None,
+        sort_by: None,
+        sort_dir: None,
+        limit: None,
+        offset: None,
+    });
+    let query = DatasetListQuery {
+        search: options.search,
+        tags: options.tags,
+        favorite_only: options.favorite_only.unwrap_or(false),
+        statuses: options.statuses,
+        sort_by: options.sort_by.unwrap_or(DatasetSortBy::Id),
+        sort_direction: options.sort_dir.unwrap_or(SortDirection::Desc),
+        limit: validate_non_negative(options.limit, "limit")?,
+        offset: validate_non_negative(options.offset, "offset")?,
+    };
     let datasets = dataset_manager
-        .list_datasets(search.as_deref(), tags.as_deref(), limit, offset)
+        .list_datasets(query)
         .await
         .context("Failed to list datasets.")?;
 
@@ -305,6 +334,17 @@ async fn list_datasets(
         .collect();
 
     Ok(dataset_info)
+}
+
+#[tauri::command]
+async fn list_dataset_tags(state: State<'_, AppState>) -> Result<Vec<String>, Error> {
+    let app = state.app();
+    let dataset_manager = app.dataset_manager();
+    dataset_manager
+        .list_dataset_tags()
+        .await
+        .context("Failed to list dataset tags.")
+        .map_err(Error::from)
 }
 
 #[tauri::command]
@@ -675,6 +715,7 @@ pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
     tauri::generate_handler![
         get_workspace_info,
         list_datasets,
+        list_dataset_tags,
         dataset_detail,
         dataset_data,
         dataset_chart_data,

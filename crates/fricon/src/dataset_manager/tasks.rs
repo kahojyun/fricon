@@ -20,7 +20,8 @@ use crate::{
     database::{self, DatasetStatus, NewDataset, Pool, SimpleUuid, schema},
     dataset_fs,
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetReader, DatasetRecord, DatasetUpdate, Error,
+        CreateDatasetRequest, DatasetId, DatasetListQuery, DatasetReader, DatasetRecord,
+        DatasetSortBy, DatasetUpdate, Error, SortDirection,
         write_registry::{WriteSessionGuard, WriteSessionRegistry},
     },
 };
@@ -230,15 +231,16 @@ pub fn do_get_dataset(conn: &mut SqliteConnection, id: DatasetId) -> Result<Data
     Ok(DatasetRecord::from_database_models(dataset, tags))
 }
 
-/// List datasets, optionally filtered by name and tags
+/// List datasets with filtering, sorting, and pagination options.
+#[expect(
+    clippy::too_many_lines,
+    reason = "Query construction and eager-loading tags are intentionally kept together."
+)]
 pub fn do_list_datasets(
     conn: &mut SqliteConnection,
-    search: Option<&str>,
-    tags: Option<&[String]>,
-    limit: Option<i64>,
-    offset: Option<i64>,
+    query_options: &DatasetListQuery,
 ) -> Result<Vec<DatasetRecord>, Error> {
-    let search = search.and_then(|value| {
+    let search = query_options.search.as_deref().and_then(|value| {
         let trimmed = value.trim();
         if trimmed.is_empty() {
             None
@@ -246,7 +248,7 @@ pub fn do_list_datasets(
             Some(trimmed)
         }
     });
-    let tag_filters = tags.and_then(|tags| {
+    let tag_filters = query_options.tags.as_deref().and_then(|tags| {
         let cleaned: Vec<String> = tags
             .iter()
             .map(|tag| tag.trim())
@@ -273,6 +275,16 @@ pub fn do_list_datasets(
     } else {
         None
     };
+    let statuses = query_options.statuses.as_ref().and_then(|statuses| {
+        let mut deduped = statuses.clone();
+        deduped.sort_unstable_by_key(|status| *status as u8);
+        deduped.dedup();
+        if deduped.is_empty() {
+            None
+        } else {
+            Some(deduped)
+        }
+    });
 
     let mut query = schema::datasets::table.into_boxed();
     if let Some(search) = search {
@@ -282,11 +294,38 @@ pub fn do_list_datasets(
     if let Some(ids) = tagged_dataset_ids {
         query = query.filter(schema::datasets::id.eq_any(ids));
     }
+    if query_options.favorite_only {
+        query = query.filter(schema::datasets::favorite.eq(true));
+    }
+    if let Some(statuses) = statuses {
+        query = query.filter(schema::datasets::status.eq_any(statuses));
+    }
 
-    let limit = limit.unwrap_or(DEFAULT_DATASET_LIST_LIMIT).max(0);
-    let offset = offset.unwrap_or(0).max(0);
+    query = match (query_options.sort_by, query_options.sort_direction) {
+        (DatasetSortBy::Id, SortDirection::Asc) => query.order(schema::datasets::id.asc()),
+        (DatasetSortBy::Id, SortDirection::Desc) => query.order(schema::datasets::id.desc()),
+        (DatasetSortBy::Name, SortDirection::Asc) => {
+            query.order((schema::datasets::name.asc(), schema::datasets::id.desc()))
+        }
+        (DatasetSortBy::Name, SortDirection::Desc) => {
+            query.order((schema::datasets::name.desc(), schema::datasets::id.desc()))
+        }
+        (DatasetSortBy::CreatedAt, SortDirection::Asc) => query.order((
+            schema::datasets::created_at.asc(),
+            schema::datasets::id.desc(),
+        )),
+        (DatasetSortBy::CreatedAt, SortDirection::Desc) => query.order((
+            schema::datasets::created_at.desc(),
+            schema::datasets::id.desc(),
+        )),
+    };
+
+    let limit = query_options
+        .limit
+        .unwrap_or(DEFAULT_DATASET_LIST_LIMIT)
+        .max(0);
+    let offset = query_options.offset.unwrap_or(0).max(0);
     let all_datasets = query
-        .order(schema::datasets::id.desc())
         .limit(limit)
         .offset(offset)
         .select(database::Dataset::as_select())
@@ -316,6 +355,15 @@ pub fn do_list_datasets(
         .into_iter()
         .map(|(dataset, tags)| DatasetRecord::from_database_models(dataset, tags))
         .collect())
+}
+
+/// List all known dataset tags in ascending name order.
+pub fn do_list_dataset_tags(conn: &mut SqliteConnection) -> Result<Vec<String>, Error> {
+    let tags = schema::tags::table
+        .select(schema::tags::name)
+        .order(schema::tags::name.asc())
+        .load(conn)?;
+    Ok(tags)
 }
 
 /// Update dataset metadata
@@ -414,7 +462,11 @@ mod tests {
 
     use arrow_array::{Int32Array, RecordBatch, RecordBatchIterator};
     use arrow_schema::{ArrowError, DataType, Field, Schema};
-    use chrono::Utc;
+    use chrono::{NaiveDate, NaiveDateTime, Utc};
+    use diesel::{
+        Connection, ExpressionMethods, RunQueryDsl, connection::SimpleConnection,
+        sqlite::SqliteConnection,
+    };
     use mockall::{Sequence, predicate::eq};
 
     use super::*;
@@ -625,5 +677,225 @@ mod tests {
 
         let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
         assert!(result.is_err());
+    }
+
+    fn setup_list_query_db() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory sqlite");
+        conn.batch_execute(
+            r"
+            CREATE TABLE datasets (
+                id INTEGER PRIMARY KEY NOT NULL,
+                uid TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                favorite BOOLEAN NOT NULL DEFAULT 0,
+                status TEXT NOT NULL,
+                created_at TIMESTAMP NOT NULL
+            );
+            CREATE TABLE tags (
+                id INTEGER PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL UNIQUE
+            );
+            CREATE TABLE datasets_tags (
+                dataset_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (dataset_id, tag_id)
+            );
+            ",
+        )
+        .expect("create schema");
+        conn
+    }
+
+    fn date(day: u32) -> NaiveDateTime {
+        NaiveDate::from_ymd_opt(2026, 1, day)
+            .expect("valid date")
+            .and_hms_opt(0, 0, 0)
+            .expect("valid time")
+    }
+
+    fn insert_dataset(
+        conn: &mut SqliteConnection,
+        id: i32,
+        name: &str,
+        favorite: bool,
+        status: DatasetStatus,
+        created_at: NaiveDateTime,
+    ) {
+        diesel::insert_into(schema::datasets::table)
+            .values((
+                schema::datasets::id.eq(id),
+                schema::datasets::uid.eq(SimpleUuid(Uuid::new_v4())),
+                schema::datasets::name.eq(name),
+                schema::datasets::description.eq("desc"),
+                schema::datasets::favorite.eq(favorite),
+                schema::datasets::status.eq(status),
+                schema::datasets::created_at.eq(created_at),
+            ))
+            .execute(conn)
+            .expect("insert dataset");
+    }
+
+    fn insert_tag(conn: &mut SqliteConnection, id: i32, name: &str) {
+        diesel::insert_into(schema::tags::table)
+            .values((schema::tags::id.eq(id), schema::tags::name.eq(name)))
+            .execute(conn)
+            .expect("insert tag");
+    }
+
+    fn link_dataset_tag(conn: &mut SqliteConnection, dataset_id: i32, tag_id: i32) {
+        diesel::insert_into(schema::datasets_tags::table)
+            .values((
+                schema::datasets_tags::dataset_id.eq(dataset_id),
+                schema::datasets_tags::tag_id.eq(tag_id),
+            ))
+            .execute(conn)
+            .expect("link dataset tag");
+    }
+
+    #[test]
+    fn list_datasets_filters_by_favorite_status_and_sorts_by_name() {
+        let mut conn = setup_list_query_db();
+        insert_dataset(
+            &mut conn,
+            1,
+            "beta",
+            false,
+            DatasetStatus::Completed,
+            date(1),
+        );
+        insert_dataset(
+            &mut conn,
+            2,
+            "alpha",
+            true,
+            DatasetStatus::Completed,
+            date(2),
+        );
+        insert_dataset(&mut conn, 3, "gamma", true, DatasetStatus::Writing, date(3));
+
+        let datasets = do_list_datasets(
+            &mut conn,
+            &DatasetListQuery {
+                favorite_only: true,
+                statuses: Some(vec![DatasetStatus::Completed]),
+                sort_by: DatasetSortBy::Name,
+                sort_direction: SortDirection::Asc,
+                ..DatasetListQuery::default()
+            },
+        )
+        .expect("list datasets");
+
+        let ids: Vec<i32> = datasets.into_iter().map(|dataset| dataset.id).collect();
+        assert_eq!(ids, vec![2]);
+    }
+
+    #[test]
+    fn list_datasets_tag_filter_matches_any_selected_tag() {
+        let mut conn = setup_list_query_db();
+        insert_dataset(
+            &mut conn,
+            1,
+            "one",
+            false,
+            DatasetStatus::Completed,
+            date(1),
+        );
+        insert_dataset(
+            &mut conn,
+            2,
+            "two",
+            false,
+            DatasetStatus::Completed,
+            date(2),
+        );
+        insert_tag(&mut conn, 10, "vision");
+        insert_tag(&mut conn, 11, "nlp");
+        link_dataset_tag(&mut conn, 1, 10);
+        link_dataset_tag(&mut conn, 2, 11);
+
+        let datasets = do_list_datasets(
+            &mut conn,
+            &DatasetListQuery {
+                tags: Some(vec!["vision".to_string(), "missing".to_string()]),
+                ..DatasetListQuery::default()
+            },
+        )
+        .expect("list datasets");
+
+        let ids: Vec<i32> = datasets.into_iter().map(|dataset| dataset.id).collect();
+        assert_eq!(ids, vec![1]);
+    }
+
+    #[test]
+    fn list_datasets_default_sort_and_pagination() {
+        let mut conn = setup_list_query_db();
+        insert_dataset(
+            &mut conn,
+            1,
+            "one",
+            false,
+            DatasetStatus::Completed,
+            date(1),
+        );
+        insert_dataset(
+            &mut conn,
+            2,
+            "two",
+            false,
+            DatasetStatus::Completed,
+            date(2),
+        );
+        insert_dataset(
+            &mut conn,
+            3,
+            "three",
+            false,
+            DatasetStatus::Completed,
+            date(3),
+        );
+
+        let first_page = do_list_datasets(
+            &mut conn,
+            &DatasetListQuery {
+                limit: Some(2),
+                offset: Some(0),
+                ..DatasetListQuery::default()
+            },
+        )
+        .expect("first page");
+        let second_page = do_list_datasets(
+            &mut conn,
+            &DatasetListQuery {
+                limit: Some(2),
+                offset: Some(2),
+                ..DatasetListQuery::default()
+            },
+        )
+        .expect("second page");
+
+        let first_ids: Vec<i32> = first_page.into_iter().map(|dataset| dataset.id).collect();
+        let second_ids: Vec<i32> = second_page.into_iter().map(|dataset| dataset.id).collect();
+        assert_eq!(first_ids, vec![3, 2]);
+        assert_eq!(second_ids, vec![1]);
+    }
+
+    #[test]
+    fn list_dataset_tags_returns_sorted_names() {
+        let mut conn = setup_list_query_db();
+        insert_tag(&mut conn, 1, "zeta");
+        insert_tag(&mut conn, 2, "alpha");
+        insert_tag(&mut conn, 3, "vision");
+
+        let tags = do_list_dataset_tags(&mut conn).expect("list tags");
+
+        assert_eq!(
+            tags,
+            vec![
+                "alpha".to_string(),
+                "vision".to_string(),
+                "zeta".to_string()
+            ]
+        );
     }
 }

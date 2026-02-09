@@ -27,8 +27,8 @@ pub use self::{
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetManager, DatasetMetadata, DatasetReader,
-        DatasetUpdate, SelectOptions,
+        CreateDatasetRequest, DatasetId, DatasetListQuery, DatasetManager, DatasetMetadata,
+        DatasetReader, DatasetSortBy, DatasetUpdate, SelectOptions, SortDirection,
     },
     server::DatasetRecord,
     workspace::{WorkspaceRoot, get_log_dir},

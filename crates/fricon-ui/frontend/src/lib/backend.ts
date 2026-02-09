@@ -50,6 +50,20 @@ export interface DatasetDetail extends DatasetInfo {
 
 export const DATASET_PAGE_SIZE = 200;
 
+export type DatasetListSortBy = "id" | "name" | "createdAt";
+export type DatasetListSortDir = "asc" | "desc";
+
+export interface ListDatasetsOptions {
+  search?: string;
+  tags?: string[];
+  favoriteOnly?: boolean;
+  statuses?: DatasetStatus[];
+  sortBy?: DatasetListSortBy;
+  sortDir?: DatasetListSortDir;
+  limit?: number;
+  offset?: number;
+}
+
 export interface ChartDataOptions {
   chartType: ChartType;
   series?: string;
@@ -75,15 +89,26 @@ export function getWorkspaceInfo(): Promise<WorkspaceInfo> {
 }
 
 export async function listDatasets(
-  search?: string,
-  tags?: string[],
-  limit?: number,
-  offset?: number,
+  options: ListDatasetsOptions = {},
 ): Promise<DatasetInfo[]> {
+  const {
+    search,
+    tags,
+    favoriteOnly,
+    statuses,
+    sortBy,
+    sortDir,
+    limit,
+    offset,
+  } = options;
   const rawDatasets = await invoke<RawDatasetInfo[]>("list_datasets", {
     options: {
       search: search?.trim() ?? undefined,
       tags: tags && tags.length > 0 ? tags : undefined,
+      favoriteOnly: favoriteOnly ? true : undefined,
+      statuses: statuses && statuses.length > 0 ? statuses : undefined,
+      sortBy,
+      sortDir,
       limit,
       offset,
     },
@@ -92,6 +117,10 @@ export async function listDatasets(
     ...dataset,
     createdAt: new Date(dataset.createdAt),
   }));
+}
+
+export function listDatasetTags(): Promise<string[]> {
+  return invoke<string[]>("list_dataset_tags");
 }
 
 export async function updateDatasetFavorite(

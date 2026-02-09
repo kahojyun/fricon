@@ -3,8 +3,6 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -48,6 +46,12 @@ const statusVariantMap: Record<
   Aborted: "destructive",
 };
 
+const datasetStatusOptions: DatasetStatus[] = [
+  "Writing",
+  "Completed",
+  "Aborted",
+];
+
 export function DatasetTable({
   selectedDatasetId,
   onDatasetSelected,
@@ -57,18 +61,19 @@ export function DatasetTable({
     searchQuery,
     setSearchQuery,
     selectedTags,
+    selectedStatuses,
     tagFilterQuery,
     setTagFilterQuery,
     sorting,
     setSorting,
-    columnFilters,
-    setColumnFilters,
     filteredTagOptions,
     favoriteOnly,
+    setFavoriteOnly,
     hasMore,
     hasActiveFilters,
     toggleFavorite,
     handleTagToggle,
+    handleStatusToggle,
     clearFilters,
     loadNextPage,
   } = useDatasetTableData();
@@ -115,10 +120,6 @@ export function DatasetTable({
         id: "favorite",
         accessorKey: "favorite",
         enableSorting: false,
-        filterFn: (row, columnId, value) => {
-          if (value !== true) return true;
-          return row.getValue<boolean>(columnId);
-        },
         meta: { label: "Favorite", width: "60px" } satisfies DatasetColumnMeta,
         cell: ({ row }) => {
           const dataset = row.original;
@@ -230,14 +231,10 @@ export function DatasetTable({
     data: datasets,
     columns,
     state: {
-      columnFilters,
       sorting,
     },
-    onColumnFiltersChange: setColumnFilters,
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
 
   const rows = table.getRowModel().rows;
@@ -271,12 +268,17 @@ export function DatasetTable({
           <div className="flex items-center gap-2">
             <Badge variant="secondary">
               {hasActiveFilters
-                ? `${selectedTags.length + Number(favoriteOnly) + Number(searchQuery.trim().length > 0)} filters`
+                ? `${selectedTags.length + selectedStatuses.length + Number(favoriteOnly) + Number(searchQuery.trim().length > 0)} filters`
                 : "No filters"}
             </Badge>
             {selectedTags.length > 0 ? (
               <div className="text-muted-foreground text-xs">
                 Tags: {selectedTags.join(", ")}
+              </div>
+            ) : null}
+            {selectedStatuses.length > 0 ? (
+              <div className="text-muted-foreground text-xs">
+                Status: {selectedStatuses.join(", ")}
               </div>
             ) : null}
           </div>
@@ -341,17 +343,7 @@ export function DatasetTable({
                           <Switch
                             aria-label="Favorites only"
                             checked={favoriteOnly}
-                            onCheckedChange={(checked) => {
-                              setColumnFilters((prev) => {
-                                const next = prev.filter(
-                                  (filter) => filter.id !== "favorite",
-                                );
-                                if (checked) {
-                                  next.push({ id: "favorite", value: true });
-                                }
-                                return next;
-                              });
-                            }}
+                            onCheckedChange={setFavoriteOnly}
                           />
                         </div>
                       );
@@ -440,6 +432,63 @@ export function DatasetTable({
                                   </div>
                                 )}
                               </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      );
+                    }
+
+                    if (header.column.id === "status") {
+                      return (
+                        <div key={`${header.id}-filter`}>
+                          <Popover>
+                            <PopoverTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  aria-label="Filter status"
+                                  variant={
+                                    selectedStatuses.length > 0
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                  size="sm"
+                                />
+                              }
+                            >
+                              Status
+                              {selectedStatuses.length > 0
+                                ? ` (${selectedStatuses.length})`
+                                : ""}
+                            </PopoverTrigger>
+                            <PopoverContent
+                              align="start"
+                              className="w-56 space-y-1"
+                            >
+                              {datasetStatusOptions.map((status) => {
+                                const isActive =
+                                  selectedStatuses.includes(status);
+                                return (
+                                  <Button
+                                    key={status}
+                                    type="button"
+                                    variant={isActive ? "secondary" : "ghost"}
+                                    size="sm"
+                                    className="w-full justify-start"
+                                    onClick={() => handleStatusToggle(status)}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "size-3",
+                                        isActive
+                                          ? "text-foreground opacity-100"
+                                          : "text-transparent opacity-0",
+                                      )}
+                                    />
+                                    {status}
+                                  </Button>
+                                );
+                              })}
                             </PopoverContent>
                           </Popover>
                         </div>
