@@ -128,6 +128,48 @@ pub struct DatasetUpdate {
     pub favorite: Option<bool>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DatasetSortBy {
+    Id,
+    Name,
+    CreatedAt,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SortDirection {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Clone)]
+pub struct DatasetListQuery {
+    pub search: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub favorite_only: bool,
+    pub statuses: Option<Vec<DatasetStatus>>,
+    pub sort_by: DatasetSortBy,
+    pub sort_direction: SortDirection,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+impl Default for DatasetListQuery {
+    fn default() -> Self {
+        Self {
+            search: None,
+            tags: None,
+            favorite_only: false,
+            statuses: None,
+            sort_by: DatasetSortBy::Id,
+            sort_direction: SortDirection::Desc,
+            limit: None,
+            offset: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, From)]
 pub enum DatasetId {
     Id(i32),
@@ -182,23 +224,18 @@ impl DatasetManager {
 
     pub async fn list_datasets(
         &self,
-        search: Option<&str>,
-        tags: Option<&[String]>,
-        limit: Option<i64>,
-        offset: Option<i64>,
+        query: DatasetListQuery,
     ) -> Result<Vec<DatasetRecord>, Error> {
-        let search = search.map(str::to_string);
-        let tags = tags.map(Vec::from);
         self.app
             .spawn_blocking(move |state| {
-                tasks::do_list_datasets(
-                    &mut *state.database.get()?,
-                    search.as_deref(),
-                    tags.as_deref(),
-                    limit,
-                    offset,
-                )
+                tasks::do_list_datasets(&mut *state.database.get()?, &query)
             })?
+            .await?
+    }
+
+    pub async fn list_dataset_tags(&self) -> Result<Vec<String>, Error> {
+        self.app
+            .spawn_blocking(move |state| tasks::do_list_dataset_tags(&mut *state.database.get()?))?
             .await?
     }
 

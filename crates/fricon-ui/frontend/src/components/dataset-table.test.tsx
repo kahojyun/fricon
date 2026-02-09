@@ -40,9 +40,10 @@ function mockHookReturn(overrides: Record<string, unknown> = {}) {
   const setSearchQuery = vi.fn();
   const setTagFilterQuery = vi.fn();
   const setSorting = vi.fn();
-  const setColumnFilters = vi.fn();
+  const setFavoriteOnly = vi.fn();
   const toggleFavorite = vi.fn().mockResolvedValue(undefined);
   const handleTagToggle = vi.fn();
+  const handleStatusToggle = vi.fn();
   const clearFilters = vi.fn();
   const loadNextPage = vi.fn().mockResolvedValue(undefined);
 
@@ -51,18 +52,19 @@ function mockHookReturn(overrides: Record<string, unknown> = {}) {
     searchQuery: "",
     setSearchQuery,
     selectedTags: [],
+    selectedStatuses: [],
     tagFilterQuery: "",
     setTagFilterQuery,
-    sorting: [{ id: "createdAt", desc: true }],
+    sorting: [{ id: "id", desc: true }],
     setSorting,
-    columnFilters: [],
-    setColumnFilters,
     filteredTagOptions: ["vision"],
     favoriteOnly: false,
+    setFavoriteOnly,
     hasMore: false,
     hasActiveFilters: false,
     toggleFavorite,
     handleTagToggle,
+    handleStatusToggle,
     clearFilters,
     loadNextPage,
     ...overrides,
@@ -129,5 +131,28 @@ describe("DatasetTable", () => {
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
 
     expect(hook.clearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it("triggers backend sorting state when clicking sortable header", async () => {
+    const hook = mockHookReturn();
+    const user = userEvent.setup();
+
+    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /^ID/ }));
+
+    expect(hook.setSorting).toHaveBeenCalled();
+  });
+
+  it("toggles status filter via popover action", async () => {
+    const hook = mockHookReturn();
+    const user = userEvent.setup();
+
+    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Filter status" }));
+    await user.click(screen.getByRole("button", { name: "Completed" }));
+
+    expect(hook.handleStatusToggle).toHaveBeenCalledWith("Completed");
   });
 });

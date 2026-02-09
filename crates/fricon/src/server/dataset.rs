@@ -8,7 +8,8 @@ use super::create_stream;
 use crate::{
     database::DatasetStatus,
     dataset_manager::{
-        DatasetId, DatasetManager, DatasetMetadata, DatasetRecord, DatasetUpdate, Error,
+        DatasetId, DatasetListQuery, DatasetManager, DatasetMetadata, DatasetRecord, DatasetUpdate,
+        Error,
     },
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
@@ -263,7 +264,11 @@ impl DatasetService for Storage {
         };
         let records = self
             .manager
-            .list_datasets(None, None, limit, offset)
+            .list_datasets(DatasetListQuery {
+                limit,
+                offset,
+                ..DatasetListQuery::default()
+            })
             .await
             .map_err(|e| {
                 error!("Failed to list datasets: {:?}", e);
