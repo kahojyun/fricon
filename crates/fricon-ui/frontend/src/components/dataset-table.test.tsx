@@ -78,6 +78,7 @@ describe("DatasetTable", () => {
 
     onDatasetCreatedMock.mockResolvedValue(() => undefined);
     onDatasetUpdatedMock.mockResolvedValue(() => undefined);
+    listDatasetsMock.mockResolvedValue([]);
     updateDatasetFavoriteMock.mockResolvedValue(undefined);
   });
 
@@ -124,9 +125,8 @@ describe("DatasetTable", () => {
 
     render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
-    await screen.findByRole("button", { name: "vision" });
-
-    await user.click(screen.getByRole("button", { name: "vision" }));
+    await user.click(screen.getByRole("button", { name: "Filter tags" }));
+    await user.click(await screen.findByRole("button", { name: "vision" }));
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenLastCalledWith("", ["vision"], 3, 0);
     });
