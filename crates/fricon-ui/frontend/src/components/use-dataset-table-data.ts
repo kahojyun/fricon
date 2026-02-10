@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import {
   DATASET_PAGE_SIZE,
   type DatasetInfo,
-  type ListDatasetsOptions,
   type DatasetListSortBy,
   type DatasetStatus,
   listDatasetTags,
@@ -36,15 +42,18 @@ function sortingToBackend(sorting: SortingState): {
   };
 }
 
-function buildDatasetListOptions(params: {
+interface DatasetQueryParams {
   search: string;
   tags: string[];
   favoriteOnly: boolean;
   statuses: DatasetStatus[];
   sorting: SortingState;
-  limit: number;
-  offset: number;
-}): ListDatasetsOptions {
+}
+
+function buildDatasetListOptions(
+  params: DatasetQueryParams,
+  pagination: { limit: number; offset: number },
+) {
   const { sortBy, sortDir } = sortingToBackend(params.sorting);
   return {
     search: params.search,
@@ -53,8 +62,8 @@ function buildDatasetListOptions(params: {
     statuses: params.statuses,
     sortBy,
     sortDir,
-    limit: params.limit,
-    offset: params.offset,
+    limit: pagination.limit,
+    offset: pagination.offset,
   };
 }
 
@@ -82,44 +91,17 @@ interface UseDatasetTableDataResult {
   loadNextPage: () => Promise<void>;
 }
 
+const DEFAULT_SORTING: SortingState = [{ id: "id", desc: true }];
+
 export function useDatasetTableData(): UseDatasetTableDataResult {
-  const [datasets, setDatasets] = useState<DatasetInfo[]>([]);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<DatasetStatus[]>([]);
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [tagFilterQuery, setTagFilterQuery] = useState("");
-  const [hasMore, setHasMore] = useState(true);
-  const [allTags, setAllTags] = useState<string[]>([]);
-  const [sortingState, setSortingState] = useState<SortingState>([
-    { id: "id", desc: true },
-  ]);
-
-  const datasetsRef = useRef<DatasetInfo[]>([]);
-  const searchRef = useRef("");
-  const selectedTagsRef = useRef<string[]>([]);
-  const selectedStatusesRef = useRef<DatasetStatus[]>([]);
-  const favoriteOnlyRef = useRef(false);
-  const sortingRef = useRef<SortingState>([{ id: "id", desc: true }]);
-  const isLoadingRef = useRef(false);
-  const hasMoreRef = useRef(true);
-  const pendingRefreshRef = useRef(false);
-  const searchDebounce = useRef<number | null>(null);
-  const statusRefreshTimer = useRef<number | null>(null);
-
-  const setDatasetsState = useCallback((next: DatasetInfo[]) => {
-    datasetsRef.current = next;
-    setDatasets(next);
-  }, []);
-
-  const setHasMoreState = useCallback((next: boolean) => {
-    hasMoreRef.current = next;
-    setHasMore(next);
-  }, []);
-
-  const setIsLoadingState = useCallback((next: boolean) => {
-    isLoadingRef.current = next;
-  }, []);
+  const [sortingState, setSortingState] =
+    useState<SortingState>(DEFAULT_SORTING);
 
   const setSorting = useCallback(
     (updater: SortingState | ((prev: SortingState) => SortingState)) => {
@@ -132,108 +114,85 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     [],
   );
 
-  useEffect(() => {
-    searchRef.current = searchQuery;
-  }, [searchQuery]);
-
-  useEffect(() => {
-    selectedTagsRef.current = selectedTags;
-  }, [selectedTags]);
-
-  useEffect(() => {
-    selectedStatusesRef.current = selectedStatuses;
-  }, [selectedStatuses]);
-
-  useEffect(() => {
-    favoriteOnlyRef.current = favoriteOnly;
-  }, [favoriteOnly]);
-
-  useEffect(() => {
-    sortingRef.current = sortingState;
-  }, [sortingState]);
-
-  const loadTags = useCallback(async () => {
-    const tags = await listDatasetTags();
-    setAllTags(tags);
-  }, []);
-
-  const refreshDatasets = useCallback(async () => {
-    if (isLoadingRef.current) {
-      pendingRefreshRef.current = true;
-      return;
-    }
-    do {
-      pendingRefreshRef.current = false;
-      setIsLoadingState(true);
-      try {
-        const limit = Math.max(datasetsRef.current.length, DATASET_PAGE_SIZE);
-        const next = await listDatasets(
-          buildDatasetListOptions({
-            search: searchRef.current,
-            tags: selectedTagsRef.current,
-            favoriteOnly: favoriteOnlyRef.current,
-            statuses: selectedStatusesRef.current,
-            sorting: sortingRef.current,
-            limit,
-            offset: 0,
-          }),
-        );
-        setDatasetsState(next);
-        setHasMoreState(deriveHasMore(next.length, limit));
-      } finally {
-        setIsLoadingState(false);
-      }
-    } while (pendingRefreshRef.current);
-  }, [setDatasetsState, setHasMoreState, setIsLoadingState]);
-
-  const loadDatasets = useCallback(
-    async ({ append = false } = {}) => {
-      if (isLoadingRef.current || (append && !hasMoreRef.current)) return;
-      setIsLoadingState(true);
-      try {
-        const offset = append ? datasetsRef.current.length : 0;
-        const next = await listDatasets(
-          buildDatasetListOptions({
-            search: searchRef.current,
-            tags: selectedTagsRef.current,
-            favoriteOnly: favoriteOnlyRef.current,
-            statuses: selectedStatusesRef.current,
-            sorting: sortingRef.current,
-            limit: DATASET_PAGE_SIZE,
-            offset,
-          }),
-        );
-        setHasMoreState(deriveHasMore(next.length, DATASET_PAGE_SIZE));
-        if (append) {
-          setDatasetsState([...datasetsRef.current, ...next]);
-        } else {
-          setDatasetsState(next);
-        }
-      } finally {
-        setIsLoadingState(false);
-        if (pendingRefreshRef.current) {
-          void refreshDatasets();
-        }
-      }
-    },
-    [refreshDatasets, setDatasetsState, setHasMoreState, setIsLoadingState],
+  const currentQueryParams = useMemo<DatasetQueryParams>(
+    () => ({
+      search: searchQuery,
+      tags: selectedTags,
+      favoriteOnly,
+      statuses: selectedStatuses,
+      sorting: sortingState,
+    }),
+    [favoriteOnly, searchQuery, selectedStatuses, selectedTags, sortingState],
   );
 
-  useEffect(() => {
-    void loadDatasets();
-    void loadTags();
+  const [debouncedQueryParams, setDebouncedQueryParams] =
+    useState<DatasetQueryParams>(currentQueryParams);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQueryParams(currentQueryParams);
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [currentQueryParams]);
+
+  const datasetQueryKey = useMemo(
+    () => ["datasets", debouncedQueryParams] as const,
+    [debouncedQueryParams],
+  );
+
+  const datasetsQuery = useInfiniteQuery({
+    queryKey: datasetQueryKey,
+    queryFn: ({ pageParam }) =>
+      listDatasets(
+        buildDatasetListOptions(debouncedQueryParams, {
+          limit: DATASET_PAGE_SIZE,
+          offset: pageParam,
+        }),
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!deriveHasMore(lastPage.length, DATASET_PAGE_SIZE)) {
+        return undefined;
+      }
+      return allPages.reduce((total, page) => total + page.length, 0);
+    },
+  });
+
+  const datasets = useMemo(
+    () => datasetsQuery.data?.pages.flat() ?? [],
+    [datasetsQuery.data],
+  );
+
+  const refreshDatasets = useCallback(async () => {
+    const limit = Math.max(datasets.length, DATASET_PAGE_SIZE);
+    const next = await listDatasets(
+      buildDatasetListOptions(debouncedQueryParams, { limit, offset: 0 }),
+    );
+    queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
+      datasetQueryKey,
+      {
+        pages: [next],
+        pageParams: [0],
+      },
+    );
+  }, [datasetQueryKey, datasets.length, debouncedQueryParams, queryClient]);
+
+  const tagsQuery = useQuery({
+    queryKey: ["datasetTags"],
+    queryFn: listDatasetTags,
+  });
+
+  useEffect(() => {
     let unlistenCreated: (() => void) | undefined;
     let unlistenUpdated: (() => void) | undefined;
     let active = true;
 
     void onDatasetCreated(() => {
       if (!active) return;
-      if (isLoadingRef.current) {
-        pendingRefreshRef.current = true;
-      }
       void refreshDatasets();
-      void loadTags();
+      void queryClient.invalidateQueries({ queryKey: ["datasetTags"] });
     }).then((unlisten) => {
       if (!active) {
         unlisten();
@@ -244,11 +203,8 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
 
     void onDatasetUpdated(() => {
       if (!active) return;
-      if (isLoadingRef.current) {
-        pendingRefreshRef.current = true;
-      }
       void refreshDatasets();
-      void loadTags();
+      void queryClient.invalidateQueries({ queryKey: ["datasetTags"] });
     }).then((unlisten) => {
       if (!active) {
         unlisten();
@@ -262,84 +218,76 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       unlistenCreated?.();
       unlistenUpdated?.();
     };
-  }, [loadDatasets, loadTags, refreshDatasets]);
-
-  useEffect(() => {
-    if (searchDebounce.current) {
-      window.clearTimeout(searchDebounce.current);
-    }
-    searchDebounce.current = window.setTimeout(() => {
-      setHasMoreState(true);
-      void loadDatasets();
-    }, 300);
-    return () => {
-      if (searchDebounce.current) {
-        window.clearTimeout(searchDebounce.current);
-      }
-    };
-  }, [
-    favoriteOnly,
-    loadDatasets,
-    searchQuery,
-    selectedStatuses,
-    selectedTags,
-    setHasMoreState,
-    sortingState,
-  ]);
+  }, [queryClient, refreshDatasets]);
 
   useEffect(() => {
     const hasWriting = datasets.some((dataset) => dataset.status === "Writing");
-    if (hasWriting && statusRefreshTimer.current == null) {
-      statusRefreshTimer.current = window.setInterval(() => {
-        void refreshDatasets();
-      }, 2000);
-    }
-    if (!hasWriting && statusRefreshTimer.current != null) {
-      window.clearInterval(statusRefreshTimer.current);
-      statusRefreshTimer.current = null;
-    }
+    if (!hasWriting) return;
+
+    const timer = window.setInterval(() => {
+      void refreshDatasets();
+    }, 2000);
+
     return () => {
-      if (statusRefreshTimer.current != null) {
-        window.clearInterval(statusRefreshTimer.current);
-        statusRefreshTimer.current = null;
-      }
+      window.clearInterval(timer);
     };
   }, [datasets, refreshDatasets]);
+
+  const favoriteMutation = useMutation({
+    mutationFn: ({ id, favorite }: { id: number; favorite: boolean }) =>
+      updateDatasetFavorite(id, favorite),
+  });
 
   const toggleFavorite = useCallback(
     async (dataset: DatasetInfo) => {
       const nextFavorite = !dataset.favorite;
-      setDatasetsState(
-        datasetsRef.current.map((item) =>
-          item.id === dataset.id ? { ...item, favorite: nextFavorite } : item,
-        ),
-      );
-      try {
-        await updateDatasetFavorite(dataset.id, nextFavorite);
-      } catch {
-        setDatasetsState(
-          datasetsRef.current.map((item) =>
-            item.id === dataset.id
-              ? { ...item, favorite: dataset.favorite }
-              : item,
-          ),
+      const previousData =
+        queryClient.getQueryData<InfiniteData<DatasetInfo[], number>>(
+          datasetQueryKey,
         );
+
+      queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
+        datasetQueryKey,
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            pages: current.pages.map((page) =>
+              page.map((item) =>
+                item.id === dataset.id
+                  ? { ...item, favorite: nextFavorite }
+                  : item,
+              ),
+            ),
+          };
+        },
+      );
+
+      try {
+        await favoriteMutation.mutateAsync({
+          id: dataset.id,
+          favorite: nextFavorite,
+        });
+      } catch {
+        queryClient.setQueryData(datasetQueryKey, previousData);
         return;
       }
+
       try {
         await refreshDatasets();
       } catch {
         // Keep optimistic state if backend write succeeded but refresh failed.
       }
     },
-    [refreshDatasets, setDatasetsState],
+    [datasetQueryKey, favoriteMutation, queryClient, refreshDatasets],
   );
 
   const filteredTagOptions = useMemo(() => {
+    const allTags = tagsQuery.data ?? [];
     const normalized = tagFilterQuery.trim().toLowerCase();
     if (!normalized) return allTags;
     return allTags.filter((tag) => tag.toLowerCase().includes(normalized));
-  }, [allTags, tagFilterQuery]);
+  }, [tagFilterQuery, tagsQuery.data]);
 
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
@@ -370,8 +318,9 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   }, []);
 
   const loadNextPage = useCallback(async () => {
-    await loadDatasets({ append: true });
-  }, [loadDatasets]);
+    if (!datasetsQuery.hasNextPage || datasetsQuery.isFetchingNextPage) return;
+    await datasetsQuery.fetchNextPage();
+  }, [datasetsQuery]);
 
   return {
     datasets,
@@ -386,7 +335,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     filteredTagOptions,
     favoriteOnly,
     setFavoriteOnly,
-    hasMore,
+    hasMore: Boolean(datasetsQuery.hasNextPage),
     hasActiveFilters,
     toggleFavorite,
     handleTagToggle,

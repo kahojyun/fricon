@@ -1,3 +1,5 @@
+import { createElement, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetTableData } from "@/components/use-dataset-table-data";
@@ -41,6 +43,25 @@ function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
   };
 }
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      children,
+    );
+  };
+}
+
 describe("useDatasetTableData", () => {
   beforeEach(() => {
     listDatasetsMock.mockReset();
@@ -63,7 +84,7 @@ describe("useDatasetTableData", () => {
   it("loads datasets with default query params", async () => {
     listDatasetsMock.mockResolvedValueOnce([makeDataset()]);
 
-    renderHook(() => useDatasetTableData());
+    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledWith({
@@ -85,7 +106,9 @@ describe("useDatasetTableData", () => {
       .mockResolvedValueOnce([makeDataset()])
       .mockResolvedValueOnce([makeDataset({ name: "Alpha dataset" })]);
 
-    const { result } = renderHook(() => useDatasetTableData());
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledTimes(1);
@@ -121,7 +144,9 @@ describe("useDatasetTableData", () => {
       ])
       .mockResolvedValueOnce([makeDataset({ id: 4 })]);
 
-    const { result } = renderHook(() => useDatasetTableData());
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenNthCalledWith(1, {
@@ -134,6 +159,9 @@ describe("useDatasetTableData", () => {
         limit: 3,
         offset: 0,
       });
+    });
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
     });
 
     await act(async () => {
@@ -162,7 +190,7 @@ describe("useDatasetTableData", () => {
       .mockResolvedValueOnce([makeDataset({ id: 1 })])
       .mockResolvedValueOnce([makeDataset({ id: 2 })]);
 
-    renderHook(() => useDatasetTableData());
+    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledTimes(1);
@@ -183,7 +211,9 @@ describe("useDatasetTableData", () => {
     ]);
     updateDatasetFavoriteMock.mockRejectedValueOnce(new Error("boom"));
 
-    const { result } = renderHook(() => useDatasetTableData());
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.datasets).toHaveLength(1);
@@ -220,7 +250,9 @@ describe("useDatasetTableData", () => {
         }),
     );
 
-    const { unmount } = renderHook(() => useDatasetTableData());
+    const { unmount } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
     unmount();
 
     resolveCreated?.(unlistenCreated);
