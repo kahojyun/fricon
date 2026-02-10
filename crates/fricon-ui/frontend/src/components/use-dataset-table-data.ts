@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -95,6 +95,8 @@ const DEFAULT_SORTING: SortingState = [{ id: "id", desc: true }];
 
 export function useDatasetTableData(): UseDatasetTableDataResult {
   const queryClient = useQueryClient();
+  const pendingRefreshRef = useRef(false);
+  const isRefreshingRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<DatasetStatus[]>([]);
@@ -166,18 +168,40 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   );
 
   const refreshDatasets = useCallback(async () => {
-    const limit = Math.max(datasets.length, DATASET_PAGE_SIZE);
-    const next = await listDatasets(
-      buildDatasetListOptions(debouncedQueryParams, { limit, offset: 0 }),
-    );
-    queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
-      datasetQueryKey,
-      {
-        pages: [next],
-        pageParams: [0],
-      },
-    );
+    if (
+      isRefreshingRef.current ||
+      queryClient.isFetching({ queryKey: datasetQueryKey }) > 0
+    ) {
+      pendingRefreshRef.current = true;
+      return;
+    }
+
+    do {
+      pendingRefreshRef.current = false;
+      isRefreshingRef.current = true;
+      try {
+        const limit = Math.max(datasets.length, DATASET_PAGE_SIZE);
+        const next = await listDatasets(
+          buildDatasetListOptions(debouncedQueryParams, { limit, offset: 0 }),
+        );
+        queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
+          datasetQueryKey,
+          {
+            pages: [next],
+            pageParams: [0],
+          },
+        );
+      } finally {
+        isRefreshingRef.current = false;
+      }
+    } while (pendingRefreshRef.current);
   }, [datasetQueryKey, datasets.length, debouncedQueryParams, queryClient]);
+
+  useEffect(() => {
+    if (!pendingRefreshRef.current) return;
+    if (datasetsQuery.isFetching || isRefreshingRef.current) return;
+    void refreshDatasets();
+  }, [datasetsQuery.isFetching, refreshDatasets]);
 
   const tagsQuery = useQuery({
     queryKey: ["datasetTags"],

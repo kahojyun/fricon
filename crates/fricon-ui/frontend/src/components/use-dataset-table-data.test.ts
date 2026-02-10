@@ -205,6 +205,44 @@ describe("useDatasetTableData", () => {
     });
   });
 
+  it("queues refresh until in-flight list query completes", async () => {
+    let createdCallback: ((event: DatasetInfo) => void) | undefined;
+    onDatasetCreatedMock.mockImplementation((callback) => {
+      createdCallback = callback;
+      return Promise.resolve(() => undefined);
+    });
+
+    let resolveInitial: ((value: DatasetInfo[]) => void) | undefined;
+    listDatasetsMock
+      .mockImplementationOnce(
+        () =>
+          new Promise<DatasetInfo[]>((resolve) => {
+            resolveInitial = resolve;
+          }),
+      )
+      .mockResolvedValueOnce([makeDataset({ id: 2 })]);
+
+    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      createdCallback?.(makeDataset({ id: 99 }));
+    });
+
+    expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      resolveInitial?.([makeDataset({ id: 1 })]);
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("rolls back optimistic favorite update when backend update fails", async () => {
     listDatasetsMock.mockResolvedValueOnce([
       makeDataset({ id: 11, name: "Pinned", favorite: true }),
