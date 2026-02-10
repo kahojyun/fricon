@@ -167,6 +167,14 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     [datasetsQuery.data],
   );
 
+  const getLoadedDatasetCount = useCallback(() => {
+    const cached =
+      queryClient.getQueryData<InfiniteData<DatasetInfo[], number>>(
+        datasetQueryKey,
+      );
+    return cached?.pages.reduce((total, page) => total + page.length, 0) ?? 0;
+  }, [datasetQueryKey, queryClient]);
+
   const refreshDatasets = useCallback(async () => {
     if (
       isRefreshingRef.current ||
@@ -180,7 +188,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       pendingRefreshRef.current = false;
       isRefreshingRef.current = true;
       try {
-        const limit = Math.max(datasets.length, DATASET_PAGE_SIZE);
+        const limit = Math.max(getLoadedDatasetCount(), DATASET_PAGE_SIZE);
         const next = await listDatasets(
           buildDatasetListOptions(debouncedQueryParams, { limit, offset: 0 }),
         );
@@ -195,7 +203,12 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
         isRefreshingRef.current = false;
       }
     } while (pendingRefreshRef.current);
-  }, [datasetQueryKey, datasets.length, debouncedQueryParams, queryClient]);
+  }, [
+    datasetQueryKey,
+    debouncedQueryParams,
+    getLoadedDatasetCount,
+    queryClient,
+  ]);
 
   useEffect(() => {
     if (!pendingRefreshRef.current) return;
@@ -341,10 +354,12 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     setTagFilterQuery("");
   }, []);
 
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = datasetsQuery;
+
   const loadNextPage = useCallback(async () => {
-    if (!datasetsQuery.hasNextPage || datasetsQuery.isFetchingNextPage) return;
-    await datasetsQuery.fetchNextPage();
-  }, [datasetsQuery]);
+    if (!hasNextPage || isFetchingNextPage) return;
+    await fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return {
     datasets,
@@ -359,7 +374,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     filteredTagOptions,
     favoriteOnly,
     setFavoriteOnly,
-    hasMore: Boolean(datasetsQuery.hasNextPage),
+    hasMore: Boolean(hasNextPage),
     hasActiveFilters,
     toggleFavorite,
     handleTagToggle,
