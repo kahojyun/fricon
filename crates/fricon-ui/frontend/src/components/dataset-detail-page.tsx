@@ -56,7 +56,7 @@ export function DatasetDetailPage({
 
             {detail ? (
               <DatasetDetailEditor
-                key={`${datasetId}-${detailQuery.dataUpdatedAt}`}
+                key={datasetId}
                 datasetId={datasetId}
                 detail={detail}
                 onDatasetUpdated={onDatasetUpdated}
