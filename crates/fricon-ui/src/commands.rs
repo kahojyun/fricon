@@ -15,10 +15,7 @@ use fricon::{
     DatasetUpdate, SelectOptions, SortDirection,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{
-    State,
-    ipc::Invoke,
-};
+use tauri::{State, ipc::Invoke};
 use tauri_specta::{Builder, collect_commands, collect_events};
 
 use super::AppState;

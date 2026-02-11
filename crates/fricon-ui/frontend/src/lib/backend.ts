@@ -8,11 +8,11 @@ import {
   type DatasetDetail as WireDatasetDetail,
   type DatasetFavoriteUpdate,
   type DatasetInfo as WireDatasetInfo,
-  type DatasetInfoUpdate as WireDatasetInfoUpdate,
+  type DatasetInfoUpdate,
   type DatasetListOptions as WireDatasetListOptions,
   type DatasetWriteStatus,
   type Error as WireError,
-  type FilterTableOptions as WireFilterTableOptions,
+  type FilterTableOptions,
   type Row as FilterTableRow,
   type TableData as WireFilterTableData,
   type UiDatasetSortBy as DatasetListSortBy,
@@ -32,7 +32,9 @@ function unwrapResult<T>(
 }
 
 async function invoke<T>(
-  commandCall: Promise<{ status: "ok"; data: T } | { status: "error"; error: WireError }>,
+  commandCall: Promise<
+    { status: "ok"; data: T } | { status: "error"; error: WireError }
+  >,
 ): Promise<T> {
   return unwrapResult(await commandCall);
 }
@@ -150,6 +152,7 @@ export type DatasetDetail = Omit<WireDatasetDetail, "createdAt"> & {
 };
 
 export { type WorkspaceInfo, type DatasetStatus, type ColumnInfo };
+export type { DatasetInfoUpdate, FilterTableOptions };
 
 export const DATASET_PAGE_SIZE = 200;
 
@@ -252,8 +255,6 @@ export async function updateDatasetFavorite(
   await invoke(commands.updateDatasetFavorite(id, update));
 }
 
-export type DatasetInfoUpdate = WireDatasetInfoUpdate;
-
 export async function updateDatasetInfo(
   id: number,
   update: DatasetInfoUpdate,
@@ -295,8 +296,6 @@ export async function getDatasetWriteStatus(
 ): Promise<DatasetWriteStatus> {
   return invoke(commands.getDatasetWriteStatus(id));
 }
-
-export type FilterTableOptions = WireFilterTableOptions;
 
 export interface FilterTableData {
   fields: string[];
