@@ -16,6 +16,7 @@ export default defineConfig([
     "site/**",
     "target/**",
     "**/node_modules/**",
+    "**/src/lib/bindings.ts",
   ]),
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,

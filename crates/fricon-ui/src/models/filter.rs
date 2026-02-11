@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
-#[derive(Serialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Row {
     pub display_values: Vec<String>,
@@ -10,14 +10,14 @@ pub struct Row {
     pub index: usize,
 }
 
-#[derive(Serialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnUniqueValue {
     pub index: usize,
     pub display_value: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TableData {
     pub fields: Vec<String>,

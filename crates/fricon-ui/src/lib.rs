@@ -65,7 +65,7 @@ impl AppState {
                                 description,
                                 favorite,
                                 tags,
-                                status,
+                                status: status.into(),
                                 created_at,
                             },
                         );
@@ -87,7 +87,7 @@ impl AppState {
                                 description,
                                 favorite,
                                 tags,
-                                status,
+                                status: status.into(),
                                 created_at,
                             },
                         );
@@ -194,6 +194,10 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
     });
 
     Ok(())
+}
+
+pub fn export_bindings(path: impl AsRef<std::path::Path>) -> Result<()> {
+    commands::export_bindings(path)
 }
 
 fn show_main_window(app: &tauri::AppHandle) {

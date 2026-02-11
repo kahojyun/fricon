@@ -88,6 +88,10 @@ jobs:
         uses: astral-sh/setup-uv@v7
       - name: Cargo build
         run: cargo build --workspace --verbose --locked
+      - name: Generate Tauri bindings
+        run: pnpm --filter fricon-ui run gen:bindings
+      - name: Check Tauri bindings are up-to-date
+        run: git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts
       - name: Cargo test
         run: cargo test --workspace --verbose
       - name: Cargo clippy

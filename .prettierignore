@@ -4,3 +4,4 @@ pnpm-lock.yaml
 CHANGELOG.md
 .agents
 routeTree.gen.ts
+crates/fricon-ui/frontend/src/lib/bindings.ts
