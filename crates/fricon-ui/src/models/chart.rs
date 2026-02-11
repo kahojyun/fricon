@@ -13,14 +13,6 @@ pub enum Type {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ScatterMode {
-    Complex,
-    TraceXy,
-    Xy,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
-#[serde(rename_all = "snake_case")]
 pub enum ComplexViewOption {
     Real,
     Imag,
@@ -28,26 +20,82 @@ pub enum ComplexViewOption {
     Arg,
 }
 
-#[derive(Deserialize, specta::Type)]
+#[derive(Debug, Clone, Default, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct DataOptions {
-    pub chart_type: Type,
-    pub series: Option<String>,
-    pub x_column: Option<String>,
-    pub y_column: Option<String>,
-    pub scatter_mode: Option<ScatterMode>,
-    pub scatter_series: Option<String>,
-    pub scatter_x_column: Option<String>,
-    pub scatter_y_column: Option<String>,
-    pub scatter_trace_x_column: Option<String>,
-    pub scatter_trace_y_column: Option<String>,
-    pub scatter_bin_column: Option<String>,
-    pub complex_views: Option<Vec<ComplexViewOption>>,
-    pub complex_view_single: Option<ComplexViewOption>,
+pub struct ChartCommonOptions {
     pub start: Option<usize>,
     pub end: Option<usize>,
     pub index_filters: Option<Vec<usize>>,
     pub exclude_columns: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LineChartDataOptions {
+    pub series: String,
+    pub x_column: Option<String>,
+    pub complex_views: Option<Vec<ComplexViewOption>>,
+    #[serde(flatten)]
+    pub common: ChartCommonOptions,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct HeatmapChartDataOptions {
+    pub series: String,
+    pub x_column: Option<String>,
+    pub y_column: String,
+    pub complex_view_single: Option<ComplexViewOption>,
+    #[serde(flatten)]
+    pub common: ChartCommonOptions,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum ScatterModeOptions {
+    Complex {
+        series: String,
+    },
+    TraceXy {
+        #[serde(rename = "traceXColumn")]
+        trace_x_column: String,
+        #[serde(rename = "traceYColumn")]
+        trace_y_column: String,
+    },
+    Xy {
+        #[serde(rename = "xColumn")]
+        x_column: String,
+        #[serde(rename = "yColumn")]
+        y_column: String,
+        #[serde(rename = "binColumn")]
+        bin_column: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ScatterChartDataOptions {
+    pub scatter: ScatterModeOptions,
+    #[serde(flatten)]
+    pub common: ChartCommonOptions,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(tag = "chartType", rename_all = "snake_case")]
+pub enum DatasetChartDataOptions {
+    Line(LineChartDataOptions),
+    Heatmap(HeatmapChartDataOptions),
+    Scatter(ScatterChartDataOptions),
+}
+
+impl DatasetChartDataOptions {
+    pub fn common(&self) -> &ChartCommonOptions {
+        match self {
+            Self::Line(options) => &options.common,
+            Self::Heatmap(options) => &options.common,
+            Self::Scatter(options) => &options.common,
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug, specta::Type)]
@@ -99,12 +147,9 @@ pub fn complex_view_label(option: ComplexViewOption) -> &'static str {
 pub fn build_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    options: &DataOptions,
+    options: &LineChartDataOptions,
 ) -> Result<DataResponse> {
-    let series_name = options
-        .series
-        .as_ref()
-        .context("Line chart requires a series column")?;
+    let series_name = &options.series;
     let data_type = *schema
         .columns()
         .get(series_name)
@@ -197,16 +242,10 @@ pub fn build_line_series(
 pub fn build_heatmap_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    options: &DataOptions,
+    options: &HeatmapChartDataOptions,
 ) -> Result<DataResponse> {
-    let series_name = options
-        .series
-        .as_ref()
-        .context("Heatmap chart requires a series column")?;
-    let y_column = options
-        .y_column
-        .as_ref()
-        .context("Heatmap chart requires y column")?;
+    let series_name = &options.series;
+    let y_column = &options.y_column;
     let data_type = *schema
         .columns()
         .get(series_name)
@@ -238,10 +277,15 @@ pub fn build_heatmap_series(
             view_option,
         )?
     } else {
+        let x_column = options
+            .x_column
+            .as_ref()
+            .context("Heatmap chart requires x column")?;
         process_scalar_heatmap(
             batch,
             series_name,
-            options,
+            x_column,
+            y_column,
             &series_array,
             is_complex,
             view_option,
@@ -310,23 +354,16 @@ fn process_trace_heatmap(
 fn process_scalar_heatmap(
     batch: &RecordBatch,
     series_name: &str,
-    options: &DataOptions,
+    x_column: &str,
+    y_column: &str,
     series_array: &DatasetArray,
     is_complex: bool,
     view_option: ComplexViewOption,
 ) -> Result<Vec<Series>> {
-    let x_column = options
-        .x_column
-        .as_ref()
-        .context("Heatmap chart requires x column")?;
     let x_array = batch
         .column_by_name(x_column)
         .cloned()
         .context("X not found")?;
-    let y_column = options
-        .y_column
-        .as_ref()
-        .context("Heatmap chart requires y column")?;
     let y_array = batch
         .column_by_name(y_column)
         .cloned()
@@ -370,13 +407,17 @@ fn process_scalar_heatmap(
 pub fn build_scatter_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    options: &DataOptions,
+    options: &ScatterChartDataOptions,
 ) -> Result<DataResponse> {
-    let mode = options.scatter_mode.unwrap_or(ScatterMode::Complex);
-    let (x_name, y_name, series) = match mode {
-        ScatterMode::Complex => process_complex_scatter(batch, schema, options)?,
-        ScatterMode::TraceXy => process_trace_xy_scatter(batch, options)?,
-        ScatterMode::Xy => process_xy_scatter(batch, options)?,
+    let (x_name, y_name, series) = match &options.scatter {
+        ScatterModeOptions::Complex { series } => process_complex_scatter(batch, schema, series)?,
+        ScatterModeOptions::TraceXy {
+            trace_x_column,
+            trace_y_column,
+        } => process_trace_xy_scatter(batch, trace_x_column, trace_y_column)?,
+        ScatterModeOptions::Xy {
+            x_column, y_column, ..
+        } => process_xy_scatter(batch, x_column, y_column)?,
     };
 
     Ok(DataResponse {
@@ -390,12 +431,8 @@ pub fn build_scatter_series(
 fn process_complex_scatter(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    options: &DataOptions,
+    series_name: &str,
 ) -> Result<(String, String, Vec<Series>)> {
-    let series_name = options
-        .scatter_series
-        .as_ref()
-        .context("Scatter complex mode requires series column")?;
     let data_type = *schema
         .columns()
         .get(series_name)
@@ -436,7 +473,7 @@ fn process_complex_scatter(
         format!("{series_name} (real)"),
         format!("{series_name} (imag)"),
         vec![Series {
-            name: series_name.clone(),
+            name: series_name.to_string(),
             data,
         }],
     ))
@@ -444,16 +481,9 @@ fn process_complex_scatter(
 
 fn process_trace_xy_scatter(
     batch: &RecordBatch,
-    options: &DataOptions,
+    trace_x: &str,
+    trace_y: &str,
 ) -> Result<(String, String, Vec<Series>)> {
-    let trace_x = options
-        .scatter_trace_x_column
-        .as_ref()
-        .context("Scatter trace_xy requires trace x column")?;
-    let trace_y = options
-        .scatter_trace_y_column
-        .as_ref()
-        .context("Scatter trace_xy requires trace y column")?;
     let x_array: DatasetArray = batch
         .column_by_name(trace_x)
         .cloned()
@@ -484,8 +514,8 @@ fn process_trace_xy_scatter(
     }
     let series_name = format!("{trace_x} vs {trace_y}");
     Ok((
-        trace_x.clone(),
-        trace_y.clone(),
+        trace_x.to_string(),
+        trace_y.to_string(),
         vec![Series {
             name: series_name,
             data,
@@ -495,16 +525,9 @@ fn process_trace_xy_scatter(
 
 fn process_xy_scatter(
     batch: &RecordBatch,
-    options: &DataOptions,
+    x_column: &str,
+    y_column: &str,
 ) -> Result<(String, String, Vec<Series>)> {
-    let x_column = options
-        .scatter_x_column
-        .as_ref()
-        .context("Scatter xy requires x column")?;
-    let y_column = options
-        .scatter_y_column
-        .as_ref()
-        .context("Scatter xy requires y column")?;
     let x_array: DatasetArray = batch
         .column_by_name(x_column)
         .cloned()
@@ -523,8 +546,8 @@ fn process_xy_scatter(
         .collect::<Vec<_>>();
     let series_name = format!("{x_column} vs {y_column}");
     Ok((
-        x_column.clone(),
-        y_column.clone(),
+        x_column.to_string(),
+        y_column.to_string(),
         vec![Series {
             name: series_name,
             data,
@@ -566,24 +589,11 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = DataOptions {
-            chart_type: Type::Line,
-            series: Some("y".to_string()),
+        let options = LineChartDataOptions {
+            series: "y".to_string(),
             x_column: Some("x".to_string()),
-            y_column: None,
-            scatter_mode: None,
-            scatter_series: None,
-            scatter_x_column: None,
-            scatter_y_column: None,
-            scatter_trace_x_column: None,
-            scatter_trace_y_column: None,
-            scatter_bin_column: None,
             complex_views: None,
-            complex_view_single: None,
-            start: None,
-            end: None,
-            index_filters: None,
-            exclude_columns: None,
+            common: ChartCommonOptions::default(),
         };
 
         let res = build_line_series(&batch, &schema, &options).unwrap();
@@ -630,24 +640,11 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = DataOptions {
-            chart_type: Type::Line,
-            series: Some("y".to_string()),
+        let options = LineChartDataOptions {
+            series: "y".to_string(),
             x_column: Some("x".to_string()),
-            y_column: None,
-            scatter_mode: None,
-            scatter_series: None,
-            scatter_x_column: None,
-            scatter_y_column: None,
-            scatter_trace_x_column: None,
-            scatter_trace_y_column: None,
-            scatter_bin_column: None,
             complex_views: Some(vec![ComplexViewOption::Mag]),
-            complex_view_single: None,
-            start: None,
-            end: None,
-            index_filters: None,
-            exclude_columns: None,
+            common: ChartCommonOptions::default(),
         };
 
         let res = build_line_series(&batch, &schema, &options).unwrap();
@@ -687,24 +684,12 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = DataOptions {
-            chart_type: Type::Heatmap,
-            series: Some("z".to_string()),
+        let options = HeatmapChartDataOptions {
+            series: "z".to_string(),
             x_column: Some("x".to_string()),
-            y_column: Some("y".to_string()),
-            scatter_mode: None,
-            scatter_series: None,
-            scatter_x_column: None,
-            scatter_y_column: None,
-            scatter_trace_x_column: None,
-            scatter_trace_y_column: None,
-            scatter_bin_column: None,
-            complex_views: None,
+            y_column: "y".to_string(),
             complex_view_single: None,
-            start: None,
-            end: None,
-            index_filters: None,
-            exclude_columns: None,
+            common: ChartCommonOptions::default(),
         };
 
         let res = build_heatmap_series(&batch, &schema, &options).unwrap();
@@ -738,28 +723,30 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let options = DataOptions {
-            chart_type: Type::Scatter,
-            scatter_mode: Some(ScatterMode::Xy),
-            scatter_x_column: Some("x".to_string()),
-            scatter_y_column: Some("y".to_string()),
-            series: None,
-            x_column: None,
-            y_column: None,
-            scatter_series: None,
-            scatter_trace_x_column: None,
-            scatter_trace_y_column: None,
-            scatter_bin_column: None,
-            complex_views: None,
-            complex_view_single: None,
-            start: None,
-            end: None,
-            index_filters: None,
-            exclude_columns: None,
+        let options = ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Xy {
+                x_column: "x".to_string(),
+                y_column: "y".to_string(),
+                bin_column: None,
+            },
+            common: ChartCommonOptions::default(),
         };
 
         let res = build_scatter_series(&batch, &schema, &options).unwrap();
         assert_eq!(res.series.len(), 1);
         assert_eq!(res.series[0].data, vec![vec![1.0, 10.0], vec![2.0, 20.0]]);
+    }
+
+    #[test]
+    fn test_deserialize_scatter_xy_missing_required_field_fails() {
+        let input = serde_json::json!({
+            "chartType": "scatter",
+            "scatter": {
+                "mode": "xy",
+                "xColumn": "x"
+            }
+        });
+        let parsed: std::result::Result<DatasetChartDataOptions, _> = serde_json::from_value(input);
+        assert!(parsed.is_err());
     }
 }

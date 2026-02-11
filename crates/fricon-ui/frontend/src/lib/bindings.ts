@@ -37,7 +37,7 @@ async datasetDetail(id: number) : Promise<Result<DatasetDetail, Error>> {
     else return { status: "error", error: e  as any };
 }
 },
-async datasetChartData(id: number, options: DataOptions) : Promise<Result<DataResponse, Error>> {
+async datasetChartData(id: number, options: DatasetChartDataOptions) : Promise<Result<DataResponse, Error>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("dataset_chart_data", { id, options }) };
 } catch (e) {
@@ -99,8 +99,8 @@ datasetUpdated: "dataset-updated"
 export type ColumnInfo = { name: string; isComplex: boolean; isTrace: boolean; isIndex: boolean }
 export type ColumnUniqueValue = { index: number; displayValue: string }
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
-export type DataOptions = { chartType: Type; series: string | null; xColumn: string | null; yColumn: string | null; scatterMode: ScatterMode | null; scatterSeries: string | null; scatterXColumn: string | null; scatterYColumn: string | null; scatterTraceXColumn: string | null; scatterTraceYColumn: string | null; scatterBinColumn: string | null; complexViews: ComplexViewOption[] | null; complexViewSingle: ComplexViewOption | null; start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }
 export type DataResponse = { type: Type; xName: string; yName: string | null; series: Series[] }
+export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
 export type DatasetCreated = DatasetInfo
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; columns: ColumnInfo[] }
 export type DatasetFavoriteUpdate = { favorite: boolean }
@@ -111,8 +111,11 @@ export type DatasetUpdated = DatasetInfo
 export type DatasetWriteStatus = { rowCount: number; isComplete: boolean }
 export type Error = { message: string }
 export type FilterTableOptions = { excludeColumns: string[] | null }
+export type HeatmapChartDataOptions = ({ start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }) & { series: string; xColumn: string | null; yColumn: string; complexViewSingle: ComplexViewOption | null }
+export type LineChartDataOptions = ({ start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }) & { series: string; xColumn: string | null; complexViews: ComplexViewOption[] | null }
 export type Row = { displayValues: string[]; valueIndices: number[]; index: number }
-export type ScatterMode = "complex" | "trace_xy" | "xy"
+export type ScatterChartDataOptions = ({ start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }) & { scatter: ScatterModeOptions }
+export type ScatterModeOptions = { mode: "complex"; series: string } | { mode: "trace_xy"; traceXColumn: string; traceYColumn: string } | { mode: "xy"; xColumn: string; yColumn: string; binColumn: string | null }
 export type Series = { name: string; data: number[][] }
 export type TableData = { fields: string[]; rows: Row[]; columnUniqueValues: Partial<{ [key in string]: ColumnUniqueValue[] }> }
 export type Type = "line" | "heatmap" | "scatter"
