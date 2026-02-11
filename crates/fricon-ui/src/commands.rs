@@ -275,8 +275,12 @@ fn build_chart_selected_columns(
 ) -> Result<Vec<usize>, Error> {
     match options {
         DatasetChartDataOptions::Line(options) => build_line_selected_columns(schema, options),
-        DatasetChartDataOptions::Heatmap(options) => build_heatmap_selected_columns(schema, options),
-        DatasetChartDataOptions::Scatter(options) => build_scatter_selected_columns(schema, options),
+        DatasetChartDataOptions::Heatmap(options) => {
+            build_heatmap_selected_columns(schema, options)
+        }
+        DatasetChartDataOptions::Scatter(options) => {
+            build_scatter_selected_columns(schema, options)
+        }
     }
 }
 
@@ -511,8 +515,8 @@ mod tests {
 
     use super::{build_chart_selected_columns, normalize_tags};
     use crate::models::chart::{
-        ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions,
-        LineChartDataOptions, ScatterChartDataOptions, ScatterModeOptions,
+        ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
+        ScatterChartDataOptions, ScatterModeOptions,
     };
 
     fn numeric_schema() -> DatasetSchema {

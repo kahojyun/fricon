@@ -416,9 +416,7 @@ pub fn build_scatter_series(
             trace_y_column,
         } => process_trace_xy_scatter(batch, trace_x_column, trace_y_column)?,
         ScatterModeOptions::Xy {
-            x_column,
-            y_column,
-            ..
+            x_column, y_column, ..
         } => process_xy_scatter(batch, x_column, y_column)?,
     };
 
@@ -748,8 +746,7 @@ mod tests {
                 "xColumn": "x"
             }
         });
-        let parsed: std::result::Result<DatasetChartDataOptions, _> =
-            serde_json::from_value(input);
+        let parsed: std::result::Result<DatasetChartDataOptions, _> = serde_json::from_value(input);
         assert!(parsed.is_err());
     }
 }
