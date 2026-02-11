@@ -5,50 +5,63 @@ function buildChartDataKey(
   datasetId: number,
   options: ChartDataOptions | null,
 ) {
-  if (!options) return ["chartData", datasetId, "disabled"];
-  const complexViewsKey =
-    options.chartType === "line" && options.complexViews
-      ? [...options.complexViews].sort().join(",")
-      : "";
-  const indexFiltersKey = options.indexFilters
-    ? options.indexFilters.join(",")
-    : "";
-  const excludeColumnsKey = options.excludeColumns
-    ? [...options.excludeColumns].sort().join("|")
-    : "";
+  if (!options) {
+    return ["chartData", datasetId, { disabled: true }] as const;
+  }
 
-  const baseKey = [
-    "chartData",
-    datasetId,
-    options.chartType,
-    indexFiltersKey,
-    excludeColumnsKey,
-  ];
+  const common = {
+    chartType: options.chartType,
+    indexFilters: options.indexFilters ?? null,
+    excludeColumns: options.excludeColumns
+      ? [...options.excludeColumns].sort()
+      : null,
+  };
 
   if (options.chartType === "line") {
-    return [...baseKey, options.series, options.xColumn ?? "", complexViewsKey];
+    return [
+      "chartData",
+      datasetId,
+      {
+        ...common,
+        series: options.series,
+        xColumn: options.xColumn ?? null,
+        complexViews: options.complexViews ? [...options.complexViews].sort() : null,
+      },
+    ] as const;
   }
 
   if (options.chartType === "heatmap") {
     return [
-      ...baseKey,
-      options.series,
-      options.xColumn ?? "",
-      options.yColumn,
-      options.complexViewSingle ?? "",
-    ];
+      "chartData",
+      datasetId,
+      {
+        ...common,
+        series: options.series,
+        xColumn: options.xColumn ?? null,
+        yColumn: options.yColumn,
+        complexViewSingle: options.complexViewSingle ?? null,
+      },
+    ] as const;
   }
 
   return [
-    ...baseKey,
-    options.scatter.mode,
-    options.scatter.mode === "complex" ? options.scatter.series : "",
-    options.scatter.mode === "xy" ? options.scatter.xColumn : "",
-    options.scatter.mode === "xy" ? options.scatter.yColumn : "",
-    options.scatter.mode === "trace_xy" ? options.scatter.traceXColumn : "",
-    options.scatter.mode === "trace_xy" ? options.scatter.traceYColumn : "",
-    options.scatter.mode === "xy" ? (options.scatter.binColumn ?? "") : "",
-  ];
+    "chartData",
+    datasetId,
+    {
+      ...common,
+      scatter: {
+        mode: options.scatter.mode,
+        series: options.scatter.mode === "complex" ? options.scatter.series : null,
+        xColumn: options.scatter.mode === "xy" ? options.scatter.xColumn : null,
+        yColumn: options.scatter.mode === "xy" ? options.scatter.yColumn : null,
+        traceXColumn:
+          options.scatter.mode === "trace_xy" ? options.scatter.traceXColumn : null,
+        traceYColumn:
+          options.scatter.mode === "trace_xy" ? options.scatter.traceYColumn : null,
+        binColumn: options.scatter.mode === "xy" ? (options.scatter.binColumn ?? null) : null,
+      },
+    },
+  ] as const;
 }
 
 export function useChartDataQuery(
