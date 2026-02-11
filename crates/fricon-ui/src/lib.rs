@@ -58,17 +58,15 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        let _ = DatasetCreated(
-                            DatasetInfo {
-                                id,
-                                name,
-                                description,
-                                favorite,
-                                tags,
-                                status: status.into(),
-                                created_at,
-                            },
-                        )
+                        let _ = DatasetCreated(DatasetInfo {
+                            id,
+                            name,
+                            description,
+                            favorite,
+                            tags,
+                            status: status.into(),
+                            created_at,
+                        })
                         .emit(&app_handle);
                     }
                     fricon::AppEvent::DatasetUpdated {
@@ -80,17 +78,15 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        let _ = DatasetUpdated(
-                            DatasetInfo {
-                                id,
-                                name,
-                                description,
-                                favorite,
-                                tags,
-                                status: status.into(),
-                                created_at,
-                            },
-                        )
+                        let _ = DatasetUpdated(DatasetInfo {
+                            id,
+                            name,
+                            description,
+                            favorite,
+                            tags,
+                            status: status.into(),
+                            created_at,
+                        })
                         .emit(&app_handle);
                     }
                 }
