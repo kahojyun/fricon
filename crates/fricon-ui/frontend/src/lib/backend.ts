@@ -1,6 +1,6 @@
-import { listen } from "@tauri-apps/api/event";
 import {
   commands,
+  events,
   type ColumnInfo,
   type ColumnUniqueValue,
   type DataOptions as WireChartDataOptions,
@@ -221,13 +221,13 @@ export async function getDatasetDetail(id: number): Promise<DatasetDetail> {
 }
 
 export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
-  return listen<WireDatasetInfo>("dataset-created", (event) => {
+  return events.datasetCreated.listen((event) => {
     callback(normalizeDataset(event.payload));
   });
 }
 
 export function onDatasetUpdated(callback: (event: DatasetInfo) => void) {
-  return listen<WireDatasetInfo>("dataset-updated", (event) => {
+  return events.datasetUpdated.listen((event) => {
     callback(normalizeDataset(event.payload));
   });
 }

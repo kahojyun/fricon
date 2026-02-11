@@ -20,7 +20,7 @@ use tauri::{
     State,
     ipc::{Invoke, Response},
 };
-use tauri_specta::{Builder, collect_commands};
+use tauri_specta::{Builder, collect_commands, collect_events};
 
 use super::AppState;
 use crate::models::{
@@ -106,7 +106,7 @@ impl From<UiSortDirection> for SortDirection {
     }
 }
 
-#[derive(Serialize, Clone, specta::Type)]
+#[derive(Debug, Deserialize, Serialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetInfo {
     pub id: i32,
@@ -117,6 +117,12 @@ pub struct DatasetInfo {
     pub status: UiDatasetStatus,
     pub created_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+pub struct DatasetCreated(pub DatasetInfo);
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+pub struct DatasetUpdated(pub DatasetInfo);
 
 #[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -789,6 +795,7 @@ fn specta_builder<R: tauri::Runtime>() -> Builder<R> {
             update_dataset_info,
             get_dataset_write_status
         ])
+        .events(collect_events![DatasetCreated, DatasetUpdated])
         .typ::<DatasetInfo>()
 }
 
@@ -799,6 +806,10 @@ pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
     specta_builder::<tauri::Wry>()
         .export(language, path)
         .map_err(|err| anyhow::anyhow!("Failed to export TypeScript bindings: {err}"))
+}
+
+pub fn mount_typed_events(app: &tauri::AppHandle) {
+    specta_builder::<tauri::Wry>().mount_events(app);
 }
 
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {

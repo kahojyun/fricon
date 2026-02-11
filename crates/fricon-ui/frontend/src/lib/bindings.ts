@@ -82,6 +82,13 @@ async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, Err
 /** user-defined events **/
 
 
+export const events = __makeEvents__<{
+datasetCreated: DatasetCreated,
+datasetUpdated: DatasetUpdated
+}>({
+datasetCreated: "dataset-created",
+datasetUpdated: "dataset-updated"
+})
 
 /** user-defined constants **/
 
@@ -94,11 +101,13 @@ export type ColumnUniqueValue = { index: number; displayValue: string }
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
 export type DataOptions = { chartType: Type; series: string | null; xColumn: string | null; yColumn: string | null; scatterMode: ScatterMode | null; scatterSeries: string | null; scatterXColumn: string | null; scatterYColumn: string | null; scatterTraceXColumn: string | null; scatterTraceYColumn: string | null; scatterBinColumn: string | null; complexViews: ComplexViewOption[] | null; complexViewSingle: ComplexViewOption | null; start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }
 export type DataResponse = { type: Type; xName: string; yName: string | null; series: Series[] }
+export type DatasetCreated = DatasetInfo
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; columns: ColumnInfo[] }
 export type DatasetFavoriteUpdate = { favorite: boolean }
 export type DatasetInfo = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string }
 export type DatasetInfoUpdate = { name: string | null; description: string | null; favorite: boolean | null; tags: string[] | null }
 export type DatasetListOptions = { search: string | null; tags: string[] | null; favoriteOnly: boolean | null; statuses: UiDatasetStatus[] | null; sortBy: UiDatasetSortBy | null; sortDir: UiSortDirection | null; limit: number | null; offset: number | null }
+export type DatasetUpdated = DatasetInfo
 export type DatasetWriteStatus = { rowCount: number; isComplete: boolean }
 export type Error = { message: string }
 export type FilterTableOptions = { excludeColumns: string[] | null }
