@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
 import { DatasetTable } from "@/components/dataset-table";
 import { DatasetDetailPage } from "@/components/dataset-detail-page";
-import { useWorkspaceInfoQuery } from "@/hooks/useWorkspaceInfoQuery";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -14,8 +12,6 @@ interface DataViewerProps {
 }
 
 export function DataViewer({ datasetId }: DataViewerProps) {
-  const setPath = useWorkspaceStore((state) => state.setPath);
-  const workspaceInfoQuery = useWorkspaceInfoQuery();
   const parsedDatasetId = (() => {
     if (!datasetId?.trim()) return undefined;
     const parsed = Number.parseInt(datasetId, 10);
@@ -24,16 +20,6 @@ export function DataViewer({ datasetId }: DataViewerProps) {
   const [selectedDatasetId, setSelectedDatasetId] = useState<
     number | undefined
   >(parsedDatasetId);
-
-  useEffect(() => {
-    if (workspaceInfoQuery.data) {
-      setPath(workspaceInfoQuery.data.path);
-      return;
-    }
-    if (workspaceInfoQuery.isError) {
-      setPath("(no workspace)");
-    }
-  }, [workspaceInfoQuery.data, workspaceInfoQuery.isError, setPath]);
 
   useEffect(() => {
     setSelectedDatasetId(parsedDatasetId);
