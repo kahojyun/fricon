@@ -37,7 +37,11 @@ function unwrapResult<T>(
 }
 
 function toDate(value: string): Date {
-  return new Date(value);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date value from backend: ${value}`);
+  }
+  return date;
 }
 
 function toWireChartOptions(options: ChartDataOptions): WireChartDataOptions {
@@ -78,10 +82,16 @@ function normalizeChartOptions(result: WireChartResponse): ChartOptions {
     };
   }
 
+  if (result.yName == null) {
+    throw new Error(
+      `Missing yName for chart type '${result.type}' in backend response`,
+    );
+  }
+
   return {
     type: result.type,
     xName: result.xName,
-    yName: result.yName ?? "",
+    yName: result.yName,
     series: result.series,
   };
 }
@@ -262,12 +272,15 @@ export async function getFilterTableData(
   const result: WireFilterTableData = unwrapResult(
     await commands.getFilterTableData(id, wireOptions),
   );
+  const columnUniqueValues = Object.fromEntries(
+    result.fields.map((field) => [
+      field,
+      result.columnUniqueValues[field] ?? [],
+    ]),
+  );
   return {
     fields: result.fields,
     rows: result.rows,
-    columnUniqueValues: result.columnUniqueValues as Record<
-      string,
-      ColumnUniqueValue[]
-    >,
+    columnUniqueValues,
   };
 }
