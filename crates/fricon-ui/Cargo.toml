@@ -8,6 +8,7 @@ description.workspace = true
 authors.workspace = true
 repository.workspace = true
 keywords.workspace = true
+default-run = "fricon-ui"
 
 [dependencies]
 fricon = { path = "../fricon" }
