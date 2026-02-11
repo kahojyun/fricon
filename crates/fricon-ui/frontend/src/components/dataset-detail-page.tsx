@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  getDatasetDetail,
-  updateDatasetInfo,
-  type DatasetDetail,
-} from "@/lib/backend";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { updateDatasetInfo } from "@/lib/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartViewer } from "@/components/chart-viewer";
+import { useDatasetDetailQuery } from "@/hooks/useDatasetDetailQuery";
 
 interface DatasetDetailPageProps {
   datasetId: number;
@@ -21,16 +19,21 @@ export function DatasetDetailPage({
   datasetId,
   onDatasetUpdated,
 }: DatasetDetailPageProps) {
-  const [detail, setDetail] = useState<DatasetDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const detailQuery = useDatasetDetailQuery(datasetId);
+  const detail = detailQuery.data ?? null;
+  const isLoading = detailQuery.isLoading;
+
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formFavorite, setFormFavorite] = useState(false);
   const [formTagsText, setFormTagsText] = useState("");
-  const requestTokenRef = useRef(0);
+
+  const loadErrorMessage =
+    detailQuery.error instanceof Error ? detailQuery.error.message : null;
+  const errorMessage = saveErrorMessage ?? loadErrorMessage;
 
   const normalizedDetailTags = useMemo(() => {
     if (!detail) return [];
@@ -57,55 +60,48 @@ export function DatasetDetailPage({
     normalizedDetailTags,
   ]);
 
-  const loadDetail = useCallback(
-    async (id: number) => {
-      const token = ++requestTokenRef.current;
-      setIsLoading(true);
-      setErrorMessage(null);
-      setSuccessMessage(null);
-      try {
-        const next = await getDatasetDetail(id);
-        if (token !== requestTokenRef.current || datasetId !== id) return;
-        setDetail(next);
-        setFormName(next.name);
-        setFormDescription(next.description);
-        setFormFavorite(next.favorite);
-        setFormTagsText(tagsToText(next.tags));
-      } catch (error) {
-        if (token !== requestTokenRef.current) return;
-        setErrorMessage(error instanceof Error ? error.message : String(error));
-      } finally {
-        if (token === requestTokenRef.current) {
-          setIsLoading(false);
-        }
-      }
-    },
-    [datasetId],
-  );
+  useEffect(() => {
+    setSaveErrorMessage(null);
+    setSuccessMessage(null);
+  }, [datasetId]);
 
   useEffect(() => {
-    void loadDetail(datasetId);
-  }, [datasetId, loadDetail]);
+    if (!detail) return;
+    setFormName(detail.name);
+    setFormDescription(detail.description);
+    setFormFavorite(detail.favorite);
+    setFormTagsText(tagsToText(detail.tags));
+  }, [detail]);
+
+  const updateMutation = useMutation({
+    mutationFn: (update: {
+      name: string;
+      description: string;
+      favorite: boolean;
+      tags: string[];
+    }) => updateDatasetInfo(datasetId, update),
+  });
+
+  const isSaving = updateMutation.isPending;
 
   const handleSave = async () => {
     if (!detail || !hasChanges) return;
-    setIsSaving(true);
-    setErrorMessage(null);
+    setSaveErrorMessage(null);
     setSuccessMessage(null);
     try {
-      await updateDatasetInfo(datasetId, {
+      await updateMutation.mutateAsync({
         name: formName,
         description: formDescription,
         favorite: formFavorite,
         tags: normalizedFormTags,
       });
+      await queryClient.invalidateQueries({
+        queryKey: ["datasetDetail", datasetId],
+      });
       setSuccessMessage("Dataset updated.");
       onDatasetUpdated?.();
-      await loadDetail(datasetId);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsSaving(false);
+      setSaveErrorMessage(error instanceof Error ? error.message : String(error));
     }
   };
 
