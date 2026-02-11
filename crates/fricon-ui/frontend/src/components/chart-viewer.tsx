@@ -306,23 +306,73 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
       }
     }
 
-    return {
-      chartType: effectiveChartType,
-      series: series?.name,
-      xColumn: xColumn?.name,
-      yColumn: yColumn?.name,
-      scatterMode: effectiveScatterMode,
-      scatterSeries: scatterSeries?.name,
-      scatterXColumn: scatterXColumn?.name,
-      scatterYColumn: scatterYColumn?.name,
-      scatterTraceXColumn: scatterTraceXColumn?.name,
-      scatterTraceYColumn: scatterTraceYColumn?.name,
-      scatterBinColumn: scatterBinColumn?.name,
-      complexViews: selectedComplexView,
-      complexViewSingle: selectedComplexViewSingle,
-      indexFilters,
-      excludeColumns,
-    };
+    if (effectiveChartType === "line" && series) {
+      return {
+        chartType: "line",
+        series: series.name,
+        xColumn: xColumn?.name,
+        complexViews: selectedComplexView,
+        indexFilters,
+        excludeColumns,
+      };
+    }
+
+    if (effectiveChartType === "heatmap" && series && yColumn) {
+      return {
+        chartType: "heatmap",
+        series: series.name,
+        xColumn: xColumn?.name,
+        yColumn: yColumn.name,
+        complexViewSingle: selectedComplexViewSingle,
+        indexFilters,
+        excludeColumns,
+      };
+    }
+
+    if (effectiveScatterMode === "complex" && scatterSeries) {
+      return {
+        chartType: "scatter",
+        scatter: {
+          mode: "complex",
+          series: scatterSeries.name,
+        },
+        indexFilters,
+        excludeColumns,
+      };
+    }
+
+    if (
+      effectiveScatterMode === "trace_xy" &&
+      scatterTraceXColumn &&
+      scatterTraceYColumn
+    ) {
+      return {
+        chartType: "scatter",
+        scatter: {
+          mode: "trace_xy",
+          traceXColumn: scatterTraceXColumn.name,
+          traceYColumn: scatterTraceYColumn.name,
+        },
+        indexFilters,
+        excludeColumns,
+      };
+    }
+
+    if (scatterXColumn && scatterYColumn) {
+      return {
+        chartType: "scatter",
+        scatter: {
+          mode: "xy",
+          xColumn: scatterXColumn.name,
+          yColumn: scatterYColumn.name,
+          binColumn: scatterBinColumn?.name,
+        },
+        indexFilters,
+        excludeColumns,
+      };
+    }
+
+    return null;
   })();
 
   const chartQuery = useChartDataQuery(datasetId, chartRequest);

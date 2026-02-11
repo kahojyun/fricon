@@ -3,7 +3,7 @@ import {
   events,
   type ColumnInfo,
   type ColumnUniqueValue,
-  type DataOptions as WireChartDataOptions,
+  type DatasetChartDataOptions as WireChartDataOptions,
   type DataResponse as WireChartResponse,
   type DatasetDetail as WireDatasetDetail,
   type DatasetFavoriteUpdate,
@@ -20,12 +20,7 @@ import {
   type UiSortDirection as DatasetListSortDir,
   type WorkspaceInfo,
 } from "@/lib/bindings";
-import type {
-  ChartOptions,
-  ChartType,
-  ComplexViewOption,
-  ScatterMode,
-} from "@/lib/chartTypes";
+import type { ChartOptions, ComplexViewOption } from "@/lib/chartTypes";
 
 function unwrapResult<T>(
   result: { status: "ok"; data: T } | { status: "error"; error: WireError },
@@ -45,20 +40,58 @@ function toDate(value: string): Date {
 }
 
 function toWireChartOptions(options: ChartDataOptions): WireChartDataOptions {
+  if (options.chartType === "line") {
+    return {
+      chartType: "line",
+      series: options.series,
+      xColumn: options.xColumn ?? null,
+      complexViews: options.complexViews ?? null,
+      start: options.start ?? null,
+      end: options.end ?? null,
+      indexFilters: options.indexFilters ?? null,
+      excludeColumns: options.excludeColumns ?? null,
+    };
+  }
+
+  if (options.chartType === "heatmap") {
+    return {
+      chartType: "heatmap",
+      series: options.series,
+      xColumn: options.xColumn ?? null,
+      yColumn: options.yColumn,
+      complexViewSingle: options.complexViewSingle ?? null,
+      start: options.start ?? null,
+      end: options.end ?? null,
+      indexFilters: options.indexFilters ?? null,
+      excludeColumns: options.excludeColumns ?? null,
+    };
+  }
+
+  const scatter = (() => {
+    if (options.scatter.mode === "complex") {
+      return {
+        mode: "complex" as const,
+        series: options.scatter.series,
+      };
+    }
+    if (options.scatter.mode === "trace_xy") {
+      return {
+        mode: "trace_xy" as const,
+        traceXColumn: options.scatter.traceXColumn,
+        traceYColumn: options.scatter.traceYColumn,
+      };
+    }
+    return {
+      mode: "xy" as const,
+      xColumn: options.scatter.xColumn,
+      yColumn: options.scatter.yColumn,
+      binColumn: options.scatter.binColumn ?? null,
+    };
+  })();
+
   return {
-    chartType: options.chartType,
-    series: options.series ?? null,
-    xColumn: options.xColumn ?? null,
-    yColumn: options.yColumn ?? null,
-    scatterMode: options.scatterMode ?? null,
-    scatterSeries: options.scatterSeries ?? null,
-    scatterXColumn: options.scatterXColumn ?? null,
-    scatterYColumn: options.scatterYColumn ?? null,
-    scatterTraceXColumn: options.scatterTraceXColumn ?? null,
-    scatterTraceYColumn: options.scatterTraceYColumn ?? null,
-    scatterBinColumn: options.scatterBinColumn ?? null,
-    complexViews: options.complexViews ?? null,
-    complexViewSingle: options.complexViewSingle ?? null,
+    chartType: "scatter",
+    scatter,
     start: options.start ?? null,
     end: options.end ?? null,
     indexFilters: options.indexFilters ?? null,
@@ -127,25 +160,48 @@ export interface ListDatasetsOptions {
   offset?: number;
 }
 
-export interface ChartDataOptions {
-  chartType: ChartType;
-  series?: string;
-  xColumn?: string;
-  yColumn?: string;
-  scatterMode?: ScatterMode;
-  scatterSeries?: string;
-  scatterXColumn?: string;
-  scatterYColumn?: string;
-  scatterTraceXColumn?: string;
-  scatterTraceYColumn?: string;
-  scatterBinColumn?: string;
-  complexViews?: ComplexViewOption[];
-  complexViewSingle?: ComplexViewOption;
+interface BaseChartDataOptions {
   start?: number;
   end?: number;
   indexFilters?: number[];
   excludeColumns?: string[];
 }
+
+export type ChartDataOptions =
+  | (BaseChartDataOptions & {
+      chartType: "line";
+      series: string;
+      xColumn?: string;
+      complexViews?: ComplexViewOption[];
+    })
+  | (BaseChartDataOptions & {
+      chartType: "heatmap";
+      series: string;
+      xColumn?: string;
+      yColumn: string;
+      complexViewSingle?: ComplexViewOption;
+    })
+  | (BaseChartDataOptions & {
+      chartType: "scatter";
+      scatter: ScatterModeOptions;
+    });
+
+export type ScatterModeOptions =
+  | {
+      mode: "complex";
+      series: string;
+    }
+  | {
+      mode: "trace_xy";
+      traceXColumn: string;
+      traceYColumn: string;
+    }
+  | {
+      mode: "xy";
+      xColumn: string;
+      yColumn: string;
+      binColumn?: string;
+    };
 
 export async function getWorkspaceInfo(): Promise<WorkspaceInfo> {
   return unwrapResult(await commands.getWorkspaceInfo());

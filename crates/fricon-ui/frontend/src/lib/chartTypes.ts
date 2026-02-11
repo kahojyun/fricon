@@ -1,12 +1,11 @@
 import type {
   ComplexViewOption as WireComplexViewOption,
-  ScatterMode as WireScatterMode,
   Type as WireChartType,
 } from "@/lib/bindings";
 
 export type ChartType = WireChartType;
 
-export type ScatterMode = WireScatterMode;
+export type ScatterMode = "complex" | "trace_xy" | "xy";
 
 export type ComplexViewOption = WireComplexViewOption;
 

@@ -25,7 +25,8 @@ use tauri_specta::{Builder, collect_commands, collect_events};
 use super::AppState;
 use crate::models::{
     chart::{
-        DataOptions, DataResponse, ScatterMode, Type, build_heatmap_series, build_line_series,
+        DataResponse, DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
+        ScatterChartDataOptions, ScatterModeOptions, build_heatmap_series, build_line_series,
         build_scatter_series,
     },
     filter::{DataInternal, TableData, process_filter_rows},
@@ -184,100 +185,95 @@ fn push_column(columns: &mut Vec<usize>, index: usize) {
     }
 }
 
-fn build_chart_selected_columns(
+fn build_line_selected_columns(
     schema: &DatasetSchema,
-    options: &DataOptions,
+    options: &LineChartDataOptions,
 ) -> Result<Vec<usize>, Error> {
     let mut selected = Vec::new();
-    match options.chart_type {
-        Type::Line => {
-            let series_name = options
-                .series
-                .as_ref()
-                .context("Line chart requires a series column")?;
-            let series_index = column_index(schema, series_name)?;
-            let data_type = *schema
-                .columns()
-                .get(series_name)
-                .context("Column not found")?;
-            push_column(&mut selected, series_index);
-            if !matches!(data_type, DatasetDataType::Trace(_, _)) {
-                let x_name = options
-                    .x_column
-                    .as_ref()
-                    .context("Line chart requires x column")?;
-                let x_index = column_index(schema, x_name)?;
-                push_column(&mut selected, x_index);
-            }
+    let series_index = column_index(schema, &options.series)?;
+    let data_type = *schema
+        .columns()
+        .get(&options.series)
+        .context("Column not found")?;
+    push_column(&mut selected, series_index);
+    if !matches!(data_type, DatasetDataType::Trace(_, _)) {
+        let x_name = options
+            .x_column
+            .as_ref()
+            .context("Line chart requires x column")?;
+        let x_index = column_index(schema, x_name)?;
+        push_column(&mut selected, x_index);
+    }
+    Ok(selected)
+}
+
+fn build_heatmap_selected_columns(
+    schema: &DatasetSchema,
+    options: &HeatmapChartDataOptions,
+) -> Result<Vec<usize>, Error> {
+    let mut selected = Vec::new();
+    let series_index = column_index(schema, &options.series)?;
+    let data_type = *schema
+        .columns()
+        .get(&options.series)
+        .context("Column not found")?;
+    push_column(&mut selected, series_index);
+
+    let y_index = column_index(schema, &options.y_column)?;
+    push_column(&mut selected, y_index);
+
+    if !matches!(data_type, DatasetDataType::Trace(_, _)) {
+        let x_name = options
+            .x_column
+            .as_ref()
+            .context("Heatmap chart requires x column")?;
+        let x_index = column_index(schema, x_name)?;
+        push_column(&mut selected, x_index);
+    }
+
+    Ok(selected)
+}
+
+fn build_scatter_selected_columns(
+    schema: &DatasetSchema,
+    options: &ScatterChartDataOptions,
+) -> Result<Vec<usize>, Error> {
+    let mut selected = Vec::new();
+    match &options.scatter {
+        ScatterModeOptions::Complex { series } => {
+            push_column(&mut selected, column_index(schema, series)?);
         }
-        Type::Heatmap => {
-            let series_name = options
-                .series
-                .as_ref()
-                .context("Heatmap chart requires a series column")?;
-            let series_index = column_index(schema, series_name)?;
-            let data_type = *schema
-                .columns()
-                .get(series_name)
-                .context("Column not found")?;
-            push_column(&mut selected, series_index);
-            let y_name = options
-                .y_column
-                .as_ref()
-                .context("Heatmap chart requires y column")?;
-            let y_index = column_index(schema, y_name)?;
-            push_column(&mut selected, y_index);
-            if !matches!(data_type, DatasetDataType::Trace(_, _)) {
-                let x_name = options
-                    .x_column
-                    .as_ref()
-                    .context("Heatmap chart requires x column")?;
-                let x_index = column_index(schema, x_name)?;
-                push_column(&mut selected, x_index);
-            }
+        ScatterModeOptions::TraceXy {
+            trace_x_column,
+            trace_y_column,
+        } => {
+            push_column(&mut selected, column_index(schema, trace_x_column)?);
+            push_column(&mut selected, column_index(schema, trace_y_column)?);
         }
-        Type::Scatter => {
-            let mode = options.scatter_mode.unwrap_or(ScatterMode::Complex);
-            match mode {
-                ScatterMode::Complex => {
-                    let series_name = options
-                        .scatter_series
-                        .as_ref()
-                        .context("Scatter complex mode requires series column")?;
-                    let series_index = column_index(schema, series_name)?;
-                    push_column(&mut selected, series_index);
-                }
-                ScatterMode::TraceXy => {
-                    let x_name = options
-                        .scatter_trace_x_column
-                        .as_ref()
-                        .context("Scatter trace_xy requires trace x column")?;
-                    let y_name = options
-                        .scatter_trace_y_column
-                        .as_ref()
-                        .context("Scatter trace_xy requires trace y column")?;
-                    push_column(&mut selected, column_index(schema, x_name)?);
-                    push_column(&mut selected, column_index(schema, y_name)?);
-                }
-                ScatterMode::Xy => {
-                    let x_name = options
-                        .scatter_x_column
-                        .as_ref()
-                        .context("Scatter xy requires x column")?;
-                    let y_name = options
-                        .scatter_y_column
-                        .as_ref()
-                        .context("Scatter xy requires y column")?;
-                    push_column(&mut selected, column_index(schema, x_name)?);
-                    push_column(&mut selected, column_index(schema, y_name)?);
-                    if let Some(bin_name) = options.scatter_bin_column.as_ref() {
-                        push_column(&mut selected, column_index(schema, bin_name)?);
-                    }
-                }
+        ScatterModeOptions::Xy {
+            x_column,
+            y_column,
+            bin_column,
+        } => {
+            push_column(&mut selected, column_index(schema, x_column)?);
+            push_column(&mut selected, column_index(schema, y_column)?);
+            if let Some(bin_name) = bin_column.as_ref() {
+                push_column(&mut selected, column_index(schema, bin_name)?);
             }
         }
     }
     Ok(selected)
+}
+
+fn build_chart_selected_columns(
+    schema: &DatasetSchema,
+    options: &DatasetChartDataOptions,
+) -> Result<Vec<usize>, Error> {
+    match options {
+        DatasetChartDataOptions::Line(options) => build_line_selected_columns(schema, options),
+        DatasetChartDataOptions::Heatmap(options) => build_heatmap_selected_columns(schema, options),
+        DatasetChartDataOptions::Scatter(options) => build_scatter_selected_columns(schema, options),
+    }
 }
 
 #[tauri::command]
@@ -285,17 +281,18 @@ fn build_chart_selected_columns(
 async fn dataset_chart_data(
     state: State<'_, AppState>,
     id: i32,
-    options: DataOptions,
+    options: DatasetChartDataOptions,
 ) -> Result<DataResponse, Error> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
-    let start = options.start.map_or(Bound::Unbounded, Bound::Included);
-    let end = options.end.map_or(Bound::Unbounded, Bound::Excluded);
-    let index_filters = if let Some(indices) = options.index_filters.clone() {
+    let common = options.common();
+    let start = common.start.map_or(Bound::Unbounded, Bound::Included);
+    let end = common.end.map_or(Bound::Unbounded, Bound::Excluded);
+    let index_filters = if let Some(indices) = common.index_filters.clone() {
         build_filter_batch(
             &state,
             id,
-            options.exclude_columns.clone(),
+            common.exclude_columns.clone(),
             &indices,
             dataset.arrow_schema().clone(),
         )
@@ -320,10 +317,16 @@ async fn dataset_chart_data(
         concat_batches(&output_schema, &batches).context("Failed to concat batches")?
     };
 
-    match options.chart_type {
-        Type::Line => build_line_series(&batch, schema, &options).map_err(Error::from),
-        Type::Heatmap => build_heatmap_series(&batch, schema, &options).map_err(Error::from),
-        Type::Scatter => build_scatter_series(&batch, schema, &options).map_err(Error::from),
+    match &options {
+        DatasetChartDataOptions::Line(options) => {
+            build_line_series(&batch, schema, options).map_err(Error::from)
+        }
+        DatasetChartDataOptions::Heatmap(options) => {
+            build_heatmap_series(&batch, schema, options).map_err(Error::from)
+        }
+        DatasetChartDataOptions::Scatter(options) => {
+            build_scatter_series(&batch, schema, options).map_err(Error::from)
+        }
     }
 }
 
@@ -499,7 +502,31 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_tags;
+    use fricon::{DatasetDataType, DatasetSchema, ScalarKind};
+    use indexmap::IndexMap;
+
+    use super::{build_chart_selected_columns, normalize_tags};
+    use crate::models::chart::{
+        ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions,
+        LineChartDataOptions, ScatterChartDataOptions, ScatterModeOptions,
+    };
+
+    fn numeric_schema() -> DatasetSchema {
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "x".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "y".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "z".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        DatasetSchema::new(columns)
+    }
 
     #[test]
     fn normalize_tags_trims_dedupes_and_sorts() {
@@ -519,6 +546,51 @@ mod tests {
             normalized,
             vec!["alpha".to_string(), "beta".to_string(), "gamma".to_string()]
         );
+    }
+
+    #[test]
+    fn build_chart_selected_columns_line() {
+        let schema = numeric_schema();
+        let options = DatasetChartDataOptions::Line(LineChartDataOptions {
+            series: "y".to_string(),
+            x_column: Some("x".to_string()),
+            complex_views: None,
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![1, 0]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_heatmap() {
+        let schema = numeric_schema();
+        let options = DatasetChartDataOptions::Heatmap(HeatmapChartDataOptions {
+            series: "z".to_string(),
+            x_column: Some("x".to_string()),
+            y_column: "y".to_string(),
+            complex_view_single: None,
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![2, 1, 0]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_scatter_xy() {
+        let schema = numeric_schema();
+        let options = DatasetChartDataOptions::Scatter(ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Xy {
+                x_column: "x".to_string(),
+                y_column: "y".to_string(),
+                bin_column: Some("z".to_string()),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![0, 1, 2]);
     }
 }
 
