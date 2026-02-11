@@ -8,7 +8,6 @@ use std::{collections::HashMap, io::Cursor, ops::Bound, path::Path, sync::Arc};
 
 use anyhow::Context;
 use arrow_array::RecordBatch;
-use arrow_ipc::writer::FileWriter;
 use arrow_select::concat::concat_batches;
 use chrono::{DateTime, Utc};
 use fricon::{
@@ -16,10 +15,7 @@ use fricon::{
     DatasetUpdate, SelectOptions, SortDirection,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{
-    State,
-    ipc::{Invoke, Response},
-};
+use tauri::{State, ipc::Invoke};
 use tauri_specta::{Builder, collect_commands, collect_events};
 
 use super::AppState;
@@ -151,17 +147,6 @@ struct DatasetDetail {
     status: UiDatasetStatus,
     created_at: DateTime<Utc>,
     columns: Vec<ColumnInfo>,
-}
-
-#[derive(Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-struct DatasetDataOptions {
-    start: Option<usize>,
-    end: Option<usize>,
-    /// Indices of chosen values for each filter field
-    index_filters: Option<Vec<usize>>,
-    exclude_columns: Option<Vec<String>>,
-    columns: Option<Vec<usize>>,
 }
 
 #[derive(Serialize, specta::Type)]
@@ -353,13 +338,21 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 #[derive(Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetListOptions {
+    #[specta(optional)]
     search: Option<String>,
+    #[specta(optional)]
     tags: Option<Vec<String>>,
+    #[specta(optional)]
     favorite_only: Option<bool>,
+    #[specta(optional)]
     statuses: Option<Vec<UiDatasetStatus>>,
+    #[specta(optional)]
     sort_by: Option<UiDatasetSortBy>,
+    #[specta(optional)]
     sort_dir: Option<UiSortDirection>,
+    #[specta(optional)]
     limit: Option<i64>,
+    #[specta(optional)]
     offset: Option<i64>,
 }
 
@@ -491,9 +484,13 @@ async fn update_dataset_favorite(
 #[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetInfoUpdate {
+    #[specta(optional)]
     name: Option<String>,
+    #[specta(optional)]
     description: Option<String>,
+    #[specta(optional)]
     favorite: Option<bool>,
+    #[specta(optional)]
     tags: Option<Vec<String>>,
 }
 
@@ -659,6 +656,7 @@ async fn update_dataset_info(
 #[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct FilterTableOptions {
+    #[specta(optional)]
     exclude_columns: Option<Vec<String>>,
 }
 
@@ -792,47 +790,6 @@ async fn build_filter_batch(
 }
 
 #[tauri::command]
-async fn dataset_data(
-    state: State<'_, AppState>,
-    id: i32,
-    options: DatasetDataOptions,
-) -> Result<Response, Error> {
-    let dataset = state.dataset(id).await?;
-    let start = options.start.map_or(Bound::Unbounded, Bound::Included);
-    let end = options.end.map_or(Bound::Unbounded, Bound::Excluded);
-
-    let index_filters = if let Some(indices) = options.index_filters {
-        build_filter_batch(
-            &state,
-            id,
-            options.exclude_columns,
-            &indices,
-            dataset.arrow_schema().clone(),
-        )
-        .await?
-    } else {
-        None
-    };
-
-    let (output_schema, batches) = dataset
-        .select_data(&SelectOptions {
-            start,
-            end,
-            index_filters,
-            selected_columns: options.columns,
-        })
-        .context("Failed to select data.")?;
-    let buffer = vec![];
-    let mut writer =
-        FileWriter::try_new(buffer, &output_schema).context("Failed to create writer")?;
-    for batch in batches {
-        writer.write(&batch).context("Failed to write batch")?;
-    }
-    let buffer = writer.into_inner().context("Failed to finish writer")?;
-    Ok(Response::new(buffer))
-}
-
-#[tauri::command]
 #[specta::specta]
 async fn get_filter_table_data(
     state: State<'_, AppState>,
@@ -898,7 +855,6 @@ pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
         list_datasets,
         list_dataset_tags,
         dataset_detail,
-        dataset_data,
         dataset_chart_data,
         get_filter_table_data,
         update_dataset_favorite,

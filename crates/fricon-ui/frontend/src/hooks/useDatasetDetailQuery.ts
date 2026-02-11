@@ -6,5 +6,6 @@ export function useDatasetDetailQuery(datasetId: number) {
     queryKey: ["datasetDetail", datasetId],
     queryFn: () => getDatasetDetail(datasetId),
     staleTime: 10_000,
+    refetchOnWindowFocus: false,
   });
 }

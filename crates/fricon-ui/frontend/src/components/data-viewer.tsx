@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { getWorkspaceInfo } from "@/lib/backend";
-import { useWorkspaceStore } from "@/lib/useWorkspaceStore";
 import { DatasetTable } from "@/components/dataset-table";
 import { DatasetDetailPage } from "@/components/dataset-detail-page";
 import {
@@ -14,7 +12,6 @@ interface DataViewerProps {
 }
 
 export function DataViewer({ datasetId }: DataViewerProps) {
-  const setPath = useWorkspaceStore((state) => state.setPath);
   const parsedDatasetId = (() => {
     if (!datasetId?.trim()) return undefined;
     const parsed = Number.parseInt(datasetId, 10);
@@ -23,24 +20,6 @@ export function DataViewer({ datasetId }: DataViewerProps) {
   const [selectedDatasetId, setSelectedDatasetId] = useState<
     number | undefined
   >(parsedDatasetId);
-
-  useEffect(() => {
-    let isActive = true;
-    getWorkspaceInfo()
-      .then((info) => {
-        if (isActive) {
-          setPath(info.path);
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setPath("(no workspace)");
-        }
-      });
-    return () => {
-      isActive = false;
-    };
-  }, [setPath]);
 
   useEffect(() => {
     setSelectedDatasetId(parsedDatasetId);

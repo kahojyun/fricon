@@ -1528,7 +1528,6 @@ version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "arrow-array",
- "arrow-ipc",
  "arrow-json",
  "arrow-schema",
  "arrow-select",

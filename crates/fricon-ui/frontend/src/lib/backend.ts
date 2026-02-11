@@ -8,11 +8,11 @@ import {
   type DatasetDetail as WireDatasetDetail,
   type DatasetFavoriteUpdate,
   type DatasetInfo as WireDatasetInfo,
-  type DatasetInfoUpdate as WireDatasetInfoUpdate,
+  type DatasetInfoUpdate,
   type DatasetListOptions as WireDatasetListOptions,
   type DatasetWriteStatus,
   type Error as WireError,
-  type FilterTableOptions as WireFilterTableOptions,
+  type FilterTableOptions,
   type Row as FilterTableRow,
   type TableData as WireFilterTableData,
   type UiDatasetSortBy as DatasetListSortBy,
@@ -31,12 +31,29 @@ function unwrapResult<T>(
   throw new Error(result.error.message);
 }
 
+async function invoke<T>(
+  commandCall: Promise<
+    { status: "ok"; data: T } | { status: "error"; error: WireError }
+  >,
+): Promise<T> {
+  return unwrapResult(await commandCall);
+}
+
 function toDate(value: string): Date {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     throw new Error(`Invalid date value from backend: ${value}`);
   }
   return date;
+}
+
+function normalizeWithCreatedAtDate<T extends { createdAt: string }>(
+  value: T,
+): Omit<T, "createdAt"> & { createdAt: Date } {
+  return {
+    ...value,
+    createdAt: toDate(value.createdAt),
+  };
 }
 
 function toWireChartOptions(options: ChartDataOptions): WireChartDataOptions {
@@ -100,10 +117,7 @@ function toWireChartOptions(options: ChartDataOptions): WireChartDataOptions {
 }
 
 function normalizeDataset(dataset: WireDatasetInfo): DatasetInfo {
-  return {
-    ...dataset,
-    createdAt: toDate(dataset.createdAt),
-  };
+  return normalizeWithCreatedAtDate(dataset);
 }
 
 function normalizeChartOptions(result: WireChartResponse): ChartOptions {
@@ -129,21 +143,16 @@ function normalizeChartOptions(result: WireChartResponse): ChartOptions {
   };
 }
 
-export interface DatasetInfo {
-  id: number;
-  name: string;
-  description: string;
-  favorite: boolean;
-  tags: string[];
-  status: DatasetStatus;
+export type DatasetInfo = Omit<WireDatasetInfo, "createdAt"> & {
   createdAt: Date;
-}
+};
 
-export interface DatasetDetail extends DatasetInfo {
-  columns: ColumnInfo[];
-}
+export type DatasetDetail = Omit<WireDatasetDetail, "createdAt"> & {
+  createdAt: Date;
+};
 
 export { type WorkspaceInfo, type DatasetStatus, type ColumnInfo };
+export type { DatasetInfoUpdate, FilterTableOptions };
 
 export const DATASET_PAGE_SIZE = 200;
 
@@ -204,7 +213,7 @@ export type ScatterModeOptions =
     };
 
 export async function getWorkspaceInfo(): Promise<WorkspaceInfo> {
-  return unwrapResult(await commands.getWorkspaceInfo());
+  return invoke(commands.getWorkspaceInfo());
 }
 
 export async function listDatasets(
@@ -221,21 +230,21 @@ export async function listDatasets(
     offset,
   } = options;
   const wireOptions: WireDatasetListOptions = {
-    search: search?.trim() ?? null,
-    tags: tags && tags.length > 0 ? tags : null,
-    favoriteOnly: favoriteOnly ? true : null,
-    statuses: statuses && statuses.length > 0 ? statuses : null,
-    sortBy: sortBy ?? null,
-    sortDir: sortDir ?? null,
-    limit: limit ?? null,
-    offset: offset ?? null,
+    search: search?.trim(),
+    tags: tags && tags.length > 0 ? tags : undefined,
+    favoriteOnly: favoriteOnly ? true : undefined,
+    statuses: statuses && statuses.length > 0 ? statuses : undefined,
+    sortBy,
+    sortDir,
+    limit,
+    offset,
   };
-  const datasets = unwrapResult(await commands.listDatasets(wireOptions));
+  const datasets = await invoke(commands.listDatasets(wireOptions));
   return datasets.map(normalizeDataset);
 }
 
 export async function listDatasetTags(): Promise<string[]> {
-  return unwrapResult(await commands.listDatasetTags());
+  return invoke(commands.listDatasetTags());
 }
 
 export async function updateDatasetFavorite(
@@ -243,47 +252,29 @@ export async function updateDatasetFavorite(
   favorite: boolean,
 ): Promise<void> {
   const update: DatasetFavoriteUpdate = { favorite };
-  unwrapResult(await commands.updateDatasetFavorite(id, update));
-}
-
-export interface DatasetInfoUpdate {
-  name?: string;
-  description?: string;
-  favorite?: boolean;
-  tags?: string[];
+  await invoke(commands.updateDatasetFavorite(id, update));
 }
 
 export async function updateDatasetInfo(
   id: number,
   update: DatasetInfoUpdate,
 ): Promise<void> {
-  const wireUpdate: WireDatasetInfoUpdate = {
-    name: update.name ?? null,
-    description: update.description ?? null,
-    favorite: update.favorite ?? null,
-    tags: update.tags ?? null,
-  };
-  unwrapResult(await commands.updateDatasetInfo(id, wireUpdate));
+  await invoke(commands.updateDatasetInfo(id, update));
 }
 
 export async function fetchChartData(
   id: number,
   options: ChartDataOptions,
 ): Promise<ChartOptions> {
-  const result: WireChartResponse = unwrapResult(
-    await commands.datasetChartData(id, toWireChartOptions(options)),
+  const result: WireChartResponse = await invoke(
+    commands.datasetChartData(id, toWireChartOptions(options)),
   );
   return normalizeChartOptions(result);
 }
 
 export async function getDatasetDetail(id: number): Promise<DatasetDetail> {
-  const rawDetail: WireDatasetDetail = unwrapResult(
-    await commands.datasetDetail(id),
-  );
-  return {
-    ...rawDetail,
-    createdAt: toDate(rawDetail.createdAt),
-  };
+  const rawDetail: WireDatasetDetail = await invoke(commands.datasetDetail(id));
+  return normalizeWithCreatedAtDate(rawDetail);
 }
 
 export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
@@ -303,11 +294,7 @@ export { type DatasetWriteStatus };
 export async function getDatasetWriteStatus(
   id: number,
 ): Promise<DatasetWriteStatus> {
-  return unwrapResult(await commands.getDatasetWriteStatus(id));
-}
-
-export interface FilterTableOptions {
-  excludeColumns?: string[];
+  return invoke(commands.getDatasetWriteStatus(id));
 }
 
 export interface FilterTableData {
@@ -322,11 +309,8 @@ export async function getFilterTableData(
   id: number,
   options: FilterTableOptions,
 ): Promise<FilterTableData> {
-  const wireOptions: WireFilterTableOptions = {
-    excludeColumns: options.excludeColumns ?? null,
-  };
-  const result: WireFilterTableData = unwrapResult(
-    await commands.getFilterTableData(id, wireOptions),
+  const result: WireFilterTableData = await invoke(
+    commands.getFilterTableData(id, options),
   );
   const columnUniqueValues = Object.fromEntries(
     result.fields.map((field) => [
