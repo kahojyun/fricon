@@ -341,13 +341,21 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
 #[derive(Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetListOptions {
+    #[specta(optional)]
     search: Option<String>,
+    #[specta(optional)]
     tags: Option<Vec<String>>,
+    #[specta(optional)]
     favorite_only: Option<bool>,
+    #[specta(optional)]
     statuses: Option<Vec<UiDatasetStatus>>,
+    #[specta(optional)]
     sort_by: Option<UiDatasetSortBy>,
+    #[specta(optional)]
     sort_dir: Option<UiSortDirection>,
+    #[specta(optional)]
     limit: Option<i64>,
+    #[specta(optional)]
     offset: Option<i64>,
 }
 
@@ -479,9 +487,13 @@ async fn update_dataset_favorite(
 #[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetInfoUpdate {
+    #[specta(optional)]
     name: Option<String>,
+    #[specta(optional)]
     description: Option<String>,
+    #[specta(optional)]
     favorite: Option<bool>,
+    #[specta(optional)]
     tags: Option<Vec<String>>,
 }
 
@@ -647,6 +659,7 @@ async fn update_dataset_info(
 #[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct FilterTableOptions {
+    #[specta(optional)]
     exclude_columns: Option<Vec<String>>,
 }
 

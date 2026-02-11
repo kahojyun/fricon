@@ -8,11 +8,9 @@ import {
   type DatasetDetail as WireDatasetDetail,
   type DatasetFavoriteUpdate,
   type DatasetInfo as WireDatasetInfo,
-  type DatasetInfoUpdate as WireDatasetInfoUpdate,
   type DatasetListOptions as WireDatasetListOptions,
   type DatasetWriteStatus,
   type Error as WireError,
-  type FilterTableOptions as WireFilterTableOptions,
   type Row as FilterTableRow,
   type TableData as WireFilterTableData,
   type UiDatasetSortBy as DatasetListSortBy,
@@ -221,14 +219,14 @@ export async function listDatasets(
     offset,
   } = options;
   const wireOptions: WireDatasetListOptions = {
-    search: search?.trim() ?? null,
-    tags: tags && tags.length > 0 ? tags : null,
-    favoriteOnly: favoriteOnly ? true : null,
-    statuses: statuses && statuses.length > 0 ? statuses : null,
-    sortBy: sortBy ?? null,
-    sortDir: sortDir ?? null,
-    limit: limit ?? null,
-    offset: offset ?? null,
+    search: search?.trim(),
+    tags: tags && tags.length > 0 ? tags : undefined,
+    favoriteOnly: favoriteOnly ? true : undefined,
+    statuses: statuses && statuses.length > 0 ? statuses : undefined,
+    sortBy,
+    sortDir,
+    limit,
+    offset,
   };
   const datasets = unwrapResult(await commands.listDatasets(wireOptions));
   return datasets.map(normalizeDataset);
@@ -257,13 +255,7 @@ export async function updateDatasetInfo(
   id: number,
   update: DatasetInfoUpdate,
 ): Promise<void> {
-  const wireUpdate: WireDatasetInfoUpdate = {
-    name: update.name ?? null,
-    description: update.description ?? null,
-    favorite: update.favorite ?? null,
-    tags: update.tags ?? null,
-  };
-  unwrapResult(await commands.updateDatasetInfo(id, wireUpdate));
+  unwrapResult(await commands.updateDatasetInfo(id, update));
 }
 
 export async function fetchChartData(
@@ -322,11 +314,8 @@ export async function getFilterTableData(
   id: number,
   options: FilterTableOptions,
 ): Promise<FilterTableData> {
-  const wireOptions: WireFilterTableOptions = {
-    excludeColumns: options.excludeColumns ?? null,
-  };
   const result: WireFilterTableData = unwrapResult(
-    await commands.getFilterTableData(id, wireOptions),
+    await commands.getFilterTableData(id, options),
   );
   const columnUniqueValues = Object.fromEntries(
     result.fields.map((field) => [
