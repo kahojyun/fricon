@@ -45,6 +45,15 @@ function toDate(value: string): Date {
   return date;
 }
 
+function normalizeWithCreatedAtDate<T extends { createdAt: string }>(
+  value: T,
+): Omit<T, "createdAt"> & { createdAt: Date } {
+  return {
+    ...value,
+    createdAt: toDate(value.createdAt),
+  };
+}
+
 function toWireChartOptions(options: ChartDataOptions): WireChartDataOptions {
   if (options.chartType === "line") {
     return {
@@ -106,10 +115,7 @@ function toWireChartOptions(options: ChartDataOptions): WireChartDataOptions {
 }
 
 function normalizeDataset(dataset: WireDatasetInfo): DatasetInfo {
-  return {
-    ...dataset,
-    createdAt: toDate(dataset.createdAt),
-  };
+  return normalizeWithCreatedAtDate(dataset);
 }
 
 function normalizeChartOptions(result: WireChartResponse): ChartOptions {
@@ -267,10 +273,7 @@ export async function fetchChartData(
 
 export async function getDatasetDetail(id: number): Promise<DatasetDetail> {
   const rawDetail: WireDatasetDetail = await invoke(commands.datasetDetail(id));
-  return {
-    ...rawDetail,
-    createdAt: toDate(rawDetail.createdAt),
-  };
+  return normalizeWithCreatedAtDate(rawDetail);
 }
 
 export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
