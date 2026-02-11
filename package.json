@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "gen:bindings": "pnpm --filter fricon-ui run gen:bindings",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write --experimental-cli .",

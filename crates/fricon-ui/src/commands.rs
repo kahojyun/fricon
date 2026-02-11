@@ -4,7 +4,7 @@
     reason = "Tauri command handlers require specific parameter signatures"
 )]
 
-use std::{collections::HashMap, io::Cursor, ops::Bound, sync::Arc};
+use std::{collections::HashMap, io::Cursor, ops::Bound, path::Path, sync::Arc};
 
 use anyhow::Context;
 use arrow_array::RecordBatch;
@@ -20,6 +20,7 @@ use tauri::{
     State,
     ipc::{Invoke, Response},
 };
+use tauri_specta::{Builder, collect_commands, collect_events};
 
 use super::AppState;
 use crate::models::{
@@ -30,20 +31,82 @@ use crate::models::{
     filter::{DataInternal, TableData, process_filter_rows},
 };
 
-#[derive(Debug, thiserror::Error)]
-#[error(transparent)]
-struct Error(#[from] anyhow::Error);
+#[derive(Debug, Clone, Serialize, specta::Type, thiserror::Error)]
+#[error("{message}")]
+struct Error {
+    message: String,
+}
 
-impl Serialize for Error {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.0.to_string())
+impl From<anyhow::Error> for Error {
+    fn from(value: anyhow::Error) -> Self {
+        Self {
+            message: value.to_string(),
+        }
     }
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
+pub enum UiDatasetStatus {
+    Writing,
+    Completed,
+    Aborted,
+}
+
+impl From<DatasetStatus> for UiDatasetStatus {
+    fn from(value: DatasetStatus) -> Self {
+        match value {
+            DatasetStatus::Writing => Self::Writing,
+            DatasetStatus::Completed => Self::Completed,
+            DatasetStatus::Aborted => Self::Aborted,
+        }
+    }
+}
+
+impl From<UiDatasetStatus> for DatasetStatus {
+    fn from(value: UiDatasetStatus) -> Self {
+        match value {
+            UiDatasetStatus::Writing => Self::Writing,
+            UiDatasetStatus::Completed => Self::Completed,
+            UiDatasetStatus::Aborted => Self::Aborted,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+enum UiDatasetSortBy {
+    Id,
+    Name,
+    CreatedAt,
+}
+
+impl From<UiDatasetSortBy> for DatasetSortBy {
+    fn from(value: UiDatasetSortBy) -> Self {
+        match value {
+            UiDatasetSortBy::Id => Self::Id,
+            UiDatasetSortBy::Name => Self::Name,
+            UiDatasetSortBy::CreatedAt => Self::CreatedAt,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+enum UiSortDirection {
+    Asc,
+    Desc,
+}
+
+impl From<UiSortDirection> for SortDirection {
+    fn from(value: UiSortDirection) -> Self {
+        match value {
+            UiSortDirection::Asc => Self::Asc,
+            UiSortDirection::Desc => Self::Desc,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetInfo {
     pub id: i32,
@@ -51,17 +114,23 @@ pub struct DatasetInfo {
     pub description: String,
     pub favorite: bool,
     pub tags: Vec<String>,
-    pub status: DatasetStatus,
+    pub status: UiDatasetStatus,
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+pub struct DatasetCreated(pub DatasetInfo);
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+pub struct DatasetUpdated(pub DatasetInfo);
+
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct WorkspaceInfo {
     path: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct ColumnInfo {
     name: String,
@@ -70,7 +139,7 @@ struct ColumnInfo {
     is_index: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetDetail {
     id: i32,
@@ -78,12 +147,12 @@ struct DatasetDetail {
     description: String,
     favorite: bool,
     tags: Vec<String>,
-    status: DatasetStatus,
+    status: UiDatasetStatus,
     created_at: DateTime<Utc>,
     columns: Vec<ColumnInfo>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetDataOptions {
     start: Option<usize>,
@@ -94,7 +163,7 @@ struct DatasetDataOptions {
     columns: Option<Vec<usize>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetWriteStatus {
     row_count: usize,
@@ -212,6 +281,7 @@ fn build_chart_selected_columns(
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn dataset_chart_data(
     state: State<'_, AppState>,
     id: i32,
@@ -258,6 +328,7 @@ async fn dataset_chart_data(
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, Error> {
     let app = state.app();
     let workspace_paths = app.paths().context("Failed to retrieve workspace paths.")?;
@@ -268,15 +339,15 @@ async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo,
     })
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetListOptions {
     search: Option<String>,
     tags: Option<Vec<String>>,
     favorite_only: Option<bool>,
-    statuses: Option<Vec<DatasetStatus>>,
-    sort_by: Option<DatasetSortBy>,
-    sort_dir: Option<SortDirection>,
+    statuses: Option<Vec<UiDatasetStatus>>,
+    sort_by: Option<UiDatasetSortBy>,
+    sort_dir: Option<UiSortDirection>,
     limit: Option<i64>,
     offset: Option<i64>,
 }
@@ -289,6 +360,7 @@ fn validate_non_negative(value: Option<i64>, field_name: &str) -> Result<Option<
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn list_datasets(
     state: State<'_, AppState>,
     options: Option<DatasetListOptions>,
@@ -300,9 +372,11 @@ async fn list_datasets(
         search: options.search,
         tags: options.tags,
         favorite_only: options.favorite_only.unwrap_or(false),
-        statuses: options.statuses,
-        sort_by: options.sort_by.unwrap_or(DatasetSortBy::Id),
-        sort_direction: options.sort_dir.unwrap_or(SortDirection::Desc),
+        statuses: options
+            .statuses
+            .map(|statuses| statuses.into_iter().map(Into::into).collect()),
+        sort_by: options.sort_by.map_or(DatasetSortBy::Id, Into::into),
+        sort_direction: options.sort_dir.map_or(SortDirection::Desc, Into::into),
         limit: validate_non_negative(options.limit, "limit")?,
         offset: validate_non_negative(options.offset, "offset")?,
     };
@@ -319,7 +393,7 @@ async fn list_datasets(
             description: record.metadata.description,
             favorite: record.metadata.favorite,
             tags: record.metadata.tags,
-            status: record.metadata.status,
+            status: record.metadata.status.into(),
             created_at: record.metadata.created_at,
         })
         .collect();
@@ -328,6 +402,7 @@ async fn list_datasets(
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn list_dataset_tags(state: State<'_, AppState>) -> Result<Vec<String>, Error> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
@@ -339,6 +414,7 @@ async fn list_dataset_tags(state: State<'_, AppState>) -> Result<Vec<String>, Er
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDetail, Error> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
@@ -366,19 +442,20 @@ async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDe
         description: record.metadata.description,
         favorite: record.metadata.favorite,
         tags: record.metadata.tags,
-        status: record.metadata.status,
+        status: record.metadata.status.into(),
         created_at: record.metadata.created_at,
         columns,
     })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetFavoriteUpdate {
     favorite: bool,
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn update_dataset_favorite(
     state: State<'_, AppState>,
     id: i32,
@@ -400,7 +477,7 @@ async fn update_dataset_favorite(
     Ok(())
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct DatasetInfoUpdate {
     name: Option<String>,
@@ -446,6 +523,7 @@ mod tests {
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn update_dataset_info(
     state: State<'_, AppState>,
     id: i32,
@@ -498,7 +576,7 @@ async fn update_dataset_info(
     Ok(())
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 struct FilterTableOptions {
     exclude_columns: Option<Vec<String>>,
@@ -675,6 +753,7 @@ async fn dataset_data(
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn get_filter_table_data(
     state: State<'_, AppState>,
     id: i32,
@@ -690,6 +769,7 @@ async fn get_filter_table_data(
 }
 
 #[tauri::command]
+#[specta::specta]
 async fn get_dataset_write_status(
     state: State<'_, AppState>,
     id: i32,
@@ -700,6 +780,36 @@ async fn get_dataset_write_status(
         row_count,
         is_complete,
     })
+}
+
+fn specta_builder<R: tauri::Runtime>() -> Builder<R> {
+    Builder::<R>::new()
+        .commands(collect_commands![
+            get_workspace_info,
+            list_datasets,
+            list_dataset_tags,
+            dataset_detail,
+            dataset_chart_data,
+            get_filter_table_data,
+            update_dataset_favorite,
+            update_dataset_info,
+            get_dataset_write_status
+        ])
+        .events(collect_events![DatasetCreated, DatasetUpdated])
+        .typ::<DatasetInfo>()
+}
+
+pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
+    let language = specta_typescript::Typescript::default()
+        .header("// @ts-nocheck")
+        .bigint(specta_typescript::BigIntExportBehavior::Number);
+    specta_builder::<tauri::Wry>()
+        .export(language, path)
+        .map_err(|err| anyhow::anyhow!("Failed to export TypeScript bindings: {err}"))
+}
+
+pub fn mount_typed_events(app: &tauri::AppHandle) {
+    specta_builder::<tauri::Wry>().mount_events(app);
 }
 
 pub fn invoke_handler() -> impl Fn(Invoke) -> bool {

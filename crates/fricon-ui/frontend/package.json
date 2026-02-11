@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "gen:bindings": "cargo run -p fricon-ui --bin export-bindings",
     "dev": "vite",
     "build": "vite build",
     "lint": "pnpm -w run lint",

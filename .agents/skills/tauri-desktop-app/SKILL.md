@@ -9,6 +9,15 @@ description: Guidelines and workflows for building, reviewing, and securing Taur
 
 Use this skill to design and implement Tauri desktop features safely and consistently, with a focus on IPC boundaries, permission scoping, and production readiness.
 
+## Project-Specific Rules (fricon)
+
+- This repository uses Tauri v2 with `tauri-specta` for typed IPC bindings.
+- Keep IPC bindings generation explicit via script (`pnpm --filter fricon-ui run gen:bindings`), not automatic on debug app startup.
+- Keep CI `fmt` lightweight. Do not add Rust-compiling or bindings-generation work to `fmt`; place those checks in `test`.
+- Treat generated bindings (`crates/fricon-ui/frontend/src/lib/bindings.ts`) as generated artifact:
+  - Regenerate when Rust command/event signatures change.
+  - Keep linter/formatter noise out of this file via ignore configuration.
+
 ## Quick Triage
 
 - IPC, Rust commands, native APIs, file system access, or CSP: read `references/tauri-security-and-ipc.md`.
@@ -21,6 +30,7 @@ Use this skill to design and implement Tauri desktop features safely and consist
 3. Implement the Rust command and frontend wrapper with typed payloads and explicit errors.
 4. Integrate UX behavior (window, menu, tray, shortcuts) and persistence.
 5. Update config/build settings for production, packaging, and updater.
+6. If IPC changed, regenerate `bindings.ts` and ensure CI checks still match project policy.
 
 ## Conventions
 

@@ -9,10 +9,11 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use tauri::{
-    Emitter, Manager, RunEvent, WindowEvent, async_runtime,
+    Manager, RunEvent, WindowEvent, async_runtime,
     menu::MenuBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+use tauri_specta::Event;
 use tokio::signal;
 use tracing::{info, level_filters::LevelFilter};
 use tracing_appender::{
@@ -21,7 +22,7 @@ use tracing_appender::{
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use crate::commands::DatasetInfo;
+use crate::commands::{DatasetCreated, DatasetInfo, DatasetUpdated};
 
 struct AppState {
     manager: Mutex<Option<(fricon::AppManager, WorkerGuard)>>,
@@ -57,18 +58,16 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        let _ = app_handle.emit(
-                            "dataset-created",
-                            DatasetInfo {
-                                id,
-                                name,
-                                description,
-                                favorite,
-                                tags,
-                                status,
-                                created_at,
-                            },
-                        );
+                        let _ = DatasetCreated(DatasetInfo {
+                            id,
+                            name,
+                            description,
+                            favorite,
+                            tags,
+                            status: status.into(),
+                            created_at,
+                        })
+                        .emit(&app_handle);
                     }
                     fricon::AppEvent::DatasetUpdated {
                         id,
@@ -79,18 +78,16 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        let _ = app_handle.emit(
-                            "dataset-updated",
-                            DatasetInfo {
-                                id,
-                                name,
-                                description,
-                                favorite,
-                                tags,
-                                status,
-                                created_at,
-                            },
-                        );
+                        let _ = DatasetUpdated(DatasetInfo {
+                            id,
+                            name,
+                            description,
+                            favorite,
+                            tags,
+                            status: status.into(),
+                            created_at,
+                        })
+                        .emit(&app_handle);
                     }
                 }
             }
@@ -156,6 +153,7 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
         .setup(|app| {
             install_ctrl_c_handler(app);
             build_system_tray(app)?;
+            commands::mount_typed_events(&app.handle().clone());
 
             // Start event listener
             let app_state = app.state::<AppState>();
@@ -194,6 +192,10 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
     });
 
     Ok(())
+}
+
+pub fn export_bindings(path: impl AsRef<std::path::Path>) -> Result<()> {
+    commands::export_bindings(path)
 }
 
 fn show_main_window(app: &tauri::AppHandle) {

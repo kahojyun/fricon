@@ -8,6 +8,29 @@ Use this reference when a task involves Rust commands, IPC, native APIs, file sy
 - Validate all command inputs in Rust. Treat frontend data as untrusted.
 - Return structured errors; never panic for user-facing operations.
 - Prefer explicit command signatures over generic "invoke anything" bridges.
+- For this repo, keep Rust as type source-of-truth and export frontend types via `tauri-specta`.
+
+## fricon: tauri-specta Operating Model
+
+- Rust commands and payload types should use `#[specta::specta]` and `specta::Type` where exported.
+- Keep unsupported/non-JSON command surfaces (for example binary payload paths) outside first-pass specta adoption.
+- Use typed events through `tauri-specta` event support where practical:
+  - Define event structs with `Serialize + Deserialize + specta::Type + tauri_specta::Event`.
+  - Register events in builder and mount via `Builder::mount_events` during app setup.
+  - Consume events from generated bindings in frontend (`events.*`) rather than raw string event names.
+
+## fricon: Binding Generation and CI
+
+- Generate bindings with:
+  - `pnpm --filter fricon-ui run gen:bindings`
+- Generated file path:
+  - `crates/fricon-ui/frontend/src/lib/bindings.ts`
+- CI placement:
+  - Keep `fmt` fast and static-only.
+  - Run bindings generation and `git diff --exit-code` checks in `test` (after Rust build), not in `fmt`.
+- Frontend integration:
+  - Keep native bridge centralized in `crates/fricon-ui/frontend/src/lib/backend.ts`.
+  - Normalize wire types to UI domain types in one place (for example `string -> Date`, strict response guards).
 
 ## Command Design
 

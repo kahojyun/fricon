@@ -3,7 +3,7 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Type {
     Line,
@@ -11,7 +11,7 @@ pub enum Type {
     Scatter,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ScatterMode {
     Complex,
@@ -19,7 +19,7 @@ pub enum ScatterMode {
     Xy,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ComplexViewOption {
     Real,
@@ -28,7 +28,7 @@ pub enum ComplexViewOption {
     Arg,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DataOptions {
     pub chart_type: Type,
@@ -50,14 +50,14 @@ pub struct DataOptions {
     pub exclude_columns: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Series {
     pub name: String,
     pub data: Vec<Vec<f64>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DataResponse {
     pub r#type: Type,
