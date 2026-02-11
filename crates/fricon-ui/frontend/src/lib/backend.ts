@@ -8,9 +8,11 @@ import {
   type DatasetDetail as WireDatasetDetail,
   type DatasetFavoriteUpdate,
   type DatasetInfo as WireDatasetInfo,
+  type DatasetInfoUpdate as WireDatasetInfoUpdate,
   type DatasetListOptions as WireDatasetListOptions,
   type DatasetWriteStatus,
   type Error as WireError,
+  type FilterTableOptions as WireFilterTableOptions,
   type Row as FilterTableRow,
   type TableData as WireFilterTableData,
   type UiDatasetSortBy as DatasetListSortBy,
@@ -127,19 +129,13 @@ function normalizeChartOptions(result: WireChartResponse): ChartOptions {
   };
 }
 
-export interface DatasetInfo {
-  id: number;
-  name: string;
-  description: string;
-  favorite: boolean;
-  tags: string[];
-  status: DatasetStatus;
+export type DatasetInfo = Omit<WireDatasetInfo, "createdAt"> & {
   createdAt: Date;
-}
+};
 
-export interface DatasetDetail extends DatasetInfo {
-  columns: ColumnInfo[];
-}
+export type DatasetDetail = Omit<WireDatasetDetail, "createdAt"> & {
+  createdAt: Date;
+};
 
 export { type WorkspaceInfo, type DatasetStatus, type ColumnInfo };
 
@@ -244,12 +240,7 @@ export async function updateDatasetFavorite(
   unwrapResult(await commands.updateDatasetFavorite(id, update));
 }
 
-export interface DatasetInfoUpdate {
-  name?: string;
-  description?: string;
-  favorite?: boolean;
-  tags?: string[];
-}
+export type DatasetInfoUpdate = WireDatasetInfoUpdate;
 
 export async function updateDatasetInfo(
   id: number,
@@ -298,9 +289,7 @@ export async function getDatasetWriteStatus(
   return unwrapResult(await commands.getDatasetWriteStatus(id));
 }
 
-export interface FilterTableOptions {
-  excludeColumns?: string[];
-}
+export type FilterTableOptions = WireFilterTableOptions;
 
 export interface FilterTableData {
   fields: string[];
