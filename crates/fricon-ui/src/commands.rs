@@ -185,16 +185,24 @@ fn push_column(columns: &mut Vec<usize>, index: usize) {
     }
 }
 
+fn resolve_series_column(
+    schema: &DatasetSchema,
+    series_name: &str,
+) -> Result<(usize, DatasetDataType), Error> {
+    let series_index = column_index(schema, series_name)?;
+    let data_type = *schema
+        .columns()
+        .get(series_name)
+        .context("Column not found")?;
+    Ok((series_index, data_type))
+}
+
 fn build_line_selected_columns(
     schema: &DatasetSchema,
     options: &LineChartDataOptions,
 ) -> Result<Vec<usize>, Error> {
     let mut selected = Vec::new();
-    let series_index = column_index(schema, &options.series)?;
-    let data_type = *schema
-        .columns()
-        .get(&options.series)
-        .context("Column not found")?;
+    let (series_index, data_type) = resolve_series_column(schema, &options.series)?;
     push_column(&mut selected, series_index);
     if !matches!(data_type, DatasetDataType::Trace(_, _)) {
         let x_name = options
@@ -212,11 +220,7 @@ fn build_heatmap_selected_columns(
     options: &HeatmapChartDataOptions,
 ) -> Result<Vec<usize>, Error> {
     let mut selected = Vec::new();
-    let series_index = column_index(schema, &options.series)?;
-    let data_type = *schema
-        .columns()
-        .get(&options.series)
-        .context("Column not found")?;
+    let (series_index, data_type) = resolve_series_column(schema, &options.series)?;
     push_column(&mut selected, series_index);
 
     let y_index = column_index(schema, &options.y_column)?;
