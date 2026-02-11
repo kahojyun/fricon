@@ -25,6 +25,18 @@ cargo +nightly fmt
 cargo clippy --all-targets --all-features
 ```
 
+### Tauri IPC / Bindings (fricon-ui)
+
+- `fricon-ui` uses `tauri-specta` as the source of truth for frontend IPC types.
+- When Rust command/event signatures change, regenerate bindings:
+
+```bash
+pnpm --filter fricon-ui run gen:bindings
+```
+
+- Do not manually edit `crates/fricon-ui/frontend/src/lib/bindings.ts`.
+- Keep CI `fmt` lightweight; bindings generation/checks belong to `test`, not `fmt`.
+
 ### Python
 
 ALWAYS run `maturin develop` before running `pytest` unless you are sure that the Python bindings are up to date.
