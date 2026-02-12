@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
@@ -111,6 +113,8 @@ pub struct DataResponse {
     pub r#type: Type,
     pub x_name: String,
     pub y_name: Option<String>,
+    pub x_categories: Option<Vec<f64>>,
+    pub y_categories: Option<Vec<f64>>,
     pub series: Vec<Series>,
 }
 
@@ -235,6 +239,8 @@ pub fn build_line_series(
         r#type: Type::Line,
         x_name,
         y_name: None,
+        x_categories: None,
+        y_categories: None,
         series,
     })
 }
@@ -267,7 +273,7 @@ pub fn build_heatmap_series(
         .complex_view_single
         .unwrap_or(ComplexViewOption::Mag);
 
-    let series = if is_trace {
+    let mut series = if is_trace {
         process_trace_heatmap(
             batch,
             series_name,
@@ -292,12 +298,60 @@ pub fn build_heatmap_series(
         )?
     };
 
+    let (x_categories, y_categories) = normalize_heatmap_series(&mut series);
+
     Ok(DataResponse {
         r#type: Type::Heatmap,
         x_name,
         y_name: Some(y_column.clone()),
+        x_categories: Some(x_categories),
+        y_categories: Some(y_categories),
         series,
     })
+}
+
+fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<f64>) {
+    fn f64_key(value: f64) -> u64 {
+        if value == 0.0 { 0_u64 } else { value.to_bits() }
+    }
+
+    let mut x_categories: Vec<f64> = Vec::new();
+    let mut y_categories: Vec<f64> = Vec::new();
+    let mut x_index_by_value: HashMap<u64, usize> = HashMap::new();
+    let mut y_index_by_value: HashMap<u64, usize> = HashMap::new();
+
+    for item in series.iter_mut() {
+        for point in item.data.iter_mut() {
+            if point.len() < 3 {
+                continue;
+            }
+            let x_value = point[0];
+            let y_value = point[1];
+
+            let x_index = if let Some(index) = x_index_by_value.get(&f64_key(x_value)) {
+                *index
+            } else {
+                let index = x_categories.len();
+                x_categories.push(x_value);
+                x_index_by_value.insert(f64_key(x_value), index);
+                index
+            };
+
+            let y_index = if let Some(index) = y_index_by_value.get(&f64_key(y_value)) {
+                *index
+            } else {
+                let index = y_categories.len();
+                y_categories.push(y_value);
+                y_index_by_value.insert(f64_key(y_value), index);
+                index
+            };
+
+            point[0] = x_index as f64;
+            point[1] = y_index as f64;
+        }
+    }
+
+    (x_categories, y_categories)
 }
 
 fn process_trace_heatmap(
@@ -424,6 +478,8 @@ pub fn build_scatter_series(
         r#type: Type::Scatter,
         x_name,
         y_name: Some(y_name),
+        x_categories: None,
+        y_categories: None,
         series,
     })
 }
@@ -559,9 +615,9 @@ fn process_xy_scatter(
 mod tests {
     use std::sync::Arc;
 
-    use arrow_array::{Array, Float64Array, StructArray};
+    use arrow_array::{Array, ArrayRef, Float64Array, StructArray};
     use arrow_schema::{DataType, Field};
-    use fricon::ScalarKind;
+    use fricon::{DatasetArray, DatasetScalar, ScalarArray, ScalarKind, TraceKind};
     use indexmap::IndexMap;
 
     use super::*;
@@ -694,9 +750,157 @@ mod tests {
 
         let res = build_heatmap_series(&batch, &schema, &options).unwrap();
         assert_eq!(res.series.len(), 1);
+        assert_eq!(res.x_categories, Some(vec![1.0, 2.0]));
+        assert_eq!(res.y_categories, Some(vec![10.0]));
         assert_eq!(
             res.series[0].data,
-            vec![vec![1.0, 10.0, 100.0], vec![2.0, 10.0, 200.0]]
+            vec![vec![0.0, 0.0, 100.0], vec![1.0, 0.0, 200.0]]
+        );
+    }
+
+    #[test]
+    fn test_build_heatmap_series_maps_1_based_indexes() {
+        let x_vals = vec![1.0, 2.0, 1.0];
+        let y_vals = vec![1.0, 1.0, 2.0];
+        let z_vals = vec![10.0, 20.0, 30.0];
+        let array_x = Arc::new(Float64Array::from(x_vals));
+        let array_y = Arc::new(Float64Array::from(y_vals));
+        let array_z = Arc::new(Float64Array::from(z_vals));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("x", DataType::Float64, false),
+            Field::new("y", DataType::Float64, false),
+            Field::new("z", DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y, array_z]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "x".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "y".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "z".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = HeatmapChartDataOptions {
+            series: "z".to_string(),
+            x_column: Some("x".to_string()),
+            y_column: "y".to_string(),
+            complex_view_single: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
+        assert_eq!(res.x_categories, Some(vec![1.0, 2.0]));
+        assert_eq!(res.y_categories, Some(vec![1.0, 2.0]));
+        assert_eq!(
+            res.series[0].data,
+            vec![
+                vec![0.0, 0.0, 10.0],
+                vec![1.0, 0.0, 20.0],
+                vec![0.0, 1.0, 30.0]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_heatmap_series_maps_non_contiguous_indexes() {
+        let x_vals = vec![10.0, 20.0, 40.0];
+        let y_vals = vec![5.0, 5.0, 9.0];
+        let z_vals = vec![1.0, 2.0, 3.0];
+        let array_x = Arc::new(Float64Array::from(x_vals));
+        let array_y = Arc::new(Float64Array::from(y_vals));
+        let array_z = Arc::new(Float64Array::from(z_vals));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("x", DataType::Float64, false),
+            Field::new("y", DataType::Float64, false),
+            Field::new("z", DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y, array_z]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "x".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "y".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "z".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = HeatmapChartDataOptions {
+            series: "z".to_string(),
+            x_column: Some("x".to_string()),
+            y_column: "y".to_string(),
+            complex_view_single: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
+        assert_eq!(res.x_categories, Some(vec![10.0, 20.0, 40.0]));
+        assert_eq!(res.y_categories, Some(vec![5.0, 9.0]));
+        assert_eq!(
+            res.series[0].data,
+            vec![
+                vec![0.0, 0.0, 1.0],
+                vec![1.0, 0.0, 2.0],
+                vec![2.0, 1.0, 3.0]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_heatmap_series_trace_uses_same_category_semantics() {
+        let y_vals = vec![100.0];
+        let trace = DatasetScalar::SimpleTrace(ScalarArray::from_iter(vec![1.0, 2.0, 3.0]));
+        let trace_array: ArrayRef = DatasetArray::from(trace).into();
+        let y_array = Arc::new(Float64Array::from(y_vals));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("y", DataType::Float64, false),
+            Field::new("trace", trace_array.data_type().clone(), false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![y_array, trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "y".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = HeatmapChartDataOptions {
+            series: "trace".to_string(),
+            x_column: None,
+            y_column: "y".to_string(),
+            complex_view_single: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
+        assert_eq!(res.x_categories, Some(vec![0.0, 1.0, 2.0]));
+        assert_eq!(res.y_categories, Some(vec![100.0]));
+        assert_eq!(
+            res.series[0].data,
+            vec![
+                vec![0.0, 0.0, 1.0],
+                vec![1.0, 0.0, 2.0],
+                vec![2.0, 0.0, 3.0]
+            ]
         );
     }
 
