@@ -148,29 +148,33 @@ impl TraceKind {
     #[must_use]
     pub fn parse_data_type(data_type: &DataType) -> Option<(TraceKind, &Field)> {
         fn parse_fixed_step(fields: &[FieldRef]) -> Option<(TraceKind, &Field)> {
-            (fields.iter().map(|f| f.name()).eq(["x0", "step", "y"])
-                && fields.iter().all(|f| !f.is_nullable()))
-            .then(|| match [0, 1, 2].map(|i| fields[i].data_type()) {
-                [DataType::Float64, DataType::Float64, DataType::List(y)] => {
-                    Some((TraceKind::FixedStep, y.as_ref()))
-                }
-                _ => None,
-            })
-            .flatten()
+            fields
+                .iter()
+                .map(|f| f.name())
+                .eq(["x0", "step", "y"])
+                .then(|| match [0, 1, 2].map(|i| fields[i].data_type()) {
+                    [DataType::Float64, DataType::Float64, DataType::List(y)] => {
+                        Some((TraceKind::FixedStep, y.as_ref()))
+                    }
+                    _ => None,
+                })
+                .flatten()
         }
 
         fn parse_variable_step(fields: &[FieldRef]) -> Option<(TraceKind, &Field)> {
-            (fields.iter().map(|f| f.name()).eq(["x", "y"])
-                && fields.iter().all(|f| !f.is_nullable()))
-            .then(|| match [0, 1].map(|i| fields[i].data_type()) {
-                [DataType::List(x), DataType::List(y)]
-                    if matches!(x.data_type(), DataType::Float64) && !x.is_nullable() =>
-                {
-                    Some((TraceKind::VariableStep, y.as_ref()))
-                }
-                _ => None,
-            })
-            .flatten()
+            fields
+                .iter()
+                .map(|f| f.name())
+                .eq(["x", "y"])
+                .then(|| match [0, 1].map(|i| fields[i].data_type()) {
+                    [DataType::List(x), DataType::List(y)]
+                        if matches!(x.data_type(), DataType::Float64) =>
+                    {
+                        Some((TraceKind::VariableStep, y.as_ref()))
+                    }
+                    _ => None,
+                })
+                .flatten()
         }
 
         match data_type {
@@ -323,5 +327,39 @@ impl TryFrom<&Schema> for DatasetSchema {
             })
             .try_collect()?;
         Ok(Self { columns })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::{DataType, Field};
+
+    use super::TraceKind;
+
+    #[test]
+    fn trace_kind_parse_variable_step_allows_nullable_fields() {
+        let data_type = DataType::Struct(
+            vec![
+                Field::new("x", DataType::new_list(DataType::Float64, true), true),
+                Field::new("y", DataType::new_list(DataType::Float64, true), true),
+            ]
+            .into(),
+        );
+        let parsed = TraceKind::parse_data_type(&data_type).map(|(kind, _)| kind);
+        assert_eq!(parsed, Some(TraceKind::VariableStep));
+    }
+
+    #[test]
+    fn trace_kind_parse_fixed_step_allows_nullable_fields() {
+        let data_type = DataType::Struct(
+            vec![
+                Field::new("x0", DataType::Float64, true),
+                Field::new("step", DataType::Float64, true),
+                Field::new("y", DataType::new_list(DataType::Float64, true), true),
+            ]
+            .into(),
+        );
+        let parsed = TraceKind::parse_data_type(&data_type).map(|(kind, _)| kind);
+        assert_eq!(parsed, Some(TraceKind::FixedStep));
     }
 }

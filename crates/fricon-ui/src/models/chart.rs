@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use serde::{Deserialize, Serialize};
+use tracing::{debug, warn};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -166,23 +167,51 @@ pub fn build_line_series(
         options.x_column.clone().unwrap_or_else(|| "X".to_string())
     };
 
-    let series_array: DatasetArray = batch
+    let series_column = batch
         .column_by_name(series_name)
         .cloned()
-        .context("Column not found")?
-        .try_into()?;
+        .context("Column not found")?;
+    debug!(
+        chart_type = "line",
+        series = %series_name,
+        ?data_type,
+        arrow_type = ?series_column.data_type(),
+        rows = batch.num_rows(),
+        "Building line chart series"
+    );
 
-    let (x_values, y_values_array) = if is_trace {
+    let series_array: DatasetArray = series_column.clone().try_into().with_context(|| {
+        format!(
+            "Failed to convert series column '{series_name}' to DatasetArray (Arrow type: {:?}, \
+             schema type: {:?})",
+            series_column.data_type(),
+            data_type
+        )
+    })?;
+
+    let (trace_row, x_values, y_values_array) = if is_trace {
         let mut values = None;
         for row in 0..batch.num_rows() {
-            if let Some((x_values, y_values_array)) = series_array.expand_trace(row)?
-                && !x_values.is_empty()
+            if let Some((x_values, y_values_array)) =
+                series_array.expand_trace(row).with_context(|| {
+                    format!("Failed to expand trace row {row} for series '{series_name}'")
+                })?
             {
-                values = Some((x_values, y_values_array));
+                if x_values.is_empty() {
+                    debug!(row, series = %series_name, "Skipping empty trace row");
+                    continue;
+                }
+                values = Some((Some(row), x_values, y_values_array));
                 break;
             }
         }
         let Some(values) = values else {
+            warn!(
+                chart_type = "line",
+                series = %series_name,
+                rows = batch.num_rows(),
+                "No non-empty trace rows found for line chart"
+            );
             return Ok(DataResponse {
                 r#type: Type::Line,
                 x_name,
@@ -208,17 +237,22 @@ pub fn build_line_series(
             .context("X must be numeric")?
             .values()
             .to_vec();
-        (
-            x_vals,
-            batch
-                .column_by_name(series_name)
-                .cloned()
-                .context("Column not found")?,
-        )
+        (None, x_vals, series_column.clone())
     };
 
     let series = if is_complex {
-        let ds_y: DatasetArray = y_values_array.try_into()?;
+        let y_arrow_type = y_values_array.data_type().clone();
+        let ds_y: DatasetArray = y_values_array.try_into().with_context(|| {
+            let trace_row_desc = if trace_row.is_none() {
+                "scalar"
+            } else {
+                "trace"
+            };
+            format!(
+                "Failed to convert {trace_row_desc} Y array for series '{series_name}' (source \
+                 row: {trace_row:?}, Arrow type: {y_arrow_type:?})"
+            )
+        })?;
         let complex_array = ds_y.as_complex().context("Expected complex array")?;
         let reals = complex_array.real().values();
         let imags = complex_array.imag().values();
@@ -240,7 +274,18 @@ pub fn build_line_series(
             })
             .collect()
     } else {
-        let ds_y: DatasetArray = y_values_array.try_into()?;
+        let y_arrow_type = y_values_array.data_type().clone();
+        let ds_y: DatasetArray = y_values_array.try_into().with_context(|| {
+            let trace_row_desc = if trace_row.is_none() {
+                "scalar"
+            } else {
+                "trace"
+            };
+            format!(
+                "Failed to convert {trace_row_desc} Y array for series '{series_name}' (source \
+                 row: {trace_row:?}, Arrow type: {y_arrow_type:?})"
+            )
+        })?;
         let y_values = ds_y
             .as_numeric()
             .context("Expected numeric array")?

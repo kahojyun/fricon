@@ -17,6 +17,7 @@ use fricon::{
 use serde::{Deserialize, Serialize};
 use tauri::{State, ipc::Invoke};
 use tauri_specta::{Builder, collect_commands, collect_events};
+use tracing::{debug, error};
 
 use super::AppState;
 use crate::models::{
@@ -276,6 +277,14 @@ async fn dataset_chart_data(
     id: i32,
     options: DatasetChartDataOptions,
 ) -> Result<DataResponse, Error> {
+    fn chart_type_name(options: &DatasetChartDataOptions) -> &'static str {
+        match options {
+            DatasetChartDataOptions::Line(_) => "line",
+            DatasetChartDataOptions::Heatmap(_) => "heatmap",
+            DatasetChartDataOptions::Scatter(_) => "scatter",
+        }
+    }
+
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let common = options.common();
@@ -295,6 +304,13 @@ async fn dataset_chart_data(
     };
 
     let selected_columns = build_chart_selected_columns(schema, &options)?;
+    let chart_type = chart_type_name(&options);
+    debug!(
+        dataset_id = id,
+        chart_type,
+        ?selected_columns,
+        "Selecting chart source data"
+    );
     let (output_schema, batches) = dataset
         .select_data(&SelectOptions {
             start,
@@ -309,18 +325,30 @@ async fn dataset_chart_data(
     } else {
         concat_batches(&output_schema, &batches).context("Failed to concat batches")?
     };
+    debug!(
+        dataset_id = id,
+        chart_type,
+        rows = batch.num_rows(),
+        cols = batch.num_columns(),
+        "Building dataset chart data"
+    );
 
-    match &options {
-        DatasetChartDataOptions::Line(options) => {
-            build_line_series(&batch, schema, options).map_err(Error::from)
-        }
-        DatasetChartDataOptions::Heatmap(options) => {
-            build_heatmap_series(&batch, schema, options).map_err(Error::from)
-        }
-        DatasetChartDataOptions::Scatter(options) => {
-            build_scatter_series(&batch, schema, options).map_err(Error::from)
-        }
+    let result = match &options {
+        DatasetChartDataOptions::Line(options) => build_line_series(&batch, schema, options),
+        DatasetChartDataOptions::Heatmap(options) => build_heatmap_series(&batch, schema, options),
+        DatasetChartDataOptions::Scatter(options) => build_scatter_series(&batch, schema, options),
+    };
+    if let Err(err) = &result {
+        error!(
+            dataset_id = id,
+            chart_type,
+            rows = batch.num_rows(),
+            cols = batch.num_columns(),
+            error = %err,
+            "Failed to build dataset chart data"
+        );
     }
+    result.map_err(Error::from)
 }
 
 #[tauri::command]
