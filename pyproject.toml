@@ -61,6 +61,7 @@ docs = [
 
 [tool.uv]
 config-settings = { build-args = "--profile=dev" }
+default-groups = ["dev", "fmt", "ci", "docs"]
 
 [tool.maturin]
 module-name = "fricon._core"
