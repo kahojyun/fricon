@@ -240,7 +240,11 @@ impl TryFrom<ArrayRef> for FixedStepTraceArray {
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
         TraceKind::FixedStep.supports_data_type(array.data_type())?;
-        let scalar_kind = array.column(2).data_type().try_into()?;
+        let y = array
+            .column(2)
+            .as_list_opt::<i32>()
+            .ok_or(Error::IncompatibleType)?;
+        let scalar_kind = y.values().data_type().try_into()?;
         Ok(Self {
             array: Arc::new(array.clone()),
             scalar_kind,
@@ -318,7 +322,11 @@ impl TryFrom<ArrayRef> for VariableStepTraceArray {
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
         TraceKind::VariableStep.supports_data_type(array.data_type())?;
-        let scalar_kind = array.column(1).data_type().try_into()?;
+        let y = array
+            .column(1)
+            .as_list_opt::<i32>()
+            .ok_or(Error::IncompatibleType)?;
+        let scalar_kind = y.values().data_type().try_into()?;
         Ok(Self {
             array: Arc::new(array.clone()),
             scalar_kind,
@@ -447,5 +455,31 @@ impl From<DatasetArray> for ArrayRef {
             DatasetArray::FixedStepTrace(a) => a.into(),
             DatasetArray::VariableStepTrace(a) => a.into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dataset::scalars::{DatasetScalar, FixedStepTrace, VariableStepTrace};
+
+    #[test]
+    fn variable_step_trace_array_try_from_infers_numeric_scalar_kind() {
+        let trace = VariableStepTrace::new(
+            Arc::new(Float64Array::from(vec![0.0, 1.0, 2.0])),
+            ScalarArray::from_iter(vec![10.0, 20.0, 30.0]),
+        )
+        .expect("valid trace");
+        let array: ArrayRef = DatasetArray::from(DatasetScalar::VariableStepTrace(trace)).into();
+        let parsed = VariableStepTraceArray::try_from(array).expect("parse variable-step trace");
+        assert_eq!(parsed.scalar_kind(), ScalarKind::Numeric);
+    }
+
+    #[test]
+    fn fixed_step_trace_array_try_from_infers_numeric_scalar_kind() {
+        let trace = FixedStepTrace::new(0.0, 0.5, ScalarArray::from_iter(vec![1.0, 2.0, 3.0]));
+        let array: ArrayRef = DatasetArray::from(DatasetScalar::FixedStepTrace(trace)).into();
+        let parsed = FixedStepTraceArray::try_from(array).expect("parse fixed-step trace");
+        assert_eq!(parsed.scalar_kind(), ScalarKind::Numeric);
     }
 }
