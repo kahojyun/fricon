@@ -137,7 +137,7 @@ describe("ChartViewer", () => {
   });
 
   it("allows index exclusion for scalar complex scatter mode", async () => {
-    const chartPayloads: Array<Record<string, unknown>> = [];
+    const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
       if (cmd === "dataset_detail") {
         return {
@@ -158,7 +158,9 @@ describe("ChartViewer", () => {
       if (cmd === "get_filter_table_data") {
         return {
           fields: ["idxA", "idxB"],
-          rows: [{ index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] }],
+          rows: [
+            { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
+          ],
           columnUniqueValues: {
             idxA: [{ index: 1, displayValue: "1" }],
             idxB: [{ index: 1, displayValue: "10" }],
@@ -231,7 +233,7 @@ describe("ChartViewer", () => {
     }
     await user.click(excludeTrigger);
     const idxBChoices = await screen.findAllByText("idxB");
-    await user.click(idxBChoices[idxBChoices.length - 1]!);
+    await user.click(idxBChoices[idxBChoices.length - 1]);
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);

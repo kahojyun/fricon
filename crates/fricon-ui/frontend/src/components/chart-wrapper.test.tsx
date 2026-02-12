@@ -41,7 +41,7 @@ describe("ChartWrapper", () => {
     const option = capturedOptions.at(-1) as {
       xAxis: { data: number[] };
       yAxis: { data: number[] };
-      series: Array<{ data: number[][] }>;
+      series: { data: number[][] }[];
     };
     expect(option.xAxis.data).toEqual([1, 2]);
     expect(option.yAxis.data).toEqual([10]);

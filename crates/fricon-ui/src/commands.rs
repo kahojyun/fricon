@@ -277,14 +277,6 @@ async fn dataset_chart_data(
     id: i32,
     options: DatasetChartDataOptions,
 ) -> Result<DataResponse, Error> {
-    fn chart_type_name(options: &DatasetChartDataOptions) -> &'static str {
-        match options {
-            DatasetChartDataOptions::Line(_) => "line",
-            DatasetChartDataOptions::Heatmap(_) => "heatmap",
-            DatasetChartDataOptions::Scatter(_) => "scatter",
-        }
-    }
-
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let common = options.common();
@@ -304,7 +296,7 @@ async fn dataset_chart_data(
     };
 
     let selected_columns = build_chart_selected_columns(schema, &options)?;
-    let chart_type = chart_type_name(&options);
+    let chart_type = options.chart_type_name();
     debug!(
         dataset_id = id,
         chart_type,

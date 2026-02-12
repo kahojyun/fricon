@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use arrow_array::RecordBatch;
+use arrow_array::{ArrayRef, RecordBatch};
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
@@ -99,6 +99,14 @@ impl DatasetChartDataOptions {
             Self::Scatter(options) => &options.common,
         }
     }
+
+    pub const fn chart_type_name(&self) -> &'static str {
+        match self {
+            Self::Line(_) => "line",
+            Self::Heatmap(_) => "heatmap",
+            Self::Scatter(_) => "scatter",
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug, specta::Type)]
@@ -149,6 +157,79 @@ pub fn complex_view_label(option: ComplexViewOption) -> &'static str {
     }
 }
 
+fn empty_line_response(x_name: String) -> DataResponse {
+    DataResponse {
+        r#type: Type::Line,
+        x_name,
+        y_name: None,
+        x_categories: None,
+        y_categories: None,
+        series: vec![],
+    }
+}
+
+fn resolve_trace_line_values(
+    series_array: &DatasetArray,
+    row_count: usize,
+    series_name: &str,
+) -> Result<Option<(usize, Vec<f64>, ArrayRef)>> {
+    for row in 0..row_count {
+        if let Some((x_values, y_values_array)) =
+            series_array.expand_trace(row).with_context(|| {
+                format!("Failed to expand trace row {row} for series '{series_name}'")
+            })?
+        {
+            if x_values.is_empty() {
+                debug!(row, series = %series_name, "Skipping empty trace row");
+                continue;
+            }
+            return Ok(Some((row, x_values, y_values_array)));
+        }
+    }
+    Ok(None)
+}
+
+fn resolve_scalar_line_values(
+    batch: &RecordBatch,
+    options: &LineChartDataOptions,
+    series_column: ArrayRef,
+) -> Result<(Vec<f64>, ArrayRef)> {
+    let x_column = options
+        .x_column
+        .as_ref()
+        .context("Line chart requires x column")?;
+    let x_array = batch
+        .column_by_name(x_column)
+        .cloned()
+        .context("X column not found")?;
+    let ds_x: DatasetArray = x_array.try_into()?;
+    let x_values = ds_x
+        .as_numeric()
+        .context("X must be numeric")?
+        .values()
+        .to_vec();
+    Ok((x_values, series_column))
+}
+
+fn convert_line_y_array(
+    y_values_array: ArrayRef,
+    series_name: &str,
+    trace_row: Option<usize>,
+) -> Result<DatasetArray> {
+    let y_arrow_type = y_values_array.data_type().clone();
+    y_values_array.try_into().with_context(|| {
+        let trace_row_desc = if trace_row.is_none() {
+            "scalar"
+        } else {
+            "trace"
+        };
+        format!(
+            "Failed to convert {trace_row_desc} Y array for series '{series_name}' (source row: \
+             {trace_row:?}, Arrow type: {y_arrow_type:?})"
+        )
+    })
+}
+
 pub fn build_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -190,69 +271,27 @@ pub fn build_line_series(
     })?;
 
     let (trace_row, x_values, y_values_array) = if is_trace {
-        let mut values = None;
-        for row in 0..batch.num_rows() {
-            if let Some((x_values, y_values_array)) =
-                series_array.expand_trace(row).with_context(|| {
-                    format!("Failed to expand trace row {row} for series '{series_name}'")
-                })?
-            {
-                if x_values.is_empty() {
-                    debug!(row, series = %series_name, "Skipping empty trace row");
-                    continue;
-                }
-                values = Some((Some(row), x_values, y_values_array));
-                break;
-            }
-        }
-        let Some(values) = values else {
+        let Some((row, x_values, y_values_array)) =
+            resolve_trace_line_values(&series_array, batch.num_rows(), series_name)?
+        else {
             warn!(
                 chart_type = "line",
                 series = %series_name,
                 rows = batch.num_rows(),
                 "No non-empty trace rows found for line chart"
             );
-            return Ok(DataResponse {
-                r#type: Type::Line,
-                x_name,
-                y_name: None,
-                x_categories: None,
-                y_categories: None,
-                series: vec![],
-            });
+            return Ok(empty_line_response(x_name));
         };
-        values
+        (Some(row), x_values, y_values_array)
     } else {
-        let x_column = options
-            .x_column
-            .as_ref()
-            .context("Line chart requires x column")?;
-        let x_array = batch
-            .column_by_name(x_column)
-            .cloned()
-            .context("X column not found")?;
-        let ds_x: DatasetArray = x_array.try_into()?;
-        let x_vals = ds_x
-            .as_numeric()
-            .context("X must be numeric")?
-            .values()
-            .to_vec();
-        (None, x_vals, series_column.clone())
+        let (x_values, y_values_array) =
+            resolve_scalar_line_values(batch, options, series_column.clone())?;
+        (None, x_values, y_values_array)
     };
 
+    let ds_y = convert_line_y_array(y_values_array, series_name, trace_row)?;
+
     let series = if is_complex {
-        let y_arrow_type = y_values_array.data_type().clone();
-        let ds_y: DatasetArray = y_values_array.try_into().with_context(|| {
-            let trace_row_desc = if trace_row.is_none() {
-                "scalar"
-            } else {
-                "trace"
-            };
-            format!(
-                "Failed to convert {trace_row_desc} Y array for series '{series_name}' (source \
-                 row: {trace_row:?}, Arrow type: {y_arrow_type:?})"
-            )
-        })?;
         let complex_array = ds_y.as_complex().context("Expected complex array")?;
         let reals = complex_array.real().values();
         let imags = complex_array.imag().values();
@@ -274,18 +313,6 @@ pub fn build_line_series(
             })
             .collect()
     } else {
-        let y_arrow_type = y_values_array.data_type().clone();
-        let ds_y: DatasetArray = y_values_array.try_into().with_context(|| {
-            let trace_row_desc = if trace_row.is_none() {
-                "scalar"
-            } else {
-                "trace"
-            };
-            format!(
-                "Failed to convert {trace_row_desc} Y array for series '{series_name}' (source \
-                 row: {trace_row:?}, Arrow type: {y_arrow_type:?})"
-            )
-        })?;
         let y_values = ds_y
             .as_numeric()
             .context("Expected numeric array")?
@@ -383,7 +410,7 @@ fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<f64>) {
     let mut y_index_by_value: HashMap<u64, usize> = HashMap::new();
 
     for item in series.iter_mut() {
-        for point in item.data.iter_mut() {
+        for point in &mut item.data {
             if point.len() < 3 {
                 continue;
             }
@@ -408,8 +435,15 @@ fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<f64>) {
                 index
             };
 
-            point[0] = x_index as f64;
-            point[1] = y_index as f64;
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "Heatmap category indices are bounded by dataset size and safe for \
+                          plotting"
+            )]
+            {
+                point[0] = x_index as f64;
+                point[1] = y_index as f64;
+            }
         }
     }
 
