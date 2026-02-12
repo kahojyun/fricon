@@ -188,7 +188,10 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   })();
 
   const effectiveScatterBinName = (() => {
-    if (effectiveScatterMode !== "xy" || scatterIsTraceBased) return null;
+    if (scatterIsTraceBased) return null;
+    if (effectiveScatterMode !== "xy" && effectiveScatterMode !== "complex") {
+      return null;
+    }
     return pickSelection(scatterBinColumnOptions, scatterBinName);
   })();
   const scatterBinColumn = columns.find(
@@ -251,7 +254,11 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
         if (yColumn) excludes.push(yColumn.name);
       }
     } else if (effectiveChartType === "scatter") {
-      if (effectiveScatterMode === "xy" && scatterBinColumn?.isIndex) {
+      if (
+        (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
+        !scatterIsTraceBased &&
+        scatterBinColumn?.isIndex
+      ) {
         excludes.push(scatterBinColumn.name);
       }
     }
@@ -627,7 +634,9 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
           </>
         ) : null}
 
-        {effectiveChartType === "scatter" && effectiveScatterMode === "xy" ? (
+        {effectiveChartType === "scatter" &&
+        (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
+        !scatterIsTraceBased ? (
           <div className="min-w-[200px]">
             <Label className="mb-1 block text-xs">
               Index Column (excluded)
