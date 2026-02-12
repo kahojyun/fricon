@@ -52,7 +52,10 @@ function FilterTableColumn({
   });
 
   return (
-    <div className="min-w-0 flex-1">
+    <div
+      data-testid={`filter-column-${field}`}
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+    >
       <div className="bg-muted text-muted-foreground border-b px-2 py-2 text-xs font-semibold">
         {field}
       </div>
@@ -69,6 +72,7 @@ function FilterTableColumn({
               <div
                 key={item.index}
                 ref={rowVirtualizer.measureElement}
+                data-index={virtualRow.index}
                 className={cn(
                   "cursor-pointer border-b px-2 py-2 text-xs",
                   isSelected ? "bg-primary/10" : "hover:bg-muted/40",
@@ -211,6 +215,7 @@ export function FilterTable({
                   <div
                     key={row.index}
                     ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
                     className={cn(
                       "grid cursor-pointer border-b px-2 py-2 text-xs",
                       isSelected ? "bg-primary/10" : "hover:bg-muted/40",
@@ -245,7 +250,7 @@ export function FilterTable({
       {mode === "split" && data ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {data.fields.map((field, index) => (
-            <div key={field} className="flex min-w-0 flex-1">
+            <div key={field} className="flex min-h-0 min-w-0 flex-1">
               <FilterTableColumn
                 field={field}
                 items={columnUniqueValues[field] ?? []}

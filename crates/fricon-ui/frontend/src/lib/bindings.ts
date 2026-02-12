@@ -99,7 +99,7 @@ datasetUpdated: "dataset-updated"
 export type ColumnInfo = { name: string; isComplex: boolean; isTrace: boolean; isIndex: boolean }
 export type ColumnUniqueValue = { index: number; displayValue: string }
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
-export type DataResponse = { type: Type; xName: string; yName: string | null; series: Series[] }
+export type DataResponse = { type: Type; xName: string; yName: string | null; xCategories: number[] | null; yCategories: number[] | null; series: Series[] }
 export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
 export type DatasetCreated = DatasetInfo
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; columns: ColumnInfo[] }

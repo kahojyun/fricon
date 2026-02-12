@@ -1536,6 +1536,7 @@ dependencies = [
  "dotenvy",
  "fricon",
  "indexmap 2.13.0",
+ "num",
  "serde",
  "serde_json",
  "specta",

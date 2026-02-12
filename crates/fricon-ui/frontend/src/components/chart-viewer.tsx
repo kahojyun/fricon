@@ -188,7 +188,10 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   })();
 
   const effectiveScatterBinName = (() => {
-    if (effectiveScatterMode !== "xy" || scatterIsTraceBased) return null;
+    if (scatterIsTraceBased) return null;
+    if (effectiveScatterMode !== "xy" && effectiveScatterMode !== "complex") {
+      return null;
+    }
     return pickSelection(scatterBinColumnOptions, scatterBinName);
   })();
   const scatterBinColumn = columns.find(
@@ -251,7 +254,11 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
         if (yColumn) excludes.push(yColumn.name);
       }
     } else if (effectiveChartType === "scatter") {
-      if (effectiveScatterMode === "xy" && scatterBinColumn?.isIndex) {
+      if (
+        (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
+        !scatterIsTraceBased &&
+        scatterBinColumn?.isIndex
+      ) {
         excludes.push(scatterBinColumn.name);
       }
     }
@@ -279,7 +286,8 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   useDatasetWriteStatusQuery(datasetId, datasetDetail?.status === "Writing");
 
   const chartRequest: ChartDataOptions | null = (() => {
-    if (!datasetDetail || !filterTableData) return null;
+    if (!datasetDetail) return null;
+    if (!filterTableData) return null;
     if (hasFilters && !filterRow) return null;
 
     if (effectiveChartType === "scatter") {
@@ -377,12 +385,11 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
 
   const chartQuery = useChartDataQuery(datasetId, chartRequest);
   const data: ChartOptions | undefined = chartQuery.data;
-  const scatterError =
-    effectiveChartType === "scatter" && chartQuery.error
-      ? chartQuery.error instanceof Error
-        ? chartQuery.error.message
-        : "Scatter data error. Please check trace lengths."
-      : null;
+  const chartError = chartQuery.error
+    ? chartQuery.error instanceof Error
+      ? chartQuery.error.message
+      : "Failed to load chart data."
+    : null;
 
   return (
     <div className="flex size-full min-h-0 flex-col overflow-hidden">
@@ -627,7 +634,9 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
           </>
         ) : null}
 
-        {effectiveChartType === "scatter" && effectiveScatterMode === "xy" ? (
+        {effectiveChartType === "scatter" &&
+        (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
+        !scatterIsTraceBased ? (
           <div className="min-w-[200px]">
             <Label className="mb-1 block text-xs">
               Index Column (excluded)
@@ -653,8 +662,8 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
         ) : null}
       </div>
 
-      {effectiveChartType === "scatter" && scatterError ? (
-        <div className="text-destructive px-2 text-sm">{scatterError}</div>
+      {chartError ? (
+        <div className="text-destructive px-2 text-sm">{chartError}</div>
       ) : null}
 
       {effectiveChartType !== "scatter" ? (

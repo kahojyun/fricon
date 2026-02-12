@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
-use arrow_array::RecordBatch;
+use arrow_array::{ArrayRef, RecordBatch};
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use serde::{Deserialize, Serialize};
+use tracing::{debug, warn};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -96,6 +99,14 @@ impl DatasetChartDataOptions {
             Self::Scatter(options) => &options.common,
         }
     }
+
+    pub const fn chart_type_name(&self) -> &'static str {
+        match self {
+            Self::Line(_) => "line",
+            Self::Heatmap(_) => "heatmap",
+            Self::Scatter(_) => "scatter",
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug, specta::Type)]
@@ -111,6 +122,8 @@ pub struct DataResponse {
     pub r#type: Type,
     pub x_name: String,
     pub y_name: Option<String>,
+    pub x_categories: Option<Vec<f64>>,
+    pub y_categories: Option<Vec<f64>>,
     pub series: Vec<Series>,
 }
 
@@ -144,6 +157,76 @@ pub fn complex_view_label(option: ComplexViewOption) -> &'static str {
     }
 }
 
+fn empty_line_response(x_name: String) -> DataResponse {
+    DataResponse {
+        r#type: Type::Line,
+        x_name,
+        y_name: None,
+        x_categories: None,
+        y_categories: None,
+        series: vec![],
+    }
+}
+
+fn resolve_trace_line_values(
+    series_array: &DatasetArray,
+    series_name: &str,
+) -> Result<Option<(usize, Vec<f64>, ArrayRef)>> {
+    let row = 0;
+    if let Some((x_values, y_values_array)) = series_array
+        .expand_trace(row)
+        .with_context(|| format!("Failed to expand trace row {row} for series '{series_name}'"))?
+    {
+        if x_values.is_empty() {
+            debug!(row, series = %series_name, "Trace row is empty");
+            return Ok(None);
+        }
+        return Ok(Some((row, x_values, y_values_array)));
+    }
+    Ok(None)
+}
+
+fn resolve_scalar_line_values(
+    batch: &RecordBatch,
+    options: &LineChartDataOptions,
+    series_column: ArrayRef,
+) -> Result<(Vec<f64>, ArrayRef)> {
+    let x_column = options
+        .x_column
+        .as_ref()
+        .context("Line chart requires x column")?;
+    let x_array = batch
+        .column_by_name(x_column)
+        .cloned()
+        .context("X column not found")?;
+    let ds_x: DatasetArray = x_array.try_into()?;
+    let x_values = ds_x
+        .as_numeric()
+        .context("X must be numeric")?
+        .values()
+        .to_vec();
+    Ok((x_values, series_column))
+}
+
+fn convert_line_y_array(
+    y_values_array: ArrayRef,
+    series_name: &str,
+    trace_row: Option<usize>,
+) -> Result<DatasetArray> {
+    let y_arrow_type = y_values_array.data_type().clone();
+    y_values_array.try_into().with_context(|| {
+        let trace_row_desc = if trace_row.is_none() {
+            "scalar"
+        } else {
+            "trace"
+        };
+        format!(
+            "Failed to convert {trace_row_desc} Y array for series '{series_name}' (source row: \
+             {trace_row:?}, Arrow type: {y_arrow_type:?})"
+        )
+    })
+}
+
 pub fn build_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -162,42 +245,50 @@ pub fn build_line_series(
         options.x_column.clone().unwrap_or_else(|| "X".to_string())
     };
 
-    let series_array: DatasetArray = batch
+    let series_column = batch
         .column_by_name(series_name)
         .cloned()
-        .context("Column not found")?
-        .try_into()?;
+        .context("Column not found")?;
+    debug!(
+        chart_type = "line",
+        series = %series_name,
+        ?data_type,
+        arrow_type = ?series_column.data_type(),
+        rows = batch.num_rows(),
+        "Building line chart series"
+    );
 
-    let (x_values, y_values_array) = if is_trace {
-        series_array
-            .expand_trace(0)?
-            .context("Trace series row is null")?
-    } else {
-        let x_column = options
-            .x_column
-            .as_ref()
-            .context("Line chart requires x column")?;
-        let x_array = batch
-            .column_by_name(x_column)
-            .cloned()
-            .context("X column not found")?;
-        let ds_x: DatasetArray = x_array.try_into()?;
-        let x_vals = ds_x
-            .as_numeric()
-            .context("X must be numeric")?
-            .values()
-            .to_vec();
-        (
-            x_vals,
-            batch
-                .column_by_name(series_name)
-                .cloned()
-                .context("Column not found")?,
+    let series_array: DatasetArray = series_column.clone().try_into().with_context(|| {
+        format!(
+            "Failed to convert series column '{series_name}' to DatasetArray (Arrow type: {:?}, \
+             schema type: {:?})",
+            series_column.data_type(),
+            data_type
         )
+    })?;
+
+    let (trace_row, x_values, y_values_array) = if is_trace {
+        let Some((row, x_values, y_values_array)) =
+            resolve_trace_line_values(&series_array, series_name)?
+        else {
+            warn!(
+                chart_type = "line",
+                series = %series_name,
+                rows = batch.num_rows(),
+                "First trace row is empty or null for line chart"
+            );
+            return Ok(empty_line_response(x_name));
+        };
+        (Some(row), x_values, y_values_array)
+    } else {
+        let (x_values, y_values_array) =
+            resolve_scalar_line_values(batch, options, series_column.clone())?;
+        (None, x_values, y_values_array)
     };
 
+    let ds_y = convert_line_y_array(y_values_array, series_name, trace_row)?;
+
     let series = if is_complex {
-        let ds_y: DatasetArray = y_values_array.try_into()?;
         let complex_array = ds_y.as_complex().context("Expected complex array")?;
         let reals = complex_array.real().values();
         let imags = complex_array.imag().values();
@@ -219,7 +310,6 @@ pub fn build_line_series(
             })
             .collect()
     } else {
-        let ds_y: DatasetArray = y_values_array.try_into()?;
         let y_values = ds_y
             .as_numeric()
             .context("Expected numeric array")?
@@ -235,6 +325,8 @@ pub fn build_line_series(
         r#type: Type::Line,
         x_name,
         y_name: None,
+        x_categories: None,
+        y_categories: None,
         series,
     })
 }
@@ -267,7 +359,7 @@ pub fn build_heatmap_series(
         .complex_view_single
         .unwrap_or(ComplexViewOption::Mag);
 
-    let series = if is_trace {
+    let mut series = if is_trace {
         process_trace_heatmap(
             batch,
             series_name,
@@ -292,12 +384,67 @@ pub fn build_heatmap_series(
         )?
     };
 
+    let (x_categories, y_categories) = normalize_heatmap_series(&mut series);
+
     Ok(DataResponse {
         r#type: Type::Heatmap,
         x_name,
         y_name: Some(y_column.clone()),
+        x_categories: Some(x_categories),
+        y_categories: Some(y_categories),
         series,
     })
+}
+
+fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<f64>) {
+    fn f64_key(value: f64) -> u64 {
+        if value == 0.0 { 0_u64 } else { value.to_bits() }
+    }
+
+    let mut x_categories: Vec<f64> = Vec::new();
+    let mut y_categories: Vec<f64> = Vec::new();
+    let mut x_index_by_value: HashMap<u64, usize> = HashMap::new();
+    let mut y_index_by_value: HashMap<u64, usize> = HashMap::new();
+
+    for item in series.iter_mut() {
+        for point in &mut item.data {
+            if point.len() < 3 {
+                continue;
+            }
+            let x_value = point[0];
+            let y_value = point[1];
+
+            let x_index = if let Some(index) = x_index_by_value.get(&f64_key(x_value)) {
+                *index
+            } else {
+                let index = x_categories.len();
+                x_categories.push(x_value);
+                x_index_by_value.insert(f64_key(x_value), index);
+                index
+            };
+
+            let y_index = if let Some(index) = y_index_by_value.get(&f64_key(y_value)) {
+                *index
+            } else {
+                let index = y_categories.len();
+                y_categories.push(y_value);
+                y_index_by_value.insert(f64_key(y_value), index);
+                index
+            };
+
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "Heatmap category indices are bounded by dataset size and safe for \
+                          plotting"
+            )]
+            {
+                point[0] = x_index as f64;
+                point[1] = y_index as f64;
+            }
+        }
+    }
+
+    (x_categories, y_categories)
 }
 
 fn process_trace_heatmap(
@@ -424,6 +571,8 @@ pub fn build_scatter_series(
         r#type: Type::Scatter,
         x_name,
         y_name: Some(y_name),
+        x_categories: None,
+        y_categories: None,
         series,
     })
 }
@@ -559,10 +708,12 @@ fn process_xy_scatter(
 mod tests {
     use std::sync::Arc;
 
-    use arrow_array::{Array, Float64Array, StructArray};
+    use arrow_array::{Array, ArrayRef, Float64Array, StructArray, new_empty_array};
     use arrow_schema::{DataType, Field};
-    use fricon::ScalarKind;
+    use arrow_select::concat::concat;
+    use fricon::{DatasetArray, DatasetScalar, ScalarArray, ScalarKind, TraceKind};
     use indexmap::IndexMap;
+    use num::complex::Complex64;
 
     use super::*;
 
@@ -655,6 +806,104 @@ mod tests {
     }
 
     #[test]
+    fn test_build_line_series_trace_empty_batch_returns_empty_series() {
+        let trace_data_type = TraceKind::Simple
+            .to_data_type(Arc::new(Field::new_list_field(DataType::Float64, false)));
+        let trace_array = new_empty_array(&trace_data_type);
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "trace",
+            trace_data_type,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = LineChartDataOptions {
+            series: "trace".to_string(),
+            x_column: None,
+            complex_views: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_line_series(&batch, &schema, &options).unwrap();
+        assert!(res.series.is_empty());
+    }
+
+    #[test]
+    fn test_build_line_series_trace_empty_trace_returns_empty_series() {
+        let trace_array: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
+            ScalarArray::from_iter(Vec::<f64>::new()),
+        ))
+        .into();
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "trace",
+            trace_array.data_type().clone(),
+            false,
+        )]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = LineChartDataOptions {
+            series: "trace".to_string(),
+            x_column: None,
+            complex_views: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_line_series(&batch, &schema, &options).unwrap();
+        assert!(res.series.is_empty());
+    }
+
+    #[test]
+    fn test_build_line_series_trace_does_not_fallback_to_next_row() {
+        let empty_trace: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
+            ScalarArray::from_iter(Vec::<f64>::new()),
+        ))
+        .into();
+        let non_empty_trace: ArrayRef =
+            DatasetArray::from(DatasetScalar::SimpleTrace(ScalarArray::from_iter(vec![
+                1.0, 2.0, 3.0,
+            ])))
+            .into();
+        let trace_array = concat(&[&*empty_trace, &*non_empty_trace]).unwrap();
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "trace",
+            trace_array.data_type().clone(),
+            false,
+        )]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = LineChartDataOptions {
+            series: "trace".to_string(),
+            x_column: None,
+            complex_views: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_line_series(&batch, &schema, &options).unwrap();
+        assert!(res.series.is_empty());
+    }
+
+    #[test]
     fn test_build_heatmap_series_numeric() {
         let x_vals = vec![1.0, 2.0];
         let y_vals = vec![10.0, 10.0];
@@ -694,10 +943,276 @@ mod tests {
 
         let res = build_heatmap_series(&batch, &schema, &options).unwrap();
         assert_eq!(res.series.len(), 1);
+        assert_eq!(res.x_categories, Some(vec![1.0, 2.0]));
+        assert_eq!(res.y_categories, Some(vec![10.0]));
         assert_eq!(
             res.series[0].data,
-            vec![vec![1.0, 10.0, 100.0], vec![2.0, 10.0, 200.0]]
+            vec![vec![0.0, 0.0, 100.0], vec![1.0, 0.0, 200.0]]
         );
+    }
+
+    #[test]
+    fn test_build_heatmap_series_maps_1_based_indexes() {
+        let x_vals = vec![1.0, 2.0, 1.0];
+        let y_vals = vec![1.0, 1.0, 2.0];
+        let z_vals = vec![10.0, 20.0, 30.0];
+        let array_x = Arc::new(Float64Array::from(x_vals));
+        let array_y = Arc::new(Float64Array::from(y_vals));
+        let array_z = Arc::new(Float64Array::from(z_vals));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("x", DataType::Float64, false),
+            Field::new("y", DataType::Float64, false),
+            Field::new("z", DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y, array_z]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "x".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "y".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "z".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = HeatmapChartDataOptions {
+            series: "z".to_string(),
+            x_column: Some("x".to_string()),
+            y_column: "y".to_string(),
+            complex_view_single: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
+        assert_eq!(res.x_categories, Some(vec![1.0, 2.0]));
+        assert_eq!(res.y_categories, Some(vec![1.0, 2.0]));
+        assert_eq!(
+            res.series[0].data,
+            vec![
+                vec![0.0, 0.0, 10.0],
+                vec![1.0, 0.0, 20.0],
+                vec![0.0, 1.0, 30.0]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_heatmap_series_maps_non_contiguous_indexes() {
+        let x_vals = vec![10.0, 20.0, 40.0];
+        let y_vals = vec![5.0, 5.0, 9.0];
+        let z_vals = vec![1.0, 2.0, 3.0];
+        let array_x = Arc::new(Float64Array::from(x_vals));
+        let array_y = Arc::new(Float64Array::from(y_vals));
+        let array_z = Arc::new(Float64Array::from(z_vals));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("x", DataType::Float64, false),
+            Field::new("y", DataType::Float64, false),
+            Field::new("z", DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y, array_z]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "x".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "y".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "z".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = HeatmapChartDataOptions {
+            series: "z".to_string(),
+            x_column: Some("x".to_string()),
+            y_column: "y".to_string(),
+            complex_view_single: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
+        assert_eq!(res.x_categories, Some(vec![10.0, 20.0, 40.0]));
+        assert_eq!(res.y_categories, Some(vec![5.0, 9.0]));
+        assert_eq!(
+            res.series[0].data,
+            vec![
+                vec![0.0, 0.0, 1.0],
+                vec![1.0, 0.0, 2.0],
+                vec![2.0, 1.0, 3.0]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_heatmap_series_trace_uses_same_category_semantics() {
+        let y_vals = vec![100.0];
+        let trace = DatasetScalar::SimpleTrace(ScalarArray::from_iter(vec![1.0, 2.0, 3.0]));
+        let trace_array: ArrayRef = DatasetArray::from(trace).into();
+        let y_array = Arc::new(Float64Array::from(y_vals));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("y", DataType::Float64, false),
+            Field::new("trace", trace_array.data_type().clone(), false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![y_array, trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "y".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = HeatmapChartDataOptions {
+            series: "trace".to_string(),
+            x_column: None,
+            y_column: "y".to_string(),
+            complex_view_single: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
+        assert_eq!(res.x_categories, Some(vec![0.0, 1.0, 2.0]));
+        assert_eq!(res.y_categories, Some(vec![100.0]));
+        assert_eq!(
+            res.series[0].data,
+            vec![
+                vec![0.0, 0.0, 1.0],
+                vec![1.0, 0.0, 2.0],
+                vec![2.0, 0.0, 3.0]
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_scatter_series_complex_scalar_and_trace() {
+        let scalar_complex_column = Arc::new(
+            StructArray::try_new(
+                vec![
+                    Arc::new(Field::new("real", DataType::Float64, false)),
+                    Arc::new(Field::new("imag", DataType::Float64, false)),
+                ]
+                .into(),
+                vec![
+                    Arc::new(Float64Array::from(vec![1.0, 2.0])),
+                    Arc::new(Float64Array::from(vec![-1.0, -2.0])),
+                ],
+                None,
+            )
+            .unwrap(),
+        );
+        let scalar_schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "c",
+            scalar_complex_column.data_type().clone(),
+            false,
+        )]));
+        let scalar_batch =
+            RecordBatch::try_new(scalar_schema, vec![scalar_complex_column]).unwrap();
+
+        let mut scalar_columns = IndexMap::new();
+        scalar_columns.insert(
+            "c".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Complex),
+        );
+        let scalar_dataset_schema = DatasetSchema::new(scalar_columns);
+        let scalar_options = ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Complex {
+                series: "c".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        };
+        let scalar_res =
+            build_scatter_series(&scalar_batch, &scalar_dataset_schema, &scalar_options).unwrap();
+        assert_eq!(
+            scalar_res.series[0].data,
+            vec![vec![1.0, -1.0], vec![2.0, -2.0]]
+        );
+
+        let trace_array: ArrayRef =
+            DatasetArray::from(DatasetScalar::SimpleTrace(ScalarArray::from_iter(vec![
+                Complex64::new(3.0, 4.0),
+                Complex64::new(5.0, 6.0),
+            ])))
+            .into();
+        let trace_schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "t",
+            trace_array.data_type().clone(),
+            false,
+        )]));
+        let trace_batch = RecordBatch::try_new(trace_schema, vec![trace_array]).unwrap();
+
+        let mut trace_columns = IndexMap::new();
+        trace_columns.insert(
+            "t".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Complex),
+        );
+        let trace_dataset_schema = DatasetSchema::new(trace_columns);
+        let trace_options = ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Complex {
+                series: "t".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        };
+        let trace_res =
+            build_scatter_series(&trace_batch, &trace_dataset_schema, &trace_options).unwrap();
+        assert_eq!(
+            trace_res.series[0].data,
+            vec![vec![3.0, 4.0], vec![5.0, 6.0]]
+        );
+    }
+
+    #[test]
+    fn test_build_scatter_series_trace_xy_truncates_to_shorter_trace() {
+        let x_array: ArrayRef =
+            DatasetArray::from(DatasetScalar::SimpleTrace(ScalarArray::from_iter(vec![
+                1.0, 2.0, 3.0,
+            ])))
+            .into();
+        let y_array: ArrayRef =
+            DatasetArray::from(DatasetScalar::SimpleTrace(ScalarArray::from_iter(vec![
+                10.0, 20.0,
+            ])))
+            .into();
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("tx", x_array.data_type().clone(), false),
+            Field::new("ty", y_array.data_type().clone(), false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![x_array, y_array]).unwrap();
+
+        let options = ScatterChartDataOptions {
+            scatter: ScatterModeOptions::TraceXy {
+                trace_x_column: "tx".to_string(),
+                trace_y_column: "ty".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        };
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "tx".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        columns.insert(
+            "ty".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let res = build_scatter_series(&batch, &schema, &options).unwrap();
+        assert_eq!(res.series[0].data, vec![vec![1.0, 10.0], vec![2.0, 20.0]]);
     }
 
     #[test]

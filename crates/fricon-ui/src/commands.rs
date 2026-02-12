@@ -17,6 +17,7 @@ use fricon::{
 use serde::{Deserialize, Serialize};
 use tauri::{State, ipc::Invoke};
 use tauri_specta::{Builder, collect_commands, collect_events};
+use tracing::{debug, error};
 
 use super::AppState;
 use crate::models::{
@@ -295,6 +296,13 @@ async fn dataset_chart_data(
     };
 
     let selected_columns = build_chart_selected_columns(schema, &options)?;
+    let chart_type = options.chart_type_name();
+    debug!(
+        dataset_id = id,
+        chart_type,
+        ?selected_columns,
+        "Selecting chart source data"
+    );
     let (output_schema, batches) = dataset
         .select_data(&SelectOptions {
             start,
@@ -309,18 +317,30 @@ async fn dataset_chart_data(
     } else {
         concat_batches(&output_schema, &batches).context("Failed to concat batches")?
     };
+    debug!(
+        dataset_id = id,
+        chart_type,
+        rows = batch.num_rows(),
+        cols = batch.num_columns(),
+        "Building dataset chart data"
+    );
 
-    match &options {
-        DatasetChartDataOptions::Line(options) => {
-            build_line_series(&batch, schema, options).map_err(Error::from)
-        }
-        DatasetChartDataOptions::Heatmap(options) => {
-            build_heatmap_series(&batch, schema, options).map_err(Error::from)
-        }
-        DatasetChartDataOptions::Scatter(options) => {
-            build_scatter_series(&batch, schema, options).map_err(Error::from)
-        }
+    let result = match &options {
+        DatasetChartDataOptions::Line(options) => build_line_series(&batch, schema, options),
+        DatasetChartDataOptions::Heatmap(options) => build_heatmap_series(&batch, schema, options),
+        DatasetChartDataOptions::Scatter(options) => build_scatter_series(&batch, schema, options),
+    };
+    if let Err(err) = &result {
+        error!(
+            dataset_id = id,
+            chart_type,
+            rows = batch.num_rows(),
+            cols = batch.num_columns(),
+            error = %err,
+            "Failed to build dataset chart data"
+        );
     }
+    result.map_err(Error::from)
 }
 
 #[tauri::command]
@@ -507,7 +527,7 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use fricon::{DatasetDataType, DatasetSchema, ScalarKind};
+    use fricon::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind};
     use indexmap::IndexMap;
 
     use super::{build_chart_selected_columns, normalize_tags};
@@ -529,6 +549,27 @@ mod tests {
         columns.insert(
             "z".to_string(),
             DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        DatasetSchema::new(columns)
+    }
+
+    fn mixed_scatter_schema() -> DatasetSchema {
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "complex_scalar".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Complex),
+        );
+        columns.insert(
+            "complex_trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Complex),
+        );
+        columns.insert(
+            "trace_x".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        columns.insert(
+            "trace_y".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
         );
         DatasetSchema::new(columns)
     }
@@ -596,6 +637,49 @@ mod tests {
 
         let selected = build_chart_selected_columns(&schema, &options).unwrap();
         assert_eq!(selected, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_scatter_complex_scalar() {
+        let schema = mixed_scatter_schema();
+        let options = DatasetChartDataOptions::Scatter(ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Complex {
+                series: "complex_scalar".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![0]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_scatter_complex_trace() {
+        let schema = mixed_scatter_schema();
+        let options = DatasetChartDataOptions::Scatter(ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Complex {
+                series: "complex_trace".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![1]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_scatter_trace_xy() {
+        let schema = mixed_scatter_schema();
+        let options = DatasetChartDataOptions::Scatter(ScatterChartDataOptions {
+            scatter: ScatterModeOptions::TraceXy {
+                trace_x_column: "trace_x".to_string(),
+                trace_y_column: "trace_y".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![2, 3]);
     }
 }
 

@@ -36,6 +36,9 @@ indexmap = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["json", "env-filter"] }
 tracing-appender = { workspace = true }
 
+[dev-dependencies]
+num = { workspace = true }
+
 [lints]
 workspace = true
 

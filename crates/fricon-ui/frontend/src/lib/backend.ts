@@ -135,6 +135,20 @@ function normalizeChartOptions(result: WireChartResponse): ChartOptions {
     );
   }
 
+  if (result.type === "heatmap") {
+    if (result.xCategories == null || result.yCategories == null) {
+      throw new Error("Missing heatmap categories in backend response");
+    }
+    return {
+      type: "heatmap",
+      xName: result.xName,
+      yName: result.yName,
+      xCategories: result.xCategories,
+      yCategories: result.yCategories,
+      series: result.series,
+    };
+  }
+
   return {
     type: result.type,
     xName: result.xName,

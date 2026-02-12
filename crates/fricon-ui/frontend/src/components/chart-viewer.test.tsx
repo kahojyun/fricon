@@ -135,4 +135,112 @@ describe("ChartViewer", () => {
 
     clearMocks();
   });
+
+  it("allows index exclusion for scalar complex scatter mode", async () => {
+    const chartPayloads: Record<string, unknown>[] = [];
+    mockIPC((cmd, payload) => {
+      if (cmd === "dataset_detail") {
+        return {
+          id: 1,
+          name: "Dataset 1",
+          description: "Test dataset",
+          favorite: false,
+          tags: [],
+          status: "Completed",
+          createdAt: new Date().toISOString(),
+          columns: [
+            { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
+            { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+            { name: "c", isComplex: true, isTrace: false, isIndex: false },
+          ],
+        };
+      }
+      if (cmd === "get_filter_table_data") {
+        return {
+          fields: ["idxA", "idxB"],
+          rows: [
+            { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
+          ],
+          columnUniqueValues: {
+            idxA: [{ index: 1, displayValue: "1" }],
+            idxB: [{ index: 1, displayValue: "10" }],
+          },
+        };
+      }
+      if (cmd === "dataset_chart_data") {
+        if (payload && typeof payload === "object") {
+          chartPayloads.push(payload as Record<string, unknown>);
+        }
+        return {
+          type: "scatter",
+          xName: "c (real)",
+          yName: "c (imag)",
+          series: [{ name: "c", data: [[1, 2]] }],
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 0, isComplete: true };
+      }
+      return null;
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          refetchOnWindowFocus: false,
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ChartViewer datasetId={1} />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+
+    const chartTypeLabel = await screen.findByText("Chart Type");
+    const chartTypeTrigger = chartTypeLabel
+      .closest("div")
+      ?.querySelector('[data-slot="select-trigger"]');
+    if (!(chartTypeTrigger instanceof HTMLElement)) {
+      throw new Error("Chart type trigger not found");
+    }
+    await user.click(chartTypeTrigger);
+    await user.click(await screen.findByText("scatter"));
+
+    await waitFor(() => {
+      const lastPayload = chartPayloads.at(-1);
+      const options = lastPayload?.options as {
+        chartType: string;
+        scatter: { mode: string };
+        excludeColumns?: string[];
+      };
+      expect(options.chartType).toBe("scatter");
+      expect(options.scatter.mode).toBe("complex");
+      expect(options.excludeColumns).toEqual(["idxA"]);
+    });
+
+    const excludeLabel = await screen.findByText("Index Column (excluded)");
+    const excludeTrigger = excludeLabel
+      .closest("div")
+      ?.querySelector('[data-slot="select-trigger"]');
+    if (!(excludeTrigger instanceof HTMLElement)) {
+      throw new Error("Excluded index trigger not found");
+    }
+    await user.click(excludeTrigger);
+    const idxBChoices = await screen.findAllByText("idxB");
+    await user.click(idxBChoices[idxBChoices.length - 1]);
+
+    await waitFor(() => {
+      const lastPayload = chartPayloads.at(-1);
+      const options = lastPayload?.options as { excludeColumns?: string[] };
+      expect(options.excludeColumns).toEqual(["idxB"]);
+    });
+
+    clearMocks();
+  });
 });

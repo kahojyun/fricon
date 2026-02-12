@@ -240,7 +240,11 @@ impl TryFrom<ArrayRef> for FixedStepTraceArray {
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
         TraceKind::FixedStep.supports_data_type(array.data_type())?;
-        let scalar_kind = array.column(2).data_type().try_into()?;
+        let y = array
+            .column(2)
+            .as_list_opt::<i32>()
+            .ok_or(Error::IncompatibleType)?;
+        let scalar_kind = y.values().data_type().try_into()?;
         Ok(Self {
             array: Arc::new(array.clone()),
             scalar_kind,
@@ -318,7 +322,11 @@ impl TryFrom<ArrayRef> for VariableStepTraceArray {
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
         TraceKind::VariableStep.supports_data_type(array.data_type())?;
-        let scalar_kind = array.column(1).data_type().try_into()?;
+        let y = array
+            .column(1)
+            .as_list_opt::<i32>()
+            .ok_or(Error::IncompatibleType)?;
+        let scalar_kind = y.values().data_type().try_into()?;
         Ok(Self {
             array: Arc::new(array.clone()),
             scalar_kind,
@@ -447,5 +455,133 @@ impl From<DatasetArray> for ArrayRef {
             DatasetArray::FixedStepTrace(a) => a.into(),
             DatasetArray::VariableStepTrace(a) => a.into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dataset::scalars::{DatasetScalar, FixedStepTrace, VariableStepTrace};
+
+    fn make_list(values: Vec<f64>, item_nullable: bool) -> ArrayRef {
+        let field = Arc::new(Field::new_list_field(DataType::Float64, item_nullable));
+        let offsets = OffsetBuffer::from_lengths([values.len()]);
+        Arc::new(ListArray::new(
+            field,
+            offsets,
+            Arc::new(Float64Array::from(values)),
+            None,
+        ))
+    }
+
+    fn make_variable_trace_struct(x: Vec<f64>, y: Vec<f64>, nullable: bool) -> ArrayRef {
+        let x_list = make_list(x, nullable);
+        let y_list = make_list(y, nullable);
+        let struct_array = StructArray::try_new(
+            vec![
+                Arc::new(Field::new("x", x_list.data_type().clone(), nullable)),
+                Arc::new(Field::new("y", y_list.data_type().clone(), nullable)),
+            ]
+            .into(),
+            vec![x_list, y_list],
+            None,
+        )
+        .expect("valid variable-step trace struct");
+        Arc::new(struct_array)
+    }
+
+    fn make_fixed_trace_struct(x0: f64, step: f64, y: Vec<f64>, nullable: bool) -> ArrayRef {
+        let struct_array = StructArray::try_new(
+            vec![
+                Arc::new(Field::new("x0", DataType::Float64, nullable)),
+                Arc::new(Field::new("step", DataType::Float64, nullable)),
+                Arc::new(Field::new(
+                    "y",
+                    DataType::new_list(DataType::Float64, nullable),
+                    nullable,
+                )),
+            ]
+            .into(),
+            vec![
+                Arc::new(Float64Array::from(vec![x0])) as ArrayRef,
+                Arc::new(Float64Array::from(vec![step])) as ArrayRef,
+                make_list(y, nullable),
+            ],
+            None,
+        )
+        .expect("valid fixed-step trace struct");
+        Arc::new(struct_array)
+    }
+
+    #[test]
+    fn variable_step_trace_array_try_from_infers_numeric_scalar_kind() {
+        let trace = VariableStepTrace::new(
+            Arc::new(Float64Array::from(vec![0.0, 1.0, 2.0])),
+            ScalarArray::from_iter(vec![10.0, 20.0, 30.0]),
+        )
+        .expect("valid trace");
+        let array: ArrayRef = DatasetArray::from(DatasetScalar::VariableStepTrace(trace)).into();
+        let parsed = VariableStepTraceArray::try_from(array).expect("parse variable-step trace");
+        assert_eq!(parsed.scalar_kind(), ScalarKind::Numeric);
+    }
+
+    #[test]
+    fn fixed_step_trace_array_try_from_infers_numeric_scalar_kind() {
+        let trace = FixedStepTrace::new(0.0, 0.5, ScalarArray::from_iter(vec![1.0, 2.0, 3.0]));
+        let array: ArrayRef = DatasetArray::from(DatasetScalar::FixedStepTrace(trace)).into();
+        let parsed = FixedStepTraceArray::try_from(array).expect("parse fixed-step trace");
+        assert_eq!(parsed.scalar_kind(), ScalarKind::Numeric);
+    }
+
+    #[test]
+    fn dataset_array_try_from_variable_step_non_null_struct_and_expand() {
+        let array = make_variable_trace_struct(vec![0.0, 2.0, 4.0], vec![1.0, 3.0, 5.0], false);
+        let parsed = DatasetArray::try_from(array).expect("parse variable-step trace");
+        assert_eq!(
+            parsed.data_type(),
+            DatasetDataType::Trace(TraceKind::VariableStep, ScalarKind::Numeric)
+        );
+
+        let (x, y) = parsed
+            .expand_trace(0)
+            .expect("expand trace")
+            .expect("row exists");
+        assert_eq!(x, vec![0.0, 2.0, 4.0]);
+
+        let y_parsed = DatasetArray::try_from(y).expect("parse y values");
+        assert_eq!(
+            y_parsed
+                .as_numeric()
+                .expect("numeric y values")
+                .values()
+                .to_vec(),
+            vec![1.0, 3.0, 5.0]
+        );
+    }
+
+    #[test]
+    fn dataset_array_try_from_fixed_step_non_null_struct_and_expand() {
+        let array = make_fixed_trace_struct(1.0, 0.5, vec![10.0, 20.0, 30.0], false);
+        let parsed = DatasetArray::try_from(array).expect("parse fixed-step trace");
+        assert_eq!(
+            parsed.data_type(),
+            DatasetDataType::Trace(TraceKind::FixedStep, ScalarKind::Numeric)
+        );
+
+        let (x, y) = parsed
+            .expand_trace(0)
+            .expect("expand trace")
+            .expect("row exists");
+        assert_eq!(x, vec![1.0, 1.5, 2.0]);
+
+        let y_parsed = DatasetArray::try_from(y).expect("parse y values");
+        assert_eq!(
+            y_parsed
+                .as_numeric()
+                .expect("numeric y values")
+                .values()
+                .to_vec(),
+            vec![10.0, 20.0, 30.0]
+        );
     }
 }

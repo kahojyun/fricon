@@ -26,6 +26,8 @@ export type ChartOptions =
       type: "heatmap";
       xName: string;
       yName: string;
+      xCategories: number[];
+      yCategories: number[];
       series: ChartSeries[];
     }
   | {
