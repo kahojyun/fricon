@@ -55,25 +55,7 @@ function buildOption(data?: ChartOptions): EChartsOption {
   if (!data) return {};
 
   if (data.type === "heatmap") {
-    const { xName, yName, series } = data;
-    const xCategories: number[] = [];
-    const yCategories: number[] = [];
-    const xSet = new Set<number>();
-    const ySet = new Set<number>();
-    for (const s of series) {
-      for (const point of s.data) {
-        const xValue = point[0];
-        const yValue = point[1];
-        if (xValue !== undefined && !xSet.has(xValue)) {
-          xSet.add(xValue);
-          xCategories.push(xValue);
-        }
-        if (yValue !== undefined && !ySet.has(yValue)) {
-          ySet.add(yValue);
-          yCategories.push(yValue);
-        }
-      }
-    }
+    const { xName, yName, xCategories, yCategories, series } = data;
 
     const seriesOption = series.map(
       (s): HeatmapSeriesOption => ({
