@@ -271,6 +271,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     Boolean(datasetDetail),
   );
   const filterTableData = filterTableQuery.data ?? null;
+  const filterTableHasError = filterTableQuery.isError;
   const { refetch: refetchFilterTable } = filterTableQuery;
 
   useEffect(() => {
@@ -286,7 +287,8 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   useDatasetWriteStatusQuery(datasetId, datasetDetail?.status === "Writing");
 
   const chartRequest: ChartDataOptions | null = (() => {
-    if (!datasetDetail || !filterTableData) return null;
+    if (!datasetDetail) return null;
+    if (!filterTableData && !filterTableHasError) return null;
     if (hasFilters && !filterRow) return null;
 
     if (effectiveChartType === "scatter") {
@@ -384,12 +386,11 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
 
   const chartQuery = useChartDataQuery(datasetId, chartRequest);
   const data: ChartOptions | undefined = chartQuery.data;
-  const scatterError =
-    effectiveChartType === "scatter" && chartQuery.error
-      ? chartQuery.error instanceof Error
-        ? chartQuery.error.message
-        : "Scatter data error. Please check trace lengths."
-      : null;
+  const chartError = chartQuery.error
+    ? chartQuery.error instanceof Error
+      ? chartQuery.error.message
+      : "Failed to load chart data."
+    : null;
 
   return (
     <div className="flex size-full min-h-0 flex-col overflow-hidden">
@@ -662,8 +663,8 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
         ) : null}
       </div>
 
-      {effectiveChartType === "scatter" && scatterError ? (
-        <div className="text-destructive px-2 text-sm">{scatterError}</div>
+      {chartError ? (
+        <div className="text-destructive px-2 text-sm">{chartError}</div>
       ) : null}
 
       {effectiveChartType !== "scatter" ? (
