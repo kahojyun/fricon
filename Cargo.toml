@@ -70,7 +70,7 @@ tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 tracing-appender = "0.2.4"
 uuid = "1.20.0"
-mockall = "0.12.1"
+mockall = "0.14.0"
 
 [workspace.lints.rust]
 rust-2018-idioms = "warn"
