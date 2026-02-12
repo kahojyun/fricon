@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import math
 import os
+from typing import cast
 
 import numpy as np
 from dotenv import find_dotenv, load_dotenv
@@ -30,7 +31,7 @@ from fricon import DatasetManager, Trace, Workspace
 
 
 def _load_workspace_from_env() -> str | None:
-    load_dotenv(find_dotenv(usecwd=True), override=False)
+    _ = load_dotenv(find_dotenv(usecwd=True), override=False)
     return os.getenv("FRICON_WORKSPACE")
 
 
@@ -44,7 +45,9 @@ def case_01_basic_scalars(manager: DatasetManager) -> None:
             scalar_regular_product_line_id = (scalar_regular_row_id % 3) + 1
             scalar_regular_test_temperature_c = 20 + (scalar_regular_row_id % 5) * 10
             scalar_regular_gain_db = (
-                9.5 + 0.15 * scalar_regular_row_id + 0.4 * scalar_regular_product_line_id
+                9.5
+                + 0.15 * scalar_regular_row_id
+                + 0.4 * scalar_regular_product_line_id
             )
             scalar_regular_noise_dbm = -78 + 0.8 * math.sin(scalar_regular_row_id / 3)
             writer.write(
@@ -90,7 +93,9 @@ def case_03_complex_signal(manager: DatasetManager) -> None:
                 scalar_regular_stimulus_freq_hz = 1e6 + idx_sample * 2e6
                 amplitude = 0.2 + 0.03 * idx_device
                 phase = idx_sample / 18 + idx_device * 0.25
-                transfer_function_complex = amplitude * np.exp(1j * phase)
+                transfer_function_complex = complex(
+                    amplitude * math.cos(phase), amplitude * math.sin(phase)
+                )
                 writer.write(
                     idx_device=idx_device,
                     idx_sample=idx_sample,
@@ -113,7 +118,9 @@ def case_04_trace_signal(manager: DatasetManager) -> None:
                     - 0.001 * idx_time_ms_regular
                     + 0.03 * np.sin(idx_time_ms_regular / 60 + idx_run)
                 )
-                current_trace_a = 0.8 + 0.07 * np.cos(idx_time_ms_regular / 45 + idx_channel)
+                current_trace_a = 0.8 + 0.07 * np.cos(
+                    idx_time_ms_regular / 45 + idx_channel
+                )
                 writer.write(
                     idx_run=idx_run,
                     idx_channel=idx_channel,
@@ -142,7 +149,8 @@ def case_05_heatmap_grid(manager: DatasetManager) -> None:
             for idx_grid_x_regular in range(0, 10):
                 for idx_grid_y_regular in range(0, 10):
                     center_distance = math.sqrt(
-                        (idx_grid_x_regular - 4.5) ** 2 + (idx_grid_y_regular - 4.5) ** 2
+                        (idx_grid_x_regular - 4.5) ** 2
+                        + (idx_grid_y_regular - 4.5) ** 2
                     )
                     deposition_rate_nm_min = (
                         45 + idx_chamber * 1.3 - center_distance * 0.7
@@ -179,16 +187,15 @@ def case_06_column_name_variants(manager: DatasetManager) -> None:
 def main() -> None:
     default_workspace = _load_workspace_from_env() or ".dev/ws"
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    _ = parser.add_argument(
         "--workspace",
         default=default_workspace,
-        help=(
-            "Workspace path (default: FRICON_WORKSPACE if set, otherwise .dev/ws)"
-        ),
+        help=("Workspace path (default: FRICON_WORKSPACE if set, otherwise .dev/ws)"),
     )
     args = parser.parse_args()
+    workspace_path = cast(str, args.workspace)
 
-    ws = Workspace.connect(args.workspace)
+    ws = Workspace.connect(workspace_path)
     manager = ws.dataset_manager
 
     case_01_basic_scalars(manager)

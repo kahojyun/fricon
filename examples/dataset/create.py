@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import math
 import os
+from typing import cast
 
 import numpy as np
 from dotenv import find_dotenv, load_dotenv
@@ -23,7 +24,7 @@ from fricon import DatasetManager, Trace, Workspace
 
 
 def _load_workspace_from_env() -> str | None:
-    load_dotenv(find_dotenv(usecwd=True), override=False)
+    _ = load_dotenv(find_dotenv(usecwd=True), override=False)
     return os.getenv("FRICON_WORKSPACE")
 
 
@@ -38,7 +39,9 @@ def seed_retail_daily_kpi(manager: DatasetManager) -> None:
             seasonality = 1.0 + 0.08 * math.sin(day_index / 4)
             for store_id in range(1, 6):
                 for channel_id in (1, 2, 3):
-                    ad_spend_usd = (1500 + 40 * day_index + 120 * store_id) * seasonality
+                    ad_spend_usd = (
+                        1500 + 40 * day_index + 120 * store_id
+                    ) * seasonality
                     units_sold = (
                         180
                         + 6 * day_index
@@ -71,7 +74,9 @@ def seed_wafer_param_heatmap(manager: DatasetManager) -> None:
                 center_y = 6.0
                 for die_x in range(0, 13):
                     for die_y in range(0, 13):
-                        radius = math.sqrt((die_x - center_x) ** 2 + (die_y - center_y) ** 2)
+                        radius = math.sqrt(
+                            (die_x - center_x) ** 2 + (die_y - center_y) ** 2
+                        )
                         threshold_shift_mv = (
                             12
                             + 0.8 * lot_id
@@ -95,16 +100,24 @@ def seed_rf_impedance_sweep(manager: DatasetManager) -> None:
         description="Complex impedance sweep data for line/scatter complex view tests",
         tags=["seed", "complex", "line", "scatter", "rf"],
     ) as writer:
+        freq_start_hz = 1e6
+        freq_end_hz = 2.4e9
+        freq_points = 120
         for device_id in range(1, 5):
             for temperature_c in (25, 60, 85):
-                for freq_hz in np.linspace(1e6, 2.4e9, 120):
-                    phase = (freq_hz / 2.4e9) * math.pi * (1 + device_id * 0.05)
+                for point_index in range(freq_points):
+                    freq_hz_f64 = freq_start_hz + (
+                        (freq_end_hz - freq_start_hz) * point_index / (freq_points - 1)
+                    )
+                    phase = (freq_hz_f64 / 2.4e9) * math.pi * (1 + device_id * 0.05)
                     magnitude = 0.2 + 0.03 * device_id + 0.0008 * temperature_c
-                    s11_complex = magnitude * np.exp(1j * phase)
+                    s11_complex = complex(
+                        magnitude * math.cos(phase), magnitude * math.sin(phase)
+                    )
                     writer.write(
                         device_id=device_id,
                         temperature_c=temperature_c,
-                        freq_hz=freq_hz,
+                        freq_hz=freq_hz_f64,
                         s11_complex=s11_complex,
                     )
 
@@ -149,8 +162,11 @@ def seed_power_grid_state(manager: DatasetManager) -> None:
                         + 8 * substation_id
                         + 45 * math.sin((hour_of_day - 6) / 24 * 2 * math.pi)
                     )
-                    power_factor = 0.92 + 0.03 * math.cos(hour_of_day / 24 * 2 * math.pi)
-                    phase_angle_complex = np.exp(1j * (hour_of_day / 24 * math.pi))
+                    power_factor = 0.92 + 0.03 * math.cos(
+                        hour_of_day / 24 * 2 * math.pi
+                    )
+                    phase = hour_of_day / 24 * math.pi
+                    phase_angle_complex = complex(math.cos(phase), math.sin(phase))
                     harmonic_trace = Trace.fixed_step(
                         50.0,
                         50.0,
@@ -170,16 +186,15 @@ def seed_power_grid_state(manager: DatasetManager) -> None:
 def main() -> None:
     default_workspace = _load_workspace_from_env() or ".dev/ws"
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    _ = parser.add_argument(
         "--workspace",
         default=default_workspace,
-        help=(
-            "Workspace path (default: FRICON_WORKSPACE if set, otherwise .dev/ws)"
-        ),
+        help=("Workspace path (default: FRICON_WORKSPACE if set, otherwise .dev/ws)"),
     )
     args = parser.parse_args()
+    workspace_path = cast(str, args.workspace)
 
-    ws = Workspace.connect(args.workspace)
+    ws = Workspace.connect(workspace_path)
     manager = ws.dataset_manager
 
     seed_retail_daily_kpi(manager)
