@@ -170,21 +170,18 @@ fn empty_line_response(x_name: String) -> DataResponse {
 
 fn resolve_trace_line_values(
     series_array: &DatasetArray,
-    row_count: usize,
     series_name: &str,
 ) -> Result<Option<(usize, Vec<f64>, ArrayRef)>> {
-    for row in 0..row_count {
-        if let Some((x_values, y_values_array)) =
-            series_array.expand_trace(row).with_context(|| {
-                format!("Failed to expand trace row {row} for series '{series_name}'")
-            })?
-        {
-            if x_values.is_empty() {
-                debug!(row, series = %series_name, "Skipping empty trace row");
-                continue;
-            }
-            return Ok(Some((row, x_values, y_values_array)));
+    let row = 0;
+    if let Some((x_values, y_values_array)) = series_array
+        .expand_trace(row)
+        .with_context(|| format!("Failed to expand trace row {row} for series '{series_name}'"))?
+    {
+        if x_values.is_empty() {
+            debug!(row, series = %series_name, "Trace row is empty");
+            return Ok(None);
         }
+        return Ok(Some((row, x_values, y_values_array)));
     }
     Ok(None)
 }
@@ -272,13 +269,13 @@ pub fn build_line_series(
 
     let (trace_row, x_values, y_values_array) = if is_trace {
         let Some((row, x_values, y_values_array)) =
-            resolve_trace_line_values(&series_array, batch.num_rows(), series_name)?
+            resolve_trace_line_values(&series_array, series_name)?
         else {
             warn!(
                 chart_type = "line",
                 series = %series_name,
                 rows = batch.num_rows(),
-                "No non-empty trace rows found for line chart"
+                "First trace row is empty or null for line chart"
             );
             return Ok(empty_line_response(x_name));
         };
@@ -870,7 +867,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_line_series_trace_skips_empty_rows() {
+    fn test_build_line_series_trace_does_not_fallback_to_next_row() {
         let empty_trace: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
             ScalarArray::from_iter(Vec::<f64>::new()),
         ))
@@ -903,10 +900,7 @@ mod tests {
         };
 
         let res = build_line_series(&batch, &schema, &options).unwrap();
-        assert_eq!(
-            res.series[0].data,
-            vec![vec![0.0, 1.0], vec![1.0, 2.0], vec![2.0, 3.0]]
-        );
+        assert!(res.series.is_empty());
     }
 
     #[test]
