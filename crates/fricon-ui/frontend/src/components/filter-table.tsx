@@ -72,6 +72,7 @@ function FilterTableColumn({
               <div
                 key={item.index}
                 ref={rowVirtualizer.measureElement}
+                data-index={virtualRow.index}
                 className={cn(
                   "cursor-pointer border-b px-2 py-2 text-xs",
                   isSelected ? "bg-primary/10" : "hover:bg-muted/40",
@@ -214,6 +215,7 @@ export function FilterTable({
                   <div
                     key={row.index}
                     ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
                     className={cn(
                       "grid cursor-pointer border-b px-2 py-2 text-xs",
                       isSelected ? "bg-primary/10" : "hover:bg-muted/40",

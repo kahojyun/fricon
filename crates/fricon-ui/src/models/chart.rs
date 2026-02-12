@@ -173,7 +173,16 @@ pub fn build_line_series(
         .try_into()?;
 
     let (x_values, y_values_array) = if is_trace {
-        let Some(values) = series_array.expand_trace(0)? else {
+        let mut values = None;
+        for row in 0..batch.num_rows() {
+            if let Some((x_values, y_values_array)) = series_array.expand_trace(row)?
+                && !x_values.is_empty()
+            {
+                values = Some((x_values, y_values_array));
+                break;
+            }
+        }
+        let Some(values) = values else {
             return Ok(DataResponse {
                 r#type: Type::Line,
                 x_name,
@@ -207,17 +216,6 @@ pub fn build_line_series(
                 .context("Column not found")?,
         )
     };
-
-    if is_trace && x_values.is_empty() {
-        return Ok(DataResponse {
-            r#type: Type::Line,
-            x_name,
-            y_name: None,
-            x_categories: None,
-            y_categories: None,
-            series: vec![],
-        });
-    }
 
     let series = if is_complex {
         let ds_y: DatasetArray = y_values_array.try_into()?;
@@ -636,6 +634,7 @@ mod tests {
 
     use arrow_array::{Array, ArrayRef, Float64Array, StructArray, new_empty_array};
     use arrow_schema::{DataType, Field};
+    use arrow_select::concat::concat;
     use fricon::{DatasetArray, DatasetScalar, ScalarArray, ScalarKind, TraceKind};
     use indexmap::IndexMap;
     use num::complex::Complex64;
@@ -789,6 +788,46 @@ mod tests {
 
         let res = build_line_series(&batch, &schema, &options).unwrap();
         assert!(res.series.is_empty());
+    }
+
+    #[test]
+    fn test_build_line_series_trace_skips_empty_rows() {
+        let empty_trace: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
+            ScalarArray::from_iter(Vec::<f64>::new()),
+        ))
+        .into();
+        let non_empty_trace: ArrayRef =
+            DatasetArray::from(DatasetScalar::SimpleTrace(ScalarArray::from_iter(vec![
+                1.0, 2.0, 3.0,
+            ])))
+            .into();
+        let trace_array = concat(&[&*empty_trace, &*non_empty_trace]).unwrap();
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "trace",
+            trace_array.data_type().clone(),
+            false,
+        )]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        let schema = DatasetSchema::new(columns);
+
+        let options = LineChartDataOptions {
+            series: "trace".to_string(),
+            x_column: None,
+            complex_views: None,
+            common: ChartCommonOptions::default(),
+        };
+
+        let res = build_line_series(&batch, &schema, &options).unwrap();
+        assert_eq!(
+            res.series[0].data,
+            vec![vec![0.0, 1.0], vec![1.0, 2.0], vec![2.0, 3.0]]
+        );
     }
 
     #[test]
