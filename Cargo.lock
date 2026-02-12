@@ -1528,6 +1528,7 @@ version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "arrow-array",
+ "arrow-buffer",
  "arrow-json",
  "arrow-schema",
  "arrow-select",
@@ -1536,6 +1537,7 @@ dependencies = [
  "dotenvy",
  "fricon",
  "indexmap 2.13.0",
+ "num",
  "serde",
  "serde_json",
  "specta",

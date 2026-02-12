@@ -507,7 +507,7 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use fricon::{DatasetDataType, DatasetSchema, ScalarKind};
+    use fricon::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind};
     use indexmap::IndexMap;
 
     use super::{build_chart_selected_columns, normalize_tags};
@@ -529,6 +529,27 @@ mod tests {
         columns.insert(
             "z".to_string(),
             DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        DatasetSchema::new(columns)
+    }
+
+    fn mixed_scatter_schema() -> DatasetSchema {
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "complex_scalar".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Complex),
+        );
+        columns.insert(
+            "complex_trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Complex),
+        );
+        columns.insert(
+            "trace_x".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        columns.insert(
+            "trace_y".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
         );
         DatasetSchema::new(columns)
     }
@@ -596,6 +617,49 @@ mod tests {
 
         let selected = build_chart_selected_columns(&schema, &options).unwrap();
         assert_eq!(selected, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_scatter_complex_scalar() {
+        let schema = mixed_scatter_schema();
+        let options = DatasetChartDataOptions::Scatter(ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Complex {
+                series: "complex_scalar".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![0]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_scatter_complex_trace() {
+        let schema = mixed_scatter_schema();
+        let options = DatasetChartDataOptions::Scatter(ScatterChartDataOptions {
+            scatter: ScatterModeOptions::Complex {
+                series: "complex_trace".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![1]);
+    }
+
+    #[test]
+    fn build_chart_selected_columns_scatter_trace_xy() {
+        let schema = mixed_scatter_schema();
+        let options = DatasetChartDataOptions::Scatter(ScatterChartDataOptions {
+            scatter: ScatterModeOptions::TraceXy {
+                trace_x_column: "trace_x".to_string(),
+                trace_y_column: "trace_y".to_string(),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let selected = build_chart_selected_columns(&schema, &options).unwrap();
+        assert_eq!(selected, vec![2, 3]);
     }
 }
 
