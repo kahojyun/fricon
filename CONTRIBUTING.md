@@ -71,10 +71,14 @@ Python:
 
     uv run maturin develop   # build extension for development
     uv run pytest
+    uv run basedpyright
+    uv run stubtest fricon._core
 
 Frontend (UI):
 
-    pnpm run check
+    pnpm run type-check
+    pnpm run lint
+    pnpm run format:check
     pnpm run format
     pnpm run lint:fix
     pnpm tauri dev
@@ -104,8 +108,14 @@ Python:
 
 Frontend:
 
-    cd crates/fricon-ui/frontend
+    pnpm run type-check
     pnpm run lint
+    pnpm run format:check
+    git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
+
+Docs:
+
+    uv run --group docs mkdocs build -s -v
 
 ## Contribution workflow
 

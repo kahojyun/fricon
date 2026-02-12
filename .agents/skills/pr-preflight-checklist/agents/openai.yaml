@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Preflight Checklist"
+  short_description: "Run focused checks before opening or updating PRs"
+  default_prompt: "Use $pr-preflight-checklist to run and report the minimum complete pre-PR checks for my current diff."

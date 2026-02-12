@@ -47,6 +47,9 @@ uv run maturin develop
 uv run pytest
 uv run ruff format
 uv run ruff check
+uv run basedpyright
+uv run stubtest fricon._core
+uv run --group docs mkdocs build -s -v
 ```
 
 ### Frontend/UI
@@ -54,7 +57,10 @@ uv run ruff check
 ```bash
 # Run from repo root
 pnpm install
-pnpm run check # Type checking and linting
+pnpm run type-check
+pnpm run lint
+pnpm run format:check
+git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 pnpm run fix # Fix auto-fixable issues
 pnpm run test --run
 pnpm --filter fricon-ui exec shadcn add <component>
