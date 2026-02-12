@@ -271,7 +271,6 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     Boolean(datasetDetail),
   );
   const filterTableData = filterTableQuery.data ?? null;
-  const filterTableHasError = filterTableQuery.isError;
   const { refetch: refetchFilterTable } = filterTableQuery;
 
   useEffect(() => {
@@ -288,7 +287,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
 
   const chartRequest: ChartDataOptions | null = (() => {
     if (!datasetDetail) return null;
-    if (!filterTableData && !filterTableHasError) return null;
+    if (!filterTableData) return null;
     if (hasFilters && !filterRow) return null;
 
     if (effectiveChartType === "scatter") {
