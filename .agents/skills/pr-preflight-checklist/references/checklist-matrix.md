@@ -1,27 +1,31 @@
 # Preflight Matrix
 
-Use this matrix to select the minimum complete check set based on changed files.
+Use one profile per run:
+- `quick` for local development loops (default)
+- `strict` once before opening/updating a PR
 
-## 1) Docs-only changes
+## Scope Detection
 
-Trigger:
-- `docs/**`
-- `README.md`
-- markdown-only updates
-
-Run:
+Check changed files first:
 ```bash
-uv run --group docs mkdocs build -s -v
-cargo check
+git diff --name-only
 ```
 
-## 2) Rust core and CLI (`crates/fricon`, `crates/fricon-cli`, shared Rust code)
+Use the result to choose areas:
+- Rust core/CLI (`crates/fricon`, `crates/fricon-cli`, shared Rust)
+- Python bindings (`crates/fricon-py`, Python tests, `pyproject.toml`)
+- Frontend (`crates/fricon-ui/frontend`, root JS/TS config)
+- Tauri IPC signatures (Rust command/event changes used by UI)
+- Docs-only (`docs/**`, markdown files)
 
-Run:
+## Quick Profile (default)
+
+Run only for changed areas.
+
+### Rust
 ```bash
 cargo +nightly fmt --all --check
 cargo check
-cargo build --workspace --locked
 cargo clippy --all-targets --all-features
 cargo test --workspace
 ```
@@ -31,75 +35,96 @@ Optional alternative:
 cargo nextest run
 ```
 
-## 3) Python bindings (`crates/fricon-py`, Python tests, pyproject files)
-
-Run:
+### Python
 ```bash
 uv run ruff format --check
 uv run maturin develop
-uv sync --locked --group ci
+uv run ruff check
+uv run pytest
+```
+
+### Frontend
+```bash
+pnpm run format:check
+pnpm run type-check
+pnpm run lint
+pnpm run test --run
+```
+
+### Tauri IPC changed
+```bash
+pnpm --filter fricon-ui run gen:bindings
+git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts
+```
+
+### Route tree guard (when frontend router files changed)
+```bash
+git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
+```
+
+### Docs-only
+```bash
+uv run --group docs mkdocs build -s -v
+```
+
+## Strict Profile (PR gate)
+
+Run once before opening/updating PR.
+
+### Rust
+```bash
+cargo +nightly fmt --all --check
+cargo check
+cargo build --workspace --locked
+cargo clippy --all-targets --all-features
+cargo test --workspace
+cargo deny --workspace --all-features check
+```
+
+Optional alternative for Rust tests:
+```bash
+cargo nextest run
+```
+
+### Python
+```bash
+uv run ruff format --check
+uv run maturin develop
 uv run ruff check
 uv run pytest
 uv run basedpyright
 uv run stubtest fricon._core
 ```
 
-## 4) Frontend/UI (`crates/fricon-ui/frontend`, root `package.json`, TS/ESLint config)
-
-Run:
+### Frontend
 ```bash
 pnpm run format:check
 pnpm run type-check
 pnpm run lint
-git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 pnpm run test --run
 pnpm run build
+git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ```
 
-## 5) Tauri IPC or Rust command signature changes
-
-Trigger:
-- Rust command/event changes used by UI
-- changes around `tauri-specta` definitions
-
-Run additionally:
+### Tauri IPC changed
 ```bash
 pnpm --filter fricon-ui run gen:bindings
 git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts
-pnpm run format:check
-pnpm run type-check
-pnpm run lint
-git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ```
 
-## 6) Mixed changes (Rust + Python + frontend)
+### Docs
+```bash
+uv run --group docs mkdocs build -s -v
+```
 
-Run all relevant sections, in this order:
-1. `cargo +nightly fmt --all --check`
-2. `uv run ruff format --check`
-3. `pnpm run format:check`
-4. `cargo check`
-5. `cargo build --workspace --locked`
-6. `uv run maturin develop`
-7. `uv sync --locked --group ci`
-8. `uv run ruff check`
-9. `pnpm run type-check`
-10. `pnpm run lint`
-11. `cargo clippy --all-targets --all-features`
-12. `pnpm --filter fricon-ui run gen:bindings` (if IPC changed)
-13. `git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts` (if IPC changed)
-14. `git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts`
-15. `cargo test --workspace`
-16. `uv run pytest`
-17. `uv run basedpyright`
-18. `uv run stubtest fricon._core`
-19. `pnpm run test --run`
-20. `pnpm run build`
-21. `uv run --group docs mkdocs build -s -v`
+## Environment Notes
 
-Optional alternative for step 15:
-- `cargo nextest run`
+- Local development does not need CI-style `uv sync --locked --group ci` by default.
+- If required tools are missing locally, run once:
+```bash
+uv sync --all-groups
+```
 
 ## Final Gate
 
-Do not mark PR ready if any selected command fails.
+Do not mark PR ready if selected checks fail.

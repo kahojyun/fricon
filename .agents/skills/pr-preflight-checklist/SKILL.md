@@ -12,15 +12,19 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 ## Workflow
 
 1. Identify changed scope using `git diff --name-only`.
-2. Map changed files to checks using `references/checklist-matrix.md`.
-3. Run checks in fail-fast order:
-   - static and type/lint checks first
-   - build/compile checks second
-   - tests last
-4. Regenerate frontend bindings when Rust IPC signatures changed:
+2. Choose profile:
+   - `quick` for normal local development loops (default)
+   - `strict` once before opening/updating a PR
+3. Map changed files to checks using `references/checklist-matrix.md`.
+4. Run selected checks in fail-fast order:
+   - format/type/lint first
+   - build/test next
+   - strict-only checks last (dependency/license checks included)
+5. If Rust IPC signatures changed, run:
    - `pnpm --filter fricon-ui run gen:bindings`
-5. Re-run only failed commands after fixes, then run the full selected set once.
-6. Report results with explicit pass/fail status and any remaining risk.
+   - `git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts`
+6. Re-run failed checks after fixes, then run the selected profile once end-to-end.
+7. Report results with explicit pass/fail status and any remaining risk.
 
 ## Repository Rules To Enforce
 
@@ -32,6 +36,7 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 
 - If the repository is managed with Jujutsu, `jj diff --name-only` can replace `git diff --name-only`.
 - If your environment uses nextest, `cargo nextest run` can replace `cargo test --workspace`.
+- If tools are missing locally, run `uv sync --all-groups` once instead of CI-style group-specific syncing.
 
 ## Output Contract
 
