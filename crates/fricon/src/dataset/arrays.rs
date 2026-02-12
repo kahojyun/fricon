@@ -534,8 +534,8 @@ mod tests {
     }
 
     #[test]
-    fn dataset_array_try_from_variable_step_nullable_struct_and_expand() {
-        let array = make_variable_trace_struct(vec![0.0, 2.0, 4.0], vec![1.0, 3.0, 5.0], true);
+    fn dataset_array_try_from_variable_step_non_null_struct_and_expand() {
+        let array = make_variable_trace_struct(vec![0.0, 2.0, 4.0], vec![1.0, 3.0, 5.0], false);
         let parsed = DatasetArray::try_from(array).expect("parse variable-step trace");
         assert_eq!(
             parsed.data_type(),
@@ -560,8 +560,8 @@ mod tests {
     }
 
     #[test]
-    fn dataset_array_try_from_fixed_step_nullable_struct_and_expand() {
-        let array = make_fixed_trace_struct(1.0, 0.5, vec![10.0, 20.0, 30.0], true);
+    fn dataset_array_try_from_fixed_step_non_null_struct_and_expand() {
+        let array = make_fixed_trace_struct(1.0, 0.5, vec![10.0, 20.0, 30.0], false);
         let parsed = DatasetArray::try_from(array).expect("parse fixed-step trace");
         assert_eq!(
             parsed.data_type(),
