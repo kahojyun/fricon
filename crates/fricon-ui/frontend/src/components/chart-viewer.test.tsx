@@ -221,7 +221,7 @@ describe("ChartViewer", () => {
       };
       expect(options.chartType).toBe("scatter");
       expect(options.scatter.mode).toBe("complex");
-      expect(options.excludeColumns).toEqual(["idxA"]);
+      expect(options.excludeColumns).toEqual(["idxB"]);
     });
 
     const excludeLabel = await screen.findByText("Index Column (excluded)");

@@ -87,6 +87,19 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     return options[defaultIndex]?.name ?? options[0]?.name ?? null;
   };
 
+  const pickSelectionFromEnd = (
+    options: ColumnInfo[],
+    current: string | null,
+    defaultOffsetFromEnd = 0,
+  ): string | null => {
+    if (options.length === 0) return null;
+    const found = options.find((option) => option.name === current);
+    if (found) return found.name;
+    const index = options.length - 1 - defaultOffsetFromEnd;
+    if (index < 0) return options[0]?.name ?? null;
+    return options[index]?.name ?? options[options.length - 1]?.name ?? null;
+  };
+
   const seriesOptions = columns.filter((column) => !column.isIndex);
   const effectiveSeriesName = pickSelection(seriesOptions, seriesName);
   const series = columns.find((column) => column.name === effectiveSeriesName);
@@ -98,8 +111,12 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     ? []
     : columns.filter((column) => column.isIndex);
   const yColumnOptions = columns.filter((column) => column.isIndex);
-  const effectiveXColumnName = pickSelection(xColumnOptions, xColumnName);
-  const effectiveYColumnName = pickSelection(yColumnOptions, yColumnName, 1);
+  const effectiveXColumnName = pickSelectionFromEnd(xColumnOptions, xColumnName);
+  const effectiveYColumnName = pickSelectionFromEnd(
+    yColumnOptions,
+    yColumnName,
+    1,
+  );
   const xColumn = columns.find(
     (column) => column.name === effectiveXColumnName,
   );
@@ -192,7 +209,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     if (effectiveScatterMode !== "xy" && effectiveScatterMode !== "complex") {
       return null;
     }
-    return pickSelection(scatterBinColumnOptions, scatterBinName);
+    return pickSelectionFromEnd(scatterBinColumnOptions, scatterBinName);
   })();
   const scatterBinColumn = columns.find(
     (column) => column.name === effectiveScatterBinName,
