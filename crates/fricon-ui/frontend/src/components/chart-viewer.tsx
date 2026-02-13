@@ -98,6 +98,10 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     ? []
     : columns.filter((column) => column.isIndex);
   const yColumnOptions = columns.filter((column) => column.isIndex);
+  const defaultYColumnIndex =
+    xColumnOptions.length > 0
+      ? yColumnOptions.length - 2
+      : yColumnOptions.length - 1;
   const effectiveXColumnName = pickSelection(
     xColumnOptions,
     xColumnName,
@@ -106,7 +110,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   const effectiveYColumnName = pickSelection(
     yColumnOptions,
     yColumnName,
-    yColumnOptions.length - 2,
+    defaultYColumnIndex,
   );
   const xColumn = columns.find(
     (column) => column.name === effectiveXColumnName,
