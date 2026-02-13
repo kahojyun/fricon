@@ -31,6 +31,122 @@ vi.mock("react-resizable-panels", () => ({
 }));
 
 describe("ChartViewer", () => {
+  it("prefers trailing index columns for default line/heatmap axes", async () => {
+    const chartPayloads: Record<string, unknown>[] = [];
+    mockIPC((cmd, payload) => {
+      if (cmd === "dataset_detail") {
+        return {
+          id: 1,
+          name: "Dataset 1",
+          description: "Test dataset",
+          favorite: false,
+          tags: [],
+          status: "Completed",
+          createdAt: new Date().toISOString(),
+          columns: [
+            { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
+            { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+            {
+              name: "signal",
+              isComplex: false,
+              isTrace: false,
+              isIndex: false,
+            },
+          ],
+        };
+      }
+      if (cmd === "get_filter_table_data") {
+        return {
+          fields: ["idxA", "idxB"],
+          rows: [
+            { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
+          ],
+          columnUniqueValues: {
+            idxA: [{ index: 1, displayValue: "1" }],
+            idxB: [{ index: 1, displayValue: "10" }],
+          },
+        };
+      }
+      if (cmd === "dataset_chart_data") {
+        if (payload && typeof payload === "object") {
+          chartPayloads.push(payload as Record<string, unknown>);
+        }
+        const options = (payload as { options?: { chartType?: string } })
+          ?.options;
+        if (options?.chartType === "heatmap") {
+          return {
+            type: "heatmap",
+            xName: "idxB",
+            yName: "idxA",
+            xCategories: [10],
+            yCategories: [1],
+            series: [{ name: "signal", data: [[0, 0, 1]] }],
+          };
+        }
+        return {
+          type: "line",
+          xName: "idxB",
+          series: [{ name: "signal", data: [[10, 1]] }],
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 0, isComplete: true };
+      }
+      return null;
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          refetchOnWindowFocus: false,
+        },
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ChartViewer datasetId={1} />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+    await waitFor(() => {
+      const firstPayload = chartPayloads[0];
+      const options = firstPayload?.options as {
+        chartType: string;
+        xColumn?: string;
+      };
+      expect(options.chartType).toBe("line");
+      expect(options.xColumn).toBe("idxB");
+    });
+
+    const chartTypeLabel = await screen.findByText("Chart Type");
+    const chartTypeTrigger = chartTypeLabel
+      .closest("div")
+      ?.querySelector('[data-slot="select-trigger"]');
+    if (!(chartTypeTrigger instanceof HTMLElement)) {
+      throw new Error("Chart type trigger not found");
+    }
+    await user.click(chartTypeTrigger);
+    await user.click(await screen.findByText("heatmap"));
+
+    await waitFor(() => {
+      const lastPayload = chartPayloads.at(-1);
+      const options = lastPayload?.options as {
+        chartType: string;
+        xColumn?: string;
+        yColumn?: string;
+      };
+      expect(options.chartType).toBe("heatmap");
+      expect(options.xColumn).toBe("idxB");
+      expect(options.yColumn).toBe("idxA");
+    });
+
+    clearMocks();
+  });
+
   it("fetches chart data once per meaningful change", async () => {
     let chartCallCount = 0;
     mockIPC((cmd) => {
