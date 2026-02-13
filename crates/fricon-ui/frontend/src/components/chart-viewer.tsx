@@ -98,8 +98,20 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     ? []
     : columns.filter((column) => column.isIndex);
   const yColumnOptions = columns.filter((column) => column.isIndex);
-  const effectiveXColumnName = pickSelection(xColumnOptions, xColumnName);
-  const effectiveYColumnName = pickSelection(yColumnOptions, yColumnName, 1);
+  const defaultYColumnIndex =
+    xColumnOptions.length > 0
+      ? yColumnOptions.length - 2
+      : yColumnOptions.length - 1;
+  const effectiveXColumnName = pickSelection(
+    xColumnOptions,
+    xColumnName,
+    xColumnOptions.length - 1,
+  );
+  const effectiveYColumnName = pickSelection(
+    yColumnOptions,
+    yColumnName,
+    defaultYColumnIndex,
+  );
   const xColumn = columns.find(
     (column) => column.name === effectiveXColumnName,
   );
@@ -192,7 +204,11 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     if (effectiveScatterMode !== "xy" && effectiveScatterMode !== "complex") {
       return null;
     }
-    return pickSelection(scatterBinColumnOptions, scatterBinName);
+    return pickSelection(
+      scatterBinColumnOptions,
+      scatterBinName,
+      scatterBinColumnOptions.length - 1,
+    );
   })();
   const scatterBinColumn = columns.find(
     (column) => column.name === effectiveScatterBinName,
