@@ -5,7 +5,7 @@ use std::{
     any::Any,
     fs, io, panic,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use anyhow::{Context as _, Result};
@@ -27,7 +27,7 @@ use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 use crate::commands::{DatasetCreated, DatasetInfo, DatasetUpdated};
 
 struct AppState {
-    manager: Mutex<Option<(fricon::AppManager, WorkerGuard)>>,
+    manager: Mutex<Option<fricon::AppManager>>,
     current_dataset: Mutex<Option<(i32, Arc<fricon::DatasetReader>)>>,
 }
 
@@ -72,10 +72,10 @@ pub struct LaunchContext {
 impl AppState {
     fn new(workspace_path: PathBuf) -> Result<Self> {
         let _runtime_guard = async_runtime::handle().inner().enter();
-        let log_guard = setup_logging(workspace_path.clone())?;
+        setup_logging(workspace_path.clone())?;
         let app_manager = fricon::AppManager::serve_with_path(workspace_path)?;
         Ok(Self {
-            manager: Mutex::new(Some((app_manager, log_guard))),
+            manager: Mutex::new(Some(app_manager)),
             current_dataset: Mutex::new(None),
         })
     }
@@ -140,14 +140,13 @@ impl AppState {
             .expect("Failed to acquire lock on app state")
             .as_ref()
             .expect("App should be running")
-            .0
             .handle()
             .clone()
     }
 
     fn shutdown(&self) {
         async_runtime::block_on(async {
-            let (app_manager, _guard) = self
+            let app_manager = self
                 .manager
                 .lock()
                 .expect("Failed to acquire lock on app state")
@@ -478,7 +477,16 @@ fn install_ctrl_c_handler(app: &mut tauri::App) {
     });
 }
 
-fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
+fn setup_logging(workspace_path: PathBuf) -> Result<()> {
+    static LOG_GUARD: OnceLock<Mutex<Option<WorkerGuard>>> = OnceLock::new();
+    let guard_slot = LOG_GUARD.get_or_init(|| Mutex::new(None));
+    let mut guard_slot = guard_slot
+        .lock()
+        .expect("logging guard should not be poisoned");
+    if guard_slot.is_some() {
+        return Ok(());
+    }
+
     let log_dir = fricon::get_log_dir(workspace_path)?;
     let rolling = RollingFileAppender::new(Rotation::DAILY, log_dir, "fricon.log");
     let (writer, guard) = tracing_appender::non_blocking(rolling);
@@ -496,8 +504,10 @@ fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
                 .with_default_directive(LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
-        .init();
-    Ok(guard)
+        .try_init()
+        .context("Failed to initialize logging")?;
+    *guard_slot = Some(guard);
+    Ok(())
 }
 
 fn install_panic_hook(interaction_mode: InteractionMode) {

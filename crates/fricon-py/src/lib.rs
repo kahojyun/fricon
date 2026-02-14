@@ -42,7 +42,7 @@ use chrono::{DateTime, Utc};
 use fricon::{
     Client, DatasetMetadata, DatasetRecord, DatasetScalar, FixedStepTrace, VariableStepTrace,
 };
-use fricon_cli::clap::Parser;
+use fricon_cli::clap::{Parser, error::ErrorKind};
 use indexmap::IndexMap;
 use pyo3::{
     prelude::*,
@@ -560,6 +560,13 @@ fn has_console_output() -> bool {
     stdout().is_terminal() || stderr().is_terminal()
 }
 
+fn parse_error_exit_code(kind: ErrorKind) -> i32 {
+    match kind {
+        ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => 0,
+        _ => 2,
+    }
+}
+
 #[expect(clippy::print_stderr, reason = "Error messages for CLI tool")]
 pub fn main_impl<T: Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
     if ignore_python_sigint(py).is_err() {
@@ -625,8 +632,9 @@ pub fn main_gui(py: Python<'_>) -> i32 {
         },
         Err(parse_error) => {
             if has_console_output() {
+                let exit_code = parse_error_exit_code(parse_error.kind());
                 eprint!("{parse_error}");
-                2
+                exit_code
             } else {
                 match fricon_cli::launch_gui_with_context(command_name, cli_help, None, false) {
                     Ok(()) => 0,
@@ -675,4 +683,22 @@ pub fn serve_workspace(path: PathBuf) -> Result<(Workspace, ServerHandle)> {
         manager: Some(manager),
     };
     Ok((workspace, server_handle))
+}
+
+#[cfg(test)]
+mod tests {
+    use fricon_cli::clap::error::ErrorKind;
+
+    use super::parse_error_exit_code;
+
+    #[test]
+    fn parse_help_and_version_return_success_exit_code() {
+        assert_eq!(parse_error_exit_code(ErrorKind::DisplayHelp), 0);
+        assert_eq!(parse_error_exit_code(ErrorKind::DisplayVersion), 0);
+    }
+
+    #[test]
+    fn parse_failure_returns_error_exit_code() {
+        assert_eq!(parse_error_exit_code(ErrorKind::MissingRequiredArgument), 2);
+    }
 }
