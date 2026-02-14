@@ -537,45 +537,85 @@ fn build_panic_dialog_message(
 
 #[cfg(test)]
 mod tests {
-    use std::{panic::Location, path::PathBuf};
+    use std::{fs, panic::Location, path::PathBuf};
+
+    use fricon::WorkspaceRoot;
+    use tempfile::tempdir;
 
     use super::{
-        InteractionMode, LaunchContext, LaunchSource, build_cli_help_message,
-        build_panic_dialog_message, resolve_workspace_path,
+        InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError,
+        build_panic_dialog_message, resolve_workspace_path, validate_workspace_path,
     };
 
     #[test]
-    fn cli_help_message_embeds_generated_help() {
-        let message = build_cli_help_message("fricon", "USAGE:\n  fricon [COMMAND]");
-        assert!(message.contains("Command: fricon"));
-        assert!(message.contains("USAGE:\n  fricon [COMMAND]"));
-    }
-
-    #[test]
-    fn cli_help_message_preserves_gui_command_name() {
-        let message = build_cli_help_message("fricon-gui", "USAGE:\n  fricon-gui <PATH>");
-        assert!(message.contains("Command: fricon-gui"));
-        assert!(message.contains("USAGE:\n  fricon-gui <PATH>"));
-    }
-
-    #[test]
-    fn terminal_mode_missing_workspace_returns_error() {
+    fn terminal_mode_missing_workspace_returns_workspace_missing_error() {
         let result = resolve_workspace_path(&LaunchContext {
             launch_source: LaunchSource::Standalone,
             workspace_path: None,
             interaction_mode: InteractionMode::Terminal,
         });
-        assert!(result.is_err());
+        let error = result.expect_err("expected missing-workspace error");
+        let launch_error = error
+            .downcast_ref::<WorkspaceLaunchError>()
+            .expect("error should be WorkspaceLaunchError");
+        assert!(matches!(
+            launch_error,
+            WorkspaceLaunchError::WorkspacePathMissing
+        ));
     }
 
     #[test]
-    fn terminal_mode_invalid_workspace_returns_error() {
+    fn terminal_mode_invalid_workspace_returns_workspace_invalid_error() {
         let result = resolve_workspace_path(&LaunchContext {
             launch_source: LaunchSource::Standalone,
             workspace_path: Some(PathBuf::from("/definitely/not/a/real/path")),
             interaction_mode: InteractionMode::Terminal,
         });
-        assert!(result.is_err());
+        let error = result.expect_err("expected invalid-workspace error");
+        let launch_error = error
+            .downcast_ref::<WorkspaceLaunchError>()
+            .expect("error should be WorkspaceLaunchError");
+        assert!(matches!(
+            launch_error,
+            WorkspaceLaunchError::WorkspacePathInvalid { .. }
+        ));
+    }
+
+    #[test]
+    fn dialog_mode_invalid_workspace_defers_to_picker_flow() {
+        let result = resolve_workspace_path(&LaunchContext {
+            launch_source: LaunchSource::Standalone,
+            workspace_path: Some(PathBuf::from("/definitely/not/a/real/path")),
+            interaction_mode: InteractionMode::Dialog,
+        });
+        assert!(matches!(result, Ok(None)));
+    }
+
+    #[test]
+    fn validate_workspace_path_accepts_valid_workspace() {
+        let temp_dir = tempdir().expect("tempdir should be created");
+        let workspace_path = temp_dir.path().join("workspace");
+        let workspace =
+            WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
+        drop(workspace);
+
+        let result = validate_workspace_path(workspace_path.clone());
+        let expected =
+            fs::canonicalize(workspace_path).expect("workspace path should canonicalize");
+        assert_eq!(result.expect("workspace should validate"), expected);
+    }
+
+    #[test]
+    fn validate_workspace_path_rejects_non_workspace_directory() {
+        let temp_dir = tempdir().expect("tempdir should be created");
+        let non_workspace_dir = temp_dir.path().join("not-workspace");
+        fs::create_dir_all(&non_workspace_dir).expect("directory should be created");
+
+        let result = validate_workspace_path(non_workspace_dir);
+        assert!(matches!(
+            result,
+            Err(WorkspaceLaunchError::WorkspacePathInvalid { .. })
+        ));
     }
 
     #[test]

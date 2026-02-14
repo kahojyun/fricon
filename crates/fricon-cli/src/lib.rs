@@ -82,7 +82,7 @@ pub fn launch_gui_with_context(
     workspace_path: Option<PathBuf>,
     force_dialog: bool,
 ) -> Result<()> {
-    let interaction_mode = detect_interaction_mode(force_dialog);
+    let interaction_mode = detect_interaction_mode(force_dialog, has_tty());
     fricon_ui::run_with_context(fricon_ui::LaunchContext {
         launch_source: fricon_ui::LaunchSource::Cli {
             command_name,
@@ -93,10 +93,14 @@ pub fn launch_gui_with_context(
     })
 }
 
-fn detect_interaction_mode(force_dialog: bool) -> fricon_ui::InteractionMode {
+fn has_tty() -> bool {
+    stdout().is_terminal() || stderr().is_terminal()
+}
+
+fn detect_interaction_mode(force_dialog: bool, has_tty: bool) -> fricon_ui::InteractionMode {
     if force_dialog {
         fricon_ui::InteractionMode::Dialog
-    } else if stdout().is_terminal() || stderr().is_terminal() {
+    } else if has_tty {
         fricon_ui::InteractionMode::Terminal
     } else {
         fricon_ui::InteractionMode::Dialog
@@ -126,8 +130,36 @@ mod tests {
     #[test]
     fn force_dialog_overrides_terminal_detection() {
         assert_eq!(
-            detect_interaction_mode(true),
+            detect_interaction_mode(true, true),
             fricon_ui::InteractionMode::Dialog
         );
+    }
+
+    #[test]
+    fn terminal_mode_when_tty_without_force_dialog() {
+        assert_eq!(
+            detect_interaction_mode(false, true),
+            fricon_ui::InteractionMode::Terminal
+        );
+    }
+
+    #[test]
+    fn dialog_mode_when_no_tty_without_force_dialog() {
+        assert_eq!(
+            detect_interaction_mode(false, false),
+            fricon_ui::InteractionMode::Dialog
+        );
+    }
+
+    #[test]
+    fn gui_cli_parses_without_path_argument() {
+        let parsed = Cli::try_parse_from(["fricon", "gui"]);
+        assert!(parsed.is_ok());
+    }
+
+    #[test]
+    fn gui_cli_parses_force_dialog_without_path_argument() {
+        let parsed = Cli::try_parse_from(["fricon", "gui", "--force-dialog"]);
+        assert!(parsed.is_ok());
     }
 }

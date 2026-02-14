@@ -39,6 +39,7 @@ tracing-appender = { workspace = true }
 
 [dev-dependencies]
 num = { workspace = true }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true
