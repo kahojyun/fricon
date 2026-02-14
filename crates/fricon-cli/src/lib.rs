@@ -82,13 +82,7 @@ pub fn launch_gui_with_context(
     workspace_path: Option<PathBuf>,
     force_dialog: bool,
 ) -> Result<()> {
-    let interaction_mode = if force_dialog {
-        fricon_ui::InteractionMode::Dialog
-    } else if stdout().is_terminal() || stderr().is_terminal() {
-        fricon_ui::InteractionMode::Terminal
-    } else {
-        fricon_ui::InteractionMode::Dialog
-    };
+    let interaction_mode = detect_interaction_mode(force_dialog);
     fricon_ui::run_with_context(fricon_ui::LaunchContext {
         launch_source: fricon_ui::LaunchSource::Cli {
             command_name,
@@ -97,6 +91,16 @@ pub fn launch_gui_with_context(
         workspace_path,
         interaction_mode,
     })
+}
+
+fn detect_interaction_mode(force_dialog: bool) -> fricon_ui::InteractionMode {
+    if force_dialog {
+        fricon_ui::InteractionMode::Dialog
+    } else if stdout().is_terminal() || stderr().is_terminal() {
+        fricon_ui::InteractionMode::Terminal
+    } else {
+        fricon_ui::InteractionMode::Dialog
+    }
 }
 
 pub fn render_help_for_command<T: clap::CommandFactory>(bin_name: &str) -> Result<String> {
@@ -117,5 +121,13 @@ mod tests {
     fn cli() {
         Gui::command().debug_assert();
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn force_dialog_overrides_terminal_detection() {
+        assert_eq!(
+            detect_interaction_mode(true),
+            fricon_ui::InteractionMode::Dialog
+        );
     }
 }

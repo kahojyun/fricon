@@ -186,17 +186,19 @@ enum WorkspaceSelection {
     Exit,
 }
 
+enum MissingWorkspaceAction {
+    ChooseWorkspace,
+    ShowCliHelpAndExit,
+    Exit,
+}
+
 const CHOOSE_WORKSPACE_BUTTON: &str = "Choose workspace";
 const HELP_BUTTON: &str = "Help";
 const EXIT_BUTTON: &str = "Exit";
 
 pub fn run_with_context(context: LaunchContext) -> Result<()> {
     match context.interaction_mode {
-        InteractionMode::Terminal => {
-            let workspace_path = resolve_workspace_path(&context)?
-                .expect("terminal mode should always resolve to a concrete workspace path");
-            run_with_canonical_workspace(workspace_path)
-        }
+        InteractionMode::Terminal => run_with_context_terminal_mode(context),
         InteractionMode::Dialog => run_with_context_dialog_mode(context),
     }
 }
@@ -227,6 +229,12 @@ fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
             InteractionMode::Terminal => Err(WorkspaceLaunchError::WorkspacePathMissing.into()),
         },
     }
+}
+
+fn run_with_context_terminal_mode(context: LaunchContext) -> Result<()> {
+    let workspace_path = resolve_workspace_path(&context)?
+        .ok_or_else(|| WorkspaceLaunchError::WorkspacePathMissing)?;
+    run_with_canonical_workspace(workspace_path)
 }
 
 fn run_with_context_dialog_mode(context: LaunchContext) -> Result<()> {
@@ -312,45 +320,19 @@ pub fn export_bindings(path: impl AsRef<std::path::Path>) -> Result<()> {
 
 fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelection> {
     loop {
-        match launch_source {
-            LaunchSource::Standalone => {
-                let action = MessageDialog::new()
-                    .set_level(MessageLevel::Warning)
-                    .set_title("Workspace not found")
-                    .set_description(
-                        "No valid workspace path is available.\n\nChoose a workspace folder, or \
-                         exit.",
-                    )
-                    .set_buttons(MessageButtons::OkCancelCustom(
-                        CHOOSE_WORKSPACE_BUTTON.to_string(),
-                        EXIT_BUTTON.to_string(),
-                    ))
-                    .show();
-                if !dialog_is_choose_workspace(&action) {
-                    return Ok(WorkspaceSelection::Exit);
-                }
-            }
-            LaunchSource::Cli {
-                command_name,
-                cli_help,
-            } => {
-                let action = MessageDialog::new()
-                    .set_level(MessageLevel::Warning)
-                    .set_title("Workspace not found")
-                    .set_description(
-                        "No valid workspace path is available.\n\nChoose a workspace folder, or \
-                         view command line help.",
-                    )
-                    .set_buttons(MessageButtons::OkCancelCustom(
-                        CHOOSE_WORKSPACE_BUTTON.to_string(),
-                        HELP_BUTTON.to_string(),
-                    ))
-                    .show();
-                if !dialog_is_choose_workspace(&action) {
+        match prompt_missing_workspace_action(launch_source) {
+            MissingWorkspaceAction::ChooseWorkspace => {}
+            MissingWorkspaceAction::ShowCliHelpAndExit => {
+                if let LaunchSource::Cli {
+                    command_name,
+                    cli_help,
+                } = launch_source
+                {
                     show_cli_help(command_name, cli_help);
-                    return Ok(WorkspaceSelection::Exit);
                 }
+                return Ok(WorkspaceSelection::Exit);
             }
+            MissingWorkspaceAction::Exit => return Ok(WorkspaceSelection::Exit),
         }
 
         let Some(path) = FileDialog::new().pick_folder() else {
@@ -379,6 +361,43 @@ fn dialog_is_choose_workspace(result: &MessageDialogResult) -> bool {
         MessageDialogResult::Ok | MessageDialogResult::Yes => true,
         MessageDialogResult::Custom(value) => value == CHOOSE_WORKSPACE_BUTTON,
         MessageDialogResult::No | MessageDialogResult::Cancel => false,
+    }
+}
+
+fn prompt_missing_workspace_action(launch_source: &LaunchSource) -> MissingWorkspaceAction {
+    let action = match launch_source {
+        LaunchSource::Standalone => MessageDialog::new()
+            .set_level(MessageLevel::Warning)
+            .set_title("Workspace not found")
+            .set_description(
+                "No valid workspace path is available.\n\nChoose a workspace folder, or exit.",
+            )
+            .set_buttons(MessageButtons::OkCancelCustom(
+                CHOOSE_WORKSPACE_BUTTON.to_string(),
+                EXIT_BUTTON.to_string(),
+            ))
+            .show(),
+        LaunchSource::Cli { .. } => MessageDialog::new()
+            .set_level(MessageLevel::Warning)
+            .set_title("Workspace not found")
+            .set_description(
+                "No valid workspace path is available.\n\nChoose a workspace folder, or view \
+                 command line help.",
+            )
+            .set_buttons(MessageButtons::OkCancelCustom(
+                CHOOSE_WORKSPACE_BUTTON.to_string(),
+                HELP_BUTTON.to_string(),
+            ))
+            .show(),
+    };
+
+    if dialog_is_choose_workspace(&action) {
+        return MissingWorkspaceAction::ChooseWorkspace;
+    }
+
+    match launch_source {
+        LaunchSource::Standalone => MissingWorkspaceAction::Exit,
+        LaunchSource::Cli { .. } => MissingWorkspaceAction::ShowCliHelpAndExit,
     }
 }
 
