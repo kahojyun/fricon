@@ -36,7 +36,7 @@ pub enum Commands {
 #[command(version, about, long_about = None)]
 pub struct Gui {
     /// Workspace path to open
-    path: PathBuf,
+    path: Option<PathBuf>,
     /// Force dialog mode even when running in a terminal
     #[arg(long)]
     force_dialog: bool,
@@ -72,7 +72,7 @@ impl Gui {
     }
 
     pub fn main_with_help(self, command_name: String, cli_help: String) -> Result<()> {
-        launch_gui_with_context(command_name, cli_help, Some(self.path), self.force_dialog)
+        launch_gui_with_context(command_name, cli_help, self.path, self.force_dialog)
     }
 }
 
