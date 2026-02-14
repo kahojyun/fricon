@@ -29,7 +29,13 @@ mod _core {
     };
 }
 
-use std::{env, mem, path::PathBuf, time::Duration};
+use std::{
+    env,
+    io::{IsTerminal, stderr, stdout},
+    mem,
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
@@ -534,16 +540,28 @@ impl DatasetWriter {
     }
 }
 
+fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
+    let signal = py.import("signal")?;
+    let sigint = signal.getattr("SIGINT")?;
+    let default_handler = signal.getattr("SIG_DFL")?;
+    _ = signal.call_method1("signal", (sigint, default_handler))?;
+    Ok(())
+}
+
+fn command_name_from_argv0(argv0: &std::ffi::OsStr) -> String {
+    std::path::Path::new(argv0)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .map_or_else(|| "fricon".to_string(), ToString::to_string)
+}
+
+fn has_console_output() -> bool {
+    stdout().is_terminal() || stderr().is_terminal()
+}
+
 #[expect(clippy::print_stderr, reason = "Error messages for CLI tool")]
 pub fn main_impl<T: Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
-    fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
-        let signal = py.import("signal")?;
-        let sigint = signal.getattr("SIGINT")?;
-        let default_handler = signal.getattr("SIG_DFL")?;
-        _ = signal.call_method1("signal", (sigint, default_handler))?;
-        Ok(())
-    }
-
     if ignore_python_sigint(py).is_err() {
         eprintln!("Failed to reset python SIGINT handler.");
         return 1;
@@ -578,7 +596,47 @@ pub fn main(py: Python<'_>) -> i32 {
 #[pyfunction]
 #[must_use]
 pub fn main_gui(py: Python<'_>) -> i32 {
-    main_impl::<fricon_cli::Gui>(py)
+    if ignore_python_sigint(py).is_err() {
+        eprintln!("Failed to reset python SIGINT handler.");
+        return 1;
+    }
+
+    // Skip python executable
+    let argv: Vec<_> = env::args_os().skip(1).collect();
+    let command_name = argv.first().map_or_else(
+        || "fricon-gui".to_string(),
+        |arg| command_name_from_argv0(arg),
+    );
+    let cli_help = match fricon_cli::render_help_for_command::<fricon_cli::Gui>(&command_name) {
+        Ok(help) => help,
+        Err(e) => {
+            eprintln!("Error: {e:?}");
+            return 1;
+        }
+    };
+    match fricon_cli::Gui::try_parse_from(argv) {
+        Ok(cli) => match cli.main_with_help(command_name, cli_help) {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("Error: {e:?}");
+                1
+            }
+        },
+        Err(parse_error) => {
+            if has_console_output() {
+                eprint!("{parse_error}");
+                2
+            } else {
+                match fricon_cli::launch_gui_with_context(command_name, cli_help, None) {
+                    Ok(()) => 0,
+                    Err(e) => {
+                        eprintln!("Error: {e:?}");
+                        1
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Create a workspace for integration testing.

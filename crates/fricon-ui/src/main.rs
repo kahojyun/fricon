@@ -1,15 +1,17 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env, fs};
+use std::{env, path::PathBuf};
 
 use anyhow::Result;
 use dotenvy::dotenv;
+use fricon_ui::{LaunchContext, LaunchSource};
 
 fn main() -> Result<()> {
     let _ = dotenv();
-    let workspace_path = env::var("FRICON_WORKSPACE").expect("FRICON_WORKSPACE not set");
-    let workspace_path =
-        fs::canonicalize(workspace_path).expect("FRICON_WORKSPACE is not a valid path");
-    fricon_ui::run_with_workspace(workspace_path)
+    let workspace_path = env::var("FRICON_WORKSPACE").ok().map(PathBuf::from);
+    fricon_ui::run_with_context(LaunchContext {
+        launch_source: LaunchSource::Standalone,
+        workspace_path,
+    })
 }

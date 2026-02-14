@@ -1,9 +1,6 @@
 //! Command line interface
 
-use std::{
-    fs,
-    path::{self, PathBuf},
-};
+use std::path::{self, PathBuf};
 
 use anyhow::Result;
 pub use clap;
@@ -57,10 +54,42 @@ impl Main for Cli {
 
 impl Main for Gui {
     fn main(self) -> Result<()> {
-        let path = fs::canonicalize(self.path)?;
-        fricon_ui::run_with_workspace(path)?;
-        Ok(())
+        self.main_with_command_name("fricon")
     }
+}
+
+impl Gui {
+    pub fn main_with_command_name(self, command_name: impl Into<String>) -> Result<()> {
+        let command_name = command_name.into();
+        let cli_help = render_help_for_command::<Cli>(&command_name)?;
+        self.main_with_help(command_name, cli_help)
+    }
+
+    pub fn main_with_help(self, command_name: String, cli_help: String) -> Result<()> {
+        launch_gui_with_context(command_name, cli_help, Some(self.path))
+    }
+}
+
+pub fn launch_gui_with_context(
+    command_name: String,
+    cli_help: String,
+    workspace_path: Option<PathBuf>,
+) -> Result<()> {
+    fricon_ui::run_with_context(fricon_ui::LaunchContext {
+        launch_source: fricon_ui::LaunchSource::Cli {
+            command_name,
+            cli_help,
+        },
+        workspace_path,
+    })
+}
+
+pub fn render_help_for_command<T: clap::CommandFactory>(bin_name: &str) -> Result<String> {
+    let mut command = T::command();
+    command = command.bin_name(bin_name);
+    let mut help = Vec::new();
+    command.write_long_help(&mut help)?;
+    Ok(String::from_utf8_lossy(&help).into_owned())
 }
 
 #[cfg(test)]

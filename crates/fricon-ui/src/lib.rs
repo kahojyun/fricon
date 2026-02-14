@@ -2,12 +2,13 @@ mod commands;
 mod models;
 
 use std::{
-    io,
+    fs, io,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 use anyhow::{Context as _, Result};
+use rfd::{FileDialog, MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
 use tauri::{
     Manager, RunEvent, WindowEvent, async_runtime,
     menu::MenuBuilder,
@@ -27,6 +28,21 @@ use crate::commands::{DatasetCreated, DatasetInfo, DatasetUpdated};
 struct AppState {
     manager: Mutex<Option<(fricon::AppManager, WorkerGuard)>>,
     current_dataset: Mutex<Option<(i32, Arc<fricon::DatasetReader>)>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LaunchSource {
+    Standalone,
+    Cli {
+        command_name: String,
+        cli_help: String,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub struct LaunchContext {
+    pub launch_source: LaunchSource,
+    pub workspace_path: Option<PathBuf>,
 }
 
 impl AppState {
@@ -142,7 +158,33 @@ impl AppState {
     }
 }
 
+enum WorkspaceSelection {
+    Selected(PathBuf),
+    Exit,
+}
+
+pub fn run_with_context(context: LaunchContext) -> Result<()> {
+    let workspace_path = context
+        .workspace_path
+        .and_then(|path| fs::canonicalize(path).ok());
+    let workspace_path = match workspace_path {
+        Some(path) => path,
+        None => match select_workspace_path(&context.launch_source)? {
+            WorkspaceSelection::Selected(path) => path,
+            WorkspaceSelection::Exit => return Ok(()),
+        },
+    };
+    run_with_canonical_workspace(workspace_path)
+}
+
 pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
+    run_with_context(LaunchContext {
+        launch_source: LaunchSource::Standalone,
+        workspace_path: Some(workspace_path),
+    })
+}
+
+fn run_with_canonical_workspace(workspace_path: PathBuf) -> Result<()> {
     let app_state = AppState::new(workspace_path).context("Failed to open workspace")?;
 
     #[expect(clippy::exit, reason = "Required by Tauri framework")]
@@ -196,6 +238,77 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
 
 pub fn export_bindings(path: impl AsRef<std::path::Path>) -> Result<()> {
     commands::export_bindings(path)
+}
+
+fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelection> {
+    loop {
+        match launch_source {
+            LaunchSource::Standalone => {
+                let open_picker = MessageDialog::new()
+                    .set_level(MessageLevel::Warning)
+                    .set_title("Workspace not found")
+                    .set_description(
+                        "No valid workspace path is available.\n\nChoose 'Yes' to open a \
+                         workspace folder picker. Choose 'No' to exit.",
+                    )
+                    .set_buttons(MessageButtons::YesNo)
+                    .show();
+                if open_picker != MessageDialogResult::Yes {
+                    return Ok(WorkspaceSelection::Exit);
+                }
+            }
+            LaunchSource::Cli {
+                command_name,
+                cli_help,
+            } => {
+                let open_picker = MessageDialog::new()
+                    .set_level(MessageLevel::Warning)
+                    .set_title("Workspace not found")
+                    .set_description(
+                        "No valid workspace path is available.\n\nChoose 'Yes' to open a \
+                         workspace folder picker. Choose 'No' to view CLI help and exit.",
+                    )
+                    .set_buttons(MessageButtons::YesNo)
+                    .show();
+                if open_picker != MessageDialogResult::Yes {
+                    show_cli_help(command_name, cli_help);
+                    return Ok(WorkspaceSelection::Exit);
+                }
+            }
+        }
+
+        let Some(path) = FileDialog::new().pick_folder() else {
+            return Ok(WorkspaceSelection::Exit);
+        };
+
+        match fs::canonicalize(path) {
+            Ok(path) => return Ok(WorkspaceSelection::Selected(path)),
+            Err(_) => {
+                MessageDialog::new()
+                    .set_level(MessageLevel::Error)
+                    .set_title("Invalid workspace")
+                    .set_description(
+                        "The selected folder is not a valid workspace path. Please choose another \
+                         folder.",
+                    )
+                    .set_buttons(MessageButtons::Ok)
+                    .show();
+            }
+        }
+    }
+}
+
+fn show_cli_help(command_name: &str, cli_help: &str) {
+    MessageDialog::new()
+        .set_level(MessageLevel::Info)
+        .set_title("Command line help")
+        .set_description(build_cli_help_message(command_name, cli_help))
+        .set_buttons(MessageButtons::Ok)
+        .show();
+}
+
+fn build_cli_help_message(command_name: &str, cli_help: &str) -> String {
+    format!("Command: {command_name}\n\n{cli_help}")
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -270,4 +383,23 @@ fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
         )
         .init();
     Ok(guard)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_cli_help_message;
+
+    #[test]
+    fn cli_help_message_embeds_generated_help() {
+        let message = build_cli_help_message("fricon", "USAGE:\n  fricon [COMMAND]");
+        assert!(message.contains("Command: fricon"));
+        assert!(message.contains("USAGE:\n  fricon [COMMAND]"));
+    }
+
+    #[test]
+    fn cli_help_message_preserves_gui_command_name() {
+        let message = build_cli_help_message("fricon-gui", "USAGE:\n  fricon-gui <PATH>");
+        assert!(message.contains("Command: fricon-gui"));
+        assert!(message.contains("USAGE:\n  fricon-gui <PATH>"));
+    }
 }

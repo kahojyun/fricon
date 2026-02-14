@@ -25,6 +25,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "chrono"] }
 specta-typescript = { workspace = true }
+rfd = { workspace = true }
 tauri = { workspace = true, features = ["tray-icon"] }
 tauri-specta = { workspace = true, features = ["derive", "typescript"] }
 tauri-plugin-opener = { workspace = true }
