@@ -187,15 +187,14 @@ enum WorkspaceSelection {
 }
 
 pub fn run_with_context(context: LaunchContext) -> Result<()> {
-    let workspace_path = resolve_workspace_path(&context)?;
-    let workspace_path = match workspace_path {
-        Some(path) => path,
-        None => match select_workspace_path(&context.launch_source)? {
-            WorkspaceSelection::Selected(path) => path,
-            WorkspaceSelection::Exit => return Ok(()),
-        },
-    };
-    run_with_canonical_workspace(workspace_path)
+    match context.interaction_mode {
+        InteractionMode::Terminal => {
+            let workspace_path = resolve_workspace_path(&context)?
+                .expect("terminal mode should always resolve to a concrete workspace path");
+            run_with_canonical_workspace(workspace_path)
+        }
+        InteractionMode::Dialog => run_with_context_dialog_mode(context),
+    }
 }
 
 pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
@@ -223,6 +222,31 @@ fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
             InteractionMode::Dialog => Ok(None),
             InteractionMode::Terminal => Err(WorkspaceLaunchError::WorkspacePathMissing.into()),
         },
+    }
+}
+
+fn run_with_context_dialog_mode(context: LaunchContext) -> Result<()> {
+    let mut next_workspace = resolve_workspace_path(&context)?;
+    loop {
+        let workspace_path = match next_workspace.take() {
+            Some(path) => path,
+            None => match select_workspace_path(&context.launch_source)? {
+                WorkspaceSelection::Selected(path) => path,
+                WorkspaceSelection::Exit => return Ok(()),
+            },
+        };
+
+        if let Err(err) = run_with_canonical_workspace(workspace_path) {
+            MessageDialog::new()
+                .set_level(MessageLevel::Error)
+                .set_title("Failed to open workspace")
+                .set_description(err.to_string())
+                .set_buttons(MessageButtons::Ok)
+                .show();
+            continue;
+        }
+
+        return Ok(());
     }
 }
 
