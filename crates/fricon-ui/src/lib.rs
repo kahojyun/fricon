@@ -186,6 +186,10 @@ enum WorkspaceSelection {
     Exit,
 }
 
+const CHOOSE_WORKSPACE_BUTTON: &str = "Choose workspace";
+const HELP_BUTTON: &str = "Help";
+const EXIT_BUTTON: &str = "Exit";
+
 pub fn run_with_context(context: LaunchContext) -> Result<()> {
     match context.interaction_mode {
         InteractionMode::Terminal => {
@@ -310,16 +314,19 @@ fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelect
     loop {
         match launch_source {
             LaunchSource::Standalone => {
-                let open_picker = MessageDialog::new()
+                let action = MessageDialog::new()
                     .set_level(MessageLevel::Warning)
                     .set_title("Workspace not found")
                     .set_description(
-                        "No valid workspace path is available.\n\nChoose 'Yes' to open a \
-                         workspace folder picker. Choose 'No' to exit.",
+                        "No valid workspace path is available.\n\nChoose a workspace folder, or \
+                         exit.",
                     )
-                    .set_buttons(MessageButtons::YesNo)
+                    .set_buttons(MessageButtons::OkCancelCustom(
+                        CHOOSE_WORKSPACE_BUTTON.to_string(),
+                        EXIT_BUTTON.to_string(),
+                    ))
                     .show();
-                if open_picker != MessageDialogResult::Yes {
+                if !dialog_is_choose_workspace(&action) {
                     return Ok(WorkspaceSelection::Exit);
                 }
             }
@@ -327,16 +334,19 @@ fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelect
                 command_name,
                 cli_help,
             } => {
-                let open_picker = MessageDialog::new()
+                let action = MessageDialog::new()
                     .set_level(MessageLevel::Warning)
                     .set_title("Workspace not found")
                     .set_description(
-                        "No valid workspace path is available.\n\nChoose 'Yes' to open a \
-                         workspace folder picker. Choose 'No' to view CLI help and exit.",
+                        "No valid workspace path is available.\n\nChoose a workspace folder, or \
+                         view command line help.",
                     )
-                    .set_buttons(MessageButtons::YesNo)
+                    .set_buttons(MessageButtons::OkCancelCustom(
+                        CHOOSE_WORKSPACE_BUTTON.to_string(),
+                        HELP_BUTTON.to_string(),
+                    ))
                     .show();
-                if open_picker != MessageDialogResult::Yes {
+                if !dialog_is_choose_workspace(&action) {
                     show_cli_help(command_name, cli_help);
                     return Ok(WorkspaceSelection::Exit);
                 }
@@ -361,6 +371,14 @@ fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelect
                     .show();
             }
         }
+    }
+}
+
+fn dialog_is_choose_workspace(result: &MessageDialogResult) -> bool {
+    match result {
+        MessageDialogResult::Ok | MessageDialogResult::Yes => true,
+        MessageDialogResult::Custom(value) => value == CHOOSE_WORKSPACE_BUTTON,
+        MessageDialogResult::No | MessageDialogResult::Cancel => false,
     }
 }
 
