@@ -595,6 +595,7 @@ pub fn main(py: Python<'_>) -> i32 {
 ///     Exit code.
 #[pyfunction]
 #[must_use]
+#[expect(clippy::print_stderr, reason = "Error messages for CLI tool")]
 pub fn main_gui(py: Python<'_>) -> i32 {
     if ignore_python_sigint(py).is_err() {
         eprintln!("Failed to reset python SIGINT handler.");

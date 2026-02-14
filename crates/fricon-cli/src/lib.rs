@@ -83,7 +83,7 @@ pub fn launch_gui_with_context(
     force_dialog: bool,
 ) -> Result<()> {
     let interaction_mode = detect_interaction_mode(force_dialog, has_tty());
-    fricon_ui::run_with_context(fricon_ui::LaunchContext {
+    fricon_ui::run_with_context(&fricon_ui::LaunchContext {
         launch_source: fricon_ui::LaunchSource::Cli {
             command_name,
             cli_help,

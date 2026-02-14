@@ -10,7 +10,7 @@ use fricon_ui::{InteractionMode, LaunchContext, LaunchSource};
 fn main() -> Result<()> {
     let _ = dotenv();
     let workspace_path = env::var("FRICON_WORKSPACE").ok().map(PathBuf::from);
-    fricon_ui::run_with_context(LaunchContext {
+    fricon_ui::run_with_context(&LaunchContext {
         launch_source: LaunchSource::Standalone,
         workspace_path,
         interaction_mode: InteractionMode::Dialog,

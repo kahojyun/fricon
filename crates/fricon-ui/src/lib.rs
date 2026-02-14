@@ -197,7 +197,7 @@ const CHOOSE_WORKSPACE_BUTTON: &str = "Choose workspace";
 const HELP_BUTTON: &str = "Help";
 const EXIT_BUTTON: &str = "Exit";
 
-pub fn run_with_context(context: LaunchContext) -> Result<()> {
+pub fn run_with_context(context: &LaunchContext) -> Result<()> {
     install_panic_hook(context.interaction_mode);
     match context.interaction_mode {
         InteractionMode::Terminal => run_with_context_terminal_mode(context),
@@ -206,7 +206,7 @@ pub fn run_with_context(context: LaunchContext) -> Result<()> {
 }
 
 pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
-    run_with_context(LaunchContext {
+    run_with_context(&LaunchContext {
         launch_source: LaunchSource::Standalone,
         workspace_path: Some(workspace_path),
         interaction_mode: InteractionMode::Dialog,
@@ -215,7 +215,7 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
 
 fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
     match &context.workspace_path {
-        Some(path) => match validate_workspace_path(path.clone()) {
+        Some(path) => match validate_workspace_path(path) {
             Ok(path) => Ok(Some(path)),
             Err(err) => match context.interaction_mode {
                 InteractionMode::Dialog => Ok(None),
@@ -229,14 +229,14 @@ fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
     }
 }
 
-fn run_with_context_terminal_mode(context: LaunchContext) -> Result<()> {
-    let workspace_path = resolve_workspace_path(&context)?
-        .ok_or_else(|| WorkspaceLaunchError::WorkspacePathMissing)?;
+fn run_with_context_terminal_mode(context: &LaunchContext) -> Result<()> {
+    let workspace_path =
+        resolve_workspace_path(context)?.ok_or(WorkspaceLaunchError::WorkspacePathMissing)?;
     run_with_canonical_workspace(workspace_path)
 }
 
-fn run_with_context_dialog_mode(context: LaunchContext) -> Result<()> {
-    let mut next_workspace = resolve_workspace_path(&context)?;
+fn run_with_context_dialog_mode(context: &LaunchContext) -> Result<()> {
+    let mut next_workspace = resolve_workspace_path(context)?;
     loop {
         let workspace_path = match next_workspace.take() {
             Some(path) => path,
@@ -337,7 +337,7 @@ fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelect
             return Ok(WorkspaceSelection::Exit);
         };
 
-        match validate_workspace_path(path) {
+        match validate_workspace_path(&path) {
             Ok(path) => return Ok(WorkspaceSelection::Selected(path)),
             Err(err) => {
                 MessageDialog::new()
@@ -351,10 +351,12 @@ fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelect
     }
 }
 
-fn validate_workspace_path(path: PathBuf) -> std::result::Result<PathBuf, WorkspaceLaunchError> {
+fn validate_workspace_path(
+    path: &std::path::Path,
+) -> std::result::Result<PathBuf, WorkspaceLaunchError> {
     let canonical =
-        fs::canonicalize(&path).map_err(|err| WorkspaceLaunchError::WorkspacePathInvalid {
-            path: Some(path.clone()),
+        fs::canonicalize(path).map_err(|err| WorkspaceLaunchError::WorkspacePathInvalid {
+            path: Some(path.to_path_buf()),
             reason: err.to_string(),
         })?;
     fricon::WorkspaceRoot::validate(canonical.clone()).map_err(|err| {
@@ -599,7 +601,7 @@ mod tests {
             WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
         drop(workspace);
 
-        let result = validate_workspace_path(workspace_path.clone());
+        let result = validate_workspace_path(&workspace_path);
         let expected =
             fs::canonicalize(workspace_path).expect("workspace path should canonicalize");
         assert_eq!(result.expect("workspace should validate"), expected);
@@ -611,7 +613,7 @@ mod tests {
         let non_workspace_dir = temp_dir.path().join("not-workspace");
         fs::create_dir_all(&non_workspace_dir).expect("directory should be created");
 
-        let result = validate_workspace_path(non_workspace_dir);
+        let result = validate_workspace_path(&non_workspace_dir);
         assert!(matches!(
             result,
             Err(WorkspaceLaunchError::WorkspacePathInvalid { .. })
