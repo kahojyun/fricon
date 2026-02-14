@@ -213,15 +213,11 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
 
 fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
     match &context.workspace_path {
-        Some(path) => match fs::canonicalize(path) {
+        Some(path) => match validate_workspace_path(path.clone()) {
             Ok(path) => Ok(Some(path)),
             Err(err) => match context.interaction_mode {
                 InteractionMode::Dialog => Ok(None),
-                InteractionMode::Terminal => Err(WorkspaceLaunchError::WorkspacePathInvalid {
-                    path: Some(path.clone()),
-                    reason: err.to_string(),
-                }
-                .into()),
+                InteractionMode::Terminal => Err(err.into()),
             },
         },
         None => match context.interaction_mode {
@@ -339,21 +335,33 @@ fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelect
             return Ok(WorkspaceSelection::Exit);
         };
 
-        match fs::canonicalize(path) {
+        match validate_workspace_path(path) {
             Ok(path) => return Ok(WorkspaceSelection::Selected(path)),
-            Err(_) => {
+            Err(err) => {
                 MessageDialog::new()
                     .set_level(MessageLevel::Error)
                     .set_title("Invalid workspace")
-                    .set_description(
-                        "The selected folder is not a valid workspace path. Please choose another \
-                         folder.",
-                    )
+                    .set_description(err.to_string())
                     .set_buttons(MessageButtons::Ok)
                     .show();
             }
         }
     }
+}
+
+fn validate_workspace_path(path: PathBuf) -> std::result::Result<PathBuf, WorkspaceLaunchError> {
+    let canonical =
+        fs::canonicalize(&path).map_err(|err| WorkspaceLaunchError::WorkspacePathInvalid {
+            path: Some(path.clone()),
+            reason: err.to_string(),
+        })?;
+    fricon::WorkspaceRoot::validate(canonical.clone()).map_err(|err| {
+        WorkspaceLaunchError::WorkspacePathInvalid {
+            path: Some(canonical.clone()),
+            reason: err.to_string(),
+        }
+    })?;
+    Ok(canonical)
 }
 
 fn dialog_is_choose_workspace(result: &MessageDialogResult) -> bool {
