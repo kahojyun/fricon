@@ -1,6 +1,9 @@
 //! Command line interface
 
-use std::path::{self, PathBuf};
+use std::{
+    io::{IsTerminal, stderr, stdout},
+    path::{self, PathBuf},
+};
 
 use anyhow::Result;
 pub use clap;
@@ -75,12 +78,18 @@ pub fn launch_gui_with_context(
     cli_help: String,
     workspace_path: Option<PathBuf>,
 ) -> Result<()> {
+    let interaction_mode = if stdout().is_terminal() || stderr().is_terminal() {
+        fricon_ui::InteractionMode::Terminal
+    } else {
+        fricon_ui::InteractionMode::Dialog
+    };
     fricon_ui::run_with_context(fricon_ui::LaunchContext {
         launch_source: fricon_ui::LaunchSource::Cli {
             command_name,
             cli_help,
         },
         workspace_path,
+        interaction_mode,
     })
 }
 

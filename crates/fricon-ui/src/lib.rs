@@ -39,10 +39,33 @@ pub enum LaunchSource {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InteractionMode {
+    Dialog,
+    Terminal,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum WorkspaceLaunchError {
+    #[error("workspace path is required")]
+    WorkspacePathMissing,
+    #[error(
+        "invalid workspace path '{}': {reason}",
+        .path
+            .as_ref()
+            .map_or_else(|| "<none>".to_string(), |p| p.display().to_string())
+    )]
+    WorkspacePathInvalid {
+        path: Option<PathBuf>,
+        reason: String,
+    },
+}
+
 #[derive(Clone, Debug)]
 pub struct LaunchContext {
     pub launch_source: LaunchSource,
     pub workspace_path: Option<PathBuf>,
+    pub interaction_mode: InteractionMode,
 }
 
 impl AppState {
@@ -164,9 +187,7 @@ enum WorkspaceSelection {
 }
 
 pub fn run_with_context(context: LaunchContext) -> Result<()> {
-    let workspace_path = context
-        .workspace_path
-        .and_then(|path| fs::canonicalize(path).ok());
+    let workspace_path = resolve_workspace_path(&context)?;
     let workspace_path = match workspace_path {
         Some(path) => path,
         None => match select_workspace_path(&context.launch_source)? {
@@ -181,7 +202,28 @@ pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
     run_with_context(LaunchContext {
         launch_source: LaunchSource::Standalone,
         workspace_path: Some(workspace_path),
+        interaction_mode: InteractionMode::Dialog,
     })
+}
+
+fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
+    match &context.workspace_path {
+        Some(path) => match fs::canonicalize(path) {
+            Ok(path) => Ok(Some(path)),
+            Err(err) => match context.interaction_mode {
+                InteractionMode::Dialog => Ok(None),
+                InteractionMode::Terminal => Err(WorkspaceLaunchError::WorkspacePathInvalid {
+                    path: Some(path.clone()),
+                    reason: err.to_string(),
+                }
+                .into()),
+            },
+        },
+        None => match context.interaction_mode {
+            InteractionMode::Dialog => Ok(None),
+            InteractionMode::Terminal => Err(WorkspaceLaunchError::WorkspacePathMissing.into()),
+        },
+    }
 }
 
 fn run_with_canonical_workspace(workspace_path: PathBuf) -> Result<()> {
@@ -387,7 +429,12 @@ fn setup_logging(workspace_path: PathBuf) -> Result<WorkerGuard> {
 
 #[cfg(test)]
 mod tests {
-    use super::build_cli_help_message;
+    use std::path::PathBuf;
+
+    use super::{
+        InteractionMode, LaunchContext, LaunchSource, build_cli_help_message,
+        resolve_workspace_path,
+    };
 
     #[test]
     fn cli_help_message_embeds_generated_help() {
@@ -401,5 +448,25 @@ mod tests {
         let message = build_cli_help_message("fricon-gui", "USAGE:\n  fricon-gui <PATH>");
         assert!(message.contains("Command: fricon-gui"));
         assert!(message.contains("USAGE:\n  fricon-gui <PATH>"));
+    }
+
+    #[test]
+    fn terminal_mode_missing_workspace_returns_error() {
+        let result = resolve_workspace_path(&LaunchContext {
+            launch_source: LaunchSource::Standalone,
+            workspace_path: None,
+            interaction_mode: InteractionMode::Terminal,
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn terminal_mode_invalid_workspace_returns_error() {
+        let result = resolve_workspace_path(&LaunchContext {
+            launch_source: LaunchSource::Standalone,
+            workspace_path: Some(PathBuf::from("/definitely/not/a/real/path")),
+            interaction_mode: InteractionMode::Terminal,
+        });
+        assert!(result.is_err());
     }
 }

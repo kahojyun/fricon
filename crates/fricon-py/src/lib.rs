@@ -573,7 +573,7 @@ pub fn main_impl<T: Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
     match cli.main() {
         Ok(()) => 0,
         Err(e) => {
-            eprintln!("Error: {e:?}");
+            eprintln!("Error: {e}");
             1
         }
     }
@@ -610,7 +610,7 @@ pub fn main_gui(py: Python<'_>) -> i32 {
     let cli_help = match fricon_cli::render_help_for_command::<fricon_cli::Gui>(&command_name) {
         Ok(help) => help,
         Err(e) => {
-            eprintln!("Error: {e:?}");
+            eprintln!("Error: {e}");
             return 1;
         }
     };
@@ -618,7 +618,7 @@ pub fn main_gui(py: Python<'_>) -> i32 {
         Ok(cli) => match cli.main_with_help(command_name, cli_help) {
             Ok(()) => 0,
             Err(e) => {
-                eprintln!("Error: {e:?}");
+                eprintln!("Error: {e}");
                 1
             }
         },
@@ -630,7 +630,7 @@ pub fn main_gui(py: Python<'_>) -> i32 {
                 match fricon_cli::launch_gui_with_context(command_name, cli_help, None) {
                     Ok(()) => 0,
                     Err(e) => {
-                        eprintln!("Error: {e:?}");
+                        eprintln!("Error: {e}");
                         1
                     }
                 }

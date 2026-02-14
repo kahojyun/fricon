@@ -5,7 +5,7 @@ use std::{env, path::PathBuf};
 
 use anyhow::Result;
 use dotenvy::dotenv;
-use fricon_ui::{LaunchContext, LaunchSource};
+use fricon_ui::{InteractionMode, LaunchContext, LaunchSource};
 
 fn main() -> Result<()> {
     let _ = dotenv();
@@ -13,5 +13,6 @@ fn main() -> Result<()> {
     fricon_ui::run_with_context(LaunchContext {
         launch_source: LaunchSource::Standalone,
         workspace_path,
+        interaction_mode: InteractionMode::Dialog,
     })
 }
