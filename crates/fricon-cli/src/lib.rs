@@ -37,6 +37,9 @@ pub enum Commands {
 pub struct Gui {
     /// Workspace path to open
     path: PathBuf,
+    /// Force dialog mode even when running in a terminal
+    #[arg(long)]
+    force_dialog: bool,
 }
 
 impl Main for Cli {
@@ -69,7 +72,7 @@ impl Gui {
     }
 
     pub fn main_with_help(self, command_name: String, cli_help: String) -> Result<()> {
-        launch_gui_with_context(command_name, cli_help, Some(self.path))
+        launch_gui_with_context(command_name, cli_help, Some(self.path), self.force_dialog)
     }
 }
 
@@ -77,8 +80,11 @@ pub fn launch_gui_with_context(
     command_name: String,
     cli_help: String,
     workspace_path: Option<PathBuf>,
+    force_dialog: bool,
 ) -> Result<()> {
-    let interaction_mode = if stdout().is_terminal() || stderr().is_terminal() {
+    let interaction_mode = if force_dialog {
+        fricon_ui::InteractionMode::Dialog
+    } else if stdout().is_terminal() || stderr().is_terminal() {
         fricon_ui::InteractionMode::Terminal
     } else {
         fricon_ui::InteractionMode::Dialog

@@ -627,7 +627,7 @@ pub fn main_gui(py: Python<'_>) -> i32 {
                 eprint!("{parse_error}");
                 2
             } else {
-                match fricon_cli::launch_gui_with_context(command_name, cli_help, None) {
+                match fricon_cli::launch_gui_with_context(command_name, cli_help, None, false) {
                     Ok(()) => 0,
                     Err(e) => {
                         eprintln!("Error: {e}");
