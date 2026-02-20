@@ -4,6 +4,13 @@ ci:
   skip:
     - uv-lock
     - cargo-fmt
+exclude: |
+  (?x)^(
+    crates/fricon-ui/icons/.*|
+    crates/fricon-ui/frontend/src/lib/bindings\.ts|
+    crates/fricon-ui/frontend/src/routeTree\.gen\.ts|
+    crates/fricon/src/database/schema\.rs
+  )$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
@@ -13,7 +20,6 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
-        exclude: crates/fricon-ui/icons/.*
   - repo: https://github.com/crate-ci/typos
     rev: 78bc6fb2c0d734235d57a2d6b9de923cc325ebdd  # frozen: v1.43.4
     hooks:
