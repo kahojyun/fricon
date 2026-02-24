@@ -68,8 +68,8 @@ impl Workspace {
     /// Returns:
     ///     A workspace client.
     #[staticmethod]
-    pub fn connect(path: PathBuf) -> Result<Self> {
-        let client = get_runtime().block_on(Client::connect(&path))?;
+    pub fn connect(py: Python<'_>, path: PathBuf) -> Result<Self> {
+        let client = py.detach(|| get_runtime().block_on(Client::connect(&path)))?;
         Ok(Self { client })
     }
 
@@ -128,12 +128,13 @@ impl DatasetManager {
     ///
     /// Raises:
     ///     RuntimeError: Dataset not found.
-    pub fn open(&self, dataset_id: &Bound<'_, PyAny>) -> Result<Dataset> {
+    pub fn open(&self, py: Python<'_>, dataset_id: &Bound<'_, PyAny>) -> Result<Dataset> {
+        let client = self.workspace.client.clone();
         if let Ok(id) = dataset_id.extract::<i32>() {
-            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_id(id))?;
+            let inner = py.detach(|| get_runtime().block_on(client.get_dataset_by_id(id)))?;
             Ok(Dataset { inner })
         } else if let Ok(uid) = dataset_id.extract::<String>() {
-            let inner = get_runtime().block_on(self.workspace.client.get_dataset_by_uid(uid))?;
+            let inner = py.detach(|| get_runtime().block_on(client.get_dataset_by_uid(uid)))?;
             Ok(Dataset { inner })
         } else {
             bail!("Invalid dataset id.")
@@ -157,8 +158,9 @@ impl DatasetManager {
     ) -> PyResult<Py<PyAny>> {
         static FROM_RECORDS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
+        let client = self.workspace.client.clone();
         let records =
-            get_runtime().block_on(self.workspace.client.list_all_datasets(limit, offset))?;
+            py.detach(|| get_runtime().block_on(client.list_all_datasets(limit, offset)))?;
         let py_records = records.into_iter().map(
             |DatasetRecord {
                  id,
@@ -280,23 +282,26 @@ impl Dataset {
     }
 
     #[pyo3(signature = (*tag))]
-    pub fn add_tags(&mut self, tag: Vec<String>) -> Result<()> {
-        get_runtime().block_on(self.inner.add_tags(tag))
+    pub fn add_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> Result<()> {
+        py.detach(|| get_runtime().block_on(self.inner.add_tags(tag)))
     }
 
     #[pyo3(signature = (*tag))]
-    pub fn remove_tags(&mut self, tag: Vec<String>) -> Result<()> {
-        get_runtime().block_on(self.inner.remove_tags(tag))
+    pub fn remove_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> Result<()> {
+        py.detach(|| get_runtime().block_on(self.inner.remove_tags(tag)))
     }
 
     #[pyo3(signature = (*, name = None, description = None, favorite = None))]
     pub fn update_metadata(
         &mut self,
+        py: Python<'_>,
         name: Option<String>,
         description: Option<String>,
         favorite: Option<bool>,
     ) -> Result<()> {
-        get_runtime().block_on(self.inner.update_metadata(name, description, favorite))
+        py.detach(|| {
+            get_runtime().block_on(self.inner.update_metadata(name, description, favorite))
+        })
     }
 
     /// Name of the dataset.
@@ -377,13 +382,13 @@ impl ServerHandle {
     /// Parameters:
     ///     timeout: Optional timeout in seconds. Defaults to 10 seconds.
     #[pyo3(signature = (timeout = None))]
-    pub fn shutdown(&mut self, _py: Python<'_>, timeout: Option<f64>) {
+    pub fn shutdown(&mut self, py: Python<'_>, timeout: Option<f64>) {
         if let Some(manager) = self.manager.take() {
             let timeout_duration = match timeout {
                 Some(secs) => Duration::from_secs_f64(secs),
                 None => Duration::from_secs(10),
             };
-            get_runtime().block_on(manager.shutdown_with_timeout(timeout_duration));
+            py.detach(|| get_runtime().block_on(manager.shutdown_with_timeout(timeout_duration)));
         }
     }
 
@@ -399,8 +404,24 @@ impl ServerHandle {
 
 impl Drop for ServerHandle {
     fn drop(&mut self) {
-        if let Some(manager) = self.manager.take() {
-            get_runtime().block_on(manager.shutdown_with_timeout(Duration::from_secs(5)));
+        let Some(manager) = self.manager.take() else {
+            return;
+        };
+        let mut manager = Some(manager);
+        let detached = Python::try_attach(|py| {
+            if let Some(manager) = manager.take() {
+                py.detach(|| {
+                    get_runtime().block_on(manager.shutdown_with_timeout(Duration::from_secs(5)));
+                });
+            }
+        })
+        .is_some();
+        if !detached {
+            if let Some(manager) = manager.take() {
+                let _shutdown_task = get_runtime().spawn(async move {
+                    manager.shutdown_with_timeout(Duration::from_secs(5)).await;
+                });
+            }
         }
     }
 }
@@ -480,14 +501,20 @@ impl DatasetWriter {
             } => {
                 let row = convert::build_row(py, values)?;
                 let schema = row.to_schema();
-                let _guard = get_runtime().enter();
-                let mut writer = client.create_dataset(name, description, tags, schema)?;
-                get_runtime().block_on(writer.write(row))?;
+                let writer = py.detach(|| -> Result<_> {
+                    let _guard = get_runtime().enter();
+                    let mut writer = client.create_dataset(name, description, tags, schema)?;
+                    get_runtime().block_on(writer.write(row))?;
+                    Ok(writer)
+                })?;
                 self.state = WriterState::Writing(writer);
             }
             WriterState::Writing(mut writer) => {
                 let row = convert::build_row(py, values)?;
-                get_runtime().block_on(writer.write(row))?;
+                writer = py.detach(|| -> Result<_> {
+                    get_runtime().block_on(writer.write(row))?;
+                    Ok(writer)
+                })?;
                 self.state = WriterState::Writing(writer);
             }
             WriterState::Finished => {
@@ -515,7 +542,7 @@ impl DatasetWriter {
     /// Finish writing to dataset.
     pub fn close(&mut self, py: Python<'_>) -> Result<()> {
         if let WriterState::Writing(writer) = mem::replace(&mut self.state, WriterState::Finished) {
-            let inner = get_runtime().block_on(writer.finish())?;
+            let inner = py.detach(|| get_runtime().block_on(writer.finish()))?;
             self.dataset = Some(Py::new(py, Dataset { inner })?);
         }
         Ok(())
@@ -667,7 +694,7 @@ pub fn main_gui(py: Python<'_>) -> i32 {
 ///       workspace
 ///     - server_handle: A handle to manage the server lifecycle
 #[pyfunction]
-pub fn serve_workspace(path: PathBuf) -> Result<(Workspace, ServerHandle)> {
+pub fn serve_workspace(py: Python<'_>, path: PathBuf) -> Result<(Workspace, ServerHandle)> {
     let runtime = get_runtime();
     let _guard = runtime.enter();
 
@@ -678,7 +705,7 @@ pub fn serve_workspace(path: PathBuf) -> Result<(Workspace, ServerHandle)> {
     let manager = fricon::AppManager::serve(root)?;
 
     // Connect to the workspace
-    let workspace = Workspace::connect(path.clone())?;
+    let workspace = Workspace::connect(py, path.clone())?;
     let server_handle = ServerHandle {
         manager: Some(manager),
     };
