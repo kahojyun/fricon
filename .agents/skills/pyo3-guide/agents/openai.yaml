@@ -1,0 +1,4 @@
+interface:
+  display_name: "PyO3 Guide"
+  short_description: "Apply current PyO3 tutorial and migration patterns"
+  default_prompt: "Use $pyo3-guide to migrate this Rust/PyO3 code to the latest PyO3 idioms and APIs."
