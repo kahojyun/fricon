@@ -416,12 +416,10 @@ impl Drop for ServerHandle {
             }
         })
         .is_some();
-        if !detached {
-            if let Some(manager) = manager.take() {
-                let _shutdown_task = get_runtime().spawn(async move {
-                    manager.shutdown_with_timeout(Duration::from_secs(5)).await;
-                });
-            }
+        if !detached && let Some(manager) = manager.take() {
+            let _shutdown_task = get_runtime().spawn(async move {
+                manager.shutdown_with_timeout(Duration::from_secs(5)).await;
+            });
         }
     }
 }
