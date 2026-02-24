@@ -50,14 +50,14 @@ pub fn extract_scalar_array(values: &Bound<'_, PyAny>) -> anyhow::Result<ScalarA
             b'f' | b'i' => {
                 // Convert to float64 array
                 let array_f64 = as_array(&np_array, Some("float64"))?;
-                let py_array = array_f64.downcast::<PyArray1<f64>>()?;
+                let py_array = array_f64.cast::<PyArray1<f64>>()?;
                 let array_readonly = py_array.readonly();
                 Ok(array_readonly.as_array().iter().copied().collect())
             }
             b'c' => {
                 // Convert to complex128 array
                 let array_complex = as_array(&np_array, Some("complex128"))?;
-                let py_array = array_complex.downcast::<PyArray1<Complex64>>()?;
+                let py_array = array_complex.cast::<PyArray1<Complex64>>()?;
                 let array_readonly = py_array.readonly();
                 Ok(array_readonly.as_array().iter().copied().collect())
             }
@@ -129,5 +129,5 @@ fn as_array<'py>(
     Ok(numpy_module(py)?
         .bind(py)
         .call_method1(intern!(py, "asarray"), (value, dtype_name))?
-        .downcast_into()?)
+        .cast_into()?)
 }
