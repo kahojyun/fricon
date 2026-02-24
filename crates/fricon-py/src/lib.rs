@@ -52,7 +52,7 @@ use pyo3::{
 use pyo3_async_runtimes::tokio::get_runtime;
 
 /// A client of fricon workspace server.
-#[pyclass(module = "fricon._core")]
+#[pyclass(module = "fricon._core", from_py_object)]
 #[derive(Clone)]
 pub struct Workspace {
     client: Client,
@@ -83,7 +83,7 @@ impl Workspace {
 }
 
 /// Manager of datasets in workspace.
-#[pyclass(module = "fricon._core")]
+#[pyclass(module = "fricon._core", from_py_object)]
 #[derive(Clone)]
 pub struct DatasetManager {
     workspace: Workspace,
@@ -207,7 +207,7 @@ impl DatasetManager {
 }
 
 /// 1-D list of values with optional x-axis values.
-#[pyclass(module = "fricon._core")]
+#[pyclass(module = "fricon._core", from_py_object)]
 #[derive(Debug, Clone)]
 pub struct Trace(DatasetScalar);
 
