@@ -99,6 +99,21 @@ impl Drop for WorkspaceLogSession {
     }
 }
 
+pub(crate) fn shutdown_workspace_file_logging() {
+    let runtime = logging_runtime();
+    let guard = {
+        let mut state = runtime
+            .file_state
+            .lock()
+            .expect("logging state should not be poisoned");
+        // Invalidate all active sessions so their subsequent drop calls are no-ops.
+        state.generation = state.generation.wrapping_add(1);
+        state.writer = None;
+        state.guard.take()
+    };
+    drop(guard);
+}
+
 pub(crate) fn init_tracing_subscriber() -> Result<()> {
     let init_lock = SUBSCRIBER_INIT_LOCK.get_or_init(|| Mutex::new(false));
     let mut initialized = init_lock
@@ -170,7 +185,10 @@ mod tests {
     use fricon::WorkspaceRoot;
     use tempfile::tempdir;
 
-    use super::{attach_workspace_file_logging, has_active_file_logging, init_tracing_subscriber};
+    use super::{
+        attach_workspace_file_logging, has_active_file_logging, init_tracing_subscriber,
+        shutdown_workspace_file_logging,
+    };
 
     fn test_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -224,5 +242,36 @@ mod tests {
         let result = attach_workspace_file_logging(&invalid_workspace);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn explicit_shutdown_invalidates_old_sessions() {
+        let _guard = test_lock()
+            .lock()
+            .expect("test lock should not be poisoned");
+        init_tracing_subscriber().expect("subscriber init should succeed");
+
+        let temp_dir = tempdir().expect("tempdir should be created");
+        let workspace_path = temp_dir.path().join("workspace");
+        let workspace =
+            WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
+        drop(workspace);
+
+        let session_1 = attach_workspace_file_logging(&workspace_path)
+            .expect("first attach logging should succeed");
+        assert!(has_active_file_logging());
+
+        shutdown_workspace_file_logging();
+        assert!(!has_active_file_logging());
+
+        let session_2 = attach_workspace_file_logging(&workspace_path)
+            .expect("second attach logging should succeed");
+        assert!(has_active_file_logging());
+
+        drop(session_1);
+        assert!(has_active_file_logging());
+
+        drop(session_2);
+        assert!(!has_active_file_logging());
     }
 }

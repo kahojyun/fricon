@@ -22,7 +22,9 @@ use tracing::info;
 
 use crate::{
     commands::{DatasetCreated, DatasetInfo, DatasetUpdated},
-    logging::{attach_workspace_file_logging, init_tracing_subscriber},
+    logging::{
+        attach_workspace_file_logging, init_tracing_subscriber, shutdown_workspace_file_logging,
+    },
 };
 
 struct AppState {
@@ -288,9 +290,10 @@ fn run_with_canonical_workspace(workspace_path: PathBuf) -> Result<()> {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    tauri_app.run(|app, event| match event {
+    let _exit_code = tauri_app.run_return(|app, event| match event {
         RunEvent::Exit => {
             app.state::<AppState>().shutdown();
+            shutdown_workspace_file_logging();
         }
         RunEvent::ExitRequested {
             code: None, api, ..
