@@ -12,20 +12,11 @@ use tracing_appender::{
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+#[derive(Default)]
 struct FileLoggingState {
     generation: u64,
     writer: Option<NonBlocking>,
     guard: Option<WorkerGuard>,
-}
-
-impl Default for FileLoggingState {
-    fn default() -> Self {
-        Self {
-            generation: 0,
-            writer: None,
-            guard: None,
-        }
-    }
 }
 
 struct LoggingRuntime {
