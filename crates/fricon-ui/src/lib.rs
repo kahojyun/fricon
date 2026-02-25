@@ -1,11 +1,12 @@
 mod commands;
+mod logging;
 mod models;
 
 use std::{
     any::Any,
-    fs, io, panic,
+    fs, panic,
     path::PathBuf,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex},
 };
 
 use anyhow::{Context as _, Result};
@@ -17,14 +18,12 @@ use tauri::{
 };
 use tauri_specta::Event;
 use tokio::signal;
-use tracing::{info, level_filters::LevelFilter};
-use tracing_appender::{
-    non_blocking::WorkerGuard,
-    rolling::{RollingFileAppender, Rotation},
-};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing::info;
 
-use crate::commands::{DatasetCreated, DatasetInfo, DatasetUpdated};
+use crate::{
+    commands::{DatasetCreated, DatasetInfo, DatasetUpdated},
+    logging::{attach_workspace_file_logging, init_tracing_subscriber},
+};
 
 struct AppState {
     manager: Mutex<Option<fricon::AppManager>>,
@@ -72,7 +71,6 @@ pub struct LaunchContext {
 impl AppState {
     fn new(workspace_path: PathBuf) -> Result<Self> {
         let _runtime_guard = async_runtime::handle().inner().enter();
-        setup_logging(workspace_path.clone())?;
         let app_manager = fricon::AppManager::serve_with_path(workspace_path)?;
         Ok(Self {
             manager: Mutex::new(Some(app_manager)),
@@ -197,6 +195,7 @@ const HELP_BUTTON: &str = "Help";
 const EXIT_BUTTON: &str = "Exit";
 
 pub fn run_with_context(context: &LaunchContext) -> Result<()> {
+    init_tracing_subscriber()?;
     install_panic_hook(context.interaction_mode);
     match context.interaction_mode {
         InteractionMode::Terminal => run_with_context_terminal_mode(context),
@@ -231,6 +230,8 @@ fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
 fn run_with_context_terminal_mode(context: &LaunchContext) -> Result<()> {
     let workspace_path =
         resolve_workspace_path(context)?.ok_or(WorkspaceLaunchError::WorkspacePathMissing)?;
+    let _log_session = attach_workspace_file_logging(&workspace_path)
+        .context("Failed to initialize workspace logging")?;
     run_with_canonical_workspace(workspace_path)
 }
 
@@ -245,7 +246,13 @@ fn run_with_context_dialog_mode(context: &LaunchContext) -> Result<()> {
             },
         };
 
-        if let Err(err) = run_with_canonical_workspace(workspace_path) {
+        let run_result = (|| -> Result<()> {
+            let _log_session = attach_workspace_file_logging(&workspace_path)
+                .context("Failed to initialize workspace logging")?;
+            run_with_canonical_workspace(workspace_path)
+        })();
+
+        if let Err(err) = run_result {
             MessageDialog::new()
                 .set_level(MessageLevel::Error)
                 .set_title("Failed to open workspace")
@@ -475,39 +482,6 @@ fn install_ctrl_c_handler(app: &mut tauri::App) {
             }
         }
     });
-}
-
-fn setup_logging(workspace_path: PathBuf) -> Result<()> {
-    static LOG_GUARD: OnceLock<Mutex<Option<WorkerGuard>>> = OnceLock::new();
-    let guard_slot = LOG_GUARD.get_or_init(|| Mutex::new(None));
-    let mut guard_slot = guard_slot
-        .lock()
-        .expect("logging guard should not be poisoned");
-    if guard_slot.is_some() {
-        return Ok(());
-    }
-
-    let log_dir = fricon::get_log_dir(workspace_path)?;
-    let rolling = RollingFileAppender::new(Rotation::DAILY, log_dir, "fricon.log");
-    let (writer, guard) = tracing_appender::non_blocking(rolling);
-    let file_layer = fmt::layer().json().with_writer(writer);
-    let stdout_layer = if cfg!(debug_assertions) {
-        Some(fmt::layer().with_writer(io::stdout))
-    } else {
-        None
-    };
-    tracing_subscriber::registry()
-        .with(file_layer)
-        .with(stdout_layer)
-        .with(
-            EnvFilter::builder()
-                .with_default_directive(LevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
-        .try_init()
-        .context("Failed to initialize logging")?;
-    *guard_slot = Some(guard);
-    Ok(())
 }
 
 fn install_panic_hook(interaction_mode: InteractionMode) {
