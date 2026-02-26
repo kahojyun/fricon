@@ -1,7 +1,7 @@
 use std::{
     io::{self, IsTerminal},
     path::Path,
-    sync::{Mutex, OnceLock},
+    sync::{LazyLock, Mutex},
 };
 
 use anyhow::{Context as _, Result};
@@ -76,13 +76,10 @@ impl LogManager {
     }
 }
 
-static LOG_MANAGER: OnceLock<Mutex<LogManager>> = OnceLock::new();
-
 fn get_manager() -> std::sync::MutexGuard<'static, LogManager> {
-    LOG_MANAGER
-        .get_or_init(Default::default)
-        .lock()
-        .expect("log manager lock poisoned")
+    static LOG_MANAGER: LazyLock<Mutex<LogManager>> = LazyLock::new(Default::default);
+
+    LOG_MANAGER.lock().expect("log manager lock poisoned")
 }
 
 pub(crate) struct WorkspaceLogSession {
