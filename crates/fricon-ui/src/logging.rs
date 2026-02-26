@@ -19,16 +19,9 @@ struct FileLoggingState {
     guard: Option<WorkerGuard>,
 }
 
+#[derive(Default)]
 struct LoggingRuntime {
     file_state: Mutex<FileLoggingState>,
-}
-
-impl Default for LoggingRuntime {
-    fn default() -> Self {
-        Self {
-            file_state: Mutex::new(FileLoggingState::default()),
-        }
-    }
 }
 
 static LOGGING_RUNTIME: OnceLock<LoggingRuntime> = OnceLock::new();
@@ -115,7 +108,7 @@ pub(crate) fn init_tracing_subscriber() -> Result<()> {
     }
 
     let file_layer = fmt::layer().json().with_writer(|| DynamicFileWriter);
-    let stdout_layer = if io::stdout().is_terminal() || io::stderr().is_terminal() {
+    let stdout_layer = if io::stdout().is_terminal() {
         Some(fmt::layer().with_writer(io::stdout))
     } else {
         None

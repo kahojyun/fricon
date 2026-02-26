@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use rfd::{FileDialog, MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
 use tauri::{
     Manager, RunEvent, WindowEvent, async_runtime,
@@ -290,7 +290,7 @@ fn run_with_canonical_workspace(workspace_path: PathBuf) -> Result<()> {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    let _exit_code = tauri_app.run_return(|app, event| match event {
+    let exit_code = tauri_app.run_return(|app, event| match event {
         RunEvent::Exit => {
             app.state::<AppState>().shutdown();
             shutdown_workspace_file_logging();
@@ -317,6 +317,10 @@ fn run_with_canonical_workspace(workspace_path: PathBuf) -> Result<()> {
         }
         _ => (),
     });
+
+    if exit_code != 0 {
+        bail!("tauri application exited with status code {exit_code}");
+    }
 
     Ok(())
 }
