@@ -40,30 +40,35 @@ fn logging_runtime() -> &'static LoggingRuntime {
     LOGGING_RUNTIME.get_or_init(LoggingRuntime::default)
 }
 
-fn disable_file_layer(invalidate_sessions: bool) {
+fn disable_file_layer_for_generation(expected_generation: Option<u64>, invalidate_sessions: bool) {
     let runtime = logging_runtime();
-    let (handle, old_guard) = {
+    let old_guard = {
         let mut state = runtime
             .file_state
             .lock()
             .expect("logging state should not be poisoned");
+        if let Some(expected_generation) = expected_generation
+            && state.generation != expected_generation
+        {
+            return;
+        }
+
         if invalidate_sessions {
             // Invalidate all active sessions so their subsequent drop calls are no-ops.
             state.generation = state.generation.wrapping_add(1);
         }
 
-        let handle = state.handle.clone();
         let old_guard = state.guard.take();
-        (handle, old_guard)
-    };
+        if let Some(handle) = state.handle.clone()
+            && let Err(err) = handle.modify(|layer| {
+                *layer = None;
+            })
+        {
+            warn!(error = %err, "failed to disable workspace file logging layer");
+        }
 
-    if let Some(handle) = handle
-        && let Err(err) = handle.modify(|layer| {
-            *layer = None;
-        })
-    {
-        warn!(error = %err, "failed to disable workspace file logging layer");
-    }
+        old_guard
+    };
 
     drop(old_guard);
 }
@@ -74,23 +79,12 @@ pub(crate) struct WorkspaceLogSession {
 
 impl Drop for WorkspaceLogSession {
     fn drop(&mut self) {
-        let runtime = logging_runtime();
-        let should_disable = {
-            let state = runtime
-                .file_state
-                .lock()
-                .expect("logging state should not be poisoned");
-            state.generation == self.generation
-        };
-
-        if should_disable {
-            disable_file_layer(false);
-        }
+        disable_file_layer_for_generation(Some(self.generation), false);
     }
 }
 
 pub(crate) fn shutdown_workspace_file_logging() {
-    disable_file_layer(true);
+    disable_file_layer_for_generation(None, true);
 }
 
 pub(crate) fn init_tracing_subscriber() -> Result<()> {
