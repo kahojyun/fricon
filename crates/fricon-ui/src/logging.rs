@@ -77,7 +77,6 @@ impl LogManager {
 }
 
 static LOG_MANAGER: OnceLock<Mutex<LogManager>> = OnceLock::new();
-static SUBSCRIBER_INIT_LOCK: OnceLock<Mutex<bool>> = OnceLock::new();
 
 fn get_manager() -> std::sync::MutexGuard<'static, LogManager> {
     LOG_MANAGER
@@ -103,14 +102,6 @@ pub(crate) fn shutdown_workspace_file_logging() {
 }
 
 pub(crate) fn init_tracing_subscriber() -> Result<()> {
-    let init_lock = SUBSCRIBER_INIT_LOCK.get_or_init(|| Mutex::new(false));
-    let mut initialized = init_lock
-        .lock()
-        .expect("logging init state should not be poisoned");
-    if *initialized {
-        return Ok(());
-    }
-
     let (file_layer, file_layer_handle) = reload::Layer::new(None);
     let stdout_layer = if io::stdout().is_terminal() {
         Some(fmt::layer().with_writer(io::stdout))
@@ -130,8 +121,6 @@ pub(crate) fn init_tracing_subscriber() -> Result<()> {
         .context("Failed to initialize logging")?;
 
     get_manager().init(file_layer_handle);
-
-    *initialized = true;
     Ok(())
 }
 
