@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{sync::broadcast, task::JoinHandle, time};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 
 use crate::{
     database::{self, DatasetStatus, Pool},
@@ -57,16 +57,18 @@ pub struct AppState {
 }
 
 impl AppState {
+    #[instrument(skip(root), fields(workspace.path = ?root.paths().root()))]
     fn new(root: WorkspaceRoot) -> Result<Arc<Self>> {
         let db_path = root.paths().database_file();
         let backup_path = root
             .paths()
             .database_backup_file(Local::now().naive_local());
+        info!(path = ?root.paths().root(), "Initializing app state");
         let database = database::connect(db_path, backup_path)?;
 
         // Clean up any datasets that were left in 'writing' state
         if let Err(e) = database::cleanup_writing_datasets(&database) {
-            error!("Failed to cleanup writing datasets: {}", e);
+            error!(error = %e, "Failed to cleanup writing datasets");
         }
 
         let shutdown_token = CancellationToken::new();
@@ -140,6 +142,7 @@ pub struct AppManager {
 }
 
 impl AppManager {
+    #[instrument(skip(root), fields(workspace.path = ?root.paths().root()))]
     pub fn serve(root: WorkspaceRoot) -> Result<Self> {
         let state = AppState::new(root)?;
         let handle = AppHandle::new(Arc::downgrade(&state));
@@ -152,6 +155,7 @@ impl AppManager {
             state.shutdown_token.clone(),
         )?;
 
+        info!(path = ?handle.paths()?.root(), "App server started");
         Ok(Self { state, handle })
     }
 
@@ -166,7 +170,7 @@ impl AppManager {
     }
 
     pub async fn shutdown_with_timeout(self, timeout: Duration) {
-        info!("Starting server shutdown with timeout: {:?}", timeout);
+        info!(timeout_ms = timeout.as_millis(), "Starting server shutdown");
 
         let result = time::timeout(timeout, async {
             self.state.shutdown_token.cancel();
@@ -181,9 +185,9 @@ impl AppManager {
             }
             Err(_) => {
                 error!(
-                    "Server shutdown timed out after {:?}. Some resources may not have been \
-                     cleaned up properly.",
-                    timeout
+                    timeout_ms = timeout.as_millis(),
+                    "Server shutdown timed out; some resources may not have been cleaned up \
+                     properly"
                 );
             }
         }

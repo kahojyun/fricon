@@ -5,6 +5,7 @@ use std::{
 };
 
 use arrow_schema::SchemaRef;
+use tracing::debug;
 
 use crate::dataset_manager::{
     Error,
@@ -35,6 +36,7 @@ impl WriteSessionGuard {
         if let Some(session) = self.session.take() {
             session.finish()?;
         }
+        debug!(dataset.id = self.id, "Write session committed");
         Ok(())
     }
 
@@ -42,6 +44,7 @@ impl WriteSessionGuard {
         if let Some(session) = self.session.take() {
             session.abort()?;
         }
+        debug!(dataset.id = self.id, "Write session aborted");
         Ok(())
     }
 }
@@ -49,6 +52,10 @@ impl WriteSessionGuard {
 impl Drop for WriteSessionGuard {
     fn drop(&mut self) {
         if let Some(session) = self.session.take() {
+            debug!(
+                dataset.id = self.id,
+                "Write session dropped without commit, aborting"
+            );
             let _ = session.abort();
         }
         self.registry.remove(self.id);
@@ -65,6 +72,7 @@ impl WriteSessionRegistry {
         if let Ok(mut m) = self.inner.write() {
             m.insert(id, session.handle());
         }
+        debug!(dataset.id = id, "Write session started");
         WriteSessionGuard {
             id,
             registry: self.clone(),

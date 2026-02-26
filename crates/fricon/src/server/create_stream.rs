@@ -8,7 +8,7 @@ use tokio_util::{
     sync::CancellationToken,
 };
 use tonic::{Status, Streaming};
-use tracing::{error, warn};
+use tracing::{error, instrument, warn};
 
 use crate::{
     dataset_manager::{CreateDatasetRequest, Error},
@@ -23,6 +23,7 @@ pub struct CreateStreamParts {
     pub reader: CreateBatchReader,
 }
 
+#[instrument(skip_all, fields(rpc.method = "dataset.create"))]
 pub async fn parse_create_stream(
     mut stream: Streaming<CreateRequest>,
     shutdown_token: CancellationToken,
@@ -32,7 +33,7 @@ pub async fn parse_create_stream(
         .await
         .ok_or_else(|| Status::invalid_argument("request stream is empty"))?
         .map_err(|e| {
-            error!("Failed to read first message: {:?}", e);
+            error!(error = %e, "Failed to read first message");
             Status::internal("failed to read first message")
         })?;
     let Some(CreateMessage::Metadata(CreateMetadata {
@@ -41,7 +42,7 @@ pub async fn parse_create_stream(
         tags,
     })) = first_message.create_message
     else {
-        error!("First message must be CreateMetadata");
+        warn!("First create stream message must be metadata");
         return Err(Status::invalid_argument(
             "first message must be CreateMetadata",
         ));
@@ -49,27 +50,27 @@ pub async fn parse_create_stream(
 
     let bytes_stream = stream.map(|request| {
         let request = request.map_err(|e| {
-            error!("Client connection error: {e:?}");
+            error!(error = %e, "Client connection error while uploading dataset");
             IoError::other(e)
         })?;
         match request.create_message {
             Some(CreateMessage::Payload(data)) => Ok(data),
             Some(CreateMessage::Metadata(_)) => {
-                error!("Unexpected CreateMetadata message after the first message");
+                warn!("Unexpected metadata message after initial create metadata");
                 Err(IoError::new(
                     ErrorKind::InvalidInput,
                     "unexpected CreateMetadata message after the first message",
                 ))
             }
             Some(CreateMessage::Abort(CreateAbort { reason })) => {
-                warn!("Client aborted the upload: {}", reason);
+                warn!(reason = %reason, "Client aborted dataset upload");
                 Err(IoError::new(
                     ErrorKind::UnexpectedEof,
                     format!("client aborted the upload: {reason}"),
                 ))
             }
             None => {
-                error!("Empty CreateRequest message");
+                warn!("Received empty CreateRequest message");
                 Err(IoError::new(
                     ErrorKind::InvalidInput,
                     "empty CreateRequest message",

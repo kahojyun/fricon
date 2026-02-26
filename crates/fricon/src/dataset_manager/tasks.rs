@@ -11,7 +11,7 @@ use arrow_array::{RecordBatch, RecordBatchReader};
 use arrow_schema::SchemaRef;
 use diesel::prelude::*;
 use tokio::sync::broadcast;
-use tracing::info;
+use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 use crate::{
@@ -116,6 +116,10 @@ impl WriteSessions for WriteSessionRegistry {
     }
 }
 
+#[instrument(
+    skip(repo, store, events, write_sessions, batches, request),
+    fields(dataset.name = %request.name, tags.count = request.tags.len())
+)]
 pub fn create_dataset_with<R, S, E, W>(
     repo: &R,
     store: &S,
@@ -133,8 +137,8 @@ where
     let uid = Uuid::new_v4();
     let dataset_path = store.create_dataset_dir(uid)?;
 
-    info!("Creating new dataset '{}' with uid: {}", request.name, uid);
     let (dataset, tags) = repo.create_dataset_record(&request, uid)?;
+    info!(dataset.id = dataset.id, %uid, name = %request.name, "Dataset record created");
 
     let event = AppEvent::DatasetCreated {
         id: dataset.id,
@@ -146,11 +150,6 @@ where
         created_at: dataset.created_at.and_utc(),
     };
     events.send_dataset_created(event);
-
-    info!(
-        "Created dataset with UUID: {} at path: {:?}",
-        uid, dataset_path
-    );
 
     let dataset_record = DatasetRecord::from_database_models(dataset, tags);
 
@@ -169,6 +168,7 @@ where
                 return Err(e);
             }
             repo.update_status(dataset_record.id, DatasetStatus::Completed)?;
+            info!(dataset.id = dataset_record.id, %uid, "Dataset write completed");
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
         Err(e) => {
@@ -180,6 +180,10 @@ where
 }
 
 /// Create a new dataset with the given request and data stream
+#[instrument(
+    skip(database, root, event_sender, write_sessions, batches, request),
+    fields(dataset.name = %request.name, tags.count = request.tags.len())
+)]
 pub fn do_create_dataset(
     database: &Pool,
     root: &WorkspaceRoot,
@@ -199,19 +203,23 @@ pub fn do_create_dataset(
 }
 
 /// Delete a dataset by ID
+#[instrument(skip(database, root), fields(dataset.id = id))]
 pub fn do_delete_dataset(database: &Pool, root: &WorkspaceRoot, id: i32) -> Result<(), Error> {
     let mut conn = database.get()?;
     let record = do_get_dataset(&mut conn, DatasetId::Id(id))?;
-    let dataset_path = root.paths().dataset_path_from_uid(record.metadata.uid);
+    let uid = record.metadata.uid;
+    let dataset_path = root.paths().dataset_path_from_uid(uid);
     database::Dataset::delete_from_db(&mut conn, id)?;
     drop(conn);
 
     dataset_fs::delete_dataset(&dataset_path)?;
+    info!(dataset.id = id, %uid, "Dataset deleted");
 
     Ok(())
 }
 
 /// Get a dataset by ID or UUID
+#[instrument(skip(conn, id), fields(dataset.id = ?id))]
 pub fn do_get_dataset(conn: &mut SqliteConnection, id: DatasetId) -> Result<DatasetRecord, Error> {
     let dataset = match id {
         DatasetId::Id(dataset_id) => database::Dataset::find_by_id(conn, dataset_id)?,
@@ -324,6 +332,7 @@ fn map_datasets_with_tags(
 }
 
 /// List datasets with filtering, sorting, and pagination options.
+#[instrument(skip(conn, query_options))]
 pub fn do_list_datasets(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
@@ -384,6 +393,7 @@ pub fn do_list_datasets(
 }
 
 /// List all known dataset tags in ascending name order.
+#[instrument(skip(conn))]
 pub fn do_list_dataset_tags(conn: &mut SqliteConnection) -> Result<Vec<String>, Error> {
     let tags = schema::tags::table
         .select(schema::tags::name)
@@ -393,6 +403,7 @@ pub fn do_list_dataset_tags(conn: &mut SqliteConnection) -> Result<Vec<String>, 
 }
 
 /// Update dataset metadata
+#[instrument(skip(conn, update), fields(dataset.id = id))]
 pub fn do_update_dataset(
     conn: &mut SqliteConnection,
     id: i32,
@@ -405,21 +416,26 @@ pub fn do_update_dataset(
         status: None,
     };
     database::Dataset::update_metadata(conn, id, &db_update)?;
+    debug!(dataset.id = id, "Dataset metadata updated");
     Ok(())
 }
 
 /// Add tags to a dataset
+#[instrument(skip(conn, tags), fields(dataset.id = id, tags.count = tags.len()))]
 pub fn do_add_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> Result<(), Error> {
     conn.immediate_transaction(|conn| {
         let created_tags = database::Tag::find_or_create_batch(conn, tags)?;
         let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
 
         database::DatasetTag::create_associations(conn, id, &tag_ids)?;
-        Ok(())
-    })
+        Ok::<(), Error>(())
+    })?;
+    debug!(dataset.id = id, ?tags, "Tags added to dataset");
+    Ok(())
 }
 
 /// Remove tags from a dataset
+#[instrument(skip(conn, tags), fields(dataset.id = id, tags.count = tags.len()))]
 pub fn do_remove_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> Result<(), Error> {
     conn.immediate_transaction(|conn| {
         let tag_ids_to_delete = schema::tags::table
@@ -428,11 +444,14 @@ pub fn do_remove_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> 
             .load::<i32>(conn)?;
 
         database::DatasetTag::remove_associations(conn, id, &tag_ids_to_delete)?;
-        Ok(())
-    })
+        Ok::<(), Error>(())
+    })?;
+    debug!(dataset.id = id, ?tags, "Tags removed from dataset");
+    Ok(())
 }
 
 /// Get a dataset reader for the specified dataset
+#[instrument(skip(database, root, write_sessions, id), fields(dataset.id = ?id))]
 pub fn do_get_dataset_reader(
     database: &Pool,
     root: &WorkspaceRoot,
