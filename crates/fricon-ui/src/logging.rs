@@ -4,7 +4,7 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Context as _, Result};
 use tracing::{level_filters::LevelFilter, warn};
 use tracing_appender::{
     non_blocking::{NonBlocking, WorkerGuard},
@@ -22,55 +22,68 @@ use tracing_subscriber::{
 type FileLayer = fmt::Layer<Registry, JsonFields, Format<Json>, NonBlocking>;
 
 #[derive(Default)]
-struct FileLoggingState {
-    generation: u64,
+struct LogManager {
     handle: Option<reload::Handle<Option<FileLayer>, Registry>>,
     guard: Option<WorkerGuard>,
+    active_generation: u64,
 }
 
-#[derive(Default)]
-struct LoggingRuntime {
-    file_state: Mutex<FileLoggingState>,
+impl LogManager {
+    fn init(&mut self, handle: reload::Handle<Option<FileLayer>, Registry>) {
+        self.handle = Some(handle);
+    }
+
+    fn attach(
+        &mut self,
+        layer: FileLayer,
+        guard: WorkerGuard,
+    ) -> Result<(u64, Option<WorkerGuard>)> {
+        let handle = self
+            .handle
+            .as_ref()
+            .context("tracing subscriber is not initialized")?;
+        handle
+            .modify(|l| *l = Some(layer))
+            .context("failed to reload workspace file logging layer")?;
+
+        self.active_generation = self.active_generation.wrapping_add(1);
+        let old_guard = self.guard.replace(guard);
+
+        Ok((self.active_generation, old_guard))
+    }
+
+    fn detach(&mut self, generation: u64) -> Option<WorkerGuard> {
+        if self.active_generation == generation {
+            if let Some(handle) = &self.handle
+                && let Err(err) = handle.modify(|l| *l = None)
+            {
+                warn!(error = %err, "failed to disable workspace file logging layer");
+            }
+            self.guard.take()
+        } else {
+            None
+        }
+    }
+
+    fn shutdown(&mut self) -> Option<WorkerGuard> {
+        if let Some(handle) = &self.handle
+            && let Err(err) = handle.modify(|l| *l = None)
+        {
+            warn!(error = %err, "failed to shutdown workspace file logging layer");
+        }
+        self.active_generation = self.active_generation.wrapping_add(1);
+        self.guard.take()
+    }
 }
 
-static LOGGING_RUNTIME: OnceLock<LoggingRuntime> = OnceLock::new();
+static LOG_MANAGER: OnceLock<Mutex<LogManager>> = OnceLock::new();
 static SUBSCRIBER_INIT_LOCK: OnceLock<Mutex<bool>> = OnceLock::new();
 
-fn logging_runtime() -> &'static LoggingRuntime {
-    LOGGING_RUNTIME.get_or_init(LoggingRuntime::default)
-}
-
-fn disable_file_layer_for_generation(expected_generation: Option<u64>, invalidate_sessions: bool) {
-    let runtime = logging_runtime();
-    let old_guard = {
-        let mut state = runtime
-            .file_state
-            .lock()
-            .expect("logging state should not be poisoned");
-        if let Some(expected_generation) = expected_generation
-            && state.generation != expected_generation
-        {
-            return;
-        }
-
-        if invalidate_sessions {
-            // Invalidate all active sessions so their subsequent drop calls are no-ops.
-            state.generation = state.generation.wrapping_add(1);
-        }
-
-        let old_guard = state.guard.take();
-        if let Some(handle) = state.handle.clone()
-            && let Err(err) = handle.modify(|layer| {
-                *layer = None;
-            })
-        {
-            warn!(error = %err, "failed to disable workspace file logging layer");
-        }
-
-        old_guard
-    };
-
-    drop(old_guard);
+fn get_manager() -> std::sync::MutexGuard<'static, LogManager> {
+    LOG_MANAGER
+        .get_or_init(Default::default)
+        .lock()
+        .expect("log manager lock poisoned")
 }
 
 pub(crate) struct WorkspaceLogSession {
@@ -79,12 +92,14 @@ pub(crate) struct WorkspaceLogSession {
 
 impl Drop for WorkspaceLogSession {
     fn drop(&mut self) {
-        disable_file_layer_for_generation(Some(self.generation), false);
+        let old_guard = get_manager().detach(self.generation);
+        drop(old_guard); // dropped outside lock to avoid blocking on flush
     }
 }
 
 pub(crate) fn shutdown_workspace_file_logging() {
-    disable_file_layer_for_generation(None, true);
+    let old_guard = get_manager().shutdown();
+    drop(old_guard);
 }
 
 pub(crate) fn init_tracing_subscriber() -> Result<()> {
@@ -114,14 +129,7 @@ pub(crate) fn init_tracing_subscriber() -> Result<()> {
         .try_init()
         .context("Failed to initialize logging")?;
 
-    {
-        let runtime = logging_runtime();
-        let mut state = runtime
-            .file_state
-            .lock()
-            .expect("logging state should not be poisoned");
-        state.handle = Some(file_layer_handle);
-    }
+    get_manager().init(file_layer_handle);
 
     *initialized = true;
     Ok(())
@@ -133,150 +141,104 @@ pub(crate) fn attach_workspace_file_logging(workspace_path: &Path) -> Result<Wor
     let (writer, guard) = tracing_appender::non_blocking(rolling);
     let file_layer = fmt::layer().json().with_writer(writer);
 
-    let runtime = logging_runtime();
-    let (generation, old_guard, handle) = {
-        let mut state = runtime
-            .file_state
-            .lock()
-            .expect("logging state should not be poisoned");
-        let Some(handle) = state.handle.clone() else {
-            bail!("tracing subscriber is not initialized");
-        };
-
-        state.generation = state.generation.wrapping_add(1);
-        let generation = state.generation;
-        let old_guard = state.guard.take();
-        state.guard = Some(guard);
-        (generation, old_guard, handle)
-    };
-
-    handle
-        .modify(|layer| {
-            *layer = Some(file_layer);
-        })
-        .context("Failed to reload workspace file logging layer")?;
-
+    let (generation, old_guard) = get_manager().attach(file_layer, guard)?;
     drop(old_guard);
 
     Ok(WorkspaceLogSession { generation })
 }
 
 #[cfg(test)]
-fn has_active_file_logging() -> bool {
-    let runtime = logging_runtime();
-    let state = runtime
-        .file_state
-        .lock()
-        .expect("logging state should not be poisoned");
-    state.guard.is_some()
-}
-
-#[cfg(test)]
 mod tests {
-    use std::sync::{Mutex, OnceLock};
+    use super::*;
 
-    use fricon::WorkspaceRoot;
-    use tempfile::tempdir;
+    // Pure unit tests for LogManager logic without touching global state
+    #[test]
+    fn test_log_manager_attach_detach() {
+        let (_layer, reload_handle) = reload::Layer::new(None);
+        let mut manager = LogManager::default();
+        manager.init(reload_handle.clone());
 
-    use super::{
-        attach_workspace_file_logging, has_active_file_logging, init_tracing_subscriber,
-        shutdown_workspace_file_logging,
-    };
+        // Attach 1
+        let (writer1, guard1) = tracing_appender::non_blocking(std::io::sink());
+        let file_layer1 = fmt::layer().json().with_writer(writer1);
+        let (gen_val, old1) = manager.attach(file_layer1, guard1).unwrap();
 
-    fn test_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
+        assert!(old1.is_none());
+        assert_eq!(gen_val, 1);
+        assert!(manager.guard.is_some());
+
+        // Ensure layer is actually loaded
+        reload_handle
+            .with_current(|l| assert!(l.is_some()))
+            .unwrap();
+
+        // Detach with wrong generation should ignore
+        let old_wrong = manager.detach(999);
+        assert!(old_wrong.is_none());
+        assert!(manager.guard.is_some());
+        reload_handle
+            .with_current(|l| assert!(l.is_some()))
+            .unwrap();
+
+        // Detach with correct generation should clear
+        let old_correct = manager.detach(gen_val);
+        assert!(old_correct.is_some());
+        assert!(manager.guard.is_none());
+        reload_handle
+            .with_current(|l| assert!(l.is_none()))
+            .unwrap();
     }
 
     #[test]
-    fn init_tracing_subscriber_is_idempotent() {
-        let _guard = test_lock()
-            .lock()
-            .expect("test lock should not be poisoned");
-        init_tracing_subscriber().expect("first init should succeed");
-        init_tracing_subscriber().expect("second init should be a no-op");
+    fn test_log_manager_attach_overlap() {
+        let (_layer, reload_handle) = reload::Layer::new(None);
+        let mut manager = LogManager::default();
+        manager.init(reload_handle.clone());
+
+        let (writer1, guard1) = tracing_appender::non_blocking(std::io::sink());
+        let layer1 = fmt::layer().json().with_writer(writer1);
+        let (gen_val1, _old1) = manager.attach(layer1, guard1).unwrap();
+
+        let (writer2, guard2) = tracing_appender::non_blocking(std::io::sink());
+        let layer2 = fmt::layer().json().with_writer(writer2);
+        let (gen_val2, old2) = manager.attach(layer2, guard2).unwrap();
+
+        // Second attach should replace first guard
+        assert!(old2.is_some());
+        assert_eq!(gen_val2, 2);
+
+        // Detaching first generation should do nothing because gen2 is active
+        let old_detach1 = manager.detach(gen_val1);
+        assert!(old_detach1.is_none());
+        assert!(manager.guard.is_some());
+
+        // Detaching second generation should clear
+        let old_detach2 = manager.detach(gen_val2);
+        assert!(old_detach2.is_some());
+        assert!(manager.guard.is_none());
+        reload_handle
+            .with_current(|l| assert!(l.is_none()))
+            .unwrap();
     }
 
     #[test]
-    fn attach_drop_and_attach_again_is_supported() {
-        let _guard = test_lock()
-            .lock()
-            .expect("test lock should not be poisoned");
-        init_tracing_subscriber().expect("subscriber init should succeed");
+    fn test_log_manager_shutdown() {
+        let (_layer, reload_handle) = reload::Layer::new(None);
+        let mut manager = LogManager::default();
+        manager.init(reload_handle.clone());
 
-        let temp_dir = tempdir().expect("tempdir should be created");
-        let workspace_path = temp_dir.path().join("workspace");
-        let workspace =
-            WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
-        drop(workspace);
+        let (writer, guard) = tracing_appender::non_blocking(std::io::sink());
+        let layer = fmt::layer().json().with_writer(writer);
+        let (gen_val, _old) = manager.attach(layer, guard).unwrap();
 
-        {
-            let session = attach_workspace_file_logging(&workspace_path)
-                .expect("attach logging should succeed");
-            assert!(has_active_file_logging());
-            drop(session);
-        }
-        assert!(!has_active_file_logging());
+        let shutdown_guard = manager.shutdown();
+        assert!(shutdown_guard.is_some());
+        assert!(manager.guard.is_none());
+        reload_handle
+            .with_current(|l| assert!(l.is_none()))
+            .unwrap();
 
-        let _session = attach_workspace_file_logging(&workspace_path)
-            .expect("reattach logging should succeed");
-        assert!(has_active_file_logging());
-    }
-
-    #[test]
-    fn dropping_stale_session_does_not_disable_latest_session() {
-        let _guard = test_lock()
-            .lock()
-            .expect("test lock should not be poisoned");
-        init_tracing_subscriber().expect("subscriber init should succeed");
-
-        let temp_dir = tempdir().expect("tempdir should be created");
-        let workspace_path = temp_dir.path().join("workspace");
-        let workspace =
-            WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
-        drop(workspace);
-
-        let session_1 = attach_workspace_file_logging(&workspace_path)
-            .expect("first attach logging should succeed");
-        let session_2 = attach_workspace_file_logging(&workspace_path)
-            .expect("second attach logging should succeed");
-        assert!(has_active_file_logging());
-
-        drop(session_1);
-        assert!(has_active_file_logging());
-
-        drop(session_2);
-        assert!(!has_active_file_logging());
-    }
-
-    #[test]
-    fn explicit_shutdown_invalidates_old_sessions() {
-        let _guard = test_lock()
-            .lock()
-            .expect("test lock should not be poisoned");
-        init_tracing_subscriber().expect("subscriber init should succeed");
-
-        let temp_dir = tempdir().expect("tempdir should be created");
-        let workspace_path = temp_dir.path().join("workspace");
-        let workspace =
-            WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
-        drop(workspace);
-
-        let session_1 = attach_workspace_file_logging(&workspace_path)
-            .expect("first attach logging should succeed");
-        assert!(has_active_file_logging());
-
-        shutdown_workspace_file_logging();
-        assert!(!has_active_file_logging());
-
-        let session_2 = attach_workspace_file_logging(&workspace_path)
-            .expect("second attach logging should succeed");
-        assert!(has_active_file_logging());
-
-        drop(session_1);
-        assert!(has_active_file_logging());
-
-        drop(session_2);
-        assert!(!has_active_file_logging());
+        // Further detach with old gen should do nothing
+        assert!(manager.detach(gen_val).is_none());
     }
 }
