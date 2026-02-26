@@ -230,17 +230,29 @@ mod tests {
     }
 
     #[test]
-    fn attach_rejects_invalid_workspace() {
+    fn dropping_stale_session_does_not_disable_latest_session() {
         let _guard = test_lock()
             .lock()
             .expect("test lock should not be poisoned");
         init_tracing_subscriber().expect("subscriber init should succeed");
 
         let temp_dir = tempdir().expect("tempdir should be created");
-        let invalid_workspace = temp_dir.path().join("invalid-workspace");
-        let result = attach_workspace_file_logging(&invalid_workspace);
+        let workspace_path = temp_dir.path().join("workspace");
+        let workspace =
+            WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
+        drop(workspace);
 
-        assert!(result.is_err());
+        let session_1 = attach_workspace_file_logging(&workspace_path)
+            .expect("first attach logging should succeed");
+        let session_2 = attach_workspace_file_logging(&workspace_path)
+            .expect("second attach logging should succeed");
+        assert!(has_active_file_logging());
+
+        drop(session_1);
+        assert!(has_active_file_logging());
+
+        drop(session_2);
+        assert!(!has_active_file_logging());
     }
 
     #[test]
