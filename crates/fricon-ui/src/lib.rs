@@ -23,7 +23,8 @@ use tracing::info;
 use crate::{
     commands::{DatasetCreated, DatasetInfo, DatasetUpdated},
     logging::{
-        attach_workspace_file_logging, init_tracing_subscriber, shutdown_workspace_file_logging,
+        WorkspaceLogSession, attach_workspace_file_logging, init_tracing_subscriber,
+        shutdown_workspace_file_logging,
     },
 };
 
@@ -232,14 +233,13 @@ fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
 fn run_with_context_terminal_mode(context: &LaunchContext) -> Result<()> {
     let workspace_path =
         resolve_workspace_path(context)?.ok_or(WorkspaceLaunchError::WorkspacePathMissing)?;
-    let _log_session = attach_workspace_file_logging(&workspace_path)
-        .context("Failed to initialize workspace logging")?;
-    run_with_canonical_workspace(workspace_path)
+    let (_log_session, app_state) = build_workspace_runtime(workspace_path)?;
+    run_with_app_state(app_state)
 }
 
 fn run_with_context_dialog_mode(context: &LaunchContext) -> Result<()> {
     let mut next_workspace = resolve_workspace_path(context)?;
-    loop {
+    let (_log_session, app_state) = loop {
         let workspace_path = match next_workspace.take() {
             Some(path) => path,
             None => match select_workspace_path(&context.launch_source)? {
@@ -248,29 +248,30 @@ fn run_with_context_dialog_mode(context: &LaunchContext) -> Result<()> {
             },
         };
 
-        let run_result = (|| -> Result<()> {
-            let _log_session = attach_workspace_file_logging(&workspace_path)
-                .context("Failed to initialize workspace logging")?;
-            run_with_canonical_workspace(workspace_path)
-        })();
-
-        if let Err(err) = run_result {
-            MessageDialog::new()
-                .set_level(MessageLevel::Error)
-                .set_title("Failed to open workspace")
-                .set_description(err.to_string())
-                .set_buttons(MessageButtons::Ok)
-                .show();
-            continue;
+        match build_workspace_runtime(workspace_path) {
+            Ok(run_inputs) => break run_inputs,
+            Err(err) => {
+                MessageDialog::new()
+                    .set_level(MessageLevel::Error)
+                    .set_title("Failed to open workspace")
+                    .set_description(format!("{err:#}"))
+                    .set_buttons(MessageButtons::Ok)
+                    .show();
+            }
         }
+    };
 
-        return Ok(());
-    }
+    run_with_app_state(app_state)
 }
 
-fn run_with_canonical_workspace(workspace_path: PathBuf) -> Result<()> {
+fn build_workspace_runtime(workspace_path: PathBuf) -> Result<(WorkspaceLogSession, AppState)> {
+    let log_session = attach_workspace_file_logging(&workspace_path)
+        .context("Failed to initialize workspace logging")?;
     let app_state = AppState::new(workspace_path).context("Failed to open workspace")?;
+    Ok((log_session, app_state))
+}
 
+fn run_with_app_state(app_state: AppState) -> Result<()> {
     #[expect(clippy::exit, reason = "Required by Tauri framework")]
     let tauri_app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
