@@ -20,6 +20,7 @@ use tauri_specta::Event;
 use tokio::signal;
 use tracing::info;
 
+pub use crate::commands::export_bindings;
 use crate::{
     commands::{DatasetCreated, DatasetInfo, DatasetUpdated},
     logging::{
@@ -197,6 +198,12 @@ const CHOOSE_WORKSPACE_BUTTON: &str = "Choose workspace";
 const HELP_BUTTON: &str = "Help";
 const EXIT_BUTTON: &str = "Exit";
 
+/// Run the application with the given launch context.
+///
+/// This function initializes the tracing subscriber, installs the panic hook,
+/// and delegates to the appropriate mode handler based on the interaction mode.
+///
+/// Called at most once during application startup.
 pub fn run_with_context(context: &LaunchContext) -> Result<()> {
     init_tracing_subscriber()?;
     install_panic_hook(context.interaction_mode);
@@ -204,14 +211,6 @@ pub fn run_with_context(context: &LaunchContext) -> Result<()> {
         InteractionMode::Terminal => run_with_context_terminal_mode(context),
         InteractionMode::Dialog => run_with_context_dialog_mode(context),
     }
-}
-
-pub fn run_with_workspace(workspace_path: PathBuf) -> Result<()> {
-    run_with_context(&LaunchContext {
-        launch_source: LaunchSource::Standalone,
-        workspace_path: Some(workspace_path),
-        interaction_mode: InteractionMode::Dialog,
-    })
 }
 
 fn resolve_workspace_path(context: &LaunchContext) -> Result<Option<PathBuf>> {
@@ -324,10 +323,6 @@ fn run_with_app_state(app_state: AppState) -> Result<()> {
     }
 
     Ok(())
-}
-
-pub fn export_bindings(path: impl AsRef<std::path::Path>) -> Result<()> {
-    commands::export_bindings(path)
 }
 
 fn select_workspace_path(launch_source: &LaunchSource) -> Result<WorkspaceSelection> {
