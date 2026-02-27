@@ -4,7 +4,7 @@ use serde::Serialize;
 
 #[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Row {
+pub(crate) struct Row {
     pub display_values: Vec<String>,
     pub value_indices: Vec<usize>,
     pub index: usize,
@@ -12,33 +12,33 @@ pub struct Row {
 
 #[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct ColumnUniqueValue {
+pub(crate) struct ColumnUniqueValue {
     pub index: usize,
     pub display_value: String,
 }
 
 #[derive(Serialize, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct TableData {
+pub(crate) struct TableData {
     pub fields: Vec<String>,
     pub rows: Vec<Row>,
     pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
 }
 
-pub struct ProcessedFilterRows {
+pub(crate) struct ProcessedFilterRows {
     pub unique_rows: Vec<Row>,
     pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
     pub column_raw_values: HashMap<String, Vec<serde_json::Value>>,
 }
 
-pub struct DataInternal {
+pub(crate) struct DataInternal {
     pub fields: Vec<String>,
     pub unique_rows: Vec<Row>,
     pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
     pub column_raw_values: HashMap<String, Vec<serde_json::Value>>,
 }
 
-pub fn format_json_value(value: &serde_json::Value) -> String {
+pub(crate) fn format_json_value(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::Null => "null".to_string(),
         serde_json::Value::String(s) => s.clone(),
@@ -46,7 +46,7 @@ pub fn format_json_value(value: &serde_json::Value) -> String {
     }
 }
 
-pub fn process_filter_rows(
+pub(crate) fn process_filter_rows(
     fields: &[String],
     json_rows: Vec<serde_json::Map<String, serde_json::Value>>,
 ) -> ProcessedFilterRows {

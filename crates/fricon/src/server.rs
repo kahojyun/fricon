@@ -20,7 +20,7 @@ use crate::{
 };
 
 #[instrument(skip(app, task_tracker, cancellation_token), fields(ipc_file = %ipc_file.display()))]
-pub fn start(
+pub(crate) fn start(
     ipc_file: PathBuf,
     app: &AppHandle,
     task_tracker: &TaskTracker,

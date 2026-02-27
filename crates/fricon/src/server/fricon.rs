@@ -5,7 +5,7 @@ use crate::{
     proto::{VersionRequest, VersionResponse, fricon_service_server::FriconService},
 };
 
-pub struct Fricon;
+pub(crate) struct Fricon;
 
 #[tonic::async_trait]
 impl FriconService for Fricon {

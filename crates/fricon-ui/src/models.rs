@@ -1,2 +1,2 @@
-pub mod chart;
-pub mod filter;
+pub(crate) mod chart;
+pub(crate) mod filter;

@@ -8,7 +8,7 @@ use tracing::{debug, warn};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum Type {
+pub(crate) enum Type {
     Line,
     Heatmap,
     Scatter,
@@ -16,7 +16,7 @@ pub enum Type {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ComplexViewOption {
+pub(crate) enum ComplexViewOption {
     Real,
     Imag,
     Mag,
@@ -25,7 +25,7 @@ pub enum ComplexViewOption {
 
 #[derive(Debug, Clone, Default, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct ChartCommonOptions {
+pub(crate) struct ChartCommonOptions {
     pub start: Option<usize>,
     pub end: Option<usize>,
     pub index_filters: Option<Vec<usize>>,
@@ -34,7 +34,7 @@ pub struct ChartCommonOptions {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct LineChartDataOptions {
+pub(crate) struct LineChartDataOptions {
     pub series: String,
     pub x_column: Option<String>,
     pub complex_views: Option<Vec<ComplexViewOption>>,
@@ -44,7 +44,7 @@ pub struct LineChartDataOptions {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct HeatmapChartDataOptions {
+pub(crate) struct HeatmapChartDataOptions {
     pub series: String,
     pub x_column: Option<String>,
     pub y_column: String,
@@ -55,7 +55,7 @@ pub struct HeatmapChartDataOptions {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(tag = "mode", rename_all = "snake_case")]
-pub enum ScatterModeOptions {
+pub(crate) enum ScatterModeOptions {
     Complex {
         series: String,
     },
@@ -77,7 +77,7 @@ pub enum ScatterModeOptions {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct ScatterChartDataOptions {
+pub(crate) struct ScatterChartDataOptions {
     pub scatter: ScatterModeOptions,
     #[serde(flatten)]
     pub common: ChartCommonOptions,
@@ -85,14 +85,14 @@ pub struct ScatterChartDataOptions {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(tag = "chartType", rename_all = "snake_case")]
-pub enum DatasetChartDataOptions {
+pub(crate) enum DatasetChartDataOptions {
     Line(LineChartDataOptions),
     Heatmap(HeatmapChartDataOptions),
     Scatter(ScatterChartDataOptions),
 }
 
 impl DatasetChartDataOptions {
-    pub fn common(&self) -> &ChartCommonOptions {
+    pub(crate) fn common(&self) -> &ChartCommonOptions {
         match self {
             Self::Line(options) => &options.common,
             Self::Heatmap(options) => &options.common,
@@ -100,7 +100,7 @@ impl DatasetChartDataOptions {
         }
     }
 
-    pub const fn chart_type_name(&self) -> &'static str {
+    pub(crate) const fn chart_type_name(&self) -> &'static str {
         match self {
             Self::Line(_) => "line",
             Self::Heatmap(_) => "heatmap",
@@ -111,14 +111,14 @@ impl DatasetChartDataOptions {
 
 #[derive(Serialize, Clone, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Series {
+pub(crate) struct Series {
     pub name: String,
     pub data: Vec<Vec<f64>>,
 }
 
 #[derive(Serialize, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct DataResponse {
+pub(crate) struct DataResponse {
     pub r#type: Type,
     pub x_name: String,
     pub y_name: Option<String>,
@@ -127,7 +127,7 @@ pub struct DataResponse {
     pub series: Vec<Series>,
 }
 
-pub fn transform_complex_values(
+pub(crate) fn transform_complex_values(
     reals: &[f64],
     imags: &[f64],
     option: ComplexViewOption,
@@ -148,7 +148,7 @@ pub fn transform_complex_values(
     }
 }
 
-pub fn complex_view_label(option: ComplexViewOption) -> &'static str {
+pub(crate) fn complex_view_label(option: ComplexViewOption) -> &'static str {
     match option {
         ComplexViewOption::Real => "real",
         ComplexViewOption::Imag => "imag",
@@ -227,7 +227,7 @@ fn convert_line_y_array(
     })
 }
 
-pub fn build_line_series(
+pub(crate) fn build_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &LineChartDataOptions,
@@ -331,7 +331,7 @@ pub fn build_line_series(
     })
 }
 
-pub fn build_heatmap_series(
+pub(crate) fn build_heatmap_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &HeatmapChartDataOptions,
@@ -551,7 +551,7 @@ fn process_scalar_heatmap(
     Ok(vec![Series { name, data }])
 }
 
-pub fn build_scatter_series(
+pub(crate) fn build_scatter_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &ScatterChartDataOptions,
