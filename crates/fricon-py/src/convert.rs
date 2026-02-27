@@ -22,7 +22,7 @@ use pyo3::{
 
 use crate::Trace;
 
-pub fn extract_float_array(values: &Bound<'_, PyAny>) -> anyhow::Result<Arc<Float64Array>> {
+pub(crate) fn extract_float_array(values: &Bound<'_, PyAny>) -> anyhow::Result<Arc<Float64Array>> {
     if let Ok(PyArrowType(data)) = values.extract() {
         let arr = make_array(data);
         let arr = arr.as_primitive_opt().ok_or_else(|| {
@@ -40,7 +40,7 @@ pub fn extract_float_array(values: &Bound<'_, PyAny>) -> anyhow::Result<Arc<Floa
     bail!("Cannot convert values with type {py_type} to float64 array.");
 }
 
-pub fn extract_scalar_array(values: &Bound<'_, PyAny>) -> anyhow::Result<ScalarArray> {
+pub(crate) fn extract_scalar_array(values: &Bound<'_, PyAny>) -> anyhow::Result<ScalarArray> {
     fn extract_with_numpy(array: &Bound<'_, PyAny>) -> PyResult<ScalarArray> {
         let np_array = as_array(array, None)?;
         let dtype = np_array.dtype();
@@ -100,7 +100,10 @@ fn extract_scalar(value: &Bound<'_, PyAny>) -> PyResult<DatasetScalar> {
     }
 }
 
-pub fn build_row(py: Python<'_>, values: IndexMap<String, Py<PyAny>>) -> PyResult<DatasetRow> {
+pub(crate) fn build_row(
+    py: Python<'_>,
+    values: IndexMap<String, Py<PyAny>>,
+) -> PyResult<DatasetRow> {
     let row = values
         .into_iter()
         .map(|(name, value)| {

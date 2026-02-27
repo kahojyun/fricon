@@ -15,16 +15,16 @@ use crate::{
     proto::{CreateAbort, CreateMetadata, CreateRequest, create_request::CreateMessage},
 };
 
-pub type BatchReader = Box<dyn RecordBatchReader + Send>;
-pub type CreateBatchReader = Box<dyn FnOnce() -> Result<BatchReader, Error> + Send>;
+pub(crate) type BatchReader = Box<dyn RecordBatchReader + Send>;
+pub(crate) type CreateBatchReader = Box<dyn FnOnce() -> Result<BatchReader, Error> + Send>;
 
-pub struct CreateStreamParts {
+pub(crate) struct CreateStreamParts {
     pub request: CreateDatasetRequest,
     pub reader: CreateBatchReader,
 }
 
 #[instrument(skip_all, fields(rpc.method = "dataset.create"))]
-pub async fn parse_create_stream(
+pub(crate) async fn parse_create_stream(
     mut stream: Streaming<CreateRequest>,
     shutdown_token: CancellationToken,
 ) -> Result<CreateStreamParts, Status> {

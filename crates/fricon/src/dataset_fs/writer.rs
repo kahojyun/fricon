@@ -15,7 +15,7 @@ use crate::dataset_fs::{Error, chunk_path};
 const MAX_BATCH_BYTE_SIZE: usize = 64 * 1024 * 1024;
 const MAX_CHUNK_BYTE_SIZE: u64 = 256 * 1024 * 1024;
 
-pub struct ChunkWriter {
+pub(crate) struct ChunkWriter {
     dir_path: PathBuf,
     schema: SchemaRef,
     next_chunk_index: usize,
@@ -23,7 +23,7 @@ pub struct ChunkWriter {
 }
 
 impl ChunkWriter {
-    pub fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
+    pub(crate) fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
         Self {
             dir_path,
             schema,
@@ -33,7 +33,7 @@ impl ChunkWriter {
     }
 
     /// Write a [`RecordBatch`], return true if current chunk file is completed.
-    pub fn write(&mut self, batch: RecordBatch) -> Result<bool, Error> {
+    pub(crate) fn write(&mut self, batch: RecordBatch) -> Result<bool, Error> {
         let writer = self.current_writer()?;
         writer.write(batch)?;
         if writer.written_size >= MAX_CHUNK_BYTE_SIZE {
@@ -44,7 +44,7 @@ impl ChunkWriter {
         }
     }
 
-    pub fn finish(mut self) -> Result<(), Error> {
+    pub(crate) fn finish(mut self) -> Result<(), Error> {
         self.finish_current_writer()
     }
 

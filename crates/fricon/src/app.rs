@@ -48,12 +48,12 @@ pub enum AppError {
 }
 
 pub struct AppState {
-    pub root: WorkspaceRoot,
-    pub database: Pool,
-    pub shutdown_token: CancellationToken,
-    pub tracker: TaskTracker,
-    pub event_sender: broadcast::Sender<AppEvent>,
-    pub write_sessions: WriteSessionRegistry,
+    pub(crate) root: WorkspaceRoot,
+    pub(crate) database: Pool,
+    pub(crate) shutdown_token: CancellationToken,
+    pub(crate) tracker: TaskTracker,
+    pub(crate) event_sender: broadcast::Sender<AppEvent>,
+    pub(crate) write_sessions: WriteSessionRegistry,
 }
 
 impl AppState {

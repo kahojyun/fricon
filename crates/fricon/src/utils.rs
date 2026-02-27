@@ -7,13 +7,13 @@ use anyhow::{Context as _, Result};
 use tracing::warn;
 
 #[derive(Debug)]
-pub struct FileLock {
+pub(crate) struct FileLock {
     _file: File,
     path: PathBuf,
 }
 
 impl FileLock {
-    pub fn new(path: impl Into<PathBuf>) -> Result<Self> {
+    pub(crate) fn new(path: impl Into<PathBuf>) -> Result<Self> {
         let path = path.into();
         let file = fs::OpenOptions::new()
             .read(true)

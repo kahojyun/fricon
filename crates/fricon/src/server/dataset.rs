@@ -103,13 +103,13 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
     }
 }
 
-pub struct Storage {
+pub(crate) struct Storage {
     manager: DatasetManager,
     shutdown_token: CancellationToken,
 }
 
 impl Storage {
-    pub fn new(manager: DatasetManager, shutdown_token: CancellationToken) -> Self {
+    pub(crate) fn new(manager: DatasetManager, shutdown_token: CancellationToken) -> Self {
         Self {
             manager,
             shutdown_token,

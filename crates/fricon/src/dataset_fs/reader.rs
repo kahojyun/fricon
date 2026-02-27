@@ -24,14 +24,14 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct ChunkReader {
+pub(crate) struct ChunkReader {
     dir_path: PathBuf,
     current_chunk: usize,
     batches: Option<ChunkedTable>,
 }
 
 impl ChunkReader {
-    pub fn new(dir_path: PathBuf, schema: Option<SchemaRef>) -> Self {
+    pub(crate) fn new(dir_path: PathBuf, schema: Option<SchemaRef>) -> Self {
         Self {
             dir_path,
             current_chunk: 0,
@@ -39,11 +39,11 @@ impl ChunkReader {
         }
     }
 
-    pub fn schema(&self) -> Option<&SchemaRef> {
+    pub(crate) fn schema(&self) -> Option<&SchemaRef> {
         self.batches.as_ref().map(ChunkedTable::schema)
     }
 
-    pub fn read_next(&mut self) -> Result<bool, Error> {
+    pub(crate) fn read_next(&mut self) -> Result<bool, Error> {
         let chunk_path = chunk_path(&self.dir_path, self.current_chunk);
         let chunk_batches = match read_ipc_file_mmap(&chunk_path) {
             Ok(batches) => batches,
@@ -61,19 +61,19 @@ impl ChunkReader {
         Ok(true)
     }
 
-    pub fn read_all(&mut self) -> Result<(), Error> {
+    pub(crate) fn read_all(&mut self) -> Result<(), Error> {
         while self.read_next()? {}
         Ok(())
     }
 
-    pub fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>
+    pub(crate) fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>
     where
         R: RangeBounds<usize> + Copy,
     {
         self.batches.iter().flat_map(move |x| x.range(range))
     }
 
-    pub fn num_rows(&self) -> usize {
+    pub(crate) fn num_rows(&self) -> usize {
         self.batches.as_ref().map_or(0, ChunkedTable::last_offset)
     }
 }

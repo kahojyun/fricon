@@ -75,6 +75,7 @@ rfd = "0.17.2"
 
 [workspace.lints.rust]
 rust-2018-idioms = "warn"
+unreachable_pub = "warn"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }

@@ -56,7 +56,7 @@ fn get_pipe_name(server_uuid: Uuid) -> String {
     format!(r"\\.\pipe\fricon-{server_uuid}")
 }
 
-pub async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectError> {
+pub(crate) async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectError> {
     let socket_path = path.as_ref();
     let server_uuid = match read_uuid_from_socket_file(socket_path) {
         Ok(uuid) => uuid,
@@ -80,7 +80,7 @@ pub async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, ConnectE
         })
 }
 
-pub fn listen(
+pub(crate) fn listen(
     path: impl Into<PathBuf>,
 ) -> io::Result<impl Stream<Item = io::Result<NamedPipeConnector>> + 'static> {
     let socket_path = path.into();
@@ -115,7 +115,7 @@ pub fn listen(
     Ok(stream)
 }
 
-pub struct SocketFile {
+struct SocketFile {
     socket_path: PathBuf,
     server_uuid: Uuid,
 }
@@ -145,7 +145,7 @@ impl Drop for SocketFile {
     }
 }
 
-pub struct NamedPipeConnector(NamedPipeServer);
+pub(crate) struct NamedPipeConnector(NamedPipeServer);
 
 impl Connected for NamedPipeConnector {
     type ConnectInfo = ();

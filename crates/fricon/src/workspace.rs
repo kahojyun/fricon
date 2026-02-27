@@ -16,7 +16,7 @@ use crate::utils::FileLock;
 const WORKSPACE_VERSION: Version = Version::new(0, 1, 0);
 
 #[derive(Debug, PartialEq)]
-pub enum VersionCheckResult {
+pub(crate) enum VersionCheckResult {
     Current,
     NeedsMigration,
 }
@@ -41,12 +41,12 @@ fn check_version(version: &Version) -> Result<VersionCheckResult> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WorkspaceMetadata {
+pub(crate) struct WorkspaceMetadata {
     pub version: Version,
 }
 
 impl WorkspaceMetadata {
-    pub fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
+    pub(crate) fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
         let path = path.as_ref();
         let mut file = NamedTempFile::new_in(path.parent().expect("Should be workspace root."))?;
         serde_json::to_writer_pretty(&mut file, self)
@@ -55,7 +55,7 @@ impl WorkspaceMetadata {
         Ok(())
     }
 
-    pub fn read_json(path: impl AsRef<Path>) -> Result<Self> {
+    pub(crate) fn read_json(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let file = File::open(path).with_context(|| {
             format!("Failed to read workspace metadata from {}", path.display())

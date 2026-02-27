@@ -13,13 +13,13 @@ use crate::{
     dataset_manager::{Error, in_progress::InProgressTable},
 };
 
-pub struct WriteSession {
+pub(super) struct WriteSession {
     writer: ChunkWriter,
     in_progress_table: Arc<Mutex<InProgressTable>>,
 }
 
 impl WriteSession {
-    pub fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
+    pub(super) fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
         let writer = ChunkWriter::new(schema.clone(), dir_path.clone());
         let in_progress_table = InProgressTable::new(schema, dir_path);
         let in_progress_table = Arc::new(Mutex::new(in_progress_table));
@@ -29,7 +29,7 @@ impl WriteSession {
         }
     }
 
-    pub fn write(&mut self, batch: RecordBatch) -> Result<(), Error> {
+    pub(super) fn write(&mut self, batch: RecordBatch) -> Result<(), Error> {
         self.in_progress_table_mut().push(batch.clone())?;
         if self.writer.write(batch)? {
             self.in_progress_table_mut().continue_read_chunks()?;
@@ -37,17 +37,17 @@ impl WriteSession {
         Ok(())
     }
 
-    pub fn handle(&self) -> WriteSessionHandle {
+    pub(super) fn handle(&self) -> WriteSessionHandle {
         WriteSessionHandle(self.in_progress_table.clone())
     }
 
-    pub fn finish(self) -> Result<(), Error> {
+    pub(super) fn finish(self) -> Result<(), Error> {
         self.in_progress_table_mut().mark_complete();
         self.writer.finish()?;
         Ok(())
     }
 
-    pub fn abort(self) -> Result<(), Error> {
+    pub(super) fn abort(self) -> Result<(), Error> {
         self.writer.finish()?;
         Ok(())
     }
@@ -61,31 +61,31 @@ impl WriteSession {
 
 /// A shareable handle to a `WriteSession`, allowing concurrent access.
 #[derive(Clone)]
-pub struct WriteSessionHandle(Arc<Mutex<InProgressTable>>);
+pub(crate) struct WriteSessionHandle(Arc<Mutex<InProgressTable>>);
 
 impl WriteSessionHandle {
-    pub fn inner(&self) -> MutexGuard<'_, InProgressTable> {
+    pub(super) fn inner(&self) -> MutexGuard<'_, InProgressTable> {
         self.0.lock().expect("Should be poisoned")
     }
 
-    pub fn is_complete(&self) -> bool {
+    pub(super) fn is_complete(&self) -> bool {
         self.0.lock().expect("Should not be poisoned").is_complete()
     }
 
-    pub fn schema(&self) -> SchemaRef {
+    pub(super) fn schema(&self) -> SchemaRef {
         self.inner().schema().clone()
     }
 
-    pub fn num_rows(&self) -> usize {
+    pub(super) fn num_rows(&self) -> usize {
         self.inner().num_rows()
     }
 
-    pub fn snapshot_status(&self) -> (usize, bool) {
+    pub(super) fn snapshot_status(&self) -> (usize, bool) {
         let inner = self.inner();
         (inner.num_rows(), inner.is_complete())
     }
 
-    pub fn snapshot_range<R>(&self, range: R) -> Vec<RecordBatch>
+    pub(super) fn snapshot_range<R>(&self, range: R) -> Vec<RecordBatch>
     where
         R: RangeBounds<usize> + Copy,
     {
@@ -93,7 +93,7 @@ impl WriteSessionHandle {
         inner.range(range).map(Cow::into_owned).collect()
     }
 
-    pub fn snapshot_range_with_schema<R>(&self, range: R) -> (SchemaRef, Vec<RecordBatch>)
+    pub(super) fn snapshot_range_with_schema<R>(&self, range: R) -> (SchemaRef, Vec<RecordBatch>)
     where
         R: RangeBounds<usize> + Copy,
     {

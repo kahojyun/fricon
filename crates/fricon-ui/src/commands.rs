@@ -106,7 +106,7 @@ impl From<UiSortDirection> for SortDirection {
 
 #[derive(Debug, Deserialize, Serialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct DatasetInfo {
+pub(crate) struct DatasetInfo {
     pub id: i32,
     pub name: String,
     pub description: String,
@@ -117,10 +117,10 @@ pub struct DatasetInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
-pub struct DatasetCreated(pub DatasetInfo);
+pub(crate) struct DatasetCreated(pub DatasetInfo);
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
-pub struct DatasetUpdated(pub DatasetInfo);
+pub(crate) struct DatasetUpdated(pub DatasetInfo);
 
 #[derive(Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -945,11 +945,11 @@ pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("Failed to export TypeScript bindings: {err}"))
 }
 
-pub fn mount_typed_events(app: &tauri::AppHandle) {
+pub(crate) fn mount_typed_events(app: &tauri::AppHandle) {
     specta_builder::<tauri::Wry>().mount_events(app);
 }
 
-pub fn invoke_handler() -> impl Fn(Invoke) -> bool {
+pub(crate) fn invoke_handler() -> impl Fn(Invoke) -> bool {
     tauri::generate_handler![
         get_workspace_info,
         list_datasets,

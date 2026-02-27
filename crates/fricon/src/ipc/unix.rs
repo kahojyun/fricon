@@ -13,14 +13,14 @@ use tracing::debug;
 
 use super::ConnectError;
 
-pub async fn connect(path: impl AsRef<Path>) -> Result<UnixStream, ConnectError> {
+pub(crate) async fn connect(path: impl AsRef<Path>) -> Result<UnixStream, ConnectError> {
     UnixStream::connect(path).await.map_err(|e| match e.kind() {
         io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused => ConnectError::NotFound(e),
         _ => ConnectError::Io(e),
     })
 }
 
-pub fn listen(path: impl Into<PathBuf>) -> io::Result<IpcListenerStream> {
+pub(crate) fn listen(path: impl Into<PathBuf>) -> io::Result<IpcListenerStream> {
     let path = path.into();
     if let Ok(metadata) = fs::metadata(&path) {
         if metadata.file_type().is_socket() {
@@ -45,7 +45,7 @@ pub fn listen(path: impl Into<PathBuf>) -> io::Result<IpcListenerStream> {
     })
 }
 
-pub struct IpcListenerStream {
+pub(crate) struct IpcListenerStream {
     path: PathBuf,
     listener: UnixListenerStream,
     inode: u64,
