@@ -59,10 +59,10 @@ impl TryFrom<&DataType> for ScalarKind {
     }
 }
 
-pub struct ComplexType;
+pub(crate) struct ComplexType;
 
 impl ComplexType {
-    pub fn fields() -> Fields {
+    pub(crate) fn fields() -> Fields {
         static FIELDS: LazyLock<Fields> = LazyLock::new(|| {
             vec![
                 Field::new("real", DataType::Float64, false),
@@ -73,11 +73,11 @@ impl ComplexType {
         FIELDS.clone()
     }
 
-    pub fn data_type() -> DataType {
+    pub(crate) fn data_type() -> DataType {
         DataType::Struct(Self::fields())
     }
 
-    pub fn field(name: impl Into<String>, nullable: bool) -> Field {
+    pub(crate) fn field(name: impl Into<String>, nullable: bool) -> Field {
         Field::new(name, Self::data_type(), nullable).with_extension_type(Self)
     }
 }

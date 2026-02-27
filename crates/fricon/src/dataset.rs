@@ -5,10 +5,10 @@ mod types;
 
 use arrow_schema::ArrowError;
 
+pub(crate) use self::table::ChunkedTable;
 pub use self::{
     arrays::{DatasetArray, ScalarArray},
     scalars::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace},
-    table::ChunkedTable,
     types::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
 };
 

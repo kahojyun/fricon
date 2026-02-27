@@ -1,4 +1,5 @@
 //! Provides cross-platform inter-process communication (IPC) functionality.
+
 #[cfg(unix)]
 mod unix;
 #[cfg(windows)]
@@ -9,12 +10,12 @@ use std::io::Error as IoError;
 use thiserror::Error;
 
 #[cfg(unix)]
-pub use self::unix::{connect, listen};
+pub(crate) use self::unix::{connect, listen};
 #[cfg(windows)]
-pub use self::win::{connect, listen};
+pub(crate) use self::win::{connect, listen};
 
 #[derive(Debug, Error)]
-pub enum ConnectError {
+pub(crate) enum ConnectError {
     #[error("Connect target not found: {0}")]
     NotFound(#[source] IoError),
     #[error("IO error: {0}")]

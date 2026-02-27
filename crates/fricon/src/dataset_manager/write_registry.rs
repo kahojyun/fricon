@@ -13,26 +13,26 @@ use crate::dataset_manager::{
 };
 
 #[derive(Clone, Default)]
-pub struct WriteSessionRegistry {
+pub(crate) struct WriteSessionRegistry {
     inner: Arc<RwLock<HashMap<i32, WriteSessionHandle>>>,
 }
 
-pub struct WriteSessionGuard {
+pub(crate) struct WriteSessionGuard {
     id: i32,
     registry: WriteSessionRegistry,
     session: Option<WriteSession>,
 }
 
 impl WriteSessionGuard {
-    pub fn session_mut(&mut self) -> &mut WriteSession {
+    pub(super) fn session_mut(&mut self) -> &mut WriteSession {
         self.session.as_mut().expect("Write session missing")
     }
 
-    pub fn write(&mut self, batch: arrow_array::RecordBatch) -> Result<(), Error> {
+    pub(super) fn write(&mut self, batch: arrow_array::RecordBatch) -> Result<(), Error> {
         self.session_mut().write(batch)
     }
 
-    pub fn commit(mut self) -> Result<(), Error> {
+    pub(super) fn commit(mut self) -> Result<(), Error> {
         if let Some(session) = self.session.take() {
             session.finish()?;
         }
@@ -40,7 +40,7 @@ impl WriteSessionGuard {
         Ok(())
     }
 
-    pub fn abort(mut self) -> Result<(), Error> {
+    pub(super) fn abort(mut self) -> Result<(), Error> {
         if let Some(session) = self.session.take() {
             session.abort()?;
         }
@@ -63,11 +63,16 @@ impl Drop for WriteSessionGuard {
 }
 
 impl WriteSessionRegistry {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
-    pub fn start_session(&self, id: i32, path: PathBuf, schema: SchemaRef) -> WriteSessionGuard {
+    pub(crate) fn start_session(
+        &self,
+        id: i32,
+        path: PathBuf,
+        schema: SchemaRef,
+    ) -> WriteSessionGuard {
         let session = WriteSession::new(schema, path);
         if let Ok(mut m) = self.inner.write() {
             m.insert(id, session.handle());
@@ -80,7 +85,7 @@ impl WriteSessionRegistry {
         }
     }
 
-    pub fn get(&self, id: i32) -> Option<WriteSessionHandle> {
+    pub(crate) fn get(&self, id: i32) -> Option<WriteSessionHandle> {
         self.inner.read().ok().and_then(|m| m.get(&id).cloned())
     }
     fn remove(&self, id: i32) {

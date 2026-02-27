@@ -27,7 +27,7 @@ use crate::{
 };
 
 #[cfg_attr(test, mockall::automock)]
-pub trait DatasetRepo {
+pub(super) trait DatasetRepo {
     fn create_dataset_record(
         &self,
         request: &CreateDatasetRequest,
@@ -59,7 +59,7 @@ impl DatasetRepo for Pool {
 }
 
 #[cfg_attr(test, mockall::automock)]
-pub trait DatasetStore {
+pub(super) trait DatasetStore {
     fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, Error>;
 }
 
@@ -72,7 +72,7 @@ impl DatasetStore for WorkspaceRoot {
 }
 
 #[cfg_attr(test, mockall::automock)]
-pub trait DatasetEvents {
+pub(super) trait DatasetEvents {
     fn send_dataset_created(&self, event: AppEvent);
 }
 
@@ -83,7 +83,7 @@ impl DatasetEvents for broadcast::Sender<AppEvent> {
 }
 
 #[cfg_attr(test, mockall::automock)]
-pub trait WriteSessionGuardOps {
+pub(super) trait WriteSessionGuardOps {
     fn write(&mut self, batch: RecordBatch) -> Result<(), Error>;
     fn commit(self) -> Result<(), Error>;
     fn abort(self) -> Result<(), Error>;
@@ -103,7 +103,7 @@ impl WriteSessionGuardOps for WriteSessionGuard {
     }
 }
 
-pub trait WriteSessions {
+pub(super) trait WriteSessions {
     type Guard: WriteSessionGuardOps;
     fn start_session(&self, id: i32, path: PathBuf, schema: SchemaRef) -> Self::Guard;
 }
@@ -120,7 +120,7 @@ impl WriteSessions for WriteSessionRegistry {
     skip(repo, store, events, write_sessions, batches, request),
     fields(dataset.name = %request.name, tags.count = request.tags.len())
 )]
-pub fn create_dataset_with<R, S, E, W>(
+fn create_dataset_with<R, S, E, W>(
     repo: &R,
     store: &S,
     events: &E,
@@ -184,7 +184,7 @@ where
     skip(database, root, event_sender, write_sessions, batches, request),
     fields(dataset.name = %request.name, tags.count = request.tags.len())
 )]
-pub fn do_create_dataset(
+pub(super) fn do_create_dataset(
     database: &Pool,
     root: &WorkspaceRoot,
     event_sender: &broadcast::Sender<AppEvent>,
@@ -204,7 +204,11 @@ pub fn do_create_dataset(
 
 /// Delete a dataset by ID
 #[instrument(skip(database, root), fields(dataset.id = id))]
-pub fn do_delete_dataset(database: &Pool, root: &WorkspaceRoot, id: i32) -> Result<(), Error> {
+pub(super) fn do_delete_dataset(
+    database: &Pool,
+    root: &WorkspaceRoot,
+    id: i32,
+) -> Result<(), Error> {
     let mut conn = database.get()?;
     let record = do_get_dataset(&mut conn, DatasetId::Id(id))?;
     let uid = record.metadata.uid;
@@ -220,7 +224,10 @@ pub fn do_delete_dataset(database: &Pool, root: &WorkspaceRoot, id: i32) -> Resu
 
 /// Get a dataset by ID or UUID
 #[instrument(skip(conn, id), fields(dataset.id = ?id))]
-pub fn do_get_dataset(conn: &mut SqliteConnection, id: DatasetId) -> Result<DatasetRecord, Error> {
+pub(super) fn do_get_dataset(
+    conn: &mut SqliteConnection,
+    id: DatasetId,
+) -> Result<DatasetRecord, Error> {
     let dataset = match id {
         DatasetId::Id(dataset_id) => database::Dataset::find_by_id(conn, dataset_id)?,
         DatasetId::Uid(uid) => database::Dataset::find_by_uid(conn, uid)?,
@@ -333,7 +340,7 @@ fn map_datasets_with_tags(
 
 /// List datasets with filtering, sorting, and pagination options.
 #[instrument(skip(conn, query_options))]
-pub fn do_list_datasets(
+pub(super) fn do_list_datasets(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
 ) -> Result<Vec<DatasetRecord>, Error> {
@@ -394,7 +401,7 @@ pub fn do_list_datasets(
 
 /// List all known dataset tags in ascending name order.
 #[instrument(skip(conn))]
-pub fn do_list_dataset_tags(conn: &mut SqliteConnection) -> Result<Vec<String>, Error> {
+pub(super) fn do_list_dataset_tags(conn: &mut SqliteConnection) -> Result<Vec<String>, Error> {
     let tags = schema::tags::table
         .select(schema::tags::name)
         .order(schema::tags::name.asc())
@@ -404,7 +411,7 @@ pub fn do_list_dataset_tags(conn: &mut SqliteConnection) -> Result<Vec<String>, 
 
 /// Update dataset metadata
 #[instrument(skip(conn, update), fields(dataset.id = id))]
-pub fn do_update_dataset(
+pub(super) fn do_update_dataset(
     conn: &mut SqliteConnection,
     id: i32,
     update: DatasetUpdate,
@@ -422,7 +429,11 @@ pub fn do_update_dataset(
 
 /// Add tags to a dataset
 #[instrument(skip(conn, tags), fields(dataset.id = id, tags.count = tags.len()))]
-pub fn do_add_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> Result<(), Error> {
+pub(super) fn do_add_tags(
+    conn: &mut SqliteConnection,
+    id: i32,
+    tags: &[String],
+) -> Result<(), Error> {
     conn.immediate_transaction(|conn| {
         let created_tags = database::Tag::find_or_create_batch(conn, tags)?;
         let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
@@ -436,7 +447,11 @@ pub fn do_add_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> Res
 
 /// Remove tags from a dataset
 #[instrument(skip(conn, tags), fields(dataset.id = id, tags.count = tags.len()))]
-pub fn do_remove_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> Result<(), Error> {
+pub(super) fn do_remove_tags(
+    conn: &mut SqliteConnection,
+    id: i32,
+    tags: &[String],
+) -> Result<(), Error> {
     conn.immediate_transaction(|conn| {
         let tag_ids_to_delete = schema::tags::table
             .filter(schema::tags::name.eq_any(tags))
@@ -452,7 +467,7 @@ pub fn do_remove_tags(conn: &mut SqliteConnection, id: i32, tags: &[String]) -> 
 
 /// Get a dataset reader for the specified dataset
 #[instrument(skip(database, root, write_sessions, id), fields(dataset.id = ?id))]
-pub fn do_get_dataset_reader(
+pub(super) fn do_get_dataset_reader(
     database: &Pool,
     root: &WorkspaceRoot,
     write_sessions: &WriteSessionRegistry,

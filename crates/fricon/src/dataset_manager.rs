@@ -33,7 +33,7 @@ use tokio::task::JoinError;
 use tracing::{error, instrument};
 use uuid::Uuid;
 
-pub use self::write_registry::WriteSessionRegistry;
+pub(crate) use self::write_registry::WriteSessionRegistry;
 use crate::{
     DatasetDataType, DatasetSchema,
     app::{AppError, AppHandle, AppState},

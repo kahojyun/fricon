@@ -1,6 +1,6 @@
 mod models;
 #[rustfmt::skip]
-pub mod schema;
+pub(crate) mod schema;
 mod types;
 
 use std::{
@@ -23,9 +23,10 @@ use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use thiserror::Error;
 use tracing::info;
 
-pub use self::{
+pub use self::types::DatasetStatus;
+pub(crate) use self::{
     models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
-    types::{DatasetStatus, SimpleUuid},
+    types::SimpleUuid,
 };
 
 #[derive(Debug, Error)]
@@ -43,10 +44,10 @@ pub enum DatabaseError {
 }
 
 #[derive(Debug, Clone)]
-pub struct Pool(r2d2::Pool<ConnectionManager<SqliteConnection>>);
+pub(crate) struct Pool(r2d2::Pool<ConnectionManager<SqliteConnection>>);
 
 impl Pool {
-    pub fn get(
+    pub(crate) fn get(
         &self,
     ) -> Result<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>, DatabaseError> {
         Ok(self.0.get()?)
@@ -75,7 +76,7 @@ impl Pool {
     }
 }
 
-pub fn connect(
+pub(crate) fn connect(
     path: impl AsRef<Path>,
     backup_path: impl Into<PathBuf>,
 ) -> Result<Pool, DatabaseError> {
@@ -123,7 +124,7 @@ fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()
 
 /// Updates all datasets with 'writing' status to 'aborted' status
 /// This should be called during service startup to handle interrupted writes
-pub fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, DatabaseError> {
+pub(crate) fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, DatabaseError> {
     use self::schema::datasets::dsl::{datasets, status};
 
     let mut conn = pool.get()?;

@@ -12,14 +12,14 @@ use crate::dataset::Error;
 /// Manage chunked batches. Able to release batches from front to a target row,
 /// while ensuring `target_row..` can be accessed.
 #[derive(Debug)]
-pub struct ChunkedTable {
+pub(crate) struct ChunkedTable {
     schema: SchemaRef,
     batches: VecDeque<RecordBatch>,
     offsets: VecDeque<usize>,
 }
 
 impl ChunkedTable {
-    pub fn new(schema: SchemaRef) -> Self {
+    pub(crate) fn new(schema: SchemaRef) -> Self {
         Self {
             schema,
             batches: VecDeque::new(),
@@ -27,19 +27,19 @@ impl ChunkedTable {
         }
     }
 
-    pub fn schema(&self) -> &SchemaRef {
+    pub(crate) fn schema(&self) -> &SchemaRef {
         &self.schema
     }
 
-    pub fn last_offset(&self) -> usize {
+    pub(crate) fn last_offset(&self) -> usize {
         *self.offsets.back().expect("At least one offset exists.")
     }
 
-    pub fn first_offset(&self) -> usize {
+    pub(crate) fn first_offset(&self) -> usize {
         *self.offsets.front().expect("At least one offset exists.")
     }
 
-    pub fn push_back(&mut self, batch: RecordBatch) -> Result<(), Error> {
+    pub(crate) fn push_back(&mut self, batch: RecordBatch) -> Result<(), Error> {
         if batch.schema() != self.schema {
             return Err(Error::SchemaMismatch);
         }
@@ -52,7 +52,7 @@ impl ChunkedTable {
     }
 
     /// Release all batches fully covered by row range `..target_row`
-    pub fn release_front(&mut self, target_row: usize) {
+    pub(crate) fn release_front(&mut self, target_row: usize) {
         let remove_count = self
             .offsets
             .binary_search(&target_row)
@@ -61,7 +61,7 @@ impl ChunkedTable {
         self.offsets.drain(..remove_count);
     }
 
-    pub fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>
+    pub(crate) fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>
     where
         R: RangeBounds<usize>,
     {
