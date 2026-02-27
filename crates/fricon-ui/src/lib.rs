@@ -17,7 +17,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tauri_specta::Event;
-use tokio::signal;
+use tokio::{signal, sync::broadcast::error::RecvError};
 use tracing::{error, warn};
 
 pub use crate::commands::export_bindings;
@@ -96,8 +96,12 @@ impl AppState {
             loop {
                 let event = match event_rx.recv().await {
                     Ok(event) => event,
-                    Err(err) => {
-                        warn!(error = %err, "App event listener stopped");
+                    Err(RecvError::Lagged(skipped)) => {
+                        warn!(skipped, "App event listener lagged behind");
+                        continue;
+                    }
+                    Err(RecvError::Closed) => {
+                        warn!("App event listener stopped (channel closed)");
                         break;
                     }
                 };
