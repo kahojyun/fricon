@@ -3,8 +3,10 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import { createViteLicensePlugin } from "rollup-license-plugin";
 
 const host = process.env.TAURI_DEV_HOST;
+const isLicenseBundle = process.env.npm_lifecycle_event === "bundle-licenses";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -16,6 +18,11 @@ export default defineConfig({
       },
     }),
     tailwindcss(),
+    isLicenseBundle
+      ? createViteLicensePlugin({
+          outputFilename: "THIRD_PARTY_NPM.json",
+        })
+      : undefined,
   ],
   resolve: {
     alias: {
