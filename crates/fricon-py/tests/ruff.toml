@@ -1,16 +1,18 @@
 extend = "../../../pyproject.toml"
+
 [lint]
 select = ["ALL"]
 ignore = [
-    # Conflict with formatter
-    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-    "COM812", # missing-trailing-comma
-    "TD",
-    "FIX",
-    "D",
-    "S101",
-    "SLF",
-    "INP",
+  # Conflict with formatter
+  # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+  "COM812",  # missing-trailing-comma
+  "TD",
+  "FIX",
+  "D",
+  "S101",
+  "SLF",
+  "INP",
 ]
+
 [lint.isort]
 required-imports = ["from __future__ import annotations"]
