@@ -48,6 +48,17 @@ pub struct Client {
     workspace_paths: WorkspacePaths,
 }
 
+fn prefer_server_error(
+    writer_error: anyhow::Error,
+    server_result: std::result::Result<Result<CreateResponse>, tokio::task::JoinError>,
+) -> anyhow::Error {
+    match server_result {
+        Ok(Err(error)) => error.context("Connection failed."),
+        Err(error) => anyhow::Error::new(error).context("Connector panicked."),
+        Ok(Ok(_)) => writer_error.context("Writer failed."),
+    }
+}
+
 impl Client {
     #[instrument(skip(path), fields(workspace.path = ?path.as_ref()))]
     pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
@@ -247,10 +258,19 @@ impl DatasetWriter {
         } = self.writer_handle.take().context("Already finished.")?;
         is_finished.store(finished, Ordering::SeqCst);
         drop(tx);
-        handle
-            .await
-            .context("Writer panicked.")?
-            .context("Writer failed.")?;
+
+        let writer_result = handle.await.context("Writer panicked.")?;
+        if let Err(writer_error) = writer_result {
+            // Ensure request stream can terminate before waiting for server result.
+            drop(self.control_tx.take());
+
+            if let Some(connection_handle) = self.connection_handle.take() {
+                let server_result = connection_handle.await;
+                return Err(prefer_server_error(writer_error, server_result));
+            }
+
+            return Err(writer_error.context("Writer failed."));
+        }
 
         if let Some(control_tx) = self.control_tx.take() {
             let _ = control_tx.send(control);
@@ -434,12 +454,13 @@ async fn check_server_version(channel: Channel) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::anyhow;
     use bytes::Bytes;
     use futures::{StreamExt, stream};
     use tokio::sync::oneshot;
 
-    use super::{StreamControl, build_request_stream};
-    use crate::proto::create_request::CreateMessage;
+    use super::{StreamControl, build_request_stream, prefer_server_error};
+    use crate::proto::{CreateResponse, create_request::CreateMessage};
 
     #[tokio::test]
     async fn build_request_stream_sends_finish_message_on_finish() {
@@ -487,5 +508,23 @@ mod tests {
         assert_eq!(messages.len(), 2);
         assert!(matches!(messages[0], CreateMessage::Metadata(_)));
         assert!(matches!(messages[1], CreateMessage::Payload(_)));
+    }
+
+    #[test]
+    fn prefer_server_error_uses_server_status_over_writer_error() {
+        let writer_error = anyhow!("broken pipe");
+        let error = prefer_server_error(writer_error, Ok(Err(anyhow!("invalid schema"))));
+        let message = format!("{error:#}");
+        assert!(message.contains("Connection failed"));
+        assert!(message.contains("invalid schema"));
+    }
+
+    #[test]
+    fn prefer_server_error_falls_back_to_writer_error_when_server_ok() {
+        let writer_error = anyhow!("broken pipe");
+        let error = prefer_server_error(writer_error, Ok(Ok(CreateResponse { dataset: None })));
+        let message = format!("{error:#}");
+        assert!(message.contains("Writer failed"));
+        assert!(message.contains("broken pipe"));
     }
 }

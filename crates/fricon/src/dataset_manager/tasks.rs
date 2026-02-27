@@ -26,6 +26,16 @@ use crate::{
     },
 };
 
+const CLIENT_ABORT_WITHOUT_FINISH_MESSAGE: &str = "stream aborted without finish message";
+
+fn is_client_abort_without_finish(error: &DatasetManagerError) -> bool {
+    matches!(
+        error,
+        DatasetManagerError::BatchStream { message }
+            if message.contains(CLIENT_ABORT_WITHOUT_FINISH_MESSAGE)
+    )
+}
+
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait DatasetRepo {
     fn create_dataset_record(
@@ -163,19 +173,22 @@ where
     });
     match write_result {
         Ok(()) => {
-            if let Err(e) = session.commit() {
+            if let Err(error) = session.commit() {
                 let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
-                let _ = e;
-                return repo.get_dataset(DatasetId::Id(dataset_record.id));
+                return Err(error);
             }
             repo.update_status(dataset_record.id, DatasetStatus::Completed)?;
             info!(dataset.id = dataset_record.id, %uid, "Dataset write completed");
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
-        Err(_e) => {
+        Err(error) => {
             let _ = session.abort();
             let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
-            repo.get_dataset(DatasetId::Id(dataset_record.id))
+            if is_client_abort_without_finish(&error) {
+                repo.get_dataset(DatasetId::Id(dataset_record.id))
+            } else {
+                Err(error)
+            }
         }
     }
 }
@@ -664,7 +677,7 @@ mod tests {
     }
 
     #[test]
-    fn create_commit_failure_returns_aborted_dataset() {
+    fn create_commit_failure_returns_error() {
         let mut seq = Sequence::new();
         let dataset_id = 1;
 
@@ -691,21 +704,6 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(|_, _| Ok(()));
-        repo.expect_get_dataset()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(move |_| {
-                let dataset = database::Dataset {
-                    id: dataset_id,
-                    uid: database::SimpleUuid(Uuid::new_v4()),
-                    name: "name".to_string(),
-                    description: "desc".to_string(),
-                    favorite: false,
-                    status: DatasetStatus::Aborted,
-                    created_at: Utc::now().naive_utc(),
-                };
-                Ok(DatasetRecord::from_database_models(dataset, vec![]))
-            });
 
         let sessions = FakeWriteSessions::new(guard);
 
@@ -718,14 +716,54 @@ mod tests {
         };
 
         let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
-        assert_eq!(
-            result.expect("aborted dataset").metadata.status,
-            DatasetStatus::Aborted
-        );
+        assert!(matches!(
+            result,
+            Err(DatasetManagerError::BatchStream { .. })
+        ));
     }
 
     #[test]
-    fn create_batch_error_returns_aborted_dataset() {
+    fn create_batch_error_returns_error() {
+        let mut seq = Sequence::new();
+        let dataset_id = 1;
+
+        let (store, mut repo, events) = setup_common_mocks(&mut seq, dataset_id);
+
+        let mut guard = MockWriteSessionGuardOps::new();
+        guard
+            .expect_abort()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|| Ok(()));
+
+        repo.expect_update_status()
+            .with(eq(dataset_id), eq(DatasetStatus::Aborted))
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Ok(()));
+
+        let sessions = FakeWriteSessions::new(guard);
+
+        let (schema, _batch) = sample_batch();
+        let batches = RecordBatchIterator::new(
+            vec![Err(ArrowError::ParseError("stream error".to_string()))],
+            schema,
+        );
+        let request = CreateDatasetRequest {
+            name: "name".to_string(),
+            description: "desc".to_string(),
+            tags: vec![],
+        };
+
+        let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
+        assert!(matches!(
+            result,
+            Err(DatasetManagerError::BatchStream { .. })
+        ));
+    }
+
+    #[test]
+    fn create_client_abort_without_finish_returns_aborted_dataset() {
         let mut seq = Sequence::new();
         let dataset_id = 1;
 
@@ -758,11 +796,14 @@ mod tests {
                 };
                 Ok(DatasetRecord::from_database_models(dataset, vec![]))
             });
+
         let sessions = FakeWriteSessions::new(guard);
 
         let (schema, _batch) = sample_batch();
         let batches = RecordBatchIterator::new(
-            vec![Err(ArrowError::ParseError("stream error".to_string()))],
+            vec![Err(ArrowError::ParseError(
+                CLIENT_ABORT_WITHOUT_FINISH_MESSAGE.to_string(),
+            ))],
             schema,
         );
         let request = CreateDatasetRequest {
