@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use arrow_array::{Array, Float64Array, RecordBatch};
 use fricon::{
-    AppManager, Client, DatasetId, DatasetRow, DatasetScalar, FixedStepTrace, ScalarArray,
-    VariableStepTrace, WorkspaceRoot,
+    AppManager, Client, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar, DatasetStatus,
+    FixedStepTrace, ScalarArray, VariableStepTrace, WorkspaceRoot,
 };
 use indexmap::IndexMap;
 use num::complex::Complex64;
@@ -163,7 +163,7 @@ fn create_test_rows() -> Vec<DatasetRow> {
 }
 
 #[tokio::test]
-async fn test_dataset_create_and_load() -> anyhow::Result<()> {
+async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Result<()> {
     // Create a temporary directory for the workspace
     let temp_dir = TempDir::new()?;
     let workspace_path = temp_dir.path();
@@ -200,6 +200,7 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
     // Verify dataset was created
     assert_eq!(dataset.name(), "test_dataset");
     assert_eq!(dataset.tags(), &["test", "integration"]);
+    assert_eq!(dataset.status(), DatasetStatus::Completed);
 
     // Load dataset using DatasetManager directly
     let dataset_manager = app_manager.handle().dataset_manager();
@@ -251,6 +252,64 @@ async fn test_dataset_create_and_load() -> anyhow::Result<()> {
         assert_eq!(numeric_float_array.value(1), 200.0);
         assert_eq!(numeric_float_array.value(2), 300.0);
     }
+
+    // Shutdown the server
+    app_manager.shutdown().await;
+    temp_dir.close()?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
+    // Create a temporary directory for the workspace
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+
+    // Initialize the workspace
+    WorkspaceRoot::create_new(workspace_path)?;
+
+    // Start the server
+    let app_manager = AppManager::serve_with_path(workspace_path)?;
+
+    // Connect the client
+    let client = Client::connect(workspace_path).await?;
+
+    // Create test data
+    let test_rows = create_test_rows();
+    let test_schema = test_rows[0].to_schema();
+
+    // Create dataset through client
+    let mut writer = client.create_dataset(
+        "aborted_dataset".to_string(),
+        "This dataset will be aborted".to_string(),
+        vec!["test".to_string(), "abort".to_string()],
+        test_schema.clone(),
+    )?;
+
+    // Write a row
+    // We recreate test_rows to avoid needing to clone it, since DatasetRow doesn't
+    // derive Clone
+    writer.write(create_test_rows().remove(0)).await?;
+
+    // Drop the writer without calling finish()
+    drop(writer);
+
+    // Give the server a moment to process the drop/abort
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Verify dataset is aborted
+    let dataset_manager = app_manager.handle().dataset_manager();
+    let datasets = dataset_manager
+        .list_datasets(DatasetListQuery {
+            search: Some("aborted_dataset".to_string()),
+            ..DatasetListQuery::default()
+        })
+        .await?;
+
+    assert_eq!(datasets.len(), 1);
+    let record = &datasets[0];
+    assert_eq!(record.metadata.status, DatasetStatus::Aborted);
 
     // Shutdown the server
     app_manager.shutdown().await;

@@ -1,7 +1,10 @@
 use std::{
-    fs,
+    fs, io,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use anyhow::{Context, Result, bail, ensure};
@@ -14,8 +17,8 @@ use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use semver::Version;
 use tokio::{
-    io,
-    sync::mpsc,
+    io::duplex,
+    sync::{mpsc, oneshot},
     task::{JoinHandle, spawn_blocking},
 };
 use tokio_util::io::{ReaderStream, SyncIoBridge};
@@ -31,7 +34,7 @@ use crate::{
     dataset_manager::DatasetRecord,
     ipc,
     proto::{
-        self, AddTagsRequest, CreateMetadata, CreateRequest, CreateResponse, GetRequest,
+        AddTagsRequest, CreateFinish, CreateMetadata, CreateRequest, CreateResponse, GetRequest,
         RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
@@ -123,6 +126,7 @@ impl Client {
 struct WriterHandle {
     tx: mpsc::Sender<RecordBatch>,
     handle: JoinHandle<Result<()>>,
+    is_finished: Arc<AtomicBool>,
 }
 
 pub struct DatasetWriter {
@@ -131,6 +135,7 @@ pub struct DatasetWriter {
     writer_handle: Option<WriterHandle>,
     connection_handle: JoinHandle<Result<CreateResponse>>,
     client: Client,
+    finish_tx: Option<oneshot::Sender<()>>,
 }
 
 impl DatasetWriter {
@@ -142,25 +147,30 @@ impl DatasetWriter {
         schema: DatasetSchema,
     ) -> Self {
         let (tx, mut rx) = mpsc::channel::<RecordBatch>(16);
-        let (dtx, drx) = io::duplex(1024 * 1024);
+        let (dtx, drx) = duplex(1024 * 1024);
+        let (finish_tx, finish_rx) = oneshot::channel();
+        let is_finished = Arc::new(AtomicBool::new(false));
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
         let writer_handle = spawn_blocking({
             let arrow_schema = arrow_schema.clone();
+            let is_finished = is_finished.clone();
             move || {
                 let dtx = SyncIoBridge::new(dtx);
                 let mut writer = StreamWriter::try_new(dtx, &arrow_schema)?;
                 while let Some(batch) = rx.blocking_recv() {
                     writer.write(&batch)?;
                 }
-                writer.finish()?;
+                if is_finished.load(Ordering::SeqCst) {
+                    writer.finish()?;
+                }
                 Ok(())
             }
         });
         let connection_handle = tokio::spawn({
             let client = client.clone();
             let request_stream =
-                build_request_stream(name, description, tags, ReaderStream::new(drx));
+                build_request_stream(name, description, tags, ReaderStream::new(drx), finish_rx);
             async move {
                 let request = Request::new(request_stream);
                 let response = client.dataset_service().create(request).await?;
@@ -173,9 +183,11 @@ impl DatasetWriter {
             writer_handle: Some(WriterHandle {
                 tx,
                 handle: writer_handle,
+                is_finished: is_finished.clone(),
             }),
             connection_handle,
             client,
+            finish_tx: Some(finish_tx),
         }
     }
 
@@ -213,12 +225,23 @@ impl DatasetWriter {
 
     #[instrument(skip(self))]
     pub async fn finish(mut self) -> Result<Dataset> {
-        let WriterHandle { tx, handle } = self.writer_handle.take().context("Already finished.")?;
+        let WriterHandle {
+            tx,
+            handle,
+            is_finished,
+        } = self.writer_handle.take().context("Already finished.")?;
+        is_finished.store(true, Ordering::SeqCst);
         drop(tx);
         handle
             .await
             .context("Writer panicked.")?
             .context("Writer failed.")?;
+
+        // Send finish signal
+        if let Some(finish_tx) = self.finish_tx.take() {
+            let _ = finish_tx.send(());
+        }
+
         let dataset = self
             .connection_handle
             .await
@@ -247,23 +270,36 @@ fn build_request_stream(
     description: String,
     tags: Vec<String>,
     bytes_stream: impl Stream<Item = io::Result<Bytes>>,
+    finish_rx: oneshot::Receiver<()>,
 ) -> impl Stream<Item = CreateRequest> {
     let first_message = CreateMessage::Metadata(CreateMetadata {
         name,
         description,
         tags,
     });
-    let payload_stream = bytes_stream.map(|chunk| match chunk {
-        Ok(chunk) => CreateMessage::Payload(chunk),
-        Err(e) => {
-            error!(error = %e, "Dataset payload reader failed");
-            CreateMessage::Abort(proto::CreateAbort {
-                reason: format!("Reader failed: {e:?}"),
-            })
+    let payload_stream = bytes_stream.filter_map(|chunk| async {
+        match chunk {
+            Ok(chunk) => Some(CreateMessage::Payload(chunk)),
+            Err(e) => {
+                error!(error = %e, "Dataset payload reader failed");
+                None // Drop error chunks, the stream will end early and server will treat it as abort
+            }
         }
     });
     stream::once(async move { first_message })
         .chain(payload_stream)
+        .chain(
+            stream::once(async move {
+                // Wait for finish signal, if it errors (dropped), the stream will end without
+                // CreateFinish
+                if finish_rx.await.is_ok() {
+                    Some(CreateMessage::Finish(CreateFinish {}))
+                } else {
+                    None
+                }
+            })
+            .filter_map(|msg| async move { msg }),
+        )
         .map(|msg| CreateRequest {
             create_message: Some(msg),
         })

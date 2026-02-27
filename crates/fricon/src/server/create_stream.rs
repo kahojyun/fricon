@@ -12,7 +12,7 @@ use tracing::{error, instrument, warn};
 
 use crate::{
     dataset_manager::{CreateDatasetRequest, DatasetManagerError},
-    proto::{CreateAbort, CreateMetadata, CreateRequest, create_request::CreateMessage},
+    proto::{CreateMetadata, CreateRequest, create_request::CreateMessage},
 };
 
 pub(crate) type BatchReader = Box<dyn RecordBatchReader + Send>;
@@ -49,52 +49,72 @@ pub(crate) async fn parse_create_stream(
         ));
     };
 
-    let bytes_stream = stream.map(|request| {
-        let request = request.map_err(|e| {
-            error!(error = %e, "Client connection error while uploading dataset");
-            IoError::other(e)
-        })?;
-        match request.create_message {
-            Some(CreateMessage::Payload(data)) => Ok(data),
-            Some(CreateMessage::Metadata(_)) => {
-                warn!("Unexpected metadata message after initial create metadata");
-                Err(IoError::new(
-                    ErrorKind::InvalidInput,
-                    "unexpected CreateMetadata message after the first message",
-                ))
-            }
-            Some(CreateMessage::Abort(CreateAbort { reason })) => {
-                warn!(reason = %reason, "Client aborted dataset upload");
-                Err(IoError::new(
-                    ErrorKind::UnexpectedEof,
-                    format!("client aborted the upload: {reason}"),
-                ))
-            }
-            None => {
-                warn!("Received empty CreateRequest message");
-                Err(IoError::new(
-                    ErrorKind::InvalidInput,
-                    "empty CreateRequest message",
-                ))
-            }
-        }
-    });
-
     let abortable_stream = stream::unfold(
-        (bytes_stream, shutdown_token, false),
-        |(mut stream, token, cancelled)| async move {
-            if cancelled {
+        (stream, shutdown_token, false),
+        |(mut stream, token, done)| async move {
+            if done {
                 return None;
             }
 
             tokio::select! {
                 item = stream.next() => {
-                    item.map(|item| (item, (stream, token, false)))
+                    match item {
+                        Some(Ok(request)) => {
+                            match request.create_message {
+                                Some(CreateMessage::Payload(data)) => {
+                                    Some((Ok(data), (stream, token, false)))
+                                }
+                                Some(CreateMessage::Metadata(_)) => {
+                                    warn!("Unexpected metadata message after initial create metadata");
+                                    Some((
+                                        Err(IoError::new(
+                                            ErrorKind::InvalidInput,
+                                            "unexpected CreateMetadata message after the first message",
+                                        )),
+                                        (stream, token, true),
+                                    ))
+                                }
+                                Some(CreateMessage::Finish(_)) => {
+                                    // Normal EOF
+                                    None
+                                }
+                                None => {
+                                    warn!("Received empty CreateRequest message");
+                                    Some((
+                                        Err(IoError::new(
+                                            ErrorKind::InvalidInput,
+                                            "empty CreateRequest message",
+                                        )),
+                                        (stream, token, true),
+                                    ))
+                                }
+                            }
+                        }
+                        Some(Err(e)) => {
+                            error!(error = %e, "Client connection error while uploading dataset");
+                            Some((
+                                Err(IoError::other(e)),
+                                (stream, token, true),
+                            ))
+                        }
+                        None => {
+                            // Reached the end of stream without a Finish message.
+                            warn!("Stream closed without finish message");
+                            Some((
+                                Err(IoError::new(
+                                    ErrorKind::ConnectionAborted,
+                                    "stream aborted without finish message",
+                                )),
+                                (stream, token, true),
+                            ))
+                        }
+                    }
                 }
                 () = token.cancelled() => {
                     Some((
                         Err(IoError::other(
-                            "Stream aborted because server is shutting down.")),
+                            "Stream aborted because server is shutting down.",
+                        )),
                         (stream, token, true),
                     ))
                 }
