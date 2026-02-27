@@ -11,7 +11,7 @@ import {
   type DatasetInfoUpdate,
   type DatasetListOptions as WireDatasetListOptions,
   type DatasetWriteStatus,
-  type Error as WireError,
+  type CommandError as WireError,
   type FilterTableOptions,
   type Row as FilterTableRow,
   type TableData as WireFilterTableData,

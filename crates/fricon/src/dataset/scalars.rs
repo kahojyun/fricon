@@ -8,7 +8,7 @@ use num::complex::Complex64;
 use crate::{
     DatasetSchema,
     dataset::{
-        Error,
+        DatasetError,
         arrays::ScalarArray,
         types::{DatasetDataType, ScalarKind, TraceKind},
     },
@@ -51,11 +51,11 @@ pub struct VariableStepTrace {
 }
 
 impl VariableStepTrace {
-    pub fn new(x: Arc<Float64Array>, y: ScalarArray) -> Result<Self, Error> {
+    pub fn new(x: Arc<Float64Array>, y: ScalarArray) -> Result<Self, DatasetError> {
         if x.len() == y.len() {
             Ok(Self { x, y })
         } else {
-            Err(Error::TraceLengthMismatch)
+            Err(DatasetError::TraceLengthMismatch)
         }
     }
     #[must_use]

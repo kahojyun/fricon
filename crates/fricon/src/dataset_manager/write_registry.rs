@@ -8,7 +8,7 @@ use arrow_schema::SchemaRef;
 use tracing::debug;
 
 use crate::dataset_manager::{
-    Error,
+    DatasetManagerError,
     write_session::{WriteSession, WriteSessionHandle},
 };
 
@@ -28,11 +28,14 @@ impl WriteSessionGuard {
         self.session.as_mut().expect("Write session missing")
     }
 
-    pub(super) fn write(&mut self, batch: arrow_array::RecordBatch) -> Result<(), Error> {
+    pub(super) fn write(
+        &mut self,
+        batch: arrow_array::RecordBatch,
+    ) -> Result<(), DatasetManagerError> {
         self.session_mut().write(batch)
     }
 
-    pub(super) fn commit(mut self) -> Result<(), Error> {
+    pub(super) fn commit(mut self) -> Result<(), DatasetManagerError> {
         if let Some(session) = self.session.take() {
             session.finish()?;
         }
@@ -40,7 +43,7 @@ impl WriteSessionGuard {
         Ok(())
     }
 
-    pub(super) fn abort(mut self) -> Result<(), Error> {
+    pub(super) fn abort(mut self) -> Result<(), DatasetManagerError> {
         if let Some(session) = self.session.take() {
             session.abort()?;
         }

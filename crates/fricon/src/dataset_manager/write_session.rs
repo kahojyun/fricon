@@ -10,7 +10,7 @@ use arrow_schema::SchemaRef;
 
 use crate::{
     dataset_fs::ChunkWriter,
-    dataset_manager::{Error, in_progress::InProgressTable},
+    dataset_manager::{DatasetManagerError, in_progress::InProgressTable},
 };
 
 pub(super) struct WriteSession {
@@ -29,7 +29,7 @@ impl WriteSession {
         }
     }
 
-    pub(super) fn write(&mut self, batch: RecordBatch) -> Result<(), Error> {
+    pub(super) fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError> {
         self.in_progress_table_mut().push(batch.clone())?;
         if self.writer.write(batch)? {
             self.in_progress_table_mut().continue_read_chunks()?;
@@ -41,13 +41,13 @@ impl WriteSession {
         WriteSessionHandle(self.in_progress_table.clone())
     }
 
-    pub(super) fn finish(self) -> Result<(), Error> {
+    pub(super) fn finish(self) -> Result<(), DatasetManagerError> {
         self.in_progress_table_mut().mark_complete();
         self.writer.finish()?;
         Ok(())
     }
 
-    pub(super) fn abort(self) -> Result<(), Error> {
+    pub(super) fn abort(self) -> Result<(), DatasetManagerError> {
         self.writer.finish()?;
         Ok(())
     }

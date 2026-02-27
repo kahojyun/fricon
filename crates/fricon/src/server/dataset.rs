@@ -8,8 +8,8 @@ use super::create_stream;
 use crate::{
     database::DatasetStatus,
     dataset_manager::{
-        DatasetId, DatasetListQuery, DatasetManager, DatasetMetadata, DatasetRecord, DatasetUpdate,
-        Error,
+        DatasetId, DatasetListQuery, DatasetManager, DatasetManagerError, DatasetMetadata,
+        DatasetRecord, DatasetUpdate,
     },
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
@@ -188,7 +188,7 @@ impl DatasetService for Storage {
         let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
             error!(error = %e, "Failed to get dataset");
             match e {
-                Error::NotFound { .. } => Status::not_found("dataset not found"),
+                DatasetManagerError::NotFound { .. } => Status::not_found("dataset not found"),
                 _ => Status::internal(e.to_string()),
             }
         })?;
