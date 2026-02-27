@@ -18,12 +18,12 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-      - id: check-toml
       - id: check-added-large-files
   - repo: https://github.com/tombi-toml/tombi-pre-commit
     rev: d524ea03f99d27227425357b50e1e25b540a474c  # frozen: v0.7.33
     hooks:
       - id: tombi-format
+        exclude: Cargo\.lock
         args: ["--offline"]
   - repo: https://github.com/crate-ci/typos
     rev: 631208b7aac2daa8b707f55e7331f9112b0e062d  # frozen: v1.44.0
