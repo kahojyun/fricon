@@ -1,7 +1,7 @@
 use anyhow::bail;
 use tokio_util::sync::CancellationToken;
 use tonic::{Request, Response, Result, Status, Streaming};
-use tracing::{error, trace};
+use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
 use super::create_stream;
@@ -142,78 +142,89 @@ impl TryFrom<proto::DatasetStatus> for DatasetStatus {
 
 #[tonic::async_trait]
 impl DatasetService for Storage {
+    #[instrument(skip_all, fields(rpc.method = "dataset.create"))]
     async fn create(
         &self,
         request: Request<Streaming<CreateRequest>>,
     ) -> Result<Response<CreateResponse>> {
-        trace!("create: {:?}", request);
+        debug!("RPC create requested");
         let stream = request.into_inner();
         let create =
             create_stream::parse_create_stream(stream, self.shutdown_token.clone()).await?;
+        debug!(name = %create.request.name, "RPC create: received dataset stream");
         let record = self
             .manager
             .create_dataset(create.request, create.reader)
             .await
             .map_err(|e| {
-                error!("Failed to write dataset: {:?}", e);
+                error!(error = %e, "Failed to write dataset");
                 Status::internal(e.to_string())
             })?;
+        debug!(
+            dataset.id = record.id,
+            "RPC create: dataset stored successfully"
+        );
         Ok(Response::new(CreateResponse {
             dataset: Some(record.into()),
         }))
     }
 
+    #[instrument(skip_all, fields(rpc.method = "dataset.get"))]
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         let id = request.into_inner().id_enum.ok_or_else(|| {
-            error!("id_enum is required");
+            warn!("id_enum is required");
             Status::invalid_argument("id_enum is required")
         })?;
         let dataset_id = match id {
             IdEnum::Id(id) => DatasetId::Id(id),
             IdEnum::Uid(uid) => {
                 let uid: Uuid = uid.parse().map_err(|e| {
-                    error!("Failed to parse uid: {:?}", e);
+                    warn!(error = %e, "Failed to parse dataset uid");
                     Status::invalid_argument("invalid uid")
                 })?;
                 DatasetId::Uid(uid)
             }
         };
         let record = self.manager.get_dataset(dataset_id).await.map_err(|e| {
-            error!("Failed to get dataset: {:?}", e);
+            error!(error = %e, "Failed to get dataset");
             match e {
                 Error::NotFound { .. } => Status::not_found("dataset not found"),
                 _ => Status::internal(e.to_string()),
             }
         })?;
+        debug!(dataset.id = record.id, "RPC get: dataset retrieved");
         Ok(Response::new(GetResponse {
             dataset: Some(record.into()),
         }))
     }
 
+    #[instrument(skip_all, fields(rpc.method = "dataset.add_tags"))]
     async fn add_tags(
         &self,
         request: Request<AddTagsRequest>,
     ) -> Result<Response<AddTagsResponse>> {
         let AddTagsRequest { id, tags } = request.into_inner();
         self.manager.add_tags(id, tags).await.map_err(|e| {
-            error!("Failed to add tags: {:?}", e);
+            error!(error = %e, dataset.id = id, "Failed to add tags");
             Status::internal(e.to_string())
         })?;
         Ok(Response::new(AddTagsResponse {}))
     }
 
+    #[instrument(skip_all, fields(rpc.method = "dataset.remove_tags"))]
     async fn remove_tags(
         &self,
         request: Request<RemoveTagsRequest>,
     ) -> Result<Response<RemoveTagsResponse>> {
         let RemoveTagsRequest { id, tags } = request.into_inner();
         self.manager.remove_tags(id, tags).await.map_err(|e| {
-            error!("Failed to remove tags: {:?}", e);
+            error!(error = %e, dataset.id = id, "Failed to remove tags");
             Status::internal(e.to_string())
         })?;
         Ok(Response::new(RemoveTagsResponse {}))
     }
 
+    #[instrument(skip_all, fields(rpc.method = "dataset.update"))]
     async fn update(&self, request: Request<UpdateRequest>) -> Result<Response<UpdateResponse>> {
         let UpdateRequest {
             id,
@@ -227,21 +238,24 @@ impl DatasetService for Storage {
             favorite,
         };
         self.manager.update_dataset(id, update).await.map_err(|e| {
-            error!("Failed to update dataset: {:?}", e);
+            error!(error = %e, dataset.id = id, "Failed to update dataset");
             Status::internal(e.to_string())
         })?;
         Ok(Response::new(UpdateResponse {}))
     }
 
+    #[instrument(skip_all, fields(rpc.method = "dataset.delete"))]
     async fn delete(&self, request: Request<DeleteRequest>) -> Result<Response<DeleteResponse>> {
         let DeleteRequest { id } = request.into_inner();
         self.manager.delete_dataset(id).await.map_err(|e| {
-            error!("Failed to delete dataset: {:?}", e);
+            error!(error = %e, dataset.id = id, "Failed to delete dataset");
             Status::internal(e.to_string())
         })?;
+        debug!(dataset.id = id, "RPC delete: dataset deleted");
         Ok(Response::new(DeleteResponse {}))
     }
 
+    #[instrument(skip_all, fields(rpc.method = "dataset.search"))]
     async fn search(
         &self,
         request: Request<SearchRequest>,
@@ -271,7 +285,7 @@ impl DatasetService for Storage {
             })
             .await
             .map_err(|e| {
-                error!("Failed to list datasets: {:?}", e);
+                error!(error = %e, "Failed to list datasets");
                 Status::internal(e.to_string())
             })?;
         let next_page_token = limit.and_then(|limit| {

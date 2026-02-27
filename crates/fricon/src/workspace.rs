@@ -8,6 +8,7 @@ use chrono::NaiveDateTime;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
+use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 use crate::utils::FileLock;
@@ -204,6 +205,7 @@ impl WorkspaceRoot {
         Self::open_internal(paths)
     }
 
+    #[instrument(skip_all, fields(path = ?paths.root()))]
     fn create_new_internal(paths: WorkspacePaths) -> Result<Self> {
         let root = paths.root();
 
@@ -237,18 +239,22 @@ impl WorkspaceRoot {
         };
         metadata.write_json(paths.metadata_file())?;
 
+        info!(path = ?paths.root(), "Workspace created");
         Ok(Self { paths, _lock: lock })
     }
 
+    #[instrument(skip_all, fields(path = ?paths.root()))]
     fn open_internal(paths: WorkspacePaths) -> Result<Self> {
         let lock = FileLock::new(paths.lock_file())?;
         let metadata = WorkspaceMetadata::read_json(paths.metadata_file())?;
         let mut root = Self { paths, _lock: lock };
 
         match check_version(&metadata.version)? {
-            VersionCheckResult::Current => {}
+            VersionCheckResult::Current => {
+                debug!(path = ?root.paths.root(), version = %metadata.version, "Workspace opened");
+            }
             VersionCheckResult::NeedsMigration => {
-                tracing::info!("Workspace requires migration");
+                info!(path = ?root.paths.root(), from_version = %metadata.version, "Workspace requires migration");
                 root.migrate_to_current(&metadata.version)?;
             }
         }

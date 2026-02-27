@@ -21,7 +21,7 @@ use tokio::{
 use tokio_util::io::{ReaderStream, SyncIoBridge};
 use tonic::{Request, transport::Channel};
 use tower::service_fn;
-use tracing::error;
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use crate::{
@@ -46,12 +46,15 @@ pub struct Client {
 }
 
 impl Client {
+    #[instrument(skip(path), fields(workspace.path = ?path.as_ref()))]
     pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
         let path = fs::canonicalize(path)?;
         WorkspaceRoot::validate(path.clone())?;
         let workspace_paths = WorkspacePaths::new(path);
+        debug!(path = ?workspace_paths.root(), "Connecting to fricon server");
         let channel = connect_ipc_channel(workspace_paths.ipc_file()).await?;
         check_server_version(channel.clone()).await?;
+        info!(path = ?workspace_paths.root(), "Connected to fricon server");
         Ok(Self {
             channel,
             workspace_paths,
@@ -208,6 +211,7 @@ impl DatasetWriter {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn finish(mut self) -> Result<Dataset> {
         let WriterHandle { tx, handle } = self.writer_handle.take().context("Already finished.")?;
         drop(tx);
@@ -222,11 +226,13 @@ impl DatasetWriter {
             .context("Connection failed.")?
             .dataset
             .context("No dataset returned.")?;
+        let record: crate::dataset_manager::DatasetRecord = dataset
+            .try_into()
+            .context("Failed to convert dataset record")?;
+        info!(dataset.id = record.id, "Dataset write finished");
         Ok(Dataset {
             client: self.client,
-            record: dataset
-                .try_into()
-                .context("Failed to convert dataset record")?,
+            record,
         })
     }
 
@@ -250,7 +256,7 @@ fn build_request_stream(
     let payload_stream = bytes_stream.map(|chunk| match chunk {
         Ok(chunk) => CreateMessage::Payload(chunk),
         Err(e) => {
-            error!("Reader failed: {:?}", e);
+            error!(error = %e, "Dataset payload reader failed");
             CreateMessage::Abort(proto::CreateAbort {
                 reason: format!("Reader failed: {e:?}"),
             })
@@ -364,6 +370,7 @@ impl Dataset {
     }
 }
 
+#[instrument(skip(channel))]
 async fn check_server_version(channel: Channel) -> Result<()> {
     let request = VersionRequest {};
     let response = FriconServiceClient::new(channel).version(request).await?;
@@ -374,5 +381,6 @@ async fn check_server_version(channel: Channel) -> Result<()> {
         client_version == server_version,
         "Server and client version mismatch. Server: {server_version}, Client: {client_version}"
     );
+    debug!(server_version = %server_version, client_version = %client_version, "Server version check passed");
     Ok(())
 }

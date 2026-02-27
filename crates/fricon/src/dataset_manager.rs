@@ -30,7 +30,7 @@ use diesel::result::Error as DieselError;
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinError;
-use tracing::error;
+use tracing::{error, instrument};
 use uuid::Uuid;
 
 pub use self::write_registry::WriteSessionRegistry;
@@ -196,6 +196,7 @@ impl DatasetManager {
         F: FnOnce() -> Result<I, Error> + Send + 'static,
         I: RecordBatchReader,
     {
+        let dataset_name = request.name.clone();
         self.app
             .spawn_blocking(move |state| {
                 reader()
@@ -210,18 +211,20 @@ impl DatasetManager {
                         )
                     })
                     .inspect_err(|e| {
-                        error!("Dataset creation failed: {e}");
+                        error!(error = %e, dataset.name = %dataset_name, "Dataset creation failed");
                     })
             })?
             .await?
     }
 
+    #[instrument(skip(self, id), fields(dataset.id = ?id))]
     pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error> {
         self.app
             .spawn_blocking(move |state| tasks::do_get_dataset(&mut *state.database.get()?, id))?
             .await?
     }
 
+    #[instrument(skip(self, query))]
     pub async fn list_datasets(
         &self,
         query: DatasetListQuery,
@@ -233,12 +236,14 @@ impl DatasetManager {
             .await?
     }
 
+    #[instrument(skip(self))]
     pub async fn list_dataset_tags(&self) -> Result<Vec<String>, Error> {
         self.app
             .spawn_blocking(move |state| tasks::do_list_dataset_tags(&mut *state.database.get()?))?
             .await?
     }
 
+    #[instrument(skip(self, update), fields(dataset.id = id))]
     pub async fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
@@ -253,6 +258,7 @@ impl DatasetManager {
             .await?
     }
 
+    #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
     pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
@@ -267,6 +273,7 @@ impl DatasetManager {
             .await?
     }
 
+    #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
     pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
@@ -281,16 +288,18 @@ impl DatasetManager {
             .await?
     }
 
+    #[instrument(skip(self), fields(dataset.id = id))]
     pub async fn delete_dataset(&self, id: i32) -> Result<(), Error> {
         self.app
             .spawn_blocking(move |state| {
                 tasks::do_delete_dataset(&state.database, &state.root, id).inspect_err(|e| {
-                    error!("Dataset deletion failed: {e}");
+                    error!(error = %e, dataset.id = id, "Dataset deletion failed");
                 })
             })?
             .await?
     }
 
+    #[instrument(skip(self, id), fields(dataset.id = ?id))]
     pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, Error> {
         self.app
             .spawn_blocking(move |state| {

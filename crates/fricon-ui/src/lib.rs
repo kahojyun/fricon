@@ -17,8 +17,8 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tauri_specta::Event;
-use tokio::signal;
-use tracing::info;
+use tokio::{signal, sync::broadcast::error::RecvError};
+use tracing::{error, warn};
 
 pub use crate::commands::export_bindings;
 use crate::{
@@ -84,12 +84,28 @@ impl AppState {
 
     fn start_event_listener(&self, app_handle: tauri::AppHandle) {
         let app = self.app();
-        let mut event_rx = app
-            .subscribe_to_events()
-            .expect("Failed to subscribe to events");
+        let mut event_rx = match app.subscribe_to_events() {
+            Ok(event_rx) => event_rx,
+            Err(err) => {
+                error!(error = %err, "Failed to subscribe to app events");
+                return;
+            }
+        };
 
         async_runtime::spawn(async move {
-            while let Ok(event) = event_rx.recv().await {
+            loop {
+                let event = match event_rx.recv().await {
+                    Ok(event) => event,
+                    Err(RecvError::Lagged(skipped)) => {
+                        warn!(skipped, "App event listener lagged behind");
+                        continue;
+                    }
+                    Err(RecvError::Closed) => {
+                        warn!("App event listener stopped (channel closed)");
+                        break;
+                    }
+                };
+
                 match event {
                     fricon::AppEvent::DatasetCreated {
                         id,
@@ -100,7 +116,7 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        let _ = DatasetCreated(DatasetInfo {
+                        if let Err(err) = DatasetCreated(DatasetInfo {
                             id,
                             name,
                             description,
@@ -109,7 +125,14 @@ impl AppState {
                             status: status.into(),
                             created_at,
                         })
-                        .emit(&app_handle);
+                        .emit(&app_handle)
+                        {
+                            warn!(
+                                dataset_id = id,
+                                error = %err,
+                                "Failed to emit DatasetCreated event"
+                            );
+                        }
                     }
                     fricon::AppEvent::DatasetUpdated {
                         id,
@@ -120,7 +143,7 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        let _ = DatasetUpdated(DatasetInfo {
+                        if let Err(err) = DatasetUpdated(DatasetInfo {
                             id,
                             name,
                             description,
@@ -129,7 +152,14 @@ impl AppState {
                             status: status.into(),
                             created_at,
                         })
-                        .emit(&app_handle);
+                        .emit(&app_handle)
+                        {
+                            warn!(
+                                dataset_id = id,
+                                error = %err,
+                                "Failed to emit DatasetUpdated event"
+                            );
+                        }
                     }
                 }
             }
@@ -481,7 +511,7 @@ fn install_ctrl_c_handler(app: &mut tauri::App) {
                 app_handle.exit(0);
             }
             Err(err) => {
-                info!("Failed to listen for Ctrl+C: {}", err);
+                error!(error = %err, "Failed to listen for Ctrl+C");
             }
         }
     });
