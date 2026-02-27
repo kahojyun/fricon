@@ -75,8 +75,24 @@ pub(crate) async fn parse_create_stream(
                                     ))
                                 }
                                 Some(CreateMessage::Finish(_)) => {
-                                    // Normal EOF
-                                    None
+                                    // Finish must be the terminal message.
+                                    match stream.next().await {
+                                        None => None,
+                                        Some(Ok(_)) => Some((
+                                            Err(IoError::new(
+                                                ErrorKind::InvalidInput,
+                                                "unexpected message after CreateFinish",
+                                            )),
+                                            (stream, token, true),
+                                        )),
+                                        Some(Err(e)) => {
+                                            error!(error = %e, "Client connection error while validating CreateFinish termination");
+                                            Some((
+                                                Err(IoError::other(e)),
+                                                (stream, token, true),
+                                            ))
+                                        }
+                                    }
                                 }
                                 None => {
                                     warn!("Received empty CreateRequest message");

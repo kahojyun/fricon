@@ -9,6 +9,7 @@ use fricon::{
 use indexmap::IndexMap;
 use num::complex::Complex64;
 use tempfile::TempDir;
+use tokio::time::{Duration, Instant};
 
 fn create_test_rows() -> Vec<DatasetRow> {
     vec![
@@ -160,6 +161,36 @@ fn create_test_rows() -> Vec<DatasetRow> {
             row
         }),
     ]
+}
+
+async fn wait_for_dataset_status(
+    app_manager: &AppManager,
+    dataset_name: &str,
+    expected_status: DatasetStatus,
+) -> anyhow::Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let dataset_manager = app_manager.handle().dataset_manager();
+        let datasets = dataset_manager
+            .list_datasets(DatasetListQuery {
+                search: Some(dataset_name.to_string()),
+                ..DatasetListQuery::default()
+            })
+            .await?;
+
+        if datasets.len() == 1 && datasets[0].metadata.status == expected_status {
+            return Ok(());
+        }
+
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "Dataset '{dataset_name}' did not reach expected status '{expected_status:?}' in \
+                 time"
+            );
+        }
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 #[tokio::test]
@@ -336,21 +367,7 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
     // Drop the writer without calling finish()
     drop(writer);
 
-    // Give the server a moment to process the drop/abort
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-    // Verify dataset is aborted
-    let dataset_manager = app_manager.handle().dataset_manager();
-    let datasets = dataset_manager
-        .list_datasets(DatasetListQuery {
-            search: Some("aborted_dataset".to_string()),
-            ..DatasetListQuery::default()
-        })
-        .await?;
-
-    assert_eq!(datasets.len(), 1);
-    let record = &datasets[0];
-    assert_eq!(record.metadata.status, DatasetStatus::Aborted);
+    wait_for_dataset_status(&app_manager, "aborted_dataset", DatasetStatus::Aborted).await?;
 
     // Shutdown the server
     app_manager.shutdown().await;
