@@ -1,29 +1,27 @@
 [package]
 name = "fricon-cli"
-publish = false
 version.workspace = true
 edition.workspace = true
-license.workspace = true
 description.workspace = true
-authors.workspace = true
 repository.workspace = true
+license.workspace = true
 keywords.workspace = true
+publish = false
 
 [[bin]]
+doc = false
 name = "fricon"
 path = "src/main.rs"
-doc = false
 
 [dependencies]
-fricon = { path = "../fricon" }
-fricon-ui = { path = "../fricon-ui" }
-
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
+fricon = { path = "../fricon" }
+fricon-ui = { path = "../fricon-ui" }
 tracing-subscriber = { workspace = true }
-
-[lints]
-workspace = true
 
 [features]
 prod = ["fricon-ui/prod"]
+
+[lints]
+workspace = true

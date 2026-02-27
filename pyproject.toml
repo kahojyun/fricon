@@ -1,33 +1,30 @@
 [project]
 name = "fricon"
-dynamic = ["version", "description", "license", "keywords", "authors"]
 readme = "README.md"
-license-files = [
-    "LICENSE-APACHE",
-    "LICENSE-MIT",
-    "THIRD_PARTY_RUST.toml",
-    "THIRD_PARTY_NPM.json",
-]
 requires-python = ">=3.10"
+license-files = [
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "THIRD_PARTY_NPM.json",
+  "THIRD_PARTY_RUST.toml",
+]
+authors = [{ name = "Jiahao Yuan", email = "kahojyun@icloud.com" }]
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Programming Language :: Python",
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-    "License :: OSI Approved :: MIT License",
-    "License :: OSI Approved :: Apache Software License",
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "Programming Language :: Rust",
 ]
 dependencies = [
-    "numpy>=1.19.3",
-    "pandas>=2.2.3",
-    "polars>=1.17.1",
-    "pyarrow>=17.0.0",
+  "numpy>=1.19.3",
+  "pandas>=2.2.3",
+  "polars>=1.17.1",
+  "pyarrow>=17.0.0",
 ]
-
-[build-system]
-requires = ["maturin>=1.8,<2.0"]
-build-backend = "maturin"
+dynamic = ["description", "keywords", "license", "version"]
 
 [project.urls]
 Documentation = "https://kahojyun.github.io/fricon/"
@@ -42,41 +39,46 @@ fricon-gui = "fricon._core:main_gui"
 
 [dependency-groups]
 dev = [
-    "ipykernel>=6.29.5",
-    "ipython>=8.18.1",
-    "packaging>=24.2",
-    "pandas-stubs>=2.2.2.240807",
-    "pyarrow-stubs>=17.6",
-    "python-dotenv>=1.2.1",
+  "ipykernel>=6.29.5",
+  "ipython>=8.18.1",
+  "packaging>=24.2",
+  "pandas-stubs>=2.2.2.240807",
+  "pyarrow-stubs>=17.6",
+  "python-dotenv>=1.2.1",
+]
+ci = ["basedpyright>=1.23.2", "mypy>=1.11.2", "pytest>=9.0.0"]
+docs = [
+  "black>=24.10.0",
+  "markdown-exec[ansi]>=1.10.0",
+  "mike>=2.1.3",
+  "mkdocs-material>=9.5.49",
+  "mkdocstrings-python>=1.12.2",
 ]
 fmt = ["ruff>=0.6.6"]
-ci = ["mypy>=1.11.2", "pytest>=8.3.3", "basedpyright>=1.23.2"]
-docs = [
-    "black>=24.10.0",
-    "markdown-exec[ansi]>=1.10.0",
-    "mike>=2.1.3",
-    "mkdocs-material>=9.5.49",
-    "mkdocstrings-python>=1.12.2",
+
+[build-system]
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"
+
+[tool.basedpyright]
+include = ["crates/fricon-py/python", "examples", "crates/fricon-py/tests"]
+
+[tool.maturin]
+features = ["pyo3/extension-module", "prod"]
+include = [
+  { format = "sdist", path = "package.json" },
+  { format = "sdist", path = "pnpm-workspace.yaml" },
+  { format = "sdist", path = "pnpm-lock.yaml" },
 ]
+manifest-path = "crates/fricon-py/Cargo.toml"
+module-name = "fricon._core"
+python-source = "crates/fricon-py/python"
+
+[tool.pytest]
+addopts = ["--import-mode=importlib"]
+minversion = "9.0"
+testpaths = ["crates/fricon-py/tests"]
 
 [tool.uv]
 config-settings = { build-args = "--profile=dev" }
 default-groups = ["dev", "fmt", "ci", "docs"]
-
-[tool.maturin]
-module-name = "fricon._core"
-python-source = "crates/fricon-py/python"
-manifest-path = "crates/fricon-py/Cargo.toml"
-features = ["pyo3/extension-module", "prod"]
-include = [
-    { path = "package.json", format = "sdist" },
-    { path = "pnpm-workspace.yaml", format = "sdist" },
-    { path = "pnpm-lock.yaml", format = "sdist" },
-]
-
-[tool.pytest.ini_options]
-testpaths = ["crates/fricon-py/tests"]
-addopts = "--import-mode=importlib"
-
-[tool.basedpyright]
-include = ["crates/fricon-py/python", "examples", "crates/fricon-py/tests"]
