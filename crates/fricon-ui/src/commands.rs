@@ -17,7 +17,7 @@ use fricon::{
 use serde::{Deserialize, Serialize};
 use tauri::{State, ipc::Invoke};
 use tauri_specta::{Builder, collect_commands, collect_events};
-use tracing::{debug, error};
+use tracing::{debug, error, instrument};
 
 use super::AppState;
 use crate::models::{
@@ -272,6 +272,7 @@ fn build_chart_selected_columns(
 
 #[tauri::command]
 #[specta::specta]
+#[instrument(level = "debug", skip(state, options), fields(dataset_id = id))]
 async fn dataset_chart_data(
     state: State<'_, AppState>,
     id: i32,
@@ -310,12 +311,21 @@ async fn dataset_chart_data(
             index_filters,
             selected_columns: Some(selected_columns),
         })
+        .map_err(|err| {
+            error!(dataset_id = id, chart_type, error = %err, "Failed to select chart source data");
+            err
+        })
         .context("Failed to select data.")?;
 
     let batch = if batches.is_empty() {
         RecordBatch::new_empty(output_schema)
     } else {
-        concat_batches(&output_schema, &batches).context("Failed to concat batches")?
+        concat_batches(&output_schema, &batches)
+            .map_err(|err| {
+                error!(dataset_id = id, chart_type, error = %err, "Failed to concat chart batches");
+                err
+            })
+            .context("Failed to concat batches")?
     };
     debug!(
         dataset_id = id,
@@ -744,6 +754,7 @@ struct FilterTableOptions {
     exclude_columns: Option<Vec<String>>,
 }
 
+#[instrument(level = "debug", skip(state, exclude_columns), fields(dataset_id = id))]
 async fn get_filter_data_internal(
     state: &AppState,
     id: i32,
@@ -818,6 +829,11 @@ async fn get_filter_data_internal(
     })
 }
 
+#[instrument(
+    level = "debug",
+    skip(state, exclude_columns, indices, arrow_schema),
+    fields(dataset_id = id)
+)]
 async fn build_filter_batch(
     state: &AppState,
     id: i32,
