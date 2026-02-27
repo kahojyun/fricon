@@ -6,7 +6,7 @@ license-files = [
     "LICENSE-APACHE",
     "LICENSE-MIT",
     "THIRD_PARTY_RUST.toml",
-    "THIRD_PARTY_NPM.txt",
+    "THIRD_PARTY_NPM.json",
 ]
 requires-python = ">=3.10"
 classifiers = [

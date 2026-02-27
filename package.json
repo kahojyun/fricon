@@ -14,7 +14,7 @@
     "test": "pnpm -r run test",
     "bundle-licenses": "run-p -c bundle-licenses:rust bundle-licenses:npm",
     "bundle-licenses:rust": "cd crates/fricon-py && cargo bundle-licenses --format toml --output ../../THIRD_PARTY_RUST.toml",
-    "bundle-licenses:npm": "pnpm --filter fricon-ui run bundle-licenses && node -e \"const fs=require('node:fs');const path=require('node:path');const src=path.resolve('crates','fricon-ui','frontend','dist','THIRD_PARTY_NPM.txt');const dst=path.resolve('THIRD_PARTY_NPM.txt');fs.renameSync(src,dst);\""
+    "bundle-licenses:npm": "pnpm --filter fricon-ui run bundle-licenses && node -e \"const fs=require('node:fs');const path=require('node:path');const src=path.resolve('crates','fricon-ui','frontend','dist','THIRD_PARTY_NPM.json');const dst=path.resolve('THIRD_PARTY_NPM.json');fs.renameSync(src,dst);\""
   },
   "packageManager": "pnpm@10.30.1+sha512.3590e550d5384caa39bd5c7c739f72270234b2f6059e13018f975c313b1eb9fefcc09714048765d4d9efe961382c312e624572c0420762bdc5d5940cdf9be73a",
   "type": "module",
