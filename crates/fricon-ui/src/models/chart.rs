@@ -8,7 +8,7 @@ use tracing::{debug, warn};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum Type {
+pub(crate) enum ChartType {
     Line,
     Heatmap,
     Scatter,
@@ -118,8 +118,8 @@ pub(crate) struct Series {
 
 #[derive(Serialize, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct DataResponse {
-    pub r#type: Type,
+pub(crate) struct ChartDataResponse {
+    pub r#type: ChartType,
     pub x_name: String,
     pub y_name: Option<String>,
     pub x_categories: Option<Vec<f64>>,
@@ -157,9 +157,9 @@ pub(crate) fn complex_view_label(option: ComplexViewOption) -> &'static str {
     }
 }
 
-fn empty_line_response(x_name: String) -> DataResponse {
-    DataResponse {
-        r#type: Type::Line,
+fn empty_line_response(x_name: String) -> ChartDataResponse {
+    ChartDataResponse {
+        r#type: ChartType::Line,
         x_name,
         y_name: None,
         x_categories: None,
@@ -231,7 +231,7 @@ pub(crate) fn build_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &LineChartDataOptions,
-) -> Result<DataResponse> {
+) -> Result<ChartDataResponse> {
     let series_name = &options.series;
     let data_type = *schema
         .columns()
@@ -321,8 +321,8 @@ pub(crate) fn build_line_series(
         }]
     };
 
-    Ok(DataResponse {
-        r#type: Type::Line,
+    Ok(ChartDataResponse {
+        r#type: ChartType::Line,
         x_name,
         y_name: None,
         x_categories: None,
@@ -335,7 +335,7 @@ pub(crate) fn build_heatmap_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &HeatmapChartDataOptions,
-) -> Result<DataResponse> {
+) -> Result<ChartDataResponse> {
     let series_name = &options.series;
     let y_column = &options.y_column;
     let data_type = *schema
@@ -386,8 +386,8 @@ pub(crate) fn build_heatmap_series(
 
     let (x_categories, y_categories) = normalize_heatmap_series(&mut series);
 
-    Ok(DataResponse {
-        r#type: Type::Heatmap,
+    Ok(ChartDataResponse {
+        r#type: ChartType::Heatmap,
         x_name,
         y_name: Some(y_column.clone()),
         x_categories: Some(x_categories),
@@ -555,7 +555,7 @@ pub(crate) fn build_scatter_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &ScatterChartDataOptions,
-) -> Result<DataResponse> {
+) -> Result<ChartDataResponse> {
     let (x_name, y_name, series) = match &options.scatter {
         ScatterModeOptions::Complex { series } => process_complex_scatter(batch, schema, series)?,
         ScatterModeOptions::TraceXy {
@@ -567,8 +567,8 @@ pub(crate) fn build_scatter_series(
         } => process_xy_scatter(batch, x_column, y_column)?,
     };
 
-    Ok(DataResponse {
-        r#type: Type::Scatter,
+    Ok(ChartDataResponse {
+        r#type: ChartType::Scatter,
         x_name,
         y_name: Some(y_name),
         x_categories: None,

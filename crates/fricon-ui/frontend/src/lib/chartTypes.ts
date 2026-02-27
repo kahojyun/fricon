@@ -1,6 +1,6 @@
 import type {
   ComplexViewOption as WireComplexViewOption,
-  Type as WireChartType,
+  ChartType as WireChartType,
 } from "@/lib/bindings";
 
 export type ChartType = WireChartType;

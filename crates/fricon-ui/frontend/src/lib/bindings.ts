@@ -5,7 +5,7 @@
 
 
 export const commands = {
-async getWorkspaceInfo() : Promise<Result<WorkspaceInfo, CommandError>> {
+async getWorkspaceInfo() : Promise<Result<WorkspaceInfo, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_workspace_info") };
 } catch (e) {
@@ -13,7 +13,7 @@ async getWorkspaceInfo() : Promise<Result<WorkspaceInfo, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async listDatasets(options: DatasetListOptions | null) : Promise<Result<DatasetInfo[], CommandError>> {
+async listDatasets(options: DatasetListOptions | null) : Promise<Result<DatasetInfo[], TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_datasets", { options }) };
 } catch (e) {
@@ -21,7 +21,7 @@ async listDatasets(options: DatasetListOptions | null) : Promise<Result<DatasetI
     else return { status: "error", error: e  as any };
 }
 },
-async listDatasetTags() : Promise<Result<string[], CommandError>> {
+async listDatasetTags() : Promise<Result<string[], TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_dataset_tags") };
 } catch (e) {
@@ -29,7 +29,7 @@ async listDatasetTags() : Promise<Result<string[], CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async datasetDetail(id: number) : Promise<Result<DatasetDetail, CommandError>> {
+async datasetDetail(id: number) : Promise<Result<DatasetDetail, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("dataset_detail", { id }) };
 } catch (e) {
@@ -37,7 +37,7 @@ async datasetDetail(id: number) : Promise<Result<DatasetDetail, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async datasetChartData(id: number, options: DatasetChartDataOptions) : Promise<Result<DataResponse, CommandError>> {
+async datasetChartData(id: number, options: DatasetChartDataOptions) : Promise<Result<ChartDataResponse, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("dataset_chart_data", { id, options }) };
 } catch (e) {
@@ -45,7 +45,7 @@ async datasetChartData(id: number, options: DatasetChartDataOptions) : Promise<R
     else return { status: "error", error: e  as any };
 }
 },
-async getFilterTableData(id: number, options: FilterTableOptions) : Promise<Result<TableData, CommandError>> {
+async getFilterTableData(id: number, options: FilterTableOptions) : Promise<Result<TableData, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_filter_table_data", { id, options }) };
 } catch (e) {
@@ -53,7 +53,7 @@ async getFilterTableData(id: number, options: FilterTableOptions) : Promise<Resu
     else return { status: "error", error: e  as any };
 }
 },
-async updateDatasetFavorite(id: number, update: DatasetFavoriteUpdate) : Promise<Result<null, CommandError>> {
+async updateDatasetFavorite(id: number, update: DatasetFavoriteUpdate) : Promise<Result<null, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_dataset_favorite", { id, update }) };
 } catch (e) {
@@ -61,7 +61,7 @@ async updateDatasetFavorite(id: number, update: DatasetFavoriteUpdate) : Promise
     else return { status: "error", error: e  as any };
 }
 },
-async updateDatasetInfo(id: number, update: DatasetInfoUpdate) : Promise<Result<null, CommandError>> {
+async updateDatasetInfo(id: number, update: DatasetInfoUpdate) : Promise<Result<null, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_dataset_info", { id, update }) };
 } catch (e) {
@@ -69,7 +69,7 @@ async updateDatasetInfo(id: number, update: DatasetInfoUpdate) : Promise<Result<
     else return { status: "error", error: e  as any };
 }
 },
-async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, CommandError>> {
+async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_dataset_write_status", { id }) };
 } catch (e) {
@@ -96,11 +96,11 @@ datasetUpdated: "dataset-updated"
 
 /** user-defined types **/
 
+export type ChartDataResponse = { type: ChartType; xName: string; yName: string | null; xCategories: number[] | null; yCategories: number[] | null; series: Series[] }
+export type ChartType = "line" | "heatmap" | "scatter"
 export type ColumnInfo = { name: string; isComplex: boolean; isTrace: boolean; isIndex: boolean }
 export type ColumnUniqueValue = { index: number; displayValue: string }
-export type CommandError = { message: string }
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
-export type DataResponse = { type: Type; xName: string; yName: string | null; xCategories: number[] | null; yCategories: number[] | null; series: Series[] }
 export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
 export type DatasetCreated = DatasetInfo
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; columns: ColumnInfo[] }
@@ -118,7 +118,7 @@ export type ScatterChartDataOptions = ({ start: number | null; end: number | nul
 export type ScatterModeOptions = { mode: "complex"; series: string } | { mode: "trace_xy"; traceXColumn: string; traceYColumn: string } | { mode: "xy"; xColumn: string; yColumn: string; binColumn: string | null }
 export type Series = { name: string; data: number[][] }
 export type TableData = { fields: string[]; rows: Row[]; columnUniqueValues: Partial<{ [key in string]: ColumnUniqueValue[] }> }
-export type Type = "line" | "heatmap" | "scatter"
+export type TauriCommandError = { message: string }
 export type UiDatasetSortBy = "id" | "name" | "createdAt"
 export type UiDatasetStatus = "Writing" | "Completed" | "Aborted"
 export type UiSortDirection = "asc" | "desc"
