@@ -457,6 +457,40 @@ impl DatasetWriter {
             dataset: None,
         }
     }
+
+    fn complete(&mut self, py: Python<'_>, abort: bool) -> Result<Py<Dataset>> {
+        if let Some(dataset) = self.dataset.as_ref() {
+            return Ok(dataset.clone_ref(py));
+        }
+
+        match mem::replace(&mut self.state, WriterState::Finished) {
+            WriterState::Writing(writer) => {
+                let inner = if abort {
+                    py.detach(|| get_runtime().block_on(writer.abort()))?
+                } else {
+                    py.detach(|| get_runtime().block_on(writer.finish()))?
+                };
+                let dataset = Py::new(py, Dataset { inner })?;
+                self.dataset = Some(dataset.clone_ref(py));
+                Ok(dataset)
+            }
+            WriterState::NotStarted {
+                client,
+                name,
+                description,
+                tags,
+            } => {
+                self.state = WriterState::NotStarted {
+                    client,
+                    name,
+                    description,
+                    tags,
+                };
+                bail!("No data to finalize.")
+            }
+            WriterState::Finished => bail!("Writer closed."),
+        }
+    }
 }
 
 #[pymethods]
@@ -537,11 +571,26 @@ impl DatasetWriter {
         Ok(dataset)
     }
 
+    /// Finish writing to dataset and return dataset metadata.
+    pub fn finish(&mut self, py: Python<'_>) -> Result<Py<Dataset>> {
+        self.complete(py, false)
+    }
+
+    /// Abort writing to dataset and return dataset metadata.
+    pub fn abort(&mut self, py: Python<'_>) -> Result<Py<Dataset>> {
+        self.complete(py, true)
+    }
+
     /// Finish writing to dataset.
     pub fn close(&mut self, py: Python<'_>) -> Result<()> {
-        if let WriterState::Writing(writer) = mem::replace(&mut self.state, WriterState::Finished) {
-            let inner = py.detach(|| get_runtime().block_on(writer.finish()))?;
-            self.dataset = Some(Py::new(py, Dataset { inner })?);
+        if self.dataset.is_some() {
+            return Ok(());
+        }
+
+        if matches!(self.state, WriterState::Writing(_)) {
+            let _ = self.finish(py)?;
+        } else {
+            self.state = WriterState::Finished;
         }
         Ok(())
     }
@@ -557,11 +606,16 @@ impl DatasetWriter {
     pub fn __exit__(
         &mut self,
         py: Python<'_>,
-        _exc_type: Py<PyAny>,
+        exc_type: Py<PyAny>,
         _exc_value: Py<PyAny>,
         _traceback: Py<PyAny>,
     ) -> Result<()> {
-        self.close(py)
+        if exc_type.is_none(py) {
+            self.close(py)
+        } else {
+            let _ = self.abort(py);
+            Ok(())
+        }
     }
 }
 

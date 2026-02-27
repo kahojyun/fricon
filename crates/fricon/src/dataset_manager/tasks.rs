@@ -165,16 +165,17 @@ where
         Ok(()) => {
             if let Err(e) = session.commit() {
                 let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
-                return Err(e);
+                let _ = e;
+                return repo.get_dataset(DatasetId::Id(dataset_record.id));
             }
             repo.update_status(dataset_record.id, DatasetStatus::Completed)?;
             info!(dataset.id = dataset_record.id, %uid, "Dataset write completed");
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
-        Err(e) => {
+        Err(_e) => {
             let _ = session.abort();
             let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
-            Err(e)
+            repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
     }
 }
@@ -663,7 +664,7 @@ mod tests {
     }
 
     #[test]
-    fn create_commit_failure_marks_aborted() {
+    fn create_commit_failure_returns_aborted_dataset() {
         let mut seq = Sequence::new();
         let dataset_id = 1;
 
@@ -690,6 +691,21 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(|_, _| Ok(()));
+        repo.expect_get_dataset()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                let dataset = database::Dataset {
+                    id: dataset_id,
+                    uid: database::SimpleUuid(Uuid::new_v4()),
+                    name: "name".to_string(),
+                    description: "desc".to_string(),
+                    favorite: false,
+                    status: DatasetStatus::Aborted,
+                    created_at: Utc::now().naive_utc(),
+                };
+                Ok(DatasetRecord::from_database_models(dataset, vec![]))
+            });
 
         let sessions = FakeWriteSessions::new(guard);
 
@@ -702,11 +718,14 @@ mod tests {
         };
 
         let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
-        assert!(result.is_err());
+        assert_eq!(
+            result.expect("aborted dataset").metadata.status,
+            DatasetStatus::Aborted
+        );
     }
 
     #[test]
-    fn create_batch_error_aborts_and_marks_aborted() {
+    fn create_batch_error_returns_aborted_dataset() {
         let mut seq = Sequence::new();
         let dataset_id = 1;
 
@@ -724,6 +743,21 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(|_, _| Ok(()));
+        repo.expect_get_dataset()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(move |_| {
+                let dataset = database::Dataset {
+                    id: dataset_id,
+                    uid: database::SimpleUuid(Uuid::new_v4()),
+                    name: "name".to_string(),
+                    description: "desc".to_string(),
+                    favorite: false,
+                    status: DatasetStatus::Aborted,
+                    created_at: Utc::now().naive_utc(),
+                };
+                Ok(DatasetRecord::from_database_models(dataset, vec![]))
+            });
         let sessions = FakeWriteSessions::new(guard);
 
         let (schema, _batch) = sample_batch();
@@ -738,7 +772,10 @@ mod tests {
         };
 
         let result = create_dataset_with(&repo, &store, &events, &sessions, request, batches);
-        assert!(result.is_err());
+        assert_eq!(
+            result.expect("aborted dataset").metadata.status,
+            DatasetStatus::Aborted
+        );
     }
 
     fn setup_list_query_db() -> SqliteConnection {

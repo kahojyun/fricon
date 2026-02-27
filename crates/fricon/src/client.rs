@@ -129,13 +129,19 @@ struct WriterHandle {
     is_finished: Arc<AtomicBool>,
 }
 
+#[derive(Debug)]
+enum StreamControl {
+    Finish,
+    Abort,
+}
+
 pub struct DatasetWriter {
     schema: DatasetSchema,
     arrow_schema: SchemaRef,
     writer_handle: Option<WriterHandle>,
-    connection_handle: JoinHandle<Result<CreateResponse>>,
+    connection_handle: Option<JoinHandle<Result<CreateResponse>>>,
     client: Client,
-    finish_tx: Option<oneshot::Sender<()>>,
+    control_tx: Option<oneshot::Sender<StreamControl>>,
 }
 
 impl DatasetWriter {
@@ -148,7 +154,7 @@ impl DatasetWriter {
     ) -> Self {
         let (tx, mut rx) = mpsc::channel::<RecordBatch>(16);
         let (dtx, drx) = duplex(1024 * 1024);
-        let (finish_tx, finish_rx) = oneshot::channel();
+        let (control_tx, control_rx) = oneshot::channel();
         let is_finished = Arc::new(AtomicBool::new(false));
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
@@ -170,7 +176,7 @@ impl DatasetWriter {
         let connection_handle = tokio::spawn({
             let client = client.clone();
             let request_stream =
-                build_request_stream(name, description, tags, ReaderStream::new(drx), finish_rx);
+                build_request_stream(name, description, tags, ReaderStream::new(drx), control_rx);
             async move {
                 let request = Request::new(request_stream);
                 let response = client.dataset_service().create(request).await?;
@@ -185,9 +191,9 @@ impl DatasetWriter {
                 handle: writer_handle,
                 is_finished: is_finished.clone(),
             }),
-            connection_handle,
+            connection_handle: Some(connection_handle),
             client,
-            finish_tx: Some(finish_tx),
+            control_tx: Some(control_tx),
         }
     }
 
@@ -224,26 +230,34 @@ impl DatasetWriter {
     }
 
     #[instrument(skip(self))]
-    pub async fn finish(mut self) -> Result<Dataset> {
+    pub async fn finish(self) -> Result<Dataset> {
+        self.complete(StreamControl::Finish, true).await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn abort(self) -> Result<Dataset> {
+        self.complete(StreamControl::Abort, false).await
+    }
+
+    async fn complete(mut self, control: StreamControl, finished: bool) -> Result<Dataset> {
         let WriterHandle {
             tx,
             handle,
             is_finished,
         } = self.writer_handle.take().context("Already finished.")?;
-        is_finished.store(true, Ordering::SeqCst);
+        is_finished.store(finished, Ordering::SeqCst);
         drop(tx);
         handle
             .await
             .context("Writer panicked.")?
             .context("Writer failed.")?;
 
-        // Send finish signal
-        if let Some(finish_tx) = self.finish_tx.take() {
-            let _ = finish_tx.send(());
+        if let Some(control_tx) = self.control_tx.take() {
+            let _ = control_tx.send(control);
         }
 
-        let dataset = self
-            .connection_handle
+        let connection_handle = self.connection_handle.take().context("Already finished.")?;
+        let dataset = connection_handle
             .await
             .context("Connector panicked.")?
             .context("Connection failed.")?
@@ -270,7 +284,7 @@ fn build_request_stream(
     description: String,
     tags: Vec<String>,
     bytes_stream: impl Stream<Item = io::Result<Bytes>>,
-    finish_rx: oneshot::Receiver<()>,
+    control_rx: oneshot::Receiver<StreamControl>,
 ) -> impl Stream<Item = CreateRequest> {
     let first_message = CreateMessage::Metadata(CreateMetadata {
         name,
@@ -290,12 +304,9 @@ fn build_request_stream(
         .chain(payload_stream)
         .chain(
             stream::once(async move {
-                // Wait for finish signal, if it errors (dropped), the stream will end without
-                // CreateFinish
-                if finish_rx.await.is_ok() {
-                    Some(CreateMessage::Finish(CreateFinish {}))
-                } else {
-                    None
+                match control_rx.await {
+                    Ok(StreamControl::Finish) => Some(CreateMessage::Finish(CreateFinish {})),
+                    Ok(StreamControl::Abort) | Err(_) => None,
                 }
             })
             .filter_map(|msg| async move { msg }),
@@ -419,4 +430,62 @@ async fn check_server_version(channel: Channel) -> Result<()> {
     );
     debug!(server_version = %server_version, client_version = %client_version, "Server version check passed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use futures::{StreamExt, stream};
+    use tokio::sync::oneshot;
+
+    use super::{StreamControl, build_request_stream};
+    use crate::proto::create_request::CreateMessage;
+
+    #[tokio::test]
+    async fn build_request_stream_sends_finish_message_on_finish() {
+        let (tx, rx) = oneshot::channel();
+        tx.send(StreamControl::Finish).expect("send control");
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec!["tag".to_string()],
+            stream::iter(vec![Ok::<Bytes, std::io::Error>(Bytes::from_static(
+                b"payload",
+            ))]),
+            rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+
+        assert!(matches!(messages[0], CreateMessage::Metadata(_)));
+        assert!(matches!(messages[1], CreateMessage::Payload(_)));
+        assert!(matches!(messages[2], CreateMessage::Finish(_)));
+    }
+
+    #[tokio::test]
+    async fn build_request_stream_omits_finish_message_on_abort() {
+        let (tx, rx) = oneshot::channel();
+        tx.send(StreamControl::Abort).expect("send control");
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec![],
+            stream::iter(vec![Ok::<Bytes, std::io::Error>(Bytes::from_static(
+                b"payload",
+            ))]),
+            rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+
+        assert_eq!(messages.len(), 2);
+        assert!(matches!(messages[0], CreateMessage::Metadata(_)));
+        assert!(matches!(messages[1], CreateMessage::Payload(_)));
+    }
 }

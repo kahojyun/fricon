@@ -261,6 +261,47 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
 }
 
 #[tokio::test]
+async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<()> {
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+    WorkspaceRoot::create_new(workspace_path)?;
+
+    let app_manager = AppManager::serve_with_path(workspace_path)?;
+    let client = Client::connect(workspace_path).await?;
+
+    let test_rows = create_test_rows();
+    let test_schema = test_rows[0].to_schema();
+
+    let mut writer = client.create_dataset(
+        "aborted_dataset_by_method".to_string(),
+        "This dataset is aborted explicitly".to_string(),
+        vec!["test".to_string(), "abort".to_string()],
+        test_schema,
+    )?;
+
+    writer.write(create_test_rows().remove(0)).await?;
+    let dataset = writer.abort().await?;
+
+    assert_eq!(dataset.name(), "aborted_dataset_by_method");
+    assert_eq!(dataset.status(), DatasetStatus::Aborted);
+
+    let dataset_manager = app_manager.handle().dataset_manager();
+    let datasets = dataset_manager
+        .list_datasets(DatasetListQuery {
+            search: Some("aborted_dataset_by_method".to_string()),
+            ..DatasetListQuery::default()
+        })
+        .await?;
+    assert_eq!(datasets.len(), 1);
+    assert_eq!(datasets[0].metadata.status, DatasetStatus::Aborted);
+
+    app_manager.shutdown().await;
+    temp_dir.close()?;
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
     // Create a temporary directory for the workspace
     let temp_dir = TempDir::new()?;
