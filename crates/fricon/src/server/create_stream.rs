@@ -11,12 +11,13 @@ use tonic::{Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
-    dataset_manager::{CreateDatasetRequest, Error},
+    dataset_manager::{CreateDatasetRequest, DatasetManagerError},
     proto::{CreateAbort, CreateMetadata, CreateRequest, create_request::CreateMessage},
 };
 
 pub(crate) type BatchReader = Box<dyn RecordBatchReader + Send>;
-pub(crate) type CreateBatchReader = Box<dyn FnOnce() -> Result<BatchReader, Error> + Send>;
+pub(crate) type CreateBatchReader =
+    Box<dyn FnOnce() -> Result<BatchReader, DatasetManagerError> + Send>;
 
 pub(crate) struct CreateStreamParts {
     pub request: CreateDatasetRequest,
@@ -106,7 +107,7 @@ pub(crate) async fn parse_create_stream(
         let sync_reader = SyncIoBridge::new(TokioStreamReader::new(abortable_stream));
         StreamReader::try_new(sync_reader, None)
             .map(|reader| Box::new(reader) as BatchReader)
-            .map_err(|e| Error::BatchStream {
+            .map_err(|e| DatasetManagerError::BatchStream {
                 message: e.to_string(),
             })
     });

@@ -13,7 +13,7 @@ pub use self::{
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum DatasetError {
     #[error("Incompatible data type.")]
     IncompatibleType,
     #[error("X and Y length of trace mismatch.")]

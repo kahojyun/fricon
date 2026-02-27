@@ -7,7 +7,7 @@ use std::{
 use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
 
-use crate::dataset::Error;
+use crate::dataset::DatasetError;
 
 /// Manage chunked batches. Able to release batches from front to a target row,
 /// while ensuring `target_row..` can be accessed.
@@ -39,9 +39,9 @@ impl ChunkedTable {
         *self.offsets.front().expect("At least one offset exists.")
     }
 
-    pub(crate) fn push_back(&mut self, batch: RecordBatch) -> Result<(), Error> {
+    pub(crate) fn push_back(&mut self, batch: RecordBatch) -> Result<(), DatasetError> {
         if batch.schema() != self.schema {
-            return Err(Error::SchemaMismatch);
+            return Err(DatasetError::SchemaMismatch);
         }
         if batch.num_rows() != 0 {
             self.offsets

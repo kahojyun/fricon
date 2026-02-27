@@ -67,7 +67,7 @@ fn emit_dataset_updated(state: &AppState, record: DatasetRecord) {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum DatasetManagerError {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
     #[error("No dataset file found.")]
@@ -77,16 +77,16 @@ pub enum Error {
     #[error(transparent)]
     Database(#[from] DatabaseError),
     #[error(transparent)]
-    Dataset(#[from] dataset::Error),
+    Dataset(#[from] dataset::DatasetError),
     #[error(transparent)]
-    DatasetFs(#[from] dataset_fs::Error),
+    DatasetFs(#[from] dataset_fs::DatasetFsError),
     #[error(transparent)]
     TaskJoin(#[from] JoinError),
     #[error(transparent)]
     App(#[from] AppError),
 }
 
-impl From<DieselError> for Error {
+impl From<DieselError> for DatasetManagerError {
     fn from(error: DieselError) -> Self {
         match error {
             DieselError::NotFound => Self::NotFound {
@@ -191,9 +191,9 @@ impl DatasetManager {
         &self,
         request: CreateDatasetRequest,
         reader: F,
-    ) -> Result<DatasetRecord, Error>
+    ) -> Result<DatasetRecord, DatasetManagerError>
     where
-        F: FnOnce() -> Result<I, Error> + Send + 'static,
+        F: FnOnce() -> Result<I, DatasetManagerError> + Send + 'static,
         I: RecordBatchReader,
     {
         let dataset_name = request.name.clone();
@@ -218,7 +218,7 @@ impl DatasetManager {
     }
 
     #[instrument(skip(self, id), fields(dataset.id = ?id))]
-    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error> {
+    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| tasks::do_get_dataset(&mut *state.database.get()?, id))?
             .await?
@@ -228,7 +228,7 @@ impl DatasetManager {
     pub async fn list_datasets(
         &self,
         query: DatasetListQuery,
-    ) -> Result<Vec<DatasetRecord>, Error> {
+    ) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| {
                 tasks::do_list_datasets(&mut *state.database.get()?, &query)
@@ -237,14 +237,18 @@ impl DatasetManager {
     }
 
     #[instrument(skip(self))]
-    pub async fn list_dataset_tags(&self) -> Result<Vec<String>, Error> {
+    pub async fn list_dataset_tags(&self) -> Result<Vec<String>, DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| tasks::do_list_dataset_tags(&mut *state.database.get()?))?
             .await?
     }
 
     #[instrument(skip(self, update), fields(dataset.id = id))]
-    pub async fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), Error> {
+    pub async fn update_dataset(
+        &self,
+        id: i32,
+        update: DatasetUpdate,
+    ) -> Result<(), DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| {
                 let mut conn = state.database.get()?;
@@ -259,7 +263,7 @@ impl DatasetManager {
     }
 
     #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
-    pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
+    pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| {
                 let mut conn = state.database.get()?;
@@ -274,7 +278,7 @@ impl DatasetManager {
     }
 
     #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
-    pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), Error> {
+    pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| {
                 let mut conn = state.database.get()?;
@@ -289,7 +293,7 @@ impl DatasetManager {
     }
 
     #[instrument(skip(self), fields(dataset.id = id))]
-    pub async fn delete_dataset(&self, id: i32) -> Result<(), Error> {
+    pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| {
                 tasks::do_delete_dataset(&state.database, &state.root, id).inspect_err(|e| {
@@ -300,7 +304,10 @@ impl DatasetManager {
     }
 
     #[instrument(skip(self, id), fields(dataset.id = ?id))]
-    pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, Error> {
+    pub async fn get_dataset_reader(
+        &self,
+        id: DatasetId,
+    ) -> Result<DatasetReader, DatasetManagerError> {
         self.app
             .spawn_blocking(move |state| {
                 tasks::do_get_dataset_reader(
@@ -367,7 +374,10 @@ impl DatasetSource {
             DatasetSource::File(r) => r.range(range).map(std::borrow::Cow::into_owned).collect(),
         }
     }
-    fn select_data(&self, options: &SelectOptions) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+    fn select_data(
+        &self,
+        options: &SelectOptions,
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), DatasetManagerError> {
         let index_filters = options.index_filters.as_ref();
         let selected_columns = options.selected_columns.as_deref();
         let result = match self {
@@ -377,7 +387,7 @@ impl DatasetSource {
             }
             DatasetSource::File(r) => select_data(
                 r.range((options.start, options.end)),
-                r.schema().ok_or(Error::EmptyDataset)?,
+                r.schema().ok_or(DatasetManagerError::EmptyDataset)?,
                 index_filters,
                 selected_columns,
             ),
@@ -405,11 +415,11 @@ struct Filter {
 }
 
 impl Filter {
-    fn new(schema: &Schema, filters: &RecordBatch) -> Result<Self, dataset::Error> {
+    fn new(schema: &Schema, filters: &RecordBatch) -> Result<Self, dataset::DatasetError> {
         if filters.schema().fields.is_empty() {
             Ok(Self { filters: vec![] })
         } else if filters.num_rows() != 1 {
-            Err(dataset::Error::InvalidFilter)
+            Err(dataset::DatasetError::InvalidFilter)
         } else {
             let filters = filters
                 .schema_ref()
@@ -419,16 +429,19 @@ impl Filter {
                 .map(|(field, column)| {
                     let column_index = schema
                         .column_with_name(field.name())
-                        .ok_or(dataset::Error::InvalidFilter)?
+                        .ok_or(dataset::DatasetError::InvalidFilter)?
                         .0;
-                    Ok::<_, dataset::Error>((column_index, Scalar::new(column.clone())))
+                    Ok::<_, dataset::DatasetError>((column_index, Scalar::new(column.clone())))
                 })
                 .try_collect()?;
             Ok(Self { filters })
         }
     }
 
-    fn build_predicate(&self, batch: &RecordBatch) -> Result<Option<BooleanArray>, dataset::Error> {
+    fn build_predicate(
+        &self,
+        batch: &RecordBatch,
+    ) -> Result<Option<BooleanArray>, dataset::DatasetError> {
         Ok(self
             .filters
             .iter()
@@ -443,7 +456,7 @@ fn select_data<'a>(
     source_schema: &SchemaRef,
     index_filters: Option<&RecordBatch>,
     selected_columns: Option<&[usize]>,
-) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::Error> {
+) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::DatasetError> {
     let filter = if let Some(f) = index_filters {
         Filter::new(source_schema, f)?
     } else {
@@ -461,7 +474,7 @@ fn select_data<'a>(
         )
     };
     let results = source
-        .map(|batch| -> Result<_, dataset::Error> {
+        .map(|batch| -> Result<_, dataset::DatasetError> {
             let mask = filter.build_predicate(&batch)?;
             let predicate = mask.map(|m| {
                 let mut builder = FilterBuilder::new(&m);
@@ -506,13 +519,13 @@ fn select_data_owned(
     source_schema: &SchemaRef,
     index_filters: Option<&RecordBatch>,
     selected_columns: Option<&[usize]>,
-) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::Error> {
+) -> Result<(SchemaRef, Vec<RecordBatch>), dataset::DatasetError> {
     let source = batches.into_iter().map(Cow::Owned);
     select_data(source, source_schema, index_filters, selected_columns)
 }
 
 impl DatasetReader {
-    fn from_handle(source: WriteSessionHandle) -> Result<Self, Error> {
+    fn from_handle(source: WriteSessionHandle) -> Result<Self, DatasetManagerError> {
         let arrow_schema = source.schema();
         let schema = arrow_schema.as_ref().try_into()?;
         Ok(Self {
@@ -521,10 +534,13 @@ impl DatasetReader {
             arrow_schema,
         })
     }
-    fn open_dir(path: PathBuf) -> Result<Self, Error> {
+    fn open_dir(path: PathBuf) -> Result<Self, DatasetManagerError> {
         let mut reader = ChunkReader::new(path, None);
         reader.read_all()?;
-        let arrow_schema = reader.schema().ok_or(Error::EmptyDataset)?.clone();
+        let arrow_schema = reader
+            .schema()
+            .ok_or(DatasetManagerError::EmptyDataset)?
+            .clone();
         let schema = arrow_schema.as_ref().try_into()?;
         Ok(Self {
             source: DatasetSource::File(reader),
@@ -559,7 +575,7 @@ impl DatasetReader {
     pub fn select_data(
         &self,
         options: &SelectOptions,
-    ) -> Result<(SchemaRef, Vec<RecordBatch>), Error> {
+    ) -> Result<(SchemaRef, Vec<RecordBatch>), DatasetManagerError> {
         self.source.select_data(options)
     }
     #[must_use]

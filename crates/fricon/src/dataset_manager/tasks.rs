@@ -20,8 +20,8 @@ use crate::{
     database::{self, DatasetStatus, NewDataset, Pool, SimpleUuid, schema},
     dataset_fs,
     dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetListQuery, DatasetReader, DatasetRecord,
-        DatasetSortBy, DatasetUpdate, Error, SortDirection,
+        CreateDatasetRequest, DatasetId, DatasetListQuery, DatasetManagerError, DatasetReader,
+        DatasetRecord, DatasetSortBy, DatasetUpdate, SortDirection,
         write_registry::{WriteSessionGuard, WriteSessionRegistry},
     },
 };
@@ -32,9 +32,9 @@ pub(super) trait DatasetRepo {
         &self,
         request: &CreateDatasetRequest,
         uid: Uuid,
-    ) -> Result<(database::Dataset, Vec<database::Tag>), Error>;
-    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), Error>;
-    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error>;
+    ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError>;
+    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), DatasetManagerError>;
+    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError>;
 }
 
 impl DatasetRepo for Pool {
@@ -42,17 +42,17 @@ impl DatasetRepo for Pool {
         &self,
         request: &CreateDatasetRequest,
         uid: Uuid,
-    ) -> Result<(database::Dataset, Vec<database::Tag>), Error> {
+    ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError> {
         create_dataset_db_record(&mut *self.get()?, request, uid)
     }
 
-    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), Error> {
+    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), DatasetManagerError> {
         let mut conn = self.get()?;
         database::Dataset::update_status(&mut conn, id, status)?;
         Ok(())
     }
 
-    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, Error> {
+    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
         let mut conn = self.get()?;
         do_get_dataset(&mut conn, id)
     }
@@ -60,11 +60,11 @@ impl DatasetRepo for Pool {
 
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait DatasetStore {
-    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, Error>;
+    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, DatasetManagerError>;
 }
 
 impl DatasetStore for WorkspaceRoot {
-    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, Error> {
+    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, DatasetManagerError> {
         let path = self.paths().dataset_path_from_uid(uid);
         dataset_fs::create_dataset(&path)?;
         Ok(path)
@@ -84,21 +84,21 @@ impl DatasetEvents for broadcast::Sender<AppEvent> {
 
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait WriteSessionGuardOps {
-    fn write(&mut self, batch: RecordBatch) -> Result<(), Error>;
-    fn commit(self) -> Result<(), Error>;
-    fn abort(self) -> Result<(), Error>;
+    fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError>;
+    fn commit(self) -> Result<(), DatasetManagerError>;
+    fn abort(self) -> Result<(), DatasetManagerError>;
 }
 
 impl WriteSessionGuardOps for WriteSessionGuard {
-    fn write(&mut self, batch: RecordBatch) -> Result<(), Error> {
+    fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError> {
         Self::write(self, batch)
     }
 
-    fn commit(self) -> Result<(), Error> {
+    fn commit(self) -> Result<(), DatasetManagerError> {
         Self::commit(self)
     }
 
-    fn abort(self) -> Result<(), Error> {
+    fn abort(self) -> Result<(), DatasetManagerError> {
         Self::abort(self)
     }
 }
@@ -127,7 +127,7 @@ fn create_dataset_with<R, S, E, W>(
     write_sessions: &W,
     request: CreateDatasetRequest,
     batches: impl RecordBatchReader,
-) -> Result<DatasetRecord, Error>
+) -> Result<DatasetRecord, DatasetManagerError>
 where
     R: DatasetRepo,
     S: DatasetStore,
@@ -156,7 +156,7 @@ where
     let mut session =
         write_sessions.start_session(dataset_record.id, dataset_path, batches.schema());
     let write_result = batches.into_iter().try_for_each(|batch| {
-        let batch = batch.map_err(|e| Error::BatchStream {
+        let batch = batch.map_err(|e| DatasetManagerError::BatchStream {
             message: e.to_string(),
         })?;
         session.write(batch)
@@ -191,7 +191,7 @@ pub(super) fn do_create_dataset(
     write_sessions: &WriteSessionRegistry,
     request: CreateDatasetRequest,
     batches: impl RecordBatchReader,
-) -> Result<DatasetRecord, Error> {
+) -> Result<DatasetRecord, DatasetManagerError> {
     create_dataset_with(
         database,
         root,
@@ -208,7 +208,7 @@ pub(super) fn do_delete_dataset(
     database: &Pool,
     root: &WorkspaceRoot,
     id: i32,
-) -> Result<(), Error> {
+) -> Result<(), DatasetManagerError> {
     let mut conn = database.get()?;
     let record = do_get_dataset(&mut conn, DatasetId::Id(id))?;
     let uid = record.metadata.uid;
@@ -227,7 +227,7 @@ pub(super) fn do_delete_dataset(
 pub(super) fn do_get_dataset(
     conn: &mut SqliteConnection,
     id: DatasetId,
-) -> Result<DatasetRecord, Error> {
+) -> Result<DatasetRecord, DatasetManagerError> {
     let dataset = match id {
         DatasetId::Id(dataset_id) => database::Dataset::find_by_id(conn, dataset_id)?,
         DatasetId::Uid(uid) => database::Dataset::find_by_uid(conn, uid)?,
@@ -238,7 +238,7 @@ pub(super) fn do_get_dataset(
             DatasetId::Id(i) => i.to_string(),
             DatasetId::Uid(u) => u.to_string(),
         };
-        return Err(Error::NotFound { id: id_str });
+        return Err(DatasetManagerError::NotFound { id: id_str });
     };
 
     let tags = dataset.load_tags(conn)?;
@@ -276,7 +276,7 @@ fn normalize_tag_filters(tags: Option<&[String]>) -> Option<Vec<String>> {
 fn resolve_tagged_dataset_ids(
     conn: &mut SqliteConnection,
     tag_filters: Option<&[String]>,
-) -> Result<Option<Vec<i32>>, Error> {
+) -> Result<Option<Vec<i32>>, DatasetManagerError> {
     let Some(tag_filters) = tag_filters else {
         return Ok(None);
     };
@@ -311,7 +311,7 @@ fn normalize_statuses(statuses: Option<&[DatasetStatus]>) -> Option<Vec<DatasetS
 fn map_datasets_with_tags(
     conn: &mut SqliteConnection,
     all_datasets: Vec<database::Dataset>,
-) -> Result<Vec<DatasetRecord>, Error> {
+) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
     let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
         .inner_join(schema::tags::table)
         .select((
@@ -343,7 +343,7 @@ fn map_datasets_with_tags(
 pub(super) fn do_list_datasets(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
-) -> Result<Vec<DatasetRecord>, Error> {
+) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
     let search = normalize_search(query_options.search.as_deref());
     let tag_filters = normalize_tag_filters(query_options.tags.as_deref());
     let tagged_dataset_ids = resolve_tagged_dataset_ids(conn, tag_filters.as_deref())?;
@@ -401,7 +401,9 @@ pub(super) fn do_list_datasets(
 
 /// List all known dataset tags in ascending name order.
 #[instrument(skip(conn))]
-pub(super) fn do_list_dataset_tags(conn: &mut SqliteConnection) -> Result<Vec<String>, Error> {
+pub(super) fn do_list_dataset_tags(
+    conn: &mut SqliteConnection,
+) -> Result<Vec<String>, DatasetManagerError> {
     let tags = schema::tags::table
         .select(schema::tags::name)
         .order(schema::tags::name.asc())
@@ -415,7 +417,7 @@ pub(super) fn do_update_dataset(
     conn: &mut SqliteConnection,
     id: i32,
     update: DatasetUpdate,
-) -> Result<(), Error> {
+) -> Result<(), DatasetManagerError> {
     let db_update = database::DatasetUpdate {
         name: update.name,
         description: update.description,
@@ -433,13 +435,13 @@ pub(super) fn do_add_tags(
     conn: &mut SqliteConnection,
     id: i32,
     tags: &[String],
-) -> Result<(), Error> {
+) -> Result<(), DatasetManagerError> {
     conn.immediate_transaction(|conn| {
         let created_tags = database::Tag::find_or_create_batch(conn, tags)?;
         let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
 
         database::DatasetTag::create_associations(conn, id, &tag_ids)?;
-        Ok::<(), Error>(())
+        Ok::<(), DatasetManagerError>(())
     })?;
     debug!(dataset.id = id, ?tags, "Tags added to dataset");
     Ok(())
@@ -451,7 +453,7 @@ pub(super) fn do_remove_tags(
     conn: &mut SqliteConnection,
     id: i32,
     tags: &[String],
-) -> Result<(), Error> {
+) -> Result<(), DatasetManagerError> {
     conn.immediate_transaction(|conn| {
         let tag_ids_to_delete = schema::tags::table
             .filter(schema::tags::name.eq_any(tags))
@@ -459,7 +461,7 @@ pub(super) fn do_remove_tags(
             .load::<i32>(conn)?;
 
         database::DatasetTag::remove_associations(conn, id, &tag_ids_to_delete)?;
-        Ok::<(), Error>(())
+        Ok::<(), DatasetManagerError>(())
     })?;
     debug!(dataset.id = id, ?tags, "Tags removed from dataset");
     Ok(())
@@ -472,7 +474,7 @@ pub(super) fn do_get_dataset_reader(
     root: &WorkspaceRoot,
     write_sessions: &WriteSessionRegistry,
     id: DatasetId,
-) -> Result<DatasetReader, Error> {
+) -> Result<DatasetReader, DatasetManagerError> {
     let mut conn = database.get()?;
     let dataset = do_get_dataset(&mut conn, id)?;
     if let Some(handle) = write_sessions.get(dataset.id) {
@@ -489,7 +491,7 @@ fn create_dataset_db_record(
     conn: &mut SqliteConnection,
     request: &CreateDatasetRequest,
     uid: Uuid,
-) -> Result<(database::Dataset, Vec<database::Tag>), Error> {
+) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError> {
     conn.immediate_transaction(|conn| {
         let new_dataset = NewDataset {
             uid: SimpleUuid(uid),
@@ -678,7 +680,7 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(|| {
-                Err(Error::BatchStream {
+                Err(DatasetManagerError::BatchStream {
                     message: "commit failed".to_string(),
                 })
             });

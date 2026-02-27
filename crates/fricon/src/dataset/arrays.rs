@@ -9,7 +9,7 @@ use derive_more::From;
 use num::complex::Complex64;
 
 use crate::dataset::{
-    Error,
+    DatasetError,
     scalars::{DatasetScalar, FixedStepTrace, VariableStepTrace},
     types::{ComplexType, DatasetDataType, ScalarKind, TraceKind},
 };
@@ -34,14 +34,16 @@ impl From<ComplexArray> for ArrayRef {
 }
 
 impl TryFrom<ArrayRef> for ComplexArray {
-    type Error = Error;
+    type Error = DatasetError;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let scalar_kind: ScalarKind = value.data_type().try_into()?;
         if scalar_kind == ScalarKind::Complex {
-            let struct_array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
+            let struct_array = value
+                .as_struct_opt()
+                .ok_or(DatasetError::IncompatibleType)?;
             Ok(ComplexArray(Arc::new(struct_array.clone())))
         } else {
-            Err(Error::IncompatibleType)
+            Err(DatasetError::IncompatibleType)
         }
     }
 }
@@ -87,7 +89,7 @@ impl From<ScalarArray> for ArrayRef {
 }
 
 impl TryFrom<ArrayRef> for ScalarArray {
-    type Error = Error;
+    type Error = DatasetError;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let scalar_kind = value.data_type().try_into()?;
         Ok(Self {
@@ -153,9 +155,9 @@ impl From<ScalarListArray> for ArrayRef {
 }
 
 impl TryFrom<ArrayRef> for ScalarListArray {
-    type Error = Error;
+    type Error = DatasetError;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
-        let array: &ListArray = value.as_list_opt().ok_or(Error::IncompatibleType)?;
+        let array: &ListArray = value.as_list_opt().ok_or(DatasetError::IncompatibleType)?;
         let scalar_kind = array.values().data_type().try_into()?;
         Ok(Self {
             array: Arc::new(array.clone()),
@@ -236,14 +238,16 @@ impl From<FixedStepTraceArray> for ArrayRef {
 }
 
 impl TryFrom<ArrayRef> for FixedStepTraceArray {
-    type Error = Error;
+    type Error = DatasetError;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
-        let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
+        let array = value
+            .as_struct_opt()
+            .ok_or(DatasetError::IncompatibleType)?;
         TraceKind::FixedStep.supports_data_type(array.data_type())?;
         let y = array
             .column(2)
             .as_list_opt::<i32>()
-            .ok_or(Error::IncompatibleType)?;
+            .ok_or(DatasetError::IncompatibleType)?;
         let scalar_kind = y.values().data_type().try_into()?;
         Ok(Self {
             array: Arc::new(array.clone()),
@@ -275,7 +279,7 @@ impl VariableStepTraceArray {
         }
     }
 
-    pub fn expand_row(&self, row: usize) -> Result<Option<(Vec<f64>, ArrayRef)>, Error> {
+    pub fn expand_row(&self, row: usize) -> Result<Option<(Vec<f64>, ArrayRef)>, DatasetError> {
         if row >= self.array.len() || self.array.is_null(row) {
             return Ok(None);
         }
@@ -290,7 +294,9 @@ impl VariableStepTraceArray {
         let x_values = x_array.value(row);
         let y_values = y_array.value(row);
 
-        let x_f64: &Float64Array = x_values.as_primitive_opt().ok_or(Error::IncompatibleType)?;
+        let x_f64: &Float64Array = x_values
+            .as_primitive_opt()
+            .ok_or(DatasetError::IncompatibleType)?;
 
         Ok(Some((x_f64.values().to_vec(), y_values)))
     }
@@ -318,14 +324,16 @@ impl From<VariableStepTraceArray> for ArrayRef {
 }
 
 impl TryFrom<ArrayRef> for VariableStepTraceArray {
-    type Error = Error;
+    type Error = DatasetError;
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
-        let array = value.as_struct_opt().ok_or(Error::IncompatibleType)?;
+        let array = value
+            .as_struct_opt()
+            .ok_or(DatasetError::IncompatibleType)?;
         TraceKind::VariableStep.supports_data_type(array.data_type())?;
         let y = array
             .column(1)
             .as_list_opt::<i32>()
-            .ok_or(Error::IncompatibleType)?;
+            .ok_or(DatasetError::IncompatibleType)?;
         let scalar_kind = y.values().data_type().try_into()?;
         Ok(Self {
             array: Arc::new(array.clone()),
@@ -388,9 +396,11 @@ impl DatasetArray {
         }
     }
 
-    pub fn expand_trace(&self, row: usize) -> Result<Option<(Vec<f64>, ArrayRef)>, Error> {
+    pub fn expand_trace(&self, row: usize) -> Result<Option<(Vec<f64>, ArrayRef)>, DatasetError> {
         match self {
-            DatasetArray::Numeric(_) | DatasetArray::Complex(_) => Err(Error::IncompatibleType),
+            DatasetArray::Numeric(_) | DatasetArray::Complex(_) => {
+                Err(DatasetError::IncompatibleType)
+            }
             DatasetArray::SimpleTrace(t) => {
                 if row >= t.array.len() || t.array.is_null(row) {
                     return Ok(None);
@@ -422,7 +432,7 @@ impl From<DatasetScalar> for DatasetArray {
 }
 
 impl TryFrom<ArrayRef> for DatasetArray {
-    type Error = Error;
+    type Error = DatasetError;
 
     fn try_from(value: ArrayRef) -> Result<Self, Self::Error> {
         let data_type = value.data_type();
@@ -436,8 +446,9 @@ impl TryFrom<ArrayRef> for DatasetArray {
             let scalar_kind: ScalarKind = data_type.try_into()?;
             match scalar_kind {
                 ScalarKind::Numeric => {
-                    let array: &Float64Array =
-                        value.as_primitive_opt().ok_or(Error::IncompatibleType)?;
+                    let array: &Float64Array = value
+                        .as_primitive_opt()
+                        .ok_or(DatasetError::IncompatibleType)?;
                     Ok(DatasetArray::Numeric(Arc::new(array.clone())))
                 }
                 ScalarKind::Complex => Ok(DatasetArray::Complex(value.try_into()?)),

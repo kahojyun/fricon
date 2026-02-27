@@ -10,7 +10,7 @@ use arrow_schema::{
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use super::Error;
+use super::DatasetError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScalarKind {
@@ -46,7 +46,7 @@ impl From<ScalarKind> for DataType {
 }
 
 impl TryFrom<&DataType> for ScalarKind {
-    type Error = Error;
+    type Error = DatasetError;
 
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         if value.is_numeric() {
@@ -54,7 +54,7 @@ impl TryFrom<&DataType> for ScalarKind {
         } else if *value == ComplexType::data_type() {
             Ok(ScalarKind::Complex)
         } else {
-            Err(Error::IncompatibleType)
+            Err(DatasetError::IncompatibleType)
         }
     }
 }
@@ -273,7 +273,7 @@ impl DatasetDataType {
 }
 
 impl TryFrom<&DataType> for DatasetDataType {
-    type Error = Error;
+    type Error = DatasetError;
 
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         if let Some((trace, field)) = TraceKind::parse_data_type(value) {
@@ -312,14 +312,14 @@ impl DatasetSchema {
 }
 
 impl TryFrom<&Schema> for DatasetSchema {
-    type Error = Error;
+    type Error = DatasetError;
 
     fn try_from(value: &Schema) -> Result<Self, Self::Error> {
         let columns = value
             .fields
             .iter()
             .map(|x| {
-                Ok::<_, Error>((
+                Ok::<_, DatasetError>((
                     x.name().to_owned(),
                     DatasetDataType::try_from(x.data_type())?,
                 ))

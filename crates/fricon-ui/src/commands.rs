@@ -22,7 +22,7 @@ use tracing::{debug, error, instrument};
 use super::AppState;
 use crate::models::{
     chart::{
-        DataResponse, DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
+        ChartDataResponse, DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
         ScatterChartDataOptions, ScatterModeOptions, build_heatmap_series, build_line_series,
         build_scatter_series,
     },
@@ -31,11 +31,11 @@ use crate::models::{
 
 #[derive(Debug, Clone, Serialize, specta::Type, thiserror::Error)]
 #[error("{message}")]
-struct Error {
+struct TauriCommandError {
     message: String,
 }
 
-impl From<anyhow::Error> for Error {
+impl From<anyhow::Error> for TauriCommandError {
     fn from(value: anyhow::Error) -> Self {
         Self {
             message: value.to_string(),
@@ -157,7 +157,7 @@ struct DatasetWriteStatus {
     is_complete: bool,
 }
 
-fn column_index(schema: &DatasetSchema, name: &str) -> Result<usize, Error> {
+fn column_index(schema: &DatasetSchema, name: &str) -> Result<usize, TauriCommandError> {
     let (idx, _, _) = schema
         .columns()
         .get_full(name)
@@ -174,7 +174,7 @@ fn push_column(columns: &mut Vec<usize>, index: usize) {
 fn resolve_series_column(
     schema: &DatasetSchema,
     series_name: &str,
-) -> Result<(usize, DatasetDataType), Error> {
+) -> Result<(usize, DatasetDataType), TauriCommandError> {
     let series_index = column_index(schema, series_name)?;
     let data_type = *schema
         .columns()
@@ -186,7 +186,7 @@ fn resolve_series_column(
 fn build_line_selected_columns(
     schema: &DatasetSchema,
     options: &LineChartDataOptions,
-) -> Result<Vec<usize>, Error> {
+) -> Result<Vec<usize>, TauriCommandError> {
     let mut selected = Vec::new();
     let (series_index, data_type) = resolve_series_column(schema, &options.series)?;
     push_column(&mut selected, series_index);
@@ -204,7 +204,7 @@ fn build_line_selected_columns(
 fn build_heatmap_selected_columns(
     schema: &DatasetSchema,
     options: &HeatmapChartDataOptions,
-) -> Result<Vec<usize>, Error> {
+) -> Result<Vec<usize>, TauriCommandError> {
     let mut selected = Vec::new();
     let (series_index, data_type) = resolve_series_column(schema, &options.series)?;
     push_column(&mut selected, series_index);
@@ -227,7 +227,7 @@ fn build_heatmap_selected_columns(
 fn build_scatter_selected_columns(
     schema: &DatasetSchema,
     options: &ScatterChartDataOptions,
-) -> Result<Vec<usize>, Error> {
+) -> Result<Vec<usize>, TauriCommandError> {
     let mut selected = Vec::new();
     match &options.scatter {
         ScatterModeOptions::Complex { series } => {
@@ -258,7 +258,7 @@ fn build_scatter_selected_columns(
 fn build_chart_selected_columns(
     schema: &DatasetSchema,
     options: &DatasetChartDataOptions,
-) -> Result<Vec<usize>, Error> {
+) -> Result<Vec<usize>, TauriCommandError> {
     match options {
         DatasetChartDataOptions::Line(options) => build_line_selected_columns(schema, options),
         DatasetChartDataOptions::Heatmap(options) => {
@@ -277,7 +277,7 @@ async fn dataset_chart_data(
     state: State<'_, AppState>,
     id: i32,
     options: DatasetChartDataOptions,
-) -> Result<DataResponse, Error> {
+) -> Result<ChartDataResponse, TauriCommandError> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let common = options.common();
@@ -350,12 +350,14 @@ async fn dataset_chart_data(
             "Failed to build dataset chart data"
         );
     }
-    result.map_err(Error::from)
+    result.map_err(TauriCommandError::from)
 }
 
 #[tauri::command]
 #[specta::specta]
-async fn get_workspace_info(state: State<'_, AppState>) -> Result<WorkspaceInfo, Error> {
+async fn get_workspace_info(
+    state: State<'_, AppState>,
+) -> Result<WorkspaceInfo, TauriCommandError> {
     let app = state.app();
     let workspace_paths = app.paths().context("Failed to retrieve workspace paths.")?;
     let workspace_path = workspace_paths.root();
@@ -386,7 +388,10 @@ struct DatasetListOptions {
     offset: Option<i64>,
 }
 
-fn validate_non_negative(value: Option<i64>, field_name: &str) -> Result<Option<i64>, Error> {
+fn validate_non_negative(
+    value: Option<i64>,
+    field_name: &str,
+) -> Result<Option<i64>, TauriCommandError> {
     match value {
         Some(v) if v < 0 => Err(anyhow::anyhow!("{field_name} must be non-negative").into()),
         _ => Ok(value),
@@ -398,7 +403,7 @@ fn validate_non_negative(value: Option<i64>, field_name: &str) -> Result<Option<
 async fn list_datasets(
     state: State<'_, AppState>,
     options: Option<DatasetListOptions>,
-) -> Result<Vec<DatasetInfo>, Error> {
+) -> Result<Vec<DatasetInfo>, TauriCommandError> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
     let options = options.unwrap_or_default();
@@ -437,19 +442,22 @@ async fn list_datasets(
 
 #[tauri::command]
 #[specta::specta]
-async fn list_dataset_tags(state: State<'_, AppState>) -> Result<Vec<String>, Error> {
+async fn list_dataset_tags(state: State<'_, AppState>) -> Result<Vec<String>, TauriCommandError> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
     dataset_manager
         .list_dataset_tags()
         .await
         .context("Failed to list dataset tags.")
-        .map_err(Error::from)
+        .map_err(TauriCommandError::from)
 }
 
 #[tauri::command]
 #[specta::specta]
-async fn dataset_detail(state: State<'_, AppState>, id: i32) -> Result<DatasetDetail, Error> {
+async fn dataset_detail(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<DatasetDetail, TauriCommandError> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
     let record = dataset_manager
@@ -494,7 +502,7 @@ async fn update_dataset_favorite(
     state: State<'_, AppState>,
     id: i32,
     update: DatasetFavoriteUpdate,
-) -> Result<(), Error> {
+) -> Result<(), TauriCommandError> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
     dataset_manager
@@ -699,7 +707,7 @@ async fn update_dataset_info(
     state: State<'_, AppState>,
     id: i32,
     update: DatasetInfoUpdate,
-) -> Result<(), Error> {
+) -> Result<(), TauriCommandError> {
     let app = state.app();
     let dataset_manager = app.dataset_manager();
 
@@ -759,7 +767,7 @@ async fn get_filter_data_internal(
     state: &AppState,
     id: i32,
     exclude_columns: Option<Vec<String>>,
-) -> Result<DataInternal, Error> {
+) -> Result<DataInternal, TauriCommandError> {
     let dataset = state.dataset(id).await?;
     let schema = dataset.schema();
     let index_columns = dataset.index_columns();
@@ -840,7 +848,7 @@ async fn build_filter_batch(
     exclude_columns: Option<Vec<String>>,
     indices: &[usize],
     arrow_schema: Arc<arrow_schema::Schema>,
-) -> Result<Option<arrow_array::RecordBatch>, Error> {
+) -> Result<Option<arrow_array::RecordBatch>, TauriCommandError> {
     let filter_data = get_filter_data_internal(state, id, exclude_columns).await?;
     let fields = filter_data.fields;
     let raw_values_map = filter_data.column_raw_values;
@@ -895,7 +903,7 @@ async fn get_filter_table_data(
     state: State<'_, AppState>,
     id: i32,
     options: FilterTableOptions,
-) -> Result<TableData, Error> {
+) -> Result<TableData, TauriCommandError> {
     let filter_data = get_filter_data_internal(&state, id, options.exclude_columns).await?;
 
     Ok(TableData {
@@ -910,7 +918,7 @@ async fn get_filter_table_data(
 async fn get_dataset_write_status(
     state: State<'_, AppState>,
     id: i32,
-) -> Result<DatasetWriteStatus, Error> {
+) -> Result<DatasetWriteStatus, TauriCommandError> {
     let dataset = state.dataset(id).await?;
     let (row_count, is_complete) = dataset.write_status();
     Ok(DatasetWriteStatus {
