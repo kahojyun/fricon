@@ -70,8 +70,6 @@ pub enum DatasetManagerError {
     NotFound { id: String },
     #[error("No dataset file found.")]
     EmptyDataset,
-    #[error("Dataset write stream error: {message}")]
-    BatchStream { message: String },
     #[error(transparent)]
     Database(#[from] DatabaseError),
     #[error(transparent)]
@@ -129,7 +127,6 @@ pub enum CreateIngestEvent {
 pub enum CreateTerminal {
     Finish,
     Abort,
-    Error,
 }
 
 #[derive(Debug, Clone, Default)]
