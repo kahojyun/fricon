@@ -154,7 +154,7 @@ impl DatasetService for Storage {
         debug!(name = %create.request.name, "RPC create: received dataset stream");
         let record = self
             .manager
-            .create_dataset(create.request, create.reader)
+            .create_dataset(create.request, create.events_rx)
             .await
             .map_err(|e| {
                 error!(error = %e, "Failed to write dataset");

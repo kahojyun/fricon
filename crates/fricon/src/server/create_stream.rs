@@ -1,27 +1,22 @@
-use std::io::{Error as IoError, ErrorKind};
-
-use arrow_array::RecordBatchReader;
-use arrow_ipc::reader::StreamReader;
-use futures::{StreamExt, stream};
-use tokio_util::{
-    io::{StreamReader as TokioStreamReader, SyncIoBridge},
-    sync::CancellationToken,
-};
+use arrow_buffer::Buffer;
+use arrow_ipc::reader::StreamDecoder;
+use futures::{Stream, StreamExt};
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use tonic::{Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
-    dataset_manager::{CreateDatasetRequest, DatasetManagerError},
+    dataset_manager::{
+        CreateAbortReason, CreateDatasetRequest, CreateFatalReason, CreateIngestEvent,
+        CreateTerminal,
+    },
     proto::{CreateMetadata, CreateRequest, create_request::CreateMessage},
 };
 
-pub(crate) type BatchReader = Box<dyn RecordBatchReader + Send>;
-pub(crate) type CreateBatchReader =
-    Box<dyn FnOnce() -> Result<BatchReader, DatasetManagerError> + Send>;
-
 pub(crate) struct CreateStreamParts {
     pub request: CreateDatasetRequest,
-    pub reader: CreateBatchReader,
+    pub events_rx: mpsc::Receiver<CreateIngestEvent>,
 }
 
 #[instrument(skip_all, fields(rpc.method = "dataset.create"))]
@@ -49,104 +44,8 @@ pub(crate) async fn parse_create_stream(
         ));
     };
 
-    let abortable_stream = stream::unfold(
-        (stream, shutdown_token, false),
-        |(mut stream, token, done)| async move {
-            if done {
-                return None;
-            }
-
-            tokio::select! {
-                item = stream.next() => {
-                    match item {
-                        Some(Ok(request)) => {
-                            match request.create_message {
-                                Some(CreateMessage::Payload(data)) => {
-                                    Some((Ok(data), (stream, token, false)))
-                                }
-                                Some(CreateMessage::Metadata(_)) => {
-                                    warn!("Unexpected metadata message after initial create metadata");
-                                    Some((
-                                        Err(IoError::new(
-                                            ErrorKind::InvalidInput,
-                                            "unexpected CreateMetadata message after the first message",
-                                        )),
-                                        (stream, token, true),
-                                    ))
-                                }
-                                Some(CreateMessage::Finish(_)) => {
-                                    // Finish must be the terminal message.
-                                    match stream.next().await {
-                                        None => None,
-                                        Some(Ok(_)) => Some((
-                                            Err(IoError::new(
-                                                ErrorKind::InvalidInput,
-                                                "unexpected message after CreateFinish",
-                                            )),
-                                            (stream, token, true),
-                                        )),
-                                        Some(Err(e)) => {
-                                            error!(error = %e, "Client connection error while validating CreateFinish termination");
-                                            Some((
-                                                Err(IoError::other(e)),
-                                                (stream, token, true),
-                                            ))
-                                        }
-                                    }
-                                }
-                                None => {
-                                    warn!("Received empty CreateRequest message");
-                                    Some((
-                                        Err(IoError::new(
-                                            ErrorKind::InvalidInput,
-                                            "empty CreateRequest message",
-                                        )),
-                                        (stream, token, true),
-                                    ))
-                                }
-                            }
-                        }
-                        Some(Err(e)) => {
-                            error!(error = %e, "Client connection error while uploading dataset");
-                            Some((
-                                Err(IoError::other(e)),
-                                (stream, token, true),
-                            ))
-                        }
-                        None => {
-                            // Reached the end of stream without a Finish message.
-                            warn!("Stream closed without finish message");
-                            Some((
-                                Err(IoError::new(
-                                    ErrorKind::ConnectionAborted,
-                                    "stream aborted without finish message",
-                                )),
-                                (stream, token, true),
-                            ))
-                        }
-                    }
-                }
-                () = token.cancelled() => {
-                    Some((
-                        Err(IoError::other(
-                            "Stream aborted because server is shutting down.",
-                        )),
-                        (stream, token, true),
-                    ))
-                }
-            }
-        },
-    )
-    .boxed();
-
-    let reader: CreateBatchReader = Box::new(move || {
-        let sync_reader = SyncIoBridge::new(TokioStreamReader::new(abortable_stream));
-        StreamReader::try_new(sync_reader, None)
-            .map(|reader| Box::new(reader) as BatchReader)
-            .map_err(|e| DatasetManagerError::BatchStream {
-                message: e.to_string(),
-            })
-    });
+    let (events_tx, events_rx) = mpsc::channel(16);
+    tokio::spawn(produce_create_events(stream, shutdown_token, events_tx));
 
     Ok(CreateStreamParts {
         request: CreateDatasetRequest {
@@ -154,6 +53,287 @@ pub(crate) async fn parse_create_stream(
             description,
             tags,
         },
-        reader,
+        events_rx,
     })
+}
+
+async fn produce_create_events<S>(
+    mut stream: S,
+    shutdown_token: CancellationToken,
+    events_tx: mpsc::Sender<CreateIngestEvent>,
+) where
+    S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
+{
+    let mut decoder = StreamDecoder::new();
+
+    loop {
+        tokio::select! {
+            item = stream.next() => {
+                let terminal = match item {
+                    Some(Ok(request)) => {
+                        handle_stream_message(
+                            request.create_message,
+                            &mut stream,
+                            &mut decoder,
+                            &events_tx,
+                        )
+                        .await
+                    }
+                    Some(Err(error)) => {
+                        error!(error = %error, "Client connection error while uploading dataset");
+                        Some(CreateTerminal::Fatal(CreateFatalReason::Transport(error.to_string())))
+                    }
+                    None => {
+                        warn!("Stream closed without finish message");
+                        Some(CreateTerminal::Abort(CreateAbortReason::ClientClosedWithoutFinish))
+                    }
+                };
+
+                if let Some(terminal) = terminal {
+                    let _ = events_tx.send(CreateIngestEvent::Terminal(terminal)).await;
+                    break;
+                }
+            }
+            () = shutdown_token.cancelled() => {
+                let _ = events_tx
+                    .send(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
+                        CreateFatalReason::ServerShutdown,
+                    )))
+                    .await;
+                break;
+            }
+        }
+    }
+}
+
+async fn handle_stream_message<S>(
+    message: Option<CreateMessage>,
+    stream: &mut S,
+    decoder: &mut StreamDecoder,
+    events_tx: &mpsc::Sender<CreateIngestEvent>,
+) -> Option<CreateTerminal>
+where
+    S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
+{
+    match message {
+        Some(CreateMessage::Payload(payload)) => decode_payload(payload, decoder, events_tx).await,
+        Some(CreateMessage::Metadata(_)) => {
+            warn!("Unexpected metadata message after initial create metadata");
+            Some(CreateTerminal::Fatal(CreateFatalReason::ProtocolViolation(
+                "unexpected CreateMetadata message after the first message",
+            )))
+        }
+        Some(CreateMessage::Finish(_)) => {
+            // Finish must be the terminal message.
+            match stream.next().await {
+                None => match decoder.finish() {
+                    Ok(()) => Some(CreateTerminal::Finish),
+                    Err(error) => Some(CreateTerminal::Fatal(CreateFatalReason::Decode(
+                        error.to_string(),
+                    ))),
+                },
+                Some(Ok(_)) => Some(CreateTerminal::Fatal(CreateFatalReason::ProtocolViolation(
+                    "unexpected message after CreateFinish",
+                ))),
+                Some(Err(error)) => {
+                    error!(error = %error, "Client connection error while validating CreateFinish termination");
+                    Some(CreateTerminal::Fatal(CreateFatalReason::Transport(
+                        error.to_string(),
+                    )))
+                }
+            }
+        }
+        None => {
+            warn!("Received empty CreateRequest message");
+            Some(CreateTerminal::Fatal(CreateFatalReason::ProtocolViolation(
+                "empty CreateRequest message",
+            )))
+        }
+    }
+}
+
+async fn decode_payload(
+    payload: bytes::Bytes,
+    decoder: &mut StreamDecoder,
+    events_tx: &mpsc::Sender<CreateIngestEvent>,
+) -> Option<CreateTerminal> {
+    let mut buffer = Buffer::from(payload);
+    while !buffer.is_empty() {
+        match decoder.decode(&mut buffer) {
+            Ok(Some(batch)) => {
+                if events_tx
+                    .send(CreateIngestEvent::Batch(batch))
+                    .await
+                    .is_err()
+                {
+                    return Some(CreateTerminal::Fatal(CreateFatalReason::Transport(
+                        "create ingest receiver dropped".to_string(),
+                    )));
+                }
+            }
+            Ok(None) => {}
+            Err(error) => {
+                return Some(CreateTerminal::Fatal(CreateFatalReason::Decode(
+                    error.to_string(),
+                )));
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_array::{Int32Array, RecordBatch};
+    use arrow_ipc::writer::StreamWriter;
+    use arrow_schema::{DataType, Field, Schema};
+    use futures::stream;
+    use tokio::sync::mpsc;
+
+    use super::*;
+    use crate::proto::CreateFinish;
+
+    fn payload_message(payload: bytes::Bytes) -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::Payload(payload)),
+        }
+    }
+
+    fn finish_message() -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::Finish(CreateFinish {})),
+        }
+    }
+
+    fn metadata_message() -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::Metadata(CreateMetadata {
+                name: "name".to_string(),
+                description: "desc".to_string(),
+                tags: vec![],
+            })),
+        }
+    }
+
+    fn build_payload_bytes() -> bytes::Bytes {
+        let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
+        )
+        .expect("batch");
+        let mut bytes = vec![];
+        let mut writer = StreamWriter::try_new(&mut bytes, &schema).expect("stream writer");
+        writer.write(&batch).expect("write batch");
+        writer.finish().expect("finish stream writer");
+        bytes::Bytes::from(bytes)
+    }
+
+    async fn collect_events(
+        stream: impl Stream<Item = Result<CreateRequest, Status>> + Unpin,
+        shutdown_token: CancellationToken,
+    ) -> Vec<CreateIngestEvent> {
+        let (tx, mut rx) = mpsc::channel(16);
+        produce_create_events(stream, shutdown_token, tx).await;
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+        events
+    }
+
+    #[tokio::test]
+    async fn payload_then_finish_produces_finish_terminal() {
+        let payload = build_payload_bytes();
+        let stream = stream::iter(vec![Ok(payload_message(payload)), Ok(finish_message())]);
+        let events = collect_events(stream, CancellationToken::new()).await;
+
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, CreateIngestEvent::Batch(_)))
+        );
+        assert!(matches!(
+            events.last(),
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Finish))
+        ));
+    }
+
+    #[tokio::test]
+    async fn stream_closed_without_finish_produces_abort_terminal() {
+        let payload = build_payload_bytes();
+        let stream = stream::iter(vec![Ok(payload_message(payload))]);
+        let events = collect_events(stream, CancellationToken::new()).await;
+
+        assert!(matches!(
+            events.last(),
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort(
+                CreateAbortReason::ClientClosedWithoutFinish
+            )))
+        ));
+    }
+
+    #[tokio::test]
+    async fn metadata_after_first_message_produces_protocol_fatal() {
+        let stream = stream::iter(vec![Ok(metadata_message())]);
+        let events = collect_events(stream, CancellationToken::new()).await;
+
+        assert!(matches!(
+            events.last(),
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
+                CreateFatalReason::ProtocolViolation(_)
+            )))
+        ));
+    }
+
+    #[tokio::test]
+    async fn finish_with_trailing_message_produces_protocol_fatal() {
+        let payload = build_payload_bytes();
+        let stream = stream::iter(vec![
+            Ok(payload_message(payload)),
+            Ok(finish_message()),
+            Ok(finish_message()),
+        ]);
+        let events = collect_events(stream, CancellationToken::new()).await;
+
+        assert!(matches!(
+            events.last(),
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
+                CreateFatalReason::ProtocolViolation(_)
+            )))
+        ));
+    }
+
+    #[tokio::test]
+    async fn invalid_payload_produces_decode_fatal() {
+        let stream = stream::iter(vec![
+            Ok(payload_message(bytes::Bytes::from_static(b"not-arrow"))),
+            Ok(finish_message()),
+        ]);
+        let events = collect_events(stream, CancellationToken::new()).await;
+
+        assert!(matches!(
+            events.last(),
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
+                CreateFatalReason::Decode(_)
+            )))
+        ));
+    }
+
+    #[tokio::test]
+    async fn shutdown_produces_server_shutdown_fatal() {
+        let token = CancellationToken::new();
+        token.cancel();
+        let stream = stream::pending::<Result<CreateRequest, Status>>();
+        let events = collect_events(stream, token).await;
+
+        assert!(matches!(
+            events.last(),
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
+                CreateFatalReason::ServerShutdown
+            )))
+        ));
+    }
 }
