@@ -7,10 +7,7 @@ use tonic::{Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
-    dataset_manager::{
-        CreateAbortReason, CreateDatasetRequest, CreateFatalReason, CreateIngestEvent,
-        CreateTerminal,
-    },
+    dataset_manager::{CreateDatasetRequest, CreateIngestEvent, CreateTerminal},
     proto::{CreateMetadata, CreateRequest, create_request::CreateMessage},
 };
 
@@ -81,11 +78,11 @@ async fn produce_create_events<S>(
                     }
                     Some(Err(error)) => {
                         error!(error = %error, "Client connection error while uploading dataset");
-                        Some(CreateTerminal::Fatal(CreateFatalReason::Transport(error.to_string())))
+                        Some(CreateTerminal::Error)
                     }
                     None => {
                         warn!("Stream closed without finish message");
-                        Some(CreateTerminal::Abort(CreateAbortReason::ClientClosedWithoutFinish))
+                        Some(CreateTerminal::Abort)
                     }
                 };
 
@@ -95,10 +92,9 @@ async fn produce_create_events<S>(
                 }
             }
             () = shutdown_token.cancelled() => {
+                warn!("Create stream cancelled because server is shutting down");
                 let _ = events_tx
-                    .send(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
-                        CreateFatalReason::ServerShutdown,
-                    )))
+                    .send(CreateIngestEvent::Terminal(CreateTerminal::Error))
                     .await;
                 break;
             }
@@ -119,35 +115,31 @@ where
         Some(CreateMessage::Payload(payload)) => decode_payload(payload, decoder, events_tx).await,
         Some(CreateMessage::Metadata(_)) => {
             warn!("Unexpected metadata message after initial create metadata");
-            Some(CreateTerminal::Fatal(CreateFatalReason::ProtocolViolation(
-                "unexpected CreateMetadata message after the first message",
-            )))
+            Some(CreateTerminal::Error)
         }
         Some(CreateMessage::Finish(_)) => {
             // Finish must be the terminal message.
             match stream.next().await {
                 None => match decoder.finish() {
                     Ok(()) => Some(CreateTerminal::Finish),
-                    Err(error) => Some(CreateTerminal::Fatal(CreateFatalReason::Decode(
-                        error.to_string(),
-                    ))),
+                    Err(error) => {
+                        error!(error = %error, "Failed to finalize Arrow stream on CreateFinish");
+                        Some(CreateTerminal::Error)
+                    }
                 },
-                Some(Ok(_)) => Some(CreateTerminal::Fatal(CreateFatalReason::ProtocolViolation(
-                    "unexpected message after CreateFinish",
-                ))),
+                Some(Ok(_)) => {
+                    warn!("Unexpected message after CreateFinish");
+                    Some(CreateTerminal::Error)
+                }
                 Some(Err(error)) => {
                     error!(error = %error, "Client connection error while validating CreateFinish termination");
-                    Some(CreateTerminal::Fatal(CreateFatalReason::Transport(
-                        error.to_string(),
-                    )))
+                    Some(CreateTerminal::Error)
                 }
             }
         }
         None => {
             warn!("Received empty CreateRequest message");
-            Some(CreateTerminal::Fatal(CreateFatalReason::ProtocolViolation(
-                "empty CreateRequest message",
-            )))
+            Some(CreateTerminal::Error)
         }
     }
 }
@@ -166,16 +158,14 @@ async fn decode_payload(
                     .await
                     .is_err()
                 {
-                    return Some(CreateTerminal::Fatal(CreateFatalReason::Transport(
-                        "create ingest receiver dropped".to_string(),
-                    )));
+                    error!("create ingest receiver dropped while forwarding payload batch");
+                    return Some(CreateTerminal::Error);
                 }
             }
             Ok(None) => {}
             Err(error) => {
-                return Some(CreateTerminal::Fatal(CreateFatalReason::Decode(
-                    error.to_string(),
-                )));
+                error!(error = %error, "Failed to decode Arrow payload");
+                return Some(CreateTerminal::Error);
             }
         }
     }
@@ -269,27 +259,23 @@ mod tests {
 
         assert!(matches!(
             events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort(
-                CreateAbortReason::ClientClosedWithoutFinish
-            )))
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
         ));
     }
 
     #[tokio::test]
-    async fn metadata_after_first_message_produces_protocol_fatal() {
+    async fn metadata_after_first_message_produces_error_terminal() {
         let stream = stream::iter(vec![Ok(metadata_message())]);
         let events = collect_events(stream, CancellationToken::new()).await;
 
         assert!(matches!(
             events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
-                CreateFatalReason::ProtocolViolation(_)
-            )))
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Error))
         ));
     }
 
     #[tokio::test]
-    async fn finish_with_trailing_message_produces_protocol_fatal() {
+    async fn finish_with_trailing_message_produces_error_terminal() {
         let payload = build_payload_bytes();
         let stream = stream::iter(vec![
             Ok(payload_message(payload)),
@@ -300,14 +286,12 @@ mod tests {
 
         assert!(matches!(
             events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
-                CreateFatalReason::ProtocolViolation(_)
-            )))
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Error))
         ));
     }
 
     #[tokio::test]
-    async fn invalid_payload_produces_decode_fatal() {
+    async fn invalid_payload_produces_error_terminal() {
         let stream = stream::iter(vec![
             Ok(payload_message(bytes::Bytes::from_static(b"not-arrow"))),
             Ok(finish_message()),
@@ -316,14 +300,12 @@ mod tests {
 
         assert!(matches!(
             events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
-                CreateFatalReason::Decode(_)
-            )))
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Error))
         ));
     }
 
     #[tokio::test]
-    async fn shutdown_produces_server_shutdown_fatal() {
+    async fn shutdown_produces_error_terminal() {
         let token = CancellationToken::new();
         token.cancel();
         let stream = stream::pending::<Result<CreateRequest, Status>>();
@@ -331,9 +313,7 @@ mod tests {
 
         assert!(matches!(
             events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Fatal(
-                CreateFatalReason::ServerShutdown
-            )))
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Error))
         ));
     }
 }

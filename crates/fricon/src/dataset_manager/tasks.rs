@@ -20,9 +20,9 @@ use crate::{
     database::{self, DatasetStatus, NewDataset, Pool, SimpleUuid, schema},
     dataset_fs,
     dataset_manager::{
-        CreateDatasetRequest, CreateFatalReason, CreateIngestEvent, CreateTerminal, DatasetId,
-        DatasetListQuery, DatasetManagerError, DatasetReader, DatasetRecord, DatasetSortBy,
-        DatasetUpdate, SortDirection,
+        CreateDatasetRequest, CreateIngestEvent, CreateTerminal, DatasetId, DatasetListQuery,
+        DatasetManagerError, DatasetReader, DatasetRecord, DatasetSortBy, DatasetUpdate,
+        SortDirection,
         write_registry::{WriteSessionGuard, WriteSessionRegistry},
     },
 };
@@ -157,9 +157,7 @@ where
     let mut session = None;
     let terminal = loop {
         let Some(event) = events_rx.blocking_recv() else {
-            break CreateTerminal::Fatal(CreateFatalReason::Transport(
-                "create ingest channel closed without terminal event".to_string(),
-            ));
+            break CreateTerminal::Error;
         };
 
         match event {
@@ -172,7 +170,8 @@ where
                     )
                 });
                 if let Err(error) = session_ref.write(batch) {
-                    break CreateTerminal::Fatal(CreateFatalReason::Transport(error.to_string()));
+                    debug!(error = %error, "Failed to write batch into dataset session");
+                    break CreateTerminal::Error;
                 }
             }
             CreateIngestEvent::Terminal(terminal) => break terminal,
@@ -191,7 +190,7 @@ where
             info!(dataset.id = dataset_record.id, %uid, "Dataset write completed");
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
-        CreateTerminal::Abort(reason) => {
+        CreateTerminal::Abort => {
             if let Some(session) = session.take() {
                 if let Err(error) = session.abort() {
                     let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
@@ -199,19 +198,17 @@ where
                 }
             }
             repo.update_status(dataset_record.id, DatasetStatus::Aborted)?;
-            info!(
-                dataset.id = dataset_record.id,
-                ?reason,
-                "Dataset write aborted"
-            );
+            info!(dataset.id = dataset_record.id, "Dataset write aborted");
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
-        CreateTerminal::Fatal(reason) => {
+        CreateTerminal::Error => {
             if let Some(session) = session {
                 let _ = session.abort();
             }
             let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
-            Err(reason.into_error())
+            Err(DatasetManagerError::BatchStream {
+                message: "create stream failed".to_string(),
+            })
         }
     }
 }
@@ -570,8 +567,6 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::dataset_manager::CreateAbortReason;
-
     struct FakeWriteSessions {
         guard: RefCell<Option<MockWriteSessionGuardOps>>,
     }
@@ -763,7 +758,7 @@ mod tests {
     }
 
     #[test]
-    fn create_fatal_returns_error_and_aborts_dataset() {
+    fn create_error_returns_error_and_aborts_dataset() {
         let mut seq = Sequence::new();
         let dataset_id = 1;
 
@@ -797,7 +792,7 @@ mod tests {
         };
         let events_rx = events_rx(vec![
             CreateIngestEvent::Batch(batch),
-            CreateIngestEvent::Terminal(CreateTerminal::Fatal(CreateFatalReason::ServerShutdown)),
+            CreateIngestEvent::Terminal(CreateTerminal::Error),
         ]);
 
         let result = create_dataset_with(&repo, &store, &events, &sessions, request, events_rx);
@@ -857,9 +852,7 @@ mod tests {
         };
         let events_rx = events_rx(vec![
             CreateIngestEvent::Batch(batch),
-            CreateIngestEvent::Terminal(CreateTerminal::Abort(
-                CreateAbortReason::ClientClosedWithoutFinish,
-            )),
+            CreateIngestEvent::Terminal(CreateTerminal::Abort),
         ]);
 
         let result = create_dataset_with(&repo, &store, &events, &sessions, request, events_rx);

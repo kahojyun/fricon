@@ -128,38 +128,8 @@ pub enum CreateIngestEvent {
 #[derive(Debug, Clone)]
 pub enum CreateTerminal {
     Finish,
-    Abort(CreateAbortReason),
-    Fatal(CreateFatalReason),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum CreateAbortReason {
-    ClientClosedWithoutFinish,
-    ClientExplicitAbort,
-}
-
-#[derive(Debug, Clone)]
-pub enum CreateFatalReason {
-    ServerShutdown,
-    ProtocolViolation(&'static str),
-    Decode(String),
-    Transport(String),
-}
-
-impl CreateFatalReason {
-    fn into_error(self) -> DatasetManagerError {
-        let message = match self {
-            Self::ServerShutdown => {
-                "create stream aborted because server is shutting down".to_string()
-            }
-            Self::ProtocolViolation(message) => {
-                format!("create stream protocol violation: {message}")
-            }
-            Self::Decode(message) => format!("create stream decode error: {message}"),
-            Self::Transport(message) => format!("create stream transport error: {message}"),
-        };
-        DatasetManagerError::BatchStream { message }
-    }
+    Abort,
+    Error,
 }
 
 #[derive(Debug, Clone, Default)]
