@@ -34,8 +34,8 @@ use crate::{
     dataset_manager::DatasetRecord,
     ipc,
     proto::{
-        AddTagsRequest, CreateFinish, CreateMetadata, CreateRequest, CreateResponse, GetRequest,
-        RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
+        AddTagsRequest, CreateAbort, CreateFinish, CreateMetadata, CreateRequest, CreateResponse,
+        GetRequest, RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
@@ -326,7 +326,8 @@ fn build_request_stream(
             stream::once(async move {
                 match control_rx.await {
                     Ok(StreamControl::Finish) => Some(CreateMessage::Finish(CreateFinish {})),
-                    Ok(StreamControl::Abort) | Err(_) => None,
+                    Ok(StreamControl::Abort) => Some(CreateMessage::Abort(CreateAbort {})),
+                    Err(_) => None,
                 }
             })
             .filter_map(|msg| async move { msg }),
@@ -487,7 +488,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn build_request_stream_omits_finish_message_on_abort() {
+    async fn build_request_stream_sends_abort_message_on_abort() {
         let (tx, rx) = oneshot::channel();
         tx.send(StreamControl::Abort).expect("send control");
         let stream = build_request_stream(
@@ -505,9 +506,10 @@ mod tests {
             .collect()
             .await;
 
-        assert_eq!(messages.len(), 2);
+        assert_eq!(messages.len(), 3);
         assert!(matches!(messages[0], CreateMessage::Metadata(_)));
         assert!(matches!(messages[1], CreateMessage::Payload(_)));
+        assert!(matches!(messages[2], CreateMessage::Abort(_)));
     }
 
     #[test]

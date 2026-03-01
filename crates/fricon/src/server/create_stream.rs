@@ -1,9 +1,9 @@
 use arrow_buffer::Buffer;
 use arrow_ipc::reader::StreamDecoder;
 use futures::{Stream, StreamExt};
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
-use tonic::{Status, Streaming};
+use tonic::{Code, Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
@@ -14,6 +14,7 @@ use crate::{
 pub(crate) struct CreateStreamParts {
     pub request: CreateDatasetRequest,
     pub events_rx: mpsc::Receiver<CreateIngestEvent>,
+    pub events_task: JoinHandle<Result<(), Status>>,
 }
 
 #[instrument(skip_all, fields(rpc.method = "dataset.create"))]
@@ -42,7 +43,7 @@ pub(crate) async fn parse_create_stream(
     };
 
     let (events_tx, events_rx) = mpsc::channel(16);
-    tokio::spawn(produce_create_events(stream, shutdown_token, events_tx));
+    let events_task = tokio::spawn(produce_create_events(stream, shutdown_token, events_tx));
 
     Ok(CreateStreamParts {
         request: CreateDatasetRequest {
@@ -51,6 +52,7 @@ pub(crate) async fn parse_create_stream(
             tags,
         },
         events_rx,
+        events_task,
     })
 }
 
@@ -58,7 +60,8 @@ async fn produce_create_events<S>(
     mut stream: S,
     shutdown_token: CancellationToken,
     events_tx: mpsc::Sender<CreateIngestEvent>,
-) where
+) -> Result<(), Status>
+where
     S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
 {
     let mut decoder = StreamDecoder::new();
@@ -68,38 +71,66 @@ async fn produce_create_events<S>(
             item = stream.next() => {
                 let terminal = match item {
                     Some(Ok(request)) => {
-                        handle_stream_message(
+                        match handle_stream_message(
                             request.create_message,
                             &mut stream,
                             &mut decoder,
                             &events_tx,
                         )
                         .await
+                        {
+                            Ok(terminal) => terminal,
+                            Err(status) => return send_abort_and_error(&events_tx, status).await,
+                        }
                     }
                     Some(Err(error)) => {
-                        error!(error = %error, "Client connection error while uploading dataset");
-                        Some(CreateTerminal::Abort)
+                        return send_abort_and_error(
+                            &events_tx,
+                            Status::new(error.code(), "client stream error while uploading dataset"),
+                        )
+                        .await;
                     }
                     None => {
                         warn!("Stream closed without finish message");
-                        Some(CreateTerminal::Abort)
+                        return send_abort_and_error(
+                            &events_tx,
+                            Status::invalid_argument(
+                                "create stream closed without terminal finish/abort message",
+                            ),
+                        )
+                        .await;
                     }
                 };
 
                 if let Some(terminal) = terminal {
-                    let _ = events_tx.send(CreateIngestEvent::Terminal(terminal)).await;
-                    break;
+                    events_tx
+                        .send(CreateIngestEvent::Terminal(terminal))
+                        .await
+                        .map_err(|_| Status::internal("create ingest receiver dropped"))?;
+                    return Ok(());
                 }
             }
             () = shutdown_token.cancelled() => {
                 warn!("Create stream cancelled because server is shutting down");
-                let _ = events_tx
-                    .send(CreateIngestEvent::Terminal(CreateTerminal::Abort))
-                    .await;
-                break;
+                return send_abort_and_error(
+                    &events_tx,
+                    Status::new(Code::Unavailable, "server is shutting down"),
+                )
+                .await;
             }
         }
     }
+}
+
+async fn send_abort_and_error(
+    events_tx: &mpsc::Sender<CreateIngestEvent>,
+    status: Status,
+) -> Result<(), Status> {
+    events_tx
+        .send(CreateIngestEvent::Terminal(CreateTerminal::Abort))
+        .await
+        .map_err(|_| Status::internal("create ingest receiver dropped"))?;
+    Err(status)
 }
 
 async fn handle_stream_message<S>(
@@ -107,7 +138,7 @@ async fn handle_stream_message<S>(
     stream: &mut S,
     decoder: &mut StreamDecoder,
     events_tx: &mpsc::Sender<CreateIngestEvent>,
-) -> Option<CreateTerminal>
+) -> Result<Option<CreateTerminal>, Status>
 where
     S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
 {
@@ -115,31 +146,55 @@ where
         Some(CreateMessage::Payload(payload)) => decode_payload(payload, decoder, events_tx).await,
         Some(CreateMessage::Metadata(_)) => {
             warn!("Unexpected metadata message after initial create metadata");
-            Some(CreateTerminal::Abort)
+            Err(Status::invalid_argument(
+                "unexpected metadata message after initial create metadata",
+            ))
         }
         Some(CreateMessage::Finish(_)) => {
             // Finish must be the terminal message.
             match stream.next().await {
                 None => match decoder.finish() {
-                    Ok(()) => Some(CreateTerminal::Finish),
+                    Ok(()) => Ok(Some(CreateTerminal::Finish)),
                     Err(error) => {
                         error!(error = %error, "Failed to finalize Arrow stream on CreateFinish");
-                        Some(CreateTerminal::Abort)
+                        Err(Status::invalid_argument(
+                            "invalid Arrow stream at create finish",
+                        ))
                     }
                 },
                 Some(Ok(_)) => {
                     warn!("Unexpected message after CreateFinish");
-                    Some(CreateTerminal::Abort)
+                    Err(Status::invalid_argument(
+                        "unexpected trailing message after create finish",
+                    ))
                 }
-                Some(Err(error)) => {
-                    error!(error = %error, "Client connection error while validating CreateFinish termination");
-                    Some(CreateTerminal::Abort)
+                Some(Err(error)) => Err(Status::new(
+                    error.code(),
+                    "client stream error while validating create finish termination",
+                )),
+            }
+        }
+        Some(CreateMessage::Abort(_)) => {
+            // Abort must be the terminal message.
+            match stream.next().await {
+                None => Ok(Some(CreateTerminal::Abort)),
+                Some(Ok(_)) => {
+                    warn!("Unexpected message after CreateAbort");
+                    Err(Status::invalid_argument(
+                        "unexpected trailing message after create abort",
+                    ))
                 }
+                Some(Err(error)) => Err(Status::new(
+                    error.code(),
+                    "client stream error while validating create abort termination",
+                )),
             }
         }
         None => {
             warn!("Received empty CreateRequest message");
-            Some(CreateTerminal::Abort)
+            Err(Status::invalid_argument(
+                "create request message body is empty",
+            ))
         }
     }
 }
@@ -148,28 +203,24 @@ async fn decode_payload(
     payload: bytes::Bytes,
     decoder: &mut StreamDecoder,
     events_tx: &mpsc::Sender<CreateIngestEvent>,
-) -> Option<CreateTerminal> {
+) -> Result<Option<CreateTerminal>, Status> {
     let mut buffer = Buffer::from(payload);
     while !buffer.is_empty() {
         match decoder.decode(&mut buffer) {
             Ok(Some(batch)) => {
-                if events_tx
+                events_tx
                     .send(CreateIngestEvent::Batch(batch))
                     .await
-                    .is_err()
-                {
-                    error!("create ingest receiver dropped while forwarding payload batch");
-                    return Some(CreateTerminal::Abort);
-                }
+                    .map_err(|_| Status::internal("create ingest receiver dropped"))?;
             }
             Ok(None) => {}
             Err(error) => {
                 error!(error = %error, "Failed to decode Arrow payload");
-                return Some(CreateTerminal::Abort);
+                return Err(Status::invalid_argument("failed to decode Arrow payload"));
             }
         }
     }
-    None
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -183,7 +234,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::proto::CreateFinish;
+    use crate::proto::{CreateAbort, CreateFinish};
 
     fn payload_message(payload: bytes::Bytes) -> CreateRequest {
         CreateRequest {
@@ -194,6 +245,12 @@ mod tests {
     fn finish_message() -> CreateRequest {
         CreateRequest {
             create_message: Some(CreateMessage::Finish(CreateFinish {})),
+        }
+    }
+
+    fn abort_message() -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::Abort(CreateAbort {})),
         }
     }
 
@@ -224,21 +281,22 @@ mod tests {
     async fn collect_events(
         stream: impl Stream<Item = Result<CreateRequest, Status>> + Unpin,
         shutdown_token: CancellationToken,
-    ) -> Vec<CreateIngestEvent> {
+    ) -> (Vec<CreateIngestEvent>, Result<(), Status>) {
         let (tx, mut rx) = mpsc::channel(16);
-        produce_create_events(stream, shutdown_token, tx).await;
+        let result = produce_create_events(stream, shutdown_token, tx).await;
         let mut events = Vec::new();
         while let Some(event) = rx.recv().await {
             events.push(event);
         }
-        events
+        (events, result)
     }
 
     #[tokio::test]
     async fn payload_then_finish_produces_finish_terminal() {
         let payload = build_payload_bytes();
         let stream = stream::iter(vec![Ok(payload_message(payload)), Ok(finish_message())]);
-        let events = collect_events(stream, CancellationToken::new()).await;
+        let (events, result) = collect_events(stream, CancellationToken::new()).await;
+        assert!(result.is_ok());
 
         assert!(
             events
@@ -252,10 +310,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stream_closed_without_finish_produces_abort_terminal() {
+    async fn stream_closed_without_finish_returns_invalid_argument() {
         let payload = build_payload_bytes();
         let stream = stream::iter(vec![Ok(payload_message(payload))]);
-        let events = collect_events(stream, CancellationToken::new()).await;
+        let (events, result) = collect_events(stream, CancellationToken::new()).await;
+        assert_eq!(
+            result.expect_err("should fail").code(),
+            Code::InvalidArgument
+        );
 
         assert!(matches!(
             events.last(),
@@ -264,9 +326,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn metadata_after_first_message_produces_abort_terminal() {
+    async fn payload_then_abort_produces_abort_terminal() {
+        let payload = build_payload_bytes();
+        let stream = stream::iter(vec![Ok(payload_message(payload)), Ok(abort_message())]);
+        let (events, result) = collect_events(stream, CancellationToken::new()).await;
+        assert!(result.is_ok());
+
+        assert!(matches!(
+            events.last(),
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
+        ));
+    }
+
+    #[tokio::test]
+    async fn metadata_after_first_message_returns_invalid_argument() {
         let stream = stream::iter(vec![Ok(metadata_message())]);
-        let events = collect_events(stream, CancellationToken::new()).await;
+        let (events, result) = collect_events(stream, CancellationToken::new()).await;
+        assert_eq!(
+            result.expect_err("should fail").code(),
+            Code::InvalidArgument
+        );
 
         assert!(matches!(
             events.last(),
@@ -275,14 +354,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn finish_with_trailing_message_produces_abort_terminal() {
+    async fn finish_with_trailing_message_returns_invalid_argument() {
         let payload = build_payload_bytes();
         let stream = stream::iter(vec![
             Ok(payload_message(payload)),
             Ok(finish_message()),
             Ok(finish_message()),
         ]);
-        let events = collect_events(stream, CancellationToken::new()).await;
+        let (events, result) = collect_events(stream, CancellationToken::new()).await;
+        assert_eq!(
+            result.expect_err("should fail").code(),
+            Code::InvalidArgument
+        );
 
         assert!(matches!(
             events.last(),
@@ -291,12 +374,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_payload_produces_abort_terminal() {
+    async fn invalid_payload_returns_invalid_argument() {
         let stream = stream::iter(vec![
             Ok(payload_message(bytes::Bytes::from_static(b"not-arrow"))),
             Ok(finish_message()),
         ]);
-        let events = collect_events(stream, CancellationToken::new()).await;
+        let (events, result) = collect_events(stream, CancellationToken::new()).await;
+        assert_eq!(
+            result.expect_err("should fail").code(),
+            Code::InvalidArgument
+        );
 
         assert!(matches!(
             events.last(),
@@ -305,11 +392,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shutdown_produces_abort_terminal() {
+    async fn shutdown_returns_unavailable() {
         let token = CancellationToken::new();
         token.cancel();
         let stream = stream::pending::<Result<CreateRequest, Status>>();
-        let events = collect_events(stream, token).await;
+        let (events, result) = collect_events(stream, token).await;
+        assert_eq!(result.expect_err("should fail").code(), Code::Unavailable);
 
         assert!(matches!(
             events.last(),

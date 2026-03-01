@@ -152,14 +152,28 @@ impl DatasetService for Storage {
         let create =
             create_stream::parse_create_stream(stream, self.shutdown_token.clone()).await?;
         debug!(name = %create.request.name, "RPC create: received dataset stream");
-        let record = self
+        let record_result = self
             .manager
             .create_dataset(create.request, create.events_rx)
-            .await
-            .map_err(|e| {
+            .await;
+        let producer_result = create.events_task.await.map_err(|e| {
+            error!(error = %e, "Create stream event producer task panicked");
+            Status::internal("create stream event producer failed unexpectedly")
+        })?;
+
+        let record = match record_result {
+            Ok(record) => {
+                if let Err(status) = producer_result {
+                    error!(status.code = ?status.code(), status.message = status.message(), "Create stream event producer failed");
+                    return Err(status);
+                }
+                record
+            }
+            Err(e) => {
                 error!(error = %e, "Failed to write dataset");
-                Status::internal(e.to_string())
-            })?;
+                return Err(Status::internal(e.to_string()));
+            }
+        };
         debug!(
             dataset.id = record.id,
             "RPC create: dataset stored successfully"
