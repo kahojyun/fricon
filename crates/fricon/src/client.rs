@@ -48,14 +48,17 @@ pub struct Client {
     workspace_paths: WorkspacePaths,
 }
 
-fn prefer_server_error(
+fn writer_error_with_server_context(
     writer_error: anyhow::Error,
     server_result: std::result::Result<Result<CreateResponse>, tokio::task::JoinError>,
 ) -> anyhow::Error {
+    let writer_error = writer_error.context("Writer failed.");
     match server_result {
-        Ok(Err(error)) => error.context("Connection failed."),
-        Err(error) => anyhow::Error::new(error).context("Connector panicked."),
-        Ok(Ok(_)) => writer_error.context("Writer failed."),
+        Ok(Err(error)) => writer_error.context(format!("Connection also failed: {error:#}")),
+        Err(error) => writer_error.context(format!(
+            "Connector panicked while handling writer failure: {error}"
+        )),
+        Ok(Ok(_)) => writer_error,
     }
 }
 
@@ -266,7 +269,10 @@ impl DatasetWriter {
 
             if let Some(connection_handle) = self.connection_handle.take() {
                 let server_result = connection_handle.await;
-                return Err(prefer_server_error(writer_error, server_result));
+                return Err(writer_error_with_server_context(
+                    writer_error,
+                    server_result,
+                ));
             }
 
             return Err(writer_error.context("Writer failed."));
@@ -460,7 +466,7 @@ mod tests {
     use futures::{StreamExt, stream};
     use tokio::sync::oneshot;
 
-    use super::{StreamControl, build_request_stream, prefer_server_error};
+    use super::{StreamControl, build_request_stream, writer_error_with_server_context};
     use crate::proto::{CreateResponse, create_request::CreateMessage};
 
     #[tokio::test]
@@ -513,18 +519,24 @@ mod tests {
     }
 
     #[test]
-    fn prefer_server_error_uses_server_status_over_writer_error() {
+    fn writer_error_with_server_context_keeps_writer_error_and_adds_server_context() {
         let writer_error = anyhow!("broken pipe");
-        let error = prefer_server_error(writer_error, Ok(Err(anyhow!("invalid schema"))));
+        let error =
+            writer_error_with_server_context(writer_error, Ok(Err(anyhow!("invalid schema"))));
         let message = format!("{error:#}");
-        assert!(message.contains("Connection failed"));
+        assert!(message.contains("Writer failed"));
+        assert!(message.contains("broken pipe"));
+        assert!(message.contains("Connection also failed"));
         assert!(message.contains("invalid schema"));
     }
 
     #[test]
-    fn prefer_server_error_falls_back_to_writer_error_when_server_ok() {
+    fn writer_error_with_server_context_falls_back_to_writer_error_when_server_ok() {
         let writer_error = anyhow!("broken pipe");
-        let error = prefer_server_error(writer_error, Ok(Ok(CreateResponse { dataset: None })));
+        let error = writer_error_with_server_context(
+            writer_error,
+            Ok(Ok(CreateResponse { dataset: None })),
+        );
         let message = format!("{error:#}");
         assert!(message.contains("Writer failed"));
         assert!(message.contains("broken pipe"));
