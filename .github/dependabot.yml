@@ -6,7 +6,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    labels: ["dependencies", "rust"]
     commit-message:
       prefix: "chore(deps)"
     groups:
@@ -29,7 +28,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    labels: ["dependencies", "python"]
     commit-message:
       prefix: "chore(deps)"
     groups:
@@ -46,7 +44,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    labels: ["dependencies", "javascript"]
     commit-message:
       prefix: "chore(deps)"
     groups:
@@ -63,7 +60,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 2
-    labels: ["dependencies", "github-actions"]
     commit-message:
       prefix: "chore(ci)"
     groups:
