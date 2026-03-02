@@ -626,11 +626,10 @@ mod tests {
         (store, repo, events)
     }
 
-    fn sample_batch() -> (SchemaRef, RecordBatch) {
+    fn sample_batch() -> RecordBatch {
         let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
         let array = Arc::new(Int32Array::from(vec![1, 2, 3]));
-        let batch = RecordBatch::try_new(schema.clone(), vec![array]).expect("batch");
-        (schema, batch)
+        RecordBatch::try_new(schema, vec![array]).expect("batch")
     }
 
     fn events_rx(events: Vec<CreateIngestEvent>) -> mpsc::Receiver<CreateIngestEvent> {
@@ -684,7 +683,7 @@ mod tests {
 
         let sessions = FakeWriteSessions::new(guard);
 
-        let (_schema, batch) = sample_batch();
+        let batch = sample_batch();
         let request = CreateDatasetRequest {
             name: "name".to_string(),
             description: "desc".to_string(),
@@ -730,7 +729,7 @@ mod tests {
 
         let sessions = FakeWriteSessions::new(guard);
 
-        let (_schema, batch) = sample_batch();
+        let batch = sample_batch();
         let request = CreateDatasetRequest {
             name: "name".to_string(),
             description: "desc".to_string(),
@@ -787,7 +786,7 @@ mod tests {
 
         let sessions = FakeWriteSessions::new(guard);
 
-        let (_schema, batch) = sample_batch();
+        let batch = sample_batch();
         let request = CreateDatasetRequest {
             name: "name".to_string(),
             description: "desc".to_string(),
@@ -847,7 +846,7 @@ mod tests {
 
         let sessions = FakeWriteSessions::new(guard);
 
-        let (_schema, batch) = sample_batch();
+        let batch = sample_batch();
         let request = CreateDatasetRequest {
             name: "name".to_string(),
             description: "desc".to_string(),
