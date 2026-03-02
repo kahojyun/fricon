@@ -18,9 +18,7 @@ use std::{
 };
 
 use arrow_arith::boolean::and;
-use arrow_array::{
-    ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, RecordBatchReader, Scalar,
-};
+use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar};
 use arrow_ord::{cmp::eq, ord::make_comparator};
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -29,7 +27,7 @@ use derive_more::From;
 use diesel::result::Error as DieselError;
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
-use tokio::task::JoinError;
+use tokio::{sync::mpsc, task::JoinError};
 use tracing::{error, instrument};
 use uuid::Uuid;
 
@@ -72,8 +70,6 @@ pub enum DatasetManagerError {
     NotFound { id: String },
     #[error("No dataset file found.")]
     EmptyDataset,
-    #[error("Dataset write stream error: {message}")]
-    BatchStream { message: String },
     #[error(transparent)]
     Database(#[from] DatabaseError),
     #[error(transparent)]
@@ -119,6 +115,18 @@ pub struct CreateDatasetRequest {
     pub name: String,
     pub description: String,
     pub tags: Vec<String>,
+}
+
+#[derive(Debug)]
+pub enum CreateIngestEvent {
+    Batch(RecordBatch),
+    Terminal(CreateTerminal),
+}
+
+#[derive(Debug, Clone)]
+pub enum CreateTerminal {
+    Finish,
+    Abort,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -187,32 +195,25 @@ impl DatasetManager {
         Self { app }
     }
 
-    pub async fn create_dataset<F, I>(
+    pub async fn create_dataset(
         &self,
         request: CreateDatasetRequest,
-        reader: F,
-    ) -> Result<DatasetRecord, DatasetManagerError>
-    where
-        F: FnOnce() -> Result<I, DatasetManagerError> + Send + 'static,
-        I: RecordBatchReader,
-    {
+        events_rx: mpsc::Receiver<CreateIngestEvent>,
+    ) -> Result<DatasetRecord, DatasetManagerError> {
         let dataset_name = request.name.clone();
         self.app
             .spawn_blocking(move |state| {
-                reader()
-                    .and_then(|batches| {
-                        tasks::do_create_dataset(
-                            &state.database,
-                            &state.root,
-                            &state.event_sender,
-                            &state.write_sessions,
-                            request,
-                            batches,
-                        )
-                    })
-                    .inspect_err(|e| {
-                        error!(error = %e, dataset.name = %dataset_name, "Dataset creation failed");
-                    })
+                tasks::do_create_dataset(
+                    &state.database,
+                    &state.root,
+                    &state.event_sender,
+                    &state.write_sessions,
+                    request,
+                    events_rx,
+                )
+                .inspect_err(|e| {
+                    error!(error = %e, dataset.name = %dataset_name, "Dataset creation failed");
+                })
             })?
             .await?
     }

@@ -34,12 +34,14 @@ message CreateRequest {
   // The streaming sequence for CreateRequest:
   // 1. The client must first send a CreateMetadata message to initiate dataset creation.
   // 2. The client can then send one or more payload messages containing dataset data.
-  // 3. If the client wishes to abort the creation, it can send a CreateAbort message.
+  // 3. The client must end the stream with either CreateFinish or CreateAbort.
+  // If the stream is closed without a terminal message, the creation is considered aborted.
   // Only one of these fields should be set per message.
   oneof create_message {
     CreateMetadata metadata = 1;
     bytes payload = 2;
     CreateAbort abort = 3;
+    CreateFinish finish = 4;
   }
 }
 
@@ -49,9 +51,9 @@ message CreateMetadata {
   repeated string tags = 3;
 }
 
-message CreateAbort {
-  string reason = 1;
-}
+message CreateAbort {}
+
+message CreateFinish {}
 
 message CreateResponse {
   Dataset dataset = 1;

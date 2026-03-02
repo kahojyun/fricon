@@ -4,7 +4,9 @@ Integration tests for dataset operations.
 
 from __future__ import annotations
 
+import gc
 import tempfile
+import time
 from pathlib import Path
 
 import fricon._core
@@ -12,6 +14,31 @@ import fricon._core
 
 class TestDatasetOperations:
     """Integration tests for dataset operations."""
+
+    @staticmethod
+    def _raise_runtime_error() -> None:
+        message = "boom"
+        raise RuntimeError(message)
+
+    @staticmethod
+    def _wait_dataset_status(
+        dm: fricon._core.DatasetManager,
+        name: str,
+        expected_status: str,
+        timeout_sec: float = 2.0,
+    ) -> None:
+        deadline = time.monotonic() + timeout_sec
+        while time.monotonic() < deadline:
+            datasets = dm.list_all()
+            matched = datasets[datasets["name"] == name]
+            if len(matched) == 1:
+                dataset_id = matched.index[0]  # pyright: ignore[reportAny]
+                dataset = dm.open(dataset_id)  # pyright: ignore[reportAny]
+                if dataset.status == expected_status:
+                    return
+            time.sleep(0.05)
+        message = f"Dataset '{name}' did not reach status '{expected_status}' in time"
+        raise AssertionError(message)
 
     def test_dataset_writer_context_manager(self) -> None:
         """Test dataset writer with context manager."""
@@ -33,6 +60,80 @@ class TestDatasetOperations:
             assert datasets.iloc[0]["name"] == "context_test"
 
             # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_writer_context_manager_exception_aborts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            try:
+                with dm.create(
+                    "context_abort_dataset", description="exception flow"
+                ) as writer:
+                    writer.write(id=1, value=9.0, measurement=9.0 + 0.5j)
+                    self._raise_runtime_error()
+            except RuntimeError:
+                pass
+
+            self._wait_dataset_status(dm, "context_abort_dataset", "aborted")
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_writer_finish_returns_completed_dataset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            writer = dm.create("finish_dataset", description="finish flow")
+            writer.write(id=1, value=1.0, measurement=1.0 + 0.5j)
+            dataset = writer.finish()
+
+            assert dataset.name == "finish_dataset"
+            assert dataset.status == "completed"
+
+            reopened = dm.open(dataset.id)
+            assert reopened.status == "completed"
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_writer_abort_returns_aborted_dataset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            writer = dm.create("abort_dataset", description="abort flow")
+            writer.write(id=1, value=2.0, measurement=2.0 + 0.5j)
+            dataset = writer.abort()
+
+            assert dataset.name == "abort_dataset"
+            assert dataset.status == "aborted"
+
+            reopened = dm.open(dataset.id)
+            assert reopened.status == "aborted"
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_writer_drop_without_finalize_is_aborted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            writer = dm.create("drop_abort_dataset", description="drop flow")
+            writer.write(id=1, value=3.0, measurement=3.0 + 0.5j)
+            del writer
+            _ = gc.collect()
+
+            self._wait_dataset_status(dm, "drop_abort_dataset", "aborted")
+
             server_handle.shutdown()
             assert not server_handle.is_running
 

@@ -8,20 +8,16 @@ use anyhow::{Context, Result, bail, ensure};
 use arrow_array::RecordBatch;
 use arrow_ipc::writer::StreamWriter;
 use arrow_schema::SchemaRef;
-use bytes::Bytes;
+use async_stream::stream;
+use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use semver::Version;
-use tokio::{
-    io,
-    sync::mpsc,
-    task::{JoinHandle, spawn_blocking},
-};
-use tokio_util::io::{ReaderStream, SyncIoBridge};
+use tokio::{sync::mpsc, task::JoinHandle};
 use tonic::{Request, transport::Channel};
 use tower::service_fn;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -31,13 +27,15 @@ use crate::{
     dataset_manager::DatasetRecord,
     ipc,
     proto::{
-        self, AddTagsRequest, CreateMetadata, CreateRequest, CreateResponse, GetRequest,
-        RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
+        AddTagsRequest, CreateAbort, CreateFinish, CreateMetadata, CreateRequest, CreateResponse,
+        GetRequest, RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
+
+const MAX_PAYLOAD_CHUNK_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -120,16 +118,18 @@ impl Client {
     }
 }
 
-struct WriterHandle {
-    tx: mpsc::Sender<RecordBatch>,
-    handle: JoinHandle<Result<()>>,
+#[derive(Debug)]
+enum StreamMessage {
+    Batch(RecordBatch),
+    Finish,
+    Abort,
 }
 
 pub struct DatasetWriter {
     schema: DatasetSchema,
     arrow_schema: SchemaRef,
-    writer_handle: Option<WriterHandle>,
-    connection_handle: JoinHandle<Result<CreateResponse>>,
+    tx: Option<mpsc::Sender<StreamMessage>>,
+    connection_handle: Option<JoinHandle<Result<CreateResponse>>>,
     client: Client,
 }
 
@@ -141,26 +141,13 @@ impl DatasetWriter {
         tags: Vec<String>,
         schema: DatasetSchema,
     ) -> Self {
-        let (tx, mut rx) = mpsc::channel::<RecordBatch>(16);
-        let (dtx, drx) = io::duplex(1024 * 1024);
+        let (tx, rx) = mpsc::channel::<StreamMessage>(16);
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
-        let writer_handle = spawn_blocking({
-            let arrow_schema = arrow_schema.clone();
-            move || {
-                let dtx = SyncIoBridge::new(dtx);
-                let mut writer = StreamWriter::try_new(dtx, &arrow_schema)?;
-                while let Some(batch) = rx.blocking_recv() {
-                    writer.write(&batch)?;
-                }
-                writer.finish()?;
-                Ok(())
-            }
-        });
         let connection_handle = tokio::spawn({
             let client = client.clone();
             let request_stream =
-                build_request_stream(name, description, tags, ReaderStream::new(drx));
+                build_request_stream(name, description, tags, arrow_schema.clone(), rx);
             async move {
                 let request = Request::new(request_stream);
                 let response = client.dataset_service().create(request).await?;
@@ -170,17 +157,14 @@ impl DatasetWriter {
         Self {
             schema,
             arrow_schema,
-            writer_handle: Some(WriterHandle {
-                tx,
-                handle: writer_handle,
-            }),
-            connection_handle,
+            tx: Some(tx),
+            connection_handle: Some(connection_handle),
             client,
         }
     }
 
     pub async fn write(&mut self, row: DatasetRow) -> Result<()> {
-        let Some(WriterHandle { tx, .. }) = self.writer_handle.as_mut() else {
+        let Some(tx) = self.tx.as_mut() else {
             bail!("Writer closed.");
         };
         let row_schema = row.to_schema();
@@ -199,28 +183,38 @@ impl DatasetWriter {
             .collect();
         let batch = RecordBatch::try_new(self.arrow_schema.clone(), columns)
             .context("Failed to create RecordBatch")?;
-        if tx.send(batch).await.is_ok() {
+        if tx.send(StreamMessage::Batch(batch)).await.is_ok() {
             Ok(())
         } else {
-            let WriterHandle { handle, .. } = self
-                .writer_handle
+            let connection_handle = self
+                .connection_handle
                 .take()
-                .expect("Handle should be available since tx.send failed");
-            let writer_result = handle.await.context("Writer panicked.")?;
-            writer_result.context("Writer failed.")
+                .context("Connection closed unexpectedly.")?;
+            let connection_result = connection_handle.await.context("Connector panicked.")?;
+            if let Err(error) = connection_result {
+                return Err(error.context("Connection failed."));
+            }
+            bail!("Writer closed.");
         }
     }
 
     #[instrument(skip(self))]
-    pub async fn finish(mut self) -> Result<Dataset> {
-        let WriterHandle { tx, handle } = self.writer_handle.take().context("Already finished.")?;
+    pub async fn finish(self) -> Result<Dataset> {
+        self.complete(StreamMessage::Finish).await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn abort(self) -> Result<Dataset> {
+        self.complete(StreamMessage::Abort).await
+    }
+
+    async fn complete(mut self, message: StreamMessage) -> Result<Dataset> {
+        let tx = self.tx.take().context("Already finished.")?;
+        let _ = tx.send(message).await;
         drop(tx);
-        handle
-            .await
-            .context("Writer panicked.")?
-            .context("Writer failed.")?;
-        let dataset = self
-            .connection_handle
+
+        let connection_handle = self.connection_handle.take().context("Already finished.")?;
+        let dataset = connection_handle
             .await
             .context("Connector panicked.")?
             .context("Connection failed.")?
@@ -231,7 +225,7 @@ impl DatasetWriter {
             .context("Failed to convert dataset record")?;
         info!(dataset.id = record.id, "Dataset write finished");
         Ok(Dataset {
-            client: self.client,
+            client: self.client.clone(),
             record,
         })
     }
@@ -242,31 +236,144 @@ impl DatasetWriter {
     }
 }
 
+impl Drop for DatasetWriter {
+    fn drop(&mut self) {
+        let Some(tx) = self.tx.take() else {
+            return;
+        };
+
+        warn!("DatasetWriter dropped without finish/abort; sending abort");
+        let _ = tx.try_send(StreamMessage::Abort);
+        drop(tx);
+
+        let Some(connection_handle) = self.connection_handle.take() else {
+            return;
+        };
+
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                match connection_handle.await {
+                    Ok(Ok(response)) => {
+                        if let Some(dataset) = response.dataset {
+                            debug!(dataset.id = dataset.id, "Dataset stream aborted on drop");
+                        } else {
+                            debug!("Dataset stream aborted on drop");
+                        }
+                    }
+                    Ok(Err(error)) => {
+                        debug!(error = %error, "Dataset stream drop cleanup ended with connection error");
+                    }
+                    Err(error) => {
+                        debug!(error = %error, "Dataset stream drop cleanup task failed");
+                    }
+                }
+            });
+            return;
+        }
+
+        // Fallback when drop runs without a Tokio runtime.
+        connection_handle.abort();
+        warn!("DatasetWriter dropped outside runtime; aborted connection task");
+    }
+}
+
 fn build_request_stream(
     name: String,
     description: String,
     tags: Vec<String>,
-    bytes_stream: impl Stream<Item = io::Result<Bytes>>,
+    arrow_schema: SchemaRef,
+    mut message_rx: mpsc::Receiver<StreamMessage>,
 ) -> impl Stream<Item = CreateRequest> {
-    let first_message = CreateMessage::Metadata(CreateMetadata {
-        name,
-        description,
-        tags,
-    });
-    let payload_stream = bytes_stream.map(|chunk| match chunk {
-        Ok(chunk) => CreateMessage::Payload(chunk),
-        Err(e) => {
-            error!(error = %e, "Dataset payload reader failed");
-            CreateMessage::Abort(proto::CreateAbort {
-                reason: format!("Reader failed: {e:?}"),
-            })
+    stream! {
+        yield CreateRequest {
+            create_message: Some(CreateMessage::Metadata(CreateMetadata {
+                name,
+                description,
+                tags,
+            })),
+        };
+
+        let buffer_writer = BytesMut::with_capacity(8192).writer();
+        let mut writer = match StreamWriter::try_new(buffer_writer, &arrow_schema) {
+            Ok(writer) => writer,
+            Err(e) => {
+                error!(error = %e, "Failed to initialize dataset stream writer");
+                yield CreateRequest {
+                    create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                };
+                return;
+            }
+        };
+
+        let schema_chunk = writer.get_mut().get_mut().split().freeze();
+        for payload_chunk in split_payload_chunk(schema_chunk) {
+            yield CreateRequest {
+                create_message: Some(CreateMessage::Payload(payload_chunk)),
+            };
         }
-    });
-    stream::once(async move { first_message })
-        .chain(payload_stream)
-        .map(|msg| CreateRequest {
-            create_message: Some(msg),
-        })
+
+        while let Some(message) = message_rx.recv().await {
+            match message {
+                StreamMessage::Batch(batch) => {
+                    if let Err(e) = writer.write(&batch) {
+                        error!(error = %e, "Failed to write batch to dataset stream");
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                        };
+                        return;
+                    }
+                    let chunk = writer.get_mut().get_mut().split().freeze();
+                    for payload_chunk in split_payload_chunk(chunk) {
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Payload(payload_chunk)),
+                        };
+                    }
+                }
+                StreamMessage::Finish => {
+                    if let Err(e) = writer.finish() {
+                        error!(error = %e, "Failed to finish dataset stream writer");
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                        };
+                        return;
+                    }
+                    let eos_chunk = writer.get_mut().get_mut().split().freeze();
+                    for payload_chunk in split_payload_chunk(eos_chunk) {
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Payload(payload_chunk)),
+                        };
+                    }
+                    yield CreateRequest {
+                        create_message: Some(CreateMessage::Finish(CreateFinish {})),
+                    };
+                    return;
+                }
+                StreamMessage::Abort => {
+                    yield CreateRequest {
+                        create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                    };
+                    return;
+                }
+            }
+        }
+
+        warn!("Dataset stream closed without finish/abort; sending abort");
+        yield CreateRequest {
+            create_message: Some(CreateMessage::Abort(CreateAbort {})),
+        };
+    }
+}
+
+fn split_payload_chunk(chunk: Bytes) -> impl Iterator<Item = Bytes> {
+    let mut remaining = chunk;
+    std::iter::from_fn(move || {
+        if remaining.is_empty() {
+            None
+        } else {
+            let size = remaining.len().min(MAX_PAYLOAD_CHUNK_SIZE);
+            Some(remaining.split_to(size))
+        }
+    })
 }
 
 async fn connect_ipc_channel(path: PathBuf) -> Result<Channel> {
@@ -383,4 +490,138 @@ async fn check_server_version(channel: Channel) -> Result<()> {
     );
     debug!(server_version = %server_version, client_version = %client_version, "Server version check passed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_array::{Int64Array, RecordBatch};
+    use arrow_schema::{DataType, Field, Schema};
+    use bytes::Bytes;
+    use futures::StreamExt;
+    use itertools::Itertools;
+    use tokio::sync::mpsc;
+
+    use super::{MAX_PAYLOAD_CHUNK_SIZE, StreamMessage, build_request_stream, split_payload_chunk};
+    use crate::proto::create_request::CreateMessage;
+
+    fn one_col_batch() -> RecordBatch {
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        RecordBatch::try_new(schema, vec![Arc::new(Int64Array::from(vec![1_i64]))]).expect("batch")
+    }
+
+    #[tokio::test]
+    async fn build_request_stream_sends_finish_message_on_finish() {
+        let (message_tx, message_rx) = mpsc::channel(2);
+        message_tx
+            .send(StreamMessage::Batch(one_col_batch()))
+            .await
+            .expect("send batch");
+        message_tx
+            .send(StreamMessage::Finish)
+            .await
+            .expect("send finish");
+        drop(message_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec!["tag".to_string()],
+            schema,
+            message_rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+
+        assert!(matches!(messages[0], CreateMessage::Metadata(_)));
+        assert!(matches!(messages[1], CreateMessage::Payload(_)));
+        assert!(matches!(
+            messages[messages.len() - 1],
+            CreateMessage::Finish(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn build_request_stream_sends_abort_message_on_abort() {
+        let (message_tx, message_rx) = mpsc::channel(2);
+        message_tx
+            .send(StreamMessage::Batch(one_col_batch()))
+            .await
+            .expect("send batch");
+        message_tx
+            .send(StreamMessage::Abort)
+            .await
+            .expect("send abort");
+        drop(message_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec![],
+            schema,
+            message_rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+
+        assert!(matches!(messages[0], CreateMessage::Metadata(_)));
+        assert!(matches!(messages[1], CreateMessage::Payload(_)));
+        assert!(matches!(
+            messages[messages.len() - 1],
+            CreateMessage::Abort(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn build_request_stream_sends_abort_when_channel_closes_without_terminal() {
+        let (message_tx, message_rx) = mpsc::channel(2);
+        message_tx
+            .send(StreamMessage::Batch(one_col_batch()))
+            .await
+            .expect("send batch");
+        drop(message_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec![],
+            schema,
+            message_rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+
+        assert!(matches!(messages[0], CreateMessage::Metadata(_)));
+        assert!(matches!(messages[1], CreateMessage::Payload(_)));
+        assert!(matches!(
+            messages[messages.len() - 1],
+            CreateMessage::Abort(_)
+        ));
+    }
+
+    #[test]
+    fn split_payload_chunk_limits_each_piece_to_1mb() {
+        let payload = Bytes::from(vec![0_u8; MAX_PAYLOAD_CHUNK_SIZE * 2 + 17]);
+        let chunks = split_payload_chunk(payload).collect_vec();
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].len(), MAX_PAYLOAD_CHUNK_SIZE);
+        assert_eq!(chunks[1].len(), MAX_PAYLOAD_CHUNK_SIZE);
+        assert_eq!(chunks[2].len(), 17);
+        assert!(
+            chunks
+                .iter()
+                .all(|chunk| chunk.len() <= MAX_PAYLOAD_CHUNK_SIZE)
+        );
+    }
 }
