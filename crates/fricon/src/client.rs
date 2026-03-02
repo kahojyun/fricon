@@ -130,6 +130,7 @@ pub struct DatasetWriter {
     arrow_schema: SchemaRef,
     tx: Option<mpsc::Sender<StreamMessage>>,
     connection_handle: Option<JoinHandle<Result<CreateResponse>>>,
+    runtime: tokio::runtime::Handle,
     client: Client,
 }
 
@@ -144,7 +145,8 @@ impl DatasetWriter {
         let (tx, rx) = mpsc::channel::<StreamMessage>(16);
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
-        let connection_handle = tokio::spawn({
+        let runtime = tokio::runtime::Handle::current();
+        let connection_handle = runtime.spawn({
             let client = client.clone();
             let request_stream =
                 build_request_stream(name, description, tags, arrow_schema.clone(), rx);
@@ -159,6 +161,7 @@ impl DatasetWriter {
             arrow_schema,
             tx: Some(tx),
             connection_handle: Some(connection_handle),
+            runtime,
             client,
         }
     }
@@ -250,30 +253,23 @@ impl Drop for DatasetWriter {
             return;
         };
 
-        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
-            runtime.spawn(async move {
-                match connection_handle.await {
-                    Ok(Ok(response)) => {
-                        if let Some(dataset) = response.dataset {
-                            debug!(dataset.id = dataset.id, "Dataset stream aborted on drop");
-                        } else {
-                            debug!("Dataset stream aborted on drop");
-                        }
-                    }
-                    Ok(Err(error)) => {
-                        debug!(error = %error, "Dataset stream drop cleanup ended with connection error");
-                    }
-                    Err(error) => {
-                        debug!(error = %error, "Dataset stream drop cleanup task failed");
+        self.runtime.spawn(async move {
+            match connection_handle.await {
+                Ok(Ok(response)) => {
+                    if let Some(dataset) = response.dataset {
+                        debug!(dataset.id = dataset.id, "Dataset stream aborted on drop");
+                    } else {
+                        debug!("Dataset stream aborted on drop");
                     }
                 }
-            });
-            return;
-        }
-
-        // Fallback when drop runs without a Tokio runtime.
-        connection_handle.abort();
-        warn!("DatasetWriter dropped outside runtime; aborted connection task");
+                Ok(Err(error)) => {
+                    debug!(error = %error, "Dataset stream drop cleanup ended with connection error");
+                }
+                Err(error) => {
+                    debug!(error = %error, "Dataset stream drop cleanup task failed");
+                }
+            }
+        });
     }
 }
 
