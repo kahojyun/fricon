@@ -1,27 +1,23 @@
 use std::{
-    fs, io,
+    fs,
     path::{Path, PathBuf},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::Arc,
 };
 
 use anyhow::{Context, Result, bail, ensure};
 use arrow_array::RecordBatch;
 use arrow_ipc::writer::StreamWriter;
 use arrow_schema::SchemaRef;
-use bytes::Bytes;
+use async_stream::stream;
+use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use semver::Version;
 use tokio::{
-    io::duplex,
     sync::{mpsc, oneshot},
-    task::{JoinHandle, spawn_blocking},
+    task::JoinHandle,
 };
-use tokio_util::io::{ReaderStream, SyncIoBridge};
 use tonic::{Request, transport::Channel};
 use tower::service_fn;
 use tracing::{debug, error, info, instrument};
@@ -42,24 +38,12 @@ use crate::{
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
 
+const MAX_PAYLOAD_CHUNK_SIZE: usize = 1024 * 1024;
+
 #[derive(Debug, Clone)]
 pub struct Client {
     channel: Channel,
     workspace_paths: WorkspacePaths,
-}
-
-fn writer_error_with_server_context(
-    writer_error: anyhow::Error,
-    server_result: std::result::Result<Result<CreateResponse>, tokio::task::JoinError>,
-) -> anyhow::Error {
-    let writer_error = writer_error.context("Writer failed.");
-    match server_result {
-        Ok(Err(error)) => writer_error.context(format!("Connection also failed: {error:#}")),
-        Err(error) => writer_error.context(format!(
-            "Connector panicked while handling writer failure: {error}"
-        )),
-        Ok(Ok(_)) => writer_error,
-    }
 }
 
 impl Client {
@@ -137,12 +121,6 @@ impl Client {
     }
 }
 
-struct WriterHandle {
-    tx: mpsc::Sender<RecordBatch>,
-    handle: JoinHandle<Result<()>>,
-    is_finished: Arc<AtomicBool>,
-}
-
 #[derive(Debug)]
 enum StreamControl {
     Finish,
@@ -152,7 +130,7 @@ enum StreamControl {
 pub struct DatasetWriter {
     schema: DatasetSchema,
     arrow_schema: SchemaRef,
-    writer_handle: Option<WriterHandle>,
+    tx: Option<mpsc::Sender<RecordBatch>>,
     connection_handle: Option<JoinHandle<Result<CreateResponse>>>,
     client: Client,
     control_tx: Option<oneshot::Sender<StreamControl>>,
@@ -166,31 +144,20 @@ impl DatasetWriter {
         tags: Vec<String>,
         schema: DatasetSchema,
     ) -> Self {
-        let (tx, mut rx) = mpsc::channel::<RecordBatch>(16);
-        let (dtx, drx) = duplex(1024 * 1024);
+        let (tx, rx) = mpsc::channel::<RecordBatch>(16);
         let (control_tx, control_rx) = oneshot::channel();
-        let is_finished = Arc::new(AtomicBool::new(false));
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
-        let writer_handle = spawn_blocking({
-            let arrow_schema = arrow_schema.clone();
-            let is_finished = is_finished.clone();
-            move || {
-                let dtx = SyncIoBridge::new(dtx);
-                let mut writer = StreamWriter::try_new(dtx, &arrow_schema)?;
-                while let Some(batch) = rx.blocking_recv() {
-                    writer.write(&batch)?;
-                }
-                if is_finished.load(Ordering::SeqCst) {
-                    writer.finish()?;
-                }
-                Ok(())
-            }
-        });
         let connection_handle = tokio::spawn({
             let client = client.clone();
-            let request_stream =
-                build_request_stream(name, description, tags, ReaderStream::new(drx), control_rx);
+            let request_stream = build_request_stream(
+                name,
+                description,
+                tags,
+                arrow_schema.clone(),
+                rx,
+                control_rx,
+            );
             async move {
                 let request = Request::new(request_stream);
                 let response = client.dataset_service().create(request).await?;
@@ -200,11 +167,7 @@ impl DatasetWriter {
         Self {
             schema,
             arrow_schema,
-            writer_handle: Some(WriterHandle {
-                tx,
-                handle: writer_handle,
-                is_finished: is_finished.clone(),
-            }),
+            tx: Some(tx),
             connection_handle: Some(connection_handle),
             client,
             control_tx: Some(control_tx),
@@ -212,7 +175,7 @@ impl DatasetWriter {
     }
 
     pub async fn write(&mut self, row: DatasetRow) -> Result<()> {
-        let Some(WriterHandle { tx, .. }) = self.writer_handle.as_mut() else {
+        let Some(tx) = self.tx.as_mut() else {
             bail!("Writer closed.");
         };
         let row_schema = row.to_schema();
@@ -234,49 +197,31 @@ impl DatasetWriter {
         if tx.send(batch).await.is_ok() {
             Ok(())
         } else {
-            let WriterHandle { handle, .. } = self
-                .writer_handle
+            let connection_handle = self
+                .connection_handle
                 .take()
-                .expect("Handle should be available since tx.send failed");
-            let writer_result = handle.await.context("Writer panicked.")?;
-            writer_result.context("Writer failed.")
+                .context("Connection closed unexpectedly.")?;
+            let connection_result = connection_handle.await.context("Connector panicked.")?;
+            if let Err(error) = connection_result {
+                return Err(error.context("Connection failed."));
+            }
+            bail!("Writer closed.");
         }
     }
 
     #[instrument(skip(self))]
     pub async fn finish(self) -> Result<Dataset> {
-        self.complete(StreamControl::Finish, true).await
+        self.complete(StreamControl::Finish).await
     }
 
     #[instrument(skip(self))]
     pub async fn abort(self) -> Result<Dataset> {
-        self.complete(StreamControl::Abort, false).await
+        self.complete(StreamControl::Abort).await
     }
 
-    async fn complete(mut self, control: StreamControl, finished: bool) -> Result<Dataset> {
-        let WriterHandle {
-            tx,
-            handle,
-            is_finished,
-        } = self.writer_handle.take().context("Already finished.")?;
-        is_finished.store(finished, Ordering::SeqCst);
+    async fn complete(mut self, control: StreamControl) -> Result<Dataset> {
+        let tx = self.tx.take().context("Already finished.")?;
         drop(tx);
-
-        let writer_result = handle.await.context("Writer panicked.")?;
-        if let Err(writer_error) = writer_result {
-            // Ensure request stream can terminate before waiting for server result.
-            drop(self.control_tx.take());
-
-            if let Some(connection_handle) = self.connection_handle.take() {
-                let server_result = connection_handle.await;
-                return Err(writer_error_with_server_context(
-                    writer_error,
-                    server_result,
-                ));
-            }
-
-            return Err(writer_error.context("Writer failed."));
-        }
 
         if let Some(control_tx) = self.control_tx.take() {
             let _ = control_tx.send(control);
@@ -309,38 +254,84 @@ fn build_request_stream(
     name: String,
     description: String,
     tags: Vec<String>,
-    bytes_stream: impl Stream<Item = io::Result<Bytes>>,
+    arrow_schema: SchemaRef,
+    mut batch_rx: mpsc::Receiver<RecordBatch>,
     control_rx: oneshot::Receiver<StreamControl>,
 ) -> impl Stream<Item = CreateRequest> {
-    let first_message = CreateMessage::Metadata(CreateMetadata {
-        name,
-        description,
-        tags,
-    });
-    let payload_stream = bytes_stream.filter_map(|chunk| async {
-        match chunk {
-            Ok(chunk) => Some(CreateMessage::Payload(chunk)),
+    stream! {
+        yield CreateRequest {
+            create_message: Some(CreateMessage::Metadata(CreateMetadata {
+                name,
+                description,
+                tags,
+            })),
+        };
+
+        let buffer_writer = BytesMut::with_capacity(8192).writer();
+        let mut writer = match StreamWriter::try_new(buffer_writer, &arrow_schema) {
+            Ok(writer) => writer,
             Err(e) => {
-                error!(error = %e, "Dataset payload reader failed");
-                None // Drop error chunks, the stream will end early and server will treat it as abort
+                error!(error = %e, "Failed to initialize dataset stream writer");
+                return;
+            }
+        };
+
+        let schema_chunk = writer.get_mut().get_mut().split().freeze();
+        for payload_chunk in split_payload_chunk(schema_chunk) {
+            yield CreateRequest {
+                create_message: Some(CreateMessage::Payload(payload_chunk)),
+            };
+        }
+
+        while let Some(batch) = batch_rx.recv().await {
+            if let Err(e) = writer.write(&batch) {
+                error!(error = %e, "Failed to write batch to dataset stream");
+                return;
+            }
+            let chunk = writer.get_mut().get_mut().split().freeze();
+            for payload_chunk in split_payload_chunk(chunk) {
+                yield CreateRequest {
+                    create_message: Some(CreateMessage::Payload(payload_chunk)),
+                };
             }
         }
-    });
-    stream::once(async move { first_message })
-        .chain(payload_stream)
-        .chain(
-            stream::once(async move {
-                match control_rx.await {
-                    Ok(StreamControl::Finish) => Some(CreateMessage::Finish(CreateFinish {})),
-                    Ok(StreamControl::Abort) => Some(CreateMessage::Abort(CreateAbort {})),
-                    Err(_) => None,
+
+        match control_rx.await {
+            Ok(StreamControl::Finish) => {
+                if let Err(e) = writer.finish() {
+                    error!(error = %e, "Failed to finish dataset stream writer");
+                    return;
                 }
-            })
-            .filter_map(|msg| async move { msg }),
-        )
-        .map(|msg| CreateRequest {
-            create_message: Some(msg),
-        })
+                let eos_chunk = writer.get_mut().get_mut().split().freeze();
+                for payload_chunk in split_payload_chunk(eos_chunk) {
+                    yield CreateRequest {
+                        create_message: Some(CreateMessage::Payload(payload_chunk)),
+                    };
+                }
+                yield CreateRequest {
+                    create_message: Some(CreateMessage::Finish(CreateFinish {})),
+                };
+            }
+            Ok(StreamControl::Abort) => {
+                yield CreateRequest {
+                    create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                };
+            }
+            Err(_) => {}
+        }
+    }
+}
+
+fn split_payload_chunk(chunk: Bytes) -> impl Iterator<Item = Bytes> {
+    let mut remaining = chunk;
+    std::iter::from_fn(move || {
+        if remaining.is_empty() {
+            None
+        } else {
+            let size = remaining.len().min(MAX_PAYLOAD_CHUNK_SIZE);
+            Some(remaining.split_to(size))
+        }
+    })
 }
 
 async fn connect_ipc_channel(path: PathBuf) -> Result<Channel> {
@@ -461,25 +452,37 @@ async fn check_server_version(channel: Channel) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::anyhow;
-    use bytes::Bytes;
-    use futures::{StreamExt, stream};
-    use tokio::sync::oneshot;
+    use std::sync::Arc;
 
-    use super::{StreamControl, build_request_stream, writer_error_with_server_context};
-    use crate::proto::{CreateResponse, create_request::CreateMessage};
+    use arrow_array::{Int64Array, RecordBatch};
+    use arrow_schema::{DataType, Field, Schema};
+    use bytes::Bytes;
+    use futures::StreamExt;
+    use itertools::Itertools;
+    use tokio::sync::{mpsc, oneshot};
+
+    use super::{MAX_PAYLOAD_CHUNK_SIZE, StreamControl, build_request_stream, split_payload_chunk};
+    use crate::proto::create_request::CreateMessage;
+
+    fn one_col_batch() -> RecordBatch {
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        RecordBatch::try_new(schema, vec![Arc::new(Int64Array::from(vec![1_i64]))]).expect("batch")
+    }
 
     #[tokio::test]
     async fn build_request_stream_sends_finish_message_on_finish() {
         let (tx, rx) = oneshot::channel();
         tx.send(StreamControl::Finish).expect("send control");
+        let (batch_tx, batch_rx) = mpsc::channel(1);
+        batch_tx.send(one_col_batch()).await.expect("send batch");
+        drop(batch_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
         let stream = build_request_stream(
             "dataset".to_string(),
             "desc".to_string(),
             vec!["tag".to_string()],
-            stream::iter(vec![Ok::<Bytes, std::io::Error>(Bytes::from_static(
-                b"payload",
-            ))]),
+            schema,
+            batch_rx,
             rx,
         );
 
@@ -490,20 +493,26 @@ mod tests {
 
         assert!(matches!(messages[0], CreateMessage::Metadata(_)));
         assert!(matches!(messages[1], CreateMessage::Payload(_)));
-        assert!(matches!(messages[2], CreateMessage::Finish(_)));
+        assert!(matches!(
+            messages[messages.len() - 1],
+            CreateMessage::Finish(_)
+        ));
     }
 
     #[tokio::test]
     async fn build_request_stream_sends_abort_message_on_abort() {
         let (tx, rx) = oneshot::channel();
         tx.send(StreamControl::Abort).expect("send control");
+        let (batch_tx, batch_rx) = mpsc::channel(1);
+        batch_tx.send(one_col_batch()).await.expect("send batch");
+        drop(batch_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
         let stream = build_request_stream(
             "dataset".to_string(),
             "desc".to_string(),
             vec![],
-            stream::iter(vec![Ok::<Bytes, std::io::Error>(Bytes::from_static(
-                b"payload",
-            ))]),
+            schema,
+            batch_rx,
             rx,
         );
 
@@ -512,33 +521,27 @@ mod tests {
             .collect()
             .await;
 
-        assert_eq!(messages.len(), 3);
         assert!(matches!(messages[0], CreateMessage::Metadata(_)));
         assert!(matches!(messages[1], CreateMessage::Payload(_)));
-        assert!(matches!(messages[2], CreateMessage::Abort(_)));
+        assert!(matches!(
+            messages[messages.len() - 1],
+            CreateMessage::Abort(_)
+        ));
     }
 
     #[test]
-    fn writer_error_with_server_context_keeps_writer_error_and_adds_server_context() {
-        let writer_error = anyhow!("broken pipe");
-        let error =
-            writer_error_with_server_context(writer_error, Ok(Err(anyhow!("invalid schema"))));
-        let message = format!("{error:#}");
-        assert!(message.contains("Writer failed"));
-        assert!(message.contains("broken pipe"));
-        assert!(message.contains("Connection also failed"));
-        assert!(message.contains("invalid schema"));
-    }
+    fn split_payload_chunk_limits_each_piece_to_1mb() {
+        let payload = Bytes::from(vec![0_u8; MAX_PAYLOAD_CHUNK_SIZE * 2 + 17]);
+        let chunks = split_payload_chunk(payload).collect_vec();
 
-    #[test]
-    fn writer_error_with_server_context_falls_back_to_writer_error_when_server_ok() {
-        let writer_error = anyhow!("broken pipe");
-        let error = writer_error_with_server_context(
-            writer_error,
-            Ok(Ok(CreateResponse { dataset: None })),
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].len(), MAX_PAYLOAD_CHUNK_SIZE);
+        assert_eq!(chunks[1].len(), MAX_PAYLOAD_CHUNK_SIZE);
+        assert_eq!(chunks[2].len(), 17);
+        assert!(
+            chunks
+                .iter()
+                .all(|chunk| chunk.len() <= MAX_PAYLOAD_CHUNK_SIZE)
         );
-        let message = format!("{error:#}");
-        assert!(message.contains("Writer failed"));
-        assert!(message.contains("broken pipe"));
     }
 }
