@@ -14,10 +14,7 @@ use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use semver::Version;
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use tokio::{sync::mpsc, task::JoinHandle};
 use tonic::{Request, transport::Channel};
 use tower::service_fn;
 use tracing::{debug, error, info, instrument};
@@ -122,7 +119,8 @@ impl Client {
 }
 
 #[derive(Debug)]
-enum StreamControl {
+enum StreamMessage {
+    Batch(RecordBatch),
     Finish,
     Abort,
 }
@@ -130,10 +128,9 @@ enum StreamControl {
 pub struct DatasetWriter {
     schema: DatasetSchema,
     arrow_schema: SchemaRef,
-    tx: Option<mpsc::Sender<RecordBatch>>,
+    tx: Option<mpsc::Sender<StreamMessage>>,
     connection_handle: Option<JoinHandle<Result<CreateResponse>>>,
     client: Client,
-    control_tx: Option<oneshot::Sender<StreamControl>>,
 }
 
 impl DatasetWriter {
@@ -144,20 +141,13 @@ impl DatasetWriter {
         tags: Vec<String>,
         schema: DatasetSchema,
     ) -> Self {
-        let (tx, rx) = mpsc::channel::<RecordBatch>(16);
-        let (control_tx, control_rx) = oneshot::channel();
+        let (tx, rx) = mpsc::channel::<StreamMessage>(16);
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
         let connection_handle = tokio::spawn({
             let client = client.clone();
-            let request_stream = build_request_stream(
-                name,
-                description,
-                tags,
-                arrow_schema.clone(),
-                rx,
-                control_rx,
-            );
+            let request_stream =
+                build_request_stream(name, description, tags, arrow_schema.clone(), rx);
             async move {
                 let request = Request::new(request_stream);
                 let response = client.dataset_service().create(request).await?;
@@ -170,7 +160,6 @@ impl DatasetWriter {
             tx: Some(tx),
             connection_handle: Some(connection_handle),
             client,
-            control_tx: Some(control_tx),
         }
     }
 
@@ -194,7 +183,7 @@ impl DatasetWriter {
             .collect();
         let batch = RecordBatch::try_new(self.arrow_schema.clone(), columns)
             .context("Failed to create RecordBatch")?;
-        if tx.send(batch).await.is_ok() {
+        if tx.send(StreamMessage::Batch(batch)).await.is_ok() {
             Ok(())
         } else {
             let connection_handle = self
@@ -211,21 +200,18 @@ impl DatasetWriter {
 
     #[instrument(skip(self))]
     pub async fn finish(self) -> Result<Dataset> {
-        self.complete(StreamControl::Finish).await
+        self.complete(StreamMessage::Finish).await
     }
 
     #[instrument(skip(self))]
     pub async fn abort(self) -> Result<Dataset> {
-        self.complete(StreamControl::Abort).await
+        self.complete(StreamMessage::Abort).await
     }
 
-    async fn complete(mut self, control: StreamControl) -> Result<Dataset> {
+    async fn complete(mut self, message: StreamMessage) -> Result<Dataset> {
         let tx = self.tx.take().context("Already finished.")?;
+        let _ = tx.send(message).await;
         drop(tx);
-
-        if let Some(control_tx) = self.control_tx.take() {
-            let _ = control_tx.send(control);
-        }
 
         let connection_handle = self.connection_handle.take().context("Already finished.")?;
         let dataset = connection_handle
@@ -255,8 +241,7 @@ fn build_request_stream(
     description: String,
     tags: Vec<String>,
     arrow_schema: SchemaRef,
-    mut batch_rx: mpsc::Receiver<RecordBatch>,
-    control_rx: oneshot::Receiver<StreamControl>,
+    mut message_rx: mpsc::Receiver<StreamMessage>,
 ) -> impl Stream<Item = CreateRequest> {
     stream! {
         yield CreateRequest {
@@ -283,41 +268,43 @@ fn build_request_stream(
             };
         }
 
-        while let Some(batch) = batch_rx.recv().await {
-            if let Err(e) = writer.write(&batch) {
-                error!(error = %e, "Failed to write batch to dataset stream");
-                return;
-            }
-            let chunk = writer.get_mut().get_mut().split().freeze();
-            for payload_chunk in split_payload_chunk(chunk) {
-                yield CreateRequest {
-                    create_message: Some(CreateMessage::Payload(payload_chunk)),
-                };
-            }
-        }
-
-        match control_rx.await {
-            Ok(StreamControl::Finish) => {
-                if let Err(e) = writer.finish() {
-                    error!(error = %e, "Failed to finish dataset stream writer");
+        while let Some(message) = message_rx.recv().await {
+            match message {
+                StreamMessage::Batch(batch) => {
+                    if let Err(e) = writer.write(&batch) {
+                        error!(error = %e, "Failed to write batch to dataset stream");
+                        return;
+                    }
+                    let chunk = writer.get_mut().get_mut().split().freeze();
+                    for payload_chunk in split_payload_chunk(chunk) {
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Payload(payload_chunk)),
+                        };
+                    }
+                }
+                StreamMessage::Finish => {
+                    if let Err(e) = writer.finish() {
+                        error!(error = %e, "Failed to finish dataset stream writer");
+                        return;
+                    }
+                    let eos_chunk = writer.get_mut().get_mut().split().freeze();
+                    for payload_chunk in split_payload_chunk(eos_chunk) {
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Payload(payload_chunk)),
+                        };
+                    }
+                    yield CreateRequest {
+                        create_message: Some(CreateMessage::Finish(CreateFinish {})),
+                    };
                     return;
                 }
-                let eos_chunk = writer.get_mut().get_mut().split().freeze();
-                for payload_chunk in split_payload_chunk(eos_chunk) {
+                StreamMessage::Abort => {
                     yield CreateRequest {
-                        create_message: Some(CreateMessage::Payload(payload_chunk)),
+                        create_message: Some(CreateMessage::Abort(CreateAbort {})),
                     };
+                    return;
                 }
-                yield CreateRequest {
-                    create_message: Some(CreateMessage::Finish(CreateFinish {})),
-                };
             }
-            Ok(StreamControl::Abort) => {
-                yield CreateRequest {
-                    create_message: Some(CreateMessage::Abort(CreateAbort {})),
-                };
-            }
-            Err(_) => {}
         }
     }
 }
@@ -459,9 +446,9 @@ mod tests {
     use bytes::Bytes;
     use futures::StreamExt;
     use itertools::Itertools;
-    use tokio::sync::{mpsc, oneshot};
+    use tokio::sync::mpsc;
 
-    use super::{MAX_PAYLOAD_CHUNK_SIZE, StreamControl, build_request_stream, split_payload_chunk};
+    use super::{MAX_PAYLOAD_CHUNK_SIZE, StreamMessage, build_request_stream, split_payload_chunk};
     use crate::proto::create_request::CreateMessage;
 
     fn one_col_batch() -> RecordBatch {
@@ -471,19 +458,23 @@ mod tests {
 
     #[tokio::test]
     async fn build_request_stream_sends_finish_message_on_finish() {
-        let (tx, rx) = oneshot::channel();
-        tx.send(StreamControl::Finish).expect("send control");
-        let (batch_tx, batch_rx) = mpsc::channel(1);
-        batch_tx.send(one_col_batch()).await.expect("send batch");
-        drop(batch_tx);
+        let (message_tx, message_rx) = mpsc::channel(2);
+        message_tx
+            .send(StreamMessage::Batch(one_col_batch()))
+            .await
+            .expect("send batch");
+        message_tx
+            .send(StreamMessage::Finish)
+            .await
+            .expect("send finish");
+        drop(message_tx);
         let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
         let stream = build_request_stream(
             "dataset".to_string(),
             "desc".to_string(),
             vec!["tag".to_string()],
             schema,
-            batch_rx,
-            rx,
+            message_rx,
         );
 
         let messages: Vec<_> = stream
@@ -501,19 +492,23 @@ mod tests {
 
     #[tokio::test]
     async fn build_request_stream_sends_abort_message_on_abort() {
-        let (tx, rx) = oneshot::channel();
-        tx.send(StreamControl::Abort).expect("send control");
-        let (batch_tx, batch_rx) = mpsc::channel(1);
-        batch_tx.send(one_col_batch()).await.expect("send batch");
-        drop(batch_tx);
+        let (message_tx, message_rx) = mpsc::channel(2);
+        message_tx
+            .send(StreamMessage::Batch(one_col_batch()))
+            .await
+            .expect("send batch");
+        message_tx
+            .send(StreamMessage::Abort)
+            .await
+            .expect("send abort");
+        drop(message_tx);
         let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
         let stream = build_request_stream(
             "dataset".to_string(),
             "desc".to_string(),
             vec![],
             schema,
-            batch_rx,
-            rx,
+            message_rx,
         );
 
         let messages: Vec<_> = stream
