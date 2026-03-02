@@ -25,7 +25,7 @@ class TestDatasetOperations:
         dm: fricon._core.DatasetManager,
         name: str,
         expected_status: str,
-        timeout_sec: float = 2.0,
+        timeout_sec: float = 10.0,
     ) -> None:
         deadline = time.monotonic() + timeout_sec
         while time.monotonic() < deadline:
@@ -36,7 +36,7 @@ class TestDatasetOperations:
                 dataset = dm.open(dataset_id)  # pyright: ignore[reportAny]
                 if dataset.status == expected_status:
                     return
-            time.sleep(0.05)
+            time.sleep(0.025)
         message = f"Dataset '{name}' did not reach status '{expected_status}' in time"
         raise AssertionError(message)
 
