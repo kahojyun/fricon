@@ -117,6 +117,10 @@ where
                 )
                 .await;
             }
+            () = events_tx.closed() => {
+                warn!("Create stream consumer dropped; stopping event producer");
+                return Ok(());
+            }
         }
     }
 }
@@ -365,5 +369,24 @@ mod tests {
             events.last(),
             Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
         ));
+    }
+
+    #[tokio::test]
+    async fn receiver_closed_stops_producer_without_waiting_stream_input() {
+        let stream = stream::pending::<Result<CreateRequest, Status>>();
+        let (tx, rx) = mpsc::channel(1);
+        drop(rx);
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            produce_create_events(stream, CancellationToken::new(), tx),
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "producer should stop after receiver is closed"
+        );
+        assert!(result.expect("join result").is_ok());
     }
 }
