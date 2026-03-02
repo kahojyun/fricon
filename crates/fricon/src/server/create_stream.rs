@@ -73,7 +73,6 @@ where
                     Some(Ok(request)) => {
                         match handle_stream_message(
                             request.create_message,
-                            &mut stream,
                             &mut decoder,
                             &events_tx,
                         )
@@ -133,15 +132,11 @@ async fn send_abort_and_error(
     Err(status)
 }
 
-async fn handle_stream_message<S>(
+async fn handle_stream_message(
     message: Option<CreateMessage>,
-    stream: &mut S,
     decoder: &mut StreamDecoder,
     events_tx: &mpsc::Sender<CreateIngestEvent>,
-) -> Result<Option<CreateTerminal>, Status>
-where
-    S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
-{
+) -> Result<Option<CreateTerminal>, Status> {
     match message {
         Some(CreateMessage::Payload(payload)) => decode_payload(payload, decoder, events_tx).await,
         Some(CreateMessage::Metadata(_)) => {
@@ -150,46 +145,16 @@ where
                 "unexpected metadata message after initial create metadata",
             ))
         }
-        Some(CreateMessage::Finish(_)) => {
-            // Finish must be the terminal message.
-            match stream.next().await {
-                None => match decoder.finish() {
-                    Ok(()) => Ok(Some(CreateTerminal::Finish)),
-                    Err(error) => {
-                        error!(error = %error, "Failed to finalize Arrow stream on CreateFinish");
-                        Err(Status::invalid_argument(
-                            "invalid Arrow stream at create finish",
-                        ))
-                    }
-                },
-                Some(Ok(_)) => {
-                    warn!("Unexpected message after CreateFinish");
-                    Err(Status::invalid_argument(
-                        "unexpected trailing message after create finish",
-                    ))
-                }
-                Some(Err(error)) => Err(Status::new(
-                    error.code(),
-                    "client stream error while validating create finish termination",
-                )),
+        Some(CreateMessage::Finish(_)) => match decoder.finish() {
+            Ok(()) => Ok(Some(CreateTerminal::Finish)),
+            Err(error) => {
+                error!(error = %error, "Failed to finalize Arrow stream on CreateFinish");
+                Err(Status::invalid_argument(
+                    "invalid Arrow stream at create finish",
+                ))
             }
-        }
-        Some(CreateMessage::Abort(_)) => {
-            // Abort must be the terminal message.
-            match stream.next().await {
-                None => Ok(Some(CreateTerminal::Abort)),
-                Some(Ok(_)) => {
-                    warn!("Unexpected message after CreateAbort");
-                    Err(Status::invalid_argument(
-                        "unexpected trailing message after create abort",
-                    ))
-                }
-                Some(Err(error)) => Err(Status::new(
-                    error.code(),
-                    "client stream error while validating create abort termination",
-                )),
-            }
-        }
+        },
+        Some(CreateMessage::Abort(_)) => Ok(Some(CreateTerminal::Abort)),
         None => {
             warn!("Received empty CreateRequest message");
             Err(Status::invalid_argument(
@@ -354,7 +319,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn finish_with_trailing_message_returns_invalid_argument() {
+    async fn finish_stops_stream_and_ignores_trailing_message() {
         let payload = build_payload_bytes();
         let stream = stream::iter(vec![
             Ok(payload_message(payload)),
@@ -362,14 +327,11 @@ mod tests {
             Ok(finish_message()),
         ]);
         let (events, result) = collect_events(stream, CancellationToken::new()).await;
-        assert_eq!(
-            result.expect_err("should fail").code(),
-            Code::InvalidArgument
-        );
+        assert!(result.is_ok());
 
         assert!(matches!(
             events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
+            Some(CreateIngestEvent::Terminal(CreateTerminal::Finish))
         ));
     }
 
