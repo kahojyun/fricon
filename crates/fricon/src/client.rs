@@ -17,7 +17,7 @@ use semver::Version;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tonic::{Request, transport::Channel};
 use tower::service_fn;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -225,7 +225,7 @@ impl DatasetWriter {
             .context("Failed to convert dataset record")?;
         info!(dataset.id = record.id, "Dataset write finished");
         Ok(Dataset {
-            client: self.client,
+            client: self.client.clone(),
             record,
         })
     }
@@ -233,6 +233,47 @@ impl DatasetWriter {
     #[must_use]
     pub fn schema(&self) -> &DatasetSchema {
         &self.schema
+    }
+}
+
+impl Drop for DatasetWriter {
+    fn drop(&mut self) {
+        let Some(tx) = self.tx.take() else {
+            return;
+        };
+
+        warn!("DatasetWriter dropped without finish/abort; sending abort");
+        let _ = tx.try_send(StreamMessage::Abort);
+        drop(tx);
+
+        let Some(connection_handle) = self.connection_handle.take() else {
+            return;
+        };
+
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                match connection_handle.await {
+                    Ok(Ok(response)) => {
+                        if let Some(dataset) = response.dataset {
+                            debug!(dataset.id = dataset.id, "Dataset stream aborted on drop");
+                        } else {
+                            debug!("Dataset stream aborted on drop");
+                        }
+                    }
+                    Ok(Err(error)) => {
+                        debug!(error = %error, "Dataset stream drop cleanup ended with connection error");
+                    }
+                    Err(error) => {
+                        debug!(error = %error, "Dataset stream drop cleanup task failed");
+                    }
+                }
+            });
+            return;
+        }
+
+        // Fallback when drop runs without a Tokio runtime.
+        connection_handle.abort();
+        warn!("DatasetWriter dropped outside runtime; aborted connection task");
     }
 }
 
@@ -257,6 +298,9 @@ fn build_request_stream(
             Ok(writer) => writer,
             Err(e) => {
                 error!(error = %e, "Failed to initialize dataset stream writer");
+                yield CreateRequest {
+                    create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                };
                 return;
             }
         };
@@ -273,6 +317,9 @@ fn build_request_stream(
                 StreamMessage::Batch(batch) => {
                     if let Err(e) = writer.write(&batch) {
                         error!(error = %e, "Failed to write batch to dataset stream");
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                        };
                         return;
                     }
                     let chunk = writer.get_mut().get_mut().split().freeze();
@@ -285,6 +332,9 @@ fn build_request_stream(
                 StreamMessage::Finish => {
                     if let Err(e) = writer.finish() {
                         error!(error = %e, "Failed to finish dataset stream writer");
+                        yield CreateRequest {
+                            create_message: Some(CreateMessage::Abort(CreateAbort {})),
+                        };
                         return;
                     }
                     let eos_chunk = writer.get_mut().get_mut().split().freeze();
@@ -306,6 +356,11 @@ fn build_request_stream(
                 }
             }
         }
+
+        warn!("Dataset stream closed without finish/abort; sending abort");
+        yield CreateRequest {
+            create_message: Some(CreateMessage::Abort(CreateAbort {})),
+        };
     }
 }
 
@@ -501,6 +556,36 @@ mod tests {
             .send(StreamMessage::Abort)
             .await
             .expect("send abort");
+        drop(message_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec![],
+            schema,
+            message_rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+
+        assert!(matches!(messages[0], CreateMessage::Metadata(_)));
+        assert!(matches!(messages[1], CreateMessage::Payload(_)));
+        assert!(matches!(
+            messages[messages.len() - 1],
+            CreateMessage::Abort(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn build_request_stream_sends_abort_when_channel_closes_without_terminal() {
+        let (message_tx, message_rx) = mpsc::channel(2);
+        message_tx
+            .send(StreamMessage::Batch(one_col_batch()))
+            .await
+            .expect("send batch");
         drop(message_tx);
         let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
         let stream = build_request_stream(
