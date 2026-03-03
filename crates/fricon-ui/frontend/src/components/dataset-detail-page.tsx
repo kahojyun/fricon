@@ -49,7 +49,7 @@ export function DatasetDetailPage({
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-auto">
             {isLoading && !detail ? (
-              <div className="text-muted-foreground text-xs">
+              <div className="text-xs text-muted-foreground">
                 Loading dataset...
               </div>
             ) : null}
@@ -64,7 +64,7 @@ export function DatasetDetailPage({
             ) : null}
 
             {!detail && !isLoading ? (
-              <div className="text-muted-foreground text-xs">
+              <div className="text-xs text-muted-foreground">
                 {loadErrorMessage ?? "Dataset not found."}
               </div>
             ) : null}
@@ -172,7 +172,7 @@ function DatasetDetailEditor({
           </div>
 
           {saveErrorMessage ? (
-            <div className="border-destructive/30 bg-destructive/10 text-destructive mt-2 rounded-md border px-3 py-2 text-xs">
+            <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {saveErrorMessage}
             </div>
           ) : null}
@@ -257,7 +257,7 @@ function DatasetDetailEditor({
                   </Badge>
                 ))
               ) : (
-                <span className="text-muted-foreground text-xs">No tags</span>
+                <span className="text-xs text-muted-foreground">No tags</span>
               )}
             </div>
           </div>
@@ -267,7 +267,7 @@ function DatasetDetailEditor({
       <div className="rounded-md border p-3">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold">Columns</h3>
-          <span className="text-muted-foreground text-xs">
+          <span className="text-xs text-muted-foreground">
             {detail.columns.length} columns
           </span>
         </div>
@@ -282,7 +282,7 @@ function DatasetDetailEditor({
             </thead>
             <tbody>
               {detail.columns.map((column) => (
-                <tr key={column.name} className="text-foreground border-t">
+                <tr key={column.name} className="border-t text-foreground">
                   <td className="px-2 py-2">{column.name}</td>
                   <td className="px-2 py-2">{column.isIndex ? "✓" : ""}</td>
                   <td className="px-2 py-2">

@@ -56,7 +56,7 @@ function FilterTableColumn({
       data-testid={`filter-column-${field}`}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
-      <div className="bg-muted text-muted-foreground border-b px-2 py-2 text-xs font-semibold">
+      <div className="border-b bg-muted px-2 py-2 text-xs font-semibold text-muted-foreground">
         {field}
       </div>
       <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
@@ -155,7 +155,7 @@ export function FilterTable({
 
   if (!data || data.rows.length === 0) {
     return (
-      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         No data available
       </div>
     );
@@ -176,7 +176,7 @@ export function FilterTable({
       ) : null}
 
       {mode === "row" && isFilterTableEmpty ? (
-        <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           No data available
         </div>
       ) : null}
@@ -185,10 +185,10 @@ export function FilterTable({
         <>
           <div
             ref={headerScrollRef}
-            className="bg-muted overflow-hidden border-b"
+            className="overflow-hidden border-b bg-muted"
           >
             <div
-              className="text-muted-foreground grid px-2 py-2 text-xs font-semibold"
+              className="grid px-2 py-2 text-xs font-semibold text-muted-foreground"
               style={{
                 gridTemplateColumns: gridTemplate,
                 minWidth: minTableWidth,
@@ -242,7 +242,7 @@ export function FilterTable({
       ) : null}
 
       {mode === "split" && isFilterTableEmpty ? (
-        <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           No data available
         </div>
       ) : null}
@@ -260,7 +260,7 @@ export function FilterTable({
                 }
               />
               {index < data.fields.length - 1 ? (
-                <div className="bg-border/60 w-px shrink-0" />
+                <div className="w-px shrink-0 bg-border/60" />
               ) : null}
             </div>
           ))}

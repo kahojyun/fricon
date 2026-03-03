@@ -46,9 +46,9 @@ function RootLayout() {
   const workspacePath = workspaceInfoQuery.data?.path ?? "(no workspace)";
 
   return (
-    <div className="bg-background text-foreground flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background text-foreground">
       <div className="flex flex-1 overflow-hidden">
-        <aside className="bg-muted/40 flex w-14 flex-col items-center gap-2 border-r py-2">
+        <aside className="flex w-14 flex-col items-center gap-2 border-r bg-muted/40 py-2">
           <Button
             variant="outline"
             size="icon"
@@ -88,7 +88,7 @@ function RootLayout() {
         </main>
       </div>
 
-      <footer className="bg-muted/60 flex h-8 items-center px-3 text-xs">
+      <footer className="flex h-8 items-center bg-muted/60 px-3 text-xs">
         <div className="truncate">Workspace: {workspacePath}</div>
       </footer>
     </div>

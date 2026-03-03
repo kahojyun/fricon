@@ -204,7 +204,7 @@ export function DatasetTable({
                   </Badge>
                 ))
               ) : (
-                <span className="text-muted-foreground text-xs">No tags</span>
+                <span className="text-xs text-muted-foreground">No tags</span>
               )}
             </div>
           );
@@ -218,7 +218,7 @@ export function DatasetTable({
           width: "160px",
         } satisfies DatasetColumnMeta,
         cell: ({ getValue }) => (
-          <div className="text-muted-foreground px-2 text-xs">
+          <div className="px-2 text-xs text-muted-foreground">
             {getValue<Date>().toLocaleString()}
           </div>
         ),
@@ -272,12 +272,12 @@ export function DatasetTable({
                 : "No filters"}
             </Badge>
             {selectedTags.length > 0 ? (
-              <div className="text-muted-foreground text-xs">
+              <div className="text-xs text-muted-foreground">
                 Tags: {selectedTags.join(", ")}
               </div>
             ) : null}
             {selectedStatuses.length > 0 ? (
-              <div className="text-muted-foreground text-xs">
+              <div className="text-xs text-muted-foreground">
                 Status: {selectedStatuses.join(", ")}
               </div>
             ) : null}
@@ -298,10 +298,10 @@ export function DatasetTable({
             <div className="min-w-[760px]">
               <div
                 ref={headerRef}
-                className="bg-muted sticky top-0 z-20 border-b"
+                className="sticky top-0 z-20 border-b bg-muted"
               >
                 <div
-                  className="text-muted-foreground grid items-center gap-2 px-3 py-2 text-xs"
+                  className="grid items-center gap-2 px-3 py-2 text-xs text-muted-foreground"
                   style={{ gridTemplateColumns }}
                 >
                   {table.getFlatHeaders().map((header) => {
@@ -427,7 +427,7 @@ export function DatasetTable({
                                     );
                                   })
                                 ) : (
-                                  <div className="text-muted-foreground px-1 py-2 text-xs">
+                                  <div className="px-1 py-2 text-xs text-muted-foreground">
                                     No tags found
                                   </div>
                                 )}
@@ -508,7 +508,7 @@ export function DatasetTable({
                 }}
               >
                 {rows.length === 0 ? (
-                  <div className="text-muted-foreground absolute inset-x-0 top-[120px] px-3 text-xs">
+                  <div className="absolute inset-x-0 top-[120px] px-3 text-xs text-muted-foreground">
                     No datasets matched the current filters.
                   </div>
                 ) : null}

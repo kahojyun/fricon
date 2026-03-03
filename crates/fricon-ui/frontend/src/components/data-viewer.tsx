@@ -47,7 +47,7 @@ export function DataViewer({ datasetId }: DataViewerProps) {
           ) : (
             <div className="p-4">
               <h2 className="text-lg font-semibold">No dataset selected</h2>
-              <p className="text-muted-foreground mt-1 text-sm">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Choose a dataset to view charts and metadata.
               </p>
             </div>
