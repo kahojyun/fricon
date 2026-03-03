@@ -15,7 +15,7 @@ use fricon::{
     DatasetUpdate, SelectOptions, SortDirection,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{State, ipc::Invoke};
+use tauri::State;
 use tauri_specta::{Builder, collect_commands, collect_events};
 use tracing::{debug, error, instrument};
 
@@ -927,8 +927,8 @@ async fn get_dataset_write_status(
     })
 }
 
-fn specta_builder<R: tauri::Runtime>() -> Builder<R> {
-    Builder::<R>::new()
+pub(crate) fn specta_builder() -> Builder {
+    Builder::new()
         .commands(collect_commands![
             get_workspace_info,
             list_datasets,
@@ -948,25 +948,7 @@ pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
     let language = specta_typescript::Typescript::default()
         .header("// @ts-nocheck")
         .bigint(specta_typescript::BigIntExportBehavior::Number);
-    specta_builder::<tauri::Wry>()
+    specta_builder()
         .export(language, path)
         .map_err(|err| anyhow::anyhow!("Failed to export TypeScript bindings: {err}"))
-}
-
-pub(crate) fn mount_typed_events(app: &tauri::AppHandle) {
-    specta_builder::<tauri::Wry>().mount_events(app);
-}
-
-pub(crate) fn invoke_handler() -> impl Fn(Invoke) -> bool {
-    tauri::generate_handler![
-        get_workspace_info,
-        list_datasets,
-        list_dataset_tags,
-        dataset_detail,
-        dataset_chart_data,
-        get_filter_table_data,
-        update_dataset_favorite,
-        update_dataset_info,
-        get_dataset_write_status
-    ]
 }

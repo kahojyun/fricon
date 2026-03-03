@@ -301,15 +301,16 @@ fn build_workspace_runtime(workspace_path: PathBuf) -> Result<(WorkspaceLogSessi
 }
 
 fn run_with_app_state(app_state: AppState) -> Result<()> {
+    let specta_builder = commands::specta_builder();
     #[expect(clippy::exit, reason = "Required by Tauri framework")]
     let tauri_app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(commands::invoke_handler())
+        .invoke_handler(specta_builder.invoke_handler())
         .manage(app_state)
-        .setup(|app| {
+        .setup(move |app| {
             install_ctrl_c_handler(app);
             build_system_tray(app)?;
-            commands::mount_typed_events(&app.handle().clone());
+            specta_builder.mount_events(&app.handle().clone());
 
             // Start event listener
             let app_state = app.state::<AppState>();
