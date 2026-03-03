@@ -188,7 +188,7 @@ export function ChartWrapper({ data }: ChartWrapperProps) {
         theme={theme}
       />
       {!data ? (
-        <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
           No chart data
         </div>
       ) : null}

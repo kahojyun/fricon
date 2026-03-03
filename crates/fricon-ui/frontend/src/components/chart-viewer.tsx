@@ -679,7 +679,7 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
       </div>
 
       {chartError ? (
-        <div className="text-destructive px-2 text-sm">{chartError}</div>
+        <div className="px-2 text-sm text-destructive">{chartError}</div>
       ) : null}
 
       {effectiveChartType !== "scatter" ? (
