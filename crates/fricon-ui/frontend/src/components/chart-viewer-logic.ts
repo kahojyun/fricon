@@ -76,8 +76,12 @@ export function deriveChartViewerState(
     state.yColumnName,
     defaultYColumnIndex,
   );
-  const xColumn = columns.find((column) => column.name === effectiveXColumnName);
-  const yColumn = columns.find((column) => column.name === effectiveYColumnName);
+  const xColumn = columns.find(
+    (column) => column.name === effectiveXColumnName,
+  );
+  const yColumn = columns.find(
+    (column) => column.name === effectiveYColumnName,
+  );
 
   const scatterComplexOptions = columns.filter(
     (column) => !column.isIndex && column.isComplex,
@@ -95,7 +99,8 @@ export function deriveChartViewerState(
   const canUseScatterXY = scatterXYOptions.length >= 2 && hasIndexColumn;
 
   const effectiveScatterMode: ScatterMode = (() => {
-    if (state.scatterMode === "complex" && canUseScatterComplex) return "complex";
+    if (state.scatterMode === "complex" && canUseScatterComplex)
+      return "complex";
     if (state.scatterMode === "trace_xy" && canUseScatterTraceXY) {
       return "trace_xy";
     }
@@ -118,8 +123,15 @@ export function deriveChartViewerState(
     state.scatterTraceYName,
     1,
   );
-  const effectiveScatterXName = pickSelection(scatterXYOptions, state.scatterXName);
-  const effectiveScatterYName = pickSelection(scatterXYOptions, state.scatterYName, 1);
+  const effectiveScatterXName = pickSelection(
+    scatterXYOptions,
+    state.scatterXName,
+  );
+  const effectiveScatterYName = pickSelection(
+    scatterXYOptions,
+    state.scatterYName,
+    1,
+  );
 
   const scatterSeries = columns.find(
     (column) => column.name === effectiveScatterSeriesName,
@@ -340,7 +352,11 @@ export function buildChartRequest(
     };
   }
 
-  if (derived.effectiveChartType === "heatmap" && derived.series && derived.yColumn) {
+  if (
+    derived.effectiveChartType === "heatmap" &&
+    derived.series &&
+    derived.yColumn
+  ) {
     return {
       chartType: "heatmap",
       series: derived.series.name,

@@ -12,6 +12,7 @@
     "fix": "run-s -c lint:fix format",
     "type-check": "pnpm -r run type-check",
     "test": "pnpm -r run test",
+    "build": "pnpm --filter fricon-ui run build",
     "bundle-licenses": "run-p -c bundle-licenses:rust bundle-licenses:npm",
     "bundle-licenses:rust": "cd crates/fricon-py && cargo bundle-licenses --format toml --output ../../THIRD_PARTY_RUST.toml",
     "bundle-licenses:npm": "pnpm --filter fricon-ui run bundle-licenses && node -e \"const fs=require('node:fs');const path=require('node:path');const src=path.resolve('crates','fricon-ui','frontend','dist','THIRD_PARTY_NPM.json');const dst=path.resolve('THIRD_PARTY_NPM.json');fs.renameSync(src,dst);\""

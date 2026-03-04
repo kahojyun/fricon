@@ -93,7 +93,9 @@ export function DatasetTableFilters({
           style={{ gridTemplateColumns }}
         >
           {table.getFlatHeaders().map((header) => {
-            const meta = header.column.columnDef.meta as DatasetColumnMeta | undefined;
+            const meta = header.column.columnDef.meta as
+              | DatasetColumnMeta
+              | undefined;
             const canSort = header.column.getCanSort();
             const sorted = header.column.getIsSorted();
             return (
@@ -104,7 +106,9 @@ export function DatasetTableFilters({
                   "flex items-center gap-1 text-left font-medium",
                   canSort ? "hover:text-foreground" : "cursor-default",
                 )}
-                onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                onClick={
+                  canSort ? header.column.getToggleSortingHandler() : undefined
+                }
               >
                 <span>{meta?.label ?? ""}</span>
                 {sorted ? <span>{sorted === "desc" ? "↓" : "↑"}</span> : null}
@@ -152,20 +156,26 @@ export function DatasetTableFilters({
                         <Button
                           type="button"
                           aria-label="Filter tags"
-                          variant={selectedTags.length > 0 ? "secondary" : "outline"}
+                          variant={
+                            selectedTags.length > 0 ? "secondary" : "outline"
+                          }
                           size="sm"
                         />
                       }
                     >
                       Tags
-                      {selectedTags.length > 0 ? ` (${selectedTags.length})` : ""}
+                      {selectedTags.length > 0
+                        ? ` (${selectedTags.length})`
+                        : ""}
                     </PopoverTrigger>
                     <PopoverContent align="start" className="w-64 gap-2">
                       <Input
                         aria-label="Filter tags"
                         placeholder="Search tags"
                         value={tagFilterQuery}
-                        onChange={(event) => setTagFilterQuery(event.target.value)}
+                        onChange={(event) =>
+                          setTagFilterQuery(event.target.value)
+                        }
                       />
                       <div className="max-h-48 space-y-1 overflow-auto pr-1">
                         {filteredTagOptions.length > 0 ? (
@@ -207,7 +217,9 @@ export function DatasetTableFilters({
                           type="button"
                           aria-label="Filter status"
                           variant={
-                            selectedStatuses.length > 0 ? "secondary" : "outline"
+                            selectedStatuses.length > 0
+                              ? "secondary"
+                              : "outline"
                           }
                           size="sm"
                         />

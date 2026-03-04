@@ -11,7 +11,9 @@ import {
   type ChartViewerSelectionState,
 } from "@/components/chart-viewer-logic";
 
-function makeColumn(overrides: Partial<ColumnInfo> & { name: string }): ColumnInfo {
+function makeColumn(
+  overrides: Partial<ColumnInfo> & { name: string },
+): ColumnInfo {
   const { name, ...rest } = overrides;
   return {
     name,

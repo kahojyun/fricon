@@ -215,7 +215,8 @@ export function ChartViewerControls({
           </div>
         ) : null}
 
-        {effectiveChartType === "scatter" && effectiveScatterMode === "complex" ? (
+        {effectiveChartType === "scatter" &&
+        effectiveScatterMode === "complex" ? (
           <div className="min-w-50">
             <Label className="mb-1 block text-xs">Complex Series</Label>
             <Select
@@ -333,7 +334,9 @@ export function ChartViewerControls({
         (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
         !scatterIsTraceBased ? (
           <div className="min-w-50">
-            <Label className="mb-1 block text-xs">Index Column (excluded)</Label>
+            <Label className="mb-1 block text-xs">
+              Index Column (excluded)
+            </Label>
             <Select
               value={effectiveScatterBinName ?? ""}
               onValueChange={(value) =>
@@ -371,9 +374,15 @@ export function ChartViewerControls({
             >
               {complexSeriesOptions.map((option) => (
                 <label key={option} className="flex items-center gap-2">
-                  <RadioGroupItem value={option} disabled={complexControlsDisabled} />
+                  <RadioGroupItem
+                    value={option}
+                    disabled={complexControlsDisabled}
+                  />
                   <span
-                    className={cn("text-sm", complexControlsDisabled && "opacity-50")}
+                    className={cn(
+                      "text-sm",
+                      complexControlsDisabled && "opacity-50",
+                    )}
                   >
                     {option}
                   </span>
@@ -393,12 +402,17 @@ export function ChartViewerControls({
                         if (complexControlsDisabled) return;
                         const next = checked
                           ? [...selectedComplexView, option]
-                          : selectedComplexView.filter((item) => item !== option);
+                          : selectedComplexView.filter(
+                              (item) => item !== option,
+                            );
                         setSelectedComplexView(next);
                       }}
                     />
                     <span
-                      className={cn("text-sm", complexControlsDisabled && "opacity-50")}
+                      className={cn(
+                        "text-sm",
+                        complexControlsDisabled && "opacity-50",
+                      )}
                     >
                       {option}
                     </span>
