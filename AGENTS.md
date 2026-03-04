@@ -1,77 +1,19 @@
-# Repository Guidelines
+# fricon Repository Agent Rules
 
-## Project Structure & Module Organization
+## Monorepo Scope
 
-This is a multi-language workspace with Rust core components, Python bindings, and a Tauri-based UI. The main structure:
+- Rust crates are under `crates/`: `fricon`, `fricon-py`, `fricon-ui`, `fricon-cli`.
+- `examples/` contains runnable examples.
+- `scripts/` contains development helpers.
+- `docs/` contains documentation sources.
 
-- `crates/` - Rust workspace with core modules:
-    - `fricon/` - Core library
-    - `fricon-py/` - Python bindings
-    - `fricon-ui/` - Tauri frontend
-    - `fricon-cli/` - Command-line interface
-- `examples/` - Usage examples
-- `scripts/` - Development and setup utilities
-- `docs/` - Documentation source
+## Repo-Specific Knowledge
 
-## Build, Test, and Development Commands
-
-### Rust (workspace)
-
-```bash
-cargo check
-cargo build
-cargo test
-cargo +nightly fmt
-cargo clippy --all-targets --all-features
-```
-
-### Tauri IPC / Bindings (fricon-ui)
-
-- `fricon-ui` uses `tauri-specta` as the source of truth for frontend IPC types.
-- When Rust command/event signatures change, regenerate bindings:
-
-```bash
-pnpm --filter fricon-ui run gen:bindings
-```
-
-- Do not manually edit `crates/fricon-ui/frontend/src/lib/bindings.ts`.
-- Keep CI `fmt` lightweight; bindings generation/checks belong to `test`, not `fmt`.
-
-### Python
-
-ALWAYS run `maturin develop` before running `pytest` unless you are sure that the Python bindings are up to date.
-
-```bash
-# Run from repo root
-uv run maturin develop
-uv run pytest
-uv run ruff format
-uv run ruff check
-uv run basedpyright
-uv run stubtest fricon._core
-uv run --group docs mkdocs build -s -v
-```
-
-### Frontend/UI
-
-```bash
-# Run from repo root
-pnpm install
-pnpm run type-check
-pnpm run lint
-pnpm run format:check
-git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
-pnpm run fix # Fix auto-fixable issues
-pnpm run test --run
-pnpm --filter fricon-ui exec shadcn add <component>
-```
-
-## Testing Guidelines
-
-- **Testing Frameworks**: Rust (`cargo test`), Python (`pytest`), Frontend (`vitest`)
-- **Coverage**: Write tests for critical paths
-- **Test Location**:
-    - Rust unit tests in `mod tests`, integration tests in `<crate>/tests`
-    - Python tests in `crates/fricon-py/tests/`
-    - Frontend tests in `crates/fricon-ui/frontend/src/**/*.test.*`
-- **Running**: Use `cargo test` for Rust, `uv run pytest` for Python, `pnpm run test` for Frontend
+- Use non-`mod.rs` layout for Rust modules (`foo.rs` plus optional `foo/*.rs` submodules).
+- Rust use nightly rustfmt: `cargo +nightly fmt`.
+- Python bindings and tests (from repo root):
+  run `uv run maturin develop` before `uv run pytest` when Rust bindings may be stale.
+- Frontend checks (from repo root):
+  `pnpm run [type-check|lint|format:check|test --run]`.
+- After Rust Tauri command/event signature changes, regenerate bindings with:
+  `pnpm --filter fricon-ui run gen:bindings`.
