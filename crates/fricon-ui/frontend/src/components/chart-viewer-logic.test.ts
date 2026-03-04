@@ -9,7 +9,6 @@ import {
   buildChartRequest,
   deriveChartViewerState,
   type ChartViewerSelectionState,
-  isComplexViewOption,
 } from "@/components/chart-viewer-logic";
 
 function makeColumn(overrides: Partial<ColumnInfo> & { name: string }): ColumnInfo {
@@ -170,10 +169,5 @@ describe("chart-viewer-logic", () => {
       indexFilters: [1],
       excludeColumns: ["idxB"],
     });
-  });
-
-  it("guards complex option type narrowing", () => {
-    expect(isComplexViewOption("real")).toBe(true);
-    expect(isComplexViewOption("unknown")).toBe(false);
   });
 });
