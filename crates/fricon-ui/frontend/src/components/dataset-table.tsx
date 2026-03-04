@@ -144,7 +144,7 @@ export function DatasetTable({
         />
         <div className="flex min-h-0 flex-1 flex-col border-t">
           <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
-            <div className="min-w-[760px]">
+            <div className="min-w-190">
               <div
                 className="relative w-full"
                 style={{
@@ -153,7 +153,7 @@ export function DatasetTable({
                 }}
               >
                 {rows.length === 0 ? (
-                  <div className="absolute inset-x-0 top-[120px] px-3 text-xs text-muted-foreground">
+                  <div className="absolute inset-x-0 top-30 px-3 text-xs text-muted-foreground">
                     No datasets matched the current filters.
                   </div>
                 ) : null}

@@ -88,7 +88,7 @@ export function ChartViewerControls({
   return (
     <>
       <div className="flex flex-wrap gap-2 p-2">
-        <div className="min-w-[160px]">
+        <div className="min-w-40">
           <Label className="mb-1 block text-xs">Chart Type</Label>
           <Select
             value={effectiveChartType}
@@ -112,7 +112,7 @@ export function ChartViewerControls({
         </div>
 
         {effectiveChartType !== "scatter" ? (
-          <div className="min-w-[180px]">
+          <div className="min-w-45">
             <Label className="mb-1 block text-xs">Series</Label>
             <Select
               value={effectiveSeriesName ?? ""}
@@ -137,7 +137,7 @@ export function ChartViewerControls({
         {effectiveChartType !== "scatter" &&
         (effectiveChartType === "line" ||
           (effectiveChartType === "heatmap" && !series?.isTrace)) ? (
-          <div className="min-w-[160px]">
+          <div className="min-w-40">
             <Label className="mb-1 block text-xs">X</Label>
             <Select
               disabled={effectiveChartType === "line" && isTraceSeries}
@@ -164,7 +164,7 @@ export function ChartViewerControls({
         ) : null}
 
         {effectiveChartType === "heatmap" ? (
-          <div className="min-w-[160px]">
+          <div className="min-w-40">
             <Label className="mb-1 block text-xs">Y</Label>
             <Select
               value={effectiveYColumnName ?? ""}
@@ -187,7 +187,7 @@ export function ChartViewerControls({
         ) : null}
 
         {effectiveChartType === "scatter" ? (
-          <div className="min-w-[200px]">
+          <div className="min-w-50">
             <Label className="mb-1 block text-xs">Point Cloud Source</Label>
             <Select
               value={effectiveScatterMode}
@@ -216,7 +216,7 @@ export function ChartViewerControls({
         ) : null}
 
         {effectiveChartType === "scatter" && effectiveScatterMode === "complex" ? (
-          <div className="min-w-[200px]">
+          <div className="min-w-50">
             <Label className="mb-1 block text-xs">Complex Series</Label>
             <Select
               value={effectiveScatterSeriesName ?? ""}
@@ -240,7 +240,7 @@ export function ChartViewerControls({
 
         {effectiveChartType === "scatter" && effectiveScatterMode === "xy" ? (
           <>
-            <div className="min-w-[160px]">
+            <div className="min-w-40">
               <Label className="mb-1 block text-xs">X Column</Label>
               <Select
                 value={effectiveScatterXName ?? ""}
@@ -260,7 +260,7 @@ export function ChartViewerControls({
                 </SelectContent>
               </Select>
             </div>
-            <div className="min-w-[160px]">
+            <div className="min-w-40">
               <Label className="mb-1 block text-xs">Y Column</Label>
               <Select
                 value={effectiveScatterYName ?? ""}
@@ -286,7 +286,7 @@ export function ChartViewerControls({
         {effectiveChartType === "scatter" &&
         effectiveScatterMode === "trace_xy" ? (
           <>
-            <div className="min-w-[160px]">
+            <div className="min-w-40">
               <Label className="mb-1 block text-xs">Trace X</Label>
               <Select
                 value={effectiveScatterTraceXName ?? ""}
@@ -306,7 +306,7 @@ export function ChartViewerControls({
                 </SelectContent>
               </Select>
             </div>
-            <div className="min-w-[160px]">
+            <div className="min-w-40">
               <Label className="mb-1 block text-xs">Trace Y</Label>
               <Select
                 value={effectiveScatterTraceYName ?? ""}
@@ -332,7 +332,7 @@ export function ChartViewerControls({
         {effectiveChartType === "scatter" &&
         (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
         !scatterIsTraceBased ? (
-          <div className="min-w-[200px]">
+          <div className="min-w-50">
             <Label className="mb-1 block text-xs">Index Column (excluded)</Label>
             <Select
               value={effectiveScatterBinName ?? ""}
