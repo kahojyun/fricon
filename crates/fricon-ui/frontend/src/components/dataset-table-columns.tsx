@@ -1,4 +1,4 @@
-import type { ColumnDef } from "@tanstack/react-table";
+import type { Column, ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown, Star, StarOff } from "lucide-react";
 import type { DatasetInfo, DatasetStatus } from "@/lib/backend";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,34 @@ export const datasetStatusOptions: DatasetStatus[] = [
 
 interface CreateDatasetColumnsOptions {
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;
+}
+
+function renderSortableHeader({
+  column,
+  label,
+}: {
+  column: Column<DatasetInfo>;
+  label: string;
+}) {
+  const sorted = column.getIsSorted();
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ml-3 h-8 data-[state=open]:bg-accent"
+      onClick={() => column.toggleSorting(sorted === "asc")}
+    >
+      <span>{label}</span>
+      {sorted === "desc" ? (
+        <ArrowDown className="ml-2 h-4 w-4" />
+      ) : sorted === "asc" ? (
+        <ArrowUp className="ml-2 h-4 w-4" />
+      ) : (
+        <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
+      )}
+    </Button>
+  );
 }
 
 export function createDatasetColumns({
@@ -89,25 +117,7 @@ export function createDatasetColumns({
         label: "ID",
         hideable: true,
       } as DatasetColumnMeta,
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-3 h-8 data-[state=open]:bg-accent"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            <span>ID</span>
-            {column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
-            )}
-          </Button>
-        );
-      },
+      header: ({ column }) => renderSortableHeader({ column, label: "ID" }),
       cell: ({ getValue }) => (
         <div className="font-medium tabular-nums">{getValue<number>()}</div>
       ),
@@ -120,25 +130,7 @@ export function createDatasetColumns({
         label: "Name",
         hideable: false,
       } as DatasetColumnMeta,
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-3 h-8 data-[state=open]:bg-accent"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            <span>Name</span>
-            {column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
-            )}
-          </Button>
-        );
-      },
+      header: ({ column }) => renderSortableHeader({ column, label: "Name" }),
       cell: ({ getValue }) => {
         const name = getValue<string>();
         return (
@@ -208,25 +200,8 @@ export function createDatasetColumns({
         hideable: true,
         defaultVisible: false,
       } as DatasetColumnMeta,
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-3 h-8 data-[state=open]:bg-accent"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            <span>Created At</span>
-            {column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-2 h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
-            )}
-          </Button>
-        );
-      },
+      header: ({ column }) =>
+        renderSortableHeader({ column, label: "Created At" }),
       cell: ({ getValue }) => (
         <div className="text-sm text-muted-foreground">
           {getValue<Date>().toLocaleString()}

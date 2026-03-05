@@ -38,6 +38,125 @@ interface DatasetTableToolbarProps {
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
 }
 
+interface FacetedFilterPopoverProps<T extends string> {
+  title: string;
+  selectedValues: T[];
+  options: T[];
+  onToggle: (value: T) => void;
+  searchValue?: string;
+  onSearchChange?: (next: string) => void;
+  searchPlaceholder?: string;
+  emptyLabel: string;
+  contentClassName: string;
+}
+
+function FacetedFilterPopover<T extends string>({
+  title,
+  selectedValues,
+  options,
+  onToggle,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
+  emptyLabel,
+  contentClassName,
+}: FacetedFilterPopoverProps<T>) {
+  const hasSearch = onSearchChange !== undefined;
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button variant="outline" size="sm" className="h-8 border-dashed" />
+        }
+      >
+        <PlusCircle className="mr-2 h-4 w-4 shrink-0" />
+        {title}
+        {selectedValues.length > 0 && (
+          <>
+            <div className="mx-2 h-4 w-px shrink-0 bg-border" />
+            <Badge
+              variant="secondary"
+              className="rounded-sm px-1 font-normal lg:hidden"
+            >
+              {selectedValues.length}
+            </Badge>
+            <div className="hidden space-x-1 lg:flex">
+              {selectedValues.length > 2 ? (
+                <Badge
+                  variant="secondary"
+                  className="rounded-sm px-1 font-normal"
+                >
+                  {selectedValues.length} selected
+                </Badge>
+              ) : (
+                selectedValues.map((value) => (
+                  <Badge
+                    key={value}
+                    variant="secondary"
+                    className="max-w-24 truncate rounded-sm px-1 font-normal"
+                  >
+                    {value}
+                  </Badge>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </PopoverTrigger>
+      <PopoverContent className={contentClassName} align="start">
+        {hasSearch && (
+          <Input
+            placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+            className="mb-2 h-8"
+          />
+        )}
+        <div className="max-h-50 space-y-1 overflow-auto pr-1">
+          {options.length > 0 ? (
+            options.map((value) => {
+              const isActive = selectedValues.includes(value);
+              return (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={isActive ? "secondary" : "ghost"}
+                  size="sm"
+                  className="w-full justify-start font-normal"
+                  onClick={() => onToggle(value)}
+                >
+                  <DatasetFilterCheckIcon active={isActive} />
+                  {value}
+                </Button>
+              );
+            })
+          ) : (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              {emptyLabel}
+            </div>
+          )}
+        </div>
+        {selectedValues.length > 0 && (
+          <>
+            <div className="my-2 h-px w-full bg-border" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-center text-sm"
+              onClick={() => {
+                selectedValues.forEach(onToggle);
+              }}
+            >
+              Clear filters
+            </Button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function DatasetTableToolbar({
   table,
   hasActiveFilters,
@@ -69,179 +188,26 @@ export function DatasetTableToolbar({
           className="h-8 w-full max-w-62.5 min-w-37.5"
         />
 
-        <Popover>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 border-dashed"
-              />
-            }
-          >
-            <PlusCircle className="mr-2 h-4 w-4 shrink-0" />
-            Tags
-            {selectedTags.length > 0 && (
-              <>
-                <div className="mx-2 h-4 w-px shrink-0 bg-border" />
-                <Badge
-                  variant="secondary"
-                  className="rounded-sm px-1 font-normal lg:hidden"
-                >
-                  {selectedTags.length}
-                </Badge>
-                <div className="hidden space-x-1 lg:flex">
-                  {selectedTags.length > 2 ? (
-                    <Badge
-                      variant="secondary"
-                      className="rounded-sm px-1 font-normal"
-                    >
-                      {selectedTags.length} selected
-                    </Badge>
-                  ) : (
-                    selectedTags.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="secondary"
-                        className="max-w-24 truncate rounded-sm px-1 font-normal"
-                      >
-                        {tag}
-                      </Badge>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-2" align="start">
-            <Input
-              placeholder="Search tags"
-              value={tagFilterQuery}
-              onChange={(event) => setTagFilterQuery(event.target.value)}
-              className="mb-2 h-8"
-            />
-            <div className="max-h-50 space-y-1 overflow-auto pr-1">
-              {filteredTagOptions.length > 0 ? (
-                filteredTagOptions.map((tag) => {
-                  const isActive = selectedTags.includes(tag);
-                  return (
-                    <Button
-                      key={tag}
-                      type="button"
-                      variant={isActive ? "secondary" : "ghost"}
-                      size="sm"
-                      className="w-full justify-start font-normal"
-                      onClick={() => handleTagToggle(tag)}
-                    >
-                      <DatasetFilterCheckIcon active={isActive} />
-                      {tag}
-                    </Button>
-                  );
-                })
-              ) : (
-                <div className="py-6 text-center text-sm text-muted-foreground">
-                  No tags found.
-                </div>
-              )}
-            </div>
-            {selectedTags.length > 0 && (
-              <>
-                <div className="my-2 h-px w-full bg-border" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-center text-sm"
-                  onClick={() => {
-                    selectedTags.forEach(handleTagToggle);
-                  }}
-                >
-                  Clear filters
-                </Button>
-              </>
-            )}
-          </PopoverContent>
-        </Popover>
+        <FacetedFilterPopover
+          title="Tags"
+          selectedValues={selectedTags}
+          options={filteredTagOptions}
+          onToggle={handleTagToggle}
+          searchValue={tagFilterQuery}
+          onSearchChange={setTagFilterQuery}
+          searchPlaceholder="Search tags"
+          emptyLabel="No tags found."
+          contentClassName="w-64 p-2"
+        />
 
-        <Popover>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 border-dashed"
-              />
-            }
-          >
-            <PlusCircle className="mr-2 h-4 w-4 shrink-0" />
-            Status
-            {selectedStatuses.length > 0 && (
-              <>
-                <div className="mx-2 h-4 w-px shrink-0 bg-border" />
-                <Badge
-                  variant="secondary"
-                  className="rounded-sm px-1 font-normal lg:hidden"
-                >
-                  {selectedStatuses.length}
-                </Badge>
-                <div className="hidden space-x-1 lg:flex">
-                  {selectedStatuses.length > 2 ? (
-                    <Badge
-                      variant="secondary"
-                      className="rounded-sm px-1 font-normal"
-                    >
-                      {selectedStatuses.length} selected
-                    </Badge>
-                  ) : (
-                    selectedStatuses.map((status) => (
-                      <Badge
-                        key={status}
-                        variant="secondary"
-                        className="max-w-24 truncate rounded-sm px-1 font-normal"
-                      >
-                        {status}
-                      </Badge>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-          </PopoverTrigger>
-          <PopoverContent className="w-50 p-2" align="start">
-            <div className="space-y-1">
-              {datasetStatusOptions.map((status) => {
-                const isActive = selectedStatuses.includes(status);
-                return (
-                  <Button
-                    key={status}
-                    type="button"
-                    variant={isActive ? "secondary" : "ghost"}
-                    size="sm"
-                    className="w-full justify-start font-normal"
-                    onClick={() => handleStatusToggle(status)}
-                  >
-                    <DatasetFilterCheckIcon active={isActive} />
-                    {status}
-                  </Button>
-                );
-              })}
-            </div>
-            {selectedStatuses.length > 0 && (
-              <>
-                <div className="my-2 h-px w-full bg-border" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-center text-sm"
-                  onClick={() => {
-                    selectedStatuses.forEach(handleStatusToggle);
-                  }}
-                >
-                  Clear filters
-                </Button>
-              </>
-            )}
-          </PopoverContent>
-        </Popover>
+        <FacetedFilterPopover
+          title="Status"
+          selectedValues={selectedStatuses}
+          options={datasetStatusOptions}
+          onToggle={handleStatusToggle}
+          emptyLabel="No status found."
+          contentClassName="w-50 p-2"
+        />
 
         <div className="flex h-8 shrink-0 items-center space-x-2 rounded-md border border-dashed px-2.5">
           <Switch
