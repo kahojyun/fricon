@@ -148,6 +148,27 @@ describe("DatasetTable", () => {
     expect(hook.toggleFavorite).toHaveBeenCalledWith(dataset);
   });
 
+  it("exposes full dataset name on hover while using truncated cell text", () => {
+    mockHookReturn({
+      datasets: [
+        makeDataset({
+          id: 21,
+          name: "A very long dataset name for hover preview validation",
+        }),
+      ],
+    });
+
+    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+
+    const nameCell = screen
+      .getByText("A very long dataset name for hover preview validation")
+      .closest("div");
+    expect(nameCell).toHaveAttribute(
+      "title",
+      "A very long dataset name for hover preview validation",
+    );
+  });
+
   it("uses clear filters action from hook", async () => {
     const hook = mockHookReturn({
       hasActiveFilters: true,
@@ -218,6 +239,14 @@ describe("DatasetTable", () => {
     expect(
       screen.queryByRole("button", { name: "Filter status" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Toggle Status column"));
+    expect(
+      screen.getByRole("button", { name: /^Status/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter status" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
   });
 
   it("supports show all and reset default column actions", async () => {

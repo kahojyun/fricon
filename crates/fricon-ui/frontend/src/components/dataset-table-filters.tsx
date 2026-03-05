@@ -38,6 +38,8 @@ interface DatasetTableFiltersProps {
   clearFilters: () => void;
   resetColumnVisibilityToDefault: () => void;
   showAllColumns: () => void;
+  onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
+  headerScrollbarWidth: number;
 }
 
 export function DatasetTableFilters({
@@ -59,6 +61,8 @@ export function DatasetTableFilters({
   clearFilters,
   resetColumnVisibilityToDefault,
   showAllColumns,
+  onColumnVisibilityChange,
+  headerScrollbarWidth,
 }: DatasetTableFiltersProps) {
   const visibleColumns = table.getVisibleLeafColumns();
   const allColumns = table.getAllLeafColumns();
@@ -124,7 +128,7 @@ export function DatasetTableFilters({
                           disabled={!hideable}
                           onCheckedChange={(checked) => {
                             if (!hideable) return;
-                            column.toggleVisibility(Boolean(checked));
+                            onColumnVisibilityChange(column.id, Boolean(checked));
                           }}
                         />
                       </span>
@@ -166,172 +170,178 @@ export function DatasetTableFilters({
         </div>
       </div>
 
-      <div ref={headerRef} className="sticky top-0 z-20 border-b bg-muted">
-        <div
-          className="grid items-center gap-2 px-3 py-2 text-xs text-muted-foreground"
-          style={{ gridTemplateColumns }}
-        >
-          {visibleColumns.map((column) => {
-            const meta = column.columnDef.meta as
-              | DatasetColumnMeta
-              | undefined;
-            const canSort = column.getCanSort();
-            const sorted = column.getIsSorted();
-            return (
-              <button
-                key={column.id}
-                type="button"
-                className={cn(
-                  "flex items-center gap-1 text-left font-medium",
-                  canSort ? "hover:text-foreground" : "cursor-default",
-                )}
-                onClick={canSort ? column.getToggleSortingHandler() : undefined}
-              >
-                <span>{meta?.label ?? ""}</span>
-                {sorted ? <span>{sorted === "desc" ? "↓" : "↑"}</span> : null}
-              </button>
-            );
-          })}
-        </div>
-
-        <div
-          className="grid items-start gap-2 border-t px-3 py-2"
-          style={{ gridTemplateColumns }}
-        >
-          {visibleColumns.map((column) => {
-            if (column.id === "favorite") {
+      <div
+        ref={headerRef}
+        className="sticky top-0 z-20 overflow-hidden border-b bg-muted"
+        style={{ paddingRight: headerScrollbarWidth }}
+      >
+        <div className="min-w-190">
+          <div
+            className="grid items-center gap-2 px-3 py-2 text-xs text-muted-foreground"
+            style={{ gridTemplateColumns }}
+          >
+            {visibleColumns.map((column) => {
+              const meta = column.columnDef.meta as
+                | DatasetColumnMeta
+                | undefined;
+              const canSort = column.getCanSort();
+              const sorted = column.getIsSorted();
               return (
-                <div key={`${column.id}-filter`} className="pt-1">
-                  <Switch
-                    aria-label="Favorites only"
-                    checked={favoriteOnly}
-                    onCheckedChange={setFavoriteOnly}
-                  />
-                </div>
+                <button
+                  key={column.id}
+                  type="button"
+                  className={cn(
+                    "flex min-w-0 items-center gap-1 text-left font-medium",
+                    canSort ? "hover:text-foreground" : "cursor-default",
+                  )}
+                  onClick={canSort ? column.getToggleSortingHandler() : undefined}
+                >
+                  <span className="truncate">{meta?.label ?? ""}</span>
+                  {sorted ? <span>{sorted === "desc" ? "↓" : "↑"}</span> : null}
+                </button>
               );
-            }
+            })}
+          </div>
 
-            if (column.id === "name") {
-              return (
-                <div key={`${column.id}-filter`}>
-                  <Input
-                    aria-label="Search datasets"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search by name"
-                  />
-                </div>
-              );
-            }
+          <div
+            className="grid items-start gap-2 border-t px-3 py-2"
+            style={{ gridTemplateColumns }}
+          >
+            {visibleColumns.map((column) => {
+              if (column.id === "favorite") {
+                return (
+                  <div key={`${column.id}-filter`} className="min-w-0 pt-1">
+                    <Switch
+                      aria-label="Favorites only"
+                      checked={favoriteOnly}
+                      onCheckedChange={setFavoriteOnly}
+                    />
+                  </div>
+                );
+              }
 
-            if (column.id === "tags") {
-              return (
-                <div key={`${column.id}-filter`}>
-                  <Popover>
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          type="button"
-                          aria-label="Filter tags"
-                          variant={
-                            selectedTags.length > 0 ? "secondary" : "outline"
-                          }
-                          size="sm"
-                        />
-                      }
-                    >
-                      Tags
-                      {selectedTags.length > 0
-                        ? ` (${selectedTags.length})`
-                        : ""}
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-64 gap-2">
-                      <Input
-                        aria-label="Filter tags"
-                        placeholder="Search tags"
-                        value={tagFilterQuery}
-                        onChange={(event) =>
-                          setTagFilterQuery(event.target.value)
-                        }
-                      />
-                      <div className="max-h-48 space-y-1 overflow-auto pr-1">
-                        {filteredTagOptions.length > 0 ? (
-                          filteredTagOptions.map((tag) => {
-                            const isActive = selectedTags.includes(tag);
-                            return (
-                              <Button
-                                key={tag}
-                                type="button"
-                                variant={isActive ? "secondary" : "ghost"}
-                                size="sm"
-                                className="w-full justify-start"
-                                onClick={() => handleTagToggle(tag)}
-                              >
-                                <DatasetFilterCheckIcon active={isActive} />
-                                {tag}
-                              </Button>
-                            );
-                          })
-                        ) : (
-                          <div className="px-1 py-2 text-xs text-muted-foreground">
-                            No tags found
-                          </div>
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              );
-            }
+              if (column.id === "name") {
+                return (
+                  <div key={`${column.id}-filter`} className="min-w-0">
+                    <Input
+                      aria-label="Search datasets"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Search by name"
+                    />
+                  </div>
+                );
+              }
 
-            if (column.id === "status") {
-              return (
-                <div key={`${column.id}-filter`}>
-                  <Popover>
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          type="button"
-                          aria-label="Filter status"
-                          variant={
-                            selectedStatuses.length > 0
-                              ? "secondary"
-                              : "outline"
-                          }
-                          size="sm"
-                        />
-                      }
-                    >
-                      Status
-                      {selectedStatuses.length > 0
-                        ? ` (${selectedStatuses.length})`
-                        : ""}
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-56 space-y-1">
-                      {datasetStatusOptions.map((status) => {
-                        const isActive = selectedStatuses.includes(status);
-                        return (
+              if (column.id === "tags") {
+                return (
+                  <div key={`${column.id}-filter`} className="min-w-0">
+                    <Popover>
+                      <PopoverTrigger
+                        render={
                           <Button
-                            key={status}
                             type="button"
-                            variant={isActive ? "secondary" : "ghost"}
+                            aria-label="Filter tags"
+                            variant={
+                              selectedTags.length > 0 ? "secondary" : "outline"
+                            }
                             size="sm"
-                            className="w-full justify-start"
-                            onClick={() => handleStatusToggle(status)}
-                          >
-                            <DatasetFilterCheckIcon active={isActive} />
-                            {status}
-                          </Button>
-                        );
-                      })}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              );
-            }
+                          />
+                        }
+                      >
+                        Tags
+                        {selectedTags.length > 0
+                          ? ` (${selectedTags.length})`
+                          : ""}
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-64 gap-2">
+                        <Input
+                          aria-label="Filter tags"
+                          placeholder="Search tags"
+                          value={tagFilterQuery}
+                          onChange={(event) =>
+                            setTagFilterQuery(event.target.value)
+                          }
+                        />
+                        <div className="max-h-48 space-y-1 overflow-auto pr-1">
+                          {filteredTagOptions.length > 0 ? (
+                            filteredTagOptions.map((tag) => {
+                              const isActive = selectedTags.includes(tag);
+                              return (
+                                <Button
+                                  key={tag}
+                                  type="button"
+                                  variant={isActive ? "secondary" : "ghost"}
+                                  size="sm"
+                                  className="w-full justify-start"
+                                  onClick={() => handleTagToggle(tag)}
+                                >
+                                  <DatasetFilterCheckIcon active={isActive} />
+                                  {tag}
+                                </Button>
+                              );
+                            })
+                          ) : (
+                            <div className="px-1 py-2 text-xs text-muted-foreground">
+                              No tags found
+                            </div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                );
+              }
 
-            return <div key={`${column.id}-filter`} />;
-          })}
+              if (column.id === "status") {
+                return (
+                  <div key={`${column.id}-filter`} className="min-w-0">
+                    <Popover>
+                      <PopoverTrigger
+                        render={
+                          <Button
+                            type="button"
+                            aria-label="Filter status"
+                            variant={
+                              selectedStatuses.length > 0
+                                ? "secondary"
+                                : "outline"
+                            }
+                            size="sm"
+                          />
+                        }
+                      >
+                        Status
+                        {selectedStatuses.length > 0
+                          ? ` (${selectedStatuses.length})`
+                          : ""}
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-56 space-y-1">
+                        {datasetStatusOptions.map((status) => {
+                          const isActive = selectedStatuses.includes(status);
+                          return (
+                            <Button
+                              key={status}
+                              type="button"
+                              variant={isActive ? "secondary" : "ghost"}
+                              size="sm"
+                              className="w-full justify-start"
+                              onClick={() => handleStatusToggle(status)}
+                            >
+                              <DatasetFilterCheckIcon active={isActive} />
+                              {status}
+                            </Button>
+                          );
+                        })}
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                );
+              }
+
+              return <div key={`${column.id}-filter`} className="min-w-0" />;
+            })}
+          </div>
         </div>
       </div>
     </>

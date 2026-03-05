@@ -99,13 +99,18 @@ export function createDatasetColumns({
       accessorKey: "name",
       meta: {
         label: "Name",
-        width: "minmax(160px,1fr)",
+        width: "minmax(160px,40%)",
         hideable: false,
         defaultVisible: true,
       } satisfies DatasetColumnMeta,
-      cell: ({ getValue }) => (
-        <div className="truncate px-2">{getValue<string>()}</div>
-      ),
+      cell: ({ getValue }) => {
+        const name = getValue<string>();
+        return (
+          <div className="w-full min-w-0 truncate px-2" title={name}>
+            {name}
+          </div>
+        );
+      },
     },
     {
       id: "status",
