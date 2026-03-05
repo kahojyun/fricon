@@ -102,6 +102,24 @@ function mockHookReturn(overrides: Record<string, unknown> = {}) {
   return value;
 }
 
+function renderDatasetTable(overrides: Record<string, unknown> = {}) {
+  const hook = mockHookReturn(overrides);
+  const onDatasetSelected = vi.fn();
+  render(<DatasetTable onDatasetSelected={onDatasetSelected} />);
+  return { hook, onDatasetSelected };
+}
+
+async function openColumnsPopover(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Columns" }));
+}
+
+async function toggleColumn(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+) {
+  await user.click(screen.getByLabelText(`Toggle ${label} column`));
+}
+
 describe("DatasetTable", () => {
   beforeEach(() => {
     useDatasetTableDataMock.mockReset();
@@ -112,11 +130,8 @@ describe("DatasetTable", () => {
   });
 
   it("renders rows and selects dataset on row click", async () => {
-    mockHookReturn();
-    const onDatasetSelected = vi.fn();
+    const { onDatasetSelected } = renderDatasetTable();
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={onDatasetSelected} />);
 
     await user.click(screen.getByText("Dataset 1"));
 
@@ -124,10 +139,8 @@ describe("DatasetTable", () => {
   });
 
   it("updates search query from input", async () => {
-    const hook = mockHookReturn();
+    const { hook } = renderDatasetTable();
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.type(screen.getByLabelText("Search datasets"), "Alpha");
 
@@ -138,10 +151,11 @@ describe("DatasetTable", () => {
 
   it("toggles favorite via row action", async () => {
     const dataset = makeDataset({ id: 11, name: "Pinned", favorite: true });
-    const hook = mockHookReturn({ datasets: [dataset], favoriteOnly: true });
+    const { hook } = renderDatasetTable({
+      datasets: [dataset],
+      favoriteOnly: true,
+    });
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.click(screen.getByLabelText("Remove from favorites"));
 
@@ -170,14 +184,12 @@ describe("DatasetTable", () => {
   });
 
   it("uses clear filters action from hook", async () => {
-    const hook = mockHookReturn({
+    const { hook } = renderDatasetTable({
       hasActiveFilters: true,
       selectedTags: ["vision"],
       searchQuery: "Alpha",
     });
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
 
@@ -185,10 +197,8 @@ describe("DatasetTable", () => {
   });
 
   it("triggers backend sorting state when clicking sortable header", async () => {
-    const hook = mockHookReturn();
+    const { hook } = renderDatasetTable();
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /^ID/ }));
 
@@ -196,15 +206,11 @@ describe("DatasetTable", () => {
   });
 
   it("uses compact column visibility defaults on first render", () => {
-    mockHookReturn();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+    renderDatasetTable();
 
     expect(screen.getByRole("button", { name: /^ID/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Status/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^Tags/ }),
     ).not.toBeInTheDocument();
@@ -217,52 +223,58 @@ describe("DatasetTable", () => {
   });
 
   it("allows toggling column visibility and keeps name required", async () => {
-    mockHookReturn();
+    renderDatasetTable();
     const user = userEvent.setup();
 
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await openColumnsPopover(user);
 
     const nameCheckbox = screen.getByLabelText("Toggle Name column");
     expect(nameCheckbox).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
 
-    await user.click(screen.getByLabelText("Toggle Tags column"));
+    await toggleColumn(user, "Tags");
     expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter tags" })).toBeInTheDocument();
-
-    await user.click(screen.getByLabelText("Toggle Status column"));
     expect(
-      screen.queryByRole("button", { name: /^Status/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Filter status" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
-
-    await user.click(screen.getByLabelText("Toggle Status column"));
-    expect(
-      screen.getByRole("button", { name: /^Status/ }),
+      screen.getByRole("button", { name: "Filter tags" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter status" })).toBeInTheDocument();
+
+    await toggleColumn(user, "Status");
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: /^Status/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Filter status" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+
+    await toggleColumn(user, "Status");
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /^Status/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Filter status" }),
+      ).toBeInTheDocument();
+    });
     expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
   });
 
   it("supports show all and reset default column actions", async () => {
-    mockHookReturn();
+    renderDatasetTable();
     const user = userEvent.setup();
 
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: "Columns" }));
+    await openColumnsPopover(user);
     await user.click(screen.getByRole("button", { name: "Show all" }));
 
     expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /^Created At/ }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter tags" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter tags" }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Reset default" }));
 
@@ -278,7 +290,6 @@ describe("DatasetTable", () => {
   });
 
   it("loads saved column visibility from localStorage", () => {
-    mockHookReturn();
     window.localStorage.setItem(
       COLUMN_VISIBILITY_STORAGE_KEY,
       JSON.stringify({
@@ -290,8 +301,7 @@ describe("DatasetTable", () => {
         createdAt: false,
       }),
     );
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+    renderDatasetTable();
 
     expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
     expect(
@@ -301,37 +311,35 @@ describe("DatasetTable", () => {
     expect(
       screen.queryByRole("button", { name: "Filter status" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter tags" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter tags" }),
+    ).toBeInTheDocument();
   });
 
   it("persists column visibility changes to localStorage", async () => {
-    mockHookReturn();
+    renderDatasetTable();
     const user = userEvent.setup();
 
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
-
-    await user.click(screen.getByRole("button", { name: "Columns" }));
-    await user.click(screen.getByLabelText("Toggle Status column"));
+    await openColumnsPopover(user);
+    await toggleColumn(user, "Status");
 
     await waitFor(() => {
       const stored = window.localStorage.getItem(COLUMN_VISIBILITY_STORAGE_KEY);
       expect(stored).not.toBeNull();
-      const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
+      const parsed = stored
+        ? (JSON.parse(stored) as Record<string, boolean>)
+        : {};
       expect(parsed.status).toBe(false);
       expect(parsed.name).toBe(true);
     });
   });
 
   it("falls back to defaults when localStorage data is invalid", () => {
-    mockHookReturn();
     window.localStorage.setItem(COLUMN_VISIBILITY_STORAGE_KEY, "not-json");
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+    renderDatasetTable();
 
     expect(screen.getByRole("button", { name: /^ID/ })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^Status/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^Tags/ }),
     ).not.toBeInTheDocument();
@@ -341,10 +349,8 @@ describe("DatasetTable", () => {
   });
 
   it("toggles status filter via popover action", async () => {
-    const hook = mockHookReturn();
+    const { hook } = renderDatasetTable();
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "Filter status" }));
     await user.click(screen.getByRole("button", { name: "Completed" }));

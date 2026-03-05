@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import type { Table } from "@tanstack/react-table";
+import type { Column, Table } from "@tanstack/react-table";
 import type { DatasetInfo, DatasetStatus } from "@/lib/backend";
 import {
   datasetStatusOptions,
@@ -40,6 +40,92 @@ interface DatasetTableFiltersProps {
   showAllColumns: () => void;
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
   headerScrollbarWidth: number;
+}
+
+interface ColumnVisibilityPopoverProps {
+  columns: Column<DatasetInfo, unknown>[];
+  onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
+  onShowAllColumns: () => void;
+  onResetColumnVisibilityToDefault: () => void;
+}
+
+function ColumnVisibilityPopover({
+  columns,
+  onColumnVisibilityChange,
+  onShowAllColumns,
+  onResetColumnVisibilityToDefault,
+}: ColumnVisibilityPopoverProps) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-label="Columns"
+          />
+        }
+      >
+        Columns
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 gap-2">
+        <div className="text-xs font-medium text-foreground">Columns</div>
+        <div className="space-y-1">
+          {columns.map((column) => {
+            const meta = column.columnDef.meta as DatasetColumnMeta | undefined;
+            const label = meta?.label ?? column.id;
+            const hideable = meta?.hideable ?? true;
+            return (
+              <label
+                key={column.id}
+                className="flex items-center justify-between gap-2 rounded-sm px-1 py-1 hover:bg-muted/50"
+              >
+                <span className="text-xs">{label}</span>
+                <span className="flex items-center gap-2">
+                  {!hideable ? (
+                    <span className="text-[0.625rem] text-muted-foreground">
+                      Required
+                    </span>
+                  ) : null}
+                  <Checkbox
+                    aria-label={`Toggle ${label} column`}
+                    checked={column.getIsVisible()}
+                    disabled={!hideable}
+                    onCheckedChange={() => {
+                      if (!hideable) return;
+                      onColumnVisibilityChange(
+                        column.id,
+                        !column.getIsVisible(),
+                      );
+                    }}
+                  />
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between border-t pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={onShowAllColumns}
+          >
+            Show all
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={onResetColumnVisibilityToDefault}
+          >
+            Reset default
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function DatasetTableFilters({
@@ -88,74 +174,12 @@ export function DatasetTableFilters({
           ) : null}
         </div>
         <div className="flex items-center gap-1">
-          <Popover>
-            <PopoverTrigger
-              render={
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  aria-label="Columns"
-                />
-              }
-            >
-              Columns
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 gap-2">
-              <div className="text-xs font-medium text-foreground">Columns</div>
-              <div className="space-y-1">
-                {allColumns.map((column) => {
-                  const meta = column.columnDef.meta as
-                    | DatasetColumnMeta
-                    | undefined;
-                  const label = meta?.label ?? column.id;
-                  const hideable = meta?.hideable ?? true;
-                  return (
-                    <label
-                      key={column.id}
-                      className="flex items-center justify-between gap-2 rounded-sm px-1 py-1 hover:bg-muted/50"
-                    >
-                      <span className="text-xs">{label}</span>
-                      <span className="flex items-center gap-2">
-                        {!hideable ? (
-                          <span className="text-[0.625rem] text-muted-foreground">
-                            Required
-                          </span>
-                        ) : null}
-                        <Checkbox
-                          aria-label={`Toggle ${label} column`}
-                          checked={column.getIsVisible()}
-                          disabled={!hideable}
-                          onCheckedChange={(checked) => {
-                            if (!hideable) return;
-                            onColumnVisibilityChange(column.id, Boolean(checked));
-                          }}
-                        />
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-between border-t pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={showAllColumns}
-                >
-                  Show all
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={resetColumnVisibilityToDefault}
-                >
-                  Reset default
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <ColumnVisibilityPopover
+            columns={allColumns}
+            onColumnVisibilityChange={onColumnVisibilityChange}
+            onShowAllColumns={showAllColumns}
+            onResetColumnVisibilityToDefault={resetColumnVisibilityToDefault}
+          />
 
           <Button
             type="button"
@@ -194,7 +218,9 @@ export function DatasetTableFilters({
                     "flex min-w-0 items-center gap-1 text-left font-medium",
                     canSort ? "hover:text-foreground" : "cursor-default",
                   )}
-                  onClick={canSort ? column.getToggleSortingHandler() : undefined}
+                  onClick={
+                    canSort ? column.getToggleSortingHandler() : undefined
+                  }
                 >
                   <span className="truncate">{meta?.label ?? ""}</span>
                   {sorted ? <span>{sorted === "desc" ? "↓" : "↑"}</span> : null}
