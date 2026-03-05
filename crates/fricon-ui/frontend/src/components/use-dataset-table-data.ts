@@ -105,16 +105,15 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   const [sortingState, setSortingState] =
     useState<SortingState>(DEFAULT_SORTING);
 
-  const setSorting = useCallback(
-    (updater: SortingState | ((prev: SortingState) => SortingState)) => {
-      setSortingState((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : updater;
-        const first = next[0];
-        return first ? [first] : [];
-      });
-    },
-    [],
-  );
+  const setSorting = (
+    updater: SortingState | ((prev: SortingState) => SortingState),
+  ) => {
+    setSortingState((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      const first = next[0];
+      return first ? [first] : [];
+    });
+  };
 
   const currentQueryParams = useMemo<DatasetQueryParams>(
     () => ({
@@ -124,7 +123,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       statuses: selectedStatuses,
       sorting: sortingState,
     }),
-    [favoriteOnly, searchQuery, selectedStatuses, selectedTags, sortingState],
+    [searchQuery, selectedTags, favoriteOnly, selectedStatuses, sortingState],
   );
 
   const [debouncedQueryParams, setDebouncedQueryParams] =
@@ -140,7 +139,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   }, [currentQueryParams]);
 
   const datasetQueryKey = useMemo(
-    () => ["datasets", debouncedQueryParams] as const,
+    () => ["datasets", "list", debouncedQueryParams] as const,
     [debouncedQueryParams],
   );
 
@@ -164,7 +163,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
 
   const datasets = useMemo(
     () => datasetsQuery.data?.pages.flat() ?? [],
-    [datasetsQuery.data],
+    [datasetsQuery.data?.pages],
   );
 
   const getLoadedDatasetCount = useCallback(() => {
@@ -173,7 +172,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
         datasetQueryKey,
       );
     return cached?.pages.reduce((total, page) => total + page.length, 0) ?? 0;
-  }, [datasetQueryKey, queryClient]);
+  }, [queryClient, datasetQueryKey]);
 
   const refreshDatasets = useCallback(async () => {
     if (
@@ -205,9 +204,9 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     } while (pendingRefreshRef.current);
   }, [
     datasetQueryKey,
-    debouncedQueryParams,
-    getLoadedDatasetCount,
     queryClient,
+    getLoadedDatasetCount,
+    debouncedQueryParams,
   ]);
 
   useEffect(() => {
@@ -275,56 +274,54 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       updateDatasetFavorite(id, favorite),
   });
 
-  const toggleFavorite = useCallback(
-    async (dataset: DatasetInfo) => {
-      const nextFavorite = !dataset.favorite;
-      const previousData =
-        queryClient.getQueryData<InfiniteData<DatasetInfo[], number>>(
-          datasetQueryKey,
-        );
-
-      queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
+  const toggleFavorite = async (dataset: DatasetInfo) => {
+    const nextFavorite = !dataset.favorite;
+    const previousData =
+      queryClient.getQueryData<InfiniteData<DatasetInfo[], number>>(
         datasetQueryKey,
-        (current) => {
-          if (!current) return current;
-          return {
-            ...current,
-            pages: current.pages.map((page) =>
-              page.map((item) =>
-                item.id === dataset.id
-                  ? { ...item, favorite: nextFavorite }
-                  : item,
-              ),
-            ),
-          };
-        },
       );
 
-      try {
-        await favoriteMutation.mutateAsync({
-          id: dataset.id,
-          favorite: nextFavorite,
-        });
-      } catch {
-        queryClient.setQueryData(datasetQueryKey, previousData);
-        return;
-      }
+    queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
+      datasetQueryKey,
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          pages: current.pages.map((page) =>
+            page.map((item) =>
+              item.id === dataset.id
+                ? { ...item, favorite: nextFavorite }
+                : item,
+            ),
+          ),
+        };
+      },
+    );
 
-      try {
-        await refreshDatasets();
-      } catch {
-        // Keep optimistic state if backend write succeeded but refresh failed.
-      }
-    },
-    [datasetQueryKey, favoriteMutation, queryClient, refreshDatasets],
-  );
+    try {
+      await favoriteMutation.mutateAsync({
+        id: dataset.id,
+        favorite: nextFavorite,
+      });
+    } catch {
+      queryClient.setQueryData(datasetQueryKey, previousData);
+      return;
+    }
 
-  const filteredTagOptions = useMemo(() => {
-    const allTags = tagsQuery.data ?? [];
-    const normalized = tagFilterQuery.trim().toLowerCase();
-    if (!normalized) return allTags;
-    return allTags.filter((tag) => tag.toLowerCase().includes(normalized));
-  }, [tagFilterQuery, tagsQuery.data]);
+    try {
+      await refreshDatasets();
+    } catch {
+      // Keep optimistic state if backend write succeeded but refresh failed.
+    }
+  };
+
+  const allTags = tagsQuery.data ?? [];
+  const normalizedTagFilterQuery = tagFilterQuery.trim().toLowerCase();
+  const filteredTagOptions = normalizedTagFilterQuery
+    ? allTags.filter((tag) =>
+        tag.toLowerCase().includes(normalizedTagFilterQuery),
+      )
+    : allTags;
 
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
@@ -332,34 +329,34 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     selectedTags.length > 0 ||
     selectedStatuses.length > 0;
 
-  const handleTagToggle = useCallback((tag: string) => {
+  const handleTagToggle = (tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag],
     );
-  }, []);
+  };
 
-  const handleStatusToggle = useCallback((status: DatasetStatus) => {
+  const handleStatusToggle = (status: DatasetStatus) => {
     setSelectedStatuses((prev) =>
       prev.includes(status)
         ? prev.filter((item) => item !== status)
         : [...prev, status],
     );
-  }, []);
+  };
 
-  const clearFilters = useCallback(() => {
+  const clearFilters = () => {
     setSearchQuery("");
     setSelectedTags([]);
     setSelectedStatuses([]);
     setFavoriteOnly(false);
     setTagFilterQuery("");
-  }, []);
+  };
 
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = datasetsQuery;
 
-  const loadNextPage = useCallback(async () => {
+  const loadNextPage = async () => {
     if (!hasNextPage || isFetchingNextPage) return;
     await fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  };
 
   return {
     datasets,
