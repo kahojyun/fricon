@@ -8,6 +8,7 @@ import {
 import { DatasetFilterCheckIcon } from "@/components/dataset-filter-check-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -35,6 +36,8 @@ interface DatasetTableFiltersProps {
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
   clearFilters: () => void;
+  resetColumnVisibilityToDefault: () => void;
+  showAllColumns: () => void;
 }
 
 export function DatasetTableFilters({
@@ -54,7 +57,12 @@ export function DatasetTableFilters({
   handleTagToggle,
   handleStatusToggle,
   clearFilters,
+  resetColumnVisibilityToDefault,
+  showAllColumns,
 }: DatasetTableFiltersProps) {
+  const visibleColumns = table.getVisibleLeafColumns();
+  const allColumns = table.getAllLeafColumns();
+
   return (
     <>
       <div className="flex items-center justify-between gap-2 border-y px-3 py-2">
@@ -75,16 +83,87 @@ export function DatasetTableFilters({
             </div>
           ) : null}
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={!hasActiveFilters}
-          onClick={clearFilters}
-        >
-          <X />
-          Clear filters
-        </Button>
+        <div className="flex items-center gap-1">
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  aria-label="Columns"
+                />
+              }
+            >
+              Columns
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 gap-2">
+              <div className="text-xs font-medium text-foreground">Columns</div>
+              <div className="space-y-1">
+                {allColumns.map((column) => {
+                  const meta = column.columnDef.meta as
+                    | DatasetColumnMeta
+                    | undefined;
+                  const label = meta?.label ?? column.id;
+                  const hideable = meta?.hideable ?? true;
+                  return (
+                    <label
+                      key={column.id}
+                      className="flex items-center justify-between gap-2 rounded-sm px-1 py-1 hover:bg-muted/50"
+                    >
+                      <span className="text-xs">{label}</span>
+                      <span className="flex items-center gap-2">
+                        {!hideable ? (
+                          <span className="text-[0.625rem] text-muted-foreground">
+                            Required
+                          </span>
+                        ) : null}
+                        <Checkbox
+                          aria-label={`Toggle ${label} column`}
+                          checked={column.getIsVisible()}
+                          disabled={!hideable}
+                          onCheckedChange={(checked) => {
+                            if (!hideable) return;
+                            column.toggleVisibility(Boolean(checked));
+                          }}
+                        />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between border-t pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={showAllColumns}
+                >
+                  Show all
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={resetColumnVisibilityToDefault}
+                >
+                  Reset default
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={!hasActiveFilters}
+            onClick={clearFilters}
+          >
+            <X />
+            Clear filters
+          </Button>
+        </div>
       </div>
 
       <div ref={headerRef} className="sticky top-0 z-20 border-b bg-muted">
@@ -92,23 +171,21 @@ export function DatasetTableFilters({
           className="grid items-center gap-2 px-3 py-2 text-xs text-muted-foreground"
           style={{ gridTemplateColumns }}
         >
-          {table.getFlatHeaders().map((header) => {
-            const meta = header.column.columnDef.meta as
+          {visibleColumns.map((column) => {
+            const meta = column.columnDef.meta as
               | DatasetColumnMeta
               | undefined;
-            const canSort = header.column.getCanSort();
-            const sorted = header.column.getIsSorted();
+            const canSort = column.getCanSort();
+            const sorted = column.getIsSorted();
             return (
               <button
-                key={header.id}
+                key={column.id}
                 type="button"
                 className={cn(
                   "flex items-center gap-1 text-left font-medium",
                   canSort ? "hover:text-foreground" : "cursor-default",
                 )}
-                onClick={
-                  canSort ? header.column.getToggleSortingHandler() : undefined
-                }
+                onClick={canSort ? column.getToggleSortingHandler() : undefined}
               >
                 <span>{meta?.label ?? ""}</span>
                 {sorted ? <span>{sorted === "desc" ? "↓" : "↑"}</span> : null}
@@ -121,10 +198,10 @@ export function DatasetTableFilters({
           className="grid items-start gap-2 border-t px-3 py-2"
           style={{ gridTemplateColumns }}
         >
-          {table.getFlatHeaders().map((header) => {
-            if (header.column.id === "favorite") {
+          {visibleColumns.map((column) => {
+            if (column.id === "favorite") {
               return (
-                <div key={`${header.id}-filter`} className="pt-1">
+                <div key={`${column.id}-filter`} className="pt-1">
                   <Switch
                     aria-label="Favorites only"
                     checked={favoriteOnly}
@@ -134,9 +211,9 @@ export function DatasetTableFilters({
               );
             }
 
-            if (header.column.id === "name") {
+            if (column.id === "name") {
               return (
-                <div key={`${header.id}-filter`}>
+                <div key={`${column.id}-filter`}>
                   <Input
                     aria-label="Search datasets"
                     value={searchQuery}
@@ -147,9 +224,9 @@ export function DatasetTableFilters({
               );
             }
 
-            if (header.column.id === "tags") {
+            if (column.id === "tags") {
               return (
-                <div key={`${header.id}-filter`}>
+                <div key={`${column.id}-filter`}>
                   <Popover>
                     <PopoverTrigger
                       render={
@@ -207,9 +284,9 @@ export function DatasetTableFilters({
               );
             }
 
-            if (header.column.id === "status") {
+            if (column.id === "status") {
               return (
-                <div key={`${header.id}-filter`}>
+                <div key={`${column.id}-filter`}>
                   <Popover>
                     <PopoverTrigger
                       render={
@@ -253,7 +330,7 @@ export function DatasetTableFilters({
               );
             }
 
-            return <div key={`${header.id}-filter`} />;
+            return <div key={`${column.id}-filter`} />;
           })}
         </div>
       </div>
