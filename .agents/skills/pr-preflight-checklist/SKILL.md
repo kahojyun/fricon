@@ -1,6 +1,6 @@
 ---
 name: pr-preflight-checklist
-description: Run a pre-pull-request quality gate for the fricon monorepo (Rust, Python bindings, and Tauri frontend). Use when preparing to open or update a PR, marking a PR ready for re-review, or when asked for PR前检查, 提交前检查, preflight, or checklist.
+description: Run a pre-pull-request quality gate for the fricon monorepo (Rust, Python bindings, and Tauri frontend). Use when preparing to open or update a PR, marking a PR ready for re-review, or when asked for PR pre-check, pre-commit check, preflight, or checklist.
 ---
 
 # PR Preflight Checklist
