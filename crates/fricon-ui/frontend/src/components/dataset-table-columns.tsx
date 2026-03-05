@@ -12,6 +12,8 @@ import {
 export interface DatasetColumnMeta {
   label: string;
   width: string;
+  hideable: boolean;
+  defaultVisible: boolean;
 }
 
 const statusVariantMap: Record<
@@ -41,7 +43,12 @@ export function createDatasetColumns({
       id: "favorite",
       accessorKey: "favorite",
       enableSorting: false,
-      meta: { label: "Favorite", width: "60px" } satisfies DatasetColumnMeta,
+      meta: {
+        label: "Favorite",
+        width: "60px",
+        hideable: true,
+        defaultVisible: true,
+      } satisfies DatasetColumnMeta,
       cell: ({ row }) => {
         const dataset = row.original;
         const tooltipLabel = dataset.favorite
@@ -77,7 +84,12 @@ export function createDatasetColumns({
     {
       id: "id",
       accessorKey: "id",
-      meta: { label: "ID", width: "70px" } satisfies DatasetColumnMeta,
+      meta: {
+        label: "ID",
+        width: "70px",
+        hideable: true,
+        defaultVisible: true,
+      } satisfies DatasetColumnMeta,
       cell: ({ getValue }) => (
         <div className="px-2 tabular-nums">{getValue<number>()}</div>
       ),
@@ -87,17 +99,29 @@ export function createDatasetColumns({
       accessorKey: "name",
       meta: {
         label: "Name",
-        width: "minmax(160px,1fr)",
+        width: "minmax(160px,40%)",
+        hideable: false,
+        defaultVisible: true,
       } satisfies DatasetColumnMeta,
-      cell: ({ getValue }) => (
-        <div className="truncate px-2">{getValue<string>()}</div>
-      ),
+      cell: ({ getValue }) => {
+        const name = getValue<string>();
+        return (
+          <div className="w-full min-w-0 truncate px-2" title={name}>
+            {name}
+          </div>
+        );
+      },
     },
     {
       id: "status",
       accessorKey: "status",
       enableSorting: false,
-      meta: { label: "Status", width: "120px" } satisfies DatasetColumnMeta,
+      meta: {
+        label: "Status",
+        width: "120px",
+        hideable: true,
+        defaultVisible: true,
+      } satisfies DatasetColumnMeta,
       cell: ({ getValue }) => (
         <div className="px-2">
           <Badge variant={statusVariantMap[getValue<DatasetStatus>()]}>
@@ -113,6 +137,8 @@ export function createDatasetColumns({
       meta: {
         label: "Tags",
         width: "minmax(140px,1fr)",
+        hideable: true,
+        defaultVisible: false,
       } satisfies DatasetColumnMeta,
       cell: ({ getValue }) => {
         const tags = getValue<string[]>();
@@ -137,6 +163,8 @@ export function createDatasetColumns({
       meta: {
         label: "Created At",
         width: "160px",
+        hideable: true,
+        defaultVisible: false,
       } satisfies DatasetColumnMeta,
       cell: ({ getValue }) => (
         <div className="px-2 text-xs text-muted-foreground">

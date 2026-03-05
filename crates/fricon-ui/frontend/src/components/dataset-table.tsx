@@ -10,6 +10,7 @@ import {
   type DatasetColumnMeta,
 } from "@/components/dataset-table-columns";
 import { DatasetTableFilters } from "@/components/dataset-table-filters";
+import { useDatasetColumnVisibility } from "@/components/use-dataset-column-visibility";
 import { useDatasetTableData } from "@/components/use-dataset-table-data";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -47,6 +48,7 @@ export function DatasetTable({
   } = useDatasetTableData();
 
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [headerScrollbarWidth, setHeaderScrollbarWidth] = useState(0);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
@@ -56,6 +58,40 @@ export function DatasetTable({
     scrollViewportRef.current = scrollRootRef.current.querySelector(
       '[data-slot="scroll-area-viewport"]',
     );
+  }, []);
+
+  useEffect(() => {
+    const viewport = scrollViewportRef.current;
+    const header = headerRef.current;
+    if (!viewport || !header) return;
+
+    const syncHeaderScroll = () => {
+      header.scrollLeft = viewport.scrollLeft;
+    };
+    const updateScrollbarWidth = () => {
+      setHeaderScrollbarWidth(viewport.offsetWidth - viewport.clientWidth);
+    };
+
+    syncHeaderScroll();
+    updateScrollbarWidth();
+
+    viewport.addEventListener("scroll", syncHeaderScroll, { passive: true });
+
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        viewport.removeEventListener("scroll", syncHeaderScroll);
+      };
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateScrollbarWidth();
+    });
+    observer.observe(viewport);
+
+    return () => {
+      viewport.removeEventListener("scroll", syncHeaderScroll);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -86,12 +122,19 @@ export function DatasetTable({
     () => createDatasetColumns({ toggleFavorite }),
     [toggleFavorite],
   );
+  const {
+    columnVisibility,
+    resetColumnVisibilityToDefault,
+    showAllColumns,
+    handleColumnVisibilityChange,
+  } = useDatasetColumnVisibility(columns);
 
   const table = useReactTable({
     data: datasets,
     columns,
     state: {
       sorting,
+      columnVisibility,
     },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -141,6 +184,10 @@ export function DatasetTable({
           handleTagToggle={handleTagToggle}
           handleStatusToggle={handleStatusToggle}
           clearFilters={clearFilters}
+          resetColumnVisibilityToDefault={resetColumnVisibilityToDefault}
+          showAllColumns={showAllColumns}
+          onColumnVisibilityChange={handleColumnVisibilityChange}
+          headerScrollbarWidth={headerScrollbarWidth}
         />
         <div className="flex min-h-0 flex-1 flex-col border-t">
           <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
@@ -192,7 +239,7 @@ export function DatasetTable({
                       }}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <div key={cell.id} className="min-w-0">
+                        <div key={cell.id} className="min-w-0 overflow-hidden">
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext(),

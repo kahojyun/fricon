@@ -5,6 +5,8 @@ import { DatasetTable } from "@/components/dataset-table";
 import { useDatasetTableData } from "@/components/use-dataset-table-data";
 import type { DatasetInfo } from "@/lib/backend";
 
+const COLUMN_VISIBILITY_STORAGE_KEY = "fricon.datasetTable.columnVisibility.v1";
+
 vi.mock("@/components/use-dataset-table-data", () => ({
   useDatasetTableData: vi.fn(),
 }));
@@ -35,6 +37,30 @@ function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
 }
 
 const useDatasetTableDataMock = vi.mocked(useDatasetTableData);
+
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  };
+}
 
 function mockHookReturn(overrides: Record<string, unknown> = {}) {
   const setSearchQuery = vi.fn();
@@ -76,17 +102,36 @@ function mockHookReturn(overrides: Record<string, unknown> = {}) {
   return value;
 }
 
+function renderDatasetTable(overrides: Record<string, unknown> = {}) {
+  const hook = mockHookReturn(overrides);
+  const onDatasetSelected = vi.fn();
+  render(<DatasetTable onDatasetSelected={onDatasetSelected} />);
+  return { hook, onDatasetSelected };
+}
+
+async function openColumnsPopover(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Columns" }));
+}
+
+async function toggleColumn(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+) {
+  await user.click(screen.getByLabelText(`Toggle ${label} column`));
+}
+
 describe("DatasetTable", () => {
   beforeEach(() => {
     useDatasetTableDataMock.mockReset();
+    Object.defineProperty(window, "localStorage", {
+      value: createMemoryStorage(),
+      configurable: true,
+    });
   });
 
   it("renders rows and selects dataset on row click", async () => {
-    mockHookReturn();
-    const onDatasetSelected = vi.fn();
+    const { onDatasetSelected } = renderDatasetTable();
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={onDatasetSelected} />);
 
     await user.click(screen.getByText("Dataset 1"));
 
@@ -94,10 +139,8 @@ describe("DatasetTable", () => {
   });
 
   it("updates search query from input", async () => {
-    const hook = mockHookReturn();
+    const { hook } = renderDatasetTable();
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.type(screen.getByLabelText("Search datasets"), "Alpha");
 
@@ -108,25 +151,45 @@ describe("DatasetTable", () => {
 
   it("toggles favorite via row action", async () => {
     const dataset = makeDataset({ id: 11, name: "Pinned", favorite: true });
-    const hook = mockHookReturn({ datasets: [dataset], favoriteOnly: true });
+    const { hook } = renderDatasetTable({
+      datasets: [dataset],
+      favoriteOnly: true,
+    });
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.click(screen.getByLabelText("Remove from favorites"));
 
     expect(hook.toggleFavorite).toHaveBeenCalledWith(dataset);
   });
 
+  it("exposes full dataset name on hover while using truncated cell text", () => {
+    mockHookReturn({
+      datasets: [
+        makeDataset({
+          id: 21,
+          name: "A very long dataset name for hover preview validation",
+        }),
+      ],
+    });
+
+    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+
+    const nameCell = screen
+      .getByText("A very long dataset name for hover preview validation")
+      .closest("div");
+    expect(nameCell).toHaveAttribute(
+      "title",
+      "A very long dataset name for hover preview validation",
+    );
+  });
+
   it("uses clear filters action from hook", async () => {
-    const hook = mockHookReturn({
+    const { hook } = renderDatasetTable({
       hasActiveFilters: true,
       selectedTags: ["vision"],
       searchQuery: "Alpha",
     });
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
 
@@ -134,21 +197,160 @@ describe("DatasetTable", () => {
   });
 
   it("triggers backend sorting state when clicking sortable header", async () => {
-    const hook = mockHookReturn();
+    const { hook } = renderDatasetTable();
     const user = userEvent.setup();
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /^ID/ }));
 
     expect(hook.setSorting).toHaveBeenCalled();
   });
 
-  it("toggles status filter via popover action", async () => {
-    const hook = mockHookReturn();
+  it("uses compact column visibility defaults on first render", () => {
+    renderDatasetTable();
+
+    expect(screen.getByRole("button", { name: /^ID/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Tags/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Created At/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Filter tags" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("allows toggling column visibility and keeps name required", async () => {
+    renderDatasetTable();
     const user = userEvent.setup();
 
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
+    await openColumnsPopover(user);
+
+    const nameCheckbox = screen.getByLabelText("Toggle Name column");
+    expect(nameCheckbox).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
+
+    await toggleColumn(user, "Tags");
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter tags" }),
+    ).toBeInTheDocument();
+
+    await toggleColumn(user, "Status");
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: /^Status/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Filter status" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+
+    await toggleColumn(user, "Status");
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /^Status/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Filter status" }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+  });
+
+  it("supports show all and reset default column actions", async () => {
+    renderDatasetTable();
+    const user = userEvent.setup();
+
+    await openColumnsPopover(user);
+    await user.click(screen.getByRole("button", { name: "Show all" }));
+
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Created At/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter tags" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reset default" }));
+
+    expect(
+      screen.queryByRole("button", { name: /^Tags/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Created At/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Filter tags" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("loads saved column visibility from localStorage", () => {
+    window.localStorage.setItem(
+      COLUMN_VISIBILITY_STORAGE_KEY,
+      JSON.stringify({
+        favorite: true,
+        id: true,
+        name: false,
+        status: false,
+        tags: true,
+        createdAt: false,
+      }),
+    );
+    renderDatasetTable();
+
+    expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Status/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Filter status" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Filter tags" }),
+    ).toBeInTheDocument();
+  });
+
+  it("persists column visibility changes to localStorage", async () => {
+    renderDatasetTable();
+    const user = userEvent.setup();
+
+    await openColumnsPopover(user);
+    await toggleColumn(user, "Status");
+
+    await waitFor(() => {
+      const stored = window.localStorage.getItem(COLUMN_VISIBILITY_STORAGE_KEY);
+      expect(stored).not.toBeNull();
+      const parsed = stored
+        ? (JSON.parse(stored) as Record<string, boolean>)
+        : {};
+      expect(parsed.status).toBe(false);
+      expect(parsed.name).toBe(true);
+    });
+  });
+
+  it("falls back to defaults when localStorage data is invalid", () => {
+    window.localStorage.setItem(COLUMN_VISIBILITY_STORAGE_KEY, "not-json");
+    renderDatasetTable();
+
+    expect(screen.getByRole("button", { name: /^ID/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Tags/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Created At/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("toggles status filter via popover action", async () => {
+    const { hook } = renderDatasetTable();
+    const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: "Filter status" }));
     await user.click(screen.getByRole("button", { name: "Completed" }));
