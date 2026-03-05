@@ -18,6 +18,7 @@ vi.mock("@tanstack/react-virtual", () => ({
       Array.from({ length: count }, (_, index) => ({
         index,
         start: index * 56,
+        end: (index + 1) * 56,
       })),
     measureElement: () => undefined,
   }),
@@ -110,7 +111,7 @@ function renderDatasetTable(overrides: Record<string, unknown> = {}) {
 }
 
 async function openColumnsPopover(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: "Columns" }));
+  await user.click(screen.getByRole("button", { name: /View/i }));
 }
 
 async function toggleColumn(
@@ -142,7 +143,7 @@ describe("DatasetTable", () => {
     const { hook } = renderDatasetTable();
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Search datasets"), "Alpha");
+    await user.type(screen.getByPlaceholderText("Filter datasets..."), "Alpha");
 
     await waitFor(() => {
       expect(hook.setSearchQuery).toHaveBeenCalled();
@@ -191,7 +192,7 @@ describe("DatasetTable", () => {
     });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await user.click(screen.getByRole("button", { name: "Reset" }));
 
     expect(hook.clearFilters).toHaveBeenCalledTimes(1);
   });
@@ -208,17 +209,20 @@ describe("DatasetTable", () => {
   it("uses compact column visibility defaults on first render", () => {
     renderDatasetTable();
 
-    expect(screen.getByRole("button", { name: /^ID/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Tags/ }),
+      screen.getByRole("columnheader", { name: /^ID/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^Name/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^Status/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: /^Tags/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Created At/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Filter tags" }),
+      screen.queryByRole("columnheader", { name: /^Created At/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -230,35 +234,34 @@ describe("DatasetTable", () => {
 
     const nameCheckbox = screen.getByLabelText("Toggle Name column");
     expect(nameCheckbox).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^Name/ }),
+    ).toBeInTheDocument();
 
     await toggleColumn(user, "Tags");
-    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Filter tags" }),
+      screen.getByRole("columnheader", { name: /^Tags/ }),
     ).toBeInTheDocument();
 
     await toggleColumn(user, "Status");
     await waitFor(() => {
       expect(
-        screen.queryByRole("button", { name: /^Status/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Filter status" }),
+        screen.queryByRole("columnheader", { name: /^Status/ }),
       ).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^Tags/ }),
+    ).toBeInTheDocument();
 
     await toggleColumn(user, "Status");
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /^Status/ }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Filter status" }),
+        screen.getByRole("columnheader", { name: /^Status/ }),
       ).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^Tags/ }),
+    ).toBeInTheDocument();
   });
 
   it("supports show all and reset default column actions", async () => {
@@ -266,26 +269,22 @@ describe("DatasetTable", () => {
     const user = userEvent.setup();
 
     await openColumnsPopover(user);
-    await user.click(screen.getByRole("button", { name: "Show all" }));
+    await user.click(screen.getByRole("button", { name: /Show all/i }));
 
-    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /^Created At/ }),
+      screen.getByRole("columnheader", { name: /^Tags/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Filter tags" }),
+      screen.getByRole("columnheader", { name: /^Created At/ }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Reset default" }));
+    await user.click(screen.getByRole("button", { name: /Reset default/i }));
 
     expect(
-      screen.queryByRole("button", { name: /^Tags/ }),
+      screen.queryByRole("columnheader", { name: /^Tags/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Created At/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Filter tags" }),
+      screen.queryByRole("columnheader", { name: /^Created At/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -303,16 +302,14 @@ describe("DatasetTable", () => {
     );
     renderDatasetTable();
 
-    expect(screen.getByRole("button", { name: /^Name/ })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Status/ }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Tags/ })).toBeInTheDocument();
+      screen.getByRole("columnheader", { name: /^Name/ }),
+    ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Filter status" }),
+      screen.queryByRole("columnheader", { name: /^Status/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Filter tags" }),
+      screen.getByRole("columnheader", { name: /^Tags/ }),
     ).toBeInTheDocument();
   });
 
@@ -338,13 +335,17 @@ describe("DatasetTable", () => {
     window.localStorage.setItem(COLUMN_VISIBILITY_STORAGE_KEY, "not-json");
     renderDatasetTable();
 
-    expect(screen.getByRole("button", { name: /^ID/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Tags/ }),
+      screen.getByRole("columnheader", { name: /^ID/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^Status/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: /^Tags/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Created At/ }),
+      screen.queryByRole("columnheader", { name: /^Created At/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -352,8 +353,8 @@ describe("DatasetTable", () => {
     const { hook } = renderDatasetTable();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Filter status" }));
-    await user.click(screen.getByRole("button", { name: "Completed" }));
+    await user.click(screen.getByRole("button", { name: /Status/i }));
+    await user.click(screen.getByRole("button", { name: /Completed/i }));
 
     expect(hook.handleStatusToggle).toHaveBeenCalledWith("Completed");
   });
