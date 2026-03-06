@@ -137,7 +137,7 @@ export function DatasetTable({
                       <TableHead
                         key={header.id}
                         style={{ width: header.getSize() }}
-                        className="h-10 border-b-0 bg-background whitespace-nowrap text-muted-foreground"
+                        className="border-b-0 bg-background text-muted-foreground"
                       >
                         {header.isPlaceholder
                           ? null
@@ -186,9 +186,7 @@ export function DatasetTable({
                         data-index={virtualRow.index}
                         className={cn(
                           "cursor-pointer",
-                          isSelected
-                            ? "bg-primary/10 hover:bg-primary/10"
-                            : "hover:bg-muted/50",
+                          isSelected && "bg-primary/10 hover:bg-primary/10",
                         )}
                         onClick={() => onDatasetSelected(dataset.id)}
                         onKeyDown={(event) => {

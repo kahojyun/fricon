@@ -167,7 +167,7 @@ export function FilterTable({
                 {data.fields.map((field) => (
                   <TableHead
                     key={field}
-                    className="h-10 border-b-0 bg-background px-2 whitespace-nowrap text-muted-foreground"
+                    className="border-b-0 bg-background text-muted-foreground"
                   >
                     {field}
                   </TableHead>
@@ -207,9 +207,7 @@ export function FilterTable({
                         data-index={virtualRow.index}
                         className={cn(
                           "cursor-pointer",
-                          isSelected
-                            ? "bg-primary/10 hover:bg-primary/10"
-                            : "hover:bg-muted/50",
+                          isSelected && "bg-primary/10 hover:bg-primary/10",
                         )}
                         onClick={() => onSelectRow(row.index)}
                         onKeyDown={(event) => {
@@ -225,7 +223,7 @@ export function FilterTable({
                         {data.fields.map((field, idx) => (
                           <TableCell
                             key={field}
-                            className="overflow-hidden px-2 py-2.5 text-ellipsis whitespace-nowrap"
+                            className="overflow-hidden py-2.5 text-ellipsis"
                           >
                             {row.displayValues[idx]}
                           </TableCell>
