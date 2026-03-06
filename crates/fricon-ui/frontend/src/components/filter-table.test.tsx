@@ -52,7 +52,7 @@ describe("FilterTable", () => {
       "overflow-hidden",
     );
     expect(
-      document.querySelectorAll('[data-slot="scroll-area-viewport"]').length,
+      document.querySelectorAll('.overflow-auto').length,
     ).toBeGreaterThanOrEqual(2);
   });
 });

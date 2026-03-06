@@ -1,8 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ColumnUniqueValue, FilterTableData } from "@/lib/backend";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { CascadeMode } from "@/hooks/cascadeReducer";
 
@@ -29,24 +35,11 @@ function FilterTableColumn({
   selectedIndex,
   onSelect,
 }: FilterTableColumnProps) {
-  const scrollRootRef = useRef<HTMLDivElement | null>(null);
-  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (!scrollRootRef.current) return;
-    const viewport = scrollRootRef.current.querySelector(
-      '[data-slot="scroll-area-viewport"]',
-    );
-    if (viewport instanceof HTMLDivElement) {
-      setViewportElement(viewport);
-    }
-  }, []);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowVirtualizer = useVirtualizer({
     count: items.length,
-    getScrollElement: () => viewportElement,
+    getScrollElement: () => scrollRef.current,
     estimateSize: () => 32,
     overscan: 8,
   });
@@ -54,14 +47,14 @@ function FilterTableColumn({
   return (
     <div
       data-testid={`filter-column-${field}`}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
     >
-      <div className="border-b bg-muted px-2 py-2 text-xs font-semibold text-muted-foreground">
+      <div className="z-10 border-b bg-muted px-2 py-2 text-xs font-semibold text-muted-foreground shadow-sm">
         {field}
       </div>
-      <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
         <div
-          className="relative"
+          className="relative w-full"
           style={{ height: rowVirtualizer.getTotalSize() }}
         >
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -75,7 +68,9 @@ function FilterTableColumn({
                 data-index={virtualRow.index}
                 className={cn(
                   "cursor-pointer border-b px-2 py-2 text-xs",
-                  isSelected ? "bg-primary/10" : "hover:bg-muted/40",
+                  isSelected
+                    ? "bg-primary/10 hover:bg-primary/10"
+                    : "hover:bg-muted/40",
                 )}
                 style={{
                   position: "absolute",
@@ -91,7 +86,7 @@ function FilterTableColumn({
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
@@ -105,18 +100,11 @@ export function FilterTable({
   selectedValueIndices,
   onSelectFieldValue,
 }: FilterTableProps) {
-  const headerScrollRef = useRef<HTMLDivElement | null>(null);
-  const bodyScrollRootRef = useRef<HTMLDivElement | null>(null);
-  const [bodyViewportElement, setBodyViewportElement] =
-    useState<HTMLDivElement | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const showFilterToggle = Boolean(data && data.fields.length > 1);
-
   const isFilterTableEmpty = !data || data.rows.length === 0;
-  const gridTemplate = useMemo(() => {
-    if (!data) return "none";
-    return `repeat(${data.fields.length}, minmax(80px, 1fr))`;
-  }, [data]);
+
   const minTableWidth = useMemo(() => {
     if (!data) return "0px";
     const minWidth = Math.max(data.fields.length * 80, 320);
@@ -125,44 +113,34 @@ export function FilterTable({
 
   const rowVirtualizer = useVirtualizer({
     count: data?.rows.length ?? 0,
-    getScrollElement: () => bodyViewportElement,
+    getScrollElement: () => tableContainerRef.current,
     estimateSize: () => 32,
     overscan: 8,
   });
 
-  useEffect(() => {
-    if (mode === "split") return;
-    if (!bodyScrollRootRef.current) return;
-    const viewport = bodyScrollRootRef.current.querySelector(
-      '[data-slot="scroll-area-viewport"]',
-    );
-    if (!(viewport instanceof HTMLDivElement)) return;
-    setBodyViewportElement(viewport);
-    const handleScroll = () => {
-      if (headerScrollRef.current) {
-        headerScrollRef.current.scrollLeft = viewport.scrollLeft;
-      }
-    };
-    handleScroll();
-    viewport.addEventListener("scroll", handleScroll, { passive: true });
-    return () => {
-      viewport.removeEventListener("scroll", handleScroll);
-    };
-  }, [data?.fields.length, mode]);
+  const virtualItems = rowVirtualizer.getVirtualItems();
 
   const columnUniqueValues: Record<string, ColumnUniqueValue[]> =
     mode === "split" && data ? data.columnUniqueValues : {};
 
-  if (!data || data.rows.length === 0) {
+  if (isFilterTableEmpty) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-background text-sm text-muted-foreground">
         No data available
       </div>
     );
   }
 
+  const virtualPaddingTop =
+    virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
+  const virtualPaddingBottom =
+    virtualItems.length > 0
+      ? rowVirtualizer.getTotalSize() -
+        (virtualItems[virtualItems.length - 1]?.end ?? 0)
+      : 0;
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-background">
       {showFilterToggle ? (
         <div className="flex items-center gap-2 px-2 pb-2">
           <Switch
@@ -175,80 +153,107 @@ export function FilterTable({
         </div>
       ) : null}
 
-      {mode === "row" && isFilterTableEmpty ? (
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          No data available
-        </div>
-      ) : null}
-
-      {mode === "row" ? (
-        <>
-          <div
-            ref={headerScrollRef}
-            className="overflow-hidden border-b bg-muted"
+      {mode === "row" && data ? (
+        <div
+          className="min-h-0 flex-1 overflow-auto border-t bg-background"
+          ref={tableContainerRef}
+        >
+          <table
+            className="w-full caption-bottom text-xs"
+            style={{ minWidth: minTableWidth, tableLayout: "fixed" }}
           >
-            <div
-              className="grid px-2 py-2 text-xs font-semibold text-muted-foreground"
-              style={{
-                gridTemplateColumns: gridTemplate,
-                minWidth: minTableWidth,
-              }}
-            >
-              {data.fields.map((field) => (
-                <div key={field}>{field}</div>
-              ))}
-            </div>
-          </div>
-          <ScrollArea ref={bodyScrollRootRef} className="min-h-0 flex-1">
-            <div
-              className="relative"
-              style={{
-                minWidth: minTableWidth,
-                height: rowVirtualizer.getTotalSize(),
-              }}
-            >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const row = data.rows[virtualRow.index];
-                if (!row) return null;
-                const isSelected = selectedRowIndex === row.index;
-                return (
-                  <div
-                    key={row.index}
-                    ref={rowVirtualizer.measureElement}
-                    data-index={virtualRow.index}
-                    className={cn(
-                      "grid cursor-pointer border-b px-2 py-2 text-xs",
-                      isSelected ? "bg-primary/10" : "hover:bg-muted/40",
-                    )}
-                    style={{
-                      gridTemplateColumns: gridTemplate,
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                    onClick={() => onSelectRow(row.index)}
+            <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
+              <TableRow>
+                {data.fields.map((field) => (
+                  <TableHead
+                    key={field}
+                    className="h-8 border-b-0 bg-muted px-2 whitespace-nowrap text-muted-foreground"
                   >
-                    {data.fields.map((field, idx) => (
-                      <div key={field}>{row.displayValues[idx]}</div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </>
-      ) : null}
-
-      {mode === "split" && isFilterTableEmpty ? (
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          No data available
+                    {field}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={data.fields.length}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No data available
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <>
+                  {virtualPaddingTop > 0 && (
+                    <TableRow className="h-0 border-0 hover:bg-transparent">
+                      <TableCell
+                        colSpan={data.fields.length}
+                        style={{ height: `${virtualPaddingTop}px`, padding: 0 }}
+                        className="border-0 p-0"
+                      />
+                    </TableRow>
+                  )}
+                  {virtualItems.map((virtualRow) => {
+                    const row = data.rows[virtualRow.index];
+                    if (!row) return null;
+                    const isSelected = selectedRowIndex === row.index;
+                    return (
+                      <TableRow
+                        key={row.index}
+                        data-state={isSelected && "selected"}
+                        ref={rowVirtualizer.measureElement}
+                        data-index={virtualRow.index}
+                        className={cn(
+                          "cursor-pointer",
+                          isSelected
+                            ? "bg-primary/10 hover:bg-primary/10"
+                            : "hover:bg-muted/40",
+                        )}
+                        onClick={() => onSelectRow(row.index)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            onSelectRow(row.index);
+                          }
+                          if (event.metaKey || event.ctrlKey) {
+                            event.stopPropagation();
+                          }
+                        }}
+                        tabIndex={0}
+                      >
+                        {data.fields.map((field, idx) => (
+                          <TableCell
+                            key={field}
+                            className="overflow-hidden px-2 py-2 text-ellipsis whitespace-nowrap"
+                          >
+                            {row.displayValues[idx]}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    );
+                  })}
+                  {virtualPaddingBottom > 0 && (
+                    <TableRow className="h-0 border-0 hover:bg-transparent">
+                      <TableCell
+                        colSpan={data.fields.length}
+                        style={{
+                          height: `${virtualPaddingBottom}px`,
+                          padding: 0,
+                        }}
+                        className="border-0 p-0"
+                      />
+                    </TableRow>
+                  )}
+                </>
+              )}
+            </TableBody>
+          </table>
         </div>
       ) : null}
 
       {mode === "split" && data ? (
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden border-t">
           {data.fields.map((field, index) => (
             <div key={field} className="flex min-h-0 min-w-0 flex-1">
               <FilterTableColumn
