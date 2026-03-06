@@ -44,48 +44,71 @@ function FilterTableColumn({
     overscan: 8,
   });
 
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
+  const virtualPaddingTop =
+    virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
+  const virtualPaddingBottom =
+    virtualItems.length > 0
+      ? rowVirtualizer.getTotalSize() -
+        (virtualItems[virtualItems.length - 1]?.end ?? 0)
+      : 0;
+
   return (
     <div
       data-testid={`filter-column-${field}`}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
     >
-      <div className="z-10 flex h-10 items-center border-b bg-background px-2 text-xs font-medium text-muted-foreground shadow-sm">
-        {field}
-      </div>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        <div
-          className="relative w-full"
-          style={{ height: rowVirtualizer.getTotalSize() }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const item = items[virtualRow.index];
-            if (!item) return null;
-            const isSelected = selectedIndex === item.index;
-            return (
-              <div
-                key={item.index}
-                ref={rowVirtualizer.measureElement}
-                data-index={virtualRow.index}
-                className={cn(
-                  "cursor-pointer border-b px-2 py-2.5 text-xs",
-                  isSelected
-                    ? "bg-primary/10 hover:bg-primary/10"
-                    : "hover:bg-muted/50",
-                )}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-                onClick={() => onSelect(item.index)}
-              >
-                {item.displayValue}
-              </div>
-            );
-          })}
-        </div>
+        <table className="w-full caption-bottom text-xs">
+          <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
+            <TableRow>
+              <TableHead className="border-b-0 bg-background text-muted-foreground">
+                {field}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {virtualPaddingTop > 0 && (
+              <TableRow className="h-0 border-0 hover:bg-transparent">
+                <TableCell
+                  style={{ height: `${virtualPaddingTop}px`, padding: 0 }}
+                  className="border-0 p-0"
+                />
+              </TableRow>
+            )}
+            {virtualItems.map((virtualRow) => {
+              const item = items[virtualRow.index];
+              if (!item) return null;
+              const isSelected = selectedIndex === item.index;
+              return (
+                <TableRow
+                  key={item.index}
+                  data-state={isSelected && "selected"}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className={cn(
+                    "cursor-pointer",
+                    isSelected && "bg-primary/10 hover:bg-primary/10",
+                  )}
+                  onClick={() => onSelect(item.index)}
+                >
+                  <TableCell className="overflow-hidden py-2.5 text-ellipsis">
+                    {item.displayValue}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {virtualPaddingBottom > 0 && (
+              <TableRow className="h-0 border-0 hover:bg-transparent">
+                <TableCell
+                  style={{ height: `${virtualPaddingBottom}px`, padding: 0 }}
+                  className="border-0 p-0"
+                />
+              </TableRow>
+            )}
+          </TableBody>
+        </table>
       </div>
     </div>
   );
