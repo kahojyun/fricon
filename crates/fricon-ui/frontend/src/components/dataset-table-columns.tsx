@@ -197,7 +197,7 @@ export function createDatasetColumns({
       header: ({ column }) =>
         renderSortableHeader({ column, label: "Created At" }),
       cell: ({ getValue }) => (
-        <div className="text-sm text-muted-foreground">
+        <div className="text-muted-foreground">
           {getValue<Date>().toLocaleString()}
         </div>
       ),

@@ -378,7 +378,7 @@ export function ChartViewerControls({
                   />
                   <span
                     className={cn(
-                      "text-sm",
+                      "text-xs",
                       complexControlsDisabled && "opacity-50",
                     )}
                   >
@@ -408,7 +408,7 @@ export function ChartViewerControls({
                     />
                     <span
                       className={cn(
-                        "text-sm",
+                        "text-xs",
                         complexControlsDisabled && "opacity-50",
                       )}
                     >
