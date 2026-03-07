@@ -40,7 +40,7 @@ function FilterTableColumn({
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 40,
+    estimateSize: () => 28,
     overscan: 8,
   });
 
@@ -93,7 +93,7 @@ function FilterTableColumn({
                   )}
                   onClick={() => onSelect(item.index)}
                 >
-                  <TableCell className="overflow-hidden py-2.5 text-ellipsis">
+                  <TableCell className="overflow-hidden py-1 text-ellipsis">
                     {item.displayValue}
                   </TableCell>
                 </TableRow>
@@ -137,7 +137,7 @@ export function FilterTable({
   const rowVirtualizer = useVirtualizer({
     count: data?.rows.length ?? 0,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 40,
+    estimateSize: () => 28,
     overscan: 8,
   });
 
@@ -165,14 +165,14 @@ export function FilterTable({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       {showFilterToggle ? (
-        <div className="flex items-center gap-2 px-2 pb-2">
+        <div className="flex items-center gap-2 px-2 py-1.5">
           <Switch
             checked={mode === "split"}
             onCheckedChange={(checked) =>
               onModeChange(checked ? "split" : "row")
             }
           />
-          <span className="text-sm">Split columns</span>
+          <span className="text-xs">Split columns</span>
         </div>
       ) : null}
 
@@ -246,7 +246,7 @@ export function FilterTable({
                         {data.fields.map((field, idx) => (
                           <TableCell
                             key={field}
-                            className="overflow-hidden py-2.5 text-ellipsis"
+                            className="overflow-hidden py-1 text-ellipsis"
                           >
                             {row.displayValues[idx]}
                           </TableCell>

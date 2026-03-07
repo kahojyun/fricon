@@ -179,13 +179,13 @@ export function DatasetTableToolbar({
   const allColumns = table.getAllLeafColumns();
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
-      <div className="flex flex-1 flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-1.5 border-b px-2.5 py-1.5">
+      <div className="flex flex-1 flex-wrap items-center gap-1.5">
         <Input
           placeholder="Filter datasets..."
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          className="h-8 w-full max-w-62.5 min-w-37.5"
+          className="h-7 w-full max-w-62.5 min-w-37.5 text-xs"
         />
 
         <FacetedFilterPopover
@@ -209,7 +209,7 @@ export function DatasetTableToolbar({
           contentClassName="w-50 p-2"
         />
 
-        <div className="flex h-8 shrink-0 items-center space-x-2 rounded-md border border-dashed px-2.5">
+        <div className="flex h-7 shrink-0 items-center space-x-2 rounded-md border border-dashed px-2">
           <Switch
             id="favorite-toggle"
             checked={favoriteOnly}

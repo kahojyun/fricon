@@ -87,7 +87,7 @@ export function ChartViewerControls({
 
   return (
     <>
-      <div className="flex flex-wrap gap-2 p-2">
+      <div className="flex flex-wrap gap-1.5 p-1.5">
         <div className="min-w-40">
           <Label className="mb-1 block text-xs">Chart Type</Label>
           <Select
@@ -359,7 +359,7 @@ export function ChartViewerControls({
       </div>
 
       {effectiveChartType !== "scatter" ? (
-        <div className="flex flex-wrap items-center gap-3 px-2 pb-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 px-1.5 pb-1.5 text-xs">
           <span className="font-medium">Complex:</span>
           {effectiveChartType === "heatmap" ? (
             <RadioGroup

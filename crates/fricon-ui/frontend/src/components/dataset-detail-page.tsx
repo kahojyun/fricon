@@ -31,7 +31,7 @@ export function DatasetDetailPage({
       <Tabs defaultValue="charts" className="flex h-full min-h-0 flex-col">
         <TabsList>
           <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="properties">Properties</TabsTrigger>
         </TabsList>
 
         <TabsContent
@@ -44,10 +44,10 @@ export function DatasetDetailPage({
         </TabsContent>
 
         <TabsContent
-          value="details"
+          value="properties"
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="min-h-0 flex-1 space-y-4 overflow-auto">
+          <div className="min-h-0 flex-1 space-y-3 overflow-auto">
             {isLoading && !detail ? (
               <div className="text-xs text-muted-foreground">
                 Loading dataset...
@@ -157,8 +157,8 @@ function DatasetDetailEditor({
 
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="rounded-md border p-3">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="rounded-md border p-2.5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Dataset Details</h2>
             <Button
@@ -182,7 +182,7 @@ function DatasetDetailEditor({
             </div>
           ) : null}
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2">
             <div className="space-y-1">
               <label className="text-xs font-medium" htmlFor="dataset-name">
                 Name
@@ -231,9 +231,9 @@ function DatasetDetailEditor({
           </div>
         </div>
 
-        <div className="rounded-md border p-3">
+        <div className="rounded-md border bg-muted/30 p-2.5">
           <h3 className="text-xs font-semibold">Metadata</h3>
-          <div className="mt-2 text-xs">
+          <div className="mt-1.5 text-xs">
             <div>
               <span className="font-medium">ID:</span> {detail.id}
             </div>
@@ -247,7 +247,7 @@ function DatasetDetailEditor({
             </div>
           </div>
 
-          <div className="mt-4 space-y-2">
+          <div className="mt-3 space-y-1.5">
             <div className="text-xs font-medium">Current Tags</div>
             <div className="flex flex-wrap gap-1">
               {detail.tags.length > 0 ? (
@@ -264,7 +264,7 @@ function DatasetDetailEditor({
         </div>
       </div>
 
-      <div className="rounded-md border p-3">
+      <div className="rounded-md border p-2.5">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold">Columns</h3>
           <span className="text-xs text-muted-foreground">

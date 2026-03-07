@@ -47,7 +47,7 @@ function renderSortableHeader({
     <Button
       variant="ghost"
       size="sm"
-      className="-ml-3 h-8 data-[state=open]:bg-accent"
+      className="-ml-2 h-7 data-[state=open]:bg-accent"
       onClick={() => column.toggleSorting(sorted === "asc")}
     >
       <span>{label}</span>
@@ -90,7 +90,7 @@ export function createDatasetColumns({
                   aria-label={tooltipLabel}
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-7 w-7"
                   onClick={(event) => {
                     event.stopPropagation();
                     void toggleFavorite(dataset);

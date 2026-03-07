@@ -80,7 +80,7 @@ export function DatasetTable({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 48,
+    estimateSize: () => 36,
     overscan: 8,
   });
 
@@ -200,7 +200,7 @@ export function DatasetTable({
                         tabIndex={0}
                       >
                         {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id} className="py-2.5">
+                          <TableCell key={cell.id} className="py-1.5">
                             {flexRender(
                               cell.column.columnDef.cell,
                               cell.getContext(),

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MousePointerClick } from "lucide-react";
 import { DatasetTable } from "@/components/dataset-table";
 import { DatasetDetailPage } from "@/components/dataset-detail-page";
 import {
@@ -32,24 +33,27 @@ export function DataViewer({ datasetId }: DataViewerProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-        <ResizablePanel defaultSize={35} minSize={25}>
+        <ResizablePanel defaultSize={30} minSize={20}>
           <DatasetTable
             selectedDatasetId={selectedDatasetId}
             onDatasetSelected={handleDatasetSelected}
           />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={65} minSize={35}>
+        <ResizablePanel defaultSize={70} minSize={35}>
           {selectedDatasetId ? (
-            <div className="h-full min-h-0 p-4">
+            <div className="h-full min-h-0 p-3">
               <DatasetDetailPage datasetId={selectedDatasetId} />
             </div>
           ) : (
-            <div className="p-4">
-              <h2 className="text-lg font-semibold">No dataset selected</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Choose a dataset to view charts and metadata.
-              </p>
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+              <MousePointerClick className="size-10 opacity-30" />
+              <div className="text-center">
+                <p className="text-sm font-medium">No dataset selected</p>
+                <p className="mt-0.5 text-xs">
+                  Choose a dataset from the list to view charts and metadata.
+                </p>
+              </div>
             </div>
           )}
         </ResizablePanel>
