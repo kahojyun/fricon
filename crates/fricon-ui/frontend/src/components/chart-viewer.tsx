@@ -135,15 +135,15 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
         <div className="px-2 text-sm text-destructive">{chartError}</div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-hidden p-2">
+      <div className="min-h-0 flex-1 overflow-hidden p-1.5">
         <ResizablePanelGroup orientation="vertical" className="h-full min-h-0">
-          <ResizablePanel defaultSize={60} minSize={35} className="min-h-0">
+          <ResizablePanel defaultSize={70} minSize={35} className="min-h-0">
             <div className="h-full min-h-0">
               <ChartWrapper data={data} />
             </div>
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={40} minSize={25} className="min-h-0">
+          <ResizablePanel defaultSize={30} minSize={20} className="min-h-0">
             <div className="h-full min-h-0">
               <FilterTable
                 data={filterTableData ?? undefined}

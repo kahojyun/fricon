@@ -46,8 +46,7 @@ function renderSortableHeader({
   return (
     <Button
       variant="ghost"
-      size="sm"
-      className="-ml-3 h-8 data-[state=open]:bg-accent"
+      className="-ml-2 data-[state=open]:bg-accent"
       onClick={() => column.toggleSorting(sorted === "asc")}
     >
       <span>{label}</span>
@@ -90,7 +89,6 @@ export function createDatasetColumns({
                   aria-label={tooltipLabel}
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
                   onClick={(event) => {
                     event.stopPropagation();
                     void toggleFavorite(dataset);
@@ -176,11 +174,7 @@ export function createDatasetColumns({
           <div className="flex flex-wrap gap-1">
             {tags.length > 0 ? (
               tags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="secondary"
-                  className="rounded-sm font-normal"
-                >
+                <Badge key={tag} variant="secondary">
                   {tag}
                 </Badge>
               ))
@@ -203,7 +197,7 @@ export function createDatasetColumns({
       header: ({ column }) =>
         renderSortableHeader({ column, label: "Created At" }),
       cell: ({ getValue }) => (
-        <div className="text-sm text-muted-foreground">
+        <div className="text-muted-foreground">
           {getValue<Date>().toLocaleString()}
         </div>
       ),

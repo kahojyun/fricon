@@ -1,4 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DatasetTable } from "@/components/dataset-table";
@@ -110,15 +116,18 @@ function renderDatasetTable(overrides: Record<string, unknown> = {}) {
   return { hook, onDatasetSelected };
 }
 
-async function openColumnsPopover(user: ReturnType<typeof userEvent.setup>) {
+async function openColumnsMenu(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /View/i }));
+  const menus = await screen.findAllByRole("menu");
+  return menus.at(-1)!;
 }
 
 async function toggleColumn(
   user: ReturnType<typeof userEvent.setup>,
   label: string,
 ) {
-  await user.click(screen.getByLabelText(`Toggle ${label} column`));
+  const menu = await openColumnsMenu(user);
+  fireEvent.click(within(menu).getByRole("menuitemcheckbox", { name: label }));
 }
 
 describe("DatasetTable", () => {
@@ -230,35 +239,19 @@ describe("DatasetTable", () => {
     renderDatasetTable();
     const user = userEvent.setup();
 
-    await openColumnsPopover(user);
+    const menu = await openColumnsMenu(user);
 
-    const nameCheckbox = screen.getByLabelText("Toggle Name column");
+    const nameCheckbox = within(menu).getByRole("menuitemcheckbox", {
+      name: "Name",
+    });
     expect(nameCheckbox).toHaveAttribute("aria-disabled", "true");
     expect(
       screen.getByRole("columnheader", { name: /^Name/ }),
     ).toBeInTheDocument();
 
-    await toggleColumn(user, "Tags");
-    expect(
-      screen.getByRole("columnheader", { name: /^Tags/ }),
-    ).toBeInTheDocument();
-
-    await toggleColumn(user, "Status");
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("columnheader", { name: /^Status/ }),
-      ).not.toBeInTheDocument();
-    });
-    expect(
-      screen.getByRole("columnheader", { name: /^Tags/ }),
-    ).toBeInTheDocument();
-
-    await toggleColumn(user, "Status");
-    await waitFor(() => {
-      expect(
-        screen.getByRole("columnheader", { name: /^Status/ }),
-      ).toBeInTheDocument();
-    });
+    fireEvent.click(
+      within(menu).getByRole("menuitemcheckbox", { name: "Tags" }),
+    );
     expect(
       screen.getByRole("columnheader", { name: /^Tags/ }),
     ).toBeInTheDocument();
@@ -268,8 +261,8 @@ describe("DatasetTable", () => {
     renderDatasetTable();
     const user = userEvent.setup();
 
-    await openColumnsPopover(user);
-    await user.click(screen.getByRole("button", { name: /Show all/i }));
+    let menu = await openColumnsMenu(user);
+    await user.click(within(menu).getByRole("menuitem", { name: /Show all/i }));
 
     expect(
       screen.getByRole("columnheader", { name: /^Tags/ }),
@@ -278,7 +271,10 @@ describe("DatasetTable", () => {
       screen.getByRole("columnheader", { name: /^Created At/ }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Reset default/i }));
+    menu = await openColumnsMenu(user);
+    await user.click(
+      within(menu).getByRole("menuitem", { name: /Reset default/i }),
+    );
 
     expect(
       screen.queryByRole("columnheader", { name: /^Tags/ }),
@@ -317,7 +313,6 @@ describe("DatasetTable", () => {
     renderDatasetTable();
     const user = userEvent.setup();
 
-    await openColumnsPopover(user);
     await toggleColumn(user, "Status");
 
     await waitFor(() => {

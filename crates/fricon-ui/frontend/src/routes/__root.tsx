@@ -83,13 +83,22 @@ function RootLayout() {
           />
         </aside>
 
-        <main className="flex-1 overflow-hidden">
-          <Outlet />
-        </main>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <header className="flex h-9 shrink-0 items-center justify-between border-b bg-muted/30 px-3">
+            <span className="text-xs font-semibold tracking-tight">fricon</span>
+            <span className="truncate text-[11px] text-muted-foreground">
+              {workspacePath}
+            </span>
+          </header>
+
+          <main className="flex-1 overflow-hidden">
+            <Outlet />
+          </main>
+        </div>
       </div>
 
-      <footer className="flex h-8 items-center bg-muted/60 px-3 text-xs">
-        <div className="truncate">Workspace: {workspacePath}</div>
+      <footer className="flex h-6 items-center border-t bg-muted/40 px-3 text-[11px] text-muted-foreground">
+        <span className="truncate">Ready</span>
       </footer>
     </div>
   );

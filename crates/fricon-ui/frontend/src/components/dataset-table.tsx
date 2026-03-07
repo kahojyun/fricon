@@ -11,13 +11,13 @@ import { useDatasetColumnVisibility } from "@/components/use-dataset-column-visi
 import { useDatasetTableData } from "@/components/use-dataset-table-data";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
+  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 
 interface DatasetTableProps {
   selectedDatasetId?: number;
@@ -80,7 +80,7 @@ export function DatasetTable({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 48,
+    estimateSize: () => 36,
     overscan: 8,
   });
 
@@ -128,7 +128,7 @@ export function DatasetTable({
           className="min-h-0 flex-1 overflow-auto bg-background"
           ref={tableContainerRef}
         >
-          <table className="w-full caption-bottom text-xs">
+          <Table withContainer={false}>
             <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
@@ -137,7 +137,7 @@ export function DatasetTable({
                       <TableHead
                         key={header.id}
                         style={{ width: header.getSize() }}
-                        className="border-b-0 bg-background text-muted-foreground"
+                        className="text-muted-foreground"
                       >
                         {header.isPlaceholder
                           ? null
@@ -184,10 +184,7 @@ export function DatasetTable({
                         data-state={isSelected && "selected"}
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className={cn(
-                          "cursor-pointer",
-                          isSelected && "bg-primary/10 hover:bg-primary/10",
-                        )}
+                        className="cursor-pointer"
                         onClick={() => onDatasetSelected(dataset.id)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -200,7 +197,7 @@ export function DatasetTable({
                         tabIndex={0}
                       >
                         {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id} className="py-2.5">
+                          <TableCell key={cell.id}>
                             {flexRender(
                               cell.column.columnDef.cell,
                               cell.getContext(),
@@ -225,7 +222,7 @@ export function DatasetTable({
                 </>
               )}
             </TableBody>
-          </table>
+          </Table>
         </div>
       </div>
     </TooltipProvider>

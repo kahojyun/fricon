@@ -3,13 +3,13 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ColumnUniqueValue, FilterTableData } from "@/lib/backend";
 import { Switch } from "@/components/ui/switch";
 import {
+  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import type { CascadeMode } from "@/hooks/cascadeReducer";
 
 interface FilterTableProps {
@@ -40,7 +40,7 @@ function FilterTableColumn({
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 40,
+    estimateSize: () => 28,
     overscan: 8,
   });
 
@@ -60,12 +60,10 @@ function FilterTableColumn({
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
     >
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full caption-bottom text-xs">
+        <Table withContainer={false}>
           <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
             <TableRow>
-              <TableHead className="border-b-0 bg-background text-muted-foreground">
-                {field}
-              </TableHead>
+              <TableHead className="text-muted-foreground">{field}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -87,13 +85,10 @@ function FilterTableColumn({
                   data-state={isSelected && "selected"}
                   ref={rowVirtualizer.measureElement}
                   data-index={virtualRow.index}
-                  className={cn(
-                    "cursor-pointer",
-                    isSelected && "bg-primary/10 hover:bg-primary/10",
-                  )}
+                  className="cursor-pointer"
                   onClick={() => onSelect(item.index)}
                 >
-                  <TableCell className="overflow-hidden py-2.5 text-ellipsis">
+                  <TableCell className="overflow-hidden text-ellipsis">
                     {item.displayValue}
                   </TableCell>
                 </TableRow>
@@ -108,7 +103,7 @@ function FilterTableColumn({
               </TableRow>
             )}
           </TableBody>
-        </table>
+        </Table>
       </div>
     </div>
   );
@@ -137,7 +132,7 @@ export function FilterTable({
   const rowVirtualizer = useVirtualizer({
     count: data?.rows.length ?? 0,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 40,
+    estimateSize: () => 28,
     overscan: 8,
   });
 
@@ -165,14 +160,14 @@ export function FilterTable({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       {showFilterToggle ? (
-        <div className="flex items-center gap-2 px-2 pb-2">
+        <div className="flex items-center gap-2 px-2 py-1.5">
           <Switch
             checked={mode === "split"}
             onCheckedChange={(checked) =>
               onModeChange(checked ? "split" : "row")
             }
           />
-          <span className="text-sm">Split columns</span>
+          <span className="text-xs">Split columns</span>
         </div>
       ) : null}
 
@@ -181,17 +176,14 @@ export function FilterTable({
           className="min-h-0 flex-1 overflow-auto border-t bg-background"
           ref={tableContainerRef}
         >
-          <table
-            className="w-full caption-bottom text-xs"
+          <Table
+            withContainer={false}
             style={{ minWidth: minTableWidth, tableLayout: "fixed" }}
           >
             <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
               <TableRow>
                 {data.fields.map((field) => (
-                  <TableHead
-                    key={field}
-                    className="border-b-0 bg-background text-muted-foreground"
-                  >
+                  <TableHead key={field} className="text-muted-foreground">
                     {field}
                   </TableHead>
                 ))}
@@ -228,10 +220,7 @@ export function FilterTable({
                         data-state={isSelected && "selected"}
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className={cn(
-                          "cursor-pointer",
-                          isSelected && "bg-primary/10 hover:bg-primary/10",
-                        )}
+                        className="cursor-pointer"
                         onClick={() => onSelectRow(row.index)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -246,7 +235,7 @@ export function FilterTable({
                         {data.fields.map((field, idx) => (
                           <TableCell
                             key={field}
-                            className="overflow-hidden py-2.5 text-ellipsis"
+                            className="overflow-hidden text-ellipsis"
                           >
                             {row.displayValues[idx]}
                           </TableCell>
@@ -269,7 +258,7 @@ export function FilterTable({
                 </>
               )}
             </TableBody>
-          </table>
+          </Table>
         </div>
       ) : null}
 

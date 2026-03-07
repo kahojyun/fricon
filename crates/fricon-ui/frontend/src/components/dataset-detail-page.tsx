@@ -4,7 +4,16 @@ import { updateDatasetInfo, type DatasetDetail } from "@/lib/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartViewer } from "@/components/chart-viewer";
@@ -31,7 +40,7 @@ export function DatasetDetailPage({
       <Tabs defaultValue="charts" className="flex h-full min-h-0 flex-col">
         <TabsList>
           <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="properties">Properties</TabsTrigger>
         </TabsList>
 
         <TabsContent
@@ -44,10 +53,10 @@ export function DatasetDetailPage({
         </TabsContent>
 
         <TabsContent
-          value="details"
+          value="properties"
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="min-h-0 flex-1 space-y-4 overflow-auto">
+          <div className="min-h-0 flex-1 space-y-3 overflow-auto">
             {isLoading && !detail ? (
               <div className="text-xs text-muted-foreground">
                 Loading dataset...
@@ -157,13 +166,12 @@ function DatasetDetailEditor({
 
   return (
     <>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="rounded-md border p-3">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="rounded-md border p-2.5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Dataset Details</h2>
             <Button
               type="button"
-              size="sm"
               disabled={!hasChanges || isSaving}
               onClick={() => void handleSave()}
             >
@@ -182,11 +190,9 @@ function DatasetDetailEditor({
             </div>
           ) : null}
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium" htmlFor="dataset-name">
-                Name
-              </label>
+              <Label htmlFor="dataset-name">Name</Label>
               <Input
                 id="dataset-name"
                 value={formName}
@@ -195,12 +201,7 @@ function DatasetDetailEditor({
             </div>
 
             <div className="space-y-1">
-              <label
-                className="text-xs font-medium"
-                htmlFor="dataset-description"
-              >
-                Description
-              </label>
+              <Label htmlFor="dataset-description">Description</Label>
               <Textarea
                 id="dataset-description"
                 rows={4}
@@ -210,9 +211,7 @@ function DatasetDetailEditor({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium" htmlFor="dataset-tags">
-                Tags
-              </label>
+              <Label htmlFor="dataset-tags">Tags</Label>
               <Input
                 id="dataset-tags"
                 placeholder="Comma separated tags"
@@ -223,17 +222,20 @@ function DatasetDetailEditor({
 
             <div className="flex items-center gap-2">
               <Switch
+                id="dataset-favorite"
                 checked={formFavorite}
                 onCheckedChange={setFormFavorite}
               />
-              <span className="text-sm">Favorite</span>
+              <Label htmlFor="dataset-favorite" className="whitespace-nowrap">
+                Favorite
+              </Label>
             </div>
           </div>
         </div>
 
-        <div className="rounded-md border p-3">
+        <div className="rounded-md border bg-muted/30 p-2.5">
           <h3 className="text-xs font-semibold">Metadata</h3>
-          <div className="mt-2 text-xs">
+          <div className="mt-1.5 text-xs">
             <div>
               <span className="font-medium">ID:</span> {detail.id}
             </div>
@@ -247,7 +249,7 @@ function DatasetDetailEditor({
             </div>
           </div>
 
-          <div className="mt-4 space-y-2">
+          <div className="mt-3 space-y-1.5">
             <div className="text-xs font-medium">Current Tags</div>
             <div className="flex flex-wrap gap-1">
               {detail.tags.length > 0 ? (
@@ -264,7 +266,7 @@ function DatasetDetailEditor({
         </div>
       </div>
 
-      <div className="rounded-md border p-3">
+      <div className="rounded-md border p-2.5">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold">Columns</h3>
           <span className="text-xs text-muted-foreground">
@@ -272,20 +274,20 @@ function DatasetDetailEditor({
           </span>
         </div>
         <div className="overflow-hidden rounded-md border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40 text-muted-foreground">
-              <tr>
-                <th className="px-2 py-2 text-left font-semibold">Name</th>
-                <th className="px-2 py-2 text-left font-semibold">Index</th>
-                <th className="px-2 py-2 text-left font-semibold">Type</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader className="bg-muted/40 text-muted-foreground">
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Index</TableHead>
+                <TableHead>Type</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {detail.columns.map((column) => (
-                <tr key={column.name} className="border-t text-foreground">
-                  <td className="px-2 py-2">{column.name}</td>
-                  <td className="px-2 py-2">{column.isIndex ? "✓" : ""}</td>
-                  <td className="px-2 py-2">
+                <TableRow key={column.name}>
+                  <TableCell>{column.name}</TableCell>
+                  <TableCell>{column.isIndex ? "✓" : ""}</TableCell>
+                  <TableCell>
                     {column.isTrace ? (
                       <Badge variant="secondary">Trace</Badge>
                     ) : column.isComplex ? (
@@ -293,11 +295,11 @@ function DatasetDetailEditor({
                     ) : (
                       <Badge variant="secondary">Scalar</Badge>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     </>
