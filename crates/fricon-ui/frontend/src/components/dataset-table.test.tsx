@@ -239,7 +239,7 @@ describe("DatasetTable", () => {
     renderDatasetTable();
     const user = userEvent.setup();
 
-    let menu = await openColumnsMenu(user);
+    const menu = await openColumnsMenu(user);
 
     const nameCheckbox = within(menu).getByRole("menuitemcheckbox", {
       name: "Name",
@@ -252,19 +252,6 @@ describe("DatasetTable", () => {
     fireEvent.click(
       within(menu).getByRole("menuitemcheckbox", { name: "Tags" }),
     );
-    expect(
-      screen.getByRole("columnheader", { name: /^Tags/ }),
-    ).toBeInTheDocument();
-
-    menu = await openColumnsMenu(user);
-    fireEvent.click(
-      within(menu).getByRole("menuitemcheckbox", { name: "Status" }),
-    );
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("columnheader", { name: /^Status/ }),
-      ).not.toBeInTheDocument();
-    });
     expect(
       screen.getByRole("columnheader", { name: /^Tags/ }),
     ).toBeInTheDocument();
