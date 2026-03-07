@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2](https://github.com/kahojyun/fricon/compare/v0.1.0-alpha.1...v0.1.0-alpha.2) - 2026-03-07
+
+### Added
+
+- refactor dataset creation streaming with robust termination handling ([#189](https://github.com/kahojyun/fricon/pull/189))
+- add structured logging with tracing instrumentation ([#180](https://github.com/kahojyun/fricon/pull/180))
+- dataset detail page ([#158](https://github.com/kahojyun/fricon/pull/158))
+- dataset paging limit ([#155](https://github.com/kahojyun/fricon/pull/155))
+- dataset write status display ([#153](https://github.com/kahojyun/fricon/pull/153))
+- filter by tags ([#138](https://github.com/kahojyun/fricon/pull/138))
+- search by name ([#137](https://github.com/kahojyun/fricon/pull/137))
+- edit and filter favorite dataset ([#136](https://github.com/kahojyun/fricon/pull/136))
+
+### Fixed
+
+- store and use `tokio::runtime::Handle` in `DatasetWriter` drop ([#192](https://github.com/kahojyun/fricon/pull/192))
+- *(fricon-ui)* stabilize trace chart rendering and semantics ([#169](https://github.com/kahojyun/fricon/pull/169))
+- update stale dataset status on startup ([#154](https://github.com/kahojyun/fricon/pull/154))
+
+### Other
+
+- use tombi to format and lint toml files ([#184](https://github.com/kahojyun/fricon/pull/184))
+- rename types for clarity ([#182](https://github.com/kahojyun/fricon/pull/182))
+- enable `unreachable_pub` lint ([#181](https://github.com/kahojyun/fricon/pull/181))
+- cleanup dataset query and table data flow ([#162](https://github.com/kahojyun/fricon/pull/162))
+- *(dataset)* clarify create flow and improve write-session safety ([#156](https://github.com/kahojyun/fricon/pull/156))
+- remove writer status watcher channel ([#152](https://github.com/kahojyun/fricon/pull/152))
+- poll dataset writing progress from frontend ([#149](https://github.com/kahojyun/fricon/pull/149))
+- command.rs ([#146](https://github.com/kahojyun/fricon/pull/146))
+- remove `downcast_array` util ([#141](https://github.com/kahojyun/fricon/pull/141))
+- process chart data in the backend ([#139](https://github.com/kahojyun/fricon/pull/139))
+
 ## [0.1.0-alpha.1](https://github.com/kahojyun/fricon/compare/v0.1.0-alpha...v0.1.0-alpha.1) - 2025-12-16
 
 ### Added
