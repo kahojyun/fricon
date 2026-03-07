@@ -88,7 +88,7 @@ function FilterTableColumn({
                   className="cursor-pointer"
                   onClick={() => onSelect(item.index)}
                 >
-                  <TableCell className="overflow-hidden py-1 text-ellipsis">
+                  <TableCell className="overflow-hidden text-ellipsis">
                     {item.displayValue}
                   </TableCell>
                 </TableRow>
@@ -235,7 +235,7 @@ export function FilterTable({
                         {data.fields.map((field, idx) => (
                           <TableCell
                             key={field}
-                            className="overflow-hidden py-1 text-ellipsis"
+                            className="overflow-hidden text-ellipsis"
                           >
                             {row.displayValues[idx]}
                           </TableCell>

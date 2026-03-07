@@ -172,7 +172,6 @@ function DatasetDetailEditor({
             <h2 className="text-sm font-semibold">Dataset Details</h2>
             <Button
               type="button"
-              size="sm"
               disabled={!hasChanges || isSaving}
               onClick={() => void handleSave()}
             >

@@ -12,8 +12,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings2, X, PlusCircle } from "lucide-react";
@@ -66,9 +64,7 @@ function FacetedFilterPopover<T extends string>({
   return (
     <Popover>
       <PopoverTrigger
-        render={
-          <Button variant="outline" size="sm" className="border-dashed" />
-        }
+        render={<Button variant="outline" className="border-dashed" />}
       >
         <PlusCircle className="mr-2 h-4 w-4 shrink-0" />
         {title}
@@ -116,7 +112,6 @@ function FacetedFilterPopover<T extends string>({
                   key={value}
                   type="button"
                   variant={isActive ? "secondary" : "ghost"}
-                  size="sm"
                   className="w-full justify-start"
                   onClick={() => onToggle(value)}
                 >
@@ -136,7 +131,6 @@ function FacetedFilterPopover<T extends string>({
             <div className="my-2 h-px w-full bg-border" />
             <Button
               variant="ghost"
-              size="sm"
               className="w-full justify-center"
               onClick={() => {
                 selectedValues.forEach(onToggle);
@@ -203,19 +197,15 @@ export function DatasetTableToolbar({
           contentClassName="w-50 p-2"
         />
 
-        <div className="flex h-7 shrink-0 items-center space-x-2 rounded-md border border-dashed px-2">
-          <Switch
-            id="favorite-toggle"
-            checked={favoriteOnly}
-            onCheckedChange={setFavoriteOnly}
-          />
-          <Label
-            htmlFor="favorite-toggle"
-            className="cursor-pointer whitespace-nowrap"
-          >
-            Favorites Only
-          </Label>
-        </div>
+        <Button
+          type="button"
+          variant={favoriteOnly ? "secondary" : "outline"}
+          aria-pressed={favoriteOnly}
+          className="shrink-0 border-dashed"
+          onClick={() => setFavoriteOnly(!favoriteOnly)}
+        >
+          Favorites Only
+        </Button>
 
         {hasActiveFilters && (
           <Button
@@ -231,9 +221,7 @@ export function DatasetTableToolbar({
 
       <Popover>
         <PopoverTrigger
-          render={
-            <Button variant="outline" size="lg" className="ml-auto shrink-0" />
-          }
+          render={<Button variant="outline" className="ml-auto shrink-0" />}
         >
           <Settings2 className="mr-2 h-4 w-4 shrink-0" />
           View
@@ -280,7 +268,6 @@ export function DatasetTableToolbar({
           <div className="flex flex-col gap-1">
             <Button
               variant="ghost"
-              size="lg"
               onClick={showAllColumns}
               className="w-full justify-start"
             >
@@ -288,7 +275,6 @@ export function DatasetTableToolbar({
             </Button>
             <Button
               variant="ghost"
-              size="lg"
               onClick={resetColumnVisibilityToDefault}
               className="w-full justify-start"
             >
