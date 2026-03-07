@@ -6,6 +6,16 @@ import {
 } from "@/components/dataset-table-columns";
 import { DatasetFilterCheckIcon } from "@/components/dataset-filter-check-icon";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -13,7 +23,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Settings2, X, PlusCircle } from "lucide-react";
 
 interface DatasetTableToolbarProps {
@@ -219,16 +228,17 @@ export function DatasetTableToolbar({
         )}
       </div>
 
-      <Popover>
-        <PopoverTrigger
+      <DropdownMenu>
+        <DropdownMenuTrigger
           render={<Button variant="outline" className="ml-auto shrink-0" />}
         >
           <Settings2 className="mr-2 h-4 w-4 shrink-0" />
           View
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-37.5 p-2">
-          <div className="mb-2 px-2 text-xs font-medium">Toggle columns</div>
-          <div className="space-y-1">
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-42">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
             {allColumns.map((column) => {
               const meta = column.columnDef.meta as
                 | DatasetColumnMeta
@@ -236,53 +246,27 @@ export function DatasetTableToolbar({
               const label = meta?.label ?? column.id;
               const hideable = meta?.hideable ?? true;
               return (
-                <label
+                <DropdownMenuCheckboxItem
                   key={column.id}
-                  className="flex w-full cursor-pointer items-center space-x-2 rounded-sm px-2 py-1 hover:bg-muted/50"
+                  checked={column.getIsVisible()}
+                  disabled={!hideable}
+                  onCheckedChange={(checked) => {
+                    if (!hideable) return;
+                    onColumnVisibilityChange(column.id, checked);
+                  }}
                 >
-                  <Checkbox
-                    aria-label={`Toggle ${label} column`}
-                    checked={column.getIsVisible()}
-                    disabled={!hideable}
-                    onCheckedChange={() => {
-                      if (!hideable) return;
-                      onColumnVisibilityChange(
-                        column.id,
-                        !column.getIsVisible(),
-                      );
-                    }}
-                  />
-                  <span className="flex-1 truncate text-sm font-normal">
-                    {label}
-                  </span>
-                  {!hideable && (
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      Req
-                    </span>
-                  )}
-                </label>
+                  {label}
+                </DropdownMenuCheckboxItem>
               );
             })}
-          </div>
-          <div className="my-2 h-px w-full bg-border" />
-          <div className="flex flex-col gap-1">
-            <Button
-              variant="ghost"
-              onClick={showAllColumns}
-              className="w-full justify-start"
-            >
-              Show All
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={resetColumnVisibilityToDefault}
-              className="w-full justify-start"
-            >
-              Reset Default
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={showAllColumns}>Show All</DropdownMenuItem>
+          <DropdownMenuItem onClick={resetColumnVisibilityToDefault}>
+            Reset Default
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
