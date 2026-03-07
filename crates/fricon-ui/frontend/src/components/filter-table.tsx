@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ColumnUniqueValue, FilterTableData } from "@/lib/backend";
 import { Switch } from "@/components/ui/switch";
 import {
+  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -60,7 +61,7 @@ function FilterTableColumn({
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
     >
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full caption-bottom text-xs">
+        <Table withContainer={false}>
           <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
             <TableRow>
               <TableHead className="text-muted-foreground">{field}</TableHead>
@@ -106,7 +107,7 @@ function FilterTableColumn({
               </TableRow>
             )}
           </TableBody>
-        </table>
+        </Table>
       </div>
     </div>
   );
@@ -179,8 +180,8 @@ export function FilterTable({
           className="min-h-0 flex-1 overflow-auto border-t bg-background"
           ref={tableContainerRef}
         >
-          <table
-            className="w-full caption-bottom text-xs"
+          <Table
+            withContainer={false}
             style={{ minWidth: minTableWidth, tableLayout: "fixed" }}
           >
             <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
@@ -264,7 +265,7 @@ export function FilterTable({
                 </>
               )}
             </TableBody>
-          </table>
+          </Table>
         </div>
       ) : null}
 

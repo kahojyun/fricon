@@ -11,6 +11,7 @@ import { useDatasetColumnVisibility } from "@/components/use-dataset-column-visi
 import { useDatasetTableData } from "@/components/use-dataset-table-data";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
+  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -128,7 +129,7 @@ export function DatasetTable({
           className="min-h-0 flex-1 overflow-auto bg-background"
           ref={tableContainerRef}
         >
-          <table className="w-full caption-bottom text-xs">
+          <Table withContainer={false}>
             <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
@@ -225,7 +226,7 @@ export function DatasetTable({
                 </>
               )}
             </TableBody>
-          </table>
+          </Table>
         </div>
       </div>
     </TooltipProvider>
