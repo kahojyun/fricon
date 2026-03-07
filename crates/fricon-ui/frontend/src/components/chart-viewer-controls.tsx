@@ -89,7 +89,7 @@ export function ChartViewerControls({
     <>
       <div className="flex flex-wrap gap-1.5 p-1.5">
         <div className="min-w-40">
-          <Label className="mb-1 block text-xs">Chart Type</Label>
+          <Label className="mb-1 block">Chart Type</Label>
           <Select
             value={effectiveChartType}
             onValueChange={(value) => {
@@ -113,7 +113,7 @@ export function ChartViewerControls({
 
         {effectiveChartType !== "scatter" ? (
           <div className="min-w-45">
-            <Label className="mb-1 block text-xs">Series</Label>
+            <Label className="mb-1 block">Series</Label>
             <Select
               value={effectiveSeriesName ?? ""}
               onValueChange={(value) =>
@@ -138,7 +138,7 @@ export function ChartViewerControls({
         (effectiveChartType === "line" ||
           (effectiveChartType === "heatmap" && !series?.isTrace)) ? (
           <div className="min-w-40">
-            <Label className="mb-1 block text-xs">X</Label>
+            <Label className="mb-1 block">X</Label>
             <Select
               disabled={effectiveChartType === "line" && isTraceSeries}
               value={effectiveXColumnName ?? ""}
@@ -165,7 +165,7 @@ export function ChartViewerControls({
 
         {effectiveChartType === "heatmap" ? (
           <div className="min-w-40">
-            <Label className="mb-1 block text-xs">Y</Label>
+            <Label className="mb-1 block">Y</Label>
             <Select
               value={effectiveYColumnName ?? ""}
               onValueChange={(value) =>
@@ -188,7 +188,7 @@ export function ChartViewerControls({
 
         {effectiveChartType === "scatter" ? (
           <div className="min-w-50">
-            <Label className="mb-1 block text-xs">Point Cloud Source</Label>
+            <Label className="mb-1 block">Point Cloud Source</Label>
             <Select
               value={effectiveScatterMode}
               onValueChange={(value) => {
@@ -218,7 +218,7 @@ export function ChartViewerControls({
         {effectiveChartType === "scatter" &&
         effectiveScatterMode === "complex" ? (
           <div className="min-w-50">
-            <Label className="mb-1 block text-xs">Complex Series</Label>
+            <Label className="mb-1 block">Complex Series</Label>
             <Select
               value={effectiveScatterSeriesName ?? ""}
               onValueChange={(value) =>
@@ -242,7 +242,7 @@ export function ChartViewerControls({
         {effectiveChartType === "scatter" && effectiveScatterMode === "xy" ? (
           <>
             <div className="min-w-40">
-              <Label className="mb-1 block text-xs">X Column</Label>
+              <Label className="mb-1 block">X Column</Label>
               <Select
                 value={effectiveScatterXName ?? ""}
                 onValueChange={(value) =>
@@ -262,7 +262,7 @@ export function ChartViewerControls({
               </Select>
             </div>
             <div className="min-w-40">
-              <Label className="mb-1 block text-xs">Y Column</Label>
+              <Label className="mb-1 block">Y Column</Label>
               <Select
                 value={effectiveScatterYName ?? ""}
                 onValueChange={(value) =>
@@ -288,7 +288,7 @@ export function ChartViewerControls({
         effectiveScatterMode === "trace_xy" ? (
           <>
             <div className="min-w-40">
-              <Label className="mb-1 block text-xs">Trace X</Label>
+              <Label className="mb-1 block">Trace X</Label>
               <Select
                 value={effectiveScatterTraceXName ?? ""}
                 onValueChange={(value) =>
@@ -308,7 +308,7 @@ export function ChartViewerControls({
               </Select>
             </div>
             <div className="min-w-40">
-              <Label className="mb-1 block text-xs">Trace Y</Label>
+              <Label className="mb-1 block">Trace Y</Label>
               <Select
                 value={effectiveScatterTraceYName ?? ""}
                 onValueChange={(value) =>
@@ -334,9 +334,7 @@ export function ChartViewerControls({
         (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
         !scatterIsTraceBased ? (
           <div className="min-w-50">
-            <Label className="mb-1 block text-xs">
-              Index Column (excluded)
-            </Label>
+            <Label className="mb-1 block">Index Column (excluded)</Label>
             <Select
               value={effectiveScatterBinName ?? ""}
               onValueChange={(value) =>

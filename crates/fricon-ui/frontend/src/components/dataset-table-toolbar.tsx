@@ -67,7 +67,7 @@ function FacetedFilterPopover<T extends string>({
     <Popover>
       <PopoverTrigger
         render={
-          <Button variant="outline" size="sm" className="h-8 border-dashed" />
+          <Button variant="outline" size="sm" className="border-dashed" />
         }
       >
         <PlusCircle className="mr-2 h-4 w-4 shrink-0" />
@@ -110,7 +110,7 @@ function FacetedFilterPopover<T extends string>({
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="mb-2 h-8"
+            className="mb-2"
           />
         )}
         <div className="max-h-50 space-y-1 overflow-auto pr-1">
@@ -185,7 +185,7 @@ export function DatasetTableToolbar({
           placeholder="Filter datasets..."
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          className="h-7 w-full max-w-62.5 min-w-37.5 text-xs"
+          className="w-full max-w-62.5 min-w-37.5"
         />
 
         <FacetedFilterPopover
