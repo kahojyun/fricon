@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import type { CascadeMode } from "@/hooks/cascadeReducer";
 
 interface FilterTableProps {
@@ -86,10 +85,7 @@ function FilterTableColumn({
                   data-state={isSelected && "selected"}
                   ref={rowVirtualizer.measureElement}
                   data-index={virtualRow.index}
-                  className={cn(
-                    "cursor-pointer",
-                    isSelected && "bg-primary/10 hover:bg-primary/10",
-                  )}
+                  className="cursor-pointer"
                   onClick={() => onSelect(item.index)}
                 >
                   <TableCell className="overflow-hidden py-1 text-ellipsis">
@@ -224,10 +220,7 @@ export function FilterTable({
                         data-state={isSelected && "selected"}
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className={cn(
-                          "cursor-pointer",
-                          isSelected && "bg-primary/10 hover:bg-primary/10",
-                        )}
+                        className="cursor-pointer"
                         onClick={() => onSelectRow(row.index)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {

@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 
 interface DatasetTableProps {
   selectedDatasetId?: number;
@@ -185,10 +184,7 @@ export function DatasetTable({
                         data-state={isSelected && "selected"}
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className={cn(
-                          "cursor-pointer",
-                          isSelected && "bg-primary/10 hover:bg-primary/10",
-                        )}
+                        className="cursor-pointer"
                         onClick={() => onDatasetSelected(dataset.id)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
