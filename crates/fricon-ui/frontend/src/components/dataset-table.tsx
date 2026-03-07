@@ -137,7 +137,7 @@ export function DatasetTable({
                       <TableHead
                         key={header.id}
                         style={{ width: header.getSize() }}
-                        className="border-b-0 bg-background text-muted-foreground"
+                        className="text-muted-foreground"
                       >
                         {header.isPlaceholder
                           ? null

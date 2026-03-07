@@ -63,9 +63,7 @@ function FilterTableColumn({
         <table className="w-full caption-bottom text-xs">
           <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
             <TableRow>
-              <TableHead className="border-b-0 bg-background text-muted-foreground">
-                {field}
-              </TableHead>
+              <TableHead className="text-muted-foreground">{field}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -188,10 +186,7 @@ export function FilterTable({
             <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
               <TableRow>
                 {data.fields.map((field) => (
-                  <TableHead
-                    key={field}
-                    className="border-b-0 bg-background text-muted-foreground"
-                  >
+                  <TableHead key={field} className="text-muted-foreground">
                     {field}
                   </TableHead>
                 ))}

@@ -75,18 +75,12 @@ function FacetedFilterPopover<T extends string>({
         {selectedValues.length > 0 && (
           <>
             <div className="mx-2 h-4 w-px shrink-0 bg-border" />
-            <Badge
-              variant="secondary"
-              className="rounded-sm px-1 font-normal lg:hidden"
-            >
+            <Badge variant="secondary" className="lg:hidden">
               {selectedValues.length}
             </Badge>
             <div className="hidden space-x-1 lg:flex">
               {selectedValues.length > 2 ? (
-                <Badge
-                  variant="secondary"
-                  className="rounded-sm px-1 font-normal"
-                >
+                <Badge variant="secondary">
                   {selectedValues.length} selected
                 </Badge>
               ) : (
@@ -94,7 +88,7 @@ function FacetedFilterPopover<T extends string>({
                   <Badge
                     key={value}
                     variant="secondary"
-                    className="max-w-24 truncate rounded-sm px-1 font-normal"
+                    className="max-w-24 truncate"
                   >
                     {value}
                   </Badge>
@@ -123,7 +117,7 @@ function FacetedFilterPopover<T extends string>({
                   type="button"
                   variant={isActive ? "secondary" : "ghost"}
                   size="sm"
-                  className="w-full justify-start font-normal"
+                  className="w-full justify-start"
                   onClick={() => onToggle(value)}
                 >
                   <DatasetFilterCheckIcon active={isActive} />
@@ -143,7 +137,7 @@ function FacetedFilterPopover<T extends string>({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full justify-center text-sm"
+              className="w-full justify-center"
               onClick={() => {
                 selectedValues.forEach(onToggle);
               }}
@@ -217,7 +211,7 @@ export function DatasetTableToolbar({
           />
           <Label
             htmlFor="favorite-toggle"
-            className="cursor-pointer text-sm font-normal whitespace-nowrap"
+            className="cursor-pointer whitespace-nowrap"
           >
             Favorites Only
           </Label>
@@ -227,7 +221,7 @@ export function DatasetTableToolbar({
           <Button
             variant="ghost"
             onClick={clearFilters}
-            className="h-8 shrink-0 px-2 lg:px-3"
+            className="shrink-0 lg:px-3"
           >
             Reset
             <X className="ml-2 h-4 w-4 shrink-0" />
@@ -238,11 +232,7 @@ export function DatasetTableToolbar({
       <Popover>
         <PopoverTrigger
           render={
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto flex h-8 shrink-0"
-            />
+            <Button variant="outline" size="lg" className="ml-auto shrink-0" />
           }
         >
           <Settings2 className="mr-2 h-4 w-4 shrink-0" />
@@ -290,17 +280,17 @@ export function DatasetTableToolbar({
           <div className="flex flex-col gap-1">
             <Button
               variant="ghost"
-              size="sm"
+              size="lg"
               onClick={showAllColumns}
-              className="h-8 w-full justify-start px-2"
+              className="w-full justify-start"
             >
               Show All
             </Button>
             <Button
               variant="ghost"
-              size="sm"
+              size="lg"
               onClick={resetColumnVisibilityToDefault}
-              className="h-8 w-full justify-start px-2"
+              className="w-full justify-start"
             >
               Reset Default
             </Button>

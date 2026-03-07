@@ -4,7 +4,16 @@ import { updateDatasetInfo, type DatasetDetail } from "@/lib/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartViewer } from "@/components/chart-viewer";
@@ -184,9 +193,7 @@ function DatasetDetailEditor({
 
           <div className="mt-3 space-y-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium" htmlFor="dataset-name">
-                Name
-              </label>
+              <Label htmlFor="dataset-name">Name</Label>
               <Input
                 id="dataset-name"
                 value={formName}
@@ -195,12 +202,7 @@ function DatasetDetailEditor({
             </div>
 
             <div className="space-y-1">
-              <label
-                className="text-xs font-medium"
-                htmlFor="dataset-description"
-              >
-                Description
-              </label>
+              <Label htmlFor="dataset-description">Description</Label>
               <Textarea
                 id="dataset-description"
                 rows={4}
@@ -210,9 +212,7 @@ function DatasetDetailEditor({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium" htmlFor="dataset-tags">
-                Tags
-              </label>
+              <Label htmlFor="dataset-tags">Tags</Label>
               <Input
                 id="dataset-tags"
                 placeholder="Comma separated tags"
@@ -223,10 +223,13 @@ function DatasetDetailEditor({
 
             <div className="flex items-center gap-2">
               <Switch
+                id="dataset-favorite"
                 checked={formFavorite}
                 onCheckedChange={setFormFavorite}
               />
-              <span className="text-sm">Favorite</span>
+              <Label htmlFor="dataset-favorite" className="whitespace-nowrap">
+                Favorite
+              </Label>
             </div>
           </div>
         </div>
@@ -272,20 +275,20 @@ function DatasetDetailEditor({
           </span>
         </div>
         <div className="overflow-hidden rounded-md border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40 text-muted-foreground">
-              <tr>
-                <th className="px-2 py-2 text-left font-semibold">Name</th>
-                <th className="px-2 py-2 text-left font-semibold">Index</th>
-                <th className="px-2 py-2 text-left font-semibold">Type</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader className="bg-muted/40 text-muted-foreground">
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Index</TableHead>
+                <TableHead>Type</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {detail.columns.map((column) => (
-                <tr key={column.name} className="border-t text-foreground">
-                  <td className="px-2 py-2">{column.name}</td>
-                  <td className="px-2 py-2">{column.isIndex ? "✓" : ""}</td>
-                  <td className="px-2 py-2">
+                <TableRow key={column.name}>
+                  <TableCell>{column.name}</TableCell>
+                  <TableCell>{column.isIndex ? "✓" : ""}</TableCell>
+                  <TableCell>
                     {column.isTrace ? (
                       <Badge variant="secondary">Trace</Badge>
                     ) : column.isComplex ? (
@@ -293,11 +296,11 @@ function DatasetDetailEditor({
                     ) : (
                       <Badge variant="secondary">Scalar</Badge>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     </>

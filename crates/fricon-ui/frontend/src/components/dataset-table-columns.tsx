@@ -174,11 +174,7 @@ export function createDatasetColumns({
           <div className="flex flex-wrap gap-1">
             {tags.length > 0 ? (
               tags.map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="secondary"
-                  className="rounded-sm font-normal"
-                >
+                <Badge key={tag} variant="secondary">
                   {tag}
                 </Badge>
               ))
