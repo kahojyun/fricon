@@ -2,7 +2,6 @@
 
 - **React Compiler is enabled.** DO NOT use `useMemo` or `useCallback` unless absolutely mandated by a third-party library API requirement.
 - Prefer shadcn/ui components
-- `shadcn/ui` uses Base UI (not Radix). Use `render={<Comp/>}` instead of the `asChild` pattern.
 
 ## Generated Files (Do Not Edit Manually)
 
