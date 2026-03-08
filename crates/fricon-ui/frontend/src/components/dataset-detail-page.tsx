@@ -72,7 +72,7 @@ export function DatasetDetailPage({
           value="properties"
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-1">
             {isLoading && !detail ? (
               <div className="text-xs text-muted-foreground">
                 Loading dataset...
