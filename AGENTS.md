@@ -3,6 +3,7 @@
 ## Monorepo Scope
 
 - Rust crates are under `crates/`: `fricon`, `fricon-py`, `fricon-ui`, `fricon-cli`.
+- Frontend is under `crates/fricon-ui/frontend`.
 - `examples/` contains runnable examples.
 - `scripts/` contains development helpers.
 - `docs/` contains documentation sources.
@@ -17,3 +18,4 @@
   `pnpm run [type-check|lint|format:check|test --run]`.
 - After Rust Tauri command/event signature changes, regenerate bindings with:
   `pnpm --filter fricon-ui run gen:bindings`.
+- Run shadcn cli with `pnpm --filter fricon-ui exec shadcn`.
