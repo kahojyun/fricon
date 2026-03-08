@@ -51,11 +51,14 @@ function renderSortableHeader({
     >
       <span>{label}</span>
       {sorted === "desc" ? (
-        <ArrowDown className="ml-2 h-4 w-4" />
+        <ArrowDown data-icon="inline-end" />
       ) : sorted === "asc" ? (
-        <ArrowUp className="ml-2 h-4 w-4" />
+        <ArrowUp data-icon="inline-end" />
       ) : (
-        <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
+        <ArrowUpDown
+          data-icon="inline-end"
+          className="text-muted-foreground/50"
+        />
       )}
     </Button>
   );
@@ -97,9 +100,9 @@ export function createDatasetColumns({
               }
             >
               {dataset.favorite ? (
-                <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                <Star className="fill-primary text-primary" />
               ) : (
-                <StarOff className="h-4 w-4 text-muted-foreground" />
+                <StarOff className="text-muted-foreground" />
               )}
             </TooltipTrigger>
             <TooltipContent>{tooltipLabel}</TooltipContent>

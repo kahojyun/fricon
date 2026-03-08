@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Settings2, X, PlusCircle } from "lucide-react";
 
 interface DatasetTableToolbarProps {
@@ -75,15 +76,15 @@ function FacetedFilterPopover<T extends string>({
       <PopoverTrigger
         render={<Button variant="outline" className="border-dashed" />}
       >
-        <PlusCircle className="mr-2 h-4 w-4 shrink-0" />
+        <PlusCircle data-icon="inline-start" />
         {title}
         {selectedValues.length > 0 && (
           <>
-            <div className="mx-2 h-4 w-px shrink-0 bg-border" />
+            <Separator orientation="vertical" className="mx-2 h-4" />
             <Badge variant="secondary" className="lg:hidden">
               {selectedValues.length}
             </Badge>
-            <div className="hidden space-x-1 lg:flex">
+            <div className="hidden flex-wrap gap-1 lg:flex">
               {selectedValues.length > 2 ? (
                 <Badge variant="secondary">
                   {selectedValues.length} selected
@@ -112,7 +113,7 @@ function FacetedFilterPopover<T extends string>({
             className="mb-2"
           />
         )}
-        <div className="max-h-50 space-y-1 overflow-auto pr-1">
+        <div className="flex max-h-50 flex-col gap-1 overflow-auto pr-1">
           {options.length > 0 ? (
             options.map((value) => {
               const isActive = selectedValues.includes(value);
@@ -137,7 +138,7 @@ function FacetedFilterPopover<T extends string>({
         </div>
         {selectedValues.length > 0 && (
           <>
-            <div className="my-2 h-px w-full bg-border" />
+            <Separator className="my-2" />
             <Button
               variant="ghost"
               className="w-full justify-center"
@@ -223,7 +224,7 @@ export function DatasetTableToolbar({
             className="shrink-0 lg:px-3"
           >
             Reset
-            <X className="ml-2 h-4 w-4 shrink-0" />
+            <X data-icon="inline-end" />
           </Button>
         )}
       </div>
@@ -232,7 +233,7 @@ export function DatasetTableToolbar({
         <DropdownMenuTrigger
           render={<Button variant="outline" className="ml-auto shrink-0" />}
         >
-          <Settings2 className="mr-2 h-4 w-4 shrink-0" />
+          <Settings2 data-icon="inline-start" />
           View
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-42">

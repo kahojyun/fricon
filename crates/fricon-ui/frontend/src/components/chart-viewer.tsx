@@ -17,6 +17,7 @@ import { useChartDataQuery } from "@/hooks/useChartDataQuery";
 import { useDatasetDetailQuery } from "@/hooks/useDatasetDetailQuery";
 import { useDatasetWriteStatusQuery } from "@/hooks/useDatasetWriteStatusQuery";
 import { useFilterTableDataQuery } from "@/hooks/useFilterTableDataQuery";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -132,7 +133,12 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
       />
 
       {chartError ? (
-        <div className="px-2 text-sm text-destructive">{chartError}</div>
+        <div className="px-1.5">
+          <Alert variant="destructive">
+            <AlertTitle>Chart load failed</AlertTitle>
+            <AlertDescription>{chartError}</AlertDescription>
+          </Alert>
+        </div>
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-hidden p-1.5">

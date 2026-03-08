@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ColumnUniqueValue, FilterTableData } from "@/lib/backend";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -88,7 +89,7 @@ function FilterTableColumn({
                   className="cursor-pointer"
                   onClick={() => onSelect(item.index)}
                 >
-                  <TableCell className="overflow-hidden text-ellipsis">
+                  <TableCell className="truncate">
                     {item.displayValue}
                   </TableCell>
                 </TableRow>
@@ -231,10 +232,7 @@ export function FilterTable({
                         tabIndex={0}
                       >
                         {data.fields.map((field, idx) => (
-                          <TableCell
-                            key={field}
-                            className="overflow-hidden text-ellipsis"
-                          >
+                          <TableCell key={field} className="truncate">
                             {row.displayValues[idx]}
                           </TableCell>
                         ))}
@@ -273,7 +271,7 @@ export function FilterTable({
                 }
               />
               {index < data.fields.length - 1 ? (
-                <div className="w-px shrink-0 bg-border/60" />
+                <Separator orientation="vertical" className="bg-border/60" />
               ) : null}
             </div>
           ))}
