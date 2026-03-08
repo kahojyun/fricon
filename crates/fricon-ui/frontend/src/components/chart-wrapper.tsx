@@ -141,10 +141,9 @@ function buildOption(data?: ChartOptions): EChartsOption {
 }
 
 export function ChartWrapper({ data }: ChartWrapperProps) {
-  const prefersDark = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  }, []);
+  const prefersDark =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
   const [theme, setTheme] = useState<"dark" | "default">(() => {
     if (typeof document === "undefined") return "default";
     return document.documentElement.classList.contains("dark") || prefersDark

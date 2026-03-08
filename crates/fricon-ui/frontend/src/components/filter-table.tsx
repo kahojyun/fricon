@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ColumnUniqueValue, FilterTableData } from "@/lib/backend";
 import { Switch } from "@/components/ui/switch";
@@ -123,11 +123,9 @@ export function FilterTable({
   const showFilterToggle = Boolean(data && data.fields.length > 1);
   const isFilterTableEmpty = !data || data.rows.length === 0;
 
-  const minTableWidth = useMemo(() => {
-    if (!data) return "0px";
-    const minWidth = Math.max(data.fields.length * 80, 320);
-    return `${minWidth}px`;
-  }, [data]);
+  const minTableWidth = data
+    ? `${Math.max(data.fields.length * 80, 320)}px`
+    : "0px";
 
   const rowVirtualizer = useVirtualizer({
     count: data?.rows.length ?? 0,
