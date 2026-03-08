@@ -115,28 +115,29 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     });
   };
 
-  const currentQueryParams = useMemo<DatasetQueryParams>(
-    () => ({
+  const [debouncedQueryParams, setDebouncedQueryParams] =
+    useState<DatasetQueryParams>(() => ({
       search: searchQuery,
       tags: selectedTags,
       favoriteOnly,
       statuses: selectedStatuses,
       sorting: sortingState,
-    }),
-    [searchQuery, selectedTags, favoriteOnly, selectedStatuses, sortingState],
-  );
-
-  const [debouncedQueryParams, setDebouncedQueryParams] =
-    useState<DatasetQueryParams>(currentQueryParams);
+    }));
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedQueryParams(currentQueryParams);
+      setDebouncedQueryParams({
+        search: searchQuery,
+        tags: selectedTags,
+        favoriteOnly,
+        statuses: selectedStatuses,
+        sorting: sortingState,
+      });
     }, 300);
     return () => {
       window.clearTimeout(timer);
     };
-  }, [currentQueryParams]);
+  }, [searchQuery, selectedTags, favoriteOnly, selectedStatuses, sortingState]);
 
   const datasetQueryKey = useMemo(
     () => ["datasets", "list", debouncedQueryParams] as const,

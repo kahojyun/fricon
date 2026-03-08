@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateDatasetInfo, type DatasetDetail } from "@/lib/backend";
 import { Badge } from "@/components/ui/badge";
@@ -105,30 +105,14 @@ function DatasetDetailEditor({
     tagsToText(detail.tags),
   );
 
-  const normalizedDetailTags = useMemo(
-    () => normalizeTagList(detail.tags),
-    [detail.tags],
-  );
-  const normalizedFormTags = useMemo(
-    () => parseTags(formTagsText),
-    [formTagsText],
-  );
+  const normalizedDetailTags = normalizeTagList(detail.tags);
+  const normalizedFormTags = parseTags(formTagsText);
 
-  const hasChanges = useMemo(() => {
-    if (formName !== detail.name) return true;
-    if (formDescription !== detail.description) return true;
-    if (formFavorite !== detail.favorite) return true;
-    return normalizedFormTags.join("|") !== normalizedDetailTags.join("|");
-  }, [
-    detail.description,
-    detail.favorite,
-    detail.name,
-    formDescription,
-    formFavorite,
-    formName,
-    normalizedDetailTags,
-    normalizedFormTags,
-  ]);
+  const hasChanges =
+    formName !== detail.name ||
+    formDescription !== detail.description ||
+    formFavorite !== detail.favorite ||
+    normalizedFormTags.join("|") !== normalizedDetailTags.join("|");
 
   const updateMutation = useMutation({
     mutationFn: (update: {
