@@ -25,9 +25,8 @@ export function useDatasetWriteStatusQuery(
     if (!data) return;
     const lastInvalidatedStatus = lastInvalidatedStatusRef.current;
     const hasMeaningfulChange =
-      !lastInvalidatedStatus ||
-      lastInvalidatedStatus.rowCount !== data.rowCount ||
-      lastInvalidatedStatus.isComplete !== data.isComplete;
+      lastInvalidatedStatus?.rowCount !== data.rowCount ||
+      lastInvalidatedStatus?.isComplete !== data.isComplete;
     if (!hasMeaningfulChange) return;
 
     lastInvalidatedStatusRef.current = {

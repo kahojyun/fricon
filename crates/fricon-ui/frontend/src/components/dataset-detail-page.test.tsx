@@ -54,11 +54,14 @@ describe("DatasetDetailPage", () => {
 
   it("resyncs form fields when refreshed detail data changes", async () => {
     let currentDetail = makeDetail();
-    useDatasetDetailQueryMock.mockImplementation(() => ({
-      data: currentDetail,
-      isLoading: false,
-      error: null,
-    }) as ReturnType<typeof useDatasetDetailQuery>);
+    useDatasetDetailQueryMock.mockImplementation(
+      () =>
+        ({
+          data: currentDetail,
+          isLoading: false,
+          error: null,
+        }) as ReturnType<typeof useDatasetDetailQuery>,
+    );
 
     const user = userEvent.setup();
     const wrapper = createWrapper();
@@ -88,9 +91,6 @@ describe("DatasetDetailPage", () => {
       "Server description",
     );
     expect(screen.getByLabelText("Tags")).toHaveValue("beta, gamma");
-    expect(screen.getByRole("switch")).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true");
   });
 });

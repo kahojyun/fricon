@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateDatasetInfo, type DatasetDetail } from "@/lib/backend";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -81,7 +81,7 @@ export function DatasetDetailPage({
 
             {detail ? (
               <DatasetDetailEditor
-                key={datasetId}
+                key={buildDatasetDetailEditorKey(datasetId, detail)}
                 datasetId={datasetId}
                 detail={detail}
                 onDatasetUpdated={onDatasetUpdated}
@@ -112,25 +112,14 @@ function DatasetDetailEditor({
   onDatasetUpdated,
 }: DatasetDetailEditorProps) {
   const queryClient = useQueryClient();
-  const detailTagsText = tagsToText(detail.tags);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formName, setFormName] = useState(detail.name);
   const [formDescription, setFormDescription] = useState(detail.description);
   const [formFavorite, setFormFavorite] = useState(detail.favorite);
-  const [formTagsText, setFormTagsText] = useState(detailTagsText);
-
-  useEffect(() => {
-    setFormName(detail.name);
-    setFormDescription(detail.description);
-    setFormFavorite(detail.favorite);
-    setFormTagsText(detailTagsText);
-  }, [
-    detail.description,
-    detail.favorite,
-    detail.name,
-    detailTagsText,
-  ]);
+  const [formTagsText, setFormTagsText] = useState(() =>
+    tagsToText(detail.tags),
+  );
 
   const normalizedDetailTags = normalizeTagList(detail.tags);
   const normalizedFormTags = parseTags(formTagsText);
@@ -366,6 +355,19 @@ const statusVariantMap: Record<
 
 function tagsToText(tags: string[]): string {
   return tags.join(", ");
+}
+
+function buildDatasetDetailEditorKey(
+  datasetId: number,
+  detail: DatasetDetail,
+): string {
+  return [
+    datasetId,
+    detail.name,
+    detail.description,
+    detail.favorite ? "1" : "0",
+    normalizeTagList(detail.tags).join("|"),
+  ].join("::");
 }
 
 function normalizeTagList(tags: string[]): string[] {
