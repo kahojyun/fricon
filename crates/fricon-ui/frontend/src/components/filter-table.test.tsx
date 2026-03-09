@@ -1,7 +1,21 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { FilterTable } from "@/components/filter-table";
 import type { FilterTableData } from "@/lib/backend";
+
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getTotalSize: () => count * 32,
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, index) => ({
+        index,
+        start: index * 32,
+        end: (index + 1) * 32,
+      })),
+    measureElement: () => undefined,
+  }),
+}));
 
 function makeData(): FilterTableData {
   return {
@@ -54,5 +68,69 @@ describe("FilterTable", () => {
     expect(
       document.querySelectorAll(".overflow-auto").length,
     ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("supports keyboard selection in split mode", async () => {
+    const user = userEvent.setup();
+    const onSelectFieldValue = vi.fn();
+
+    render(
+      <div className="h-60">
+        <FilterTable
+          data={makeData()}
+          mode="split"
+          onModeChange={() => undefined}
+          selectedRowIndex={null}
+          onSelectRow={() => undefined}
+          selectedValueIndices={[1, 1]}
+          onSelectFieldValue={onSelectFieldValue}
+        />
+      </div>,
+    );
+
+    const option = screen.getByText("A2").closest("tr");
+    if (!(option instanceof HTMLElement)) {
+      throw new Error("Split mode option row not found");
+    }
+
+    option.focus();
+    await user.keyboard("{Enter}");
+    await user.keyboard(" ");
+
+    expect(onSelectFieldValue).toHaveBeenNthCalledWith(1, 0, 2);
+    expect(onSelectFieldValue).toHaveBeenNthCalledWith(2, 0, 2);
+  });
+
+  it("prevents scroll behavior when using Space to select", () => {
+    const onSelectFieldValue = vi.fn();
+
+    render(
+      <div className="h-60">
+        <FilterTable
+          data={makeData()}
+          mode="split"
+          onModeChange={() => undefined}
+          selectedRowIndex={null}
+          onSelectRow={() => undefined}
+          selectedValueIndices={[1, 1]}
+          onSelectFieldValue={onSelectFieldValue}
+        />
+      </div>,
+    );
+
+    const option = screen.getByText("A2").closest("tr");
+    if (!(option instanceof HTMLElement)) {
+      throw new Error("Split mode option row not found");
+    }
+
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: " ",
+    });
+    const prevented = !option.dispatchEvent(event);
+
+    expect(prevented || event.defaultPrevented).toBe(true);
+    expect(onSelectFieldValue).toHaveBeenCalledWith(0, 2);
   });
 });

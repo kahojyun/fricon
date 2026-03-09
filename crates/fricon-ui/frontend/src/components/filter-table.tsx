@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ColumnUniqueValue, FilterTableData } from "@/lib/backend";
 import { Switch } from "@/components/ui/switch";
@@ -28,6 +28,19 @@ interface FilterTableColumnProps {
   items: ColumnUniqueValue[];
   selectedIndex?: number;
   onSelect: (index: number) => void;
+}
+
+function handleSelectableRowKeyDown(
+  event: KeyboardEvent<HTMLTableRowElement>,
+  onSelect: () => void,
+) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    onSelect();
+  }
+  if (event.metaKey || event.ctrlKey) {
+    event.stopPropagation();
+  }
 }
 
 function FilterTableColumn({
@@ -88,6 +101,12 @@ function FilterTableColumn({
                   data-index={virtualRow.index}
                   className="cursor-pointer"
                   onClick={() => onSelect(item.index)}
+                  onKeyDown={(event) =>
+                    handleSelectableRowKeyDown(event, () =>
+                      onSelect(item.index),
+                    )
+                  }
+                  tabIndex={0}
                 >
                   <TableCell className="truncate">
                     {item.displayValue}
@@ -221,14 +240,11 @@ export function FilterTable({
                         data-index={virtualRow.index}
                         className="cursor-pointer"
                         onClick={() => onSelectRow(row.index)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            onSelectRow(row.index);
-                          }
-                          if (event.metaKey || event.ctrlKey) {
-                            event.stopPropagation();
-                          }
-                        }}
+                        onKeyDown={(event) =>
+                          handleSelectableRowKeyDown(event, () =>
+                            onSelectRow(row.index),
+                          )
+                        }
                         tabIndex={0}
                       >
                         {data.fields.map((field, idx) => (

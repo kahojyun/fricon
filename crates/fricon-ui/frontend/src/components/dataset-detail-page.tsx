@@ -81,7 +81,7 @@ export function DatasetDetailPage({
 
             {detail ? (
               <DatasetDetailEditor
-                key={datasetId}
+                key={buildDatasetDetailEditorKey(datasetId, detail)}
                 datasetId={datasetId}
                 detail={detail}
                 onDatasetUpdated={onDatasetUpdated}
@@ -106,29 +106,37 @@ interface DatasetDetailEditorProps {
   onDatasetUpdated?: () => void;
 }
 
+interface DatasetDetailEditorDraft {
+  name: string;
+  description: string;
+  favorite: boolean;
+  tagsText: string;
+  normalizedTags: string[];
+}
+
 function DatasetDetailEditor({
   datasetId,
   detail,
   onDatasetUpdated,
 }: DatasetDetailEditorProps) {
   const queryClient = useQueryClient();
+  const initialDraft = createDatasetDetailEditorDraft(detail);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [formName, setFormName] = useState(detail.name);
-  const [formDescription, setFormDescription] = useState(detail.description);
-  const [formFavorite, setFormFavorite] = useState(detail.favorite);
-  const [formTagsText, setFormTagsText] = useState(() =>
-    tagsToText(detail.tags),
+  const [formName, setFormName] = useState(initialDraft.name);
+  const [formDescription, setFormDescription] = useState(
+    initialDraft.description,
   );
+  const [formFavorite, setFormFavorite] = useState(initialDraft.favorite);
+  const [formTagsText, setFormTagsText] = useState(() => initialDraft.tagsText);
 
-  const normalizedDetailTags = normalizeTagList(detail.tags);
   const normalizedFormTags = parseTags(formTagsText);
 
   const hasChanges =
-    formName !== detail.name ||
-    formDescription !== detail.description ||
-    formFavorite !== detail.favorite ||
-    normalizedFormTags.join("|") !== normalizedDetailTags.join("|");
+    formName !== initialDraft.name ||
+    formDescription !== initialDraft.description ||
+    formFavorite !== initialDraft.favorite ||
+    normalizedFormTags.join("|") !== initialDraft.normalizedTags.join("|");
 
   const updateMutation = useMutation({
     mutationFn: (update: {
@@ -355,6 +363,35 @@ const statusVariantMap: Record<
 
 function tagsToText(tags: string[]): string {
   return tags.join(", ");
+}
+
+function createDatasetDetailEditorDraft(
+  detail: DatasetDetail,
+): DatasetDetailEditorDraft {
+  const normalizedTags = normalizeTagList(detail.tags);
+
+  return {
+    name: detail.name,
+    description: detail.description,
+    favorite: detail.favorite,
+    tagsText: tagsToText(normalizedTags),
+    normalizedTags,
+  };
+}
+
+function buildDatasetDetailEditorKey(
+  datasetId: number,
+  detail: DatasetDetail,
+): string {
+  const draft = createDatasetDetailEditorDraft(detail);
+
+  return JSON.stringify({
+    datasetId,
+    name: draft.name,
+    description: draft.description,
+    favorite: draft.favorite,
+    tags: draft.normalizedTags,
+  });
 }
 
 function normalizeTagList(tags: string[]): string[] {
