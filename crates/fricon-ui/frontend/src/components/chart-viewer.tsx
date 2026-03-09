@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
   ChartOptions,
   ChartType,
@@ -78,12 +78,6 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
     Boolean(datasetDetail),
   );
   const filterTableData = filterTableQuery.data ?? null;
-  const { refetch: refetchFilterTable } = filterTableQuery;
-
-  useEffect(() => {
-    if (!datasetDetail) return;
-    void refetchFilterTable();
-  }, [datasetDetail, refetchFilterTable]);
 
   const cascade = useCascadeSelection(filterTableData);
   const filterRow = cascade.resolvedRow ?? null;

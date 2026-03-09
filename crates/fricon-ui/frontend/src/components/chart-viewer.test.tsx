@@ -139,6 +139,7 @@ describe("ChartViewer", () => {
 
   it("fetches chart data once per meaningful change", async () => {
     let chartCallCount = 0;
+    let filterTableCallCount = 0;
     mockIPC((cmd) => {
       if (cmd === "dataset_detail") {
         return {
@@ -161,6 +162,7 @@ describe("ChartViewer", () => {
         };
       }
       if (cmd === "get_filter_table_data") {
+        filterTableCallCount += 1;
         return {
           fields: ["A", "B"],
           rows: [
@@ -223,6 +225,7 @@ describe("ChartViewer", () => {
 
     await waitFor(() => {
       expect(chartCallCount).toBe(1);
+      expect(filterTableCallCount).toBe(1);
     });
 
     const switchToggle = await screen.findByRole("switch");
