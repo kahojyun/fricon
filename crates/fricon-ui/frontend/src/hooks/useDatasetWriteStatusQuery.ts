@@ -55,6 +55,10 @@ export function useDatasetWriteStatusQuery(
   });
 
   useEffect(() => {
+    lastInvalidatedStatusRef.current = null;
+  }, [datasetId]);
+
+  useEffect(() => {
     const data = query.data;
     if (!data) return;
     const snapshot: DatasetWriteStatusSnapshot = {

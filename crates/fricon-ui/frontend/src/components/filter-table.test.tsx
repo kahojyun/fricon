@@ -100,4 +100,37 @@ describe("FilterTable", () => {
     expect(onSelectFieldValue).toHaveBeenNthCalledWith(1, 0, 2);
     expect(onSelectFieldValue).toHaveBeenNthCalledWith(2, 0, 2);
   });
+
+  it("prevents scroll behavior when using Space to select", () => {
+    const onSelectFieldValue = vi.fn();
+
+    render(
+      <div className="h-60">
+        <FilterTable
+          data={makeData()}
+          mode="split"
+          onModeChange={() => undefined}
+          selectedRowIndex={null}
+          onSelectRow={() => undefined}
+          selectedValueIndices={[1, 1]}
+          onSelectFieldValue={onSelectFieldValue}
+        />
+      </div>,
+    );
+
+    const option = screen.getByText("A2").closest("tr");
+    if (!(option instanceof HTMLElement)) {
+      throw new Error("Split mode option row not found");
+    }
+
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: " ",
+    });
+    const prevented = !option.dispatchEvent(event);
+
+    expect(prevented || event.defaultPrevented).toBe(true);
+    expect(onSelectFieldValue).toHaveBeenCalledWith(0, 2);
+  });
 });

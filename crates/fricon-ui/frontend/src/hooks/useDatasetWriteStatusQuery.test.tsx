@@ -63,4 +63,30 @@ describe("useDatasetWriteStatusQuery", () => {
       queryKey: ["chartData", 1],
     });
   });
+
+  it("resets the cached snapshot when the dataset changes", () => {
+    vi.mocked(useQuery)
+      .mockReturnValueOnce(makeQueryResult(5, false))
+      .mockReturnValueOnce(makeQueryResult(5, false));
+
+    const { rerender } = renderHook(
+      ({ datasetId }) => useDatasetWriteStatusQuery(datasetId, true),
+      {
+        initialProps: { datasetId: 1 },
+      },
+    );
+
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(2);
+    invalidateQueriesMock.mockClear();
+
+    rerender({ datasetId: 2 });
+
+    expect(invalidateQueriesMock).toHaveBeenCalledTimes(2);
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(1, {
+      queryKey: ["filterTableData", 2],
+    });
+    expect(invalidateQueriesMock).toHaveBeenNthCalledWith(2, {
+      queryKey: ["chartData", 2],
+    });
+  });
 });

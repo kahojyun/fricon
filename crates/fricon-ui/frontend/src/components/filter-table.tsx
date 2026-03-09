@@ -35,6 +35,7 @@ function handleSelectableRowKeyDown(
   onSelect: () => void,
 ) {
   if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
     onSelect();
   }
   if (event.metaKey || event.ctrlKey) {
