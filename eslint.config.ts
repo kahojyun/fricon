@@ -41,12 +41,6 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.tsx"],
-    rules: {
-      "react-hooks/incompatible-library": "off",
-    },
-  },
-  {
     files: ["**/*.test.ts", "**/*.test.tsx", "src/test/**/*"],
     languageOptions: {
       globals: {
