@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateDatasetInfo, type DatasetDetail } from "@/lib/backend";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -112,14 +112,25 @@ function DatasetDetailEditor({
   onDatasetUpdated,
 }: DatasetDetailEditorProps) {
   const queryClient = useQueryClient();
+  const detailTagsText = tagsToText(detail.tags);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formName, setFormName] = useState(detail.name);
   const [formDescription, setFormDescription] = useState(detail.description);
   const [formFavorite, setFormFavorite] = useState(detail.favorite);
-  const [formTagsText, setFormTagsText] = useState(() =>
-    tagsToText(detail.tags),
-  );
+  const [formTagsText, setFormTagsText] = useState(detailTagsText);
+
+  useEffect(() => {
+    setFormName(detail.name);
+    setFormDescription(detail.description);
+    setFormFavorite(detail.favorite);
+    setFormTagsText(detailTagsText);
+  }, [
+    detail.description,
+    detail.favorite,
+    detail.name,
+    detailTagsText,
+  ]);
 
   const normalizedDetailTags = normalizeTagList(detail.tags);
   const normalizedFormTags = parseTags(formTagsText);
