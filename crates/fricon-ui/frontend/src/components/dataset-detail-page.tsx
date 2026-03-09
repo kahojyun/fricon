@@ -385,13 +385,13 @@ function buildDatasetDetailEditorKey(
 ): string {
   const draft = createDatasetDetailEditorDraft(detail);
 
-  return [
+  return JSON.stringify({
     datasetId,
-    draft.name,
-    draft.description,
-    draft.favorite ? "1" : "0",
-    draft.normalizedTags.join("|"),
-  ].join("::");
+    name: draft.name,
+    description: draft.description,
+    favorite: draft.favorite,
+    tags: draft.normalizedTags,
+  });
 }
 
 function normalizeTagList(tags: string[]): string[] {

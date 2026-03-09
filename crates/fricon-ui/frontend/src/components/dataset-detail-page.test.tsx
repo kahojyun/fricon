@@ -93,4 +93,41 @@ describe("DatasetDetailPage", () => {
     expect(screen.getByLabelText("Tags")).toHaveValue("beta, gamma");
     expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true");
   });
+
+  it("resets the form when detail values would collide under delimiter joining", async () => {
+    let currentDetail = makeDetail({
+      name: "a",
+      description: "b::c",
+      tags: [],
+    });
+    useDatasetDetailQueryMock.mockImplementation(
+      () =>
+        ({
+          data: currentDetail,
+          isLoading: false,
+          error: null,
+        }) as ReturnType<typeof useDatasetDetailQuery>,
+    );
+
+    const user = userEvent.setup();
+    const wrapper = createWrapper();
+    const { rerender } = render(<DatasetDetailPage datasetId={1} />, {
+      wrapper,
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Properties" }));
+
+    expect(await screen.findByLabelText("Name")).toHaveValue("a");
+    expect(screen.getByLabelText("Description")).toHaveValue("b::c");
+
+    currentDetail = makeDetail({
+      name: "a::b",
+      description: "c",
+      tags: [],
+    });
+    rerender(<DatasetDetailPage datasetId={1} />);
+
+    expect(await screen.findByLabelText("Name")).toHaveValue("a::b");
+    expect(screen.getByLabelText("Description")).toHaveValue("c");
+  });
 });
