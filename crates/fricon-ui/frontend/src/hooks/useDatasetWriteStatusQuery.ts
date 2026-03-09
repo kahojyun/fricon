@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDatasetWriteStatus } from "@/lib/backend";
 
@@ -7,6 +7,10 @@ export function useDatasetWriteStatusQuery(
   enabled: boolean,
 ) {
   const queryClient = useQueryClient();
+  const lastInvalidatedStatusRef = useRef<{
+    rowCount: number;
+    isComplete: boolean;
+  } | null>(null);
 
   const query = useQuery({
     queryKey: ["datasetWriteStatus", datasetId],
@@ -19,6 +23,18 @@ export function useDatasetWriteStatusQuery(
   useEffect(() => {
     const data = query.data;
     if (!data) return;
+    const lastInvalidatedStatus = lastInvalidatedStatusRef.current;
+    const hasMeaningfulChange =
+      !lastInvalidatedStatus ||
+      lastInvalidatedStatus.rowCount !== data.rowCount ||
+      lastInvalidatedStatus.isComplete !== data.isComplete;
+    if (!hasMeaningfulChange) return;
+
+    lastInvalidatedStatusRef.current = {
+      rowCount: data.rowCount,
+      isComplete: data.isComplete,
+    };
+
     if (data.isComplete) {
       void queryClient.invalidateQueries({
         queryKey: ["datasetDetail", datasetId],
