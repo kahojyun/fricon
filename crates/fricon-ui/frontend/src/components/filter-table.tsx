@@ -88,6 +88,15 @@ function FilterTableColumn({
                   data-index={virtualRow.index}
                   className="cursor-pointer"
                   onClick={() => onSelect(item.index)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      onSelect(item.index);
+                    }
+                    if (event.metaKey || event.ctrlKey) {
+                      event.stopPropagation();
+                    }
+                  }}
+                  tabIndex={0}
                 >
                   <TableCell className="truncate">
                     {item.displayValue}
