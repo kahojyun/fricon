@@ -1,0 +1,4 @@
+interface:
+  display_name: "React 19 & Compiler"
+  short_description: "Apply official React 19 and Compiler patterns"
+  default_prompt: "Use $react-19-compiler to update this codebase to current React 19 and React Compiler patterns from the official docs."
