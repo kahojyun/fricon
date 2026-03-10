@@ -84,7 +84,9 @@ describe("useDatasetTableData", () => {
   it("loads datasets with default query params", async () => {
     listDatasetsMock.mockResolvedValueOnce([makeDataset()]);
 
-    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
+    renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledWith({
@@ -135,7 +137,7 @@ describe("useDatasetTableData", () => {
     });
   });
 
-  it("appends next page with offset based on current dataset count", async () => {
+  it("expands query limit when loading the next page", async () => {
     listDatasetsMock
       .mockResolvedValueOnce([
         makeDataset({ id: 1 }),
@@ -175,8 +177,169 @@ describe("useDatasetTableData", () => {
       statuses: [],
       sortBy: "id",
       sortDir: "desc",
-      limit: 3,
-      offset: 3,
+      limit: 6,
+      offset: 0,
+    });
+  });
+
+  it("keeps hasMore true while the next page is loading with placeholder data", async () => {
+    let resolveNextPage: ((value: DatasetInfo[]) => void) | undefined;
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockImplementationOnce(
+        () =>
+          new Promise<DatasetInfo[]>((resolve) => {
+            resolveNextPage = resolve;
+          }),
+      );
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.datasets).toHaveLength(3);
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(2);
+      expect(result.current.datasets).toHaveLength(3);
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    act(() => {
+      resolveNextPage?.([makeDataset({ id: 4 })]);
+    });
+  });
+
+  it("does not reset visibleCount on the initial debounce window", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
+    });
+
+    expect(listDatasetsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets the query limit when debounced filters change", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 9, name: "Alpha dataset" })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(1, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setSearchQuery("Alpha");
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+        search: "Alpha",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
     });
   });
 
@@ -190,7 +353,9 @@ describe("useDatasetTableData", () => {
       .mockResolvedValueOnce([makeDataset({ id: 1 })])
       .mockResolvedValueOnce([makeDataset({ id: 2 })]);
 
-    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
+    renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledTimes(1);
@@ -205,7 +370,7 @@ describe("useDatasetTableData", () => {
     });
   });
 
-  it("queues refresh until in-flight list query completes", async () => {
+  it("does not enqueue an extra refetch when invalidating an in-flight request", async () => {
     let createdCallback: ((event: DatasetInfo) => void) | undefined;
     onDatasetCreatedMock.mockImplementation((callback) => {
       createdCallback = callback;
@@ -222,7 +387,9 @@ describe("useDatasetTableData", () => {
       )
       .mockResolvedValueOnce([makeDataset({ id: 2 })]);
 
-    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledTimes(1);
@@ -239,8 +406,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenCalledTimes(2);
+      expect(result.current.datasets).toHaveLength(1);
     });
+
+    expect(listDatasetsMock).toHaveBeenCalledTimes(1);
   });
 
   it("rolls back optimistic favorite update when backend update fails", async () => {
