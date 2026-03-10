@@ -182,6 +182,82 @@ describe("useDatasetTableData", () => {
     });
   });
 
+  it("resets the query limit when debounced filters change", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 9, name: "Alpha dataset" })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(1, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setSearchQuery("Alpha");
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+        search: "Alpha",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+  });
+
   it("refreshes datasets on create event instead of prepending locally", async () => {
     let createdCallback: ((event: DatasetInfo) => void) | undefined;
     onDatasetCreatedMock.mockImplementation((callback) => {

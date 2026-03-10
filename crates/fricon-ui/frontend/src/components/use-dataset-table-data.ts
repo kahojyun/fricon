@@ -1,9 +1,5 @@
 import { useEffect, useEffectEvent, useState } from "react";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import {
   DATASET_PAGE_SIZE,
@@ -105,6 +101,8 @@ interface DatasetTableFiltersResult {
     updater: SortingState | ((prev: SortingState) => SortingState),
   ) => void;
   debouncedQueryParams: DatasetQueryParams;
+  visibleCount: number;
+  loadNextPage: () => Promise<void>;
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
   clearFilters: () => void;
@@ -119,6 +117,7 @@ function useDatasetTableFilters(): DatasetTableFiltersResult {
   const [tagFilterQuery, setTagFilterQuery] = useState("");
   const [sortingState, setSortingState] =
     useState<SortingState>(DEFAULT_SORTING);
+  const [visibleCount, setVisibleCount] = useState(DATASET_PAGE_SIZE);
   const [debouncedQueryParams, setDebouncedQueryParams] =
     useState<DatasetQueryParams>(() => ({
       search: searchQuery,
@@ -137,6 +136,7 @@ function useDatasetTableFilters(): DatasetTableFiltersResult {
         statuses: selectedStatuses,
         sorting: sortingState,
       });
+      setVisibleCount(DATASET_PAGE_SIZE);
     }, 300);
     return () => {
       window.clearTimeout(timer);
@@ -181,6 +181,11 @@ function useDatasetTableFilters(): DatasetTableFiltersResult {
     selectedTags.length > 0 ||
     selectedStatuses.length > 0;
 
+  const loadNextPage = () => {
+    setVisibleCount((current) => current + DATASET_PAGE_SIZE);
+    return Promise.resolve();
+  };
+
   return {
     searchQuery,
     setSearchQuery,
@@ -193,6 +198,8 @@ function useDatasetTableFilters(): DatasetTableFiltersResult {
     sorting: sortingState,
     setSorting,
     debouncedQueryParams,
+    visibleCount,
+    loadNextPage,
     handleTagToggle,
     handleStatusToggle,
     clearFilters,
@@ -202,10 +209,16 @@ function useDatasetTableFilters(): DatasetTableFiltersResult {
 
 function useDatasetTableQuery(
   queryParams: DatasetQueryParams,
+  visibleCount: number,
+  incrementVisibleCount: () => Promise<void>,
   queryClient: ReturnType<typeof useQueryClient>,
 ) {
-  const [visibleCount, setVisibleCount] = useState(DATASET_PAGE_SIZE);
-  const datasetQueryKey = ["datasets", "list", queryParams, visibleCount] as const;
+  const datasetQueryKey = [
+    "datasets",
+    "list",
+    queryParams,
+    visibleCount,
+  ] as const;
 
   const datasetsQuery = useQuery({
     queryKey: datasetQueryKey,
@@ -228,8 +241,7 @@ function useDatasetTableQuery(
 
   const loadNextPage = () => {
     if (datasetsQuery.isFetching || !hasMore) return Promise.resolve();
-    setVisibleCount((current) => current + DATASET_PAGE_SIZE);
-    return Promise.resolve();
+    return incrementVisibleCount();
   };
 
   return {
@@ -316,7 +328,8 @@ function useDatasetFavoriteMutation(
 
   const toggleFavorite = async (dataset: DatasetInfo) => {
     const nextFavorite = !dataset.favorite;
-    const previousData = queryClient.getQueryData<DatasetInfo[]>(datasetQueryKey);
+    const previousData =
+      queryClient.getQueryData<DatasetInfo[]>(datasetQueryKey);
 
     queryClient.setQueryData<DatasetInfo[]>(datasetQueryKey, (current) => {
       if (!current) return current;
@@ -348,14 +361,13 @@ function useDatasetFavoriteMutation(
 export function useDatasetTableData(): UseDatasetTableDataResult {
   const queryClient = useQueryClient();
   const filters = useDatasetTableFilters();
-  const {
-    datasetQueryKey,
-    datasets,
-    hasMore,
-    refreshDatasets,
-    loadNextPage,
-  } =
-    useDatasetTableQuery(filters.debouncedQueryParams, queryClient);
+  const { datasetQueryKey, datasets, hasMore, refreshDatasets, loadNextPage } =
+    useDatasetTableQuery(
+      filters.debouncedQueryParams,
+      filters.visibleCount,
+      filters.loadNextPage,
+      queryClient,
+    );
 
   const tagsQuery = useQuery({
     queryKey: ["datasetTags"],
