@@ -7,13 +7,13 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DatasetTable } from "@/components/dataset-table";
-import { useDatasetTableData } from "@/components/use-dataset-table-data";
+import { DatasetTable } from "@/features/dataset-table/components/DatasetTable";
+import { useDatasetTableData } from "@/features/dataset-table/hooks/useDatasetTableData";
 import type { DatasetInfo } from "@/lib/backend";
 
 const COLUMN_VISIBILITY_STORAGE_KEY = "fricon.datasetTable.columnVisibility.v1";
 
-vi.mock("@/components/use-dataset-table-data", () => ({
+vi.mock("@/features/dataset-table/hooks/useDatasetTableData", () => ({
   useDatasetTableData: vi.fn(),
 }));
 

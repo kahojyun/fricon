@@ -4,7 +4,7 @@ import {
   cascadeReducer,
   initialCascadeState,
   resolveRow,
-} from "@/hooks/cascadeReducer";
+} from "@/features/chart-viewer/hooks/cascadeReducer";
 
 const data: FilterTableData = {
   fields: ["A", "B"],

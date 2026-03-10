@@ -9,7 +9,7 @@ import {
   buildChartRequest,
   deriveChartViewerState,
   type ChartViewerSelectionState,
-} from "@/components/chart-viewer-logic";
+} from "@/features/chart-viewer/lib/chartViewerLogic";
 
 function makeColumn(
   overrides: Partial<ColumnInfo> & { name: string },
@@ -66,7 +66,7 @@ function makeFilterTableData(): FilterTableData {
   };
 }
 
-describe("chart-viewer-logic", () => {
+describe("chartViewerLogic", () => {
   it("selects trailing index columns as default X/Y", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),

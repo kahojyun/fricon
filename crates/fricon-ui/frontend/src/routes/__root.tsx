@@ -5,7 +5,7 @@ import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Database, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useWorkspaceInfoQuery } from "@/hooks/useWorkspaceInfoQuery";
+import { useWorkspaceInfoQuery } from "@/features/workspace";
 
 const queryClient = new QueryClient({
   defaultOptions: {

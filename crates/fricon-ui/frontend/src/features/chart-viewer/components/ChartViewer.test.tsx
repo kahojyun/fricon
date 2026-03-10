@@ -4,9 +4,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { mockIPC, clearMocks } from "@tauri-apps/api/mocks";
-import { ChartViewer } from "@/components/chart-viewer";
+import { ChartViewer } from "@/features/chart-viewer/components/ChartViewer";
 
-vi.mock("@/components/chart-wrapper", () => ({
+vi.mock("@/features/chart-viewer/components/ChartWrapper", () => ({
   ChartWrapper: ({ data }: { data?: unknown }) => (
     <div data-testid="chart">{data ? "data" : "empty"}</div>
   ),

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DataViewer } from "@/components/data-viewer";
+import { DataViewer } from "@/features/data-explorer";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,

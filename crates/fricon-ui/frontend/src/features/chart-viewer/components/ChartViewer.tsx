@@ -5,18 +5,18 @@ import type {
   ComplexViewOption,
   ScatterMode,
 } from "@/lib/chartTypes";
-import { ChartViewerControls } from "@/components/chart-viewer-controls";
-import { ChartWrapper } from "@/components/chart-wrapper";
-import { FilterTable } from "@/components/filter-table";
+import { ChartViewerControls } from "@/features/chart-viewer/components/ChartViewerControls";
+import { ChartWrapper } from "@/features/chart-viewer/components/ChartWrapper";
+import { FilterTable } from "@/features/chart-viewer/components/FilterTable";
 import {
   buildChartRequest,
   deriveChartViewerState,
-} from "@/components/chart-viewer-logic";
-import { useCascadeSelection } from "@/hooks/useCascadeSelection";
-import { useChartDataQuery } from "@/hooks/useChartDataQuery";
-import { useDatasetDetailQuery } from "@/hooks/useDatasetDetailQuery";
-import { useDatasetWriteStatusQuery } from "@/hooks/useDatasetWriteStatusQuery";
-import { useFilterTableDataQuery } from "@/hooks/useFilterTableDataQuery";
+} from "@/features/chart-viewer/lib/chartViewerLogic";
+import { useCascadeSelection } from "@/features/chart-viewer/hooks/useCascadeSelection";
+import { useChartDataQuery } from "@/features/chart-viewer/hooks/useChartDataQuery";
+import { useDatasetWriteStatusQuery } from "@/features/chart-viewer/hooks/useDatasetWriteStatusQuery";
+import { useFilterTableDataQuery } from "@/features/chart-viewer/hooks/useFilterTableDataQuery";
+import { useDatasetDetailQuery } from "@/features/dataset-detail/queries/useDatasetDetailQuery";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   ResizableHandle,

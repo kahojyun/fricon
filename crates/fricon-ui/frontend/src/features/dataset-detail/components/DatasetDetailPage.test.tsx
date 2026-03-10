@@ -3,15 +3,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DatasetDetailPage } from "@/components/dataset-detail-page";
+import { DatasetDetailPage } from "@/features/dataset-detail/components/DatasetDetailPage";
 import type { DatasetDetail } from "@/lib/backend";
-import { useDatasetDetailQuery } from "@/hooks/useDatasetDetailQuery";
+import { useDatasetDetailQuery } from "@/features/dataset-detail/queries/useDatasetDetailQuery";
 
-vi.mock("@/components/chart-viewer", () => ({
+vi.mock("@/features/chart-viewer", () => ({
   ChartViewer: () => <div data-testid="chart-viewer" />,
 }));
 
-vi.mock("@/hooks/useDatasetDetailQuery", () => ({
+vi.mock("@/features/dataset-detail/queries/useDatasetDetailQuery", () => ({
   useDatasetDetailQuery: vi.fn(),
 }));
 

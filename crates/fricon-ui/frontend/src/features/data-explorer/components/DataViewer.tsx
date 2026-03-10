@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { MousePointerClick } from "lucide-react";
-import { DatasetTable } from "@/components/dataset-table";
-import { DatasetDetailPage } from "@/components/dataset-detail-page";
+import { DatasetTable } from "@/features/dataset-table";
+import { DatasetDetailPage } from "@/features/dataset-detail";
 import {
   ResizableHandle,
   ResizablePanel,

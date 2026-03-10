@@ -3,8 +3,8 @@ import type { DatasetInfo, DatasetStatus } from "@/lib/backend";
 import {
   datasetStatusOptions,
   type DatasetColumnMeta,
-} from "@/components/dataset-table-columns";
-import { DatasetFilterCheckIcon } from "@/components/dataset-filter-check-icon";
+} from "@/features/dataset-table/components/DatasetTableColumns";
+import { DatasetFilterCheckIcon } from "@/features/dataset-table/components/DatasetFilterCheckIcon";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
