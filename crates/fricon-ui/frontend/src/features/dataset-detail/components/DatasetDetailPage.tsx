@@ -32,8 +32,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChartViewer } from "@/components/chart-viewer";
-import { useDatasetDetailQuery } from "@/hooks/useDatasetDetailQuery";
+import { ChartViewer } from "@/features/chart-viewer";
+import { useDatasetDetailQuery } from "@/features/dataset-detail/queries/useDatasetDetailQuery";
 
 interface DatasetDetailPageProps {
   datasetId: number;

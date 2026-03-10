@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { FilterTable } from "@/components/filter-table";
+import { FilterTable } from "@/features/chart-viewer/components/FilterTable";
 import type { FilterTableData } from "@/lib/backend";
 
 vi.mock("@tanstack/react-virtual", () => ({

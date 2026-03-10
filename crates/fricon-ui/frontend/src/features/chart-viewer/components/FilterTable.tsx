@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { CascadeMode } from "@/hooks/cascadeReducer";
+import type { CascadeMode } from "@/features/chart-viewer/hooks/cascadeReducer";
 
 interface FilterTableProps {
   data?: FilterTableData;

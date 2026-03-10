@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useDatasetWriteStatusQuery } from "@/hooks/useDatasetWriteStatusQuery";
+import { useDatasetWriteStatusQuery } from "@/features/chart-viewer/hooks/useDatasetWriteStatusQuery";
 
 const invalidateQueriesMock = vi.fn();
 
