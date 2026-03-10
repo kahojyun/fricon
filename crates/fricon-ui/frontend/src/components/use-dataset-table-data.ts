@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -205,11 +205,7 @@ function useDatasetTableQuery(
   queryClient: ReturnType<typeof useQueryClient>,
 ) {
   const [visibleCount, setVisibleCount] = useState(DATASET_PAGE_SIZE);
-
-  const datasetQueryKey = useMemo(
-    () => ["datasets", "list", queryParams, visibleCount] as const,
-    [queryParams, visibleCount],
-  );
+  const datasetQueryKey = ["datasets", "list", queryParams, visibleCount] as const;
 
   const datasetsQuery = useQuery({
     queryKey: datasetQueryKey,
@@ -224,9 +220,9 @@ function useDatasetTableQuery(
 
   const datasets = datasetsQuery.data ?? [];
 
-  const refreshDatasets = useCallback(async () => {
+  const refreshDatasets = async () => {
     await queryClient.invalidateQueries({ queryKey: datasetQueryKey });
-  }, [datasetQueryKey, queryClient]);
+  };
 
   const hasMore = deriveHasMore(datasets.length, visibleCount);
 
@@ -251,6 +247,15 @@ function useDatasetTableRefreshSync(
   refreshDatasets: () => Promise<void>,
   queryClient: ReturnType<typeof useQueryClient>,
 ) {
+  const refreshAndInvalidateTags = useEffectEvent(() => {
+    void refreshDatasets();
+    void queryClient.invalidateQueries({ queryKey: ["datasetTags"] });
+  });
+
+  const refreshDatasetsEvent = useEffectEvent(() => {
+    void refreshDatasets();
+  });
+
   useEffect(() => {
     let unlistenCreated: (() => void) | undefined;
     let unlistenUpdated: (() => void) | undefined;
@@ -258,8 +263,7 @@ function useDatasetTableRefreshSync(
 
     void onDatasetCreated(() => {
       if (!active) return;
-      void refreshDatasets();
-      void queryClient.invalidateQueries({ queryKey: ["datasetTags"] });
+      refreshAndInvalidateTags();
     }).then((unlisten) => {
       if (!active) {
         unlisten();
@@ -270,8 +274,7 @@ function useDatasetTableRefreshSync(
 
     void onDatasetUpdated(() => {
       if (!active) return;
-      void refreshDatasets();
-      void queryClient.invalidateQueries({ queryKey: ["datasetTags"] });
+      refreshAndInvalidateTags();
     }).then((unlisten) => {
       if (!active) {
         unlisten();
@@ -285,20 +288,20 @@ function useDatasetTableRefreshSync(
       unlistenCreated?.();
       unlistenUpdated?.();
     };
-  }, [queryClient, refreshDatasets]);
+  }, []);
 
   useEffect(() => {
     const hasWriting = datasets.some((dataset) => dataset.status === "Writing");
     if (!hasWriting) return;
 
     const timer = window.setInterval(() => {
-      void refreshDatasets();
+      refreshDatasetsEvent();
     }, 2000);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [datasets, refreshDatasets]);
+  }, [datasets]);
 }
 
 function useDatasetFavoriteMutation(
