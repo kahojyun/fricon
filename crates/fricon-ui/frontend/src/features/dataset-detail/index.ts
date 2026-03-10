@@ -1,2 +1,2 @@
-export { DatasetDetailPage } from "./components/DatasetDetailPage";
-export { useDatasetDetailQuery } from "./queries/useDatasetDetailQuery";
+export { DatasetDetailPage } from "./ui/DatasetDetailPage";
+export { useDatasetDetailQuery } from "./api/useDatasetDetailQuery";

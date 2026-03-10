@@ -7,7 +7,7 @@ ci:
 exclude: |
   (?x)^(
     crates/fricon-ui/icons/.*|
-    crates/fricon-ui/frontend/src/lib/bindings\.ts|
+    crates/fricon-ui/frontend/src/shared/lib/bindings\.ts|
     crates/fricon-ui/frontend/src/routeTree\.gen\.ts|
     crates/fricon/src/database/schema\.rs
   )$

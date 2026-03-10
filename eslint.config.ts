@@ -16,8 +16,8 @@ export default defineConfig([
     "site/**",
     "target/**",
     "**/node_modules/**",
-    "**/src/lib/bindings.ts",
-    "crates/fricon-ui/frontend/src/components/ui/**",
+    "**/src/shared/lib/bindings.ts",
+    "crates/fricon-ui/frontend/src/shared/ui/**",
   ]),
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -41,7 +41,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.test.ts", "**/*.test.tsx", "src/test/**/*"],
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/src/shared/test/**/*"],
     languageOptions: {
       globals: {
         ...globals.browser,

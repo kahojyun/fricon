@@ -22,7 +22,7 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
    - strict-only checks last (dependency/license checks included)
 5. If Rust IPC signatures changed, run:
    - `pnpm --filter fricon-ui run gen:bindings`
-   - `git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts`
+   - `git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts`
 6. Re-run failed checks after fixes, then run the selected profile once end-to-end.
 7. Report results with explicit pass/fail status and any remaining risk.
 
@@ -30,7 +30,7 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 
 - Prefer `pnpm` and `uv` for package management commands.
 - Run `uv run maturin develop` before `uv run pytest` for Python binding tests.
-- Never hand-edit `crates/fricon-ui/frontend/src/lib/bindings.ts`; regenerate it.
+- Never hand-edit `crates/fricon-ui/frontend/src/shared/lib/bindings.ts`; regenerate it.
 
 ## Optional Alternatives
 

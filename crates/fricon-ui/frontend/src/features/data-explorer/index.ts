@@ -1,1 +1,1 @@
-export { DataViewer } from "./components/DataViewer";
+export { DataViewer } from "./ui/DataViewer";

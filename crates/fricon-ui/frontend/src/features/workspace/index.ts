@@ -1,1 +1,1 @@
-export { useWorkspaceInfoQuery } from "./queries/useWorkspaceInfoQuery";
+export { useWorkspaceInfoQuery } from "./api/useWorkspaceInfoQuery";
