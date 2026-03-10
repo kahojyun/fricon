@@ -221,6 +221,52 @@ describe("useDatasetTableData", () => {
     });
   });
 
+  it("does not reset visibleCount on the initial debounce window", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
+    });
+
+    expect(listDatasetsMock).toHaveBeenCalledTimes(2);
+  });
+
   it("resets the query limit when debounced filters change", async () => {
     listDatasetsMock
       .mockResolvedValueOnce([

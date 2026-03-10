@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   keepPreviousData,
   useMutation,
@@ -66,6 +66,31 @@ function buildDatasetListOptions(
   };
 }
 
+function areStringArraysEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function areSortingStatesEqual(a: SortingState, b: SortingState): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((entry, index) => {
+    const other = b[index];
+    return entry.id === other?.id && entry.desc === other?.desc;
+  });
+}
+
+function areDatasetQueryParamsEqual(
+  a: DatasetQueryParams,
+  b: DatasetQueryParams,
+): boolean {
+  return (
+    a.search === b.search &&
+    a.favoriteOnly === b.favoriteOnly &&
+    areStringArraysEqual(a.tags, b.tags) &&
+    areStringArraysEqual(a.statuses, b.statuses) &&
+    areSortingStatesEqual(a.sorting, b.sorting)
+  );
+}
+
 interface UseDatasetTableDataResult {
   datasets: DatasetInfo[];
   searchQuery: string;
@@ -131,17 +156,28 @@ function useDatasetTableFilters(): DatasetTableFiltersResult {
       statuses: selectedStatuses,
       sorting: sortingState,
     }));
+  const latestDebouncedQueryParamsRef = useRef(debouncedQueryParams);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedQueryParams({
+      const nextDebouncedQueryParams = {
         search: searchQuery,
         tags: selectedTags,
         favoriteOnly,
         statuses: selectedStatuses,
         sorting: sortingState,
-      });
-      setVisibleCount(DATASET_PAGE_SIZE);
+      };
+      const didQueryParamsChange = !areDatasetQueryParamsEqual(
+        latestDebouncedQueryParamsRef.current,
+        nextDebouncedQueryParams,
+      );
+
+      setDebouncedQueryParams(nextDebouncedQueryParams);
+      latestDebouncedQueryParamsRef.current = nextDebouncedQueryParams;
+
+      if (didQueryParamsChange) {
+        setVisibleCount(DATASET_PAGE_SIZE);
+      }
     }, 300);
     return () => {
       window.clearTimeout(timer);
