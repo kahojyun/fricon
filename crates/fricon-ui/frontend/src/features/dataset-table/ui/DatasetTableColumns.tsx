@@ -3,11 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Star, StarOff } from "lucide-react";
 import type { DatasetInfo, DatasetStatus } from "@/shared/lib/backend";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/shared/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 export interface DatasetColumnMeta {
   label: string;
