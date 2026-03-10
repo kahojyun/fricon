@@ -1,5 +1,10 @@
 import { useEffect, useEffectEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import {
   DATASET_PAGE_SIZE,
@@ -229,6 +234,7 @@ function useDatasetTableQuery(
           offset: 0,
         }),
       ),
+    placeholderData: keepPreviousData,
   });
 
   const datasets = datasetsQuery.data ?? [];
