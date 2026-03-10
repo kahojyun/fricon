@@ -41,7 +41,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.test.ts", "**/*.test.tsx", "src/shared/test/**/*"],
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/src/shared/test/**/*"],
     languageOptions: {
       globals: {
         ...globals.browser,
