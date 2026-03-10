@@ -243,7 +243,9 @@ function useDatasetTableQuery(
     await queryClient.invalidateQueries({ queryKey: datasetQueryKey });
   };
 
-  const hasMore = deriveHasMore(datasets.length, visibleCount);
+  const hasMore = datasetsQuery.isPlaceholderData
+    ? true
+    : deriveHasMore(datasets.length, visibleCount);
 
   const loadNextPage = () => {
     if (datasetsQuery.isFetching || !hasMore) return Promise.resolve();

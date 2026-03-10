@@ -182,6 +182,45 @@ describe("useDatasetTableData", () => {
     });
   });
 
+  it("keeps hasMore true while the next page is loading with placeholder data", async () => {
+    let resolveNextPage: ((value: DatasetInfo[]) => void) | undefined;
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockImplementationOnce(
+        () =>
+          new Promise<DatasetInfo[]>((resolve) => {
+            resolveNextPage = resolve;
+          }),
+      );
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.datasets).toHaveLength(3);
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(2);
+      expect(result.current.datasets).toHaveLength(3);
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    act(() => {
+      resolveNextPage?.([makeDataset({ id: 4 })]);
+    });
+  });
+
   it("resets the query limit when debounced filters change", async () => {
     listDatasetsMock
       .mockResolvedValueOnce([
