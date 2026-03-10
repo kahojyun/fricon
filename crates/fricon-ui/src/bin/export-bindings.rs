@@ -8,6 +8,7 @@ fn main() -> Result<()> {
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("frontend")
                 .join("src")
+                .join("shared")
                 .join("lib")
                 .join("bindings.ts")
         },

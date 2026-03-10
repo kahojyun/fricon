@@ -1,1 +1,1 @@
-export { ChartViewer } from "./components/ChartViewer";
+export { ChartViewer } from "./ui/ChartViewer";

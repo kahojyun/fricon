@@ -13,15 +13,15 @@ Use this skill only for work under `crates/fricon-ui` that crosses the Rust/Taur
 - App setup, tray, window lifecycle: `crates/fricon-ui/src/runtime.rs`
 - Tauri config: `crates/fricon-ui/tauri.conf.json`
 - Capabilities and permissions: `crates/fricon-ui/capabilities/default.json`
-- Frontend bridge and wire-to-domain normalization: `crates/fricon-ui/frontend/src/lib/backend.ts`
-- Generated bindings: `crates/fricon-ui/frontend/src/lib/bindings.ts`
+- Frontend bridge and wire-to-domain normalization: `crates/fricon-ui/frontend/src/shared/lib/backend.ts`
+- Generated bindings: `crates/fricon-ui/frontend/src/shared/lib/bindings.ts`
 
 ## Repo Rules
 
 - This repo uses Tauri v2 with `tauri-specta`; Rust is the type source of truth for exported commands, payloads, and events.
-- Do not edit `crates/fricon-ui/frontend/src/lib/bindings.ts` manually.
+- Do not edit `crates/fricon-ui/frontend/src/shared/lib/bindings.ts` manually.
 - Regenerate bindings with `pnpm --filter fricon-ui run gen:bindings` after Rust command or event signature changes.
-- Keep native-call wrappers and wire-to-domain normalization in `crates/fricon-ui/frontend/src/lib/backend.ts`.
+- Keep native-call wrappers and wire-to-domain normalization in `crates/fricon-ui/frontend/src/shared/lib/backend.ts`.
 - When a feature needs Tauri capabilities or plugin permissions, update `crates/fricon-ui/capabilities/default.json`.
 - Keep CI `fmt` lightweight. Do not move binding generation or Rust-compiling checks into `fmt`.
 
@@ -30,7 +30,7 @@ Use this skill only for work under `crates/fricon-ui` that crosses the Rust/Taur
 1. Decide whether the change is frontend-only or needs a Rust command/event.
 2. If IPC changes, update the Rust types first in `crates/fricon-ui/src/commands/`.
 3. If runtime behavior changes, inspect `crates/fricon-ui/src/runtime.rs` before adding new Tauri setup code.
-4. Keep the frontend integration behind `crates/fricon-ui/frontend/src/lib/backend.ts`.
+4. Keep the frontend integration behind `crates/fricon-ui/frontend/src/shared/lib/backend.ts`.
 5. Regenerate `bindings.ts` if command or event signatures changed.
 6. If the feature needs extra Tauri permissions, update `crates/fricon-ui/capabilities/default.json` and `tauri.conf.json` only as required by the concrete feature.
 

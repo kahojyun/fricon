@@ -1,1 +1,1 @@
-export { DatasetTable } from "./components/DatasetTable";
+export { DatasetTable } from "./ui/DatasetTable";

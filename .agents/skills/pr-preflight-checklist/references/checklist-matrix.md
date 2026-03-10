@@ -54,7 +54,7 @@ pnpm run test --run
 ### Tauri IPC changed
 ```bash
 pnpm --filter fricon-ui run gen:bindings
-git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts
+git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
 ```
 
 ### Route tree guard (when frontend router files changed)
@@ -109,7 +109,7 @@ git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ### Tauri IPC changed
 ```bash
 pnpm --filter fricon-ui run gen:bindings
-git diff --exit-code crates/fricon-ui/frontend/src/lib/bindings.ts
+git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
 ```
 
 ### Docs

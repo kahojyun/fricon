@@ -1,12 +1,12 @@
 import { useReducer } from "react";
-import type { FilterTableData } from "@/lib/backend";
+import type { FilterTableData } from "@/shared/lib/backend";
 import {
   cascadeReducer,
   initialCascadeState,
   resolveRow,
   type CascadeAction,
   type CascadeMode,
-} from "@/features/chart-viewer/hooks/cascadeReducer";
+} from "@/features/chart-viewer/model/cascadeReducer";
 
 export function useCascadeSelection(data?: FilterTableData | null) {
   const [state, dispatch] = useReducer(cascadeReducer, initialCascadeState);
