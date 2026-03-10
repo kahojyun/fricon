@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
-  type InfiniteData,
 } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import {
@@ -93,10 +91,27 @@ interface UseDatasetTableDataResult {
 
 const DEFAULT_SORTING: SortingState = [{ id: "id", desc: true }];
 
-export function useDatasetTableData(): UseDatasetTableDataResult {
-  const queryClient = useQueryClient();
-  const pendingRefreshRef = useRef(false);
-  const isRefreshingRef = useRef(false);
+interface DatasetTableFiltersResult {
+  searchQuery: string;
+  setSearchQuery: (next: string) => void;
+  selectedTags: string[];
+  selectedStatuses: DatasetStatus[];
+  favoriteOnly: boolean;
+  setFavoriteOnly: (next: boolean) => void;
+  tagFilterQuery: string;
+  setTagFilterQuery: (next: string) => void;
+  sorting: SortingState;
+  setSorting: (
+    updater: SortingState | ((prev: SortingState) => SortingState),
+  ) => void;
+  debouncedQueryParams: DatasetQueryParams;
+  handleTagToggle: (tag: string) => void;
+  handleStatusToggle: (status: DatasetStatus) => void;
+  clearFilters: () => void;
+  hasActiveFilters: boolean;
+}
+
+function useDatasetTableFilters(): DatasetTableFiltersResult {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<DatasetStatus[]>([]);
@@ -104,17 +119,6 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   const [tagFilterQuery, setTagFilterQuery] = useState("");
   const [sortingState, setSortingState] =
     useState<SortingState>(DEFAULT_SORTING);
-
-  const setSorting = (
-    updater: SortingState | ((prev: SortingState) => SortingState),
-  ) => {
-    setSortingState((prev) => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      const first = next[0];
-      return first ? [first] : [];
-    });
-  };
-
   const [debouncedQueryParams, setDebouncedQueryParams] =
     useState<DatasetQueryParams>(() => ({
       search: searchQuery,
@@ -139,88 +143,114 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     };
   }, [searchQuery, selectedTags, favoriteOnly, selectedStatuses, sortingState]);
 
+  const setSorting = (
+    updater: SortingState | ((prev: SortingState) => SortingState),
+  ) => {
+    setSortingState((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      const first = next[0];
+      return first ? [first] : [];
+    });
+  };
+
+  const handleTagToggle = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag],
+    );
+  };
+
+  const handleStatusToggle = (status: DatasetStatus) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status)
+        ? prev.filter((item) => item !== status)
+        : [...prev, status],
+    );
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedTags([]);
+    setSelectedStatuses([]);
+    setFavoriteOnly(false);
+    setTagFilterQuery("");
+  };
+
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 ||
+    favoriteOnly ||
+    selectedTags.length > 0 ||
+    selectedStatuses.length > 0;
+
+  return {
+    searchQuery,
+    setSearchQuery,
+    selectedTags,
+    selectedStatuses,
+    favoriteOnly,
+    setFavoriteOnly,
+    tagFilterQuery,
+    setTagFilterQuery,
+    sorting: sortingState,
+    setSorting,
+    debouncedQueryParams,
+    handleTagToggle,
+    handleStatusToggle,
+    clearFilters,
+    hasActiveFilters,
+  };
+}
+
+function useDatasetTableQuery(
+  queryParams: DatasetQueryParams,
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  const [visibleCount, setVisibleCount] = useState(DATASET_PAGE_SIZE);
+
   const datasetQueryKey = useMemo(
-    () => ["datasets", "list", debouncedQueryParams] as const,
-    [debouncedQueryParams],
+    () => ["datasets", "list", queryParams, visibleCount] as const,
+    [queryParams, visibleCount],
   );
 
-  const datasetsQuery = useInfiniteQuery({
+  const datasetsQuery = useQuery({
     queryKey: datasetQueryKey,
-    queryFn: ({ pageParam }) =>
+    queryFn: () =>
       listDatasets(
-        buildDatasetListOptions(debouncedQueryParams, {
-          limit: DATASET_PAGE_SIZE,
-          offset: pageParam,
+        buildDatasetListOptions(queryParams, {
+          limit: visibleCount,
+          offset: 0,
         }),
       ),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => {
-      if (!deriveHasMore(lastPage.length, DATASET_PAGE_SIZE)) {
-        return undefined;
-      }
-      return allPages.reduce((total, page) => total + page.length, 0);
-    },
   });
 
-  const datasets = useMemo(
-    () => datasetsQuery.data?.pages.flat() ?? [],
-    [datasetsQuery.data?.pages],
-  );
-
-  const getLoadedDatasetCount = useCallback(() => {
-    const cached =
-      queryClient.getQueryData<InfiniteData<DatasetInfo[], number>>(
-        datasetQueryKey,
-      );
-    return cached?.pages.reduce((total, page) => total + page.length, 0) ?? 0;
-  }, [queryClient, datasetQueryKey]);
+  const datasets = datasetsQuery.data ?? [];
 
   const refreshDatasets = useCallback(async () => {
-    if (
-      isRefreshingRef.current ||
-      queryClient.isFetching({ queryKey: datasetQueryKey }) > 0
-    ) {
-      pendingRefreshRef.current = true;
-      return;
-    }
+    await queryClient.invalidateQueries({ queryKey: datasetQueryKey });
+  }, [datasetQueryKey, queryClient]);
 
-    do {
-      pendingRefreshRef.current = false;
-      isRefreshingRef.current = true;
-      try {
-        const limit = Math.max(getLoadedDatasetCount(), DATASET_PAGE_SIZE);
-        const next = await listDatasets(
-          buildDatasetListOptions(debouncedQueryParams, { limit, offset: 0 }),
-        );
-        queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
-          datasetQueryKey,
-          {
-            pages: [next],
-            pageParams: [0],
-          },
-        );
-      } finally {
-        isRefreshingRef.current = false;
-      }
-    } while (pendingRefreshRef.current);
-  }, [
+  const hasMore = deriveHasMore(datasets.length, visibleCount);
+
+  const loadNextPage = () => {
+    if (datasetsQuery.isFetching || !hasMore) return Promise.resolve();
+    setVisibleCount((current) => current + DATASET_PAGE_SIZE);
+    return Promise.resolve();
+  };
+
+  return {
     datasetQueryKey,
-    queryClient,
-    getLoadedDatasetCount,
-    debouncedQueryParams,
-  ]);
+    datasetsQuery,
+    datasets,
+    hasMore,
+    refreshDatasets,
+    loadNextPage,
+  };
+}
 
-  useEffect(() => {
-    if (!pendingRefreshRef.current) return;
-    if (datasetsQuery.isFetching || isRefreshingRef.current) return;
-    void refreshDatasets();
-  }, [datasetsQuery.isFetching, refreshDatasets]);
-
-  const tagsQuery = useQuery({
-    queryKey: ["datasetTags"],
-    queryFn: listDatasetTags,
-  });
-
+function useDatasetTableRefreshSync(
+  datasets: DatasetInfo[],
+  refreshDatasets: () => Promise<void>,
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
   useEffect(() => {
     let unlistenCreated: (() => void) | undefined;
     let unlistenUpdated: (() => void) | undefined;
@@ -269,7 +299,13 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       window.clearInterval(timer);
     };
   }, [datasets, refreshDatasets]);
+}
 
+function useDatasetFavoriteMutation(
+  datasetQueryKey: readonly ["datasets", "list", DatasetQueryParams, number],
+  refreshDatasets: () => Promise<void>,
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
   const favoriteMutation = useMutation({
     mutationFn: ({ id, favorite }: { id: number; favorite: boolean }) =>
       updateDatasetFavorite(id, favorite),
@@ -277,27 +313,14 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
 
   const toggleFavorite = async (dataset: DatasetInfo) => {
     const nextFavorite = !dataset.favorite;
-    const previousData =
-      queryClient.getQueryData<InfiniteData<DatasetInfo[], number>>(
-        datasetQueryKey,
-      );
+    const previousData = queryClient.getQueryData<DatasetInfo[]>(datasetQueryKey);
 
-    queryClient.setQueryData<InfiniteData<DatasetInfo[], number>>(
-      datasetQueryKey,
-      (current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          pages: current.pages.map((page) =>
-            page.map((item) =>
-              item.id === dataset.id
-                ? { ...item, favorite: nextFavorite }
-                : item,
-            ),
-          ),
-        };
-      },
-    );
+    queryClient.setQueryData<DatasetInfo[]>(datasetQueryKey, (current) => {
+      if (!current) return current;
+      return current.map((item) =>
+        item.id === dataset.id ? { ...item, favorite: nextFavorite } : item,
+      );
+    });
 
     try {
       await favoriteMutation.mutateAsync({
@@ -316,68 +339,60 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     }
   };
 
+  return { toggleFavorite };
+}
+
+export function useDatasetTableData(): UseDatasetTableDataResult {
+  const queryClient = useQueryClient();
+  const filters = useDatasetTableFilters();
+  const {
+    datasetQueryKey,
+    datasets,
+    hasMore,
+    refreshDatasets,
+    loadNextPage,
+  } =
+    useDatasetTableQuery(filters.debouncedQueryParams, queryClient);
+
+  const tagsQuery = useQuery({
+    queryKey: ["datasetTags"],
+    queryFn: listDatasetTags,
+  });
+
+  useDatasetTableRefreshSync(datasets, refreshDatasets, queryClient);
+  const { toggleFavorite } = useDatasetFavoriteMutation(
+    datasetQueryKey,
+    refreshDatasets,
+    queryClient,
+  );
+
   const allTags = tagsQuery.data ?? [];
-  const normalizedTagFilterQuery = tagFilterQuery.trim().toLowerCase();
+  const normalizedTagFilterQuery = filters.tagFilterQuery.trim().toLowerCase();
   const filteredTagOptions = normalizedTagFilterQuery
     ? allTags.filter((tag) =>
         tag.toLowerCase().includes(normalizedTagFilterQuery),
       )
     : allTags;
 
-  const hasActiveFilters =
-    searchQuery.trim().length > 0 ||
-    favoriteOnly ||
-    selectedTags.length > 0 ||
-    selectedStatuses.length > 0;
-
-  const handleTagToggle = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag],
-    );
-  };
-
-  const handleStatusToggle = (status: DatasetStatus) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(status)
-        ? prev.filter((item) => item !== status)
-        : [...prev, status],
-    );
-  };
-
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedTags([]);
-    setSelectedStatuses([]);
-    setFavoriteOnly(false);
-    setTagFilterQuery("");
-  };
-
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = datasetsQuery;
-
-  const loadNextPage = async () => {
-    if (!hasNextPage || isFetchingNextPage) return;
-    await fetchNextPage();
-  };
-
   return {
     datasets,
-    searchQuery,
-    setSearchQuery,
-    selectedTags,
-    selectedStatuses,
-    tagFilterQuery,
-    setTagFilterQuery,
-    sorting: sortingState,
-    setSorting,
+    searchQuery: filters.searchQuery,
+    setSearchQuery: filters.setSearchQuery,
+    selectedTags: filters.selectedTags,
+    selectedStatuses: filters.selectedStatuses,
+    tagFilterQuery: filters.tagFilterQuery,
+    setTagFilterQuery: filters.setTagFilterQuery,
+    sorting: filters.sorting,
+    setSorting: filters.setSorting,
     filteredTagOptions,
-    favoriteOnly,
-    setFavoriteOnly,
-    hasMore: Boolean(hasNextPage),
-    hasActiveFilters,
+    favoriteOnly: filters.favoriteOnly,
+    setFavoriteOnly: filters.setFavoriteOnly,
+    hasMore,
+    hasActiveFilters: filters.hasActiveFilters,
     toggleFavorite,
-    handleTagToggle,
-    handleStatusToggle,
-    clearFilters,
+    handleTagToggle: filters.handleTagToggle,
+    handleStatusToggle: filters.handleStatusToggle,
+    clearFilters: filters.clearFilters,
     loadNextPage,
   };
 }

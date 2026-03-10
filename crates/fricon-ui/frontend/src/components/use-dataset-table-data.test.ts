@@ -84,7 +84,9 @@ describe("useDatasetTableData", () => {
   it("loads datasets with default query params", async () => {
     listDatasetsMock.mockResolvedValueOnce([makeDataset()]);
 
-    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
+    renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledWith({
@@ -135,7 +137,7 @@ describe("useDatasetTableData", () => {
     });
   });
 
-  it("appends next page with offset based on current dataset count", async () => {
+  it("expands query limit when loading the next page", async () => {
     listDatasetsMock
       .mockResolvedValueOnce([
         makeDataset({ id: 1 }),
@@ -175,8 +177,8 @@ describe("useDatasetTableData", () => {
       statuses: [],
       sortBy: "id",
       sortDir: "desc",
-      limit: 3,
-      offset: 3,
+      limit: 6,
+      offset: 0,
     });
   });
 
@@ -190,7 +192,9 @@ describe("useDatasetTableData", () => {
       .mockResolvedValueOnce([makeDataset({ id: 1 })])
       .mockResolvedValueOnce([makeDataset({ id: 2 })]);
 
-    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
+    renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledTimes(1);
@@ -205,7 +209,7 @@ describe("useDatasetTableData", () => {
     });
   });
 
-  it("queues refresh until in-flight list query completes", async () => {
+  it("does not enqueue an extra refetch when invalidating an in-flight request", async () => {
     let createdCallback: ((event: DatasetInfo) => void) | undefined;
     onDatasetCreatedMock.mockImplementation((callback) => {
       createdCallback = callback;
@@ -222,7 +226,9 @@ describe("useDatasetTableData", () => {
       )
       .mockResolvedValueOnce([makeDataset({ id: 2 })]);
 
-    renderHook(() => useDatasetTableData(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(listDatasetsMock).toHaveBeenCalledTimes(1);
@@ -239,8 +245,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenCalledTimes(2);
+      expect(result.current.datasets).toHaveLength(1);
     });
+
+    expect(listDatasetsMock).toHaveBeenCalledTimes(1);
   });
 
   it("rolls back optimistic favorite update when backend update fails", async () => {
