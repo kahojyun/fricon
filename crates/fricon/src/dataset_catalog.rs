@@ -1,4 +1,3 @@
-mod db;
 mod events;
 mod query;
 mod service;

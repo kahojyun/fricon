@@ -1,9 +1,5 @@
 //! Command line interface
 
-mod help;
-mod parse;
-mod types;
-
 use std::{
     io::{IsTerminal, stderr, stdout},
     path::{self, PathBuf},

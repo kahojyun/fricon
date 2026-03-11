@@ -4,23 +4,12 @@ mod desktop_runtime;
 mod filter_data;
 mod launch;
 mod tauri_api;
-mod workspace_session;
 
 use anyhow::Result;
 
 #[expect(unused_imports, reason = "Compatibility shim for internal tests")]
 mod logging {
     pub(crate) use crate::desktop_runtime::logging::*;
-}
-
-mod models {
-    pub(crate) mod chart {
-        pub(crate) use crate::chart_data::*;
-    }
-
-    pub(crate) mod filter {
-        pub(crate) use crate::filter_data::*;
-    }
 }
 
 mod runtime {

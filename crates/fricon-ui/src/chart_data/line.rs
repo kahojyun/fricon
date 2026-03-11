@@ -196,7 +196,7 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::*;
-    use crate::models::chart::ChartCommonOptions;
+    use crate::chart_data::ChartCommonOptions;
 
     #[test]
     fn test_build_line_series_numeric() {

@@ -21,7 +21,6 @@ mod dataset_manager;
 mod proto;
 pub mod runtime;
 mod storage;
-mod support;
 mod transport;
 mod utils;
 pub mod workspace;

@@ -2,11 +2,11 @@ use anyhow::Context;
 use fricon::{DatasetDataType, DatasetSchema};
 
 use crate::{
-    dataset_browser::types::TauriCommandError,
-    models::chart::{
-    DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
-    ScatterChartDataOptions, ScatterModeOptions,
+    chart_data::{
+        DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
+        ScatterChartDataOptions, ScatterModeOptions,
     },
+    dataset_browser::types::TauriCommandError,
 };
 
 fn column_index(schema: &DatasetSchema, name: &str) -> Result<usize, TauriCommandError> {
@@ -128,7 +128,7 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::build_chart_selected_columns;
-    use crate::models::chart::{
+    use crate::chart_data::{
         ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
         ScatterChartDataOptions, ScatterModeOptions,
     };

@@ -6,7 +6,7 @@ use tauri::State;
 use tracing::instrument;
 
 use super::{AppState, TauriCommandError};
-use crate::models::filter::{DataInternal, TableData, process_filter_rows};
+use crate::filter_data::{DataInternal, TableData, process_filter_rows};
 
 #[derive(serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
