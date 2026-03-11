@@ -11,6 +11,7 @@ use futures::prelude::*;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::windows::named_pipe::{ClientOptions, NamedPipeClient, NamedPipeServer, ServerOptions},
+    runtime::Handle,
 };
 use tonic::transport::server::Connected;
 use tracing::{debug, error};
@@ -82,7 +83,9 @@ pub(crate) async fn connect(path: impl AsRef<Path>) -> Result<NamedPipeClient, C
 
 pub(crate) fn listen(
     path: impl Into<PathBuf>,
+    runtime: &Handle,
 ) -> io::Result<impl Stream<Item = io::Result<NamedPipeConnector>> + 'static> {
+    let _guard = runtime.enter();
     let socket_path = path.into();
 
     // Generate a new UUID for this server instance

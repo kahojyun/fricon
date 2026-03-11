@@ -19,6 +19,7 @@ mod tests {
     use futures::StreamExt;
     use tempfile::tempdir;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::runtime::Handle;
 
     use super::*;
     use crate::transport::ipc::error::ConnectError;
@@ -28,7 +29,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("fricon.sock");
         {
-            let server = listen(&path).unwrap();
+            let server = listen(&path, &Handle::current()).unwrap();
             let mut client = connect(&path).await.unwrap();
 
             let server_task = tokio::spawn(async move {

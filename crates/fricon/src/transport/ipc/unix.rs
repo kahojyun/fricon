@@ -7,6 +7,7 @@ use std::{
 };
 
 use futures::{Stream, StreamExt};
+use tokio::runtime::Handle;
 use tokio::net::{UnixListener, UnixStream};
 use tokio_stream::wrappers::UnixListenerStream;
 use tracing::debug;
@@ -20,7 +21,8 @@ pub(crate) async fn connect(path: impl AsRef<Path>) -> Result<UnixStream, Connec
     })
 }
 
-pub(crate) fn listen(path: impl Into<PathBuf>) -> io::Result<IpcListenerStream> {
+pub(crate) fn listen(path: impl Into<PathBuf>, runtime: &Handle) -> io::Result<IpcListenerStream> {
+    let _guard = runtime.enter();
     let path = path.into();
     if let Ok(metadata) = fs::metadata(&path) {
         if metadata.file_type().is_socket() {
@@ -77,6 +79,8 @@ impl Drop for IpcListenerStream {
 
 #[cfg(test)]
 mod tests {
+    use tokio::runtime::Handle;
+
     use super::*;
 
     #[tokio::test]
@@ -85,14 +89,14 @@ mod tests {
         let socket_path = temp_dir.path().join("test_socket.sock");
 
         // Create the first listener
-        let listener1 = listen(&socket_path).unwrap();
+        let listener1 = listen(&socket_path, &Handle::current()).unwrap();
         let inode1 = fs::metadata(&socket_path).unwrap().ino();
         assert!(socket_path.exists());
         assert_eq!(listener1.inode, inode1);
 
         // Create the second listener at the same path
         // This will cause the old file to be removed and a new one created.
-        let listener2 = listen(&socket_path).unwrap();
+        let listener2 = listen(&socket_path, &Handle::current()).unwrap();
         let inode2 = fs::metadata(&socket_path).unwrap().ino();
         assert!(socket_path.exists());
         assert_eq!(listener2.inode, inode2);

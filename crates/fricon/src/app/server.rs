@@ -29,7 +29,7 @@ pub(crate) fn start(
         cancellation_token.clone(),
     );
     let service = DatasetServiceServer::new(storage);
-    let listener = ipc::listen(ipc_file)?;
+    let listener = ipc::listen(ipc_file, runtime)?;
 
     info!("Starting gRPC server");
     task_tracker.spawn_on(
