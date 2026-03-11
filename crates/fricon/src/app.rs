@@ -15,10 +15,10 @@ use tracing::{error, info, instrument};
 
 pub use crate::dataset::events::AppEvent;
 use crate::{
+    database::{core, dataset as database_dataset},
     dataset::{
         DatasetCatalogService, DatasetIngestService, DatasetReadService,
         ingest::WriteSessionRegistry,
-        sqlite::{self, Pool},
     },
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
@@ -47,22 +47,23 @@ impl AppState {
         let tracker = TaskTracker::new();
         let (event_sender, _) = broadcast::channel(1000);
         let write_sessions = WriteSessionRegistry::new();
+        let dataset_repository = Arc::new(database_dataset::DatasetRepository::new(database));
 
         let dataset_catalog = DatasetCatalogService::new(
-            database.clone(),
+            dataset_repository.clone(),
             root.paths().clone(),
             event_sender.clone(),
             tracker.clone(),
         );
         let dataset_ingest = DatasetIngestService::new(
-            database.clone(),
+            dataset_repository.clone(),
             root.paths().clone(),
             event_sender.clone(),
             write_sessions.clone(),
             tracker.clone(),
         );
         let dataset_read = DatasetReadService::new(
-            database,
+            dataset_repository,
             root.paths().clone(),
             write_sessions,
             tracker.clone(),
@@ -80,15 +81,15 @@ impl AppState {
     }
 }
 
-fn init_database(root: &WorkspaceRoot) -> Result<Pool> {
+fn init_database(root: &WorkspaceRoot) -> Result<core::Pool> {
     let db_path = root.paths().database_file();
     let backup_path = root
         .paths()
         .database_backup_file(Local::now().naive_local());
     info!(path = ?root.paths().root(), "Initializing app state");
-    let database = sqlite::connect(db_path, backup_path)?;
+    let database = core::connect(db_path, backup_path)?;
 
-    if let Err(e) = sqlite::cleanup_writing_datasets(&database) {
+    if let Err(e) = database_dataset::cleanup_writing_datasets(&database) {
         error!(error = %e, "Failed to cleanup writing datasets");
     }
 

@@ -1,4 +1,9 @@
-use tokio::{sync::broadcast, task::JoinHandle};
+use std::sync::Arc;
+
+use tokio::{
+    sync::{broadcast, mpsc},
+    task::JoinHandle,
+};
 use tokio_util::task::TaskTracker;
 use tracing::error;
 
@@ -6,17 +11,17 @@ use crate::{
     dataset::{
         events::AppEvent,
         ingest::{
-            CreateDatasetRequest, CreateIngestEvent, IngestError, WriteSessionRegistry, create,
+            CreateDatasetRequest, CreateIngestEvent, DatasetIngestRepository, IngestError,
+            WriteSessionRegistry, create,
         },
         model::DatasetRecord,
-        sqlite::Pool,
     },
     workspace::WorkspacePaths,
 };
 
 #[derive(Clone)]
 pub struct DatasetIngestService {
-    database: Pool,
+    repository: Arc<dyn DatasetIngestRepository>,
     paths: WorkspacePaths,
     event_sender: broadcast::Sender<AppEvent>,
     write_sessions: WriteSessionRegistry,
@@ -26,14 +31,14 @@ pub struct DatasetIngestService {
 impl DatasetIngestService {
     #[must_use]
     pub(crate) fn new(
-        database: Pool,
+        repository: Arc<dyn DatasetIngestRepository>,
         paths: WorkspacePaths,
         event_sender: broadcast::Sender<AppEvent>,
         write_sessions: WriteSessionRegistry,
         tracker: TaskTracker,
     ) -> Self {
         Self {
-            database,
+            repository,
             paths,
             event_sender,
             write_sessions,
@@ -52,9 +57,9 @@ impl DatasetIngestService {
     pub async fn create_dataset(
         &self,
         request: CreateDatasetRequest,
-        events_rx: tokio::sync::mpsc::Receiver<CreateIngestEvent>,
+        events_rx: mpsc::Receiver<CreateIngestEvent>,
     ) -> Result<DatasetRecord, IngestError> {
-        let database = self.database.clone();
+        let repository = Arc::clone(&self.repository);
         let paths = self.paths.clone();
         let event_sender = self.event_sender.clone();
         let write_sessions = self.write_sessions.clone();
@@ -62,11 +67,11 @@ impl DatasetIngestService {
 
         self.spawn_blocking(move || {
             create::create_dataset_with(
-                &database,
+                &*repository,
                 &paths,
                 &event_sender,
                 &write_sessions,
-                request,
+                &request,
                 events_rx,
             )
             .inspect_err(|e| {

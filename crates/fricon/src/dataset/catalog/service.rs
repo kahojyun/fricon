@@ -1,20 +1,22 @@
+use std::sync::Arc;
+
 use tokio::{sync::broadcast, task::JoinHandle};
 use tokio_util::task::TaskTracker;
 use tracing::{error, instrument};
 
 use crate::{
     dataset::{
-        catalog::{CatalogError, mutate, query},
+        catalog::{CatalogError, DatasetCatalogRepository},
         events::{AppEvent, dataset_updated_event},
         model::{DatasetId, DatasetListQuery, DatasetRecord, DatasetUpdate},
-        sqlite::Pool,
+        storage,
     },
     workspace::WorkspacePaths,
 };
 
 #[derive(Clone)]
 pub struct DatasetCatalogService {
-    database: Pool,
+    repository: Arc<dyn DatasetCatalogRepository>,
     paths: WorkspacePaths,
     event_sender: broadcast::Sender<AppEvent>,
     tracker: TaskTracker,
@@ -23,13 +25,13 @@ pub struct DatasetCatalogService {
 impl DatasetCatalogService {
     #[must_use]
     pub(crate) fn new(
-        database: Pool,
+        repository: Arc<dyn DatasetCatalogRepository>,
         paths: WorkspacePaths,
         event_sender: broadcast::Sender<AppEvent>,
         tracker: TaskTracker,
     ) -> Self {
         Self {
-            database,
+            repository,
             paths,
             event_sender,
             tracker,
@@ -46,8 +48,8 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, id), fields(dataset.id = ?id))]
     pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, CatalogError> {
-        let database = self.database.clone();
-        self.spawn_blocking(move || query::do_get_dataset(&mut *database.get()?, id))
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.get_dataset(id))
             .await?
     }
 
@@ -56,15 +58,15 @@ impl DatasetCatalogService {
         &self,
         query_options: DatasetListQuery,
     ) -> Result<Vec<DatasetRecord>, CatalogError> {
-        let database = self.database.clone();
-        self.spawn_blocking(move || query::do_list_datasets(&mut *database.get()?, &query_options))
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.list_datasets(query_options))
             .await?
     }
 
     #[instrument(skip(self))]
     pub async fn list_dataset_tags(&self) -> Result<Vec<String>, CatalogError> {
-        let database = self.database.clone();
-        self.spawn_blocking(move || query::do_list_dataset_tags(&mut *database.get()?))
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.list_dataset_tags())
             .await?
     }
 
@@ -74,12 +76,11 @@ impl DatasetCatalogService {
         id: i32,
         update_payload: DatasetUpdate,
     ) -> Result<(), CatalogError> {
-        let database = self.database.clone();
+        let repository = Arc::clone(&self.repository);
         let event_sender = self.event_sender.clone();
         self.spawn_blocking(move || {
-            let mut conn = database.get()?;
-            mutate::do_update_dataset(&mut conn, id, update_payload)?;
-            let record = query::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+            repository.update_dataset(id, update_payload)?;
+            let record = repository.get_dataset(DatasetId::Id(id))?;
             let _ = event_sender.send(dataset_updated_event(record));
             Ok(())
         })
@@ -88,12 +89,11 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
     pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), CatalogError> {
-        let database = self.database.clone();
+        let repository = Arc::clone(&self.repository);
         let event_sender = self.event_sender.clone();
         self.spawn_blocking(move || {
-            let mut conn = database.get()?;
-            mutate::do_add_tags(&mut conn, id, &tags)?;
-            let record = query::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+            repository.add_tags(id, &tags)?;
+            let record = repository.get_dataset(DatasetId::Id(id))?;
             let _ = event_sender.send(dataset_updated_event(record));
             Ok(())
         })
@@ -102,12 +102,11 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
     pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), CatalogError> {
-        let database = self.database.clone();
+        let repository = Arc::clone(&self.repository);
         let event_sender = self.event_sender.clone();
         self.spawn_blocking(move || {
-            let mut conn = database.get()?;
-            mutate::do_remove_tags(&mut conn, id, &tags)?;
-            let record = query::do_get_dataset(&mut conn, DatasetId::Id(id))?;
+            repository.remove_tags(id, &tags)?;
+            let record = repository.get_dataset(DatasetId::Id(id))?;
             let _ = event_sender.send(dataset_updated_event(record));
             Ok(())
         })
@@ -116,12 +115,16 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self), fields(dataset.id = id))]
     pub async fn delete_dataset(&self, id: i32) -> Result<(), CatalogError> {
-        let database = self.database.clone();
+        let repository = Arc::clone(&self.repository);
         let paths = self.paths.clone();
         self.spawn_blocking(move || {
-            mutate::do_delete_dataset(&database, &paths, id).inspect_err(|e| {
+            let record = repository.get_dataset(DatasetId::Id(id))?;
+            repository.delete_dataset(id)?;
+            let dataset_path = paths.dataset_path_from_uid(record.metadata.uid);
+            storage::delete_dataset(&dataset_path).inspect_err(|e| {
                 error!(error = %e, dataset.id = id, "Dataset deletion failed");
-            })
+            })?;
+            Ok(())
         })
         .await?
     }

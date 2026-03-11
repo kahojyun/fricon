@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio::task::JoinHandle;
 use tokio_util::task::TaskTracker;
 use tracing::instrument;
@@ -6,15 +8,14 @@ use crate::{
     dataset::{
         ingest::WriteSessionRegistry,
         model::DatasetId,
-        read::{DatasetReader, ReadError, access},
-        sqlite::Pool,
+        read::{DatasetReadRepository, DatasetReader, ReadError, access},
     },
     workspace::WorkspacePaths,
 };
 
 #[derive(Clone)]
 pub struct DatasetReadService {
-    database: Pool,
+    repository: Arc<dyn DatasetReadRepository>,
     paths: WorkspacePaths,
     write_sessions: WriteSessionRegistry,
     tracker: TaskTracker,
@@ -23,13 +24,13 @@ pub struct DatasetReadService {
 impl DatasetReadService {
     #[must_use]
     pub(crate) fn new(
-        database: Pool,
+        repository: Arc<dyn DatasetReadRepository>,
         paths: WorkspacePaths,
         write_sessions: WriteSessionRegistry,
         tracker: TaskTracker,
     ) -> Self {
         Self {
-            database,
+            repository,
             paths,
             write_sessions,
             tracker,
@@ -46,11 +47,11 @@ impl DatasetReadService {
 
     #[instrument(skip(self, id), fields(dataset.id = ?id))]
     pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, ReadError> {
-        let database = self.database.clone();
+        let repository = Arc::clone(&self.repository);
         let paths = self.paths.clone();
         let write_sessions = self.write_sessions.clone();
         self.spawn_blocking(move || {
-            access::get_dataset_reader(&database, &paths, &write_sessions, id)
+            access::get_dataset_reader(&*repository, &paths, &write_sessions, id)
         })
         .await?
     }

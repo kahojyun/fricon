@@ -1,27 +1,15 @@
-use diesel::result::Error as DieselError;
 use tokio::task::JoinError;
 
-use crate::dataset::{sqlite::DatabaseError, storage::error::DatasetFsError};
+use crate::dataset::storage::error::DatasetFsError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CatalogError {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
     #[error(transparent)]
-    Database(#[from] DatabaseError),
-    #[error(transparent)]
     DatasetFs(#[from] DatasetFsError),
     #[error(transparent)]
     TaskJoin(#[from] JoinError),
-}
-
-impl From<DieselError> for CatalogError {
-    fn from(error: DieselError) -> Self {
-        match error {
-            DieselError::NotFound => Self::NotFound {
-                id: "unknown".to_string(),
-            },
-            other => Self::Database(other.into()),
-        }
-    }
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
 }

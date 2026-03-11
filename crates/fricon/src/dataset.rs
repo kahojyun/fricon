@@ -4,7 +4,6 @@ pub mod ingest;
 pub mod model;
 pub mod read;
 pub mod schema;
-pub(crate) mod sqlite;
 pub mod storage;
 
 pub use self::{

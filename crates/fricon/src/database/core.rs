@@ -1,8 +1,3 @@
-mod models;
-#[rustfmt::skip]
-pub(crate) mod schema;
-mod types;
-
 use std::{
     error::Error as StdError,
     path::{Path, PathBuf},
@@ -12,7 +7,6 @@ use diesel::{
     RunQueryDsl, SqliteConnection,
     connection::SimpleConnection,
     migration::MigrationSource,
-    prelude::*,
     r2d2,
     r2d2::{ConnectionManager, CustomizeConnection},
     result::Error as DieselError,
@@ -23,15 +17,8 @@ use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use thiserror::Error;
 use tracing::info;
 
-pub(crate) use self::{
-    models::{Dataset, DatasetTag, DatasetUpdate, NewDataset, Tag},
-    types::SimpleUuid,
-};
-pub(crate) use crate::dataset::model::DatasetStatus;
-use crate::dataset::model::{DatasetMetadata, DatasetRecord};
-
 #[derive(Debug, Error)]
-pub enum DatabaseError {
+pub(crate) enum DatabaseError {
     #[error("Invalid backup path encoding.")]
     InvalidBackupPath,
     #[error("Migration failed: {0}")]
@@ -121,42 +108,4 @@ fn backup_database(conn: &mut SqliteConnection, backup_path: &Path) -> Result<()
         .bind::<Text, _>(backup_path_str)
         .execute(conn)?;
     Ok(())
-}
-
-/// Updates all datasets with 'writing' status to 'aborted' status
-/// This should be called during service startup to handle interrupted writes
-pub(crate) fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, DatabaseError> {
-    use self::schema::datasets::dsl::{datasets, status};
-
-    let mut conn = pool.get()?;
-    let updated_count = diesel::update(datasets.filter(status.eq(DatasetStatus::Writing)))
-        .set(status.eq(DatasetStatus::Aborted))
-        .execute(&mut conn)?;
-
-    if updated_count > 0 {
-        info!(
-            "Updated {} datasets from 'writing' to 'aborted' status",
-            updated_count
-        );
-    }
-
-    Ok(updated_count)
-}
-
-#[must_use]
-pub(crate) fn dataset_record_from_models(dataset: Dataset, tags: Vec<Tag>) -> DatasetRecord {
-    let metadata = DatasetMetadata {
-        uid: dataset.uid.0,
-        name: dataset.name,
-        description: dataset.description,
-        favorite: dataset.favorite,
-        status: dataset.status,
-        created_at: dataset.created_at.and_utc(),
-        tags: tags.into_iter().map(|tag| tag.name).collect(),
-    };
-
-    DatasetRecord {
-        id: dataset.id,
-        metadata,
-    }
 }

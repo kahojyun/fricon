@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use diesel::{SqliteConnection, prelude::*};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
@@ -9,58 +8,14 @@ use crate::{
     dataset::{
         events::AppEvent,
         ingest::{
-            CreateDatasetRequest, CreateIngestEvent, CreateTerminal, IngestError,
-            WriteSessionGuard, WriteSessionRegistry,
+            CreateDatasetRequest, CreateIngestEvent, CreateTerminal, DatasetIngestRepository,
+            IngestError, WriteSessionGuard, WriteSessionRegistry,
         },
         model::{DatasetId, DatasetRecord, DatasetStatus},
-        sqlite::{self, NewDataset, Pool, SimpleUuid, schema},
         storage,
     },
     workspace::WorkspacePaths,
 };
-
-#[cfg_attr(test, mockall::automock)]
-pub(super) trait DatasetRepo {
-    fn create_dataset_record(
-        &self,
-        request: &CreateDatasetRequest,
-        uid: Uuid,
-    ) -> Result<(sqlite::Dataset, Vec<sqlite::Tag>), IngestError>;
-    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), IngestError>;
-    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, IngestError>;
-}
-
-impl DatasetRepo for Pool {
-    fn create_dataset_record(
-        &self,
-        request: &CreateDatasetRequest,
-        uid: Uuid,
-    ) -> Result<(sqlite::Dataset, Vec<sqlite::Tag>), IngestError> {
-        create_dataset_db_record(&mut *self.get()?, request, uid)
-    }
-
-    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), IngestError> {
-        let mut conn = self.get()?;
-        sqlite::Dataset::update_status(&mut conn, id, status)?;
-        Ok(())
-    }
-
-    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, IngestError> {
-        let mut conn = self.get()?;
-        let dataset = match id {
-            DatasetId::Id(dataset_id) => sqlite::Dataset::find_by_id(&mut conn, dataset_id)?,
-            DatasetId::Uid(uid) => sqlite::Dataset::find_by_uid(&mut conn, uid)?,
-        }
-        .ok_or_else(|| IngestError::NotFound {
-            id: match id {
-                DatasetId::Id(value) => value.to_string(),
-                DatasetId::Uid(value) => value.to_string(),
-            },
-        })?;
-        let tags = dataset.load_tags(&mut conn)?;
-        Ok(sqlite::dataset_record_from_models(dataset, tags))
-    }
-}
 
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait DatasetStore {
@@ -136,11 +91,11 @@ pub(super) fn create_dataset_with<R, S, E, W>(
     store: &S,
     events: &E,
     write_sessions: &W,
-    request: CreateDatasetRequest,
+    request: &CreateDatasetRequest,
     mut events_rx: mpsc::Receiver<CreateIngestEvent>,
 ) -> Result<DatasetRecord, IngestError>
 where
-    R: DatasetRepo,
+    R: DatasetIngestRepository + ?Sized,
     S: DatasetStore,
     E: DatasetEvents,
     W: WriteSessions,
@@ -148,20 +103,18 @@ where
     let uid = Uuid::new_v4();
     let dataset_path = store.create_dataset_dir(uid)?;
 
-    let (dataset, tags) = repo.create_dataset_record(&request, uid)?;
-    info!(dataset.id = dataset.id, %uid, name = %request.name, "Dataset record created");
+    let dataset_record = repo.create_dataset_record(request, uid)?;
+    info!(dataset.id = dataset_record.id, %uid, name = %request.name, "Dataset record created");
 
     events.send_dataset_created(AppEvent::DatasetCreated {
-        id: dataset.id,
-        name: request.name,
-        description: request.description,
-        favorite: dataset.favorite,
-        tags: request.tags,
-        status: dataset.status,
-        created_at: dataset.created_at.and_utc(),
+        id: dataset_record.id,
+        name: dataset_record.metadata.name.clone(),
+        description: dataset_record.metadata.description.clone(),
+        favorite: dataset_record.metadata.favorite,
+        tags: dataset_record.metadata.tags.clone(),
+        status: dataset_record.metadata.status,
+        created_at: dataset_record.metadata.created_at,
     });
-
-    let dataset_record = sqlite::dataset_record_from_models(dataset, tags);
 
     let mut session = None;
     let terminal = loop {
@@ -211,35 +164,4 @@ where
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
     }
-}
-
-pub(super) fn create_dataset_db_record(
-    conn: &mut SqliteConnection,
-    request: &CreateDatasetRequest,
-    uid: Uuid,
-) -> Result<(sqlite::Dataset, Vec<sqlite::Tag>), IngestError> {
-    conn.immediate_transaction(|conn| {
-        let new_dataset = NewDataset {
-            uid: SimpleUuid(uid),
-            name: &request.name,
-            description: &request.description,
-            status: DatasetStatus::Writing,
-        };
-
-        let dataset = diesel::insert_into(schema::datasets::table)
-            .values(new_dataset)
-            .returning(sqlite::Dataset::as_returning())
-            .get_result(conn)?;
-
-        let tags = if request.tags.is_empty() {
-            vec![]
-        } else {
-            let created_tags = sqlite::Tag::find_or_create_batch(conn, &request.tags)?;
-            let tag_ids: Vec<i32> = created_tags.iter().map(|tag| tag.id).collect();
-            sqlite::DatasetTag::create_associations(conn, dataset.id, &tag_ids)?;
-            created_tags
-        };
-
-        Ok((dataset, tags))
-    })
 }

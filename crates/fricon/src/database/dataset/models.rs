@@ -5,22 +5,26 @@ use diesel::{
 };
 use uuid::Uuid;
 
-use super::{DatasetStatus, SimpleUuid, schema};
+use super::types::{DbDatasetStatus, SimpleUuid};
+use crate::database::schema;
 
 #[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = schema::datasets, check_for_backend(Sqlite))]
-pub struct Dataset {
-    pub id: i32,
-    pub uid: SimpleUuid,
-    pub name: String,
-    pub description: String,
-    pub favorite: bool,
-    pub status: DatasetStatus,
-    pub created_at: NaiveDateTime,
+pub(super) struct Dataset {
+    pub(super) id: i32,
+    pub(super) uid: SimpleUuid,
+    pub(super) name: String,
+    pub(super) description: String,
+    pub(super) favorite: bool,
+    pub(super) status: DbDatasetStatus,
+    pub(super) created_at: NaiveDateTime,
 }
 
 impl Dataset {
-    pub fn find_by_id(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<Option<Self>> {
+    pub(super) fn find_by_id(
+        conn: &mut SqliteConnection,
+        dataset_id: i32,
+    ) -> QueryResult<Option<Self>> {
         use schema::datasets::dsl::datasets;
 
         datasets
@@ -30,7 +34,7 @@ impl Dataset {
             .optional()
     }
 
-    pub fn find_by_uid(
+    pub(super) fn find_by_uid(
         conn: &mut SqliteConnection,
         dataset_uid: Uuid,
     ) -> QueryResult<Option<Self>> {
@@ -43,33 +47,10 @@ impl Dataset {
             .optional()
     }
 
-    pub fn list_all_ordered(conn: &mut SqliteConnection) -> QueryResult<Vec<Self>> {
-        use schema::datasets::dsl::{datasets, id};
-
-        datasets
-            .order(id.desc())
-            .select(Self::as_select())
-            .load(conn)
-    }
-
-    pub fn list_by_name_ordered(
-        conn: &mut SqliteConnection,
-        search: &str,
-    ) -> QueryResult<Vec<Self>> {
-        use schema::datasets::dsl::{datasets, id, name};
-
-        let pattern = format!("%{search}%");
-        datasets
-            .filter(name.like(pattern))
-            .order(id.desc())
-            .select(Self::as_select())
-            .load(conn)
-    }
-
-    pub fn update_status(
+    pub(super) fn update_status(
         conn: &mut SqliteConnection,
         dataset_id: i32,
-        new_status: DatasetStatus,
+        new_status: DbDatasetStatus,
     ) -> QueryResult<usize> {
         use schema::datasets::dsl::{datasets, status};
 
@@ -78,7 +59,7 @@ impl Dataset {
             .execute(conn)
     }
 
-    pub fn update_metadata(
+    pub(super) fn update_metadata(
         conn: &mut SqliteConnection,
         dataset_id: i32,
         update: &DatasetUpdate,
@@ -90,13 +71,16 @@ impl Dataset {
             .execute(conn)
     }
 
-    pub fn delete_from_db(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<usize> {
+    pub(super) fn delete_from_db(
+        conn: &mut SqliteConnection,
+        dataset_id: i32,
+    ) -> QueryResult<usize> {
         use schema::datasets::dsl::datasets;
 
         diesel::delete(datasets.find(dataset_id)).execute(conn)
     }
 
-    pub fn load_tags(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Tag>> {
+    pub(super) fn load_tags(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Tag>> {
         DatasetTag::belonging_to(self)
             .inner_join(schema::tags::table)
             .select(Tag::as_select())
@@ -106,40 +90,31 @@ impl Dataset {
 
 #[derive(Debug, AsChangeset)]
 #[diesel(table_name = schema::datasets)]
-pub struct DatasetUpdate {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub favorite: Option<bool>,
-    pub status: Option<DatasetStatus>,
+pub(super) struct DatasetUpdate {
+    pub(super) name: Option<String>,
+    pub(super) description: Option<String>,
+    pub(super) favorite: Option<bool>,
+    pub(super) status: Option<DbDatasetStatus>,
 }
 
 #[derive(Debug, Insertable)]
 #[diesel(table_name = schema::datasets)]
-pub struct NewDataset<'a> {
-    pub uid: SimpleUuid,
-    pub name: &'a str,
-    pub description: &'a str,
-    pub status: DatasetStatus,
+pub(super) struct NewDataset<'a> {
+    pub(super) uid: SimpleUuid,
+    pub(super) name: &'a str,
+    pub(super) description: &'a str,
+    pub(super) status: DbDatasetStatus,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = schema::tags, check_for_backend(Sqlite))]
-pub struct Tag {
-    pub id: i32,
-    pub name: String,
+pub(super) struct Tag {
+    pub(super) id: i32,
+    pub(super) name: String,
 }
 
 impl Tag {
-    pub fn find_by_name(conn: &mut SqliteConnection, tag_name: &str) -> QueryResult<Option<Self>> {
-        use schema::tags::dsl::{name, tags};
-
-        tags.filter(name.eq(tag_name))
-            .select(Self::as_select())
-            .first(conn)
-            .optional()
-    }
-
-    pub fn find_or_create_batch(
+    pub(super) fn find_or_create_batch(
         conn: &mut SqliteConnection,
         names: &[String],
     ) -> QueryResult<Vec<Self>> {
@@ -157,45 +132,25 @@ impl Tag {
             .select(Self::as_select())
             .load(conn)
     }
-
-    pub fn create_new(conn: &mut SqliteConnection, tag_name: &str) -> QueryResult<Self> {
-        use schema::tags::dsl::tags;
-
-        let new_tag = NewTag { name: tag_name };
-        diesel::insert_into(tags)
-            .values(new_tag)
-            .returning(Self::as_returning())
-            .get_result(conn)
-    }
-
-    pub fn datasets(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Dataset>> {
-        use schema::{datasets, datasets_tags};
-
-        datasets_tags::table
-            .filter(datasets_tags::tag_id.eq(self.id))
-            .inner_join(datasets::table)
-            .select(Dataset::as_select())
-            .load(conn)
-    }
 }
 
 #[derive(Debug, Insertable)]
 #[diesel(table_name = schema::tags)]
-pub struct NewTag<'a> {
-    pub name: &'a str,
+struct NewTag<'a> {
+    name: &'a str,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, Identifiable, Associations)]
 #[diesel(belongs_to(Dataset), belongs_to(Tag))]
 #[diesel(primary_key(dataset_id, tag_id))]
 #[diesel(table_name = schema::datasets_tags, check_for_backend(Sqlite))]
-pub struct DatasetTag {
-    pub dataset_id: i32,
-    pub tag_id: i32,
+pub(super) struct DatasetTag {
+    dataset_id: i32,
+    tag_id: i32,
 }
 
 impl DatasetTag {
-    pub fn create_associations(
+    pub(super) fn create_associations(
         conn: &mut SqliteConnection,
         ds_id: i32,
         tag_ids: &[i32],
@@ -217,7 +172,7 @@ impl DatasetTag {
         Ok(new_associations)
     }
 
-    pub fn remove_associations(
+    pub(super) fn remove_associations(
         conn: &mut SqliteConnection,
         ds_id: i32,
         tag_ids: &[i32],
@@ -228,14 +183,5 @@ impl DatasetTag {
             .filter(dataset_id.eq(ds_id))
             .filter(tag_id.eq_any(tag_ids))
             .execute(conn)
-    }
-
-    pub fn find_by_dataset(conn: &mut SqliteConnection, ds_id: i32) -> QueryResult<Vec<Self>> {
-        use schema::datasets_tags::dsl::{dataset_id, datasets_tags};
-
-        datasets_tags
-            .filter(dataset_id.eq(ds_id))
-            .select(Self::as_select())
-            .load(conn)
     }
 }

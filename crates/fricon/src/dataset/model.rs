@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use derive_more::From;
-use diesel::{deserialize::FromSqlRow, expression::AsExpression, sql_types::Text};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -21,8 +20,7 @@ pub struct DatasetMetadata {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromSqlRow, AsExpression)]
-#[diesel(sql_type = Text)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DatasetStatus {
     Writing,
