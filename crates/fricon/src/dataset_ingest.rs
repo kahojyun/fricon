@@ -1,14 +1,31 @@
+use arrow_array::RecordBatch;
+
 mod registry;
 mod service;
 mod session;
 mod storage;
-mod types;
 
+pub use self::service::DatasetIngestService;
 pub(crate) use self::{
     registry::{WriteSessionGuard, WriteSessionRegistry},
     session::WriteSessionHandle,
 };
-pub use self::{
-    service::DatasetIngestService,
-    types::{CreateDatasetRequest, CreateIngestEvent, CreateTerminal},
-};
+
+#[derive(Debug, Clone)]
+pub struct CreateDatasetRequest {
+    pub name: String,
+    pub description: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug)]
+pub enum CreateIngestEvent {
+    Batch(RecordBatch),
+    Terminal(CreateTerminal),
+}
+
+#[derive(Debug, Clone)]
+pub enum CreateTerminal {
+    Finish,
+    Abort,
+}
