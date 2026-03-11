@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use fricon::{DatasetSortBy, DatasetStatus, SortDirection};
+use fricon::{DatasetRecord, DatasetSortBy, DatasetStatus, SortDirection};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
@@ -73,6 +73,42 @@ pub(crate) struct DatasetInfo {
     pub tags: Vec<String>,
     pub status: UiDatasetStatus,
     pub created_at: DateTime<Utc>,
+}
+
+impl DatasetInfo {
+    pub(crate) fn new(
+        id: i32,
+        name: String,
+        description: String,
+        favorite: bool,
+        tags: Vec<String>,
+        status: UiDatasetStatus,
+        created_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            description,
+            favorite,
+            tags,
+            status,
+            created_at,
+        }
+    }
+}
+
+impl From<DatasetRecord> for DatasetInfo {
+    fn from(record: DatasetRecord) -> Self {
+        Self::new(
+            record.id,
+            record.metadata.name,
+            record.metadata.description,
+            record.metadata.favorite,
+            record.metadata.tags,
+            record.metadata.status.into(),
+            record.metadata.created_at,
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]

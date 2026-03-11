@@ -10,6 +10,7 @@
 
 ## Repo-Specific Knowledge
 
+- Users interact with this repo through the Python API, CLI, and desktop UI. Internal Rust APIs between crates have no stability guarantees and may be aggressively refactored or broken when it improves the architecture.
 - Use non-`mod.rs` layout for Rust modules (`foo.rs` plus optional `foo/*.rs` submodules).
 - Rust use nightly rustfmt: `cargo +nightly fmt`.
 - Python bindings and tests (from repo root):

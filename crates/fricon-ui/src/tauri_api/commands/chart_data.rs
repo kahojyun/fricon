@@ -13,7 +13,7 @@ use crate::{
         ChartDataResponse, DatasetChartDataOptions, build_heatmap_series, build_line_series,
         build_scatter_series, mapping::build_chart_selected_columns,
     },
-    tauri_api::commands::filter_data::build_filter_batch,
+    filter_data::build_filter_batch,
 };
 
 #[tauri::command]
@@ -37,7 +37,8 @@ pub(crate) async fn dataset_chart_data(
             &indices,
             dataset.arrow_schema().clone(),
         )
-        .await?
+        .await
+        .context("Failed to build index filters")?
     } else {
         None
     };

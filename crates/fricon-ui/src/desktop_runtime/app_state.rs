@@ -58,15 +58,15 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        if let Err(err) = DatasetCreated(DatasetInfo {
+                        if let Err(err) = DatasetCreated(DatasetInfo::new(
                             id,
                             name,
                             description,
                             favorite,
                             tags,
-                            status: status.into(),
+                            status.into(),
                             created_at,
-                        })
+                        ))
                         .emit(&app_handle)
                         {
                             warn!(
@@ -85,15 +85,15 @@ impl AppState {
                         status,
                         created_at,
                     } => {
-                        if let Err(err) = DatasetUpdated(DatasetInfo {
+                        if let Err(err) = DatasetUpdated(DatasetInfo::new(
                             id,
                             name,
                             description,
                             favorite,
                             tags,
-                            status: status.into(),
+                            status.into(),
                             created_at,
-                        })
+                        ))
                         .emit(&app_handle)
                         {
                             warn!(

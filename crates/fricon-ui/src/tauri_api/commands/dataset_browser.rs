@@ -137,18 +137,7 @@ pub(crate) async fn list_datasets(
         .await
         .context("Failed to list datasets.")?;
 
-    let dataset_info: Vec<DatasetInfo> = datasets
-        .into_iter()
-        .map(|record| DatasetInfo {
-            id: record.id,
-            name: record.metadata.name,
-            description: record.metadata.description,
-            favorite: record.metadata.favorite,
-            tags: record.metadata.tags,
-            status: record.metadata.status.into(),
-            created_at: record.metadata.created_at,
-        })
-        .collect();
+    let dataset_info: Vec<DatasetInfo> = datasets.into_iter().map(DatasetInfo::from).collect();
 
     Ok(dataset_info)
 }
