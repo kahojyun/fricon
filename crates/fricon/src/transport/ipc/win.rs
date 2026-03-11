@@ -16,7 +16,7 @@ use tonic::transport::server::Connected;
 use tracing::{debug, error};
 use uuid::Uuid;
 
-use super::ConnectError;
+use crate::transport::ipc::error::ConnectError;
 
 // Binary format constants
 const HEADER: &[u8; 4] = b"FRIC";

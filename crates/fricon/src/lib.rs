@@ -6,33 +6,24 @@
 //! - **Dataset Operations**: Create, store, and query datasets using Apache
 //!   Arrow format
 //! - **Client-Server Architecture**: gRPC-based communication
+pub mod app;
 pub mod client;
-mod database;
-pub mod dataset_catalog;
-pub mod dataset_ingest;
-pub mod dataset_read;
-pub mod dataset_schema;
+pub mod dataset;
 mod proto;
-pub mod runtime;
-mod storage;
 mod transport;
 mod utils;
 pub mod workspace;
 
 pub use self::{
+    app::{AppEvent, AppHandle, AppManager},
     client::{Client, Dataset, DatasetWriter},
-    database::DatasetStatus,
-    dataset_catalog::{
-        DatasetCatalogService, DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord,
-        DatasetSortBy, DatasetUpdate, SortDirection,
+    dataset::{
+        CreateDatasetRequest, DatasetArray, DatasetCatalogService, DatasetDataType, DatasetId,
+        DatasetIngestService, DatasetListQuery, DatasetMetadata, DatasetReadService, DatasetReader,
+        DatasetRecord, DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus,
+        DatasetUpdate, FixedStepTrace, ScalarArray, ScalarKind, SelectOptions, SortDirection,
+        TraceKind, VariableStepTrace,
     },
-    dataset_ingest::{CreateDatasetRequest, DatasetIngestService},
-    dataset_read::{DatasetReadService, DatasetReader, SelectOptions},
-    dataset_schema::{
-        DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
-        ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
-    },
-    runtime::app::{AppEvent, AppHandle, AppManager},
     workspace::{WorkspaceRoot, get_log_dir},
 };
 

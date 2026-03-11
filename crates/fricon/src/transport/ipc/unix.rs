@@ -11,7 +11,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio_stream::wrappers::UnixListenerStream;
 use tracing::debug;
 
-use super::ConnectError;
+use crate::transport::ipc::error::ConnectError;
 
 pub(crate) async fn connect(path: impl AsRef<Path>) -> Result<UnixStream, ConnectError> {
     UnixStream::connect(path).await.map_err(|e| match e.kind() {

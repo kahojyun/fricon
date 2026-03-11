@@ -40,7 +40,12 @@ use std::{
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use fricon::{
-    Client, DatasetMetadata, DatasetRecord, DatasetScalar, FixedStepTrace, VariableStepTrace,
+    Client,
+    app::AppManager,
+    dataset::{
+        model::{DatasetMetadata, DatasetRecord, DatasetStatus},
+        schema::{DatasetScalar, FixedStepTrace, VariableStepTrace},
+    },
 };
 use fricon_cli::clap::{Parser, error::ErrorKind};
 use indexmap::IndexMap;
@@ -356,9 +361,9 @@ impl Dataset {
     #[getter]
     pub fn status(&self) -> String {
         match self.inner.status() {
-            fricon::DatasetStatus::Writing => "writing".to_string(),
-            fricon::DatasetStatus::Completed => "completed".to_string(),
-            fricon::DatasetStatus::Aborted => "aborted".to_string(),
+            DatasetStatus::Writing => "writing".to_string(),
+            DatasetStatus::Completed => "completed".to_string(),
+            DatasetStatus::Aborted => "aborted".to_string(),
         }
     }
 }
@@ -369,7 +374,7 @@ impl Dataset {
 /// When this handle is dropped, the server will be automatically shut down.
 #[pyclass(module = "fricon._core")]
 pub struct ServerHandle {
-    manager: Option<fricon::AppManager>,
+    manager: Option<AppManager>,
 }
 
 #[pymethods]
@@ -754,7 +759,7 @@ pub fn serve_workspace(py: Python<'_>, path: PathBuf) -> Result<(Workspace, Serv
     let root = fricon::WorkspaceRoot::create_new(&path)?;
 
     // Start the server in the background and keep the manager
-    let manager = fricon::AppManager::serve(root)?;
+    let manager = AppManager::serve(root)?;
 
     // Connect to the workspace
     let workspace = Workspace::connect(py, path.clone())?;

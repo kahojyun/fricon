@@ -7,7 +7,7 @@ use tonic::{Code, Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
-    dataset_ingest::{CreateDatasetRequest, CreateIngestEvent, CreateTerminal},
+    dataset::ingest::{CreateDatasetRequest, CreateIngestEvent, CreateTerminal},
     proto::{CreateMetadata, CreateRequest, create_request::CreateMessage},
 };
 

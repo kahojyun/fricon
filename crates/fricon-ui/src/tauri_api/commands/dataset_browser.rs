@@ -1,6 +1,7 @@
 use anyhow::Context;
-use fricon::{
-    DatasetDataType, DatasetId, DatasetListQuery, DatasetSortBy, DatasetUpdate, SortDirection,
+use fricon::dataset::{
+    model::{DatasetId, DatasetListQuery, DatasetSortBy, DatasetUpdate, SortDirection},
+    schema::DatasetDataType,
 };
 use serde::{Deserialize, Serialize};
 use tauri::State;

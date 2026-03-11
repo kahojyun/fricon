@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use fricon::runtime::app::{AppEvent, AppHandle, AppManager};
+use fricon::app::{AppEvent, AppHandle, AppManager};
 use tauri::async_runtime;
 use tauri_specta::Event;
 use tokio::sync::broadcast::error::RecvError;

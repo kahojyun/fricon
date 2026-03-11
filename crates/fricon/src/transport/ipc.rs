@@ -1,26 +1,16 @@
 //! Provides cross-platform inter-process communication (IPC) functionality.
 
+pub(crate) mod error;
+
 #[cfg(unix)]
 mod unix;
 #[cfg(windows)]
 mod win;
 
-use std::io::Error as IoError;
-
-use thiserror::Error;
-
 #[cfg(unix)]
 pub(crate) use self::unix::{connect, listen};
 #[cfg(windows)]
 pub(crate) use self::win::{connect, listen};
-
-#[derive(Debug, Error)]
-pub(crate) enum ConnectError {
-    #[error("Connect target not found: {0}")]
-    NotFound(#[source] IoError),
-    #[error("IO error: {0}")]
-    Io(#[from] IoError),
-}
 
 #[cfg(test)]
 mod tests {
@@ -31,6 +21,7 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
+    use crate::transport::ipc::error::ConnectError;
 
     #[tokio::test]
     async fn connect_succeed() {

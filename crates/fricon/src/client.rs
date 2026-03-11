@@ -22,9 +22,10 @@ use uuid::Uuid;
 
 use crate::{
     DEFAULT_DATASET_LIST_LIMIT, VERSION,
-    database::DatasetStatus,
-    dataset_catalog::DatasetRecord,
-    dataset_schema::{DatasetArray, DatasetRow, DatasetSchema},
+    dataset::{
+        model::{DatasetRecord, DatasetStatus},
+        schema::{DatasetArray, DatasetRow, DatasetSchema},
+    },
     proto::{
         AddTagsRequest, CreateAbort, CreateFinish, CreateMetadata, CreateRequest, CreateResponse,
         GetRequest, RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
