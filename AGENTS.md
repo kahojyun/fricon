@@ -20,3 +20,7 @@
 - After Rust Tauri command/event signature changes, regenerate bindings with:
   `pnpm --filter fricon-ui run gen:bindings`.
 - Run shadcn cli with `pnpm --filter fricon-ui exec shadcn`.
+- `crates/fricon-ui` uses vertical feature slices.
+  Rust flows as `desktop_runtime -> api::<feature> -> application::<feature> -> fricon`.
+  Frontend flows as `app/routes -> features/<feature> -> feature-local api -> src/shared/lib/tauri.ts -> generated bindings`.
+  Inside `frontend/src/features/**`, use relative imports only; `app` and `routes` must consume feature barrel exports.

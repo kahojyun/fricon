@@ -3,8 +3,11 @@
 - **React Compiler is enabled.** DO NOT use `useMemo` or `useCallback` unless absolutely mandated by a third-party library API requirement.
 - Prefer shadcn/ui components
 - Shared primitives live under `src/shared/ui/`.
-- Shared helpers and backend normalization live under `src/shared/lib/`.
+- Shared helpers live under `src/shared/lib/`.
 - Feature internals should default to `ui/`, `api/`, `model/`, and `hooks/`.
+- The frontend uses vertical feature slices rooted under `src/features/`.
+- Inside `src/features/**`, use relative imports only. Do not import `@/features/**` from another feature.
+- `src/app/**` and `src/routes/**` should consume only feature barrel exports such as `@/features/<feature>`.
 
 ## Generated Files (Do Not Edit Manually)
 
@@ -21,7 +24,8 @@
 
 ## Backend Integration Boundary
 
-- Keep wire-to-domain normalization in `src/shared/lib/backend.ts`
-  (for example date parsing and strict response guards).
+- Keep the generic Tauri bridge minimal in `src/shared/lib/tauri.ts`.
+- Keep wire-to-domain normalization and query/event wiring inside feature-local `api/` modules.
 - Prefer typed APIs from generated bindings (`events.*`, commands, payload types)
   instead of hardcoded Tauri event strings.
+- Only `src/shared/lib/tauri.ts` and feature-local `api/*` modules should import from `src/shared/lib/bindings.ts`.

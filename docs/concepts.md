@@ -58,3 +58,28 @@ Each dataset will be given two unique identifiers:
   workspace.
 
 Users can open a dataset by either `uid` or `id`.
+
+## Desktop UI Architecture
+
+`fricon-ui` is organized as vertical feature slices across the Rust and React boundary.
+
+Rust dependency flow:
+
+```text
+desktop_runtime -> api::<feature> -> application::<feature> -> fricon
+```
+
+Frontend dependency flow:
+
+```text
+app/routes -> features/<feature> -> feature-local api -> shared/lib/tauri.ts -> generated bindings
+```
+
+The important boundary rules are:
+
+- Rust `src/api/*.rs` files are Tauri adapters only. They own commands, events, and exported DTOs.
+- Rust `src/application/*.rs` files own feature orchestration and should not depend on Tauri types.
+- Frontend features own their own `api/`, `ui/`, `model/`, and `hooks/` modules.
+- Files under `frontend/src/features/**` use relative imports only.
+- `frontend/src/app/**` and `frontend/src/routes/**` import features only through public barrels such as `@/features/<feature>`.
+- `frontend/src/shared/lib/tauri.ts` stays generic; feature-specific normalization and query/event wiring belong in each feature's `api/` folder.
