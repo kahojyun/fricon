@@ -20,14 +20,16 @@ export function useCascadeSelection(data?: FilterTableData | null) {
     fieldIndex: number,
     valueIndex: number,
     baselineRowIndex: number | null,
-  ) =>
+  ) => {
+    if (!data) return;
     dispatch({
       type: "field/select",
       fieldIndex,
       valueIndex,
-      data: data!,
+      data,
       baselineRowIndex,
     } satisfies CascadeAction);
+  };
 
   return {
     state,
