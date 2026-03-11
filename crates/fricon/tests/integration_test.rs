@@ -203,7 +203,8 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
     WorkspaceRoot::create_new(workspace_path)?;
 
     // Start the server
-    let app_manager = AppManager::serve_with_path(workspace_path)?;
+    let app_manager =
+        AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
 
     // Connect the client
     let client = Client::connect(workspace_path).await?;
@@ -218,6 +219,7 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
         "Test dataset for integration test".to_string(),
         vec!["test".to_string(), "integration".to_string()],
         test_schema.clone(),
+        &tokio::runtime::Handle::current(),
     )?;
 
     // Write the test rows
@@ -297,7 +299,8 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
     let workspace_path = temp_dir.path();
     WorkspaceRoot::create_new(workspace_path)?;
 
-    let app_manager = AppManager::serve_with_path(workspace_path)?;
+    let app_manager =
+        AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
     let client = Client::connect(workspace_path).await?;
 
     let test_rows = create_test_rows();
@@ -308,6 +311,7 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
         "This dataset is aborted explicitly".to_string(),
         vec!["test".to_string(), "abort".to_string()],
         test_schema,
+        &tokio::runtime::Handle::current(),
     )?;
 
     writer.write(create_test_rows().remove(0)).await?;
@@ -342,7 +346,8 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
     WorkspaceRoot::create_new(workspace_path)?;
 
     // Start the server
-    let app_manager = AppManager::serve_with_path(workspace_path)?;
+    let app_manager =
+        AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
 
     // Connect the client
     let client = Client::connect(workspace_path).await?;
@@ -357,6 +362,7 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
         "This dataset will be aborted".to_string(),
         vec!["test".to_string(), "abort".to_string()],
         test_schema.clone(),
+        &tokio::runtime::Handle::current(),
     )?;
 
     // Write a row

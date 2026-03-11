@@ -11,8 +11,8 @@ pub(crate) struct AppState {
 
 impl AppState {
     pub(crate) fn new(workspace_path: std::path::PathBuf) -> Result<Self> {
-        let _runtime_guard = async_runtime::handle().inner().enter();
-        let app_manager = AppManager::serve_with_path(workspace_path)?;
+        let runtime = async_runtime::handle();
+        let app_manager = AppManager::new_with_path(workspace_path)?.start(runtime.inner())?;
         let session = WorkspaceSession::new(app_manager.handle().clone());
         Ok(Self {
             runtime: RuntimeOwner::new(app_manager),

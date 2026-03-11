@@ -66,6 +66,7 @@ impl Client {
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
+        runtime: &tokio::runtime::Handle,
     ) -> Result<DatasetWriter> {
         Ok(DatasetWriter::new(
             self.clone(),
@@ -73,6 +74,7 @@ impl Client {
             description,
             tags,
             schema,
+            runtime.clone(),
         ))
     }
 
@@ -142,11 +144,11 @@ impl DatasetWriter {
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
+        runtime: tokio::runtime::Handle,
     ) -> Self {
         let (tx, rx) = mpsc::channel::<StreamMessage>(16);
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
-        let runtime = tokio::runtime::Handle::current();
         let connection_handle = runtime.spawn({
             let client = client.clone();
             let request_stream =

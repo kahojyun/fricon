@@ -6,10 +6,10 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use chrono::Local;
 use thiserror::Error;
-use tokio::{sync::broadcast, time};
+use tokio::{runtime::Handle, sync::broadcast, time};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info, instrument};
 
@@ -146,29 +146,44 @@ impl AppHandle {
 pub struct AppManager {
     state: Arc<AppState>,
     handle: AppHandle,
+    started: bool,
 }
 
 impl AppManager {
     #[instrument(skip(root), fields(workspace.path = ?root.paths().root()))]
-    pub fn serve(root: WorkspaceRoot) -> Result<Self> {
+    pub fn new(root: WorkspaceRoot) -> Result<Self> {
         let state = AppState::new(root)?;
         let handle = AppHandle::new(Arc::downgrade(&state));
-
-        let ipc_file = handle.paths()?.ipc_file();
-        server::start(
-            ipc_file,
-            &handle,
-            &state.tracker,
-            state.shutdown_token.clone(),
-        )?;
-
-        info!(path = ?handle.paths()?.root(), "App server started");
-        Ok(Self { state, handle })
+        Ok(Self {
+            state,
+            handle,
+            started: false,
+        })
     }
 
-    pub fn serve_with_path(path: impl Into<PathBuf>) -> Result<Self> {
+    pub fn new_with_path(path: impl Into<PathBuf>) -> Result<Self> {
         let root = WorkspaceRoot::create(path)?;
-        Self::serve(root)
+        Self::new(root)
+    }
+
+    #[instrument(skip(self, runtime), fields(workspace.path = ?self.handle.paths()?.root()))]
+    pub fn start(mut self, runtime: &Handle) -> Result<Self> {
+        if self.started {
+            bail!("App server is already started");
+        }
+
+        let ipc_file = self.handle.paths()?.ipc_file();
+        server::start(
+            ipc_file,
+            &self.handle,
+            &self.state.tracker,
+            self.state.shutdown_token.clone(),
+            runtime,
+        )?;
+
+        self.started = true;
+        info!(path = ?self.handle.paths()?.root(), "App server started");
+        Ok(self)
     }
 
     pub async fn shutdown(self) {

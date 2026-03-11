@@ -539,8 +539,13 @@ impl DatasetWriter {
                 let row = convert::build_row(py, values)?;
                 let schema = row.to_schema();
                 let writer = py.detach(|| -> Result<_> {
-                    let _guard = get_runtime().enter();
-                    let mut writer = client.create_dataset(name, description, tags, schema)?;
+                    let mut writer = client.create_dataset(
+                        name,
+                        description,
+                        tags,
+                        schema,
+                        get_runtime().handle(),
+                    )?;
                     get_runtime().block_on(writer.write(row))?;
                     Ok(writer)
                 })?;
@@ -753,13 +758,12 @@ pub fn main_gui(py: Python<'_>) -> i32 {
 #[pyfunction]
 pub fn serve_workspace(py: Python<'_>, path: PathBuf) -> Result<(Workspace, ServerHandle)> {
     let runtime = get_runtime();
-    let _guard = runtime.enter();
 
     // Create the workspace first
     let root = fricon::WorkspaceRoot::create_new(&path)?;
 
     // Start the server in the background and keep the manager
-    let manager = AppManager::serve(root)?;
+    let manager = AppManager::new(root)?.start(runtime.handle())?;
 
     // Connect to the workspace
     let workspace = Workspace::connect(py, path.clone())?;

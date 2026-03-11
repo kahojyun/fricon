@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use grpc::{dataset_service::Storage, fricon_service::Fricon};
+use tokio::runtime::Handle;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tonic::transport::Server;
 use tracing::{error, info, instrument};
@@ -20,6 +21,7 @@ pub(crate) fn start(
     app: &AppHandle,
     task_tracker: &TaskTracker,
     cancellation_token: CancellationToken,
+    runtime: &Handle,
 ) -> Result<()> {
     let storage = Storage::new(
         app.dataset_catalog(),
@@ -30,21 +32,24 @@ pub(crate) fn start(
     let listener = ipc::listen(ipc_file)?;
 
     info!("Starting gRPC server");
-    task_tracker.spawn(async move {
-        let result = Server::builder()
-            .add_service(service)
-            .add_service(FriconServiceServer::new(Fricon))
-            .serve_with_incoming_shutdown(listener, async {
-                cancellation_token.cancelled().await;
-                info!("Received shutdown signal");
-            })
-            .await;
+    task_tracker.spawn_on(
+        async move {
+            let result = Server::builder()
+                .add_service(service)
+                .add_service(FriconServiceServer::new(Fricon))
+                .serve_with_incoming_shutdown(listener, async {
+                    cancellation_token.cancelled().await;
+                    info!("Received shutdown signal");
+                })
+                .await;
 
-        match result {
-            Ok(()) => info!("Server shutdown complete"),
-            Err(error) => error!(error = %error, "gRPC server exited with error"),
-        }
-    });
+            match result {
+                Ok(()) => info!("Server shutdown complete"),
+                Err(error) => error!(error = %error, "gRPC server exited with error"),
+            }
+        },
+        runtime,
+    );
 
     Ok(())
 }
