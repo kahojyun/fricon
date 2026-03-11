@@ -1,9 +1,9 @@
 import { MousePointerClick } from "lucide-react";
-import { ChartViewer } from "@/features/chart-viewer";
+import { ChartViewer } from "@/features/charts";
 import {
   DatasetPropertiesPanel,
   useDatasetDetailQuery,
-} from "@/features/dataset-detail";
+} from "@/features/datasets";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
 interface DatasetInspectorProps {

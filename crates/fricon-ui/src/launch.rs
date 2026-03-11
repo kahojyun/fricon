@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+pub(crate) mod resolve;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LaunchSource {
     Standalone,

@@ -1,13 +1,8 @@
-import type {
-  ComplexViewOption as WireComplexViewOption,
-  ChartType as WireChartType,
-} from "@/shared/lib/bindings";
-
-export type ChartType = WireChartType;
+export type ChartType = "line" | "heatmap" | "scatter";
 
 export type ScatterMode = "complex" | "trace_xy" | "xy";
 
-export type ComplexViewOption = WireComplexViewOption;
+export type ComplexViewOption = "real" | "imag" | "mag" | "arg";
 
 export type ChartSeriesData = number[][];
 

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DatasetExplorerScreen } from "./DatasetExplorerScreen";
 
-vi.mock("@/features/dataset-table", () => ({
+vi.mock("@/features/datasets", () => ({
   DatasetTable: ({
     selectedDatasetId,
     onDatasetSelected,
