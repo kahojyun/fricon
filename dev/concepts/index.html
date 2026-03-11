@@ -439,6 +439,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#desktop-ui-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Desktop UI Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -550,6 +561,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#desktop-ui-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Desktop UI Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -612,6 +634,23 @@ one data table based on the Arrow format with additional metadata.</p>
   workspace.</li>
 </ul>
 <p>Users can open a dataset by either <code>uid</code> or <code>id</code>.</p>
+<h2 id="desktop-ui-architecture">Desktop UI Architecture</h2>
+<p><code>fricon-ui</code> is organized as vertical feature slices across the Rust and React boundary.</p>
+<p>Rust dependency flow:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>desktop_runtime -&gt; api::&lt;feature&gt; -&gt; application::&lt;feature&gt; -&gt; fricon
+</span></code></pre></div>
+<p>Frontend dependency flow:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>app/routes -&gt; features/&lt;feature&gt; -&gt; feature-local api -&gt; shared/lib/tauri.ts -&gt; generated bindings
+</span></code></pre></div>
+<p>The important boundary rules are:</p>
+<ul>
+<li>Rust <code>src/api/*.rs</code> files are Tauri adapters only. They own commands, events, and exported DTOs.</li>
+<li>Rust <code>src/application/*.rs</code> files own feature orchestration and should not depend on Tauri types.</li>
+<li>Frontend features own their own <code>api/</code>, <code>ui/</code>, <code>model/</code>, and <code>hooks/</code> modules.</li>
+<li>Files under <code>frontend/src/features/**</code> use relative imports only.</li>
+<li><code>frontend/src/app/**</code> and <code>frontend/src/routes/**</code> import features only through public barrels such as <code>@/features/&lt;feature&gt;</code>.</li>
+<li><code>frontend/src/shared/lib/tauri.ts</code> stays generic; feature-specific normalization and query/event wiring belong in each feature's <code>api/</code> folder.</li>
+</ul>
 
 
 
