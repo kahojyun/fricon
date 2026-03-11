@@ -49,5 +49,47 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ["crates/fricon-ui/frontend/src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "@/routes/**", "@/features/**"],
+              message:
+                "Feature files must use relative imports within the feature and may not import app, routes, or other features.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "crates/fricon-ui/frontend/src/app/**/*.{ts,tsx}",
+      "crates/fricon-ui/frontend/src/routes/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/features/*/api/**",
+                "@/features/*/hooks/**",
+                "@/features/*/model/**",
+                "@/features/*/ui/**",
+              ],
+              message:
+                "App and routes must import features through their public barrel exports.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   prettier,
 ]);

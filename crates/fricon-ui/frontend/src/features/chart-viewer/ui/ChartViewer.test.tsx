@@ -2,11 +2,12 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
-import { mockIPC, clearMocks } from "@tauri-apps/api/mocks";
-import { ChartViewer } from "@/features/chart-viewer/ui/ChartViewer";
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+import { describe, expect, it, vi } from "vitest";
+import type { DatasetDetail } from "@/shared/lib/backend";
+import { ChartViewer } from "./ChartViewer";
 
-vi.mock("@/features/chart-viewer/ui/ChartWrapper", () => ({
+vi.mock("./ChartWrapper", () => ({
   ChartWrapper: ({ data }: { data?: unknown }) => (
     <div data-testid="chart">{data ? "data" : "empty"}</div>
   ),
@@ -30,31 +31,35 @@ vi.mock("react-resizable-panels", () => ({
   Separator: () => <div />,
 }));
 
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+}
+
+function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
+  return {
+    id: 1,
+    name: "Dataset 1",
+    description: "Test dataset",
+    favorite: false,
+    tags: [],
+    status: "Completed",
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    columns: [],
+    ...overrides,
+  };
+}
+
 describe("ChartViewer", () => {
   it("uses trailing Y default for trace heatmap without X axis", async () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
-      if (cmd === "dataset_detail") {
-        return {
-          id: 1,
-          name: "Dataset 1",
-          description: "Test dataset",
-          favorite: false,
-          tags: [],
-          status: "Completed",
-          createdAt: new Date().toISOString(),
-          columns: [
-            { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-            { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
-            {
-              name: "trace_signal",
-              isComplex: false,
-              isTrace: true,
-              isIndex: false,
-            },
-          ],
-        };
-      }
       if (cmd === "get_filter_table_data") {
         return {
           fields: ["idxA", "idxB"],
@@ -94,19 +99,24 @@ describe("ChartViewer", () => {
       return null;
     });
 
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnWindowFocus: false,
-        },
-      },
-    });
-
     const user = userEvent.setup();
     render(
-      <QueryClientProvider client={queryClient}>
-        <ChartViewer datasetId={1} />
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
+              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "trace_signal",
+                isComplex: false,
+                isTrace: true,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
       </QueryClientProvider>,
     );
 
@@ -141,26 +151,6 @@ describe("ChartViewer", () => {
     let chartCallCount = 0;
     let filterTableCallCount = 0;
     mockIPC((cmd) => {
-      if (cmd === "dataset_detail") {
-        return {
-          id: 1,
-          name: "Dataset 1",
-          description: "Test dataset",
-          favorite: false,
-          tags: [],
-          status: "Completed",
-          createdAt: new Date().toISOString(),
-          columns: [
-            { name: "t", isComplex: false, isTrace: false, isIndex: true },
-            {
-              name: "signal",
-              isComplex: false,
-              isTrace: false,
-              isIndex: false,
-            },
-          ],
-        };
-      }
       if (cmd === "get_filter_table_data") {
         filterTableCallCount += 1;
         return {
@@ -204,20 +194,24 @@ describe("ChartViewer", () => {
       return null;
     });
 
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnWindowFocus: false,
-        },
-      },
-    });
-
     const user = userEvent.setup();
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <ChartViewer datasetId={1} />
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "signal",
+                isComplex: false,
+                isTrace: false,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
       </QueryClientProvider>,
     );
 
@@ -248,22 +242,6 @@ describe("ChartViewer", () => {
   it("allows index exclusion for scalar complex scatter mode", async () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
-      if (cmd === "dataset_detail") {
-        return {
-          id: 1,
-          name: "Dataset 1",
-          description: "Test dataset",
-          favorite: false,
-          tags: [],
-          status: "Completed",
-          createdAt: new Date().toISOString(),
-          columns: [
-            { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-            { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
-            { name: "c", isComplex: true, isTrace: false, isIndex: false },
-          ],
-        };
-      }
       if (cmd === "get_filter_table_data") {
         return {
           fields: ["idxA", "idxB"],
@@ -293,19 +271,19 @@ describe("ChartViewer", () => {
       return null;
     });
 
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          refetchOnWindowFocus: false,
-        },
-      },
-    });
-
     const user = userEvent.setup();
     render(
-      <QueryClientProvider client={queryClient}>
-        <ChartViewer datasetId={1} />
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
+              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              { name: "c", isComplex: true, isTrace: false, isIndex: false },
+            ],
+          })}
+        />
       </QueryClientProvider>,
     );
 

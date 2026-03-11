@@ -6,7 +6,7 @@ import {
   resolveRow,
   type CascadeAction,
   type CascadeMode,
-} from "@/features/chart-viewer/model/cascadeReducer";
+} from "../model/cascadeReducer";
 
 export function useCascadeSelection(data?: FilterTableData | null) {
   const [state, dispatch] = useReducer(cascadeReducer, initialCascadeState);

@@ -2,20 +2,9 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DatasetDetailPage } from "@/features/dataset-detail/ui/DatasetDetailPage";
+import { describe, expect, it } from "vitest";
 import type { DatasetDetail } from "@/shared/lib/backend";
-import { useDatasetDetailQuery } from "@/features/dataset-detail/api/useDatasetDetailQuery";
-
-vi.mock("@/features/chart-viewer", () => ({
-  ChartViewer: () => <div data-testid="chart-viewer" />,
-}));
-
-vi.mock("@/features/dataset-detail/api/useDatasetDetailQuery", () => ({
-  useDatasetDetailQuery: vi.fn(),
-}));
-
-const useDatasetDetailQueryMock = vi.mocked(useDatasetDetailQuery);
+import { DatasetPropertiesPanel } from "./DatasetPropertiesPanel";
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -47,42 +36,38 @@ function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
   };
 }
 
-describe("DatasetDetailPage", () => {
-  beforeEach(() => {
-    useDatasetDetailQueryMock.mockReset();
-  });
-
+describe("DatasetPropertiesPanel", () => {
   it("resyncs form fields when refreshed detail data changes", async () => {
-    let currentDetail = makeDetail();
-    useDatasetDetailQueryMock.mockImplementation(
-      () =>
-        ({
-          data: currentDetail,
-          isLoading: false,
-          error: null,
-        }) as ReturnType<typeof useDatasetDetailQuery>,
-    );
-
     const user = userEvent.setup();
     const wrapper = createWrapper();
-    const { rerender } = render(<DatasetDetailPage datasetId={1} />, {
-      wrapper,
-    });
-
-    await user.click(screen.getByRole("tab", { name: "Properties" }));
+    const { rerender } = render(
+      <DatasetPropertiesPanel
+        datasetId={1}
+        detail={makeDetail()}
+        isLoading={false}
+        loadErrorMessage={null}
+      />,
+      { wrapper },
+    );
 
     const nameInput = await screen.findByLabelText("Name");
     await user.clear(nameInput);
     await user.type(nameInput, "Local draft");
     expect(nameInput).toHaveValue("Local draft");
 
-    currentDetail = makeDetail({
-      name: "Dataset 1 (server)",
-      description: "Server description",
-      favorite: true,
-      tags: ["beta", "gamma"],
-    });
-    rerender(<DatasetDetailPage datasetId={1} />);
+    rerender(
+      <DatasetPropertiesPanel
+        datasetId={1}
+        detail={makeDetail({
+          name: "Dataset 1 (server)",
+          description: "Server description",
+          favorite: true,
+          tags: ["beta", "gamma"],
+        })}
+        isLoading={false}
+        loadErrorMessage={null}
+      />,
+    );
 
     expect(await screen.findByLabelText("Name")).toHaveValue(
       "Dataset 1 (server)",
@@ -95,37 +80,36 @@ describe("DatasetDetailPage", () => {
   });
 
   it("resets the form when detail values would collide under delimiter joining", async () => {
-    let currentDetail = makeDetail({
-      name: "a",
-      description: "b::c",
-      tags: [],
-    });
-    useDatasetDetailQueryMock.mockImplementation(
-      () =>
-        ({
-          data: currentDetail,
-          isLoading: false,
-          error: null,
-        }) as ReturnType<typeof useDatasetDetailQuery>,
-    );
-
-    const user = userEvent.setup();
     const wrapper = createWrapper();
-    const { rerender } = render(<DatasetDetailPage datasetId={1} />, {
-      wrapper,
-    });
-
-    await user.click(screen.getByRole("tab", { name: "Properties" }));
+    const { rerender } = render(
+      <DatasetPropertiesPanel
+        datasetId={1}
+        detail={makeDetail({
+          name: "a",
+          description: "b::c",
+          tags: [],
+        })}
+        isLoading={false}
+        loadErrorMessage={null}
+      />,
+      { wrapper },
+    );
 
     expect(await screen.findByLabelText("Name")).toHaveValue("a");
     expect(screen.getByLabelText("Description")).toHaveValue("b::c");
 
-    currentDetail = makeDetail({
-      name: "a::b",
-      description: "c",
-      tags: [],
-    });
-    rerender(<DatasetDetailPage datasetId={1} />);
+    rerender(
+      <DatasetPropertiesPanel
+        datasetId={1}
+        detail={makeDetail({
+          name: "a::b",
+          description: "c",
+          tags: [],
+        })}
+        isLoading={false}
+        loadErrorMessage={null}
+      />,
+    );
 
     expect(await screen.findByLabelText("Name")).toHaveValue("a::b");
     expect(screen.getByLabelText("Description")).toHaveValue("c");

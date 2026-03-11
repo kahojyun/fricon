@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChartWrapper } from "@/features/chart-viewer/ui/ChartWrapper";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
+import { ChartWrapper } from "./ChartWrapper";
 
 const capturedOptions: unknown[] = [];
 

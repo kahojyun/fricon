@@ -9,7 +9,7 @@ import {
   buildChartRequest,
   deriveChartViewerState,
   type ChartViewerSelectionState,
-} from "@/features/chart-viewer/model/chartViewerLogic";
+} from "./chartViewerLogic";
 
 function makeColumn(
   overrides: Partial<ColumnInfo> & { name: string },

@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import type { CascadeMode } from "../model/cascadeReducer";
 import type { ColumnUniqueValue, FilterTableData } from "@/shared/lib/backend";
 import { Switch } from "@/shared/ui/switch";
 import { Separator } from "@/shared/ui/separator";
@@ -11,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table";
-import type { CascadeMode } from "@/features/chart-viewer/model/cascadeReducer";
 
 interface FilterTableProps {
   data?: FilterTableData;

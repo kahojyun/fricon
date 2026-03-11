@@ -5,10 +5,10 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { createDatasetColumns } from "@/features/dataset-table/ui/DatasetTableColumns";
-import { DatasetTableToolbar } from "@/features/dataset-table/ui/DatasetTableToolbar";
-import { useDatasetColumnVisibility } from "@/features/dataset-table/model/useDatasetColumnVisibility";
-import { useDatasetTableData } from "@/features/dataset-table/api/useDatasetTableData";
+import { useDatasetTableData } from "../api/useDatasetTableData";
+import { useDatasetColumnVisibility } from "../model/useDatasetColumnVisibility";
+import { createDatasetColumns } from "./DatasetTableColumns";
+import { DatasetTableToolbar } from "./DatasetTableToolbar";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 import {
   Table,

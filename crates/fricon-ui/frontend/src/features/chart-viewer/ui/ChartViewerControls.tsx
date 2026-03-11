@@ -8,7 +8,7 @@ import {
   complexSeriesOptions,
   deriveChartViewerState,
   isComplexViewOption,
-} from "@/features/chart-viewer/model/chartViewerLogic";
+} from "../model/chartViewerLogic";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Label } from "@/shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";

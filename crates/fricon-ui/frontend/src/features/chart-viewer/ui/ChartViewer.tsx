@@ -1,22 +1,22 @@
 import { useState } from "react";
+import type { DatasetDetail } from "@/shared/lib/backend";
 import type {
   ChartOptions,
   ChartType,
   ComplexViewOption,
   ScatterMode,
 } from "@/shared/lib/chartTypes";
-import { ChartViewerControls } from "@/features/chart-viewer/ui/ChartViewerControls";
-import { ChartWrapper } from "@/features/chart-viewer/ui/ChartWrapper";
-import { FilterTable } from "@/features/chart-viewer/ui/FilterTable";
+import { useChartDataQuery } from "../api/useChartDataQuery";
+import { useDatasetWriteStatusQuery } from "../api/useDatasetWriteStatusQuery";
+import { useFilterTableDataQuery } from "../api/useFilterTableDataQuery";
+import { useCascadeSelection } from "../hooks/useCascadeSelection";
 import {
   buildChartRequest,
   deriveChartViewerState,
-} from "@/features/chart-viewer/model/chartViewerLogic";
-import { useCascadeSelection } from "@/features/chart-viewer/hooks/useCascadeSelection";
-import { useChartDataQuery } from "@/features/chart-viewer/api/useChartDataQuery";
-import { useDatasetWriteStatusQuery } from "@/features/chart-viewer/api/useDatasetWriteStatusQuery";
-import { useFilterTableDataQuery } from "@/features/chart-viewer/api/useFilterTableDataQuery";
-import { useDatasetDetailQuery } from "@/features/dataset-detail/api/useDatasetDetailQuery";
+} from "../model/chartViewerLogic";
+import { ChartViewerControls } from "./ChartViewerControls";
+import { ChartWrapper } from "./ChartWrapper";
+import { FilterTable } from "./FilterTable";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import {
   ResizableHandle,
@@ -26,9 +26,10 @@ import {
 
 interface ChartViewerProps {
   datasetId: number;
+  datasetDetail: DatasetDetail | null;
 }
 
-export function ChartViewer({ datasetId }: ChartViewerProps) {
+export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
   const [chartType, setChartType] = useState<ChartType>("line");
   const [selectedComplexView, setSelectedComplexView] = useState<
     ComplexViewOption[]
@@ -54,8 +55,6 @@ export function ChartViewer({ datasetId }: ChartViewerProps) {
   const [scatterYName, setScatterYName] = useState<string | null>(null);
   const [scatterBinName, setScatterBinName] = useState<string | null>(null);
 
-  const datasetDetailQuery = useDatasetDetailQuery(datasetId);
-  const datasetDetail = datasetDetailQuery.data ?? null;
   const columns = datasetDetail?.columns ?? [];
   const derived = deriveChartViewerState(columns, {
     chartType,
