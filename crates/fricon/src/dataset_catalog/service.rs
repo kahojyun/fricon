@@ -1,9 +1,9 @@
-use tracing::instrument;
+use tracing::{error, instrument};
 
 use crate::{
     dataset_catalog::{
         DatasetCatalogError, DatasetId, DatasetListQuery, DatasetRecord, DatasetUpdate,
-        events::emit_dataset_updated, query, update,
+        events::emit_dataset_updated, tasks,
     },
     runtime::app::AppHandle,
 };
@@ -22,7 +22,7 @@ impl DatasetCatalogService {
     #[instrument(skip(self, id), fields(dataset.id = ?id))]
     pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetCatalogError> {
         self.app
-            .spawn_blocking(move |state| query::get_dataset(&mut *state.database.get()?, id))?
+            .spawn_blocking(move |state| tasks::do_get_dataset(&mut *state.database.get()?, id))?
             .await?
     }
 
@@ -32,14 +32,16 @@ impl DatasetCatalogService {
         query: DatasetListQuery,
     ) -> Result<Vec<DatasetRecord>, DatasetCatalogError> {
         self.app
-            .spawn_blocking(move |state| query::list_datasets(&mut *state.database.get()?, &query))?
+            .spawn_blocking(move |state| {
+                tasks::do_list_datasets(&mut *state.database.get()?, &query)
+            })?
             .await?
     }
 
     #[instrument(skip(self))]
     pub async fn list_dataset_tags(&self) -> Result<Vec<String>, DatasetCatalogError> {
         self.app
-            .spawn_blocking(move |state| query::list_dataset_tags(&mut *state.database.get()?))?
+            .spawn_blocking(move |state| tasks::do_list_dataset_tags(&mut *state.database.get()?))?
             .await?
     }
 
@@ -52,8 +54,8 @@ impl DatasetCatalogService {
         self.app
             .spawn_blocking(move |state| {
                 let mut conn = state.database.get()?;
-                update::update_dataset(&mut conn, id, update_payload)?;
-                let record = update::reload_dataset(&mut conn, id)?;
+                tasks::do_update_dataset(&mut conn, id, update_payload)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
                 emit_dataset_updated(&state, record);
                 Ok(())
             })?
@@ -65,8 +67,8 @@ impl DatasetCatalogService {
         self.app
             .spawn_blocking(move |state| {
                 let mut conn = state.database.get()?;
-                update::add_tags(&mut conn, id, &tags)?;
-                let record = update::reload_dataset(&mut conn, id)?;
+                tasks::do_add_tags(&mut conn, id, &tags)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
                 emit_dataset_updated(&state, record);
                 Ok(())
             })?
@@ -78,8 +80,8 @@ impl DatasetCatalogService {
         self.app
             .spawn_blocking(move |state| {
                 let mut conn = state.database.get()?;
-                update::remove_tags(&mut conn, id, &tags)?;
-                let record = update::reload_dataset(&mut conn, id)?;
+                tasks::do_remove_tags(&mut conn, id, &tags)?;
+                let record = tasks::do_get_dataset(&mut conn, DatasetId::Id(id))?;
                 emit_dataset_updated(&state, record);
                 Ok(())
             })?
@@ -89,7 +91,11 @@ impl DatasetCatalogService {
     #[instrument(skip(self), fields(dataset.id = id))]
     pub async fn delete_dataset(&self, id: i32) -> Result<(), DatasetCatalogError> {
         self.app
-            .spawn_blocking(move |state| update::delete_dataset(&state.database, &state.root, id))?
+            .spawn_blocking(move |state| {
+                tasks::do_delete_dataset(&state.database, &state.root, id).inspect_err(|e| {
+                    error!(error = %e, dataset.id = id, "Dataset deletion failed");
+                })
+            })?
             .await?
     }
 }
