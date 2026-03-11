@@ -6,12 +6,12 @@ use uuid::Uuid;
 
 use super::create_stream;
 use crate::{
+    database::DatasetStatus,
     dataset_catalog::{
         DatasetCatalogError, DatasetCatalogService, DatasetId, DatasetListQuery, DatasetMetadata,
         DatasetRecord, DatasetUpdate,
     },
     dataset_ingest::DatasetIngestService,
-    database::DatasetStatus,
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
         DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest, RemoveTagsResponse,
@@ -159,7 +159,10 @@ impl DatasetService for Storage {
         let create =
             create_stream::parse_create_stream(stream, self.shutdown_token.clone()).await?;
         debug!(name = %create.request.name, "RPC create: received dataset stream");
-        let record_result = self.ingest.create_dataset(create.request, create.events_rx).await;
+        let record_result = self
+            .ingest
+            .create_dataset(create.request, create.events_rx)
+            .await;
         let producer_result = create.events_task.await.map_err(|e| {
             error!(error = %e, "Create stream event producer task panicked");
             Status::internal("create stream event producer failed unexpectedly")

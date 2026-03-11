@@ -21,11 +21,11 @@ mod workspace {
 }
 
 pub(crate) use crate::desktop_runtime::app_state::AppState;
+use crate::desktop_runtime::{logging::init_tracing_subscriber, panic_hook::install_panic_hook};
 pub use crate::{
     launch::{InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError},
     tauri_api::bindings::export_bindings,
 };
-use crate::desktop_runtime::{logging::init_tracing_subscriber, panic_hook::install_panic_hook};
 
 /// Run the application with the given launch context.
 ///
@@ -50,8 +50,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        desktop_runtime::panic_hook::build_panic_dialog_message,
         InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError,
+        desktop_runtime::panic_hook::build_panic_dialog_message,
         workspace::{resolve_workspace_path, validate_workspace_path},
     };
 

@@ -15,15 +15,13 @@ pub(super) fn emit_dataset_updated(state: &AppState, record: DatasetRecord) {
         ..
     } = metadata;
 
-    let _ = state
-        .event_sender
-        .send(AppEvent::DatasetUpdated {
-            id,
-            name,
-            description,
-            favorite,
-            tags,
-            status,
-            created_at,
-        });
+    let _ = state.event_sender.send(AppEvent::DatasetUpdated {
+        id,
+        name,
+        description,
+        favorite,
+        tags,
+        status,
+        created_at,
+    });
 }

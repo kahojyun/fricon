@@ -1,12 +1,11 @@
+use tokio::sync::mpsc;
 use tracing::error;
 
 use crate::{
-    dataset_catalog::{DatasetCatalogError, DatasetRecord},
+    dataset_catalog::{DatasetCatalogError, DatasetRecord, tasks},
     dataset_ingest::{CreateDatasetRequest, CreateIngestEvent},
-    dataset_manager::tasks,
     runtime::app::AppHandle,
 };
-use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub struct DatasetIngestService {

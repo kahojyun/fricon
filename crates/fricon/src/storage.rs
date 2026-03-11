@@ -11,7 +11,7 @@ use arrow_schema::ArrowError;
 use tracing::warn;
 
 pub(crate) use self::{reader::ChunkReader, writer::ChunkWriter};
-use crate::dataset;
+use crate::dataset_schema::DatasetError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatasetFsError {
@@ -24,7 +24,7 @@ pub enum DatasetFsError {
     #[error("Schema mismatch.")]
     SchemaMismatch,
     #[error(transparent)]
-    Dataset(#[from] dataset::DatasetError),
+    Dataset(#[from] DatasetError),
     #[error(transparent)]
     Arrow(#[from] ArrowError),
     #[error(transparent)]

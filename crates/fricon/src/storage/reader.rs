@@ -19,8 +19,8 @@ use arrow_schema::SchemaRef;
 use itertools::Itertools;
 
 use crate::{
-    dataset::ChunkedTable,
-    dataset_fs::{DatasetFsError, chunk_path},
+    dataset_schema::ChunkedTable,
+    storage::{DatasetFsError, chunk_path},
 };
 
 #[derive(Debug)]

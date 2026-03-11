@@ -11,12 +11,9 @@ use super::{AppState, TauriCommandError};
 use crate::{
     chart_data::{
         ChartDataResponse, DatasetChartDataOptions, build_heatmap_series, build_line_series,
-        build_scatter_series,
+        build_scatter_series, mapping::build_chart_selected_columns,
     },
     tauri_api::commands::filter_data::build_filter_batch,
-};
-use crate::{
-    chart_data::mapping::build_chart_selected_columns,
 };
 
 #[tauri::command]

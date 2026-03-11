@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
+use grpc::{dataset_service::Storage, fricon_service::Fricon};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tonic::transport::Server;
 use tracing::{error, info, instrument};
@@ -12,7 +13,6 @@ use crate::{
     runtime::app::AppHandle,
     transport::{grpc, ipc},
 };
-use grpc::{dataset_service::Storage, fricon_service::Fricon};
 
 #[instrument(skip(app, task_tracker, cancellation_token), fields(ipc_file = %ipc_file.display()))]
 pub(crate) fn start(

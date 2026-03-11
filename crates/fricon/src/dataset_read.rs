@@ -1,11 +1,5 @@
-mod filter;
-mod select;
+mod reader;
 mod service;
-mod sort;
-mod storage;
 mod types;
 
-pub use self::{
-    service::DatasetReadService,
-    types::{DatasetReader, SelectOptions},
-};
+pub use self::{reader::DatasetReader, service::DatasetReadService, types::SelectOptions};

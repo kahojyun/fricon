@@ -1,8 +1,7 @@
 use tracing::instrument;
 
 use crate::{
-    dataset_catalog::{DatasetCatalogError, DatasetId},
-    dataset_manager::tasks,
+    dataset_catalog::{DatasetCatalogError, DatasetId, tasks},
     dataset_read::DatasetReader,
     runtime::app::AppHandle,
 };

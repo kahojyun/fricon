@@ -15,16 +15,20 @@ use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 use crate::{
-    DEFAULT_DATASET_LIST_LIMIT, WorkspaceRoot,
-    app::AppEvent,
+    DEFAULT_DATASET_LIST_LIMIT,
     database::{self, DatasetStatus, NewDataset, Pool, SimpleUuid, schema},
-    dataset_fs,
-    dataset_manager::{
-        CreateDatasetRequest, CreateIngestEvent, CreateTerminal, DatasetId, DatasetListQuery,
-        DatasetManagerError, DatasetReader, DatasetRecord, DatasetSortBy, DatasetUpdate,
-        SortDirection,
-        write_registry::{WriteSessionGuard, WriteSessionRegistry},
+    dataset_catalog::{
+        DatasetCatalogError, DatasetId, DatasetListQuery, DatasetRecord, DatasetSortBy,
+        DatasetUpdate, SortDirection,
     },
+    dataset_ingest::{
+        CreateDatasetRequest, CreateIngestEvent, CreateTerminal, WriteSessionGuard,
+        WriteSessionRegistry,
+    },
+    dataset_read::DatasetReader,
+    runtime::app::AppEvent,
+    storage,
+    workspace::WorkspaceRoot,
 };
 
 #[cfg_attr(test, mockall::automock)]
@@ -33,9 +37,9 @@ pub(super) trait DatasetRepo {
         &self,
         request: &CreateDatasetRequest,
         uid: Uuid,
-    ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError>;
-    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), DatasetManagerError>;
-    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError>;
+    ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetCatalogError>;
+    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), DatasetCatalogError>;
+    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetCatalogError>;
 }
 
 impl DatasetRepo for Pool {
@@ -43,17 +47,17 @@ impl DatasetRepo for Pool {
         &self,
         request: &CreateDatasetRequest,
         uid: Uuid,
-    ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError> {
+    ) -> Result<(database::Dataset, Vec<database::Tag>), DatasetCatalogError> {
         create_dataset_db_record(&mut *self.get()?, request, uid)
     }
 
-    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), DatasetManagerError> {
+    fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), DatasetCatalogError> {
         let mut conn = self.get()?;
         database::Dataset::update_status(&mut conn, id, status)?;
         Ok(())
     }
 
-    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetManagerError> {
+    fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, DatasetCatalogError> {
         let mut conn = self.get()?;
         do_get_dataset(&mut conn, id)
     }
@@ -61,13 +65,13 @@ impl DatasetRepo for Pool {
 
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait DatasetStore {
-    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, DatasetManagerError>;
+    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, DatasetCatalogError>;
 }
 
 impl DatasetStore for WorkspaceRoot {
-    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, DatasetManagerError> {
+    fn create_dataset_dir(&self, uid: Uuid) -> Result<PathBuf, DatasetCatalogError> {
         let path = self.paths().dataset_path_from_uid(uid);
-        dataset_fs::create_dataset(&path)?;
+        storage::create_dataset(&path)?;
         Ok(path)
     }
 }
@@ -85,22 +89,22 @@ impl DatasetEvents for broadcast::Sender<AppEvent> {
 
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait WriteSessionGuardOps {
-    fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError>;
-    fn commit(self) -> Result<(), DatasetManagerError>;
-    fn abort(self) -> Result<(), DatasetManagerError>;
+    fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetCatalogError>;
+    fn commit(self) -> Result<(), DatasetCatalogError>;
+    fn abort(self) -> Result<(), DatasetCatalogError>;
 }
 
 impl WriteSessionGuardOps for WriteSessionGuard {
-    fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetManagerError> {
-        Self::write(self, batch)
+    fn write(&mut self, batch: RecordBatch) -> Result<(), DatasetCatalogError> {
+        self.write_batch(batch)
     }
 
-    fn commit(self) -> Result<(), DatasetManagerError> {
-        Self::commit(self)
+    fn commit(self) -> Result<(), DatasetCatalogError> {
+        self.commit_session()
     }
 
-    fn abort(self) -> Result<(), DatasetManagerError> {
-        Self::abort(self)
+    fn abort(self) -> Result<(), DatasetCatalogError> {
+        self.abort_session()
     }
 }
 
@@ -128,7 +132,7 @@ fn create_dataset_with<R, S, E, W>(
     write_sessions: &W,
     request: CreateDatasetRequest,
     mut events_rx: mpsc::Receiver<CreateIngestEvent>,
-) -> Result<DatasetRecord, DatasetManagerError>
+) -> Result<DatasetRecord, DatasetCatalogError>
 where
     R: DatasetRepo,
     S: DatasetStore,
@@ -216,7 +220,7 @@ pub(crate) fn do_create_dataset(
     write_sessions: &WriteSessionRegistry,
     request: CreateDatasetRequest,
     events_rx: mpsc::Receiver<CreateIngestEvent>,
-) -> Result<DatasetRecord, DatasetManagerError> {
+) -> Result<DatasetRecord, DatasetCatalogError> {
     create_dataset_with(
         database,
         root,
@@ -233,7 +237,7 @@ pub(crate) fn do_delete_dataset(
     database: &Pool,
     root: &WorkspaceRoot,
     id: i32,
-) -> Result<(), DatasetManagerError> {
+) -> Result<(), DatasetCatalogError> {
     let mut conn = database.get()?;
     let record = do_get_dataset(&mut conn, DatasetId::Id(id))?;
     let uid = record.metadata.uid;
@@ -241,7 +245,7 @@ pub(crate) fn do_delete_dataset(
     database::Dataset::delete_from_db(&mut conn, id)?;
     drop(conn);
 
-    dataset_fs::delete_dataset(&dataset_path)?;
+    storage::delete_dataset(&dataset_path)?;
     info!(dataset.id = id, %uid, "Dataset deleted");
 
     Ok(())
@@ -252,7 +256,7 @@ pub(crate) fn do_delete_dataset(
 pub(crate) fn do_get_dataset(
     conn: &mut SqliteConnection,
     id: DatasetId,
-) -> Result<DatasetRecord, DatasetManagerError> {
+) -> Result<DatasetRecord, DatasetCatalogError> {
     let dataset = match id {
         DatasetId::Id(dataset_id) => database::Dataset::find_by_id(conn, dataset_id)?,
         DatasetId::Uid(uid) => database::Dataset::find_by_uid(conn, uid)?,
@@ -263,7 +267,7 @@ pub(crate) fn do_get_dataset(
             DatasetId::Id(i) => i.to_string(),
             DatasetId::Uid(u) => u.to_string(),
         };
-        return Err(DatasetManagerError::NotFound { id: id_str });
+        return Err(DatasetCatalogError::NotFound { id: id_str });
     };
 
     let tags = dataset.load_tags(conn)?;
@@ -301,7 +305,7 @@ fn normalize_tag_filters(tags: Option<&[String]>) -> Option<Vec<String>> {
 fn resolve_tagged_dataset_ids(
     conn: &mut SqliteConnection,
     tag_filters: Option<&[String]>,
-) -> Result<Option<Vec<i32>>, DatasetManagerError> {
+) -> Result<Option<Vec<i32>>, DatasetCatalogError> {
     let Some(tag_filters) = tag_filters else {
         return Ok(None);
     };
@@ -336,7 +340,7 @@ fn normalize_statuses(statuses: Option<&[DatasetStatus]>) -> Option<Vec<DatasetS
 fn map_datasets_with_tags(
     conn: &mut SqliteConnection,
     all_datasets: Vec<database::Dataset>,
-) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
+) -> Result<Vec<DatasetRecord>, DatasetCatalogError> {
     let dataset_tags = database::DatasetTag::belonging_to(&all_datasets)
         .inner_join(schema::tags::table)
         .select((
@@ -368,7 +372,7 @@ fn map_datasets_with_tags(
 pub(crate) fn do_list_datasets(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
-) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
+) -> Result<Vec<DatasetRecord>, DatasetCatalogError> {
     let search = normalize_search(query_options.search.as_deref());
     let tag_filters = normalize_tag_filters(query_options.tags.as_deref());
     let tagged_dataset_ids = resolve_tagged_dataset_ids(conn, tag_filters.as_deref())?;
@@ -428,7 +432,7 @@ pub(crate) fn do_list_datasets(
 #[instrument(skip(conn))]
 pub(crate) fn do_list_dataset_tags(
     conn: &mut SqliteConnection,
-) -> Result<Vec<String>, DatasetManagerError> {
+) -> Result<Vec<String>, DatasetCatalogError> {
     let tags = schema::tags::table
         .select(schema::tags::name)
         .order(schema::tags::name.asc())
@@ -442,7 +446,7 @@ pub(crate) fn do_update_dataset(
     conn: &mut SqliteConnection,
     id: i32,
     update: DatasetUpdate,
-) -> Result<(), DatasetManagerError> {
+) -> Result<(), DatasetCatalogError> {
     let db_update = database::DatasetUpdate {
         name: update.name,
         description: update.description,
@@ -460,13 +464,13 @@ pub(crate) fn do_add_tags(
     conn: &mut SqliteConnection,
     id: i32,
     tags: &[String],
-) -> Result<(), DatasetManagerError> {
+) -> Result<(), DatasetCatalogError> {
     conn.immediate_transaction(|conn| {
         let created_tags = database::Tag::find_or_create_batch(conn, tags)?;
         let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
 
         database::DatasetTag::create_associations(conn, id, &tag_ids)?;
-        Ok::<(), DatasetManagerError>(())
+        Ok::<(), DatasetCatalogError>(())
     })?;
     debug!(dataset.id = id, ?tags, "Tags added to dataset");
     Ok(())
@@ -478,7 +482,7 @@ pub(crate) fn do_remove_tags(
     conn: &mut SqliteConnection,
     id: i32,
     tags: &[String],
-) -> Result<(), DatasetManagerError> {
+) -> Result<(), DatasetCatalogError> {
     conn.immediate_transaction(|conn| {
         let tag_ids_to_delete = schema::tags::table
             .filter(schema::tags::name.eq_any(tags))
@@ -486,7 +490,7 @@ pub(crate) fn do_remove_tags(
             .load::<i32>(conn)?;
 
         database::DatasetTag::remove_associations(conn, id, &tag_ids_to_delete)?;
-        Ok::<(), DatasetManagerError>(())
+        Ok::<(), DatasetCatalogError>(())
     })?;
     debug!(dataset.id = id, ?tags, "Tags removed from dataset");
     Ok(())
@@ -499,7 +503,7 @@ pub(crate) fn do_get_dataset_reader(
     root: &WorkspaceRoot,
     write_sessions: &WriteSessionRegistry,
     id: DatasetId,
-) -> Result<DatasetReader, DatasetManagerError> {
+) -> Result<DatasetReader, DatasetCatalogError> {
     let mut conn = database.get()?;
     let dataset = do_get_dataset(&mut conn, id)?;
     if let Some(handle) = write_sessions.get(dataset.id) {
@@ -516,7 +520,7 @@ fn create_dataset_db_record(
     conn: &mut SqliteConnection,
     request: &CreateDatasetRequest,
     uid: Uuid,
-) -> Result<(database::Dataset, Vec<database::Tag>), DatasetManagerError> {
+) -> Result<(database::Dataset, Vec<database::Tag>), DatasetCatalogError> {
     conn.immediate_transaction(|conn| {
         let new_dataset = NewDataset {
             uid: SimpleUuid(uid),
@@ -716,7 +720,7 @@ mod tests {
             .times(1)
             .in_sequence(&mut seq)
             .returning(|| {
-                Err(DatasetManagerError::NotFound {
+                Err(DatasetCatalogError::NotFound {
                     id: "commit failed".to_string(),
                 })
             });
@@ -741,7 +745,7 @@ mod tests {
         ]);
 
         let result = create_dataset_with(&repo, &store, &events, &sessions, request, events_rx);
-        assert!(matches!(result, Err(DatasetManagerError::NotFound { .. })));
+        assert!(matches!(result, Err(DatasetCatalogError::NotFound { .. })));
     }
 
     #[test]

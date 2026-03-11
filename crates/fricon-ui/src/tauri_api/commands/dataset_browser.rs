@@ -124,9 +124,9 @@ pub(crate) async fn list_datasets(
         search: options.search,
         tags: options.tags,
         favorite_only: options.favorite_only.unwrap_or(false),
-        statuses: options.statuses.map(|statuses: Vec<UiDatasetStatus>| {
-            statuses.into_iter().map(Into::into).collect()
-        }),
+        statuses: options
+            .statuses
+            .map(|statuses: Vec<UiDatasetStatus>| statuses.into_iter().map(Into::into).collect()),
         sort_by: options.sort_by.map_or(DatasetSortBy::Id, Into::into),
         sort_direction: options.sort_dir.map_or(SortDirection::Desc, Into::into),
         limit: validate_non_negative(options.limit, "limit")?,

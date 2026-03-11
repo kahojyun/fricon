@@ -74,11 +74,7 @@ impl DatasetCatalogService {
     }
 
     #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
-    pub async fn remove_tags(
-        &self,
-        id: i32,
-        tags: Vec<String>,
-    ) -> Result<(), DatasetCatalogError> {
+    pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), DatasetCatalogError> {
         self.app
             .spawn_blocking(move |state| {
                 let mut conn = state.database.get()?;

@@ -1,9 +1,6 @@
 use tracing::error;
 
-use crate::{
-    dataset_catalog::{DatasetCatalogError, DatasetId, DatasetUpdate},
-    dataset_manager::tasks,
-};
+use crate::dataset_catalog::{DatasetCatalogError, DatasetId, DatasetUpdate, tasks};
 
 pub(super) fn update_dataset(
     conn: &mut diesel::SqliteConnection,

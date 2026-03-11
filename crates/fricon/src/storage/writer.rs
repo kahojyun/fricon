@@ -10,7 +10,7 @@ use arrow_select::concat::concat_batches;
 use tempfile::NamedTempFile;
 use tracing::{error, warn};
 
-use crate::dataset_fs::{DatasetFsError, chunk_path};
+use crate::storage::{DatasetFsError, chunk_path};
 
 const MAX_BATCH_BYTE_SIZE: usize = 64 * 1024 * 1024;
 const MAX_CHUNK_BYTE_SIZE: u64 = 256 * 1024 * 1024;

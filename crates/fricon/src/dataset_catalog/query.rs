@@ -1,4 +1,4 @@
-use crate::dataset_manager::tasks;
+use crate::dataset_catalog::tasks;
 
 pub(super) fn get_dataset(
     conn: &mut diesel::SqliteConnection,

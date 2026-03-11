@@ -7,7 +7,7 @@ use std::{
 use arrow_array::RecordBatch;
 use arrow_schema::SchemaRef;
 
-use crate::dataset::DatasetError;
+use crate::dataset_schema::DatasetError;
 
 /// Manage chunked batches. Able to release batches from front to a target row,
 /// while ensuring `target_row..` can be accessed.

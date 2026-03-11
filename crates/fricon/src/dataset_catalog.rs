@@ -1,6 +1,7 @@
 mod events;
 mod query;
 mod service;
+pub(crate) mod tasks;
 mod types;
 mod update;
 

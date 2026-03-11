@@ -11,8 +11,8 @@ use tauri_specta::{Builder, collect_commands, collect_events};
 pub(crate) mod bindings;
 pub(crate) mod commands;
 
-pub(super) use crate::{AppState, dataset_browser::types::TauriCommandError};
 pub(crate) use crate::dataset_browser::types::{DatasetCreated, DatasetInfo, DatasetUpdated};
+pub(super) use crate::{AppState, dataset_browser::types::TauriCommandError};
 
 pub(crate) fn specta_builder() -> Builder {
     Builder::new()

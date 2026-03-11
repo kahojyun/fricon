@@ -23,15 +23,15 @@ use uuid::Uuid;
 use crate::{
     DEFAULT_DATASET_LIST_LIMIT, VERSION,
     database::DatasetStatus,
-    dataset::{DatasetArray, DatasetRow, DatasetSchema},
-    dataset_manager::DatasetRecord,
-    ipc,
+    dataset_catalog::DatasetRecord,
+    dataset_schema::{DatasetArray, DatasetRow, DatasetSchema},
     proto::{
         AddTagsRequest, CreateAbort, CreateFinish, CreateMetadata, CreateRequest, CreateResponse,
         GetRequest, RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
+    transport::ipc,
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
 
@@ -223,7 +223,7 @@ impl DatasetWriter {
             .context("Connection failed.")?
             .dataset
             .context("No dataset returned.")?;
-        let record: crate::dataset_manager::DatasetRecord = dataset
+        let record: DatasetRecord = dataset
             .try_into()
             .context("Failed to convert dataset record")?;
         info!(dataset.id = record.id, "Dataset write finished");

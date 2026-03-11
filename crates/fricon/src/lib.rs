@@ -12,34 +12,12 @@ pub mod dataset_catalog;
 pub mod dataset_ingest;
 pub mod dataset_read;
 pub mod dataset_schema;
-#[expect(
-    dead_code,
-    unreachable_pub,
-    reason = "Compatibility shim during capability split"
-)]
-mod dataset_manager;
 mod proto;
 pub mod runtime;
 mod storage;
 mod transport;
 mod utils;
 pub mod workspace;
-
-mod app {
-    pub(crate) use crate::runtime::app::*;
-}
-
-mod dataset {
-    pub(crate) use crate::dataset_schema::*;
-}
-
-mod dataset_fs {
-    pub(crate) use crate::storage::*;
-}
-
-mod ipc {
-    pub(crate) use crate::transport::ipc::*;
-}
 
 pub use self::{
     client::{Client, Dataset, DatasetWriter},
