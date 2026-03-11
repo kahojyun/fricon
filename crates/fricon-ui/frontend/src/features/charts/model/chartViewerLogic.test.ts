@@ -45,15 +45,9 @@ function makeState(
 
 function makeDatasetDetail(columns: ColumnInfo[]): DatasetDetail {
   return {
-    id: 1,
-    name: "Dataset",
-    description: "",
-    favorite: false,
-    tags: [],
     status: "Completed",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
     columns,
-  } as DatasetDetail;
+  };
 }
 
 function makeFilterTableData(): FilterTableData {

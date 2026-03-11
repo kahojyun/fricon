@@ -4,7 +4,6 @@ import {
   type DatasetFavoriteUpdate,
   type DatasetInfo as WireDatasetInfo,
   type DatasetListOptions as WireDatasetListOptions,
-  type DatasetWriteStatus,
 } from "@/shared/lib/bindings";
 import { invoke } from "@/shared/lib/tauri";
 import {
@@ -67,10 +66,4 @@ export async function updateDatasetInfo(
 export async function getDatasetDetail(id: number): Promise<DatasetDetail> {
   const rawDetail: WireDatasetDetail = await invoke(commands.datasetDetail(id));
   return normalizeDatasetDetail(rawDetail);
-}
-
-export async function getDatasetWriteStatus(
-  id: number,
-): Promise<DatasetWriteStatus> {
-  return invoke(commands.getDatasetWriteStatus(id));
 }

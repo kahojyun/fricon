@@ -3,7 +3,6 @@ import type {
   DatasetDetail as WireDatasetDetail,
   DatasetInfo as WireDatasetInfo,
   DatasetInfoUpdate,
-  DatasetWriteStatus,
   UiDatasetSortBy as DatasetListSortBy,
   UiDatasetStatus as DatasetStatus,
   UiSortDirection as DatasetListSortDir,
@@ -26,7 +25,6 @@ export type {
   DatasetListSortBy,
   DatasetListSortDir,
   DatasetStatus,
-  DatasetWriteStatus,
 };
 
 export interface ListDatasetsOptions {

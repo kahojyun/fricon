@@ -44,13 +44,7 @@ function createQueryClient() {
 
 function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
   return {
-    id: 1,
-    name: "Dataset 1",
-    description: "Test dataset",
-    favorite: false,
-    tags: [],
     status: "Completed",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
     columns: [],
     ...overrides,
   };

@@ -2,26 +2,28 @@ import type {
   ChartDataResponse as WireChartResponse,
   ColumnUniqueValue,
   ColumnInfo,
-  DatasetDetail as WireDatasetDetail,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
   Row as FilterTableRow,
   TableData as WireFilterTableData,
+  UiDatasetStatus as DatasetStatus,
 } from "@/shared/lib/bindings";
 import type { ChartOptions, ComplexViewOption } from "@/shared/lib/chartTypes";
 
 export type {
   ColumnInfo,
   ColumnUniqueValue,
+  DatasetStatus,
   DatasetWriteStatus,
   FilterTableOptions,
   FilterTableRow,
 };
 
-export type DatasetDetail = Omit<WireDatasetDetail, "createdAt"> & {
-  createdAt: Date;
-};
+export interface DatasetDetail {
+  status: DatasetStatus;
+  columns: ColumnInfo[];
+}
 
 export interface FilterTableData {
   fields: string[];
