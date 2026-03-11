@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { FilterTable } from "@/features/chart-viewer/ui/FilterTable";
 import type { FilterTableData } from "@/shared/lib/backend";
+import { FilterTable } from "./FilterTable";
 
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: ({ count }: { count: number }) => ({

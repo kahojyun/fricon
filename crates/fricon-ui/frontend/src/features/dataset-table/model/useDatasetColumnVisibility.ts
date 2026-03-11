@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ColumnDef, VisibilityState } from "@tanstack/react-table";
 import type { DatasetInfo } from "@/shared/lib/backend";
-import type { DatasetColumnMeta } from "@/features/dataset-table/ui/DatasetTableColumns";
+import type { DatasetColumnMeta } from "./datasetColumnMeta";
 
 const COLUMN_VISIBILITY_STORAGE_KEY = "fricon.datasetTable.columnVisibility.v1";
 const REQUIRED_DATASET_COLUMN_ID = "name";

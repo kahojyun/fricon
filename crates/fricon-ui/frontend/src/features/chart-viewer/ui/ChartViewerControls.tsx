@@ -1,14 +1,13 @@
 import type { ColumnInfo } from "@/shared/lib/backend";
-import type {
-  ChartType,
-  ComplexViewOption,
-  ScatterMode,
-} from "@/shared/lib/chartTypes";
 import {
   complexSeriesOptions,
   deriveChartViewerState,
   isComplexViewOption,
-} from "@/features/chart-viewer/model/chartViewerLogic";
+} from "../model/chartViewerLogic";
+import type {
+  ChartViewerControlActions,
+  ChartViewerControlState,
+} from "../hooks/useChartViewerSelection";
 import { Checkbox } from "@/shared/ui/checkbox";
 import { Label } from "@/shared/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group";
@@ -23,41 +22,32 @@ import { cn } from "@/shared/lib/utils";
 
 interface ChartViewerControlsProps {
   derived: ReturnType<typeof deriveChartViewerState>;
-  selectedComplexView: ComplexViewOption[];
-  selectedComplexViewSingle: ComplexViewOption;
-  setChartType: (next: ChartType) => void;
-  setSeriesName: (next: string | null) => void;
-  setXColumnName: (next: string | null) => void;
-  setYColumnName: (next: string | null) => void;
-  setScatterMode: (next: ScatterMode) => void;
-  setScatterSeriesName: (next: string | null) => void;
-  setScatterTraceXName: (next: string | null) => void;
-  setScatterTraceYName: (next: string | null) => void;
-  setScatterXName: (next: string | null) => void;
-  setScatterYName: (next: string | null) => void;
-  setScatterBinName: (next: string | null) => void;
-  setSelectedComplexView: (next: ComplexViewOption[]) => void;
-  setSelectedComplexViewSingle: (next: ComplexViewOption) => void;
+  controlState: ChartViewerControlState;
+  actions: ChartViewerControlActions;
 }
 
 export function ChartViewerControls({
   derived,
-  selectedComplexView,
-  selectedComplexViewSingle,
-  setChartType,
-  setSeriesName,
-  setXColumnName,
-  setYColumnName,
-  setScatterMode,
-  setScatterSeriesName,
-  setScatterTraceXName,
-  setScatterTraceYName,
-  setScatterXName,
-  setScatterYName,
-  setScatterBinName,
-  setSelectedComplexView,
-  setSelectedComplexViewSingle,
+  controlState,
+  actions,
 }: ChartViewerControlsProps) {
+  const { selectedComplexView, selectedComplexViewSingle } = controlState;
+  const {
+    setChartType,
+    setSeriesName,
+    setXColumnName,
+    setYColumnName,
+    setScatterMode,
+    setScatterSeriesName,
+    setScatterTraceXName,
+    setScatterTraceYName,
+    setScatterXName,
+    setScatterYName,
+    setScatterBinName,
+    setSelectedComplexView,
+    setSelectedComplexViewSingle,
+  } = actions;
+
   const {
     availableChartTypes,
     complexControlsDisabled,

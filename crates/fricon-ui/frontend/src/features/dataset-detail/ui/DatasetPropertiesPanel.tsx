@@ -31,71 +31,42 @@ import {
   TableRow,
 } from "@/shared/ui/table";
 import { Textarea } from "@/shared/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-import { ChartViewer } from "@/features/chart-viewer";
-import { useDatasetDetailQuery } from "@/features/dataset-detail/api/useDatasetDetailQuery";
 
-interface DatasetDetailPageProps {
+interface DatasetPropertiesPanelProps {
   datasetId: number;
+  detail: DatasetDetail | null;
+  isLoading: boolean;
+  loadErrorMessage: string | null;
   onDatasetUpdated?: () => void;
 }
 
-export function DatasetDetailPage({
+export function DatasetPropertiesPanel({
   datasetId,
+  detail,
+  isLoading,
+  loadErrorMessage,
   onDatasetUpdated,
-}: DatasetDetailPageProps) {
-  const detailQuery = useDatasetDetailQuery(datasetId);
-  const detail = detailQuery.data ?? null;
-  const isLoading = detailQuery.isLoading;
-
-  const loadErrorMessage =
-    detailQuery.error instanceof Error ? detailQuery.error.message : null;
-
+}: DatasetPropertiesPanelProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <Tabs defaultValue="charts" className="flex h-full min-h-0 flex-col">
-        <TabsList>
-          <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="properties">Properties</TabsTrigger>
-        </TabsList>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-1">
+      {isLoading && !detail ? (
+        <div className="text-xs text-muted-foreground">Loading dataset...</div>
+      ) : null}
 
-        <TabsContent
-          value="charts"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        >
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <ChartViewer datasetId={datasetId} />
-          </div>
-        </TabsContent>
+      {detail ? (
+        <DatasetDetailEditor
+          key={buildDatasetDetailEditorKey(datasetId, detail)}
+          datasetId={datasetId}
+          detail={detail}
+          onDatasetUpdated={onDatasetUpdated}
+        />
+      ) : null}
 
-        <TabsContent
-          value="properties"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        >
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-1">
-            {isLoading && !detail ? (
-              <div className="text-xs text-muted-foreground">
-                Loading dataset...
-              </div>
-            ) : null}
-
-            {detail ? (
-              <DatasetDetailEditor
-                key={buildDatasetDetailEditorKey(datasetId, detail)}
-                datasetId={datasetId}
-                detail={detail}
-                onDatasetUpdated={onDatasetUpdated}
-              />
-            ) : null}
-
-            {!detail && !isLoading ? (
-              <div className="text-xs text-muted-foreground">
-                {loadErrorMessage ?? "Dataset not found."}
-              </div>
-            ) : null}
-          </div>
-        </TabsContent>
-      </Tabs>
+      {!detail && !isLoading ? (
+        <div className="text-xs text-muted-foreground">
+          {loadErrorMessage ?? "Dataset not found."}
+        </div>
+      ) : null}
     </div>
   );
 }

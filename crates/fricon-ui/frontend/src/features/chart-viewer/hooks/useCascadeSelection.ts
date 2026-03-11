@@ -6,7 +6,7 @@ import {
   resolveRow,
   type CascadeAction,
   type CascadeMode,
-} from "@/features/chart-viewer/model/cascadeReducer";
+} from "../model/cascadeReducer";
 
 export function useCascadeSelection(data?: FilterTableData | null) {
   const [state, dispatch] = useReducer(cascadeReducer, initialCascadeState);
@@ -20,14 +20,16 @@ export function useCascadeSelection(data?: FilterTableData | null) {
     fieldIndex: number,
     valueIndex: number,
     baselineRowIndex: number | null,
-  ) =>
+  ) => {
+    if (!data) return;
     dispatch({
       type: "field/select",
       fieldIndex,
       valueIndex,
-      data: data!,
+      data,
       baselineRowIndex,
     } satisfies CascadeAction);
+  };
 
   return {
     state,
