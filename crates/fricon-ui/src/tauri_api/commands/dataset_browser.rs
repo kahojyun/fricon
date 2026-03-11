@@ -8,7 +8,7 @@ use tauri::State;
 use super::TauriCommandError;
 use crate::{
     AppState,
-    dataset_browser::types::{DatasetInfo, UiDatasetSortBy, UiDatasetStatus, UiSortDirection},
+    dataset_browser::{DatasetInfo, UiDatasetSortBy, UiDatasetStatus, UiSortDirection},
     tauri_api::commands::tags::normalize_tags,
 };
 

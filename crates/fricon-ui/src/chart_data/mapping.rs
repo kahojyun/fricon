@@ -6,7 +6,7 @@ use crate::{
         DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
         ScatterChartDataOptions, ScatterModeOptions,
     },
-    dataset_browser::types::TauriCommandError,
+    tauri_api::TauriCommandError,
 };
 
 fn column_index(schema: &DatasetSchema, name: &str) -> Result<usize, TauriCommandError> {

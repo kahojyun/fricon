@@ -7,24 +7,15 @@ mod tauri_api;
 
 use anyhow::Result;
 
-#[expect(unused_imports, reason = "Compatibility shim for internal tests")]
-mod logging {
-    pub(crate) use crate::desktop_runtime::logging::*;
-}
-
-mod runtime {
-    pub(crate) use crate::desktop_runtime::runtime::*;
-}
-
-mod workspace {
-    pub(crate) use crate::launch::resolve::*;
-}
-
 pub(crate) use crate::desktop_runtime::app_state::AppState;
-use crate::desktop_runtime::{logging::init_tracing_subscriber, panic_hook::install_panic_hook};
+use crate::desktop_runtime::{
+    logging::init_tracing_subscriber,
+    panic_hook::install_panic_hook,
+    runtime::{run_with_context_dialog_mode, run_with_context_terminal_mode},
+};
 pub use crate::{
     launch::{InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError},
-    tauri_api::bindings::export_bindings,
+    tauri_api::export_bindings,
 };
 
 /// Run the application with the given launch context.
@@ -37,8 +28,8 @@ pub fn run_with_context(context: &LaunchContext) -> Result<()> {
     init_tracing_subscriber()?;
     install_panic_hook(context.interaction_mode);
     match context.interaction_mode {
-        InteractionMode::Terminal => runtime::run_with_context_terminal_mode(context),
-        InteractionMode::Dialog => runtime::run_with_context_dialog_mode(context),
+        InteractionMode::Terminal => run_with_context_terminal_mode(context),
+        InteractionMode::Dialog => run_with_context_dialog_mode(context),
     }
 }
 
@@ -52,7 +43,7 @@ mod tests {
     use super::{
         InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError,
         desktop_runtime::panic_hook::build_panic_dialog_message,
-        workspace::{resolve_workspace_path, validate_workspace_path},
+        launch::resolve::{resolve_workspace_path, validate_workspace_path},
     };
 
     #[test]

@@ -7,7 +7,7 @@ use tauri_specta::Event;
 use tokio::sync::broadcast::error::RecvError;
 use tracing::{error, warn};
 
-use crate::dataset_browser::types::{DatasetCreated, DatasetInfo, DatasetUpdated};
+use crate::dataset_browser::{DatasetCreated, DatasetInfo, DatasetUpdated};
 
 pub(crate) struct AppState {
     manager: Mutex<Option<AppManager>>,

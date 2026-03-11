@@ -17,9 +17,11 @@ use crate::{
             WorkspaceLogSession, attach_workspace_file_logging, shutdown_workspace_file_logging,
         },
     },
-    launch::{LaunchContext, WorkspaceLaunchError},
+    launch::{
+        LaunchContext, WorkspaceLaunchError,
+        resolve::{resolve_workspace_path, select_workspace_path},
+    },
     tauri_api,
-    workspace::{resolve_workspace_path, select_workspace_path},
 };
 
 pub(crate) fn run_with_context_terminal_mode(context: &LaunchContext) -> Result<()> {

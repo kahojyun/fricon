@@ -8,11 +8,23 @@ use std::path::Path;
 
 use tauri_specta::{Builder, collect_commands, collect_events};
 
-pub(crate) mod bindings;
 pub(crate) mod commands;
 
-pub(crate) use crate::dataset_browser::types::{DatasetCreated, DatasetInfo, DatasetUpdated};
-pub(super) use crate::{AppState, dataset_browser::types::TauriCommandError};
+use crate::dataset_browser::{DatasetCreated, DatasetInfo, DatasetUpdated};
+
+#[derive(Debug, Clone, serde::Serialize, specta::Type, thiserror::Error)]
+#[error("{message}")]
+pub(crate) struct TauriCommandError {
+    message: String,
+}
+
+impl From<anyhow::Error> for TauriCommandError {
+    fn from(value: anyhow::Error) -> Self {
+        Self {
+            message: value.to_string(),
+        }
+    }
+}
 
 pub(crate) fn specta_builder() -> Builder {
     Builder::new()
