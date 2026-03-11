@@ -1,13 +1,11 @@
+mod application;
 mod chart_data;
-mod dataset_browser;
 mod desktop_runtime;
-mod filter_data;
 mod launch;
 mod tauri_api;
 
 use anyhow::Result;
 
-pub(crate) use crate::desktop_runtime::app_state::AppState;
 use crate::desktop_runtime::{
     logging::init_tracing_subscriber,
     panic_hook::install_panic_hook,

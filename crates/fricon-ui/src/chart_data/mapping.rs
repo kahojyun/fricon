@@ -1,15 +1,12 @@
 use anyhow::Context;
 use fricon::{DatasetDataType, DatasetSchema};
 
-use crate::{
-    chart_data::{
-        DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
-        ScatterChartDataOptions, ScatterModeOptions,
-    },
-    tauri_api::TauriCommandError,
+use crate::chart_data::{
+    DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
+    ScatterChartDataOptions, ScatterModeOptions,
 };
 
-fn column_index(schema: &DatasetSchema, name: &str) -> Result<usize, TauriCommandError> {
+fn column_index(schema: &DatasetSchema, name: &str) -> anyhow::Result<usize> {
     let (idx, _, _) = schema
         .columns()
         .get_full(name)
@@ -26,7 +23,7 @@ fn push_column(columns: &mut Vec<usize>, index: usize) {
 fn resolve_series_column(
     schema: &DatasetSchema,
     series_name: &str,
-) -> Result<(usize, DatasetDataType), TauriCommandError> {
+) -> anyhow::Result<(usize, DatasetDataType)> {
     let series_index = column_index(schema, series_name)?;
     let data_type = *schema
         .columns()
@@ -38,7 +35,7 @@ fn resolve_series_column(
 fn build_line_selected_columns(
     schema: &DatasetSchema,
     options: &LineChartDataOptions,
-) -> Result<Vec<usize>, TauriCommandError> {
+) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
     let (series_index, data_type) = resolve_series_column(schema, &options.series)?;
     push_column(&mut selected, series_index);
@@ -56,7 +53,7 @@ fn build_line_selected_columns(
 fn build_heatmap_selected_columns(
     schema: &DatasetSchema,
     options: &HeatmapChartDataOptions,
-) -> Result<Vec<usize>, TauriCommandError> {
+) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
     let (series_index, data_type) = resolve_series_column(schema, &options.series)?;
     push_column(&mut selected, series_index);
@@ -79,7 +76,7 @@ fn build_heatmap_selected_columns(
 fn build_scatter_selected_columns(
     schema: &DatasetSchema,
     options: &ScatterChartDataOptions,
-) -> Result<Vec<usize>, TauriCommandError> {
+) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
     match &options.scatter {
         ScatterModeOptions::Complex { series } => {
@@ -110,7 +107,7 @@ fn build_scatter_selected_columns(
 pub(crate) fn build_chart_selected_columns(
     schema: &DatasetSchema,
     options: &DatasetChartDataOptions,
-) -> Result<Vec<usize>, TauriCommandError> {
+) -> anyhow::Result<Vec<usize>> {
     match options {
         DatasetChartDataOptions::Line(options) => build_line_selected_columns(schema, options),
         DatasetChartDataOptions::Heatmap(options) => {

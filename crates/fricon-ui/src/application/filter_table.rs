@@ -11,54 +11,40 @@ use arrow_array::{
 use arrow_buffer::NullBuffer;
 use arrow_schema::{DataType, Fields, SchemaRef};
 use fricon::{DatasetDataType, ScalarKind, SelectOptions};
-use serde::Serialize;
 
-use crate::AppState;
+use crate::application::session::WorkspaceSession;
 
-#[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, PartialEq, Debug)]
 pub(crate) struct Row {
-    pub display_values: Vec<String>,
-    pub value_indices: Vec<usize>,
-    pub index: usize,
+    pub(crate) display_values: Vec<String>,
+    pub(crate) value_indices: Vec<usize>,
+    pub(crate) index: usize,
 }
 
-#[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, PartialEq, Debug)]
 pub(crate) struct ColumnUniqueValue {
-    pub index: usize,
-    pub display_value: String,
+    pub(crate) index: usize,
+    pub(crate) display_value: String,
 }
 
-#[derive(Serialize, Debug, specta::Type)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub(crate) struct TableData {
-    pub fields: Vec<String>,
-    pub rows: Vec<Row>,
-    pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
-}
-
-impl From<DataInternal> for TableData {
-    fn from(value: DataInternal) -> Self {
-        Self {
-            fields: value.fields,
-            rows: value.unique_rows,
-            column_unique_values: value.column_unique_values,
-        }
-    }
+    pub(crate) fields: Vec<String>,
+    pub(crate) rows: Vec<Row>,
+    pub(crate) column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
 }
 
 pub(crate) struct ProcessedFilterRows {
-    pub unique_rows: Vec<Row>,
-    pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
-    pub column_raw_values: HashMap<String, Vec<serde_json::Value>>,
+    pub(crate) unique_rows: Vec<Row>,
+    pub(crate) column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+    pub(crate) column_raw_values: HashMap<String, Vec<serde_json::Value>>,
 }
 
 pub(crate) struct DataInternal {
-    pub fields: Vec<String>,
-    pub unique_rows: Vec<Row>,
-    pub column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
-    pub column_raw_values: HashMap<String, Vec<serde_json::Value>>,
+    pub(crate) fields: Vec<String>,
+    pub(crate) unique_rows: Vec<Row>,
+    pub(crate) column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+    pub(crate) column_raw_values: HashMap<String, Vec<serde_json::Value>>,
 }
 
 impl DataInternal {
@@ -189,11 +175,11 @@ fn build_filter_array(data_type: &DataType, value: &serde_json::Value) -> Result
 }
 
 pub(crate) async fn load_filter_data(
-    state: &AppState,
+    session: &WorkspaceSession,
     id: i32,
     exclude_columns: Option<Vec<String>>,
 ) -> Result<DataInternal> {
-    let dataset = state.dataset(id).await?;
+    let dataset = session.dataset(id).await?;
     let schema = dataset.schema();
     let index_columns = dataset.index_columns();
 
@@ -246,14 +232,27 @@ pub(crate) async fn load_filter_data(
     })
 }
 
+pub(crate) async fn get_filter_table_data(
+    session: &WorkspaceSession,
+    id: i32,
+    exclude_columns: Option<Vec<String>>,
+) -> Result<TableData> {
+    let data = load_filter_data(session, id, exclude_columns).await?;
+    Ok(TableData {
+        fields: data.fields,
+        rows: data.unique_rows,
+        column_unique_values: data.column_unique_values,
+    })
+}
+
 pub(crate) async fn build_filter_batch(
-    state: &AppState,
+    session: &WorkspaceSession,
     id: i32,
     exclude_columns: Option<Vec<String>>,
     indices: &[usize],
     arrow_schema: SchemaRef,
 ) -> Result<Option<RecordBatch>> {
-    let filter_data = load_filter_data(state, id, exclude_columns).await?;
+    let filter_data = load_filter_data(session, id, exclude_columns).await?;
 
     let mut selected_filters = Vec::new();
     for (field_index, &value_index) in indices.iter().enumerate() {

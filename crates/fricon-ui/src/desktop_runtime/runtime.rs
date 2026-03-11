@@ -13,6 +13,7 @@ use tracing::error;
 use crate::{
     desktop_runtime::{
         app_state::AppState,
+        event_forwarder::start_event_forwarder,
         logging::{
             WorkspaceLogSession, attach_workspace_file_logging, shutdown_workspace_file_logging,
         },
@@ -78,7 +79,7 @@ fn run_with_app_state(app_state: AppState) -> Result<()> {
             specta_builder.mount_events(&app.handle().clone());
 
             let app_state = app.state::<AppState>();
-            app_state.start_event_listener(app.handle().clone());
+            start_event_forwarder(app_state.session(), app.handle().clone());
 
             Ok(())
         })

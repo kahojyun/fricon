@@ -8,9 +8,12 @@ use std::path::Path;
 
 use tauri_specta::{Builder, collect_commands, collect_events};
 
+pub(crate) mod chart_data;
 pub(crate) mod commands;
+pub(crate) mod dataset;
+pub(crate) mod filter_table;
 
-use crate::dataset_browser::{DatasetCreated, DatasetInfo, DatasetUpdated};
+use crate::tauri_api::dataset::{DatasetCreated, DatasetInfo, DatasetUpdated};
 
 #[derive(Debug, Clone, serde::Serialize, specta::Type, thiserror::Error)]
 #[error("{message}")]

@@ -1,15 +1,10 @@
-use anyhow::Context;
 use tauri::State;
 
 use super::{AppState, TauriCommandError};
-use crate::filter_data::{TableData, load_filter_data};
-
-#[derive(serde::Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct FilterTableOptions {
-    #[specta(optional)]
-    exclude_columns: Option<Vec<String>>,
-}
+use crate::{
+    application,
+    tauri_api::filter_table::{FilterTableOptions, TableData},
+};
 
 #[tauri::command]
 #[specta::specta]
@@ -18,9 +13,8 @@ pub(crate) async fn get_filter_table_data(
     id: i32,
     options: FilterTableOptions,
 ) -> Result<TableData, TauriCommandError> {
-    load_filter_data(&state, id, options.exclude_columns)
+    application::filter_table::get_filter_table_data(state.session(), id, options.exclude_columns)
         .await
-        .context("Failed to load filter table data")
-        .map(TableData::from)
+        .map(Into::into)
         .map_err(TauriCommandError::from)
 }

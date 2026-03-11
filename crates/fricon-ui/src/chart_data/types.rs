@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ChartType {
     Line,
@@ -8,7 +8,7 @@ pub(crate) enum ChartType {
     Scatter,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ComplexViewOption {
     Real,
@@ -17,7 +17,7 @@ pub(crate) enum ComplexViewOption {
     Arg,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChartCommonOptions {
     pub start: Option<usize>,
@@ -26,7 +26,7 @@ pub(crate) struct ChartCommonOptions {
     pub exclude_columns: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LineChartDataOptions {
     pub series: String,
@@ -36,7 +36,7 @@ pub(crate) struct LineChartDataOptions {
     pub common: ChartCommonOptions,
 }
 
-#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HeatmapChartDataOptions {
     pub series: String,
@@ -47,7 +47,7 @@ pub(crate) struct HeatmapChartDataOptions {
     pub common: ChartCommonOptions,
 }
 
-#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub(crate) enum ScatterModeOptions {
     Complex {
@@ -69,7 +69,7 @@ pub(crate) enum ScatterModeOptions {
     },
 }
 
-#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ScatterChartDataOptions {
     pub scatter: ScatterModeOptions,
@@ -77,7 +77,7 @@ pub(crate) struct ScatterChartDataOptions {
     pub common: ChartCommonOptions,
 }
 
-#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "chartType", rename_all = "snake_case")]
 pub(crate) enum DatasetChartDataOptions {
     Line(LineChartDataOptions),
@@ -103,14 +103,14 @@ impl DatasetChartDataOptions {
     }
 }
 
-#[derive(Serialize, Clone, Debug, specta::Type)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Series {
     pub name: String,
     pub data: Vec<Vec<f64>>,
 }
 
-#[derive(Serialize, Debug, specta::Type)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChartDataResponse {
     pub r#type: ChartType,
