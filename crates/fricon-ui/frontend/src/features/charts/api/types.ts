@@ -10,7 +10,6 @@ import type {
   TableData as WireFilterTableData,
 } from "@/shared/lib/bindings";
 import type { ChartOptions, ComplexViewOption } from "@/shared/lib/chartTypes";
-import { normalizeCreatedAtDate } from "@/shared/lib/tauri";
 
 export type {
   ColumnInfo,
@@ -186,10 +185,4 @@ export function normalizeFilterTableData(
     rows: result.rows,
     columnUniqueValues,
   };
-}
-
-export function normalizeDatasetDetail(
-  value: WireDatasetDetail,
-): DatasetDetail {
-  return normalizeCreatedAtDate(value);
 }

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { datasetDetailQueryKey } from "@/shared/lib/queryKeys";
 import { useDatasetWriteStatusQuery } from "./useDatasetWriteStatusQuery";
 
 const invalidateQueriesMock = vi.fn();
@@ -54,7 +55,7 @@ describe("useDatasetWriteStatusQuery", () => {
     rerender();
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(7);
     expect(invalidateQueriesMock).toHaveBeenNthCalledWith(5, {
-      queryKey: ["datasets", "detail", 1],
+      queryKey: datasetDetailQueryKey(1),
     });
     expect(invalidateQueriesMock).toHaveBeenNthCalledWith(6, {
       queryKey: ["charts", "filterTableData", 1],

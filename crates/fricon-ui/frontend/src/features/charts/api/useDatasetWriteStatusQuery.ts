@@ -4,6 +4,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
+import { datasetDetailQueryKey } from "@/shared/lib/queryKeys";
 import { getDatasetWriteStatus } from "./client";
 import { chartKeys } from "./queryKeys";
 
@@ -29,7 +30,7 @@ function invalidateWriteDependentQueries(
 ) {
   if (isComplete) {
     void queryClient.invalidateQueries({
-      queryKey: ["datasets", "detail", datasetId],
+      queryKey: datasetDetailQueryKey(datasetId),
     });
   }
   void queryClient.invalidateQueries({
