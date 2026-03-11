@@ -1,12 +1,12 @@
-use std::ops::Bound;
-
-use arrow_array::RecordBatch;
-use uuid::Uuid;
-
 mod access;
 mod error;
 mod reader;
 mod service;
+
+use std::ops::Bound;
+
+use arrow_array::RecordBatch;
+use uuid::Uuid;
 
 pub use self::{error::ReadError, reader::DatasetReader, service::DatasetReadService};
 use crate::dataset::model::DatasetId;

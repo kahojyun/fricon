@@ -1,12 +1,12 @@
-use arrow_array::RecordBatch;
-use uuid::Uuid;
-
 mod create;
 mod error;
 mod registry;
 mod service;
 mod session;
 mod storage;
+
+use arrow_array::RecordBatch;
+use uuid::Uuid;
 
 pub use self::{error::IngestError, service::DatasetIngestService};
 pub(crate) use self::{
