@@ -1,8 +1,5 @@
 import type { Table } from "@tanstack/react-table";
-import type {
-  DatasetInfo,
-  DatasetStatus,
-} from "../api/types";
+import type { DatasetInfo, DatasetStatus } from "../api/types";
 import type { DatasetColumnMeta } from "../model/datasetColumnMeta";
 import { datasetStatusOptions } from "./DatasetTableColumns";
 import { DatasetFilterCheckIcon } from "./DatasetFilterCheckIcon";

@@ -35,7 +35,9 @@ function invalidateWriteDependentQueries(
   void queryClient.invalidateQueries({
     queryKey: chartKeys.filterTableData(datasetId),
   });
-  void queryClient.invalidateQueries({ queryKey: chartKeys.chartData(datasetId) });
+  void queryClient.invalidateQueries({
+    queryKey: chartKeys.chartData(datasetId),
+  });
 }
 
 export function useDatasetWriteStatusQuery(

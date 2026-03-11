@@ -176,7 +176,10 @@ export function normalizeFilterTableData(
   result: WireFilterTableData,
 ): FilterTableData {
   const columnUniqueValues = Object.fromEntries(
-    result.fields.map((field) => [field, result.columnUniqueValues[field] ?? []]),
+    result.fields.map((field) => [
+      field,
+      result.columnUniqueValues[field] ?? [],
+    ]),
   );
   return {
     fields: result.fields,
@@ -185,6 +188,8 @@ export function normalizeFilterTableData(
   };
 }
 
-export function normalizeDatasetDetail(value: WireDatasetDetail): DatasetDetail {
+export function normalizeDatasetDetail(
+  value: WireDatasetDetail,
+): DatasetDetail {
   return normalizeCreatedAtDate(value);
 }

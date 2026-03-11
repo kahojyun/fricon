@@ -39,7 +39,9 @@ export async function listDatasets(
     limit,
     offset,
   };
-  const datasets: WireDatasetInfo[] = await invoke(commands.listDatasets(wireOptions));
+  const datasets: WireDatasetInfo[] = await invoke(
+    commands.listDatasets(wireOptions),
+  );
   return datasets.map(normalizeDataset);
 }
 

@@ -7,8 +7,10 @@ use std::{
 };
 
 use futures::{Stream, StreamExt};
-use tokio::runtime::Handle;
-use tokio::net::{UnixListener, UnixStream};
+use tokio::{
+    net::{UnixListener, UnixStream},
+    runtime::Handle,
+};
 use tokio_stream::wrappers::UnixListenerStream;
 use tracing::debug;
 

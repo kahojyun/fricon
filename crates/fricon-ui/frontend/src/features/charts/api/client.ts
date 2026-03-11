@@ -14,10 +14,7 @@ import {
   type FilterTableOptions,
 } from "./types";
 
-export async function fetchChartData(
-  id: number,
-  options: ChartDataOptions,
-) {
+export async function fetchChartData(id: number, options: ChartDataOptions) {
   const result: WireChartResponse = await invoke(
     commands.datasetChartData(id, toWireChartOptions(options)),
   );

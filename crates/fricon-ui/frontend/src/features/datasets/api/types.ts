@@ -44,6 +44,8 @@ export function normalizeDataset(value: WireDatasetInfo): DatasetInfo {
   return normalizeCreatedAtDate(value);
 }
 
-export function normalizeDatasetDetail(value: WireDatasetDetail): DatasetDetail {
+export function normalizeDatasetDetail(
+  value: WireDatasetDetail,
+): DatasetDetail {
   return normalizeCreatedAtDate(value);
 }

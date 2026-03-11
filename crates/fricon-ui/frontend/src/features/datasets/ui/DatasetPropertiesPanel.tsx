@@ -2,10 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateDatasetInfo } from "../api/client";
 import { datasetKeys } from "../api/queryKeys";
-import type {
-  DatasetDetail,
-  DatasetInfoUpdate,
-} from "../api/types";
+import type { DatasetDetail, DatasetInfoUpdate } from "../api/types";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";

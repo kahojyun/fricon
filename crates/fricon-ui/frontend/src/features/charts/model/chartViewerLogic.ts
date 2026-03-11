@@ -1,7 +1,4 @@
-import type {
-  ColumnInfo,
-  DatasetDetail,
-} from "../api/types";
+import type { ColumnInfo, DatasetDetail } from "../api/types";
 import type {
   ChartDataOptions,
   FilterTableData,

@@ -1,7 +1,4 @@
-import type {
-  FilterTableData,
-  FilterTableRow,
-} from "../api/types";
+import type { FilterTableData, FilterTableRow } from "../api/types";
 
 export type CascadeMode = "row" | "split";
 

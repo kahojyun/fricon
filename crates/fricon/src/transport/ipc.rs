@@ -18,8 +18,10 @@ mod tests {
 
     use futures::StreamExt;
     use tempfile::tempdir;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::runtime::Handle;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        runtime::Handle,
+    };
 
     use super::*;
     use crate::transport::ipc::error::ConnectError;

@@ -1,9 +1,6 @@
 import type { Column, ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown, Star, StarOff } from "lucide-react";
-import type {
-  DatasetInfo,
-  DatasetStatus,
-} from "../api/types";
+import type { DatasetInfo, DatasetStatus } from "../api/types";
 import type { DatasetColumnMeta } from "../model/datasetColumnMeta";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";

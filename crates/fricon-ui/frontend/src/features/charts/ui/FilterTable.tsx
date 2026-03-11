@@ -1,10 +1,7 @@
 import { useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { CascadeMode } from "../model/cascadeReducer";
-import type {
-  ColumnUniqueValue,
-  FilterTableData,
-} from "../api/types";
+import type { ColumnUniqueValue, FilterTableData } from "../api/types";
 import { Switch } from "@/shared/ui/switch";
 import { Separator } from "@/shared/ui/separator";
 import {

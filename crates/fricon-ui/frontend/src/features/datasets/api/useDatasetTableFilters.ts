@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { SortingState } from "@tanstack/react-table";
-import {
-  DATASET_PAGE_SIZE,
-  type DatasetStatus,
-} from "./types";
+import { DATASET_PAGE_SIZE, type DatasetStatus } from "./types";
 import {
   areDatasetQueryParamsEqual,
   type DatasetQueryParams,
