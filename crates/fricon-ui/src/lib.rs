@@ -1,8 +1,8 @@
+mod api;
 mod application;
 mod chart_data;
 mod desktop_runtime;
 mod launch;
-mod tauri_api;
 
 use anyhow::Result;
 
@@ -12,8 +12,8 @@ use crate::desktop_runtime::{
     runtime::{run_with_context_dialog_mode, run_with_context_terminal_mode},
 };
 pub use crate::{
+    api::export_bindings,
     launch::{InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError},
-    tauri_api::export_bindings,
 };
 
 /// Run the application with the given launch context.

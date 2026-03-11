@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DatasetTable } from "@/features/dataset-table";
+import { DatasetTable } from "@/features/datasets";
 import {
   ResizableHandle,
   ResizablePanel,

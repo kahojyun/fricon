@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DatasetDetail } from "@/shared/lib/backend";
-import { useDatasetDetailQuery } from "@/features/dataset-detail";
+import type { DatasetDetail } from "@/features/datasets";
+import { useDatasetDetailQuery } from "@/features/datasets";
 import { DatasetInspector } from "./DatasetInspector";
 
-vi.mock("@/features/chart-viewer", () => ({
+vi.mock("@/features/charts", () => ({
   ChartViewer: ({
     datasetId,
     datasetDetail,
@@ -19,7 +19,7 @@ vi.mock("@/features/chart-viewer", () => ({
   ),
 }));
 
-vi.mock("@/features/dataset-detail", () => ({
+vi.mock("@/features/datasets", () => ({
   DatasetPropertiesPanel: ({
     detail,
     isLoading,

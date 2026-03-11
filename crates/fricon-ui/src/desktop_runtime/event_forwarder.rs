@@ -5,8 +5,8 @@ use tokio::sync::broadcast::error::RecvError;
 use tracing::{error, warn};
 
 use crate::{
+    api::datasets::{DatasetCreated, DatasetInfo, DatasetUpdated},
     application::session::WorkspaceSession,
-    tauri_api::dataset::{DatasetCreated, DatasetInfo, DatasetUpdated},
 };
 
 pub(crate) fn start_event_forwarder(session: &WorkspaceSession, app_handle: tauri::AppHandle) {

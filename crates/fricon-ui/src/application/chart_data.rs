@@ -7,7 +7,7 @@ use fricon::SelectOptions;
 use tracing::{debug, error, instrument};
 
 use crate::{
-    application::{filter_table, session::WorkspaceSession},
+    application::{charts::build_filter_batch, session::WorkspaceSession},
     chart_data::{
         ChartDataResponse, DatasetChartDataOptions, build_heatmap_series, build_line_series,
         build_scatter_series, mapping::build_chart_selected_columns,
@@ -26,7 +26,7 @@ pub(crate) async fn dataset_chart_data(
     let start = common.start.map_or(Bound::Unbounded, Bound::Included);
     let end = common.end.map_or(Bound::Unbounded, Bound::Excluded);
     let index_filters = if let Some(indices) = common.index_filters.clone() {
-        filter_table::build_filter_batch(
+        build_filter_batch(
             session,
             id,
             common.exclude_columns.clone(),
