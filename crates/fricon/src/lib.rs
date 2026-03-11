@@ -6,31 +6,56 @@
 //! - **Dataset Operations**: Create, store, and query datasets using Apache
 //!   Arrow format
 //! - **Client-Server Architecture**: gRPC-based communication
-mod app;
-mod client;
+pub mod client;
 mod database;
-mod dataset;
-mod dataset_fs;
+pub mod dataset_catalog;
+pub mod dataset_ingest;
+pub mod dataset_read;
+pub mod dataset_schema;
+#[expect(
+    dead_code,
+    unreachable_pub,
+    reason = "Compatibility shim during capability split"
+)]
 mod dataset_manager;
-mod ipc;
 mod proto;
-mod server;
+pub mod runtime;
+mod storage;
+mod support;
+mod transport;
 mod utils;
-mod workspace;
+pub mod workspace;
+
+mod app {
+    pub(crate) use crate::runtime::app::*;
+}
+
+mod dataset {
+    pub(crate) use crate::dataset_schema::*;
+}
+
+mod dataset_fs {
+    pub(crate) use crate::storage::*;
+}
+
+mod ipc {
+    pub(crate) use crate::transport::ipc::*;
+}
 
 pub use self::{
-    app::{AppEvent, AppHandle, AppManager},
     client::{Client, Dataset, DatasetWriter},
     database::DatasetStatus,
-    dataset::{
+    dataset_catalog::{
+        DatasetCatalogService, DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord,
+        DatasetSortBy, DatasetUpdate, SortDirection,
+    },
+    dataset_ingest::{CreateDatasetRequest, DatasetIngestService},
+    dataset_read::{DatasetReadService, DatasetReader, SelectOptions},
+    dataset_schema::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
-    dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetListQuery, DatasetManager, DatasetMetadata,
-        DatasetReader, DatasetSortBy, DatasetUpdate, SelectOptions, SortDirection,
-    },
-    server::DatasetRecord,
+    runtime::app::{AppEvent, AppHandle, AppManager},
     workspace::{WorkspaceRoot, get_log_dir},
 };
 

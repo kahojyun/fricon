@@ -209,7 +209,7 @@ where
     skip(database, root, event_sender, write_sessions, events_rx, request),
     fields(dataset.name = %request.name, tags.count = request.tags.len())
 )]
-pub(super) fn do_create_dataset(
+pub(crate) fn do_create_dataset(
     database: &Pool,
     root: &WorkspaceRoot,
     event_sender: &broadcast::Sender<AppEvent>,
@@ -229,7 +229,7 @@ pub(super) fn do_create_dataset(
 
 /// Delete a dataset by ID
 #[instrument(skip(database, root), fields(dataset.id = id))]
-pub(super) fn do_delete_dataset(
+pub(crate) fn do_delete_dataset(
     database: &Pool,
     root: &WorkspaceRoot,
     id: i32,
@@ -249,7 +249,7 @@ pub(super) fn do_delete_dataset(
 
 /// Get a dataset by ID or UUID
 #[instrument(skip(conn, id), fields(dataset.id = ?id))]
-pub(super) fn do_get_dataset(
+pub(crate) fn do_get_dataset(
     conn: &mut SqliteConnection,
     id: DatasetId,
 ) -> Result<DatasetRecord, DatasetManagerError> {
@@ -365,7 +365,7 @@ fn map_datasets_with_tags(
 
 /// List datasets with filtering, sorting, and pagination options.
 #[instrument(skip(conn, query_options))]
-pub(super) fn do_list_datasets(
+pub(crate) fn do_list_datasets(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
 ) -> Result<Vec<DatasetRecord>, DatasetManagerError> {
@@ -426,7 +426,7 @@ pub(super) fn do_list_datasets(
 
 /// List all known dataset tags in ascending name order.
 #[instrument(skip(conn))]
-pub(super) fn do_list_dataset_tags(
+pub(crate) fn do_list_dataset_tags(
     conn: &mut SqliteConnection,
 ) -> Result<Vec<String>, DatasetManagerError> {
     let tags = schema::tags::table
@@ -438,7 +438,7 @@ pub(super) fn do_list_dataset_tags(
 
 /// Update dataset metadata
 #[instrument(skip(conn, update), fields(dataset.id = id))]
-pub(super) fn do_update_dataset(
+pub(crate) fn do_update_dataset(
     conn: &mut SqliteConnection,
     id: i32,
     update: DatasetUpdate,
@@ -456,7 +456,7 @@ pub(super) fn do_update_dataset(
 
 /// Add tags to a dataset
 #[instrument(skip(conn, tags), fields(dataset.id = id, tags.count = tags.len()))]
-pub(super) fn do_add_tags(
+pub(crate) fn do_add_tags(
     conn: &mut SqliteConnection,
     id: i32,
     tags: &[String],
@@ -474,7 +474,7 @@ pub(super) fn do_add_tags(
 
 /// Remove tags from a dataset
 #[instrument(skip(conn, tags), fields(dataset.id = id, tags.count = tags.len()))]
-pub(super) fn do_remove_tags(
+pub(crate) fn do_remove_tags(
     conn: &mut SqliteConnection,
     id: i32,
     tags: &[String],
@@ -494,7 +494,7 @@ pub(super) fn do_remove_tags(
 
 /// Get a dataset reader for the specified dataset
 #[instrument(skip(database, root, write_sessions, id), fields(dataset.id = ?id))]
-pub(super) fn do_get_dataset_reader(
+pub(crate) fn do_get_dataset_reader(
     database: &Pool,
     root: &WorkspaceRoot,
     write_sessions: &WriteSessionRegistry,

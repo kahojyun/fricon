@@ -1,20 +1,42 @@
-mod app_state;
-mod commands;
+mod chart_data;
+mod dataset_browser;
+mod desktop_runtime;
+mod filter_data;
 mod launch;
-mod logging;
-mod models;
-mod panic_hook;
-mod runtime;
-mod workspace;
+mod tauri_api;
+mod workspace_session;
 
 use anyhow::Result;
 
-pub(crate) use crate::app_state::AppState;
+#[expect(unused_imports, reason = "Compatibility shim for internal tests")]
+mod logging {
+    pub(crate) use crate::desktop_runtime::logging::*;
+}
+
+mod models {
+    pub(crate) mod chart {
+        pub(crate) use crate::chart_data::*;
+    }
+
+    pub(crate) mod filter {
+        pub(crate) use crate::filter_data::*;
+    }
+}
+
+mod runtime {
+    pub(crate) use crate::desktop_runtime::runtime::*;
+}
+
+mod workspace {
+    pub(crate) use crate::launch::resolve::*;
+}
+
+pub(crate) use crate::desktop_runtime::app_state::AppState;
 pub use crate::{
-    commands::export_bindings,
     launch::{InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError},
+    tauri_api::bindings::export_bindings,
 };
-use crate::{logging::init_tracing_subscriber, panic_hook::install_panic_hook};
+use crate::desktop_runtime::{logging::init_tracing_subscriber, panic_hook::install_panic_hook};
 
 /// Run the application with the given launch context.
 ///
@@ -39,8 +61,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
+        desktop_runtime::panic_hook::build_panic_dialog_message,
         InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError,
-        panic_hook::build_panic_dialog_message,
         workspace::{resolve_workspace_path, validate_workspace_path},
     };
 

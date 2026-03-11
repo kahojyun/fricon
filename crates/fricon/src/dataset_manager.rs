@@ -4,10 +4,10 @@
 //! lifecycle management, providing a clean interface that abstracts database
 //! operations and file system interactions.
 
-mod in_progress;
-mod tasks;
+pub(crate) mod in_progress;
+pub(crate) mod tasks;
 mod write_registry;
-mod write_session;
+pub(crate) mod write_session;
 
 use std::{
     borrow::Cow,
@@ -39,6 +39,7 @@ use crate::{
     dataset, dataset_fs,
     dataset_fs::ChunkReader,
     dataset_manager::write_session::WriteSessionHandle,
+    runtime::app::AppEvent,
 };
 
 fn emit_dataset_updated(state: &AppState, record: DatasetRecord) {
@@ -53,10 +54,12 @@ fn emit_dataset_updated(state: &AppState, record: DatasetRecord) {
         ..
     } = metadata;
 
-    let _ = state.event_sender.send(crate::AppEvent::DatasetUpdated {
-        id,
-        name,
-        description,
+    let _ = state
+        .event_sender
+        .send(AppEvent::DatasetUpdated {
+            id,
+            name,
+            description,
         favorite,
         tags,
         status,

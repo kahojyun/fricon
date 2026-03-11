@@ -170,8 +170,8 @@ async fn wait_for_dataset_status(
 ) -> anyhow::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        let dataset_manager = app_manager.handle().dataset_manager();
-        let datasets = dataset_manager
+        let dataset_catalog = app_manager.handle().dataset_catalog();
+        let datasets = dataset_catalog
             .list_datasets(DatasetListQuery {
                 search: Some(dataset_name.to_string()),
                 ..DatasetListQuery::default()
@@ -234,8 +234,8 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
     assert_eq!(dataset.status(), DatasetStatus::Completed);
 
     // Load dataset using DatasetManager directly
-    let dataset_manager = app_manager.handle().dataset_manager();
-    let reader = dataset_manager
+    let dataset_read = app_manager.handle().dataset_read();
+    let reader = dataset_read
         .get_dataset_reader(DatasetId::Id(dataset.id()))
         .await?;
     let loaded_batches: Vec<RecordBatch> = reader.batches();
@@ -316,8 +316,8 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
     assert_eq!(dataset.name(), "aborted_dataset_by_method");
     assert_eq!(dataset.status(), DatasetStatus::Aborted);
 
-    let dataset_manager = app_manager.handle().dataset_manager();
-    let datasets = dataset_manager
+    let dataset_catalog = app_manager.handle().dataset_catalog();
+    let datasets = dataset_catalog
         .list_datasets(DatasetListQuery {
             search: Some("aborted_dataset_by_method".to_string()),
             ..DatasetListQuery::default()
