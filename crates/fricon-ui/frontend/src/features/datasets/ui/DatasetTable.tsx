@@ -74,7 +74,7 @@ export function DatasetTable({
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [idsToDelete, setIdsToDelete] = useState<number[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  const [anchorId, setAnchorId] = useState<string | null>(null);
   const [dragState, setDragState] = useState<{
     initialSelection: Record<string, boolean>;
     mode: "replace" | "toggle";
@@ -169,11 +169,22 @@ export function DatasetTable({
       return;
     }
 
+    const isMac = navigator.platform.toUpperCase().includes("MAC");
+
     if (e.shiftKey) {
       e.preventDefault();
-      const effectiveAnchor = anchorIndex ?? rowIndex;
-      const start = Math.min(effectiveAnchor, rowIndex);
-      const end = Math.max(effectiveAnchor, rowIndex);
+      const effectiveAnchorIndex = anchorId
+        ? rows.findIndex((r) => r.id === anchorId)
+        : -1;
+      const start =
+        effectiveAnchorIndex !== -1
+          ? Math.min(effectiveAnchorIndex, rowIndex)
+          : rowIndex;
+      const end =
+        effectiveAnchorIndex !== -1
+          ? Math.max(effectiveAnchorIndex, rowIndex)
+          : rowIndex;
+
       const newSelection: Record<string, boolean> = {};
       for (let i = start; i <= end; i++) {
         const id = rows[i]?.id;
@@ -184,8 +195,8 @@ export function DatasetTable({
         initialSelection: {},
         mode: "replace",
       });
-      if (anchorIndex === null) {
-        setAnchorIndex(rowIndex);
+      if (effectiveAnchorIndex === -1) {
+        setAnchorId(rowId);
       }
       if (!isCheckbox) {
         onDatasetSelected(datasetId);
@@ -193,11 +204,17 @@ export function DatasetTable({
       return;
     }
 
+    // On macOS, Ctrl+click is secondary click.
+    if (isMac && e.ctrlKey) {
+      // Let the browser handle context menu
+      return;
+    }
+
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const isSelected = !!rowSelection[rowId];
       const nextValue = !isSelected;
-      
+
       setRowSelection((prev) => {
         const next = { ...prev };
         if (nextValue) {
@@ -208,8 +225,8 @@ export function DatasetTable({
         return next;
       });
 
-      setAnchorIndex(rowIndex);
-      
+      setAnchorId(rowId);
+
       setDragState({
         initialSelection: rowSelection,
         mode: "toggle",
@@ -222,7 +239,7 @@ export function DatasetTable({
 
     // Normal click
     setRowSelection({ [rowId]: true });
-    setAnchorIndex(rowIndex);
+    setAnchorId(rowId);
     setDragState({
       initialSelection: {},
       mode: "replace",
@@ -233,10 +250,19 @@ export function DatasetTable({
   const handleRowPointerEnter = (rowIndex: number) => {
     if (!dragState) return;
 
+    const effectiveAnchorIndex = anchorId
+      ? rows.findIndex((r) => r.id === anchorId)
+      : -1;
+
     if (dragState.mode === "replace") {
-      const effectiveAnchor = anchorIndex ?? rowIndex;
-      const start = Math.min(effectiveAnchor, rowIndex);
-      const end = Math.max(effectiveAnchor, rowIndex);
+      const start =
+        effectiveAnchorIndex !== -1
+          ? Math.min(effectiveAnchorIndex, rowIndex)
+          : rowIndex;
+      const end =
+        effectiveAnchorIndex !== -1
+          ? Math.max(effectiveAnchorIndex, rowIndex)
+          : rowIndex;
       const nextSelection: Record<string, boolean> = {};
       for (let i = start; i <= end; i++) {
         const id = rows[i]?.id;
@@ -244,9 +270,14 @@ export function DatasetTable({
       }
       setRowSelection(nextSelection);
     } else if (dragState.mode === "toggle") {
-      const effectiveAnchor = anchorIndex ?? rowIndex;
-      const start = Math.min(effectiveAnchor, rowIndex);
-      const end = Math.max(effectiveAnchor, rowIndex);
+      const start =
+        effectiveAnchorIndex !== -1
+          ? Math.min(effectiveAnchorIndex, rowIndex)
+          : rowIndex;
+      const end =
+        effectiveAnchorIndex !== -1
+          ? Math.max(effectiveAnchorIndex, rowIndex)
+          : rowIndex;
       const nextSelection = { ...dragState.initialSelection };
       for (let i = start; i <= end; i++) {
         const id = rows[i]?.id;
