@@ -12,9 +12,22 @@ import { useDatasetTableData } from "../api/useDatasetTableData";
 import { DatasetTable } from "./DatasetTable";
 
 const COLUMN_VISIBILITY_STORAGE_KEY = "fricon.datasetTable.columnVisibility.v1";
+const { toastSuccess, toastError, toastWarning } = vi.hoisted(() => ({
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+  toastWarning: vi.fn(),
+}));
 
 vi.mock("../api/useDatasetTableData", () => ({
   useDatasetTableData: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: toastSuccess,
+    error: toastError,
+    warning: toastWarning,
+  },
 }));
 
 vi.mock("@tanstack/react-virtual", () => ({
@@ -119,6 +132,14 @@ function renderDatasetTable(overrides: Record<string, unknown> = {}) {
   return { hook, onDatasetSelected };
 }
 
+async function openRowContextMenu(name: string) {
+  const row = screen.getByText(name).closest("tr");
+  expect(row).not.toBeNull();
+  fireEvent.contextMenu(row!);
+  const menus = await screen.findAllByRole("menu");
+  return menus.at(-1)!;
+}
+
 async function openColumnsMenu(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /View/i }));
   const menus = await screen.findAllByRole("menu");
@@ -136,6 +157,9 @@ async function toggleColumn(
 describe("DatasetTable", () => {
   beforeEach(() => {
     useDatasetTableDataMock.mockReset();
+    toastSuccess.mockReset();
+    toastError.mockReset();
+    toastWarning.mockReset();
     Object.defineProperty(window, "localStorage", {
       value: createMemoryStorage(),
       configurable: true,
@@ -355,5 +379,75 @@ describe("DatasetTable", () => {
     await user.click(screen.getByRole("button", { name: /Completed/i }));
 
     expect(hook.handleStatusToggle).toHaveBeenCalledWith("Completed");
+  });
+
+  it("deletes a dataset from the context menu and clears selection on success", async () => {
+    const dataset = makeDataset({ id: 11, name: "Delete me" });
+    const deleteDatasets = vi
+      .fn()
+      .mockResolvedValue([{ id: 11, success: true, error: null }]);
+    const { onDatasetSelected } = renderDatasetTable({
+      datasets: [dataset],
+      deleteDatasets,
+    });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText("Select row"));
+
+    const menu = await openRowContextMenu("Delete me");
+    await user.click(within(menu).getByRole("menuitem", { name: "Delete" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText(/delete 1 dataset/i)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(deleteDatasets).toHaveBeenCalledWith([11]);
+    });
+    expect(onDatasetSelected).not.toHaveBeenCalledWith(undefined);
+    expect(toastSuccess).toHaveBeenCalledWith("Successfully deleted 1 dataset(s)");
+    expect(screen.getByLabelText("Select row")).not.toBeChecked();
+  });
+
+  it("keeps failed rows selected after partial delete failure", async () => {
+    const datasets = [
+      makeDataset({ id: 11, name: "Delete ok" }),
+      makeDataset({ id: 12, name: "Delete fails" }),
+    ];
+    const deleteDatasets = vi.fn().mockResolvedValue([
+      { id: 11, success: true, error: null },
+      { id: 12, success: false, error: "locked" },
+    ]);
+    renderDatasetTable({
+      datasets,
+      deleteDatasets,
+    });
+    const user = userEvent.setup();
+
+    const rowCheckboxes = screen.getAllByLabelText("Select row");
+    expect(rowCheckboxes).toHaveLength(2);
+    const [firstCheckbox, secondCheckbox] = rowCheckboxes;
+    await user.click(firstCheckbox);
+    await user.click(secondCheckbox);
+
+    const menu = await openRowContextMenu("Delete fails");
+    await user.click(
+      within(menu).getByRole("menuitem", { name: "Delete Selected (2)" }),
+    );
+
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(deleteDatasets).toHaveBeenCalledWith([11, 12]);
+    });
+    expect(toastWarning).toHaveBeenCalled();
+    expect(screen.getAllByLabelText("Select row")[0]).not.toBeChecked();
+    expect(screen.getAllByLabelText("Select row")[1]).toBeChecked();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("alertdialog")).getByText(/delete 1 dataset/i),
+    ).toBeInTheDocument();
   });
 });

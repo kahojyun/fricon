@@ -304,30 +304,38 @@ export function DatasetTable({
     setIsDeleteDialogOpen(true);
   };
 
+  const buildSelectionFromIds = (ids: number[]) =>
+    ids.reduce<Record<string, boolean>>((selection, id) => {
+      selection[id.toString()] = true;
+      return selection;
+    }, {});
+
   const confirmDelete = async () => {
     try {
       const results = await deleteDatasets(idsToDelete);
-      setRowSelection({});
 
       const successIds = results.filter((r) => r.success).map((r) => r.id);
       const failedResults = results.filter((r) => !r.success);
+      const failedIds = failedResults.map((r) => r.id);
 
       // Invalidate selection if it was deleted
       if (selectedDatasetId && successIds.includes(selectedDatasetId)) {
         onDatasetSelected(undefined);
       }
 
-      setIsDeleteDialogOpen(false);
-
       if (failedResults.length === 0) {
+        setRowSelection({});
         setIdsToDelete([]);
+        setIsDeleteDialogOpen(false);
         toast.success(`Successfully deleted ${successIds.length} dataset(s)`);
       } else if (successIds.length === 0) {
+        setRowSelection(buildSelectionFromIds(failedIds));
         // All failed
         toast.error(`Failed to delete ${failedResults.length} dataset(s)`);
       } else {
         // Partial success
-        setIdsToDelete(failedResults.map((r) => r.id));
+        setRowSelection(buildSelectionFromIds(failedIds));
+        setIdsToDelete(failedIds);
         toast.warning(
           `Successfully deleted ${successIds.length} dataset(s), but ${failedResults.length} failed.`,
           {
