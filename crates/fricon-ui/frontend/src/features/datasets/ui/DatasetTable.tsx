@@ -71,9 +71,21 @@ export function DatasetTable({
     isDeleting,
   } = useDatasetTableData();
 
-  const [rowSelection, setRowSelection] = useState({});
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [idsToDelete, setIdsToDelete] = useState<number[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  const [dragState, setDragState] = useState<{
+    initialSelection: Record<string, boolean>;
+    mode: "replace" | "toggle";
+    targetValue?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleMouseUp = () => setDragState(null);
+    window.addEventListener("pointerup", handleMouseUp);
+    return () => window.removeEventListener("pointerup", handleMouseUp);
+  }, []);
 
   const columns = useMemo(
     () => createDatasetColumns({ toggleFavorite }),
@@ -130,6 +142,92 @@ export function DatasetTable({
         (virtualItems[virtualItems.length - 1]?.end ?? 0)
       : 0;
 
+  const handleRowPointerDown = (
+    e: React.PointerEvent<HTMLTableRowElement>,
+    rowIndex: number,
+    rowId: string,
+    datasetId: number,
+  ) => {
+    if (e.button !== 0) return;
+
+    // Don't interfere with buttons or links
+    if ((e.target as HTMLElement).closest('button:not([role="checkbox"]), a'))
+      return;
+
+    const isCheckbox = (e.target as HTMLElement).closest(
+      'button[role="checkbox"]',
+    );
+
+    if (e.shiftKey) {
+      e.preventDefault();
+      const effectiveAnchor = anchorIndex ?? 0;
+      const start = Math.min(effectiveAnchor, rowIndex);
+      const end = Math.max(effectiveAnchor, rowIndex);
+      const newSelection: Record<string, boolean> = {};
+      for (let i = start; i <= end; i++) {
+        const id = rows[i]?.id;
+        if (id) newSelection[id] = true;
+      }
+      setRowSelection(newSelection);
+      setDragState({
+        initialSelection: {},
+        mode: "replace",
+      });
+      onDatasetSelected(datasetId);
+      return;
+    }
+
+    if (e.ctrlKey || e.metaKey || isCheckbox) {
+      e.preventDefault();
+      const isSelected = !!rowSelection[rowId];
+      const nextValue = !isSelected;
+      setRowSelection((prev) => ({ ...prev, [rowId]: nextValue }));
+      setAnchorIndex(rowIndex);
+      setDragState({
+        initialSelection: rowSelection,
+        mode: "toggle",
+        targetValue: nextValue,
+      });
+      onDatasetSelected(datasetId);
+      return;
+    }
+
+    // Normal click
+    setRowSelection({ [rowId]: true });
+    setAnchorIndex(rowIndex);
+    setDragState({
+      initialSelection: {},
+      mode: "replace",
+    });
+    onDatasetSelected(datasetId);
+  };
+
+  const handleRowPointerEnter = (rowIndex: number) => {
+    if (!dragState) return;
+
+    if (dragState.mode === "replace") {
+      const effectiveAnchor = anchorIndex ?? 0;
+      const start = Math.min(effectiveAnchor, rowIndex);
+      const end = Math.max(effectiveAnchor, rowIndex);
+      const nextSelection: Record<string, boolean> = {};
+      for (let i = start; i <= end; i++) {
+        const id = rows[i]?.id;
+        if (id) nextSelection[id] = true;
+      }
+      setRowSelection(nextSelection);
+    } else if (dragState.mode === "toggle") {
+      const effectiveAnchor = anchorIndex ?? 0;
+      const start = Math.min(effectiveAnchor, rowIndex);
+      const end = Math.max(effectiveAnchor, rowIndex);
+      const nextSelection = { ...dragState.initialSelection };
+      for (let i = start; i <= end; i++) {
+        const id = rows[i]?.id;
+        if (id) nextSelection[id] = !!dragState.targetValue;
+      }
+      setRowSelection(nextSelection);
+    }
+  };
+
   const handleDeleteClick = (ids: number[]) => {
     setIdsToDelete(ids);
     setIsDeleteDialogOpen(true);
@@ -140,9 +238,7 @@ export function DatasetTable({
       const results = await deleteDatasets(idsToDelete);
       setRowSelection({});
 
-      const successIds = results
-        .filter((r) => r.success)
-        .map((r) => r.id);
+      const successIds = results.filter((r) => r.success).map((r) => r.id);
       const failedResults = results.filter((r) => !r.success);
 
       // Invalidate selection if it was deleted
@@ -268,8 +364,18 @@ export function DatasetTable({
                               }
                               ref={rowVirtualizer.measureElement}
                               data-index={virtualRow.index}
-                              className="cursor-pointer"
-                              onClick={() => onDatasetSelected(dataset.id)}
+                              className="cursor-pointer select-none"
+                              onPointerDown={(e) =>
+                                handleRowPointerDown(
+                                  e,
+                                  virtualRow.index,
+                                  row.id,
+                                  dataset.id,
+                                )
+                              }
+                              onPointerEnter={() =>
+                                handleRowPointerEnter(virtualRow.index)
+                              }
                               onKeyDown={(event) => {
                                 if (
                                   event.key === "Enter" ||
