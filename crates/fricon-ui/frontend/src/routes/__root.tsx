@@ -1,9 +1,9 @@
-import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Database, Info } from "lucide-react";
+import { ThemeProvider } from "next-themes";
 import { Button } from "@/shared/ui/button";
 import { Toaster } from "@/shared/ui/sonner";
 import { useWorkspaceInfoQuery } from "@/features/workspace";
@@ -22,23 +22,19 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = (isDark: boolean) => {
-      document.documentElement.classList.toggle("dark", isDark);
-    };
-    apply(media.matches);
-    const handler = (event: MediaQueryListEvent) => apply(event.matches);
-    media.addEventListener("change", handler);
-    return () => media.removeEventListener("change", handler);
-  }, []);
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <RootLayout />
-      <ReactQueryDevtools />
-      <TanStackRouterDevtools />
-    </QueryClientProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <QueryClientProvider client={queryClient}>
+        <RootLayout />
+        <ReactQueryDevtools />
+        <TanStackRouterDevtools />
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
