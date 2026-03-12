@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
 import {
@@ -145,14 +144,12 @@ export function ChartWrapper({ data }: ChartWrapperProps) {
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === "dark" ? "dark" : "default";
 
-  const option = useMemo(() => buildOption(data), [data]);
-
   return (
     <div className="relative size-full">
       <ReactEChartsCore
         echarts={echarts}
         style={{ width: "100%", height: "100%" }}
-        option={option}
+        option={buildOption(data)}
         notMerge
         lazyUpdate
         theme={theme}
