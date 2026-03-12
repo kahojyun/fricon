@@ -406,7 +406,9 @@ describe("DatasetTable", () => {
       expect(deleteDatasets).toHaveBeenCalledWith([11]);
     });
     expect(onDatasetSelected).not.toHaveBeenCalledWith(undefined);
-    expect(toastSuccess).toHaveBeenCalledWith("Successfully deleted 1 dataset(s)");
+    expect(toastSuccess).toHaveBeenCalledWith(
+      "Successfully deleted 1 dataset(s)",
+    );
     expect(screen.getByLabelText("Select row")).not.toBeChecked();
   });
 

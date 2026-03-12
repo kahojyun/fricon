@@ -2,11 +2,11 @@ use std::collections::BTreeSet;
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use serde::Serialize;
 use fricon::{
     DatasetDataType, DatasetListQuery, DatasetRecord, DatasetStatus, DatasetUpdate,
     dataset::model::DatasetId,
 };
+use serde::Serialize;
 
 use crate::application::session::WorkspaceSession;
 
@@ -220,7 +220,7 @@ pub(crate) async fn delete_datasets(
     let mut results = Vec::with_capacity(ids.len());
     for id in ids {
         match dataset_catalog.delete_dataset(id).await {
-            Ok(_) => results.push(DatasetDeleteResult {
+            Ok(()) => results.push(DatasetDeleteResult {
                 id,
                 success: true,
                 error: None,
@@ -237,15 +237,15 @@ pub(crate) async fn delete_datasets(
 
 #[cfg(test)]
 mod tests {
+    use fricon::{
+        AppManager, CreateDatasetRequest, DatasetListQuery, WorkspaceRoot,
+        dataset::ingest::{CreateIngestEvent, CreateTerminal},
+    };
     use tempfile::TempDir;
     use tokio::sync::mpsc;
 
     use super::delete_datasets;
     use crate::application::session::WorkspaceSession;
-    use fricon::{
-        AppManager, CreateDatasetRequest, DatasetListQuery, WorkspaceRoot,
-        dataset::ingest::{CreateIngestEvent, CreateTerminal},
-    };
 
     async fn create_completed_dataset(
         session: &WorkspaceSession,
