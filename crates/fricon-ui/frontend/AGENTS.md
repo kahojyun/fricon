@@ -1,6 +1,6 @@
 ## Package-Specific Constraints
 
-- **React Compiler is enabled.** DO NOT use `useMemo` or `useCallback` unless absolutely mandated by a third-party library API requirement.
+- **React Compiler is enabled.** Prefer compiler-led memoization and do not add `useMemo`, `useCallback`, or `React.memo` by default. Exception: if `eslint-plugin-react-hooks` reports `react-hooks/incompatible-library`, treat the affected component or hook as outside React Compiler optimization and follow the library's own usage and performance guidance instead of compiler assumptions. Prefer compiler-compatible alternative APIs when the library provides one.
 - Prefer shadcn/ui components
 - `src/shared/ui/` is reserved for shadcn/ui primitives and thin local patches to those files.
 - Repo-owned shared components must not be added under `src/shared/ui/`; place them in a separate shared directory such as `src/shared/components/` so they stay linted.
