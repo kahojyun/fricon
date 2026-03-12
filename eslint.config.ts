@@ -17,6 +17,7 @@ export default defineConfig([
     "target/**",
     "**/node_modules/**",
     "**/src/shared/lib/bindings.ts",
+    // shadcn/ui source files live here; keep repo-owned shared components elsewhere so they remain linted.
     "crates/fricon-ui/frontend/src/shared/ui/**",
   ]),
   js.configs.recommended,
@@ -38,6 +39,9 @@ export default defineConfig([
       parserOptions: {
         projectService: true,
       },
+    },
+    rules: {
+      "@typescript-eslint/no-deprecated": "error",
     },
   },
   {

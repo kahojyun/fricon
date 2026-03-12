@@ -1,5 +1,6 @@
 import type { SortingState } from "@tanstack/react-table";
 import {
+  type DatasetDeleteResult,
   type DatasetInfo,
   type DatasetListSortBy,
   type DatasetStatus,
@@ -102,6 +103,8 @@ export interface UseDatasetTableDataResult {
   hasMore: boolean;
   hasActiveFilters: boolean;
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;
+  deleteDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
+  isDeleting: boolean;
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
   clearFilters: () => void;

@@ -1,5 +1,6 @@
 import {
   commands,
+  type DatasetDeleteResult,
   type DatasetDetail as WireDatasetDetail,
   type DatasetFavoriteUpdate,
   type DatasetInfo as WireDatasetInfo,
@@ -66,4 +67,10 @@ export async function updateDatasetInfo(
 export async function getDatasetDetail(id: number): Promise<DatasetDetail> {
   const rawDetail: WireDatasetDetail = await invoke(commands.datasetDetail(id));
   return normalizeDatasetDetail(rawDetail);
+}
+
+export async function deleteDatasets(
+  ids: number[],
+): Promise<DatasetDeleteResult[]> {
+  return invoke(commands.deleteDatasets(ids));
 }

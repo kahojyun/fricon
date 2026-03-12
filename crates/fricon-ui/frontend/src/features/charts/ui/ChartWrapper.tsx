@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
 import {
@@ -22,6 +22,7 @@ import {
   type ScatterSeriesOption,
 } from "echarts/charts";
 import { CanvasRenderer } from "echarts/renderers";
+import { useTheme } from "next-themes";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
 
 echarts.use([
@@ -141,38 +142,8 @@ function buildOption(data?: ChartOptions): EChartsOption {
 }
 
 export function ChartWrapper({ data }: ChartWrapperProps) {
-  const prefersDark =
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const [theme, setTheme] = useState<"dark" | "default">(() => {
-    if (typeof document === "undefined") return "default";
-    return document.documentElement.classList.contains("dark") || prefersDark
-      ? "dark"
-      : "default";
-  });
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const updateTheme = () => {
-      const next =
-        document.documentElement.classList.contains("dark") || media.matches
-          ? "dark"
-          : "default";
-      setTheme(next);
-    };
-    updateTheme();
-    const handler = () => updateTheme();
-    media.addEventListener("change", handler);
-    const observer = new MutationObserver(updateTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => {
-      media.removeEventListener("change", handler);
-      observer.disconnect();
-    };
-  }, []);
+  const { resolvedTheme } = useTheme();
+  const theme = resolvedTheme === "dark" ? "dark" : "default";
 
   const option = useMemo(() => buildOption(data), [data]);
 

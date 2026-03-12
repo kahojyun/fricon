@@ -3,6 +3,7 @@ import { listDatasetTags } from "./client";
 import { datasetKeys } from "./queryKeys";
 import { type UseDatasetTableDataResult } from "./datasetTableShared";
 import { useDatasetFavoriteMutation } from "./useDatasetFavoriteMutation";
+import { useDatasetDeleteMutation } from "./useDatasetDeleteMutation";
 import { useDatasetTableFilters } from "./useDatasetTableFilters";
 import { useDatasetTableQuery } from "./useDatasetTableQuery";
 import { useDatasetTableRefreshSync } from "./useDatasetTableRefreshSync";
@@ -26,6 +27,8 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     datasetQueryKey,
     refreshDatasets,
   );
+  const { deleteDatasets, isDeleting } =
+    useDatasetDeleteMutation(refreshDatasets);
 
   const allTags = tagsQuery.data ?? [];
   const normalizedTagFilterQuery = filters.tagFilterQuery.trim().toLowerCase();
@@ -51,6 +54,8 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     hasMore,
     hasActiveFilters: filters.hasActiveFilters,
     toggleFavorite,
+    deleteDatasets,
+    isDeleting,
     handleTagToggle: filters.handleTagToggle,
     handleStatusToggle: filters.handleStatusToggle,
     clearFilters: filters.clearFilters,
