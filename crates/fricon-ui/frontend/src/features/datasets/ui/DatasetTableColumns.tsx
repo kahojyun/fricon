@@ -4,6 +4,7 @@ import type { DatasetInfo, DatasetStatus } from "../api/types";
 import type { DatasetColumnMeta } from "../model/datasetColumnMeta";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 const statusVariantMap: Record<
@@ -59,6 +60,29 @@ export function createDatasetColumns({
   toggleFavorite,
 }: CreateDatasetColumnsOptions): ColumnDef<DatasetInfo>[] {
   return [
+    {
+      id: "select",
+      size: 40,
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="translate-y-0.5"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onClick={(event) => event.stopPropagation()}
+          aria-label="Select row"
+          className="translate-y-0.5"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       id: "favorite",
       accessorKey: "favorite",

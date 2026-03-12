@@ -102,6 +102,8 @@ export interface UseDatasetTableDataResult {
   hasMore: boolean;
   hasActiveFilters: boolean;
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;
+  deleteDatasets: (ids: number[]) => Promise<void>;
+  isDeleting: boolean;
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
   clearFilters: () => void;

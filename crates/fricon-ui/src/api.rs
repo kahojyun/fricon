@@ -39,7 +39,8 @@ pub(crate) fn specta_builder() -> Builder {
             charts::get_filter_table_data,
             datasets::update_dataset_favorite,
             datasets::update_dataset_info,
-            datasets::get_dataset_write_status
+            datasets::get_dataset_write_status,
+            datasets::delete_datasets
         ])
         .events(collect_events![DatasetCreated, DatasetUpdated])
         .typ::<DatasetInfo>()

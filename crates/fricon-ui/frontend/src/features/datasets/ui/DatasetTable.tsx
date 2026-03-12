@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -18,10 +18,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/shared/ui/context-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 interface DatasetTableProps {
   selectedDatasetId?: number;
-  onDatasetSelected: (id: number) => void;
+  onDatasetSelected: (id?: number) => void;
 }
 
 export function DatasetTable({
@@ -48,7 +66,13 @@ export function DatasetTable({
     handleStatusToggle,
     clearFilters,
     loadNextPage,
+    deleteDatasets,
+    isDeleting,
   } = useDatasetTableData();
+
+  const [rowSelection, setRowSelection] = useState({});
+  const [idsToDelete, setIdsToDelete] = useState<number[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const columns = useMemo(
     () => createDatasetColumns({ toggleFavorite }),
@@ -68,9 +92,12 @@ export function DatasetTable({
     state: {
       sorting,
       columnVisibility,
+      rowSelection,
     },
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id.toString(),
   });
 
   const { rows } = table.getRowModel();
@@ -101,6 +128,26 @@ export function DatasetTable({
       ? rowVirtualizer.getTotalSize() -
         (virtualItems[virtualItems.length - 1]?.end ?? 0)
       : 0;
+
+  const handleDeleteClick = (ids: number[]) => {
+    setIdsToDelete(ids);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteDatasets(idsToDelete);
+      setRowSelection({});
+
+      // If the currently selected dataset was deleted, clear the selection
+      if (selectedDatasetId && idsToDelete.includes(selectedDatasetId)) {
+        onDatasetSelected(undefined);
+      }
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setIdsToDelete([]);
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -177,34 +224,77 @@ export function DatasetTable({
                     if (!row) return null;
                     const dataset = row.original;
                     const isSelected = dataset.id === selectedDatasetId;
+                    const isRowSelected = row.getIsSelected();
+                    const selectedRows =
+                      table.getFilteredSelectedRowModel().rows;
+                    const selectedCount = selectedRows.length;
 
                     return (
-                      <TableRow
-                        key={row.id}
-                        data-state={isSelected && "selected"}
-                        ref={rowVirtualizer.measureElement}
-                        data-index={virtualRow.index}
-                        className="cursor-pointer"
-                        onClick={() => onDatasetSelected(dataset.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            onDatasetSelected(dataset.id);
+                      <ContextMenu key={row.id}>
+                        <ContextMenuTrigger
+                          render={
+                            <TableRow
+                              data-state={
+                                (isSelected && "selected") ||
+                                (isRowSelected && "selected")
+                              }
+                              ref={rowVirtualizer.measureElement}
+                              data-index={virtualRow.index}
+                              className="cursor-pointer"
+                              onClick={() => onDatasetSelected(dataset.id)}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === "Enter" ||
+                                  event.key === " "
+                                ) {
+                                  onDatasetSelected(dataset.id);
+                                }
+                              }}
+                              tabIndex={0}
+                            >
+                              {row.getVisibleCells().map((cell) => (
+                                <TableCell key={cell.id}>
+                                  {flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext(),
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
                           }
-                          if (event.metaKey || event.ctrlKey) {
-                            event.stopPropagation();
-                          }
-                        }}
-                        tabIndex={0}
-                      >
-                        {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id}>
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
+                        />
+                        <ContextMenuContent className="w-64">
+                          <ContextMenuItem
+                            onClick={() => onDatasetSelected(dataset.id)}
+                          >
+                            View Details
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            variant="destructive"
+                            onClick={() => handleDeleteClick([dataset.id])}
+                          >
+                            <Trash2 data-icon="inline-start" />
+                            Delete
+                          </ContextMenuItem>
+                          {selectedCount > 1 &&
+                            selectedRows.some(
+                              (r) => r.original.id === dataset.id,
+                            ) && (
+                              <ContextMenuItem
+                                variant="destructive"
+                                onClick={() =>
+                                  handleDeleteClick(
+                                    selectedRows.map((r) => r.original.id),
+                                  )
+                                }
+                              >
+                                <Trash2 data-icon="inline-start" />
+                                Delete Selected ({selectedCount})
+                              </ContextMenuItem>
                             )}
-                          </TableCell>
-                        ))}
-                      </TableRow>
+                        </ContextMenuContent>
+                      </ContextMenu>
                     );
                   })}
                   {virtualPaddingBottom > 0 && (
@@ -225,6 +315,34 @@ export function DatasetTable({
           </Table>
         </div>
       </div>
+
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Dataset</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {idsToDelete.length} dataset(s)?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+              disabled={isDeleting}
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 }

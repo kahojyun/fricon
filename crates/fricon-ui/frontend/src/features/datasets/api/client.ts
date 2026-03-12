@@ -67,3 +67,7 @@ export async function getDatasetDetail(id: number): Promise<DatasetDetail> {
   const rawDetail: WireDatasetDetail = await invoke(commands.datasetDetail(id));
   return normalizeDatasetDetail(rawDetail);
 }
+
+export async function deleteDatasets(ids: number[]): Promise<void> {
+  await invoke(commands.deleteDatasets(ids));
+}

@@ -79,6 +79,7 @@ function mockHookReturn(overrides: Record<string, unknown> = {}) {
   const handleStatusToggle = vi.fn();
   const clearFilters = vi.fn();
   const loadNextPage = vi.fn().mockResolvedValue(undefined);
+  const deleteDatasets = vi.fn().mockResolvedValue(undefined);
 
   const value = {
     datasets: [makeDataset()],
@@ -96,6 +97,8 @@ function mockHookReturn(overrides: Record<string, unknown> = {}) {
     hasMore: false,
     hasActiveFilters: false,
     toggleFavorite,
+    deleteDatasets,
+    isDeleting: false,
     handleTagToggle,
     handleStatusToggle,
     clearFilters,

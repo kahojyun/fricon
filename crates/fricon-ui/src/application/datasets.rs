@@ -203,3 +203,17 @@ pub(crate) async fn get_dataset_write_status(
         is_complete,
     })
 }
+
+pub(crate) async fn delete_datasets(
+    session: &WorkspaceSession,
+    ids: Vec<i32>,
+) -> anyhow::Result<()> {
+    let dataset_catalog = session.app().dataset_catalog();
+    for id in ids {
+        dataset_catalog
+            .delete_dataset(id)
+            .await
+            .with_context(|| format!("Failed to delete dataset with id {id}"))?;
+    }
+    Ok(())
+}

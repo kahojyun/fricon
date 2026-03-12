@@ -76,6 +76,14 @@ async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, Tau
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async deleteDatasets(ids: number[]) : Promise<Result<null, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_datasets", { ids }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 

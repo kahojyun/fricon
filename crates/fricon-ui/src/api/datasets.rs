@@ -309,3 +309,13 @@ pub(crate) async fn get_dataset_write_status(
         .await?
         .into())
 }
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn delete_datasets(
+    state: State<'_, AppState>,
+    ids: Vec<i32>,
+) -> Result<(), TauriCommandError> {
+    app::delete_datasets(state.session(), ids).await?;
+    Ok(())
+}
