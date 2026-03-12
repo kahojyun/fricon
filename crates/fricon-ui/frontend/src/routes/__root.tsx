@@ -5,6 +5,7 @@ import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Database, Info } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+import { Toaster } from "@/shared/ui/sonner";
 import { useWorkspaceInfoQuery } from "@/features/workspace";
 
 const queryClient = new QueryClient({
@@ -100,6 +101,8 @@ function RootLayout() {
       <footer className="flex h-6 items-center border-t bg-muted/40 px-3 text-[11px] text-muted-foreground">
         <span className="truncate">Ready</span>
       </footer>
+
+      <Toaster />
     </div>
   );
 }

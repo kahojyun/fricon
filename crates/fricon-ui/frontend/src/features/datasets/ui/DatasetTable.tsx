@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface DatasetTableProps {
   selectedDatasetId?: number;
@@ -143,9 +144,13 @@ export function DatasetTable({
       if (selectedDatasetId && idsToDelete.includes(selectedDatasetId)) {
         onDatasetSelected(undefined);
       }
-    } finally {
       setIsDeleteDialogOpen(false);
       setIdsToDelete([]);
+      toast.success(`Successfully deleted ${idsToDelete.length} dataset(s)`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete dataset(s)",
+      );
     }
   };
 
@@ -318,7 +323,10 @@ export function DatasetTable({
 
       <AlertDialog
         open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isDeleting) return;
+          setIsDeleteDialogOpen(open);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
