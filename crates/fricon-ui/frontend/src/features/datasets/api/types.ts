@@ -1,5 +1,6 @@
 import type {
   ColumnInfo,
+  DatasetDeleteResult,
   DatasetDetail as WireDatasetDetail,
   DatasetInfo as WireDatasetInfo,
   DatasetInfoUpdate,
@@ -21,6 +22,7 @@ export const DATASET_PAGE_SIZE = 200;
 
 export type {
   ColumnInfo,
+  DatasetDeleteResult,
   DatasetInfoUpdate,
   DatasetListSortBy,
   DatasetListSortDir,

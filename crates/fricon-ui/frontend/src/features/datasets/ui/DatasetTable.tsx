@@ -137,16 +137,39 @@ export function DatasetTable({
 
   const confirmDelete = async () => {
     try {
-      await deleteDatasets(idsToDelete);
+      const results = await deleteDatasets(idsToDelete);
       setRowSelection({});
 
-      // If the currently selected dataset was deleted, clear the selection
-      if (selectedDatasetId && idsToDelete.includes(selectedDatasetId)) {
+      const successIds = results
+        .filter((r) => r.success)
+        .map((r) => r.id);
+      const failedResults = results.filter((r) => !r.success);
+
+      // Invalidate selection if it was deleted
+      if (selectedDatasetId && successIds.includes(selectedDatasetId)) {
         onDatasetSelected(undefined);
       }
+
       setIsDeleteDialogOpen(false);
-      setIdsToDelete([]);
-      toast.success(`Successfully deleted ${idsToDelete.length} dataset(s)`);
+
+      if (failedResults.length === 0) {
+        setIdsToDelete([]);
+        toast.success(`Successfully deleted ${successIds.length} dataset(s)`);
+      } else if (successIds.length === 0) {
+        // All failed
+        toast.error(`Failed to delete ${failedResults.length} dataset(s)`);
+      } else {
+        // Partial success
+        setIdsToDelete(failedResults.map((r) => r.id));
+        toast.warning(
+          `Successfully deleted ${successIds.length} dataset(s), but ${failedResults.length} failed.`,
+          {
+            description: failedResults
+              .map((r) => `ID ${r.id}: ${r.error}`)
+              .join("\n"),
+          },
+        );
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete dataset(s)",

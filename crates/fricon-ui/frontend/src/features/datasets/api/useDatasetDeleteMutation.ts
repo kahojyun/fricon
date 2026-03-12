@@ -21,8 +21,9 @@ export function useDatasetDeleteMutation(refreshDatasets: () => Promise<void>) {
 
   const deleteDatasets = async (ids: number[]) => {
     try {
-      await deleteMutation.mutateAsync(ids);
+      const results = await deleteMutation.mutateAsync(ids);
       await refreshDatasets();
+      return results;
     } catch (error) {
       console.error("Failed to delete datasets:", error);
       throw error;

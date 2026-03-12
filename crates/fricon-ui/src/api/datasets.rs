@@ -219,6 +219,24 @@ impl From<app::DatasetWriteStatus> for DatasetWriteStatus {
     }
 }
 
+#[derive(Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DatasetDeleteResult {
+    pub(crate) id: i32,
+    pub(crate) success: bool,
+    pub(crate) error: Option<String>,
+}
+
+impl From<app::DatasetDeleteResult> for DatasetDeleteResult {
+    fn from(value: app::DatasetDeleteResult) -> Self {
+        Self {
+            id: value.id,
+            success: value.success,
+            error: value.error,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub(crate) struct DatasetCreated(pub(crate) DatasetInfo);
 
@@ -315,7 +333,7 @@ pub(crate) async fn get_dataset_write_status(
 pub(crate) async fn delete_datasets(
     state: State<'_, AppState>,
     ids: Vec<i32>,
-) -> Result<(), TauriCommandError> {
-    app::delete_datasets(state.session(), ids).await?;
-    Ok(())
+) -> Result<Vec<DatasetDeleteResult>, TauriCommandError> {
+    let results = app::delete_datasets(state.session(), ids).await;
+    Ok(results.into_iter().map(DatasetDeleteResult::from).collect())
 }

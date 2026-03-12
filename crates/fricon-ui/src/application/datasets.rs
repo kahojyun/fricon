@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use fricon::{
     DatasetDataType, DatasetListQuery, DatasetRecord, DatasetStatus, DatasetUpdate,
     dataset::model::DatasetId,
@@ -33,6 +34,13 @@ pub(crate) struct DatasetDetail {
 pub(crate) struct DatasetWriteStatus {
     pub(crate) row_count: usize,
     pub(crate) is_complete: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct DatasetDeleteResult {
+    pub(crate) id: i32,
+    pub(crate) success: bool,
+    pub(crate) error: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -207,13 +215,22 @@ pub(crate) async fn get_dataset_write_status(
 pub(crate) async fn delete_datasets(
     session: &WorkspaceSession,
     ids: Vec<i32>,
-) -> anyhow::Result<()> {
+) -> Vec<DatasetDeleteResult> {
     let dataset_catalog = session.app().dataset_catalog();
+    let mut results = Vec::with_capacity(ids.len());
     for id in ids {
-        dataset_catalog
-            .delete_dataset(id)
-            .await
-            .with_context(|| format!("Failed to delete dataset with id {id}"))?;
+        match dataset_catalog.delete_dataset(id).await {
+            Ok(_) => results.push(DatasetDeleteResult {
+                id,
+                success: true,
+                error: None,
+            }),
+            Err(e) => results.push(DatasetDeleteResult {
+                id,
+                success: false,
+                error: Some(e.to_string()),
+            }),
+        }
     }
-    Ok(())
+    results
 }
