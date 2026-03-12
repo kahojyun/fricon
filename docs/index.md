@@ -5,6 +5,7 @@ Fricon is a framework for data collection automation.
 ## Current features
 
 - Data storage.
+- Desktop UI built as Rust + React feature slices.
 
 ## Usage
 

@@ -1,20 +1,20 @@
-mod app_state;
-mod commands;
+mod api;
+mod application;
+mod chart_data;
+mod desktop_runtime;
 mod launch;
-mod logging;
-mod models;
-mod panic_hook;
-mod runtime;
-mod workspace;
 
 use anyhow::Result;
 
-pub(crate) use crate::app_state::AppState;
+use crate::desktop_runtime::{
+    logging::init_tracing_subscriber,
+    panic_hook::install_panic_hook,
+    runtime::{run_with_context_dialog_mode, run_with_context_terminal_mode},
+};
 pub use crate::{
-    commands::export_bindings,
+    api::export_bindings,
     launch::{InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError},
 };
-use crate::{logging::init_tracing_subscriber, panic_hook::install_panic_hook};
 
 /// Run the application with the given launch context.
 ///
@@ -26,8 +26,8 @@ pub fn run_with_context(context: &LaunchContext) -> Result<()> {
     init_tracing_subscriber()?;
     install_panic_hook(context.interaction_mode);
     match context.interaction_mode {
-        InteractionMode::Terminal => runtime::run_with_context_terminal_mode(context),
-        InteractionMode::Dialog => runtime::run_with_context_dialog_mode(context),
+        InteractionMode::Terminal => run_with_context_terminal_mode(context),
+        InteractionMode::Dialog => run_with_context_dialog_mode(context),
     }
 }
 
@@ -40,8 +40,8 @@ mod tests {
 
     use super::{
         InteractionMode, LaunchContext, LaunchSource, WorkspaceLaunchError,
-        panic_hook::build_panic_dialog_message,
-        workspace::{resolve_workspace_path, validate_workspace_path},
+        desktop_runtime::panic_hook::build_panic_dialog_message,
+        launch::resolve::{resolve_workspace_path, validate_workspace_path},
     };
 
     #[test]

@@ -17,6 +17,7 @@ export default defineConfig([
     "target/**",
     "**/node_modules/**",
     "**/src/shared/lib/bindings.ts",
+    // shadcn/ui source files live here; keep repo-owned shared components elsewhere so they remain linted.
     "crates/fricon-ui/frontend/src/shared/ui/**",
   ]),
   js.configs.recommended,
@@ -39,6 +40,9 @@ export default defineConfig([
         projectService: true,
       },
     },
+    rules: {
+      "@typescript-eslint/no-deprecated": "error",
+    },
   },
   {
     files: ["**/*.test.ts", "**/*.test.tsx", "**/src/shared/test/**/*"],
@@ -47,6 +51,48 @@ export default defineConfig([
         ...globals.browser,
         ...globals.vitest,
       },
+    },
+  },
+  {
+    files: ["crates/fricon-ui/frontend/src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/**", "@/routes/**", "@/features/**"],
+              message:
+                "Feature files must use relative imports within the feature and may not import app, routes, or other features.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "crates/fricon-ui/frontend/src/app/**/*.{ts,tsx}",
+      "crates/fricon-ui/frontend/src/routes/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/features/*/api/**",
+                "@/features/*/hooks/**",
+                "@/features/*/model/**",
+                "@/features/*/ui/**",
+              ],
+              message:
+                "App and routes must import features through their public barrel exports.",
+            },
+          ],
+        },
+      ],
     },
   },
   prettier,

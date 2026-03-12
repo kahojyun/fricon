@@ -1,4 +1,5 @@
 {
     "plugins": ["prettier-plugin-tailwindcss"],
-    "tailwindStylesheet": "./crates/fricon-ui/frontend/src/index.css"
+    "tailwindStylesheet": "./crates/fricon-ui/frontend/src/index.css",
+    "tailwindFunctions": ["cn", "cva"]
 }

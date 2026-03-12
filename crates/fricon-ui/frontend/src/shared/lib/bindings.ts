@@ -76,6 +76,14 @@ async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, Tau
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async deleteDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_datasets", { ids }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -103,6 +111,7 @@ export type ColumnUniqueValue = { index: number; displayValue: string }
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
 export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
 export type DatasetCreated = DatasetInfo
+export type DatasetDeleteResult = { id: number; success: boolean; error: string | null }
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; columns: ColumnInfo[] }
 export type DatasetFavoriteUpdate = { favorite: boolean }
 export type DatasetInfo = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string }

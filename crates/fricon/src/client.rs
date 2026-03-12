@@ -22,16 +22,17 @@ use uuid::Uuid;
 
 use crate::{
     DEFAULT_DATASET_LIST_LIMIT, VERSION,
-    database::DatasetStatus,
-    dataset::{DatasetArray, DatasetRow, DatasetSchema},
-    dataset_manager::DatasetRecord,
-    ipc,
+    dataset::{
+        model::{DatasetRecord, DatasetStatus},
+        schema::{DatasetArray, DatasetRow, DatasetSchema},
+    },
     proto::{
         AddTagsRequest, CreateAbort, CreateFinish, CreateMetadata, CreateRequest, CreateResponse,
         GetRequest, RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
+    transport::ipc,
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
 
@@ -65,6 +66,7 @@ impl Client {
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
+        runtime: &tokio::runtime::Handle,
     ) -> Result<DatasetWriter> {
         Ok(DatasetWriter::new(
             self.clone(),
@@ -72,6 +74,7 @@ impl Client {
             description,
             tags,
             schema,
+            runtime.clone(),
         ))
     }
 
@@ -141,11 +144,11 @@ impl DatasetWriter {
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
+        runtime: tokio::runtime::Handle,
     ) -> Self {
         let (tx, rx) = mpsc::channel::<StreamMessage>(16);
 
         let arrow_schema = Arc::new(schema.to_arrow_schema());
-        let runtime = tokio::runtime::Handle::current();
         let connection_handle = runtime.spawn({
             let client = client.clone();
             let request_stream =
@@ -223,7 +226,7 @@ impl DatasetWriter {
             .context("Connection failed.")?
             .dataset
             .context("No dataset returned.")?;
-        let record: crate::dataset_manager::DatasetRecord = dataset
+        let record: DatasetRecord = dataset
             .try_into()
             .context("Failed to convert dataset record")?;
         info!(dataset.id = record.id, "Dataset write finished");

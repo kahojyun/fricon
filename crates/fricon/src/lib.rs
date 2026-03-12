@@ -6,31 +6,25 @@
 //! - **Dataset Operations**: Create, store, and query datasets using Apache
 //!   Arrow format
 //! - **Client-Server Architecture**: gRPC-based communication
-mod app;
-mod client;
+pub mod app;
+pub mod client;
 mod database;
-mod dataset;
-mod dataset_fs;
-mod dataset_manager;
-mod ipc;
+pub mod dataset;
 mod proto;
-mod server;
+mod transport;
 mod utils;
-mod workspace;
+pub mod workspace;
 
 pub use self::{
     app::{AppEvent, AppHandle, AppManager},
     client::{Client, Dataset, DatasetWriter},
-    database::DatasetStatus,
     dataset::{
-        DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
-        ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
+        CreateDatasetRequest, DatasetArray, DatasetCatalogService, DatasetDataType, DatasetId,
+        DatasetIngestService, DatasetListQuery, DatasetMetadata, DatasetReadService, DatasetReader,
+        DatasetRecord, DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus,
+        DatasetUpdate, FixedStepTrace, ScalarArray, ScalarKind, SelectOptions, SortDirection,
+        TraceKind, VariableStepTrace,
     },
-    dataset_manager::{
-        CreateDatasetRequest, DatasetId, DatasetListQuery, DatasetManager, DatasetMetadata,
-        DatasetReader, DatasetSortBy, DatasetUpdate, SelectOptions, SortDirection,
-    },
-    server::DatasetRecord,
     workspace::{WorkspaceRoot, get_log_dir},
 };
 

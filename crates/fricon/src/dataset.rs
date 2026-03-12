@@ -1,27 +1,21 @@
-mod arrays;
-mod scalars;
-mod table;
-mod types;
+pub mod catalog;
+pub mod events;
+pub mod ingest;
+pub mod model;
+pub mod read;
+pub mod schema;
+pub mod storage;
 
-use arrow_schema::ArrowError;
-
-pub(crate) use self::table::ChunkedTable;
 pub use self::{
-    arrays::{DatasetArray, ScalarArray},
-    scalars::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace},
-    types::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
+    catalog::DatasetCatalogService,
+    ingest::{CreateDatasetRequest, DatasetIngestService},
+    model::{
+        DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
+        DatasetUpdate, SortDirection,
+    },
+    read::{DatasetReadService, DatasetReader, SelectOptions},
+    schema::{
+        DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
+        ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
+    },
 };
-
-#[derive(Debug, thiserror::Error)]
-pub enum DatasetError {
-    #[error("Incompatible data type.")]
-    IncompatibleType,
-    #[error("X and Y length of trace mismatch.")]
-    TraceLengthMismatch,
-    #[error("Schema mismatch.")]
-    SchemaMismatch,
-    #[error("Invalid filter table.")]
-    InvalidFilter,
-    #[error(transparent)]
-    Arrow(#[from] ArrowError),
-}
