@@ -234,3 +234,72 @@ pub(crate) async fn delete_datasets(
     }
     results
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+    use tokio::sync::mpsc;
+
+    use super::delete_datasets;
+    use crate::application::session::WorkspaceSession;
+    use fricon::{
+        AppManager, CreateDatasetRequest, DatasetListQuery, WorkspaceRoot,
+        dataset::ingest::{CreateIngestEvent, CreateTerminal},
+    };
+
+    async fn create_completed_dataset(
+        session: &WorkspaceSession,
+        name: &str,
+    ) -> anyhow::Result<i32> {
+        let (events_tx, events_rx) = mpsc::channel::<CreateIngestEvent>(1);
+        events_tx
+            .send(CreateIngestEvent::Terminal(CreateTerminal::Finish))
+            .await
+            .expect("test event channel should accept finish event");
+
+        let dataset = session
+            .app()
+            .dataset_ingest()
+            .create_dataset(
+                CreateDatasetRequest {
+                    name: name.to_string(),
+                    description: "test dataset".to_string(),
+                    tags: vec!["test".to_string()],
+                },
+                events_rx,
+            )
+            .await?;
+
+        Ok(dataset.id)
+    }
+
+    #[tokio::test]
+    async fn delete_datasets_reports_partial_success() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let existing_id = create_completed_dataset(&session, "delete-me").await?;
+        let missing_id = existing_id + 10_000;
+
+        let results = delete_datasets(&session, vec![existing_id, missing_id]).await;
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].id, existing_id);
+        assert!(results[0].success);
+        assert_eq!(results[0].error, None);
+        assert_eq!(results[1].id, missing_id);
+        assert!(!results[1].success);
+        assert!(results[1].error.is_some());
+
+        let remaining = session
+            .app()
+            .dataset_catalog()
+            .list_datasets(DatasetListQuery::default())
+            .await?;
+        assert!(remaining.is_empty());
+
+        Ok(())
+    }
+}
