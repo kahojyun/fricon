@@ -210,6 +210,10 @@ export function DatasetTable({
     event: React.KeyboardEvent<HTMLTableRowElement>,
     rowIndex: number,
   ) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
 

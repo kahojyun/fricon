@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -254,6 +255,32 @@ describe("DatasetTable", () => {
     expect(onDatasetSelected).toHaveBeenNthCalledWith(1, 7);
     expect(onDatasetSelected).toHaveBeenNthCalledWith(2, 7);
     expect(screen.getByLabelText("Select row")).toBeChecked();
+  });
+
+  it("keeps keyboard activation working for interactive controls inside a row", async () => {
+    const user = userEvent.setup();
+    const dataset = makeDataset({ id: 11, name: "Dataset 11" });
+    const { hook, onDatasetSelected } = renderDatasetTable({
+      datasets: [dataset],
+    });
+
+    const checkbox = screen.getByLabelText("Select row");
+    await act(async () => {
+      checkbox.focus();
+    });
+    await user.keyboard(" ");
+
+    expect(checkbox).toBeChecked();
+    expect(onDatasetSelected).not.toHaveBeenCalled();
+
+    const favoriteButton = screen.getByLabelText("Add to favorites");
+    await act(async () => {
+      favoriteButton.focus();
+    });
+    await user.keyboard("{Enter}");
+
+    expect(hook.toggleFavorite).toHaveBeenCalledWith(dataset);
+    expect(onDatasetSelected).not.toHaveBeenCalled();
   });
 
   it("updates search query from input", async () => {
