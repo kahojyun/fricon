@@ -67,13 +67,16 @@ For most React 19 apps, the default compiler setup is enough.
 2. Prefer compiler-led memoization for new code.
 Avoid adding `useMemo`, `useCallback`, or `React.memo` by default in compiler-enabled code.
 
-3. Preserve existing manual memoization unless removal is verified.
+3. Treat `react-hooks/incompatible-library` as an explicit exception.
+If `eslint-plugin-react-hooks` reports `react-hooks/incompatible-library`, React Compiler skips optimization for the affected component or hook. Treat that code as outside compiler assumptions and follow the library's own API and performance guidance instead. Prefer compiler-compatible alternative APIs when the library provides one.
+
+4. Preserve existing manual memoization unless removal is verified.
 Removing legacy memoization can change compiler output. Keep it unless tests or profiling show the rewrite is safe.
 
-4. Use directives sparingly.
+5. Use directives sparingly.
 `"use memo"` is mainly for `annotation` mode or explicit overrides. `"use no memo"` is a temporary escape hatch for debugging or incompatible code.
 
-5. Use lint-driven incremental adoption.
+6. Use lint-driven incremental adoption.
 Upgrade `eslint-plugin-react-hooks`, then fix purity, immutability, refs, unsupported syntax, static component, and render/effect state issues over time. Compiler diagnostics skip only the unsafe components and hooks.
 
 ## High-Value Interpretations
@@ -99,4 +102,5 @@ Conditional or looped `use(...)` does not relax the ordinary Rules of Hooks for 
 - Calling components as plain functions breaks the React model and confuses compiler assumptions.
 - Render-time side effects, mutation, and ref access remain high-signal causes of compiler skips and lint findings.
 - Removing effect dependencies or old manual memoization without proof can change behavior.
+- `react-hooks/incompatible-library` means compiler memoization is unavailable for that boundary; do not mechanically apply or remove `useMemo` / `useCallback` based on compiler-era heuristics alone. Follow the library's own contract instead.
 - Libraries that depend on React internals or outdated test infrastructure remain upgrade and compatibility risks.
