@@ -39,6 +39,9 @@ export default defineConfig([
         projectService: true,
       },
     },
+    rules: {
+      "@typescript-eslint/no-deprecated": "error",
+    },
   },
   {
     files: ["**/*.test.ts", "**/*.test.tsx", "**/src/shared/test/**/*"],

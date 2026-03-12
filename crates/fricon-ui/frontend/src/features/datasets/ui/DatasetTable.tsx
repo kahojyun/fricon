@@ -43,6 +43,12 @@ interface DatasetTableProps {
   onDatasetSelected: (id?: number) => void;
 }
 
+function isMacPlatform() {
+  const platform = navigator.userAgent;
+
+  return platform.toUpperCase().includes("MAC");
+}
+
 export function DatasetTable({
   selectedDatasetId,
   onDatasetSelected,
@@ -169,7 +175,7 @@ export function DatasetTable({
       return;
     }
 
-    const isMac = navigator.platform.toUpperCase().includes("MAC");
+    const isMac = isMacPlatform();
 
     if (e.shiftKey) {
       e.preventDefault();
