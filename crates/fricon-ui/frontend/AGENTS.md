@@ -2,7 +2,8 @@
 
 - **React Compiler is enabled.** DO NOT use `useMemo` or `useCallback` unless absolutely mandated by a third-party library API requirement.
 - Prefer shadcn/ui components
-- Shared primitives live under `src/shared/ui/`.
+- `src/shared/ui/` is reserved for shadcn/ui primitives and thin local patches to those files.
+- Repo-owned shared components must not be added under `src/shared/ui/`; place them in a separate shared directory such as `src/shared/components/` so they stay linted.
 - Shared helpers live under `src/shared/lib/`.
 - Feature internals should default to `ui/`, `api/`, `model/`, and `hooks/`.
 - The frontend uses vertical feature slices rooted under `src/features/`.
