@@ -99,19 +99,25 @@ export function DatasetTable({
     handleColumnVisibilityChange,
   } = useDatasetColumnVisibility(columns);
 
-  const table = useReactTable({
-    data: datasets,
-    columns,
-    state: {
-      sorting,
-      columnVisibility,
-      rowSelection,
-    },
-    onSortingChange: setSorting,
-    onRowSelectionChange: setRowSelection,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (row) => row.id.toString(),
-  });
+  const tableOptions = useMemo(
+    () => ({
+      data: datasets,
+      columns,
+      state: {
+        sorting,
+        columnVisibility,
+        rowSelection,
+      },
+      onSortingChange: setSorting,
+      onRowSelectionChange: setRowSelection,
+      getCoreRowModel: getCoreRowModel(),
+      getRowId: (row: (typeof datasets)[0]) => row.id.toString(),
+      autoResetRowSelection: false,
+    }),
+    [datasets, columns, sorting, columnVisibility, rowSelection, setSorting],
+  );
+
+  const table = useReactTable(tableOptions);
 
   const { rows } = table.getRowModel();
   const visibleColumnCount = table.getVisibleLeafColumns().length;
@@ -155,12 +161,17 @@ export function DatasetTable({
       return;
 
     const isCheckbox = (e.target as HTMLElement).closest(
-      'button[role="checkbox"]',
+      'button[role="checkbox"], [data-slot="checkbox"], [data-slot="checkbox-indicator"]',
     );
+
+    if (isCheckbox) {
+      // Return completely so that native checkbox handlers assume full control
+      return;
+    }
 
     if (e.shiftKey) {
       e.preventDefault();
-      const effectiveAnchor = anchorIndex ?? 0;
+      const effectiveAnchor = anchorIndex ?? rowIndex;
       const start = Math.min(effectiveAnchor, rowIndex);
       const end = Math.max(effectiveAnchor, rowIndex);
       const newSelection: Record<string, boolean> = {};
@@ -173,21 +184,38 @@ export function DatasetTable({
         initialSelection: {},
         mode: "replace",
       });
-      onDatasetSelected(datasetId);
+      if (anchorIndex === null) {
+        setAnchorIndex(rowIndex);
+      }
+      if (!isCheckbox) {
+        onDatasetSelected(datasetId);
+      }
       return;
     }
 
-    if (e.ctrlKey || e.metaKey || isCheckbox) {
+    if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const isSelected = !!rowSelection[rowId];
       const nextValue = !isSelected;
-      setRowSelection((prev) => ({ ...prev, [rowId]: nextValue }));
+      
+      setRowSelection((prev) => {
+        const next = { ...prev };
+        if (nextValue) {
+          next[rowId] = true;
+        } else {
+          delete next[rowId];
+        }
+        return next;
+      });
+
       setAnchorIndex(rowIndex);
+      
       setDragState({
         initialSelection: rowSelection,
         mode: "toggle",
         targetValue: nextValue,
       });
+
       onDatasetSelected(datasetId);
       return;
     }
@@ -206,7 +234,7 @@ export function DatasetTable({
     if (!dragState) return;
 
     if (dragState.mode === "replace") {
-      const effectiveAnchor = anchorIndex ?? 0;
+      const effectiveAnchor = anchorIndex ?? rowIndex;
       const start = Math.min(effectiveAnchor, rowIndex);
       const end = Math.max(effectiveAnchor, rowIndex);
       const nextSelection: Record<string, boolean> = {};
@@ -216,13 +244,19 @@ export function DatasetTable({
       }
       setRowSelection(nextSelection);
     } else if (dragState.mode === "toggle") {
-      const effectiveAnchor = anchorIndex ?? 0;
+      const effectiveAnchor = anchorIndex ?? rowIndex;
       const start = Math.min(effectiveAnchor, rowIndex);
       const end = Math.max(effectiveAnchor, rowIndex);
       const nextSelection = { ...dragState.initialSelection };
       for (let i = start; i <= end; i++) {
         const id = rows[i]?.id;
-        if (id) nextSelection[id] = !!dragState.targetValue;
+        if (id) {
+          if (dragState.targetValue) {
+            nextSelection[id] = true;
+          } else {
+            delete nextSelection[id];
+          }
+        }
       }
       setRowSelection(nextSelection);
     }
