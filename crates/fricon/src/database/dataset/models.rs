@@ -288,17 +288,19 @@ mod tests {
     use uuid::Uuid;
 
     use super::{DatasetTag, NewDataset, Tag};
-    use crate::database::{
-        dataset::types::{DbDatasetStatus, SimpleUuid},
-        schema,
+    use crate::{
+        database::{
+            dataset::types::{DbDatasetStatus, SimpleUuid},
+            schema,
+        },
+        dataset::model::DatasetStatus,
     };
-    use crate::dataset::model::DatasetStatus;
 
     fn setup_connection() -> diesel::SqliteConnection {
         let mut conn = diesel::SqliteConnection::establish(":memory:")
             .expect("in-memory sqlite should connect");
         conn.batch_execute(
-            r#"
+            r"
             CREATE TABLE datasets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 uid TEXT NOT NULL,
@@ -317,7 +319,7 @@ mod tests {
                 tag_id INTEGER NOT NULL,
                 PRIMARY KEY (dataset_id, tag_id)
             );
-            "#,
+            ",
         )
         .expect("test schema should be created");
         conn
@@ -362,15 +364,17 @@ mod tests {
         DatasetTag::create_associations(&mut conn, dataset_id, &[tag.id])
             .expect("association should be created");
 
-        Tag::merge_into(&mut conn, "vision", "vision")
-            .expect("self-merge should succeed");
+        Tag::merge_into(&mut conn, "vision", "vision").expect("self-merge should succeed");
 
         let tags: Vec<String> = schema::tags::table
             .select(schema::tags::name)
             .load(&mut conn)
             .expect("tags should be readable");
         let associations: Vec<(i32, i32)> = schema::datasets_tags::table
-            .select((schema::datasets_tags::dataset_id, schema::datasets_tags::tag_id))
+            .select((
+                schema::datasets_tags::dataset_id,
+                schema::datasets_tags::tag_id,
+            ))
             .load(&mut conn)
             .expect("associations should be readable");
 

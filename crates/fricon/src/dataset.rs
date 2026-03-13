@@ -5,7 +5,9 @@ pub mod model;
 pub mod read;
 pub mod schema;
 pub mod storage;
+mod tag;
 
+pub(crate) use self::tag::NormalizedTag;
 pub use self::{
     catalog::DatasetCatalogService,
     ingest::{CreateDatasetRequest, DatasetIngestService},
