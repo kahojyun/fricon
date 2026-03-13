@@ -9,7 +9,7 @@ type BatchUpdateDatasetTagsFn = (
   ids: number[],
   add?: string[],
   remove?: string[],
-) => Promise<Array<{ id: number; success: boolean; error: string | null }>>;
+) => Promise<{ id: number; success: boolean; error: string | null }[]>;
 type DeleteTagFn = (tag: string) => Promise<void>;
 type RenameTagFn = (oldName: string, newName: string) => Promise<void>;
 type MergeTagFn = (source: string, target: string) => Promise<void>;
@@ -20,11 +20,8 @@ const renameTagMock = vi.fn<RenameTagFn>();
 const mergeTagMock = vi.fn<MergeTagFn>();
 
 vi.mock("./client", () => ({
-  batchUpdateDatasetTags: (
-    ids: number[],
-    add?: string[],
-    remove?: string[],
-  ) => batchUpdateDatasetTagsMock(ids, add, remove),
+  batchUpdateDatasetTags: (ids: number[], add?: string[], remove?: string[]) =>
+    batchUpdateDatasetTagsMock(ids, add, remove),
   deleteTag: (tag: string) => deleteTagMock(tag),
   renameTag: (oldName: string, newName: string) =>
     renameTagMock(oldName, newName),

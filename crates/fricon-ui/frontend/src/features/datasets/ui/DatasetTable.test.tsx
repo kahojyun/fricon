@@ -669,11 +669,13 @@ describe("DatasetTable", () => {
     await waitFor(() => {
       expect(toastWarning).toHaveBeenCalledWith(
         expect.stringContaining("but 1 failed"),
-        expect.objectContaining({
-          description: expect.stringContaining("ID 6: locked"),
-        }),
+        expect.any(Object),
       );
     });
+    const warningOptions = toastWarning.mock.calls[0]?.[1] as
+      | { description?: string }
+      | undefined;
+    expect(warningOptions?.description).toContain("ID 6: locked");
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
@@ -783,10 +785,14 @@ describe("DatasetTable", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /Tags/i }));
-    await user.click(await screen.findByRole("button", { name: /Manage Tags/i }));
+    await user.click(
+      await screen.findByRole("button", { name: /Manage Tags/i }),
+    );
 
     const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: /Delete tag vision/i }));
+    await user.click(
+      within(dialog).getByRole("button", { name: /Delete tag vision/i }),
+    );
 
     await waitFor(() => {
       expect(deleteTag).toHaveBeenCalledWith("vision");
