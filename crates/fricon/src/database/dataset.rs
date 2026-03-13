@@ -13,6 +13,7 @@ use crate::{
     DEFAULT_DATASET_LIST_LIMIT,
     database::{core::Pool, schema},
     dataset::{
+        NormalizedTag,
         catalog::{CatalogError, DatasetCatalogRepository},
         ingest::{CreateDatasetRequest, DatasetIngestRepository, IngestError},
         model::{
@@ -308,10 +309,11 @@ impl DatasetCatalogRepository for DatasetRepository {
         Ok(())
     }
 
-    fn add_tags(&self, id: i32, tags: &[String]) -> Result<(), CatalogError> {
+    fn add_tags(&self, id: i32, tags: &[NormalizedTag]) -> Result<(), CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let tag_names: Vec<String> = tags.iter().map(|tag| tag.as_str().to_string()).collect();
         conn.immediate_transaction(|conn| {
-            let created_tags = Tag::find_or_create_batch(conn, tags)?;
+            let created_tags = Tag::find_or_create_batch(conn, &tag_names)?;
             let tag_ids: Vec<i32> = created_tags.into_iter().map(|tag| tag.id).collect();
             DatasetTag::create_associations(conn, id, &tag_ids)?;
             Ok::<(), diesel::result::Error>(())
@@ -321,11 +323,12 @@ impl DatasetCatalogRepository for DatasetRepository {
         Ok(())
     }
 
-    fn remove_tags(&self, id: i32, tags: &[String]) -> Result<(), CatalogError> {
+    fn remove_tags(&self, id: i32, tags: &[NormalizedTag]) -> Result<(), CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let tag_names: Vec<String> = tags.iter().map(|tag| tag.as_str().to_string()).collect();
         conn.immediate_transaction(|conn| {
             let tag_ids_to_delete = schema::tags::table
-                .filter(schema::tags::name.eq_any(tags))
+                .filter(schema::tags::name.eq_any(tag_names))
                 .select(schema::tags::id)
                 .load::<i32>(conn)?;
 
@@ -340,6 +343,35 @@ impl DatasetCatalogRepository for DatasetRepository {
     fn delete_dataset(&self, id: i32) -> Result<(), CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
         Dataset::delete_from_db(&mut conn, id).map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
+    fn delete_tag(&self, tag: &NormalizedTag) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        conn.immediate_transaction(|conn| Tag::delete_by_name(conn, tag.as_str()))
+            .map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
+    fn rename_tag(
+        &self,
+        old_name: &NormalizedTag,
+        new_name: &NormalizedTag,
+    ) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        conn.immediate_transaction(|conn| Tag::rename(conn, old_name.as_str(), new_name.as_str()))
+            .map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
+    fn merge_tag(
+        &self,
+        source: &NormalizedTag,
+        target: &NormalizedTag,
+    ) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        conn.immediate_transaction(|conn| Tag::merge_into(conn, source.as_str(), target.as_str()))
+            .map_err(anyhow::Error::from)?;
         Ok(())
     }
 }

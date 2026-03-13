@@ -23,6 +23,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/shared/ui/context-menu";
 import {
@@ -35,8 +38,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Input } from "@/shared/ui/input";
+import { Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import type { DatasetDeleteResult } from "../api/types";
 
 interface DatasetTableProps {
   selectedDatasetId?: number;
@@ -47,6 +52,13 @@ function isMacPlatform() {
   const platform = navigator.userAgent;
 
   return platform.toUpperCase().includes("MAC");
+}
+
+function getTagMutationDescription(results: DatasetDeleteResult[]) {
+  return results
+    .filter((result) => !result.success)
+    .map((result) => `ID ${result.id}: ${result.error ?? "Unknown error"}`)
+    .join("\n");
 }
 
 export function DatasetTable({
@@ -64,6 +76,7 @@ export function DatasetTable({
     sorting,
     setSorting,
     filteredTagOptions,
+    allTags,
     favoriteOnly,
     setFavoriteOnly,
     hasMore,
@@ -75,6 +88,12 @@ export function DatasetTable({
     loadNextPage,
     deleteDatasets,
     isDeleting,
+    batchAddTags,
+    batchRemoveTags,
+    deleteTag,
+    renameTag,
+    mergeTag,
+    isUpdatingTags,
   } = useDatasetTableData();
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
@@ -86,6 +105,7 @@ export function DatasetTable({
     mode: "replace" | "toggle";
     targetValue?: boolean;
   } | null>(null);
+  const [newTagInput, setNewTagInput] = useState("");
 
   useEffect(() => {
     const handleMouseUp = () => setDragState(null);
@@ -442,6 +462,55 @@ export function DatasetTable({
     }
   };
 
+  const handleBatchTagMutation = async (
+    operation: "add" | "remove",
+    targetIds: number[],
+    tag: string,
+  ) => {
+    const actionLabel = operation === "add" ? "Added" : "Removed";
+    const actionVerb = operation === "add" ? "add" : "remove";
+
+    try {
+      const results =
+        operation === "add"
+          ? await batchAddTags(targetIds, [tag])
+          : await batchRemoveTags(targetIds, [tag]);
+
+      const successCount = results.filter((result) => result.success).length;
+      const failedCount = results.length - successCount;
+
+      if (failedCount === 0) {
+        toast.success(
+          `${actionLabel} tag "${tag}" ${operation === "add" ? "to" : "from"} ${successCount} dataset(s).`,
+        );
+        return;
+      }
+
+      if (successCount === 0) {
+        toast.error(
+          `Failed to ${actionVerb} tag "${tag}" ${operation === "add" ? "to" : "from"} ${failedCount} dataset(s).`,
+          {
+            description: getTagMutationDescription(results),
+          },
+        );
+        return;
+      }
+
+      toast.warning(
+        `${actionLabel} tag "${tag}" ${operation === "add" ? "to" : "from"} ${successCount} dataset(s), but ${failedCount} failed.`,
+        {
+          description: getTagMutationDescription(results),
+        },
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Failed to ${actionVerb} tag "${tag}".`,
+      );
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="flex h-full min-h-0 flex-col bg-background">
@@ -454,6 +523,8 @@ export function DatasetTable({
           searchQuery={searchQuery}
           tagFilterQuery={tagFilterQuery}
           filteredTagOptions={filteredTagOptions}
+          allTags={allTags}
+          isUpdatingTags={isUpdatingTags}
           setFavoriteOnly={setFavoriteOnly}
           setSearchQuery={setSearchQuery}
           setTagFilterQuery={setTagFilterQuery}
@@ -463,6 +534,9 @@ export function DatasetTable({
           resetColumnVisibilityToDefault={resetColumnVisibilityToDefault}
           showAllColumns={showAllColumns}
           onColumnVisibilityChange={handleColumnVisibilityChange}
+          onDeleteTag={deleteTag}
+          onRenameTag={renameTag}
+          onMergeTag={mergeTag}
         />
         <div
           className="min-h-0 flex-1 overflow-auto bg-background"
@@ -569,6 +643,131 @@ export function DatasetTable({
                           >
                             View Details
                           </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          {/* Tag management sub-menus */}
+                          {(() => {
+                            const isInSelection =
+                              selectedCount > 1 &&
+                              selectedRows.some(
+                                (r) => r.original.id === dataset.id,
+                              );
+                            const targetIds = isInSelection
+                              ? selectedRows.map((r) => r.original.id)
+                              : [dataset.id];
+                            const targetLabel =
+                              isInSelection && selectedCount > 1
+                                ? ` (${selectedCount})`
+                                : "";
+                            // Union of tags across target datasets
+                            const targetDatasets = isInSelection
+                              ? selectedRows.map((r) => r.original)
+                              : [dataset];
+                            const removableTags = Array.from(
+                              new Set(targetDatasets.flatMap((d) => d.tags)),
+                            ).sort();
+
+                            return (
+                              <>
+                                <ContextMenuSub>
+                                  <ContextMenuSubTrigger>
+                                    <Tag
+                                      data-icon="inline-start"
+                                      className="size-3.5"
+                                    />
+                                    Add Tags{targetLabel}
+                                  </ContextMenuSubTrigger>
+                                  <ContextMenuSubContent className="w-56">
+                                    <div
+                                      className="px-2 pb-1"
+                                      onPointerDown={(event) => {
+                                        event.stopPropagation();
+                                      }}
+                                    >
+                                      <form
+                                        onSubmit={(e) => {
+                                          e.preventDefault();
+                                          const tag = newTagInput.trim();
+                                          if (!tag) return;
+                                          void handleBatchTagMutation(
+                                            "add",
+                                            targetIds,
+                                            tag,
+                                          );
+                                          setNewTagInput("");
+                                        }}
+                                        className="flex gap-1"
+                                      >
+                                        <Input
+                                          placeholder="New tag..."
+                                          value={newTagInput}
+                                          onChange={(e) =>
+                                            setNewTagInput(e.target.value)
+                                          }
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                          }}
+                                          onKeyDown={(event) => {
+                                            event.stopPropagation();
+                                          }}
+                                          className="h-7 text-xs"
+                                        />
+                                      </form>
+                                    </div>
+                                    {allTags.length > 0 && (
+                                      <div className="flex max-h-40 flex-col overflow-y-auto">
+                                        {allTags.map((tag) => (
+                                          <ContextMenuItem
+                                            key={tag}
+                                            disabled={isUpdatingTags}
+                                            onClick={() => {
+                                              void handleBatchTagMutation(
+                                                "add",
+                                                targetIds,
+                                                tag,
+                                              );
+                                            }}
+                                          >
+                                            {tag}
+                                          </ContextMenuItem>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </ContextMenuSubContent>
+                                </ContextMenuSub>
+
+                                {removableTags.length > 0 && (
+                                  <ContextMenuSub>
+                                    <ContextMenuSubTrigger>
+                                      <Tag
+                                        data-icon="inline-start"
+                                        className="size-3.5"
+                                      />
+                                      Remove Tags{targetLabel}
+                                    </ContextMenuSubTrigger>
+                                    <ContextMenuSubContent className="w-56">
+                                      <div className="flex max-h-40 flex-col overflow-y-auto">
+                                        {removableTags.map((tag) => (
+                                          <ContextMenuItem
+                                            key={tag}
+                                            disabled={isUpdatingTags}
+                                            onClick={() => {
+                                              void handleBatchTagMutation(
+                                                "remove",
+                                                targetIds,
+                                                tag,
+                                              );
+                                            }}
+                                          >
+                                            {tag}
+                                          </ContextMenuItem>
+                                        ))}
+                                      </div>
+                                    </ContextMenuSubContent>
+                                  </ContextMenuSub>
+                                )}
+                              </>
+                            );
+                          })()}
                           <ContextMenuSeparator />
                           <ContextMenuItem
                             variant="destructive"

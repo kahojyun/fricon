@@ -84,6 +84,38 @@ async deleteDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], Taur
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async batchUpdateDatasetTags(update: BatchTagUpdateOptions) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("batch_update_dataset_tags", { update }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteTag(tag: string) : Promise<Result<null, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_tag", { tag }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameTag(oldName: string, newName: string) : Promise<Result<null, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_tag", { oldName, newName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mergeTag(source: string, target: string) : Promise<Result<null, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("merge_tag", { source, target }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -104,6 +136,7 @@ datasetUpdated: "dataset-updated"
 
 /** user-defined types **/
 
+export type BatchTagUpdateOptions = { ids: number[]; add?: string[] | null; remove?: string[] | null }
 export type ChartDataResponse = { type: ChartType; xName: string; yName: string | null; xCategories: number[] | null; yCategories: number[] | null; series: Series[] }
 export type ChartType = "line" | "heatmap" | "scatter"
 export type ColumnInfo = { name: string; isComplex: boolean; isTrace: boolean; isIndex: boolean }

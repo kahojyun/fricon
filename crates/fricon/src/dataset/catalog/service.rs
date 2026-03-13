@@ -6,6 +6,7 @@ use tracing::{error, instrument};
 
 use crate::{
     dataset::{
+        NormalizedTag,
         catalog::{CatalogError, DatasetCatalogRepository},
         events::{AppEvent, dataset_updated_event},
         model::{DatasetId, DatasetListQuery, DatasetRecord, DatasetUpdate},
@@ -89,6 +90,10 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
     pub async fn add_tags(&self, id: i32, tags: Vec<String>) -> Result<(), CatalogError> {
+        let tags = NormalizedTag::parse_many(tags);
+        if tags.is_empty() {
+            return Ok(());
+        }
         let repository = Arc::clone(&self.repository);
         let event_sender = self.event_sender.clone();
         self.spawn_blocking(move || {
@@ -102,6 +107,10 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, tags), fields(dataset.id = id, tags.count = tags.len()))]
     pub async fn remove_tags(&self, id: i32, tags: Vec<String>) -> Result<(), CatalogError> {
+        let tags = NormalizedTag::parse_many(tags);
+        if tags.is_empty() {
+            return Ok(());
+        }
         let repository = Arc::clone(&self.repository);
         let event_sender = self.event_sender.clone();
         self.spawn_blocking(move || {
@@ -127,5 +136,37 @@ impl DatasetCatalogService {
             Ok(())
         })
         .await?
+    }
+
+    #[instrument(skip(self, tag), fields(tag.name = %tag))]
+    pub async fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {
+        let tag = NormalizedTag::parse(tag)?;
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.delete_tag(&tag))
+            .await?
+    }
+
+    #[instrument(skip(self, old_name, new_name), fields(tag.old = %old_name, tag.new = %new_name))]
+    pub async fn rename_tag(&self, old_name: String, new_name: String) -> Result<(), CatalogError> {
+        let old_name = NormalizedTag::parse(old_name)?;
+        let new_name = NormalizedTag::parse(new_name)?;
+        if old_name == new_name {
+            return Err(anyhow::anyhow!("old tag name and new tag name must differ").into());
+        }
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.rename_tag(&old_name, &new_name))
+            .await?
+    }
+
+    #[instrument(skip(self, source, target), fields(tag.source = %source, tag.target = %target))]
+    pub async fn merge_tag(&self, source: String, target: String) -> Result<(), CatalogError> {
+        let source = NormalizedTag::parse(source)?;
+        let target = NormalizedTag::parse(target)?;
+        if source == target {
+            return Err(anyhow::anyhow!("source tag and target tag must differ").into());
+        }
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.merge_tag(&source, &target))
+            .await?
     }
 }

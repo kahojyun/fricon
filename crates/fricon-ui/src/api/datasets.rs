@@ -337,3 +337,63 @@ pub(crate) async fn delete_datasets(
     let results = app::delete_datasets(state.session(), ids).await;
     Ok(results.into_iter().map(DatasetDeleteResult::from).collect())
 }
+
+#[derive(Debug, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BatchTagUpdateOptions {
+    pub(crate) ids: Vec<i32>,
+    #[specta(optional)]
+    pub(crate) add: Option<Vec<String>>,
+    #[specta(optional)]
+    pub(crate) remove: Option<Vec<String>>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn batch_update_dataset_tags(
+    state: State<'_, AppState>,
+    update: BatchTagUpdateOptions,
+) -> Result<Vec<DatasetDeleteResult>, TauriCommandError> {
+    let results = app::batch_update_dataset_tags(
+        state.session(),
+        app::BatchTagUpdate {
+            ids: update.ids,
+            add: update.add.unwrap_or_default(),
+            remove: update.remove.unwrap_or_default(),
+        },
+    )
+    .await;
+    Ok(results.into_iter().map(DatasetDeleteResult::from).collect())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn delete_tag(
+    state: State<'_, AppState>,
+    tag: String,
+) -> Result<(), TauriCommandError> {
+    app::delete_tag(state.session(), tag).await?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn rename_tag(
+    state: State<'_, AppState>,
+    old_name: String,
+    new_name: String,
+) -> Result<(), TauriCommandError> {
+    app::rename_tag(state.session(), old_name, new_name).await?;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn merge_tag(
+    state: State<'_, AppState>,
+    source: String,
+    target: String,
+) -> Result<(), TauriCommandError> {
+    app::merge_tag(state.session(), source, target).await?;
+    Ok(())
+}

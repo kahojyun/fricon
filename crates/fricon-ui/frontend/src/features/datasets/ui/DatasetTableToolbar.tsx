@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import type { Table } from "@tanstack/react-table";
 import type { DatasetInfo, DatasetStatus } from "../api/types";
 import type { DatasetColumnMeta } from "../model/datasetColumnMeta";
 import { datasetStatusOptions } from "./DatasetTableColumns";
 import { DatasetFilterCheckIcon } from "./DatasetFilterCheckIcon";
+import { ManageTagsDialog } from "./ManageTagsDialog";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +31,8 @@ interface DatasetTableToolbarProps {
   searchQuery: string;
   tagFilterQuery: string;
   filteredTagOptions: string[];
+  allTags: string[];
+  isUpdatingTags: boolean;
   setFavoriteOnly: (next: boolean) => void;
   setSearchQuery: (next: string) => void;
   setTagFilterQuery: (next: string) => void;
@@ -38,6 +42,9 @@ interface DatasetTableToolbarProps {
   resetColumnVisibilityToDefault: () => void;
   showAllColumns: () => void;
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
+  onDeleteTag: (tag: string) => Promise<void>;
+  onRenameTag: (oldName: string, newName: string) => Promise<void>;
+  onMergeTag: (source: string, target: string) => Promise<void>;
 }
 
 interface FacetedFilterPopoverProps<T extends string> {
@@ -50,6 +57,7 @@ interface FacetedFilterPopoverProps<T extends string> {
   searchPlaceholder?: string;
   emptyLabel: string;
   contentClassName: string;
+  footer?: ReactNode;
 }
 
 function FacetedFilterPopover<T extends string>({
@@ -62,6 +70,7 @@ function FacetedFilterPopover<T extends string>({
   searchPlaceholder,
   emptyLabel,
   contentClassName,
+  footer,
 }: FacetedFilterPopoverProps<T>) {
   const hasSearch = onSearchChange !== undefined;
 
@@ -144,6 +153,7 @@ function FacetedFilterPopover<T extends string>({
             </Button>
           </>
         )}
+        {footer}
       </PopoverContent>
     </Popover>
   );
@@ -158,6 +168,8 @@ export function DatasetTableToolbar({
   searchQuery,
   tagFilterQuery,
   filteredTagOptions,
+  allTags,
+  isUpdatingTags,
   setFavoriteOnly,
   setSearchQuery,
   setTagFilterQuery,
@@ -167,8 +179,39 @@ export function DatasetTableToolbar({
   resetColumnVisibilityToDefault,
   showAllColumns,
   onColumnVisibilityChange,
+  onDeleteTag,
+  onRenameTag,
+  onMergeTag,
 }: DatasetTableToolbarProps) {
   const allColumns = table.getAllLeafColumns();
+  const handleManagedTagDelete = async (tag: string) => {
+    await onDeleteTag(tag);
+    if (selectedTags.includes(tag)) {
+      handleTagToggle(tag);
+    }
+  };
+
+  const handleManagedTagRename = async (oldName: string, newName: string) => {
+    await onRenameTag(oldName, newName);
+    if (!selectedTags.includes(oldName)) {
+      return;
+    }
+    handleTagToggle(oldName);
+    if (!selectedTags.includes(newName)) {
+      handleTagToggle(newName);
+    }
+  };
+
+  const handleManagedTagMerge = async (source: string, target: string) => {
+    await onMergeTag(source, target);
+    if (!selectedTags.includes(source)) {
+      return;
+    }
+    handleTagToggle(source);
+    if (!selectedTags.includes(target)) {
+      handleTagToggle(target);
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-1.5 border-b px-2.5 py-1.5">
@@ -190,6 +233,18 @@ export function DatasetTableToolbar({
           searchPlaceholder="Search tags"
           emptyLabel="No tags found."
           contentClassName="w-64 p-2"
+          footer={
+            <>
+              <Separator className="my-2" />
+              <ManageTagsDialog
+                allTags={allTags}
+                isUpdatingTags={isUpdatingTags}
+                onDeleteTag={handleManagedTagDelete}
+                onRenameTag={handleManagedTagRename}
+                onMergeTag={handleManagedTagMerge}
+              />
+            </>
+          }
         />
 
         <FacetedFilterPopover
