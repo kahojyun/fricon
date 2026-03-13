@@ -123,11 +123,15 @@ export function DatasetTable({
     [datasets, columns, sorting, columnVisibility, rowSelection, setSorting],
   );
 
+  // TanStack Table is an intentional compiler boundary for this component.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable(tableOptions);
 
   const { rows } = table.getRowModel();
   const visibleColumnCount = table.getVisibleLeafColumns().length;
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const rowElementMapRef = useRef(new Map<string, HTMLTableRowElement>());
+  const pendingFocusRowIdRef = useRef<string | null>(null);
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
@@ -154,6 +158,90 @@ export function DatasetTable({
         (virtualItems[virtualItems.length - 1]?.end ?? 0)
       : 0;
 
+  const focusRow = (rowId: string) => {
+    pendingFocusRowIdRef.current = rowId;
+    const rowElement = rowElementMapRef.current.get(rowId);
+    if (!rowElement) return;
+    rowElement.focus();
+    pendingFocusRowIdRef.current = null;
+  };
+
+  const registerRowElement = (
+    rowId: string,
+    rowElement: HTMLTableRowElement | null,
+  ) => {
+    if (!rowElement) {
+      rowElementMapRef.current.delete(rowId);
+      return;
+    }
+
+    rowElementMapRef.current.set(rowId, rowElement);
+    rowVirtualizer.measureElement(rowElement);
+
+    if (pendingFocusRowIdRef.current === rowId) {
+      rowElement.focus();
+      pendingFocusRowIdRef.current = null;
+    }
+  };
+
+  const selectSingleDatasetRow = (
+    rowIndex: number,
+    options: {
+      focus?: boolean;
+      scroll?: boolean;
+    } = {},
+  ) => {
+    const row = rows[rowIndex];
+    if (!row) return;
+
+    if (options.scroll) {
+      rowVirtualizer.scrollToIndex?.(rowIndex, { align: "auto" });
+    }
+
+    setRowSelection({ [row.id]: true });
+    setAnchorId(row.id);
+    setDragState(null);
+    onDatasetSelected(row.original.id);
+
+    if (options.focus) {
+      focusRow(row.id);
+    }
+  };
+
+  const handleRowKeyDown = (
+    event: React.KeyboardEvent<HTMLTableRowElement>,
+    rowIndex: number,
+  ) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+
+      const nextRowIndex =
+        event.key === "ArrowUp"
+          ? Math.max(rowIndex - 1, 0)
+          : Math.min(rowIndex + 1, rows.length - 1);
+
+      if (nextRowIndex !== rowIndex) {
+        selectSingleDatasetRow(nextRowIndex, {
+          focus: true,
+          scroll: true,
+        });
+      }
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      const row = rows[rowIndex];
+      if (!row) return;
+      onDatasetSelected(row.original.id);
+      focusRow(row.id);
+    }
+  };
+
   const handleRowPointerDown = (
     e: React.PointerEvent<HTMLTableRowElement>,
     rowIndex: number,
@@ -174,6 +262,8 @@ export function DatasetTable({
       // Return completely so that native checkbox handlers assume full control
       return;
     }
+
+    e.currentTarget.focus();
 
     const isMac = isMacPlatform();
 
@@ -441,7 +531,9 @@ export function DatasetTable({
                                 (isSelected && "selected") ||
                                 (isRowSelected && "selected")
                               }
-                              ref={rowVirtualizer.measureElement}
+                              ref={(element) =>
+                                registerRowElement(row.id, element)
+                              }
                               data-index={virtualRow.index}
                               className="cursor-pointer select-none"
                               onPointerDown={(e) =>
@@ -455,14 +547,9 @@ export function DatasetTable({
                               onPointerEnter={() =>
                                 handleRowPointerEnter(virtualRow.index)
                               }
-                              onKeyDown={(event) => {
-                                if (
-                                  event.key === "Enter" ||
-                                  event.key === " "
-                                ) {
-                                  onDatasetSelected(dataset.id);
-                                }
-                              }}
+                              onKeyDown={(event) =>
+                                handleRowKeyDown(event, virtualRow.index)
+                              }
                               tabIndex={0}
                             >
                               {row.getVisibleCells().map((cell) => (

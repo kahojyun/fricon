@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -40,6 +41,7 @@ vi.mock("@tanstack/react-virtual", () => ({
         end: (index + 1) * 56,
       })),
     measureElement: () => undefined,
+    scrollToIndex: () => undefined,
   }),
 }));
 
@@ -132,6 +134,14 @@ function renderDatasetTable(overrides: Record<string, unknown> = {}) {
   return { hook, onDatasetSelected };
 }
 
+function getRowByText(text: string) {
+  const row = screen.getByText(text).closest("tr");
+  if (!(row instanceof HTMLElement)) {
+    throw new Error(`Row not found for text: ${text}`);
+  }
+  return row;
+}
+
 async function openRowContextMenu(name: string) {
   const row = screen.getByText(name).closest("tr");
   expect(row).not.toBeNull();
@@ -173,6 +183,127 @@ describe("DatasetTable", () => {
     await user.click(screen.getByText("Dataset 1"));
 
     expect(onDatasetSelected).toHaveBeenCalledWith(1);
+  });
+
+  it("moves selection down with ArrowDown and focuses the next row", async () => {
+    const user = userEvent.setup();
+    const { onDatasetSelected } = renderDatasetTable({
+      datasets: [
+        makeDataset({ id: 1, name: "Dataset 1" }),
+        makeDataset({ id: 2, name: "Dataset 2" }),
+      ],
+    });
+
+    const firstRow = getRowByText("Dataset 1");
+    const secondRow = getRowByText("Dataset 2");
+
+    firstRow.focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(onDatasetSelected).toHaveBeenCalledWith(2);
+    expect(secondRow).toHaveFocus();
+
+    const rowCheckboxes = screen.getAllByLabelText("Select row");
+    expect(rowCheckboxes[0]).not.toBeChecked();
+    expect(rowCheckboxes[1]).toBeChecked();
+  });
+
+  it("moves selection up with ArrowUp and stops at table boundaries", async () => {
+    const user = userEvent.setup();
+    const { onDatasetSelected } = renderDatasetTable({
+      datasets: [
+        makeDataset({ id: 1, name: "Dataset 1" }),
+        makeDataset({ id: 2, name: "Dataset 2" }),
+      ],
+    });
+
+    const firstRow = getRowByText("Dataset 1");
+    const secondRow = getRowByText("Dataset 2");
+
+    secondRow.focus();
+    await user.keyboard("{ArrowUp}");
+
+    expect(onDatasetSelected).toHaveBeenCalledWith(1);
+    expect(firstRow).toHaveFocus();
+
+    onDatasetSelected.mockClear();
+    firstRow.focus();
+    await user.keyboard("{ArrowUp}");
+
+    expect(onDatasetSelected).not.toHaveBeenCalled();
+    expect(firstRow).toHaveFocus();
+
+    secondRow.focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(onDatasetSelected).not.toHaveBeenCalled();
+    expect(secondRow).toHaveFocus();
+  });
+
+  it("keeps Enter and Space row activation working from the keyboard", async () => {
+    const user = userEvent.setup();
+    const { onDatasetSelected } = renderDatasetTable({
+      datasets: [makeDataset({ id: 7, name: "Dataset 7" })],
+    });
+
+    const row = getRowByText("Dataset 7");
+    row.focus();
+
+    await user.keyboard("{Enter}");
+    await user.keyboard(" ");
+
+    expect(onDatasetSelected).toHaveBeenNthCalledWith(1, 7);
+    expect(onDatasetSelected).toHaveBeenNthCalledWith(2, 7);
+    expect(row).toHaveFocus();
+    expect(screen.getByLabelText("Select row")).not.toBeChecked();
+  });
+
+  it("keeps existing multi-row selection when activating a row from the keyboard", async () => {
+    const user = userEvent.setup();
+    const { onDatasetSelected } = renderDatasetTable({
+      datasets: [
+        makeDataset({ id: 1, name: "Dataset 1" }),
+        makeDataset({ id: 2, name: "Dataset 2" }),
+      ],
+    });
+
+    const rowCheckboxes = screen.getAllByLabelText("Select row");
+    await user.click(rowCheckboxes[0]);
+    await user.click(rowCheckboxes[1]);
+
+    const secondRow = getRowByText("Dataset 2");
+    secondRow.focus();
+    await user.keyboard("{Enter}");
+
+    expect(onDatasetSelected).toHaveBeenLastCalledWith(2);
+    expect(rowCheckboxes[0]).toBeChecked();
+    expect(rowCheckboxes[1]).toBeChecked();
+  });
+
+  it("keeps keyboard activation working for interactive controls inside a row", async () => {
+    const user = userEvent.setup();
+    const dataset = makeDataset({ id: 11, name: "Dataset 11" });
+    const { hook, onDatasetSelected } = renderDatasetTable({
+      datasets: [dataset],
+    });
+
+    const checkbox = screen.getByLabelText("Select row");
+    act(() => {
+      checkbox.focus();
+    });
+    await user.keyboard(" ");
+
+    expect(checkbox).toBeChecked();
+    expect(onDatasetSelected).not.toHaveBeenCalled();
+
+    const favoriteButton = screen.getByLabelText("Add to favorites");
+    act(() => {
+      favoriteButton.focus();
+    });
+    await user.keyboard("{Enter}");
+
+    expect(hook.toggleFavorite).toHaveBeenCalledWith(dataset);
+    expect(onDatasetSelected).not.toHaveBeenCalled();
   });
 
   it("updates search query from input", async () => {

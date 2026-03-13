@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { CascadeMode } from "../model/cascadeReducer";
 import type { ColumnUniqueValue, FilterTableData } from "../api/types";
@@ -24,19 +24,61 @@ interface FilterTableProps {
 }
 
 interface FilterTableColumnProps {
+  columnIndex: number;
   field: string;
   items: ColumnUniqueValue[];
   selectedIndex?: number;
   onSelect: (index: number) => void;
+  onRegisterFocusItem: (
+    columnIndex: number,
+    focusItem: ((itemIndex: number, fallbackItemIndex?: number) => void) | null,
+  ) => void;
+  onFocusColumnItem: (columnIndex: number, fallbackItemIndex?: number) => void;
+}
+
+const focusRowClassName =
+  "cursor-pointer outline-none [&:focus>td]:bg-accent/70 [&:focus>td]:shadow-[inset_0_0_0_2px_color-mix(in_oklab,var(--color-ring)_45%,transparent)] [&:focus>td]:relative";
+
+function getAdjacentIndex(
+  currentIndex: number,
+  key: string,
+  totalCount: number,
+): number {
+  if (key === "ArrowUp") {
+    return Math.max(currentIndex - 1, 0);
+  }
+  if (key === "ArrowDown") {
+    return Math.min(currentIndex + 1, totalCount - 1);
+  }
+  return currentIndex;
 }
 
 function handleSelectableRowKeyDown(
   event: KeyboardEvent<HTMLTableRowElement>,
-  onSelect: () => void,
+  options: {
+    currentIndex: number;
+    totalCount: number;
+    onSelect: () => void;
+    onNavigate: (nextIndex: number) => void;
+  },
 ) {
+  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    event.preventDefault();
+    const nextIndex = getAdjacentIndex(
+      options.currentIndex,
+      event.key,
+      options.totalCount,
+    );
+
+    if (nextIndex !== options.currentIndex) {
+      options.onNavigate(nextIndex);
+    }
+    return;
+  }
+
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
-    onSelect();
+    options.onSelect();
   }
   if (event.metaKey || event.ctrlKey) {
     event.stopPropagation();
@@ -44,13 +86,20 @@ function handleSelectableRowKeyDown(
 }
 
 function FilterTableColumn({
+  columnIndex,
   field,
   items,
   selectedIndex,
   onSelect,
+  onRegisterFocusItem,
+  onFocusColumnItem,
 }: FilterTableColumnProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rowElementMapRef = useRef(new Map<number, HTMLTableRowElement>());
+  const pendingFocusIndexRef = useRef<number | null>(null);
 
+  // TanStack Virtual is an intentional compiler boundary for this component.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -67,6 +116,82 @@ function FilterTableColumn({
       ? rowVirtualizer.getTotalSize() -
         (virtualItems[virtualItems.length - 1]?.end ?? 0)
       : 0;
+
+  const focusItem = (itemIndex: number) => {
+    pendingFocusIndexRef.current = itemIndex;
+    const rowElement = rowElementMapRef.current.get(itemIndex);
+    if (!rowElement) return;
+    rowElement.focus();
+    pendingFocusIndexRef.current = null;
+  };
+
+  const registerRowElement = (
+    itemIndex: number,
+    rowElement: HTMLTableRowElement | null,
+  ) => {
+    if (!rowElement) {
+      rowElementMapRef.current.delete(itemIndex);
+      return;
+    }
+
+    rowElementMapRef.current.set(itemIndex, rowElement);
+    rowVirtualizer.measureElement(rowElement);
+
+    if (pendingFocusIndexRef.current === itemIndex) {
+      rowElement.focus();
+      pendingFocusIndexRef.current = null;
+    }
+  };
+
+  const selectItemAt = (
+    itemPosition: number,
+    options: {
+      focus?: boolean;
+      scroll?: boolean;
+    } = {},
+  ) => {
+    const item = items[itemPosition];
+    if (!item) return;
+
+    if (options.scroll) {
+      rowVirtualizer.scrollToIndex?.(itemPosition, { align: "auto" });
+    }
+
+    onSelect(item.index);
+
+    if (options.focus) {
+      focusItem(item.index);
+    }
+  };
+
+  useEffect(() => {
+    onRegisterFocusItem(columnIndex, (itemIndex, fallbackItemIndex) => {
+      const itemPosition = items.findIndex((item) => item.index === itemIndex);
+      if (itemPosition !== -1) {
+        rowVirtualizer.scrollToIndex?.(itemPosition, { align: "auto" });
+        focusItem(items[itemPosition].index);
+        return;
+      }
+
+      if (fallbackItemIndex != null) {
+        const fallbackPosition = items.findIndex(
+          (item) => item.index === fallbackItemIndex,
+        );
+        if (fallbackPosition !== -1) {
+          rowVirtualizer.scrollToIndex?.(fallbackPosition, { align: "auto" });
+          focusItem(items[fallbackPosition].index);
+          return;
+        }
+      }
+
+      if (items.length > 0) {
+        rowVirtualizer.scrollToIndex?.(0, { align: "auto" });
+        focusItem(items[0].index);
+      }
+    });
+
+    return () => onRegisterFocusItem(columnIndex, null);
+  }, [columnIndex, items, onRegisterFocusItem, rowVirtualizer]);
 
   return (
     <div
@@ -97,14 +222,32 @@ function FilterTableColumn({
                 <TableRow
                   key={item.index}
                   data-state={isSelected && "selected"}
-                  ref={rowVirtualizer.measureElement}
+                  ref={(element) => registerRowElement(item.index, element)}
                   data-index={virtualRow.index}
-                  className="cursor-pointer"
-                  onClick={() => onSelect(item.index)}
+                  className={focusRowClassName}
+                  onClick={(event) => {
+                    event.currentTarget.focus();
+                    onSelect(item.index);
+                  }}
                   onKeyDown={(event) =>
-                    handleSelectableRowKeyDown(event, () =>
-                      onSelect(item.index),
-                    )
+                    event.key === "ArrowLeft" || event.key === "ArrowRight"
+                      ? (() => {
+                          event.preventDefault();
+                          onFocusColumnItem(
+                            columnIndex + (event.key === "ArrowRight" ? 1 : -1),
+                            selectedIndex,
+                          );
+                        })()
+                      : handleSelectableRowKeyDown(event, {
+                          currentIndex: virtualRow.index,
+                          totalCount: items.length,
+                          onSelect: () => onSelect(item.index),
+                          onNavigate: (nextIndex) =>
+                            selectItemAt(nextIndex, {
+                              focus: true,
+                              scroll: true,
+                            }),
+                        })
                   }
                   tabIndex={0}
                 >
@@ -139,6 +282,8 @@ export function FilterTable({
   onSelectFieldValue,
 }: FilterTableProps) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const rowElementMapRef = useRef(new Map<number, HTMLTableRowElement>());
+  const pendingFocusIndexRef = useRef<number | null>(null);
 
   const showFilterToggle = Boolean(data && data.fields.length > 1);
   const isFilterTableEmpty = !data || data.rows.length === 0;
@@ -147,6 +292,8 @@ export function FilterTable({
     ? `${Math.max(data.fields.length * 80, 320)}px`
     : "0px";
 
+  // TanStack Virtual is an intentional compiler boundary for this component.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: data?.rows.length ?? 0,
     getScrollElement: () => tableContainerRef.current,
@@ -158,6 +305,10 @@ export function FilterTable({
 
   const columnUniqueValues: Record<string, ColumnUniqueValue[]> =
     mode === "split" && data ? data.columnUniqueValues : {};
+
+  const splitColumnFocusersRef = useRef<
+    Map<number, (itemIndex: number, fallbackItemIndex?: number) => void>
+  >(new Map());
 
   if (isFilterTableEmpty) {
     return (
@@ -174,6 +325,75 @@ export function FilterTable({
       ? rowVirtualizer.getTotalSize() -
         (virtualItems[virtualItems.length - 1]?.end ?? 0)
       : 0;
+
+  const focusRow = (rowIndex: number) => {
+    pendingFocusIndexRef.current = rowIndex;
+    const rowElement = rowElementMapRef.current.get(rowIndex);
+    if (!rowElement) return;
+    rowElement.focus();
+    pendingFocusIndexRef.current = null;
+  };
+
+  const registerRowElement = (
+    rowIndex: number,
+    rowElement: HTMLTableRowElement | null,
+  ) => {
+    if (!rowElement) {
+      rowElementMapRef.current.delete(rowIndex);
+      return;
+    }
+
+    rowElementMapRef.current.set(rowIndex, rowElement);
+    rowVirtualizer.measureElement(rowElement);
+
+    if (pendingFocusIndexRef.current === rowIndex) {
+      rowElement.focus();
+      pendingFocusIndexRef.current = null;
+    }
+  };
+
+  const selectRowAt = (
+    rowPosition: number,
+    options: {
+      focus?: boolean;
+      scroll?: boolean;
+    } = {},
+  ) => {
+    const row = data.rows[rowPosition];
+    if (!row) return;
+
+    if (options.scroll) {
+      rowVirtualizer.scrollToIndex?.(rowPosition, { align: "auto" });
+    }
+
+    onSelectRow(row.index);
+
+    if (options.focus) {
+      focusRow(row.index);
+    }
+  };
+
+  const registerSplitColumnFocuser = (
+    columnIndex: number,
+    focusItem: ((itemIndex: number, fallbackItemIndex?: number) => void) | null,
+  ) => {
+    if (!focusItem) {
+      splitColumnFocusersRef.current.delete(columnIndex);
+      return;
+    }
+    splitColumnFocusersRef.current.set(columnIndex, focusItem);
+  };
+
+  const focusSplitColumnItem = (
+    columnIndex: number,
+    fallbackItemIndex?: number,
+  ) => {
+    const preferredItemIndex = selectedValueIndices?.[columnIndex];
+    splitColumnFocusersRef.current.get(columnIndex)?.(
+      preferredItemIndex ?? fallbackItemIndex ?? -1,
+      fallbackItemIndex,
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -236,14 +456,26 @@ export function FilterTable({
                       <TableRow
                         key={row.index}
                         data-state={isSelected && "selected"}
-                        ref={rowVirtualizer.measureElement}
+                        ref={(element) =>
+                          registerRowElement(row.index, element)
+                        }
                         data-index={virtualRow.index}
-                        className="cursor-pointer"
-                        onClick={() => onSelectRow(row.index)}
+                        className={focusRowClassName}
+                        onClick={(event) => {
+                          event.currentTarget.focus();
+                          onSelectRow(row.index);
+                        }}
                         onKeyDown={(event) =>
-                          handleSelectableRowKeyDown(event, () =>
-                            onSelectRow(row.index),
-                          )
+                          handleSelectableRowKeyDown(event, {
+                            currentIndex: virtualRow.index,
+                            totalCount: data.rows.length,
+                            onSelect: () => onSelectRow(row.index),
+                            onNavigate: (nextIndex) =>
+                              selectRowAt(nextIndex, {
+                                focus: true,
+                                scroll: true,
+                              }),
+                          })
                         }
                         tabIndex={0}
                       >
@@ -279,12 +511,15 @@ export function FilterTable({
           {data.fields.map((field, index) => (
             <div key={field} className="flex min-h-0 min-w-0 flex-1">
               <FilterTableColumn
+                columnIndex={index}
                 field={field}
                 items={columnUniqueValues[field] ?? []}
                 selectedIndex={selectedValueIndices?.[index]}
                 onSelect={(selectedIndex) =>
                   onSelectFieldValue(index, selectedIndex)
                 }
+                onRegisterFocusItem={registerSplitColumnFocuser}
+                onFocusColumnItem={focusSplitColumnItem}
               />
               {index < data.fields.length - 1 ? (
                 <Separator orientation="vertical" className="bg-border/60" />
