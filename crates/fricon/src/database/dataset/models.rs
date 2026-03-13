@@ -170,9 +170,12 @@ impl Tag {
         new_name: &str,
     ) -> QueryResult<()> {
         use schema::tags::dsl::{name, tags};
-        diesel::update(tags.filter(name.eq(old_name)))
+        let updated_rows = diesel::update(tags.filter(name.eq(old_name)))
             .set(name.eq(new_name))
             .execute(conn)?;
+        if updated_rows == 0 {
+            return Err(diesel::result::Error::NotFound);
+        }
         Ok(())
     }
 
@@ -188,6 +191,10 @@ impl Tag {
             datasets_tags::dsl::{dataset_id, datasets_tags, tag_id},
             tags::dsl::{name, tags},
         };
+
+        if source_name == target_name {
+            return Ok(());
+        }
 
         let Some(source) = Self::find_by_name(conn, source_name)? else {
             return Ok(());
@@ -270,5 +277,104 @@ impl DatasetTag {
             .filter(dataset_id.eq(ds_id))
             .filter(tag_id.eq_any(tag_ids))
             .execute(conn)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use diesel::{
+        Connection, ExpressionMethods, QueryDsl, RunQueryDsl, connection::SimpleConnection,
+    };
+    use uuid::Uuid;
+
+    use super::{DatasetTag, NewDataset, Tag};
+    use crate::database::{
+        dataset::types::{DbDatasetStatus, SimpleUuid},
+        schema,
+    };
+    use crate::dataset::model::DatasetStatus;
+
+    fn setup_connection() -> diesel::SqliteConnection {
+        let mut conn = diesel::SqliteConnection::establish(":memory:")
+            .expect("in-memory sqlite should connect");
+        conn.batch_execute(
+            r#"
+            CREATE TABLE datasets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uid TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                favorite BOOLEAN NOT NULL DEFAULT 0,
+                status TEXT NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            );
+            CREATE TABLE datasets_tags (
+                dataset_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (dataset_id, tag_id)
+            );
+            "#,
+        )
+        .expect("test schema should be created");
+        conn
+    }
+
+    fn insert_dataset(conn: &mut diesel::SqliteConnection, name: &str) -> i32 {
+        let dataset = NewDataset {
+            uid: SimpleUuid(Uuid::new_v4()),
+            name,
+            description: "",
+            status: DbDatasetStatus::from(DatasetStatus::Writing),
+        };
+        diesel::insert_into(schema::datasets::table)
+            .values(&dataset)
+            .execute(conn)
+            .expect("dataset insert should succeed");
+
+        schema::datasets::table
+            .select(schema::datasets::id)
+            .order(schema::datasets::id.desc())
+            .first(conn)
+            .expect("dataset id should be readable")
+    }
+
+    #[test]
+    fn rename_returns_not_found_when_source_tag_is_missing() {
+        let mut conn = setup_connection();
+
+        let result = Tag::rename(&mut conn, "missing", "renamed");
+
+        assert!(matches!(result, Err(diesel::result::Error::NotFound)));
+    }
+
+    #[test]
+    fn merge_into_same_tag_is_a_no_op() {
+        let mut conn = setup_connection();
+        let dataset_id = insert_dataset(&mut conn, "dataset");
+        let tag = Tag::find_or_create_batch(&mut conn, &["vision".to_string()])
+            .expect("tag should be created")
+            .pop()
+            .expect("tag should exist");
+        DatasetTag::create_associations(&mut conn, dataset_id, &[tag.id])
+            .expect("association should be created");
+
+        Tag::merge_into(&mut conn, "vision", "vision")
+            .expect("self-merge should succeed");
+
+        let tags: Vec<String> = schema::tags::table
+            .select(schema::tags::name)
+            .load(&mut conn)
+            .expect("tags should be readable");
+        let associations: Vec<(i32, i32)> = schema::datasets_tags::table
+            .select((schema::datasets_tags::dataset_id, schema::datasets_tags::tag_id))
+            .load(&mut conn)
+            .expect("associations should be readable");
+
+        assert_eq!(tags, vec!["vision".to_string()]);
+        assert_eq!(associations, vec![(dataset_id, tag.id)]);
     }
 }
