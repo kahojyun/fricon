@@ -254,7 +254,30 @@ describe("DatasetTable", () => {
 
     expect(onDatasetSelected).toHaveBeenNthCalledWith(1, 7);
     expect(onDatasetSelected).toHaveBeenNthCalledWith(2, 7);
-    expect(screen.getByLabelText("Select row")).toBeChecked();
+    expect(row).toHaveFocus();
+    expect(screen.getByLabelText("Select row")).not.toBeChecked();
+  });
+
+  it("keeps existing multi-row selection when activating a row from the keyboard", async () => {
+    const user = userEvent.setup();
+    const { onDatasetSelected } = renderDatasetTable({
+      datasets: [
+        makeDataset({ id: 1, name: "Dataset 1" }),
+        makeDataset({ id: 2, name: "Dataset 2" }),
+      ],
+    });
+
+    const rowCheckboxes = screen.getAllByLabelText("Select row");
+    await user.click(rowCheckboxes[0]);
+    await user.click(rowCheckboxes[1]);
+
+    const secondRow = getRowByText("Dataset 2");
+    secondRow.focus();
+    await user.keyboard("{Enter}");
+
+    expect(onDatasetSelected).toHaveBeenLastCalledWith(2);
+    expect(rowCheckboxes[0]).toBeChecked();
+    expect(rowCheckboxes[1]).toBeChecked();
   });
 
   it("keeps keyboard activation working for interactive controls inside a row", async () => {

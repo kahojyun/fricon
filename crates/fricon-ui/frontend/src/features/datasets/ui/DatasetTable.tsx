@@ -233,7 +233,10 @@ export function DatasetTable({
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      selectSingleDatasetRow(rowIndex, { focus: true });
+      const row = rows[rowIndex];
+      if (!row) return;
+      onDatasetSelected(row.original.id);
+      focusRow(row.id);
     }
   };
 
