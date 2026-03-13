@@ -13,7 +13,12 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
   const queryClient = useQueryClient();
   const [isUpdatingTags, setIsUpdatingTags] = useState(false);
 
-  const invalidateAfterTagChange = async () => {
+  const invalidateAfterTagChange = async (invalidateAllDetails = false) => {
+    if (invalidateAllDetails) {
+      await queryClient.invalidateQueries({
+        queryKey: ["datasets", "detail"],
+      });
+    }
     await queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
     await refreshDatasets();
   };
@@ -61,7 +66,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
     setIsUpdatingTags(true);
     try {
       await deleteTagApi(tag);
-      await invalidateAfterTagChange();
+      await invalidateAfterTagChange(true);
     } finally {
       setIsUpdatingTags(false);
     }
@@ -71,7 +76,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
     setIsUpdatingTags(true);
     try {
       await renameTagApi(oldName, newName);
-      await invalidateAfterTagChange();
+      await invalidateAfterTagChange(true);
     } finally {
       setIsUpdatingTags(false);
     }
@@ -81,7 +86,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
     setIsUpdatingTags(true);
     try {
       await mergeTagApi(source, target);
-      await invalidateAfterTagChange();
+      await invalidateAfterTagChange(true);
     } finally {
       setIsUpdatingTags(false);
     }

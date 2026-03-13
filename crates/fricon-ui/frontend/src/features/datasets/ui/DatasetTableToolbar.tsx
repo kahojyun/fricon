@@ -184,6 +184,34 @@ export function DatasetTableToolbar({
   onMergeTag,
 }: DatasetTableToolbarProps) {
   const allColumns = table.getAllLeafColumns();
+  const handleManagedTagDelete = async (tag: string) => {
+    await onDeleteTag(tag);
+    if (selectedTags.includes(tag)) {
+      handleTagToggle(tag);
+    }
+  };
+
+  const handleManagedTagRename = async (oldName: string, newName: string) => {
+    await onRenameTag(oldName, newName);
+    if (!selectedTags.includes(oldName)) {
+      return;
+    }
+    handleTagToggle(oldName);
+    if (!selectedTags.includes(newName)) {
+      handleTagToggle(newName);
+    }
+  };
+
+  const handleManagedTagMerge = async (source: string, target: string) => {
+    await onMergeTag(source, target);
+    if (!selectedTags.includes(source)) {
+      return;
+    }
+    handleTagToggle(source);
+    if (!selectedTags.includes(target)) {
+      handleTagToggle(target);
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-1.5 border-b px-2.5 py-1.5">
@@ -211,9 +239,9 @@ export function DatasetTableToolbar({
               <ManageTagsDialog
                 allTags={allTags}
                 isUpdatingTags={isUpdatingTags}
-                onDeleteTag={onDeleteTag}
-                onRenameTag={onRenameTag}
-                onMergeTag={onMergeTag}
+                onDeleteTag={handleManagedTagDelete}
+                onRenameTag={handleManagedTagRename}
+                onMergeTag={handleManagedTagMerge}
               />
             </>
           }

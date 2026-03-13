@@ -41,6 +41,7 @@ import {
 import { Input } from "@/shared/ui/input";
 import { Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import type { DatasetDeleteResult } from "../api/types";
 
 interface DatasetTableProps {
   selectedDatasetId?: number;
@@ -51,6 +52,13 @@ function isMacPlatform() {
   const platform = navigator.userAgent;
 
   return platform.toUpperCase().includes("MAC");
+}
+
+function getTagMutationDescription(results: DatasetDeleteResult[]) {
+  return results
+    .filter((result) => !result.success)
+    .map((result) => `ID ${result.id}: ${result.error ?? "Unknown error"}`)
+    .join("\n");
 }
 
 export function DatasetTable({
@@ -454,6 +462,55 @@ export function DatasetTable({
     }
   };
 
+  const handleBatchTagMutation = async (
+    operation: "add" | "remove",
+    targetIds: number[],
+    tag: string,
+  ) => {
+    const actionLabel = operation === "add" ? "Added" : "Removed";
+    const actionVerb = operation === "add" ? "add" : "remove";
+
+    try {
+      const results =
+        operation === "add"
+          ? await batchAddTags(targetIds, [tag])
+          : await batchRemoveTags(targetIds, [tag]);
+
+      const successCount = results.filter((result) => result.success).length;
+      const failedCount = results.length - successCount;
+
+      if (failedCount === 0) {
+        toast.success(
+          `${actionLabel} tag "${tag}" ${operation === "add" ? "to" : "from"} ${successCount} dataset(s).`,
+        );
+        return;
+      }
+
+      if (successCount === 0) {
+        toast.error(
+          `Failed to ${actionVerb} tag "${tag}" ${operation === "add" ? "to" : "from"} ${failedCount} dataset(s).`,
+          {
+            description: getTagMutationDescription(results),
+          },
+        );
+        return;
+      }
+
+      toast.warning(
+        `${actionLabel} tag "${tag}" ${operation === "add" ? "to" : "from"} ${successCount} dataset(s), but ${failedCount} failed.`,
+        {
+          description: getTagMutationDescription(results),
+        },
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Failed to ${actionVerb} tag "${tag}".`,
+      );
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="flex h-full min-h-0 flex-col bg-background">
@@ -626,13 +683,11 @@ export function DatasetTable({
                                           e.preventDefault();
                                           const tag = newTagInput.trim();
                                           if (!tag) return;
-                                          void batchAddTags(targetIds, [
+                                          void handleBatchTagMutation(
+                                            "add",
+                                            targetIds,
                                             tag,
-                                          ]).then(() => {
-                                            toast.success(
-                                              `Added tag "${tag}" to ${targetIds.length} dataset(s).`,
-                                            );
-                                          });
+                                          );
                                           setNewTagInput("");
                                         }}
                                         className="flex gap-1"
@@ -654,13 +709,11 @@ export function DatasetTable({
                                             key={tag}
                                             disabled={isUpdatingTags}
                                             onClick={() => {
-                                              void batchAddTags(targetIds, [
+                                              void handleBatchTagMutation(
+                                                "add",
+                                                targetIds,
                                                 tag,
-                                              ]).then(() => {
-                                                toast.success(
-                                                  `Added tag "${tag}" to ${targetIds.length} dataset(s).`,
-                                                );
-                                              });
+                                              );
                                             }}
                                           >
                                             {tag}
@@ -687,13 +740,11 @@ export function DatasetTable({
                                             key={tag}
                                             disabled={isUpdatingTags}
                                             onClick={() => {
-                                              void batchRemoveTags(targetIds, [
+                                              void handleBatchTagMutation(
+                                                "remove",
+                                                targetIds,
                                                 tag,
-                                              ]).then(() => {
-                                                toast.success(
-                                                  `Removed tag "${tag}" from ${targetIds.length} dataset(s).`,
-                                                );
-                                              });
+                                              );
                                             }}
                                           >
                                             {tag}

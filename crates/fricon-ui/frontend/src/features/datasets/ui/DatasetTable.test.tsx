@@ -638,6 +638,45 @@ describe("DatasetTable", () => {
     );
   });
 
+  it("shows a warning toast when adding a tag partially fails", async () => {
+    const datasets = [
+      makeDataset({ id: 5, name: "Dataset A", tags: [] }),
+      makeDataset({ id: 6, name: "Dataset B", tags: [] }),
+    ];
+    const batchAddTags = vi.fn().mockResolvedValue([
+      { id: 5, success: true, error: null },
+      { id: 6, success: false, error: "locked" },
+    ]);
+    renderDatasetTable({
+      datasets,
+      allTags: ["vision"],
+      batchAddTags,
+    });
+    const user = userEvent.setup();
+
+    const checkboxes = screen.getAllByLabelText("Select row");
+    await user.click(checkboxes[0]);
+    await user.click(checkboxes[1]);
+
+    await openRowContextMenu("Dataset B");
+    const subTrigger = screen.getByRole("menuitem", { name: /Add Tags/i });
+    subTrigger.focus();
+    fireEvent.keyDown(subTrigger, { key: "ArrowRight" });
+
+    const tagItem = await screen.findByRole("menuitem", { name: "vision" });
+    await user.click(tagItem);
+
+    await waitFor(() => {
+      expect(toastWarning).toHaveBeenCalledWith(
+        expect.stringContaining("but 1 failed"),
+        expect.objectContaining({
+          description: expect.stringContaining("ID 6: locked"),
+        }),
+      );
+    });
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
   it("shows Remove Tags sub-menu only when target datasets have tags", async () => {
     const dataset = makeDataset({ id: 7, name: "Has Tags", tags: ["vision"] });
     renderDatasetTable({ datasets: [dataset], allTags: ["vision"] });
@@ -733,5 +772,25 @@ describe("DatasetTable", () => {
     expect(
       await screen.findByRole("button", { name: /Manage Tags/i }),
     ).toBeInTheDocument();
+  });
+
+  it("clears an active tag filter after deleting that tag from Manage Tags", async () => {
+    const deleteTag = vi.fn().mockResolvedValue(undefined);
+    const { hook } = renderDatasetTable({
+      selectedTags: ["vision"],
+      deleteTag,
+    });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Tags/i }));
+    await user.click(await screen.findByRole("button", { name: /Manage Tags/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /Delete tag vision/i }));
+
+    await waitFor(() => {
+      expect(deleteTag).toHaveBeenCalledWith("vision");
+    });
+    expect(hook.handleTagToggle).toHaveBeenCalledWith("vision");
   });
 });
