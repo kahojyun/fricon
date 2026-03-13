@@ -677,7 +677,12 @@ export function DatasetTable({
                                     Add Tags{targetLabel}
                                   </ContextMenuSubTrigger>
                                   <ContextMenuSubContent className="w-56">
-                                    <div className="px-2 pb-1">
+                                    <div
+                                      className="px-2 pb-1"
+                                      onPointerDown={(event) => {
+                                        event.stopPropagation();
+                                      }}
+                                    >
                                       <form
                                         onSubmit={(e) => {
                                           e.preventDefault();
@@ -698,6 +703,12 @@ export function DatasetTable({
                                           onChange={(e) =>
                                             setNewTagInput(e.target.value)
                                           }
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                          }}
+                                          onKeyDown={(event) => {
+                                            event.stopPropagation();
+                                          }}
                                           className="h-7 text-xs"
                                         />
                                       </form>

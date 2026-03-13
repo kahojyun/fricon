@@ -644,6 +644,31 @@ describe("DatasetTable", () => {
     );
   });
 
+  it("accepts typed input in the Add Tags sub-menu and submits it", async () => {
+    const dataset = makeDataset({ id: 5, name: "Tagged Dataset", tags: [] });
+    const batchAddTags = vi
+      .fn()
+      .mockResolvedValue([{ id: 5, success: true, error: null }]);
+    renderDatasetTable({
+      datasets: [dataset],
+      allTags: ["vision"],
+      batchAddTags,
+    });
+    const user = userEvent.setup();
+
+    await openRowContextMenu("Tagged Dataset");
+    await openContextSubmenu(user, /Add Tags/i);
+
+    const input = await screen.findByPlaceholderText("New tag...");
+    await user.click(input);
+    await user.type(input, "fresh-tag");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(batchAddTags).toHaveBeenCalledWith([5], ["fresh-tag"]);
+    });
+  });
+
   it("shows a warning toast when adding a tag partially fails", async () => {
     const datasets = [
       makeDataset({ id: 5, name: "Dataset A", tags: [] }),
