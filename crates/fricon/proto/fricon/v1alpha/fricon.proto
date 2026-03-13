@@ -7,6 +7,11 @@ service FriconService {
    * Get the version of the Fricon service.
    */
   rpc Version(VersionRequest) returns (VersionResponse) {}
+
+  /*
+   * Tell the UI to bring its window to the front.
+   */
+  rpc ShowUi(ShowUiRequest) returns (ShowUiResponse) {}
 }
 
 message VersionRequest {}
@@ -14,3 +19,7 @@ message VersionRequest {}
 message VersionResponse {
   string version = 1;
 }
+
+message ShowUiRequest {}
+
+message ShowUiResponse {}

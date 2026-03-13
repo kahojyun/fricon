@@ -15,7 +15,7 @@ use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use semver::Version;
 use tokio::{sync::mpsc, task::JoinHandle};
-use tonic::{Request, transport::Channel};
+use tonic::{Code, Request, transport::Channel};
 use tower::service_fn;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
@@ -32,11 +32,18 @@ use crate::{
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
-    transport::ipc,
+    transport::{ipc, ipc::error::ConnectError},
     workspace::{WorkspacePaths, WorkspaceRoot},
 };
 
 const MAX_PAYLOAD_CHUNK_SIZE: usize = 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExistingUiProbeResult {
+    NotRunning,
+    UiShown,
+    UiUnavailable,
+}
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -45,6 +52,21 @@ pub struct Client {
 }
 
 impl Client {
+    #[instrument(skip(path), fields(workspace.path = ?path.as_ref()))]
+    pub async fn probe_existing_ui(path: impl AsRef<Path>) -> Result<ExistingUiProbeResult> {
+        match Self::connect(path).await {
+            Ok(client) => match client.show_ui().await {
+                Ok(()) => Ok(ExistingUiProbeResult::UiShown),
+                Err(err) if show_ui_requires_desktop_ui(&err) => {
+                    Ok(ExistingUiProbeResult::UiUnavailable)
+                }
+                Err(err) => Err(err.context("Failed to delegate launch to existing workspace UI")),
+            },
+            Err(err) if connect_target_missing(&err) => Ok(ExistingUiProbeResult::NotRunning),
+            Err(err) => Err(err.context("Failed to connect to existing workspace server")),
+        }
+    }
+
     #[instrument(skip(path), fields(workspace.path = ?path.as_ref()))]
     pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
         let path = fs::canonicalize(path)?;
@@ -116,9 +138,33 @@ impl Client {
         })
     }
 
+    pub async fn show_ui(&self) -> Result<()> {
+        let request = crate::proto::ShowUiRequest {};
+        let mut client = FriconServiceClient::new(self.channel.clone());
+        client.show_ui(request).await?;
+        Ok(())
+    }
+
     fn dataset_service(&self) -> DatasetServiceClient<Channel> {
         DatasetServiceClient::new(self.channel.clone())
     }
+}
+
+fn connect_target_missing(err: &anyhow::Error) -> bool {
+    err.chain().any(|cause| {
+        cause
+            .downcast_ref::<ConnectError>()
+            .is_some_and(|connect_error| matches!(connect_error, ConnectError::NotFound(_)))
+            || cause.to_string().contains("Connect target not found")
+    })
+}
+
+fn show_ui_requires_desktop_ui(err: &anyhow::Error) -> bool {
+    err.chain().any(|cause| {
+        cause
+            .downcast_ref::<tonic::Status>()
+            .is_some_and(|status| status.code() == Code::FailedPrecondition)
+    })
 }
 
 #[derive(Debug)]

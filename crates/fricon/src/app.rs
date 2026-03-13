@@ -27,6 +27,8 @@ use crate::{
 pub enum AppError {
     #[error("AppState has been dropped")]
     StateDropped,
+    #[error("App event was not delivered to any subscribers")]
+    EventUndelivered,
 }
 
 pub struct AppState {
@@ -116,6 +118,13 @@ impl AppHandle {
 
     pub fn subscribe_to_events(&self) -> Result<broadcast::Receiver<AppEvent>, AppError> {
         Ok(self.state()?.event_sender.subscribe())
+    }
+
+    pub fn send_event(&self, event: AppEvent) -> Result<usize, AppError> {
+        self.state()?
+            .event_sender
+            .send(event)
+            .map_err(|_| AppError::EventUndelivered)
     }
 
     #[must_use]

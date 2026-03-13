@@ -7,6 +7,7 @@ use tracing::{error, warn};
 use crate::{
     api::datasets::{DatasetCreated, DatasetInfo, DatasetUpdated},
     application::session::WorkspaceSession,
+    desktop_runtime::runtime::show_main_window,
 };
 
 pub(crate) fn start_event_forwarder(session: &WorkspaceSession, app_handle: tauri::AppHandle) {
@@ -86,6 +87,9 @@ pub(crate) fn start_event_forwarder(session: &WorkspaceSession, app_handle: taur
                             "Failed to emit DatasetUpdated event"
                         );
                     }
+                }
+                AppEvent::ShowUiRequest => {
+                    show_main_window(&app_handle);
                 }
             }
         }
