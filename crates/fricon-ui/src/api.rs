@@ -40,7 +40,11 @@ pub(crate) fn specta_builder() -> Builder {
             datasets::update_dataset_favorite,
             datasets::update_dataset_info,
             datasets::get_dataset_write_status,
-            datasets::delete_datasets
+            datasets::delete_datasets,
+            datasets::batch_update_dataset_tags,
+            datasets::delete_tag,
+            datasets::rename_tag,
+            datasets::merge_tag
         ])
         .events(collect_events![DatasetCreated, DatasetUpdated])
         .typ::<DatasetInfo>()

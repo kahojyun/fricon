@@ -16,4 +16,7 @@ pub(crate) trait DatasetCatalogRepository: Send + Sync {
     fn add_tags(&self, id: i32, tags: &[String]) -> Result<(), CatalogError>;
     fn remove_tags(&self, id: i32, tags: &[String]) -> Result<(), CatalogError>;
     fn delete_dataset(&self, id: i32) -> Result<(), CatalogError>;
+    fn delete_tag(&self, tag: &str) -> Result<(), CatalogError>;
+    fn rename_tag(&self, old_name: &str, new_name: &str) -> Result<(), CatalogError>;
+    fn merge_tag(&self, source: &str, target: &str) -> Result<(), CatalogError>;
 }

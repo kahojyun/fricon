@@ -74,3 +74,26 @@ export async function deleteDatasets(
 ): Promise<DatasetDeleteResult[]> {
   return invoke(commands.deleteDatasets(ids));
 }
+
+export async function batchUpdateDatasetTags(
+  ids: number[],
+  add: string[] = [],
+  remove: string[] = [],
+): Promise<DatasetDeleteResult[]> {
+  return invoke(commands.batchUpdateDatasetTags({ ids, add, remove }));
+}
+
+export async function deleteTag(tag: string): Promise<void> {
+  await invoke(commands.deleteTag(tag));
+}
+
+export async function renameTag(
+  oldName: string,
+  newName: string,
+): Promise<void> {
+  await invoke(commands.renameTag(oldName, newName));
+}
+
+export async function mergeTag(source: string, target: string): Promise<void> {
+  await invoke(commands.mergeTag(source, target));
+}

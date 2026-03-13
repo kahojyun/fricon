@@ -4,6 +4,7 @@ import { datasetKeys } from "./queryKeys";
 import { type UseDatasetTableDataResult } from "./datasetTableShared";
 import { useDatasetFavoriteMutation } from "./useDatasetFavoriteMutation";
 import { useDatasetDeleteMutation } from "./useDatasetDeleteMutation";
+import { useDatasetTagMutation } from "./useDatasetTagMutation";
 import { useDatasetTableFilters } from "./useDatasetTableFilters";
 import { useDatasetTableQuery } from "./useDatasetTableQuery";
 import { useDatasetTableRefreshSync } from "./useDatasetTableRefreshSync";
@@ -29,6 +30,14 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   );
   const { deleteDatasets, isDeleting } =
     useDatasetDeleteMutation(refreshDatasets);
+  const {
+    batchAddTags,
+    batchRemoveTags,
+    deleteTag,
+    renameTag,
+    mergeTag,
+    isUpdatingTags,
+  } = useDatasetTagMutation(refreshDatasets);
 
   const allTags = tagsQuery.data ?? [];
   const normalizedTagFilterQuery = filters.tagFilterQuery.trim().toLowerCase();
@@ -49,6 +58,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     sorting: filters.sorting,
     setSorting: filters.setSorting,
     filteredTagOptions,
+    allTags,
     favoriteOnly: filters.favoriteOnly,
     setFavoriteOnly: filters.setFavoriteOnly,
     hasMore,
@@ -56,6 +66,12 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     toggleFavorite,
     deleteDatasets,
     isDeleting,
+    batchAddTags,
+    batchRemoveTags,
+    deleteTag,
+    renameTag,
+    mergeTag,
+    isUpdatingTags,
     handleTagToggle: filters.handleTagToggle,
     handleStatusToggle: filters.handleStatusToggle,
     clearFilters: filters.clearFilters,

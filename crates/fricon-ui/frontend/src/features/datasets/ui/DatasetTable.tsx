@@ -23,6 +23,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/shared/ui/context-menu";
 import {
@@ -35,7 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Input } from "@/shared/ui/input";
+import { Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface DatasetTableProps {
@@ -64,6 +68,7 @@ export function DatasetTable({
     sorting,
     setSorting,
     filteredTagOptions,
+    allTags,
     favoriteOnly,
     setFavoriteOnly,
     hasMore,
@@ -75,6 +80,12 @@ export function DatasetTable({
     loadNextPage,
     deleteDatasets,
     isDeleting,
+    batchAddTags,
+    batchRemoveTags,
+    deleteTag,
+    renameTag,
+    mergeTag,
+    isUpdatingTags,
   } = useDatasetTableData();
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
@@ -86,6 +97,7 @@ export function DatasetTable({
     mode: "replace" | "toggle";
     targetValue?: boolean;
   } | null>(null);
+  const [newTagInput, setNewTagInput] = useState("");
 
   useEffect(() => {
     const handleMouseUp = () => setDragState(null);
@@ -454,6 +466,8 @@ export function DatasetTable({
           searchQuery={searchQuery}
           tagFilterQuery={tagFilterQuery}
           filteredTagOptions={filteredTagOptions}
+          allTags={allTags}
+          isUpdatingTags={isUpdatingTags}
           setFavoriteOnly={setFavoriteOnly}
           setSearchQuery={setSearchQuery}
           setTagFilterQuery={setTagFilterQuery}
@@ -463,6 +477,9 @@ export function DatasetTable({
           resetColumnVisibilityToDefault={resetColumnVisibilityToDefault}
           showAllColumns={showAllColumns}
           onColumnVisibilityChange={handleColumnVisibilityChange}
+          onDeleteTag={deleteTag}
+          onRenameTag={renameTag}
+          onMergeTag={mergeTag}
         />
         <div
           className="min-h-0 flex-1 overflow-auto bg-background"
@@ -569,6 +586,126 @@ export function DatasetTable({
                           >
                             View Details
                           </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          {/* Tag management sub-menus */}
+                          {(() => {
+                            const isInSelection =
+                              selectedCount > 1 &&
+                              selectedRows.some(
+                                (r) => r.original.id === dataset.id,
+                              );
+                            const targetIds = isInSelection
+                              ? selectedRows.map((r) => r.original.id)
+                              : [dataset.id];
+                            const targetLabel =
+                              isInSelection && selectedCount > 1
+                                ? ` (${selectedCount})`
+                                : "";
+                            // Union of tags across target datasets
+                            const targetDatasets = isInSelection
+                              ? selectedRows.map((r) => r.original)
+                              : [dataset];
+                            const removableTags = Array.from(
+                              new Set(targetDatasets.flatMap((d) => d.tags)),
+                            ).sort();
+
+                            return (
+                              <>
+                                <ContextMenuSub>
+                                  <ContextMenuSubTrigger>
+                                    <Tag
+                                      data-icon="inline-start"
+                                      className="size-3.5"
+                                    />
+                                    Add Tags{targetLabel}
+                                  </ContextMenuSubTrigger>
+                                  <ContextMenuSubContent className="w-56">
+                                    <div className="px-2 pb-1">
+                                      <form
+                                        onSubmit={(e) => {
+                                          e.preventDefault();
+                                          const tag = newTagInput.trim();
+                                          if (!tag) return;
+                                          void batchAddTags(targetIds, [
+                                            tag,
+                                          ]).then(() => {
+                                            toast.success(
+                                              `Added tag "${tag}" to ${targetIds.length} dataset(s).`,
+                                            );
+                                          });
+                                          setNewTagInput("");
+                                        }}
+                                        className="flex gap-1"
+                                      >
+                                        <Input
+                                          placeholder="New tag..."
+                                          value={newTagInput}
+                                          onChange={(e) =>
+                                            setNewTagInput(e.target.value)
+                                          }
+                                          className="h-7 text-xs"
+                                        />
+                                      </form>
+                                    </div>
+                                    {allTags.length > 0 && (
+                                      <div className="flex max-h-40 flex-col overflow-y-auto">
+                                        {allTags.map((tag) => (
+                                          <ContextMenuItem
+                                            key={tag}
+                                            disabled={isUpdatingTags}
+                                            onClick={() => {
+                                              void batchAddTags(targetIds, [
+                                                tag,
+                                              ]).then(() => {
+                                                toast.success(
+                                                  `Added tag "${tag}" to ${targetIds.length} dataset(s).`,
+                                                );
+                                              });
+                                            }}
+                                          >
+                                            {tag}
+                                          </ContextMenuItem>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </ContextMenuSubContent>
+                                </ContextMenuSub>
+
+                                {removableTags.length > 0 && (
+                                  <ContextMenuSub>
+                                    <ContextMenuSubTrigger>
+                                      <Tag
+                                        data-icon="inline-start"
+                                        className="size-3.5"
+                                      />
+                                      Remove Tags{targetLabel}
+                                    </ContextMenuSubTrigger>
+                                    <ContextMenuSubContent className="w-56">
+                                      <div className="flex max-h-40 flex-col overflow-y-auto">
+                                        {removableTags.map((tag) => (
+                                          <ContextMenuItem
+                                            key={tag}
+                                            disabled={isUpdatingTags}
+                                            onClick={() => {
+                                              void batchRemoveTags(targetIds, [
+                                                tag,
+                                              ]).then(() => {
+                                                toast.success(
+                                                  `Removed tag "${tag}" from ${targetIds.length} dataset(s).`,
+                                                );
+                                              });
+                                            }}
+                                          >
+                                            {tag}
+                                          </ContextMenuItem>
+                                        ))}
+                                      </div>
+                                    </ContextMenuSubContent>
+                                  </ContextMenuSub>
+                                )}
+                              </>
+                            );
+                          })()}
                           <ContextMenuSeparator />
                           <ContextMenuItem
                             variant="destructive"

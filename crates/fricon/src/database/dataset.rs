@@ -342,6 +342,27 @@ impl DatasetCatalogRepository for DatasetRepository {
         Dataset::delete_from_db(&mut conn, id).map_err(anyhow::Error::from)?;
         Ok(())
     }
+
+    fn delete_tag(&self, tag: &str) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        conn.immediate_transaction(|conn| Tag::delete_by_name(conn, tag))
+            .map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
+    fn rename_tag(&self, old_name: &str, new_name: &str) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        conn.immediate_transaction(|conn| Tag::rename(conn, old_name, new_name))
+            .map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
+    fn merge_tag(&self, source: &str, target: &str) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        conn.immediate_transaction(|conn| Tag::merge_into(conn, source, target))
+            .map_err(anyhow::Error::from)?;
+        Ok(())
+    }
 }
 
 impl DatasetIngestRepository for DatasetRepository {

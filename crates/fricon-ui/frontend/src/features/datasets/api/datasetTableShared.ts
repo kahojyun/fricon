@@ -98,6 +98,7 @@ export interface UseDatasetTableDataResult {
     updater: SortingState | ((prev: SortingState) => SortingState),
   ) => void;
   filteredTagOptions: string[];
+  allTags: string[];
   favoriteOnly: boolean;
   setFavoriteOnly: (next: boolean) => void;
   hasMore: boolean;
@@ -105,6 +106,18 @@ export interface UseDatasetTableDataResult {
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;
   deleteDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
   isDeleting: boolean;
+  batchAddTags: (
+    ids: number[],
+    tags: string[],
+  ) => Promise<DatasetDeleteResult[]>;
+  batchRemoveTags: (
+    ids: number[],
+    tags: string[],
+  ) => Promise<DatasetDeleteResult[]>;
+  deleteTag: (tag: string) => Promise<void>;
+  renameTag: (oldName: string, newName: string) => Promise<void>;
+  mergeTag: (source: string, target: string) => Promise<void>;
+  isUpdatingTags: boolean;
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
   clearFilters: () => void;

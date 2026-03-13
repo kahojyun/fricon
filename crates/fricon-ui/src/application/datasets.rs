@@ -235,6 +235,82 @@ pub(crate) async fn delete_datasets(
     results
 }
 
+#[derive(Debug, Clone, Default)]
+pub(crate) struct BatchTagUpdate {
+    pub(crate) ids: Vec<i32>,
+    pub(crate) add: Vec<String>,
+    pub(crate) remove: Vec<String>,
+}
+
+pub(crate) async fn batch_update_dataset_tags(
+    session: &WorkspaceSession,
+    update: BatchTagUpdate,
+) -> Vec<DatasetDeleteResult> {
+    let dataset_catalog = session.app().dataset_catalog();
+    let add = normalize_tags(update.add);
+    let remove = normalize_tags(update.remove);
+    let mut results = Vec::with_capacity(update.ids.len());
+    for id in update.ids {
+        let add_result = if add.is_empty() {
+            Ok(())
+        } else {
+            dataset_catalog.add_tags(id, add.clone()).await
+        };
+        let remove_result = if remove.is_empty() {
+            Ok(())
+        } else {
+            dataset_catalog.remove_tags(id, remove.clone()).await
+        };
+        let error = match (add_result, remove_result) {
+            (Ok(()), Ok(())) => None,
+            (Err(e), Ok(())) => Some(format!("add tags failed: {e}")),
+            (Ok(()), Err(e)) => Some(format!("remove tags failed: {e}")),
+            (Err(e1), Err(e2)) => Some(format!("add tags failed: {e1}; remove tags failed: {e2}")),
+        };
+        results.push(DatasetDeleteResult {
+            id,
+            success: error.is_none(),
+            error,
+        });
+    }
+    results
+}
+
+pub(crate) async fn delete_tag(session: &WorkspaceSession, tag: String) -> anyhow::Result<()> {
+    session
+        .app()
+        .dataset_catalog()
+        .delete_tag(tag)
+        .await
+        .context("Failed to delete tag.")
+}
+
+pub(crate) async fn rename_tag(
+    session: &WorkspaceSession,
+    old_name: String,
+    new_name: String,
+) -> anyhow::Result<()> {
+    session
+        .app()
+        .dataset_catalog()
+        .rename_tag(old_name, new_name)
+        .await
+        .context("Failed to rename tag.")
+}
+
+pub(crate) async fn merge_tag(
+    session: &WorkspaceSession,
+    source: String,
+    target: String,
+) -> anyhow::Result<()> {
+    session
+        .app()
+        .dataset_catalog()
+        .merge_tag(source, target)
+        .await
+        .context("Failed to merge tag.")
+}
+
 #[cfg(test)]
 mod tests {
     use fricon::{

@@ -132,6 +132,93 @@ impl Tag {
             .select(Self::as_select())
             .load(conn)
     }
+
+    /// Find a tag by name, returning `None` if it does not exist.
+    pub(super) fn find_by_name(
+        conn: &mut SqliteConnection,
+        tag_name: &str,
+    ) -> QueryResult<Option<Self>> {
+        use schema::tags::dsl::{name, tags};
+        tags.filter(name.eq(tag_name))
+            .select(Self::as_select())
+            .first(conn)
+            .optional()
+    }
+
+    /// Delete all dataset associations for this tag, then delete the tag row
+    /// itself.
+    pub(super) fn delete_by_name(conn: &mut SqliteConnection, tag_name: &str) -> QueryResult<()> {
+        use schema::{
+            datasets_tags::dsl::{datasets_tags, tag_id},
+            tags::dsl::{name, tags},
+        };
+
+        let Some(tag) = Self::find_by_name(conn, tag_name)? else {
+            return Ok(());
+        };
+        // Remove all dataset associations first.
+        diesel::delete(datasets_tags.filter(tag_id.eq(tag.id))).execute(conn)?;
+        // Then remove the tag row.
+        diesel::delete(tags.filter(name.eq(tag_name))).execute(conn)?;
+        Ok(())
+    }
+
+    /// Rename a tag. Returns an error if `new_name` already exists.
+    pub(super) fn rename(
+        conn: &mut SqliteConnection,
+        old_name: &str,
+        new_name: &str,
+    ) -> QueryResult<()> {
+        use schema::tags::dsl::{name, tags};
+        diesel::update(tags.filter(name.eq(old_name)))
+            .set(name.eq(new_name))
+            .execute(conn)?;
+        Ok(())
+    }
+
+    /// Merge `source` tag into `target` tag:
+    /// re-points all `datasets_tags` rows from source to target (skipping
+    /// duplicates), then deletes the source tag row.
+    pub(super) fn merge_into(
+        conn: &mut SqliteConnection,
+        source_name: &str,
+        target_name: &str,
+    ) -> QueryResult<()> {
+        use schema::{
+            datasets_tags::dsl::{dataset_id, datasets_tags, tag_id},
+            tags::dsl::{name, tags},
+        };
+
+        let Some(source) = Self::find_by_name(conn, source_name)? else {
+            return Ok(());
+        };
+        // Ensure target exists (create if not).
+        let target_names = vec![target_name.to_owned()];
+        let target_vec = Tag::find_or_create_batch(conn, &target_names)?;
+        let target = &target_vec[0];
+
+        // Dataset IDs that already have the target tag — we must not insert duplicates.
+        let already_tagged: Vec<i32> = datasets_tags
+            .filter(tag_id.eq(target.id))
+            .select(dataset_id)
+            .load(conn)?;
+
+        // Move source-only rows to target.
+        diesel::update(
+            datasets_tags
+                .filter(tag_id.eq(source.id))
+                .filter(dataset_id.ne_all(&already_tagged)),
+        )
+        .set(tag_id.eq(target.id))
+        .execute(conn)?;
+
+        // Delete any remaining source rows (duplicates that already had target).
+        diesel::delete(datasets_tags.filter(tag_id.eq(source.id))).execute(conn)?;
+
+        // Delete the source tag row.
+        diesel::delete(tags.filter(name.eq(source_name))).execute(conn)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Insertable)]

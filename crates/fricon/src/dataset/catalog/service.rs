@@ -128,4 +128,25 @@ impl DatasetCatalogService {
         })
         .await?
     }
+
+    #[instrument(skip(self, tag), fields(tag.name = %tag))]
+    pub async fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.delete_tag(&tag))
+            .await?
+    }
+
+    #[instrument(skip(self, old_name, new_name), fields(tag.old = %old_name, tag.new = %new_name))]
+    pub async fn rename_tag(&self, old_name: String, new_name: String) -> Result<(), CatalogError> {
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.rename_tag(&old_name, &new_name))
+            .await?
+    }
+
+    #[instrument(skip(self, source, target), fields(tag.source = %source, tag.target = %target))]
+    pub async fn merge_tag(&self, source: String, target: String) -> Result<(), CatalogError> {
+        let repository = Arc::clone(&self.repository);
+        self.spawn_blocking(move || repository.merge_tag(&source, &target))
+            .await?
+    }
 }
