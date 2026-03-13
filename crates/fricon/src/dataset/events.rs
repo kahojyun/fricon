@@ -23,6 +23,7 @@ pub enum AppEvent {
         status: DatasetStatus,
         created_at: DateTime<Utc>,
     },
+    ShowUiRequest,
 }
 
 #[must_use]

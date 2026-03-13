@@ -17,7 +17,7 @@ pub mod workspace;
 
 pub use self::{
     app::{AppEvent, AppHandle, AppManager},
-    client::{Client, Dataset, DatasetWriter},
+    client::{Client, Dataset, DatasetWriter, ExistingUiProbeResult},
     dataset::{
         CreateDatasetRequest, DatasetArray, DatasetCatalogService, DatasetDataType, DatasetId,
         DatasetIngestService, DatasetListQuery, DatasetMetadata, DatasetReadService, DatasetReader,

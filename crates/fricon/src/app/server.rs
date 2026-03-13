@@ -32,11 +32,14 @@ pub(crate) fn start(
     let listener = ipc::listen(ipc_file, runtime)?;
 
     info!("Starting gRPC server");
+    let app_for_fricon = app.clone();
     task_tracker.spawn_on(
         async move {
             let result = Server::builder()
                 .add_service(service)
-                .add_service(FriconServiceServer::new(Fricon))
+                .add_service(FriconServiceServer::new(Fricon {
+                    app: app_for_fricon,
+                }))
                 .serve_with_incoming_shutdown(listener, async {
                     cancellation_token.cancelled().await;
                     info!("Received shutdown signal");

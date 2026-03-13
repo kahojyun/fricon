@@ -3,13 +3,15 @@ use std::sync::Arc;
 
 use arrow_array::{Array, Float64Array, RecordBatch};
 use fricon::{
-    AppManager, Client, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar, DatasetStatus,
-    FixedStepTrace, ScalarArray, VariableStepTrace, WorkspaceRoot,
+    AppEvent, AppManager, Client, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar,
+    DatasetStatus, ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace,
+    WorkspaceRoot,
 };
 use indexmap::IndexMap;
 use num::complex::Complex64;
 use tempfile::TempDir;
 use tokio::time::{Duration, Instant};
+use tonic::Code;
 
 fn create_test_rows() -> Vec<DatasetRow> {
     vec![
@@ -379,5 +381,68 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
     app_manager.shutdown().await;
     temp_dir.close()?;
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_probe_existing_ui_reports_not_running_without_server() -> anyhow::Result<()> {
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+    WorkspaceRoot::create_new(workspace_path)?;
+
+    let probe_result = Client::probe_existing_ui(workspace_path).await?;
+
+    assert_eq!(probe_result, ExistingUiProbeResult::NotRunning);
+
+    temp_dir.close()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_show_ui_requires_attached_ui_subscriber() -> anyhow::Result<()> {
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+    WorkspaceRoot::create_new(workspace_path)?;
+
+    let app_manager =
+        AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
+    let client = Client::connect(workspace_path).await?;
+
+    assert_eq!(
+        Client::probe_existing_ui(workspace_path).await?,
+        ExistingUiProbeResult::UiUnavailable
+    );
+
+    let error = client
+        .show_ui()
+        .await
+        .expect_err("show_ui should fail when no UI subscriber is attached");
+    let status = error
+        .downcast_ref::<tonic::Status>()
+        .expect("show_ui should return tonic::Status");
+    assert_eq!(status.code(), Code::FailedPrecondition);
+
+    app_manager.shutdown().await;
+    temp_dir.close()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_probe_existing_ui_delegates_when_subscriber_is_attached() -> anyhow::Result<()> {
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+    WorkspaceRoot::create_new(workspace_path)?;
+
+    let app_manager =
+        AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
+    let mut event_rx = app_manager.handle().subscribe_to_events()?;
+
+    let probe_result = Client::probe_existing_ui(workspace_path).await?;
+
+    assert_eq!(probe_result, ExistingUiProbeResult::UiShown);
+    assert!(matches!(event_rx.recv().await?, AppEvent::ShowUiRequest));
+
+    app_manager.shutdown().await;
+    temp_dir.close()?;
     Ok(())
 }
