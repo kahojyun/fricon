@@ -123,6 +123,8 @@ export function DatasetTable({
     [datasets, columns, sorting, columnVisibility, rowSelection, setSorting],
   );
 
+  // TanStack Table is an intentional compiler boundary for this component.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable(tableOptions);
 
   const { rows } = table.getRowModel();

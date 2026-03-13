@@ -98,6 +98,8 @@ function FilterTableColumn({
   const rowElementMapRef = useRef(new Map<number, HTMLTableRowElement>());
   const pendingFocusIndexRef = useRef<number | null>(null);
 
+  // TanStack Virtual is an intentional compiler boundary for this component.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -121,22 +123,6 @@ function FilterTableColumn({
     if (!rowElement) return;
     rowElement.focus();
     pendingFocusIndexRef.current = null;
-  };
-
-  const focusItemAt = (
-    itemPosition: number,
-    options: {
-      scroll?: boolean;
-    } = {},
-  ) => {
-    const item = items[itemPosition];
-    if (!item) return;
-
-    if (options.scroll) {
-      rowVirtualizer.scrollToIndex?.(itemPosition, { align: "auto" });
-    }
-
-    focusItem(item.index);
   };
 
   const registerRowElement = (
@@ -182,7 +168,8 @@ function FilterTableColumn({
     onRegisterFocusItem(columnIndex, (itemIndex, fallbackItemIndex) => {
       const itemPosition = items.findIndex((item) => item.index === itemIndex);
       if (itemPosition !== -1) {
-        focusItemAt(itemPosition, { scroll: true });
+        rowVirtualizer.scrollToIndex?.(itemPosition, { align: "auto" });
+        focusItem(items[itemPosition].index);
         return;
       }
 
@@ -191,18 +178,20 @@ function FilterTableColumn({
           (item) => item.index === fallbackItemIndex,
         );
         if (fallbackPosition !== -1) {
-          focusItemAt(fallbackPosition, { scroll: true });
+          rowVirtualizer.scrollToIndex?.(fallbackPosition, { align: "auto" });
+          focusItem(items[fallbackPosition].index);
           return;
         }
       }
 
       if (items.length > 0) {
-        focusItemAt(0, { scroll: true });
+        rowVirtualizer.scrollToIndex?.(0, { align: "auto" });
+        focusItem(items[0].index);
       }
     });
 
     return () => onRegisterFocusItem(columnIndex, null);
-  }, [columnIndex, items, onRegisterFocusItem]);
+  }, [columnIndex, items, onRegisterFocusItem, rowVirtualizer]);
 
   return (
     <div
@@ -303,6 +292,8 @@ export function FilterTable({
     ? `${Math.max(data.fields.length * 80, 320)}px`
     : "0px";
 
+  // TanStack Virtual is an intentional compiler boundary for this component.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: data?.rows.length ?? 0,
     getScrollElement: () => tableContainerRef.current,

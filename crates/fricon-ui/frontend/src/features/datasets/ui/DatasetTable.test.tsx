@@ -288,7 +288,7 @@ describe("DatasetTable", () => {
     });
 
     const checkbox = screen.getByLabelText("Select row");
-    await act(async () => {
+    act(() => {
       checkbox.focus();
     });
     await user.keyboard(" ");
@@ -297,7 +297,7 @@ describe("DatasetTable", () => {
     expect(onDatasetSelected).not.toHaveBeenCalled();
 
     const favoriteButton = screen.getByLabelText("Add to favorites");
-    await act(async () => {
+    act(() => {
       favoriteButton.focus();
     });
     await user.keyboard("{Enter}");
