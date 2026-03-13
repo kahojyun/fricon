@@ -162,6 +162,15 @@ async function openRowContextMenu(name: string) {
   return menus.at(-1)!;
 }
 
+async function openContextSubmenu(
+  user: ReturnType<typeof userEvent.setup>,
+  label: RegExp,
+) {
+  const subTrigger = screen.getByRole("menuitem", { name: label });
+  subTrigger.focus();
+  await user.keyboard("{ArrowRight}");
+}
+
 async function openColumnsMenu(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /View/i }));
   const menus = await screen.findAllByRole("menu");
@@ -622,10 +631,7 @@ describe("DatasetTable", () => {
     // we can use pointer events on the submenu trigger to open it, then query
     // the sub-menu content which is rendered in a portal.
     // Since Base-UI sub-menus open on focus/keyboard, use keyboard navigation.
-    const subTrigger = screen.getByRole("menuitem", { name: /Add Tags/i });
-    // Focus and open sub-menu via ArrowRight (base-ui keyboard navigation)
-    subTrigger.focus();
-    fireEvent.keyDown(subTrigger, { key: "ArrowRight" });
+    await openContextSubmenu(user, /Add Tags/i);
 
     const tagItem = await screen.findByRole("menuitem", { name: "vision" });
     await user.click(tagItem);
@@ -659,9 +665,7 @@ describe("DatasetTable", () => {
     await user.click(checkboxes[1]);
 
     await openRowContextMenu("Dataset B");
-    const subTrigger = screen.getByRole("menuitem", { name: /Add Tags/i });
-    subTrigger.focus();
-    fireEvent.keyDown(subTrigger, { key: "ArrowRight" });
+    await openContextSubmenu(user, /Add Tags/i);
 
     const tagItem = await screen.findByRole("menuitem", { name: "vision" });
     await user.click(tagItem);
@@ -712,9 +716,7 @@ describe("DatasetTable", () => {
     const user = userEvent.setup();
 
     await openRowContextMenu("Remove Tag");
-    const subTrigger = screen.getByRole("menuitem", { name: /Remove Tags/i });
-    subTrigger.focus();
-    fireEvent.keyDown(subTrigger, { key: "ArrowRight" });
+    await openContextSubmenu(user, /Remove Tags/i);
 
     const tagItem = await screen.findByRole("menuitem", { name: "vision" });
     await user.click(tagItem);
@@ -749,9 +751,7 @@ describe("DatasetTable", () => {
     // Should say "Add Tags (2)" when 2 rows are targeted
     expect(within(menu).getByText(/Add Tags \(2\)/i)).toBeInTheDocument();
 
-    const subTrigger = within(menu).getByText(/Add Tags/i);
-    subTrigger.focus();
-    fireEvent.keyDown(subTrigger, { key: "ArrowRight" });
+    await openContextSubmenu(user, /Add Tags/i);
 
     const tagItem = await screen.findByRole("menuitem", { name: "vision" });
     await user.click(tagItem);

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use chrono::{DateTime, Utc};
 use fricon::{
     DatasetDataType, DatasetListQuery, DatasetRecord, DatasetStatus, DatasetUpdate,
@@ -60,6 +60,32 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
         }
     }
     unique.into_iter().collect()
+}
+
+fn normalize_tag_name(tag: String, field_name: &str) -> anyhow::Result<String> {
+    let normalized = tag.trim().to_string();
+    if normalized.is_empty() {
+        bail!("{field_name} must not be empty");
+    }
+    Ok(normalized)
+}
+
+fn normalize_rename_tags(old_name: String, new_name: String) -> anyhow::Result<(String, String)> {
+    let old_name = normalize_tag_name(old_name, "old tag name")?;
+    let new_name = normalize_tag_name(new_name, "new tag name")?;
+    if old_name == new_name {
+        bail!("old tag name and new tag name must differ");
+    }
+    Ok((old_name, new_name))
+}
+
+fn normalize_merge_tags(source: String, target: String) -> anyhow::Result<(String, String)> {
+    let source = normalize_tag_name(source, "source tag")?;
+    let target = normalize_tag_name(target, "target tag")?;
+    if source == target {
+        bail!("source tag and target tag must differ");
+    }
+    Ok((source, target))
 }
 
 pub(crate) fn validate_non_negative(
@@ -277,6 +303,7 @@ pub(crate) async fn batch_update_dataset_tags(
 }
 
 pub(crate) async fn delete_tag(session: &WorkspaceSession, tag: String) -> anyhow::Result<()> {
+    let tag = normalize_tag_name(tag, "tag")?;
     session
         .app()
         .dataset_catalog()
@@ -290,6 +317,7 @@ pub(crate) async fn rename_tag(
     old_name: String,
     new_name: String,
 ) -> anyhow::Result<()> {
+    let (old_name, new_name) = normalize_rename_tags(old_name, new_name)?;
     session
         .app()
         .dataset_catalog()
@@ -303,6 +331,7 @@ pub(crate) async fn merge_tag(
     source: String,
     target: String,
 ) -> anyhow::Result<()> {
+    let (source, target) = normalize_merge_tags(source, target)?;
     session
         .app()
         .dataset_catalog()
@@ -320,7 +349,7 @@ mod tests {
     use tempfile::TempDir;
     use tokio::sync::mpsc;
 
-    use super::delete_datasets;
+    use super::{delete_datasets, normalize_merge_tags, normalize_rename_tags, normalize_tag_name};
     use crate::application::session::WorkspaceSession;
 
     async fn create_completed_dataset(
@@ -376,6 +405,43 @@ mod tests {
             .await?;
         assert!(remaining.is_empty());
 
+        Ok(())
+    }
+
+    #[test]
+    fn normalize_tag_name_rejects_blank_values() {
+        let error = normalize_tag_name("   ".to_string(), "tag")
+            .expect_err("blank tag should be rejected");
+        assert_eq!(error.to_string(), "tag must not be empty");
+    }
+
+    #[test]
+    fn normalize_rename_tags_trims_and_requires_distinct_values() -> anyhow::Result<()> {
+        let normalized =
+            normalize_rename_tags(" vision ".to_string(), " audio ".to_string())?;
+        assert_eq!(normalized, ("vision".to_string(), "audio".to_string()));
+
+        let error = normalize_rename_tags("vision".to_string(), " vision ".to_string())
+            .expect_err("equal rename targets should be rejected");
+        assert_eq!(
+            error.to_string(),
+            "old tag name and new tag name must differ"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn normalize_merge_tags_trims_and_requires_distinct_values() -> anyhow::Result<()> {
+        let normalized =
+            normalize_merge_tags(" vision ".to_string(), " audio ".to_string())?;
+        assert_eq!(normalized, ("vision".to_string(), "audio".to_string()));
+
+        let error = normalize_merge_tags("vision".to_string(), " vision ".to_string())
+            .expect_err("equal merge targets should be rejected");
+        assert_eq!(
+            error.to_string(),
+            "source tag and target tag must differ"
+        );
         Ok(())
     }
 }
