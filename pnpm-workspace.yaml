@@ -1,6 +1,13 @@
 packages:
   - crates/fricon-ui/frontend
 
+catalogs:
+  default:
+    "@tsconfig/node-lts": "^24.0.0"
+    "@tsconfig/node-ts": "^23.6.4"
+    "@types/node": "^25.4.0"
+    typescript: "~5.9.3"
+
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild

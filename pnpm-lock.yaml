@@ -4,6 +4,21 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@tsconfig/node-lts':
+      specifier: ^24.0.0
+      version: 24.0.0
+    '@tsconfig/node-ts':
+      specifier: ^23.6.4
+      version: 23.6.4
+    '@types/node':
+      specifier: ^25.4.0
+      version: 25.4.0
+    typescript:
+      specifier: ~5.9.3
+      version: 5.9.3
+
 importers:
 
   .:
@@ -18,13 +33,13 @@ importers:
         specifier: ^2.10.1
         version: 2.10.1
       '@tsconfig/node-lts':
-        specifier: ^24.0.0
+        specifier: 'catalog:'
         version: 24.0.0
       '@tsconfig/node-ts':
-        specifier: ^23.6.4
+        specifier: 'catalog:'
         version: 23.6.4
       '@types/node':
-        specifier: ^25.4.0
+        specifier: 'catalog:'
         version: 25.4.0
       eslint:
         specifier: ^9.39.3
@@ -142,16 +157,16 @@ importers:
         specifier: ^14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@tsconfig/node-lts':
-        specifier: ^24.0.0
+        specifier: 'catalog:'
         version: 24.0.0
       '@tsconfig/node-ts':
-        specifier: ^23.6.4
+        specifier: 'catalog:'
         version: 23.6.4
       '@tsconfig/vite-react':
         specifier: ^7.0.2
         version: 7.0.2
       '@types/node':
-        specifier: ^25.4.0
+        specifier: 'catalog:'
         version: 25.4.0
       '@types/react':
         specifier: ^19.2.14
@@ -181,7 +196,7 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       typescript:
-        specifier: ~5.9.3
+        specifier: 'catalog:'
         version: 5.9.3
       vite:
         specifier: ^7.3.1
