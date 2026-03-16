@@ -36,9 +36,6 @@ interface FilterTableColumnProps {
   onFocusColumnItem: (columnIndex: number, fallbackItemIndex?: number) => void;
 }
 
-const focusRowClassName =
-  "cursor-pointer outline-none [&:focus>td]:bg-accent/70 [&:focus>td]:shadow-[inset_0_0_0_2px_color-mix(in_oklab,var(--color-ring)_45%,transparent)] [&:focus>td]:relative";
-
 function getAdjacentIndex(
   currentIndex: number,
   key: string,
@@ -83,6 +80,29 @@ function handleSelectableRowKeyDown(
   if (event.metaKey || event.ctrlKey) {
     event.stopPropagation();
   }
+}
+
+function handleColumnBoundaryKeyDown(
+  event: KeyboardEvent<HTMLTableRowElement>,
+  options: {
+    columnIndex: number;
+    selectedIndex?: number;
+    onFocusColumnItem: (
+      columnIndex: number,
+      fallbackItemIndex?: number,
+    ) => void;
+  },
+) {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+    return false;
+  }
+
+  event.preventDefault();
+  options.onFocusColumnItem(
+    options.columnIndex + (event.key === "ArrowRight" ? 1 : -1),
+    options.selectedIndex,
+  );
+  return true;
 }
 
 function FilterTableColumn({
@@ -196,7 +216,7 @@ function FilterTableColumn({
   return (
     <div
       data-testid={`filter-column-${field}`}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-transparent bg-background transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30"
     >
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
         <Table withContainer={false}>
@@ -224,31 +244,32 @@ function FilterTableColumn({
                   data-state={isSelected && "selected"}
                   ref={(element) => registerRowElement(item.index, element)}
                   data-index={virtualRow.index}
-                  className={focusRowClassName}
                   onClick={(event) => {
                     event.currentTarget.focus();
                     onSelect(item.index);
                   }}
-                  onKeyDown={(event) =>
-                    event.key === "ArrowLeft" || event.key === "ArrowRight"
-                      ? (() => {
-                          event.preventDefault();
-                          onFocusColumnItem(
-                            columnIndex + (event.key === "ArrowRight" ? 1 : -1),
-                            selectedIndex,
-                          );
-                        })()
-                      : handleSelectableRowKeyDown(event, {
-                          currentIndex: virtualRow.index,
-                          totalCount: items.length,
-                          onSelect: () => onSelect(item.index),
-                          onNavigate: (nextIndex) =>
-                            selectItemAt(nextIndex, {
-                              focus: true,
-                              scroll: true,
-                            }),
-                        })
-                  }
+                  onKeyDown={(event) => {
+                    if (
+                      handleColumnBoundaryKeyDown(event, {
+                        columnIndex,
+                        selectedIndex,
+                        onFocusColumnItem,
+                      })
+                    ) {
+                      return;
+                    }
+
+                    handleSelectableRowKeyDown(event, {
+                      currentIndex: virtualRow.index,
+                      totalCount: items.length,
+                      onSelect: () => onSelect(item.index),
+                      onNavigate: (nextIndex) =>
+                        selectItemAt(nextIndex, {
+                          focus: true,
+                          scroll: true,
+                        }),
+                    });
+                  }}
                   tabIndex={0}
                 >
                   <TableCell className="truncate">
@@ -460,7 +481,6 @@ export function FilterTable({
                           registerRowElement(row.index, element)
                         }
                         data-index={virtualRow.index}
-                        className={focusRowClassName}
                         onClick={(event) => {
                           event.currentTarget.focus();
                           onSelectRow(row.index);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DatasetTable } from "@/features/datasets";
 import {
   ResizableHandle,
@@ -7,25 +7,10 @@ import {
 } from "@/shared/ui/resizable";
 import { DatasetInspector } from "./DatasetInspector";
 
-interface DatasetExplorerScreenProps {
-  datasetId?: string;
-}
-
-export function DatasetExplorerScreen({
-  datasetId,
-}: DatasetExplorerScreenProps) {
-  const parsedDatasetId = (() => {
-    if (!datasetId?.trim()) return undefined;
-    const parsed = Number.parseInt(datasetId, 10);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  })();
+export function DatasetExplorerScreen() {
   const [selectedDatasetId, setSelectedDatasetId] = useState<
     number | undefined
-  >(parsedDatasetId);
-
-  useEffect(() => {
-    setSelectedDatasetId(parsedDatasetId);
-  }, [parsedDatasetId]);
+  >(undefined);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

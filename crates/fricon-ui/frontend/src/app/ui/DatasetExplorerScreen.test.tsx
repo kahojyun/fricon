@@ -29,7 +29,7 @@ vi.mock("./DatasetInspector", () => ({
 describe("DatasetExplorerScreen", () => {
   it("keeps selection state in the app composition layer", async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<DatasetExplorerScreen />);
+    render(<DatasetExplorerScreen />);
 
     expect(screen.getByTestId("table-selection")).toHaveTextContent("none");
     expect(screen.getByTestId("inspector-selection")).toHaveTextContent("none");
@@ -38,10 +38,5 @@ describe("DatasetExplorerScreen", () => {
 
     expect(screen.getByTestId("table-selection")).toHaveTextContent("42");
     expect(screen.getByTestId("inspector-selection")).toHaveTextContent("42");
-
-    rerender(<DatasetExplorerScreen datasetId="17" />);
-
-    expect(screen.getByTestId("table-selection")).toHaveTextContent("17");
-    expect(screen.getByTestId("inspector-selection")).toHaveTextContent("17");
   });
 });

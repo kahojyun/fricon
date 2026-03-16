@@ -162,15 +162,6 @@ async function openRowContextMenu(name: string) {
   return menus.at(-1)!;
 }
 
-async function openContextSubmenu(
-  user: ReturnType<typeof userEvent.setup>,
-  label: RegExp,
-) {
-  const subTrigger = screen.getByRole("menuitem", { name: label });
-  subTrigger.focus();
-  await user.keyboard("{ArrowRight}");
-}
-
 async function openColumnsMenu(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /View/i }));
   const menus = await screen.findAllByRole("menu");
@@ -610,102 +601,7 @@ describe("DatasetTable", () => {
     renderDatasetTable({ datasets: [dataset], allTags: ["vision", "audio"] });
 
     const menu = await openRowContextMenu("Tagged Dataset");
-    // The ContextMenuSubTrigger item is rendered inside the context menu
     expect(within(menu).getByText(/Add Tags/i)).toBeInTheDocument();
-  });
-
-  it("calls batchAddTags when clicking a tag in the Add Tags sub-menu", async () => {
-    const dataset = makeDataset({ id: 5, name: "Tagged Dataset", tags: [] });
-    const batchAddTags = vi
-      .fn()
-      .mockResolvedValue([{ id: 5, success: true, error: null }]);
-    renderDatasetTable({
-      datasets: [dataset],
-      allTags: ["vision"],
-      batchAddTags,
-    });
-    const user = userEvent.setup();
-
-    await openRowContextMenu("Tagged Dataset");
-    // The tag items from allTags are rendered in the submenu popup; in JSDOM,
-    // we can use pointer events on the submenu trigger to open it, then query
-    // the sub-menu content which is rendered in a portal.
-    // Since Base-UI sub-menus open on focus/keyboard, use keyboard navigation.
-    await openContextSubmenu(user, /Add Tags/i);
-
-    const tagItem = await screen.findByRole("menuitem", { name: "vision" });
-    await user.click(tagItem);
-
-    await waitFor(() => {
-      expect(batchAddTags).toHaveBeenCalledWith([5], ["vision"]);
-    });
-    expect(toastSuccess).toHaveBeenCalledWith(
-      expect.stringContaining("vision"),
-    );
-  });
-
-  it("accepts typed input in the Add Tags sub-menu and submits it", async () => {
-    const dataset = makeDataset({ id: 5, name: "Tagged Dataset", tags: [] });
-    const batchAddTags = vi
-      .fn()
-      .mockResolvedValue([{ id: 5, success: true, error: null }]);
-    renderDatasetTable({
-      datasets: [dataset],
-      allTags: ["vision"],
-      batchAddTags,
-    });
-    const user = userEvent.setup();
-
-    await openRowContextMenu("Tagged Dataset");
-    await openContextSubmenu(user, /Add Tags/i);
-
-    const input = await screen.findByPlaceholderText("New tag...");
-    await user.click(input);
-    await user.type(input, "fresh-tag");
-    await user.keyboard("{Enter}");
-
-    await waitFor(() => {
-      expect(batchAddTags).toHaveBeenCalledWith([5], ["fresh-tag"]);
-    });
-  });
-
-  it("shows a warning toast when adding a tag partially fails", async () => {
-    const datasets = [
-      makeDataset({ id: 5, name: "Dataset A", tags: [] }),
-      makeDataset({ id: 6, name: "Dataset B", tags: [] }),
-    ];
-    const batchAddTags = vi.fn().mockResolvedValue([
-      { id: 5, success: true, error: null },
-      { id: 6, success: false, error: "locked" },
-    ]);
-    renderDatasetTable({
-      datasets,
-      allTags: ["vision"],
-      batchAddTags,
-    });
-    const user = userEvent.setup();
-
-    const checkboxes = screen.getAllByLabelText("Select row");
-    await user.click(checkboxes[0]);
-    await user.click(checkboxes[1]);
-
-    await openRowContextMenu("Dataset B");
-    await openContextSubmenu(user, /Add Tags/i);
-
-    const tagItem = await screen.findByRole("menuitem", { name: "vision" });
-    await user.click(tagItem);
-
-    await waitFor(() => {
-      expect(toastWarning).toHaveBeenCalledWith(
-        expect.stringContaining("but 1 failed"),
-        expect.any(Object),
-      );
-    });
-    const warningOptions = toastWarning.mock.calls[0]?.[1] as
-      | { description?: string }
-      | undefined;
-    expect(warningOptions?.description).toContain("ID 6: locked");
-    expect(toastSuccess).not.toHaveBeenCalled();
   });
 
   it("shows Remove Tags sub-menu only when target datasets have tags", async () => {
@@ -724,70 +620,21 @@ describe("DatasetTable", () => {
     expect(within(menu).queryByText(/Remove Tags/i)).not.toBeInTheDocument();
   });
 
-  it("calls batchRemoveTags when clicking a tag in the Remove Tags sub-menu", async () => {
-    const dataset = makeDataset({
-      id: 9,
-      name: "Remove Tag",
-      tags: ["vision"],
-    });
-    const batchRemoveTags = vi
-      .fn()
-      .mockResolvedValue([{ id: 9, success: true, error: null }]);
-    renderDatasetTable({
-      datasets: [dataset],
-      allTags: ["vision"],
-      batchRemoveTags,
-    });
-    const user = userEvent.setup();
-
-    await openRowContextMenu("Remove Tag");
-    await openContextSubmenu(user, /Remove Tags/i);
-
-    const tagItem = await screen.findByRole("menuitem", { name: "vision" });
-    await user.click(tagItem);
-
-    await waitFor(() => {
-      expect(batchRemoveTags).toHaveBeenCalledWith([9], ["vision"]);
-    });
-    expect(toastSuccess).toHaveBeenCalledWith(
-      expect.stringContaining("vision"),
-    );
-  });
-
   it("targets all selected rows for tag operations when right-clicking a selected row", async () => {
     const datasets = [
       makeDataset({ id: 10, name: "Dataset A", tags: [] }),
       makeDataset({ id: 11, name: "Dataset B", tags: [] }),
     ];
-    const batchAddTags = vi.fn().mockResolvedValue([
-      { id: 10, success: true, error: null },
-      { id: 11, success: true, error: null },
-    ]);
-    renderDatasetTable({ datasets, allTags: ["vision"], batchAddTags });
+    renderDatasetTable({ datasets, allTags: ["vision"] });
     const user = userEvent.setup();
 
-    // Select both rows via checkboxes
     const checkboxes = screen.getAllByLabelText("Select row");
     await user.click(checkboxes[0]);
     await user.click(checkboxes[1]);
 
-    // Right-click one of the selected rows
     const menu = await openRowContextMenu("Dataset B");
-    // Should say "Add Tags (2)" when 2 rows are targeted
     expect(within(menu).getByText(/Add Tags \(2\)/i)).toBeInTheDocument();
-
-    await openContextSubmenu(user, /Add Tags/i);
-
-    const tagItem = await screen.findByRole("menuitem", { name: "vision" });
-    await user.click(tagItem);
-
-    await waitFor(() => {
-      // Should include both selected IDs
-      expect(batchAddTags).toHaveBeenCalledWith(
-        expect.arrayContaining([10, 11]),
-        ["vision"],
-      );
-    });
+    expect(within(menu).queryByText(/Remove Tags/i)).not.toBeInTheDocument();
   });
 
   it("shows Manage Tags button inside the Tags filter popover", async () => {

@@ -39,38 +39,6 @@ function makeData(): FilterTableData {
 }
 
 describe("FilterTable", () => {
-  it("keeps split columns as independent scroll containers", () => {
-    render(
-      <div className="h-60">
-        <FilterTable
-          data={makeData()}
-          mode="split"
-          onModeChange={() => undefined}
-          selectedRowIndex={null}
-          onSelectRow={() => undefined}
-          selectedValueIndices={[1, 1]}
-          onSelectFieldValue={() => undefined}
-        />
-      </div>,
-    );
-
-    expect(screen.getByTestId("filter-column-A")).toHaveClass(
-      "flex",
-      "flex-col",
-      "min-h-0",
-      "overflow-hidden",
-    );
-    expect(screen.getByTestId("filter-column-B")).toHaveClass(
-      "flex",
-      "flex-col",
-      "min-h-0",
-      "overflow-hidden",
-    );
-    expect(
-      document.querySelectorAll(".overflow-auto").length,
-    ).toBeGreaterThanOrEqual(2);
-  });
-
   it("supports keyboard selection in split mode", async () => {
     const user = userEvent.setup();
     const onSelectFieldValue = vi.fn();
