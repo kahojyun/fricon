@@ -50,6 +50,9 @@ export default defineConfig([
         ...globals.vitest,
       },
     },
+    rules: {
+      "@eslint-react/component-hook-factories": "off",
+    },
   },
   {
     files: ["crates/fricon-ui/frontend/src/features/**/*.{ts,tsx}"],
