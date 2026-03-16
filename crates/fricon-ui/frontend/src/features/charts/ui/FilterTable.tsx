@@ -85,6 +85,29 @@ function handleSelectableRowKeyDown(
   }
 }
 
+function handleColumnBoundaryKeyDown(
+  event: KeyboardEvent<HTMLTableRowElement>,
+  options: {
+    columnIndex: number;
+    selectedIndex?: number;
+    onFocusColumnItem: (
+      columnIndex: number,
+      fallbackItemIndex?: number,
+    ) => void;
+  },
+) {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+    return false;
+  }
+
+  event.preventDefault();
+  options.onFocusColumnItem(
+    options.columnIndex + (event.key === "ArrowRight" ? 1 : -1),
+    options.selectedIndex,
+  );
+  return true;
+}
+
 function FilterTableColumn({
   columnIndex,
   field,
@@ -229,26 +252,28 @@ function FilterTableColumn({
                     event.currentTarget.focus();
                     onSelect(item.index);
                   }}
-                  onKeyDown={(event) =>
-                    event.key === "ArrowLeft" || event.key === "ArrowRight"
-                      ? (() => {
-                          event.preventDefault();
-                          onFocusColumnItem(
-                            columnIndex + (event.key === "ArrowRight" ? 1 : -1),
-                            selectedIndex,
-                          );
-                        })()
-                      : handleSelectableRowKeyDown(event, {
-                          currentIndex: virtualRow.index,
-                          totalCount: items.length,
-                          onSelect: () => onSelect(item.index),
-                          onNavigate: (nextIndex) =>
-                            selectItemAt(nextIndex, {
-                              focus: true,
-                              scroll: true,
-                            }),
-                        })
-                  }
+                  onKeyDown={(event) => {
+                    if (
+                      handleColumnBoundaryKeyDown(event, {
+                        columnIndex,
+                        selectedIndex,
+                        onFocusColumnItem,
+                      })
+                    ) {
+                      return;
+                    }
+
+                    handleSelectableRowKeyDown(event, {
+                      currentIndex: virtualRow.index,
+                      totalCount: items.length,
+                      onSelect: () => onSelect(item.index),
+                      onNavigate: (nextIndex) =>
+                        selectItemAt(nextIndex, {
+                          focus: true,
+                          scroll: true,
+                        }),
+                    });
+                  }}
                   tabIndex={0}
                 >
                   <TableCell className="truncate">

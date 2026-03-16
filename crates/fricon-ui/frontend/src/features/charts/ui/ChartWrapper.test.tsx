@@ -5,7 +5,7 @@ import { ChartWrapper } from "./ChartWrapper";
 
 const capturedOptions: unknown[] = [];
 
-vi.mock("echarts-for-react/lib/core", () => ({
+vi.mock("echarts-for-react/esm/core", () => ({
   default: ({ option }: { option: unknown }) => {
     capturedOptions.push(option);
     return <div data-testid="echarts-instance" />;
