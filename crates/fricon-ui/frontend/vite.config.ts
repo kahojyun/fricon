@@ -1,7 +1,8 @@
-import path from "path";
+import { fileURLToPath } from "node:url";
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { createViteLicensePlugin } from "rollup-license-plugin";
 
@@ -12,10 +13,10 @@ const isLicenseBundle = process.env.npm_lifecycle_event === "bundle-licenses";
 export default defineConfig({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
-    react({
-      babel: {
-        plugins: [["babel-plugin-react-compiler"]],
-      },
+    react(),
+    // @ts-expect-error The published types currently reject the documented presets-only shape.
+    babel({
+      presets: [reactCompilerPreset()],
     }),
     tailwindcss(),
     isLicenseBundle
@@ -26,7 +27,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
