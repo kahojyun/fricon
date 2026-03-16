@@ -17,9 +17,10 @@
     "bundle-licenses:rust": "cd crates/fricon-py && cargo bundle-licenses --format toml --output ../../THIRD_PARTY_RUST.toml",
     "bundle-licenses:npm": "pnpm --filter fricon-ui run bundle-licenses && node -e \"const fs=require('node:fs');const path=require('node:path');const src=path.resolve('crates','fricon-ui','frontend','dist','THIRD_PARTY_NPM.json');const dst=path.resolve('THIRD_PARTY_NPM.json');fs.renameSync(src,dst);\""
   },
-  "packageManager": "pnpm@10.30.1+sha512.3590e550d5384caa39bd5c7c739f72270234b2f6059e13018f975c313b1eb9fefcc09714048765d4d9efe961382c312e624572c0420762bdc5d5940cdf9be73a",
+  "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be",
   "type": "module",
   "devDependencies": {
+    "@eslint-react/eslint-plugin": "^3.0.0",
     "@eslint/compat": "^2.0.3",
     "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2.10.1",
@@ -28,10 +29,8 @@
     "@types/node": "catalog:",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-dom": "^2.13.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
-    "eslint-plugin-react-x": "^2.13.0",
     "globals": "^17.4.0",
     "npm-run-all2": "^8.0.4",
     "prettier": "3.8.1",

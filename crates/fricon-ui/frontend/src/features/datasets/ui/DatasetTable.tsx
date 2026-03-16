@@ -595,6 +595,30 @@ export function DatasetTable({
                     const selectedRows =
                       table.getFilteredSelectedRowModel().rows;
                     const selectedCount = selectedRows.length;
+                    const isInSelection =
+                      selectedCount > 1 &&
+                      selectedRows.some((selectedRow) => {
+                        return selectedRow.original.id === dataset.id;
+                      });
+                    const targetIds = isInSelection
+                      ? selectedRows.map(
+                          (selectedRow) => selectedRow.original.id,
+                        )
+                      : [dataset.id];
+                    const targetLabel =
+                      isInSelection && selectedCount > 1
+                        ? ` (${selectedCount})`
+                        : "";
+                    const targetDatasets = isInSelection
+                      ? selectedRows.map((selectedRow) => selectedRow.original)
+                      : [dataset];
+                    const removableTags = Array.from(
+                      new Set(
+                        targetDatasets.flatMap(
+                          (targetDataset) => targetDataset.tags,
+                        ),
+                      ),
+                    ).sort();
 
                     return (
                       <ContextMenu key={row.id}>
@@ -645,129 +669,103 @@ export function DatasetTable({
                           </ContextMenuItem>
                           <ContextMenuSeparator />
                           {/* Tag management sub-menus */}
-                          {(() => {
-                            const isInSelection =
-                              selectedCount > 1 &&
-                              selectedRows.some(
-                                (r) => r.original.id === dataset.id,
-                              );
-                            const targetIds = isInSelection
-                              ? selectedRows.map((r) => r.original.id)
-                              : [dataset.id];
-                            const targetLabel =
-                              isInSelection && selectedCount > 1
-                                ? ` (${selectedCount})`
-                                : "";
-                            // Union of tags across target datasets
-                            const targetDatasets = isInSelection
-                              ? selectedRows.map((r) => r.original)
-                              : [dataset];
-                            const removableTags = Array.from(
-                              new Set(targetDatasets.flatMap((d) => d.tags)),
-                            ).sort();
-
-                            return (
-                              <>
-                                <ContextMenuSub>
-                                  <ContextMenuSubTrigger>
-                                    <Tag
-                                      data-icon="inline-start"
-                                      className="size-3.5"
-                                    />
-                                    Add Tags{targetLabel}
-                                  </ContextMenuSubTrigger>
-                                  <ContextMenuSubContent className="w-56">
-                                    <div
-                                      className="px-2 pb-1"
-                                      onPointerDown={(event) => {
-                                        event.stopPropagation();
+                          <ContextMenuSub>
+                            <ContextMenuSubTrigger>
+                              <Tag
+                                data-icon="inline-start"
+                                className="size-3.5"
+                              />
+                              Add Tags{targetLabel}
+                            </ContextMenuSubTrigger>
+                            <ContextMenuSubContent className="w-56">
+                              <div
+                                className="px-2 pb-1"
+                                onPointerDown={(event) => {
+                                  event.stopPropagation();
+                                }}
+                              >
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const tag = newTagInput.trim();
+                                    if (!tag) return;
+                                    void handleBatchTagMutation(
+                                      "add",
+                                      targetIds,
+                                      tag,
+                                    );
+                                    setNewTagInput("");
+                                  }}
+                                  className="flex gap-1"
+                                >
+                                  <Input
+                                    placeholder="New tag..."
+                                    value={newTagInput}
+                                    onChange={(e) =>
+                                      setNewTagInput(e.target.value)
+                                    }
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                    }}
+                                    onKeyDown={(event) => {
+                                      event.stopPropagation();
+                                    }}
+                                    className="h-7 text-xs"
+                                  />
+                                </form>
+                              </div>
+                              {allTags.length > 0 && (
+                                <div className="flex max-h-40 flex-col overflow-y-auto">
+                                  {allTags.map((tag) => (
+                                    <ContextMenuItem
+                                      key={tag}
+                                      disabled={isUpdatingTags}
+                                      onClick={() => {
+                                        void handleBatchTagMutation(
+                                          "add",
+                                          targetIds,
+                                          tag,
+                                        );
                                       }}
                                     >
-                                      <form
-                                        onSubmit={(e) => {
-                                          e.preventDefault();
-                                          const tag = newTagInput.trim();
-                                          if (!tag) return;
-                                          void handleBatchTagMutation(
-                                            "add",
-                                            targetIds,
-                                            tag,
-                                          );
-                                          setNewTagInput("");
-                                        }}
-                                        className="flex gap-1"
-                                      >
-                                        <Input
-                                          placeholder="New tag..."
-                                          value={newTagInput}
-                                          onChange={(e) =>
-                                            setNewTagInput(e.target.value)
-                                          }
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                          }}
-                                          onKeyDown={(event) => {
-                                            event.stopPropagation();
-                                          }}
-                                          className="h-7 text-xs"
-                                        />
-                                      </form>
-                                    </div>
-                                    {allTags.length > 0 && (
-                                      <div className="flex max-h-40 flex-col overflow-y-auto">
-                                        {allTags.map((tag) => (
-                                          <ContextMenuItem
-                                            key={tag}
-                                            disabled={isUpdatingTags}
-                                            onClick={() => {
-                                              void handleBatchTagMutation(
-                                                "add",
-                                                targetIds,
-                                                tag,
-                                              );
-                                            }}
-                                          >
-                                            {tag}
-                                          </ContextMenuItem>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </ContextMenuSubContent>
-                                </ContextMenuSub>
+                                      {tag}
+                                    </ContextMenuItem>
+                                  ))}
+                                </div>
+                              )}
+                            </ContextMenuSubContent>
+                          </ContextMenuSub>
 
-                                {removableTags.length > 0 && (
-                                  <ContextMenuSub>
-                                    <ContextMenuSubTrigger>
-                                      <Tag
-                                        data-icon="inline-start"
-                                        className="size-3.5"
-                                      />
-                                      Remove Tags{targetLabel}
-                                    </ContextMenuSubTrigger>
-                                    <ContextMenuSubContent className="w-56">
-                                      <div className="flex max-h-40 flex-col overflow-y-auto">
-                                        {removableTags.map((tag) => (
-                                          <ContextMenuItem
-                                            key={tag}
-                                            disabled={isUpdatingTags}
-                                            onClick={() => {
-                                              void handleBatchTagMutation(
-                                                "remove",
-                                                targetIds,
-                                                tag,
-                                              );
-                                            }}
-                                          >
-                                            {tag}
-                                          </ContextMenuItem>
-                                        ))}
-                                      </div>
-                                    </ContextMenuSubContent>
-                                  </ContextMenuSub>
-                                )}
-                              </>
-                            );
-                          })()}
+                          {removableTags.length > 0 && (
+                            <ContextMenuSub>
+                              <ContextMenuSubTrigger>
+                                <Tag
+                                  data-icon="inline-start"
+                                  className="size-3.5"
+                                />
+                                Remove Tags{targetLabel}
+                              </ContextMenuSubTrigger>
+                              <ContextMenuSubContent className="w-56">
+                                <div className="flex max-h-40 flex-col overflow-y-auto">
+                                  {removableTags.map((tag) => (
+                                    <ContextMenuItem
+                                      key={tag}
+                                      disabled={isUpdatingTags}
+                                      onClick={() => {
+                                        void handleBatchTagMutation(
+                                          "remove",
+                                          targetIds,
+                                          tag,
+                                        );
+                                      }}
+                                    >
+                                      {tag}
+                                    </ContextMenuItem>
+                                  ))}
+                                </div>
+                              </ContextMenuSubContent>
+                            </ContextMenuSub>
+                          )}
                           <ContextMenuSeparator />
                           <ContextMenuItem
                             variant="destructive"
