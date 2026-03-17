@@ -1,16 +1,14 @@
-import * as React from "react";
 import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
 
 import { cn } from "@/shared/lib/utils";
 
-type ScrollAreaProps = React.ComponentPropsWithRef<
-  typeof ScrollAreaPrimitive.Root
->;
-
-function ScrollArea({ className, children, ref, ...props }: ScrollAreaProps) {
+function ScrollArea({
+  className,
+  children,
+  ...props
+}: ScrollAreaPrimitive.Root.Props) {
   return (
     <ScrollAreaPrimitive.Root
-      ref={ref}
       data-slot="scroll-area"
       className={cn("relative", className)}
       {...props}

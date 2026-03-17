@@ -19,5 +19,7 @@
     "lib": "@/shared/lib",
     "hooks": "@/shared/hooks"
   },
+  "menuColor": "default",
+  "menuAccent": "subtle",
   "registries": {}
 }
