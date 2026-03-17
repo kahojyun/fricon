@@ -141,7 +141,7 @@ function FacetedFilterPopover<T extends string>({
         </div>
         {selectedValues.length > 0 && (
           <>
-            <Separator className="my-2" />
+            <Separator />
             <Button
               variant="ghost"
               className="w-full justify-center"
@@ -232,10 +232,10 @@ export function DatasetTableToolbar({
           onSearchChange={setTagFilterQuery}
           searchPlaceholder="Search tags"
           emptyLabel="No tags found."
-          contentClassName="w-64 p-2"
+          contentClassName="w-64 p-2 gap-1"
           footer={
             <>
-              <Separator className="my-2" />
+              <Separator />
               <ManageTagsDialog
                 allTags={allTags}
                 isUpdatingTags={isUpdatingTags}
