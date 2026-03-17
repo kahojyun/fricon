@@ -1,6 +1,7 @@
 ## Package-Specific Constraints
 
 - **React Compiler is enabled.** Prefer compiler-led memoization and do not add `useMemo`, `useCallback`, or `React.memo` by default. Exception: if `eslint-plugin-react-hooks` reports `react-hooks/incompatible-library`, treat the affected component or hook as outside React Compiler optimization and follow the library's own usage and performance guidance instead of compiler assumptions. Prefer compiler-compatible alternative APIs when the library provides one.
+- `react-hooks/todo` is intentionally enabled in the repo lint config because it exposes React Compiler bailout diagnostics that are otherwise easy to miss, including unsupported `try/catch/finally` shapes.
 - Prefer shadcn/ui components
 - `src/shared/ui/` is reserved for shadcn/ui primitives and thin local patches to those files.
 - Repo-owned shared components must not be added under `src/shared/ui/`; place them in a separate shared directory such as `src/shared/components/` so they stay linted.

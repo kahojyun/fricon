@@ -3,6 +3,30 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteDatasets as deleteDatasetsApi } from "./client";
 import { datasetKeys } from "./queryKeys";
 
+async function executeDeleteMutation<T>({
+  ids,
+  mutateAsync,
+  refreshDatasets,
+  setIsRefreshingAfterDelete,
+}: {
+  ids: number[];
+  mutateAsync: (ids: number[]) => Promise<T>;
+  refreshDatasets: () => Promise<void>;
+  setIsRefreshingAfterDelete: (next: boolean) => void;
+}): Promise<T> {
+  setIsRefreshingAfterDelete(true);
+  try {
+    const results = await mutateAsync(ids);
+    await refreshDatasets();
+    return results;
+  } catch (error) {
+    console.error("Failed to delete datasets:", error);
+    throw error;
+  } finally {
+    setIsRefreshingAfterDelete(false);
+  }
+}
+
 export function useDatasetDeleteMutation(refreshDatasets: () => Promise<void>) {
   const queryClient = useQueryClient();
   const [isRefreshingAfterDelete, setIsRefreshingAfterDelete] = useState(false);
@@ -21,19 +45,13 @@ export function useDatasetDeleteMutation(refreshDatasets: () => Promise<void>) {
     },
   });
 
-  const deleteDatasets = async (ids: number[]) => {
-    setIsRefreshingAfterDelete(true);
-    try {
-      const results = await deleteMutation.mutateAsync(ids);
-      await refreshDatasets();
-      return results;
-    } catch (error) {
-      console.error("Failed to delete datasets:", error);
-      throw error;
-    } finally {
-      setIsRefreshingAfterDelete(false);
-    }
-  };
+  const deleteDatasets = (ids: number[]) =>
+    executeDeleteMutation({
+      ids,
+      mutateAsync: deleteMutation.mutateAsync,
+      refreshDatasets,
+      setIsRefreshingAfterDelete,
+    });
 
   return {
     deleteDatasets,

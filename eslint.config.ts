@@ -40,6 +40,10 @@ export default defineConfig([
     },
     rules: {
       "@typescript-eslint/no-deprecated": "error",
+      // `react-hooks/todo` surfaces React Compiler bailout diagnostics that the
+      // default recommended presets do not enable. Keep it on so unsupported
+      // syntax such as some `try/catch/finally` patterns shows up in normal lint.
+      "react-hooks/todo": "warn",
     },
   },
   {
