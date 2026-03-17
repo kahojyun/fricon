@@ -19,7 +19,7 @@ interface DatasetTableVirtualizer {
 }
 
 interface UseDatasetTableSelectionArgs {
-  getRows: () => DatasetTableRow[];
+  rows: DatasetTableRow[];
   rowVirtualizer: DatasetTableVirtualizer;
   onDatasetSelected: (id?: number) => void;
 }
@@ -36,7 +36,7 @@ function isMacPlatform() {
 }
 
 export function useDatasetTableSelection({
-  getRows,
+  rows,
   rowVirtualizer,
   onDatasetSelected,
 }: UseDatasetTableSelectionArgs) {
@@ -88,7 +88,6 @@ export function useDatasetTableSelection({
       scroll?: boolean;
     } = {},
   ) => {
-    const rows = getRows();
     const row = rows[rowIndex];
     if (!row) {
       return;
@@ -118,7 +117,6 @@ export function useDatasetTableSelection({
 
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault();
-      const rows = getRows();
       const nextRowIndex =
         event.key === "ArrowUp"
           ? Math.max(rowIndex - 1, 0)
@@ -136,7 +134,6 @@ export function useDatasetTableSelection({
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      const rows = getRows();
       const row = rows[rowIndex];
       if (!row) {
         return;
@@ -171,7 +168,6 @@ export function useDatasetTableSelection({
     }
 
     event.currentTarget.focus();
-    const rows = getRows();
 
     if (event.shiftKey) {
       event.preventDefault();
@@ -236,7 +232,6 @@ export function useDatasetTableSelection({
       return;
     }
 
-    const rows = getRows();
     const anchorIndex = findRowIndexById(rows, anchorId);
     const effectiveAnchorIndex = anchorIndex !== -1 ? anchorIndex : rowIndex;
     const { start, end } = getSelectionRange(effectiveAnchorIndex, rowIndex);

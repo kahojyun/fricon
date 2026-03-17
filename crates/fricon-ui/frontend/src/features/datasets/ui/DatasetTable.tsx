@@ -1,19 +1,13 @@
-import { useEffect, useMemo, useRef } from "react";
-import {
-  flexRender,
-  getCoreRowModel,
-  type Table as TanStackTable,
-  useReactTable,
-} from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useMemo, useRef } from "react";
+import { flexRender } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import { useDatasetColumnVisibility } from "../model/useDatasetColumnVisibility";
 import { createDatasetColumns } from "./DatasetTableColumns";
 import { DatasetTableBody } from "./DatasetTableBody";
 import { DatasetTableToolbar } from "./DatasetTableToolbar";
+import { useDatasetTableController } from "./useDatasetTableController";
 import { useDatasetDeleteFlow } from "./useDatasetDeleteFlow";
-import { useDatasetTableSelection } from "./useDatasetTableSelection";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,88 +71,32 @@ export function DatasetTable({
   } = useDatasetColumnVisibility(columns);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const tableRef = useRef<TanStackTable<(typeof datasets)[0]> | null>(null);
-  // TanStack Virtual is an intentional compiler boundary for this component.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
-    count: datasets.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 36,
-    overscan: 8,
-  });
-
-  const selection = useDatasetTableSelection({
-    getRows: () => tableRef.current?.getRowModel().rows ?? [],
-    rowVirtualizer,
+  const controller = useDatasetTableController({
+    datasets,
+    columns,
+    sorting,
+    setSorting,
+    columnVisibility,
+    hasMore,
+    loadNextPage,
     onDatasetSelected,
+    tableContainerRef,
   });
-
-  const tableOptions = useMemo(
-    () => ({
-      data: datasets,
-      columns,
-      state: {
-        sorting,
-        columnVisibility,
-        rowSelection: selection.rowSelection,
-      },
-      onSortingChange: setSorting,
-      onRowSelectionChange: selection.setRowSelection,
-      getCoreRowModel: getCoreRowModel(),
-      getRowId: (row: (typeof datasets)[0]) => row.id.toString(),
-      autoResetRowSelection: false,
-    }),
-    [
-      datasets,
-      columns,
-      sorting,
-      columnVisibility,
-      selection.rowSelection,
-      selection.setRowSelection,
-      setSorting,
-    ],
-  );
-
-  const table = useReactTable(tableOptions);
-  tableRef.current = table;
-  const { rows } = table.getRowModel();
-  const visibleColumnCount = table.getVisibleLeafColumns().length;
 
   const deleteFlow = useDatasetDeleteFlow({
     deleteDatasets,
     isDeleting,
     selectedDatasetId,
     onDatasetSelected,
-    setRowSelection: selection.setRowSelection,
+    setRowSelection: controller.setRowSelection,
     notify: toast,
   });
-
-  const virtualItems = rowVirtualizer.getVirtualItems();
-
-  useEffect(() => {
-    const last = virtualItems.at(-1);
-    if (!last) {
-      return;
-    }
-
-    if (hasMore && last.index >= rows.length - 10) {
-      void loadNextPage();
-    }
-  }, [hasMore, loadNextPage, rows.length, virtualItems]);
-
-  const virtualPaddingTop =
-    virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
-  const virtualPaddingBottom =
-    virtualItems.length > 0
-      ? rowVirtualizer.getTotalSize() -
-        (virtualItems[virtualItems.length - 1]?.end ?? 0)
-      : 0;
 
   return (
     <TooltipProvider>
       <div className="flex h-full min-h-0 flex-col bg-background">
         <DatasetTableToolbar
-          table={table}
+          table={controller.table}
           hasActiveFilters={hasActiveFilters}
           selectedTags={selectedTags}
           selectedStatuses={selectedStatuses}
@@ -184,7 +122,7 @@ export function DatasetTable({
         >
           <Table withContainer={false}>
             <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
-              {table.getHeaderGroups().map((headerGroup) => (
+              {controller.table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <TableHead
@@ -204,19 +142,19 @@ export function DatasetTable({
               ))}
             </TableHeader>
             <DatasetTableBody
-              table={table}
-              rows={rows}
-              visibleColumnCount={visibleColumnCount}
-              virtualItems={virtualItems}
-              virtualPaddingTop={virtualPaddingTop}
-              virtualPaddingBottom={virtualPaddingBottom}
+              table={controller.table}
+              rows={controller.rows}
+              visibleColumnCount={controller.visibleColumnCount}
+              virtualItems={controller.virtualItems}
+              virtualPaddingTop={controller.virtualPaddingTop}
+              virtualPaddingBottom={controller.virtualPaddingBottom}
               selectedDatasetId={selectedDatasetId}
               allTags={allTags}
               isUpdatingTags={isUpdatingTags}
-              registerRowElement={selection.registerRowElement}
-              handleRowPointerDown={selection.handleRowPointerDown}
-              handleRowPointerEnter={selection.handleRowPointerEnter}
-              handleRowKeyDown={selection.handleRowKeyDown}
+              registerRowElement={controller.registerRowElement}
+              handleRowPointerDown={controller.handleRowPointerDown}
+              handleRowPointerEnter={controller.handleRowPointerEnter}
+              handleRowKeyDown={controller.handleRowKeyDown}
               onDatasetSelected={onDatasetSelected}
               openDeleteDialog={deleteFlow.openDeleteDialog}
               batchAddTags={batchAddTags}

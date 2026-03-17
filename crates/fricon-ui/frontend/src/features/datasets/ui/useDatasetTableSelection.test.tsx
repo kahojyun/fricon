@@ -52,7 +52,7 @@ describe("useDatasetTableSelection", () => {
 
     const { result } = renderHook(() =>
       useDatasetTableSelection({
-        getRows: () => rows,
+        rows,
         rowVirtualizer: { measureElement, scrollToIndex },
         onDatasetSelected,
       }),
@@ -81,7 +81,7 @@ describe("useDatasetTableSelection", () => {
 
     const { result } = renderHook(() =>
       useDatasetTableSelection({
-        getRows: () => rows,
+        rows,
         rowVirtualizer: {
           measureElement: vi.fn(),
           scrollToIndex: vi.fn(),
@@ -146,5 +146,44 @@ describe("useDatasetTableSelection", () => {
       "4": true,
     });
     expect(onDatasetSelected).toHaveBeenLastCalledWith(2);
+  });
+
+  it("uses the latest visible row order after rerender", () => {
+    const onDatasetSelected = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ rows }) =>
+        useDatasetTableSelection({
+          rows,
+          rowVirtualizer: {
+            measureElement: vi.fn(),
+            scrollToIndex: vi.fn(),
+          },
+          onDatasetSelected,
+        }),
+      {
+        initialProps: {
+          rows: createRows(),
+        },
+      },
+    );
+
+    rerender({
+      rows: [
+        { id: "4", original: { id: 4 } },
+        { id: "3", original: { id: 3 } },
+        { id: "2", original: { id: 2 } },
+        { id: "1", original: { id: 1 } },
+      ],
+    });
+
+    act(() => {
+      result.current.handleRowKeyDown(
+        createKeyboardEvent("ArrowDown", document.createElement("tr")),
+        0,
+      );
+    });
+
+    expect(onDatasetSelected).toHaveBeenLastCalledWith(3);
+    expect(result.current.rowSelection).toEqual({ "3": true });
   });
 });
