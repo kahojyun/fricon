@@ -8,6 +8,14 @@ import type { DatasetInfo, ListDatasetsOptions } from "./types";
 type ListDatasetsFn = (options?: ListDatasetsOptions) => Promise<DatasetInfo[]>;
 type ListDatasetTagsFn = () => Promise<string[]>;
 type UpdateDatasetFavoriteFn = (id: number, favorite: boolean) => Promise<void>;
+type DeleteTagFn = (tag: string) => Promise<void>;
+type RenameTagFn = (oldName: string, newName: string) => Promise<void>;
+type MergeTagFn = (source: string, target: string) => Promise<void>;
+type BatchUpdateDatasetTagsFn = (
+  ids: number[],
+  addTags: string[],
+  removeTags: string[],
+) => Promise<unknown[]>;
 type DatasetEventListenerFn = (
   callback: (event: DatasetInfo) => void,
 ) => Promise<() => void>;
@@ -15,6 +23,10 @@ type DatasetEventListenerFn = (
 const listDatasetsMock = vi.fn<ListDatasetsFn>();
 const listDatasetTagsMock = vi.fn<ListDatasetTagsFn>();
 const updateDatasetFavoriteMock = vi.fn<UpdateDatasetFavoriteFn>();
+const deleteTagMock = vi.fn<DeleteTagFn>();
+const renameTagMock = vi.fn<RenameTagFn>();
+const mergeTagMock = vi.fn<MergeTagFn>();
+const batchUpdateDatasetTagsMock = vi.fn<BatchUpdateDatasetTagsFn>();
 const onDatasetCreatedMock = vi.fn<DatasetEventListenerFn>();
 const onDatasetUpdatedMock = vi.fn<DatasetEventListenerFn>();
 
@@ -23,6 +35,15 @@ vi.mock("./client", () => ({
   listDatasetTags: () => listDatasetTagsMock(),
   updateDatasetFavorite: (id: number, favorite: boolean) =>
     updateDatasetFavoriteMock(id, favorite),
+  deleteTag: (tag: string) => deleteTagMock(tag),
+  renameTag: (oldName: string, newName: string) =>
+    renameTagMock(oldName, newName),
+  mergeTag: (source: string, target: string) => mergeTagMock(source, target),
+  batchUpdateDatasetTags: (
+    ids: number[],
+    addTags: string[],
+    removeTags: string[],
+  ) => batchUpdateDatasetTagsMock(ids, addTags, removeTags),
 }));
 
 vi.mock("./events", () => ({
@@ -77,12 +98,20 @@ describe("useDatasetTableData", () => {
     listDatasetsMock.mockReset();
     listDatasetTagsMock.mockReset();
     updateDatasetFavoriteMock.mockReset();
+    deleteTagMock.mockReset();
+    renameTagMock.mockReset();
+    mergeTagMock.mockReset();
+    batchUpdateDatasetTagsMock.mockReset();
     onDatasetCreatedMock.mockReset();
     onDatasetUpdatedMock.mockReset();
 
     listDatasetsMock.mockResolvedValue([]);
     listDatasetTagsMock.mockResolvedValue([]);
     updateDatasetFavoriteMock.mockResolvedValue(undefined);
+    deleteTagMock.mockResolvedValue(undefined);
+    renameTagMock.mockResolvedValue(undefined);
+    mergeTagMock.mockResolvedValue(undefined);
+    batchUpdateDatasetTagsMock.mockResolvedValue([]);
     onDatasetCreatedMock.mockResolvedValue(() => undefined);
     onDatasetUpdatedMock.mockResolvedValue(() => undefined);
   });
@@ -445,6 +474,69 @@ describe("useDatasetTableData", () => {
 
     expect(updateDatasetFavoriteMock).toHaveBeenCalledWith(11, false);
     expect(result.current.datasets[0]?.favorite).toBe(true);
+  });
+
+  it("removes a deleted tag from selected tags", async () => {
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      result.current.handleTagToggle("vision");
+    });
+
+    await act(async () => {
+      await result.current.deleteTag("vision");
+    });
+
+    expect(deleteTagMock).toHaveBeenCalledWith("vision");
+    expect(result.current.selectedTags).toEqual([]);
+  });
+
+  it("replaces a selected tag after rename", async () => {
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      result.current.handleTagToggle("vision");
+    });
+
+    await act(async () => {
+      await result.current.renameTag("vision", "images");
+    });
+
+    expect(renameTagMock).toHaveBeenCalledWith("vision", "images");
+    expect(result.current.selectedTags).toEqual(["images"]);
+  });
+
+  it("replaces a selected source tag with the merge target", async () => {
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      result.current.handleTagToggle("vision");
+    });
+
+    await act(async () => {
+      await result.current.mergeTag("vision", "images");
+    });
+
+    expect(mergeTagMock).toHaveBeenCalledWith("vision", "images");
+    expect(result.current.selectedTags).toEqual(["images"]);
   });
 
   it("cleans up late-resolving listeners after unmount", async () => {

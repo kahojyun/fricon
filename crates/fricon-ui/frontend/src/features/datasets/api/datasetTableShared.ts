@@ -91,13 +91,10 @@ export interface UseDatasetTableDataResult {
   setSearchQuery: (next: string) => void;
   selectedTags: string[];
   selectedStatuses: DatasetStatus[];
-  tagFilterQuery: string;
-  setTagFilterQuery: (next: string) => void;
   sorting: SortingState;
   setSorting: (
     updater: SortingState | ((prev: SortingState) => SortingState),
   ) => void;
-  filteredTagOptions: string[];
   allTags: string[];
   favoriteOnly: boolean;
   setFavoriteOnly: (next: boolean) => void;

@@ -64,11 +64,8 @@ export function DatasetTable({
     setSearchQuery,
     selectedTags,
     selectedStatuses,
-    tagFilterQuery,
-    setTagFilterQuery,
     sorting,
     setSorting,
-    filteredTagOptions,
     allTags,
     favoriteOnly,
     setFavoriteOnly,
@@ -479,13 +476,10 @@ export function DatasetTable({
           selectedStatuses={selectedStatuses}
           favoriteOnly={favoriteOnly}
           searchQuery={searchQuery}
-          tagFilterQuery={tagFilterQuery}
-          filteredTagOptions={filteredTagOptions}
           allTags={allTags}
           isUpdatingTags={isUpdatingTags}
           setFavoriteOnly={setFavoriteOnly}
           setSearchQuery={setSearchQuery}
-          setTagFilterQuery={setTagFilterQuery}
           handleTagToggle={handleTagToggle}
           handleStatusToggle={handleStatusToggle}
           clearFilters={clearFilters}

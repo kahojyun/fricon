@@ -33,19 +33,27 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   const {
     batchAddTags,
     batchRemoveTags,
-    deleteTag,
-    renameTag,
-    mergeTag,
+    deleteTag: deleteTagMutation,
+    renameTag: renameTagMutation,
+    mergeTag: mergeTagMutation,
     isUpdatingTags,
   } = useDatasetTagMutation(refreshDatasets);
 
   const allTags = tagsQuery.data ?? [];
-  const normalizedTagFilterQuery = filters.tagFilterQuery.trim().toLowerCase();
-  const filteredTagOptions = normalizedTagFilterQuery
-    ? allTags.filter((tag) =>
-        tag.toLowerCase().includes(normalizedTagFilterQuery),
-      )
-    : allTags;
+  const deleteTag = async (tag: string) => {
+    await deleteTagMutation(tag);
+    filters.removeSelectedTag(tag);
+  };
+
+  const renameTag = async (oldName: string, newName: string) => {
+    await renameTagMutation(oldName, newName);
+    filters.replaceSelectedTag(oldName, newName);
+  };
+
+  const mergeTag = async (source: string, target: string) => {
+    await mergeTagMutation(source, target);
+    filters.replaceSelectedTag(source, target);
+  };
 
   return {
     datasets,
@@ -53,11 +61,8 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     setSearchQuery: filters.setSearchQuery,
     selectedTags: filters.selectedTags,
     selectedStatuses: filters.selectedStatuses,
-    tagFilterQuery: filters.tagFilterQuery,
-    setTagFilterQuery: filters.setTagFilterQuery,
     sorting: filters.sorting,
     setSorting: filters.setSorting,
-    filteredTagOptions,
     allTags,
     favoriteOnly: filters.favoriteOnly,
     setFavoriteOnly: filters.setFavoriteOnly,

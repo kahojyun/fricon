@@ -86,7 +86,6 @@ function createMemoryStorage(): Storage {
 
 function mockHookReturn(overrides: Record<string, unknown> = {}) {
   const setSearchQuery = vi.fn();
-  const setTagFilterQuery = vi.fn();
   const setSorting = vi.fn();
   const setFavoriteOnly = vi.fn();
   const toggleFavorite = vi.fn().mockResolvedValue(undefined);
@@ -107,11 +106,8 @@ function mockHookReturn(overrides: Record<string, unknown> = {}) {
     setSearchQuery,
     selectedTags: [],
     selectedStatuses: [],
-    tagFilterQuery: "",
-    setTagFilterQuery,
     sorting: [{ id: "id", desc: true }],
     setSorting,
-    filteredTagOptions: ["vision"],
     allTags: ["vision"],
     favoriteOnly: false,
     setFavoriteOnly,
@@ -186,6 +182,7 @@ describe("DatasetTable", () => {
       value: createMemoryStorage(),
       configurable: true,
     });
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   it("renders rows and selects dataset on row click", async () => {
@@ -327,6 +324,15 @@ describe("DatasetTable", () => {
     await waitFor(() => {
       expect(hook.setSearchQuery).toHaveBeenCalled();
     });
+  });
+
+  it("toggles the favorites-only filter from the toolbar", async () => {
+    const { hook } = renderDatasetTable();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Favorites Only/i }));
+
+    expect(hook.setFavoriteOnly).toHaveBeenCalledWith(true, expect.any(Object));
   });
 
   it("toggles favorite via row action", async () => {
@@ -514,14 +520,29 @@ describe("DatasetTable", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("toggles status filter via popover action", async () => {
+  it("toggles status filter via inline toggle group", async () => {
     const { hook } = renderDatasetTable();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Status/i }));
     await user.click(screen.getByRole("button", { name: /Completed/i }));
 
     expect(hook.handleStatusToggle).toHaveBeenCalledWith("Completed");
+  });
+
+  it("filters tags locally and supports toggling and clearing tag filters", async () => {
+    const { hook } = renderDatasetTable({
+      allTags: ["vision", "audio"],
+      selectedTags: ["vision"],
+    });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Tags/i }));
+    await user.type(screen.getByPlaceholderText("Search tags"), "aud");
+    await user.click(screen.getByText("audio"));
+    await user.click(screen.getByRole("button", { name: /Clear filters/i }));
+
+    expect(hook.handleTagToggle).toHaveBeenCalledWith("audio");
+    expect(hook.handleTagToggle).toHaveBeenCalledWith("vision");
   });
 
   it("deletes a dataset from the context menu and clears selection on success", async () => {
@@ -650,7 +671,7 @@ describe("DatasetTable", () => {
 
   it("clears an active tag filter after deleting that tag from Manage Tags", async () => {
     const deleteTag = vi.fn().mockResolvedValue(undefined);
-    const { hook } = renderDatasetTable({
+    renderDatasetTable({
       selectedTags: ["vision"],
       deleteTag,
     });
@@ -669,6 +690,5 @@ describe("DatasetTable", () => {
     await waitFor(() => {
       expect(deleteTag).toHaveBeenCalledWith("vision");
     });
-    expect(hook.handleTagToggle).toHaveBeenCalledWith("vision");
   });
 });
