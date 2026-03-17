@@ -25,7 +25,7 @@ interface UseDatasetTableControllerArgs {
 }
 
 export function useDatasetTableController({
-  datasets,
+  datasets: visibleDatasets,
   columns,
   sorting,
   setSorting,
@@ -38,7 +38,7 @@ export function useDatasetTableController({
   // TanStack Virtual is an intentional compiler boundary for this hook.
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
-    count: datasets.length,
+    count: visibleDatasets.length,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: () => 36,
     overscan: 8,
@@ -46,13 +46,13 @@ export function useDatasetTableController({
 
   const selectionRows = useMemo(
     () =>
-      // Selection follows the backend-provided visible row order.
+      // Selection assumes the backend already provides the visible row order.
       // This controller does not apply additional client-side row transforms.
-      datasets.map((dataset) => ({
+      visibleDatasets.map((dataset) => ({
         id: dataset.id.toString(),
         original: { id: dataset.id },
       })),
-    [datasets],
+    [visibleDatasets],
   );
 
   const selection = useDatasetTableSelection({
@@ -89,12 +89,12 @@ export function useDatasetTableController({
           }
 
           return Object.fromEntries(
-            datasets.map((dataset) => [dataset.id.toString(), true]),
+            visibleDatasets.map((dataset) => [dataset.id.toString(), true]),
           );
         });
       },
     }),
-    [datasets, setRowSelection],
+    [visibleDatasets, setRowSelection],
   );
 
   const tableColumns = useMemo(
@@ -110,7 +110,7 @@ export function useDatasetTableController({
 
   const tableOptions = useMemo(
     () => ({
-      data: datasets,
+      data: visibleDatasets,
       columns: tableColumns,
       state: {
         sorting,
@@ -125,7 +125,7 @@ export function useDatasetTableController({
       manualSorting: true,
     }),
     [
-      datasets,
+      visibleDatasets,
       tableColumns,
       sorting,
       columnVisibility,

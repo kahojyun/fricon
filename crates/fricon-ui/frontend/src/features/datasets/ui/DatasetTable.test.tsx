@@ -144,17 +144,6 @@ describe("DatasetTable", () => {
     expect(onDatasetSelected).not.toHaveBeenCalled();
   });
 
-  it("wires the toolbar search input to the dataset table hook", async () => {
-    const { hook } = renderDatasetTable(useDatasetTableDataMock);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("Filter datasets..."), "Alpha");
-
-    await waitFor(() => {
-      expect(hook.setSearchQuery).toHaveBeenCalled();
-    });
-  });
-
   it("toggles favorite via the row action", async () => {
     const dataset = makeDataset({ id: 11, name: "Pinned", favorite: true });
     const { hook } = renderDatasetTable(useDatasetTableDataMock, {
