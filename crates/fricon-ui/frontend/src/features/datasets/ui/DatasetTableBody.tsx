@@ -1,20 +1,7 @@
-import { flexRender, type Row, type Table } from "@tanstack/react-table";
+import { flexRender, type Row } from "@tanstack/react-table";
 import type { DatasetDeleteResult, DatasetInfo } from "../api/types";
-import { DatasetRowTagMenus } from "./DatasetTableTagMenu";
-import {
-  deriveDatasetTagMenuTarget,
-  runDatasetTagMutation,
-} from "../model/datasetTableTagMenuLogic";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/shared/ui/context-menu";
+import { DatasetTableRowActions } from "./DatasetTableRowActions";
 import { TableBody, TableCell, TableRow } from "@/shared/ui/table";
-import { Trash2 } from "lucide-react";
-import { toast } from "sonner";
 
 interface VirtualRowLike {
   index: number;
@@ -23,8 +10,8 @@ interface VirtualRowLike {
 }
 
 interface DatasetTableBodyProps {
-  table: Table<DatasetInfo>;
   rows: Row<DatasetInfo>[];
+  rowSelection: Record<string, boolean>;
   visibleColumnCount: number;
   virtualItems: VirtualRowLike[];
   virtualPaddingTop: number;
@@ -60,8 +47,8 @@ interface DatasetTableBodyProps {
 }
 
 export function DatasetTableBody({
-  table,
   rows,
+  rowSelection,
   visibleColumnCount,
   virtualItems,
   virtualPaddingTop,
@@ -78,24 +65,9 @@ export function DatasetTableBody({
   batchAddTags,
   batchRemoveTags,
 }: DatasetTableBodyProps) {
-  const selectedRows = table.getFilteredSelectedRowModel().rows;
-  const selectedDatasets = selectedRows.map((row) => row.original);
-  const selectedCount = selectedRows.length;
-
-  const handleBatchTagMutation = async (
-    operation: "add" | "remove",
-    targetIds: number[],
-    tag: string,
-  ) => {
-    await runDatasetTagMutation({
-      operation,
-      targetIds,
-      tag,
-      batchAddTags,
-      batchRemoveTags,
-      notify: toast,
-    });
-  };
+  const selectedDatasets = rows
+    .filter((row) => rowSelection[row.id])
+    .map((row) => row.original);
 
   return (
     <TableBody>
@@ -124,101 +96,51 @@ export function DatasetTableBody({
 
             const dataset = row.original;
             const isSelected = dataset.id === selectedDatasetId;
-            const isRowSelected = row.getIsSelected();
-            const target = deriveDatasetTagMenuTarget(
-              dataset,
-              selectedDatasets,
-            );
+            const isRowSelected = !!rowSelection[row.id];
 
             return (
-              <ContextMenu key={row.id}>
-                <ContextMenuTrigger
-                  render={
-                    <TableRow
-                      data-state={
-                        (isSelected && "selected") ||
-                        (isRowSelected && "selected")
-                      }
-                      ref={(element) => registerRowElement(row.id, element)}
-                      data-index={virtualRow.index}
-                      className="cursor-pointer select-none"
-                      onPointerDown={(event) =>
-                        handleRowPointerDown(
-                          event,
-                          virtualRow.index,
-                          row.id,
-                          dataset.id,
-                        )
-                      }
-                      onPointerEnter={() =>
-                        handleRowPointerEnter(virtualRow.index)
-                      }
-                      onKeyDown={(event) =>
-                        handleRowKeyDown(event, virtualRow.index)
-                      }
-                      tabIndex={0}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
+              <DatasetTableRowActions
+                key={row.id}
+                dataset={dataset}
+                selectedDatasets={selectedDatasets}
+                allTags={allTags}
+                isUpdatingTags={isUpdatingTags}
+                onDatasetSelected={onDatasetSelected}
+                openDeleteDialog={openDeleteDialog}
+                batchAddTags={batchAddTags}
+                batchRemoveTags={batchRemoveTags}
+              >
+                <TableRow
+                  data-state={
+                    (isSelected && "selected") || (isRowSelected && "selected")
                   }
-                />
-                <ContextMenuContent className="w-64">
-                  <ContextMenuItem
-                    onClick={() => onDatasetSelected(dataset.id)}
-                  >
-                    View Details
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <DatasetRowTagMenus
-                    allTags={allTags}
-                    isUpdatingTags={isUpdatingTags}
-                    target={target}
-                    onAddTag={(tag) => {
-                      void handleBatchTagMutation("add", target.targetIds, tag);
-                    }}
-                    onRemoveTag={(tag) => {
-                      void handleBatchTagMutation(
-                        "remove",
-                        target.targetIds,
-                        tag,
-                      );
-                    }}
-                  />
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    variant="destructive"
-                    onClick={() => openDeleteDialog([dataset.id])}
-                  >
-                    <Trash2 data-icon="inline-start" />
-                    Delete
-                  </ContextMenuItem>
-                  {selectedCount > 1 &&
-                    selectedRows.some(
-                      (selectedRow) => selectedRow.original.id === dataset.id,
-                    ) && (
-                      <ContextMenuItem
-                        variant="destructive"
-                        onClick={() =>
-                          openDeleteDialog(
-                            selectedRows.map(
-                              (selectedRow) => selectedRow.original.id,
-                            ),
-                          )
-                        }
-                      >
-                        <Trash2 data-icon="inline-start" />
-                        Delete Selected ({selectedCount})
-                      </ContextMenuItem>
-                    )}
-                </ContextMenuContent>
-              </ContextMenu>
+                  ref={(element) => registerRowElement(row.id, element)}
+                  data-index={virtualRow.index}
+                  className="cursor-pointer select-none"
+                  onPointerDown={(event) =>
+                    handleRowPointerDown(
+                      event,
+                      virtualRow.index,
+                      row.id,
+                      dataset.id,
+                    )
+                  }
+                  onPointerEnter={() => handleRowPointerEnter(virtualRow.index)}
+                  onKeyDown={(event) =>
+                    handleRowKeyDown(event, virtualRow.index)
+                  }
+                  tabIndex={0}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </DatasetTableRowActions>
             );
           })}
           {virtualPaddingBottom > 0 && (

@@ -50,7 +50,6 @@ describe("useDatasetColumnVisibility", () => {
     );
 
     expect(result.current.columnVisibility).toMatchObject({
-      select: true,
       favorite: true,
       id: true,
       name: true,

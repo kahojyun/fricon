@@ -240,6 +240,10 @@ describe("DatasetTable", () => {
     const [firstCheckbox, secondCheckbox] = rowCheckboxes;
     await user.click(firstCheckbox);
     await user.click(secondCheckbox);
+    await waitFor(() => {
+      expect(firstCheckbox).toBeChecked();
+      expect(secondCheckbox).toBeChecked();
+    });
 
     const menu = await openRowContextMenu("Delete fails");
     await user.click(
@@ -275,6 +279,10 @@ describe("DatasetTable", () => {
     const checkboxes = screen.getAllByLabelText("Select row");
     await user.click(checkboxes[0]);
     await user.click(checkboxes[1]);
+    await waitFor(() => {
+      expect(checkboxes[0]).toBeChecked();
+      expect(checkboxes[1]).toBeChecked();
+    });
 
     const menu = await openRowContextMenu("Dataset B");
     expect(within(menu).getByText(/Add Tags \(2\)/i)).toBeInTheDocument();

@@ -58,7 +58,7 @@ export function DatasetTable({
     isUpdatingTags,
   } = useDatasetTableData();
 
-  const columns = useMemo(
+  const dataColumns = useMemo(
     () => createDatasetColumns({ toggleFavorite }),
     [toggleFavorite],
   );
@@ -68,12 +68,12 @@ export function DatasetTable({
     resetColumnVisibilityToDefault,
     showAllColumns,
     handleColumnVisibilityChange,
-  } = useDatasetColumnVisibility(columns);
+  } = useDatasetColumnVisibility(dataColumns);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const controller = useDatasetTableController({
     datasets,
-    columns,
+    columns: dataColumns,
     sorting,
     setSorting,
     columnVisibility,
@@ -142,8 +142,8 @@ export function DatasetTable({
               ))}
             </TableHeader>
             <DatasetTableBody
-              table={controller.table}
               rows={controller.rows}
+              rowSelection={controller.rowSelection}
               visibleColumnCount={controller.visibleColumnCount}
               virtualItems={controller.virtualItems}
               virtualPaddingTop={controller.virtualPaddingTop}

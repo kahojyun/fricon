@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { DatasetInfo } from "../api/types";
+import { createDatasetSelectionColumn } from "./DatasetTableColumns";
 import { useDatasetTableSelection } from "./useDatasetTableSelection";
 
 interface UseDatasetTableControllerArgs {
@@ -59,30 +60,76 @@ export function useDatasetTableController({
     rowVirtualizer,
     onDatasetSelected,
   });
+  const {
+    rowSelection,
+    setRowSelection,
+    registerRowElement,
+    handleRowPointerDown,
+    handleRowPointerEnter,
+    handleRowKeyDown,
+  } = selection;
+
+  const selectionActions = useMemo(
+    () => ({
+      toggleDatasetRowSelected: (rowId: string, isSelected: boolean) => {
+        setRowSelection((previous) => {
+          const nextSelection = { ...previous };
+          if (isSelected) {
+            nextSelection[rowId] = true;
+          } else {
+            delete nextSelection[rowId];
+          }
+          return nextSelection;
+        });
+      },
+      toggleAllDatasetRowsSelected: (isSelected: boolean) => {
+        setRowSelection(() => {
+          if (!isSelected) {
+            return {};
+          }
+
+          return Object.fromEntries(
+            datasets.map((dataset) => [dataset.id.toString(), true]),
+          );
+        });
+      },
+    }),
+    [datasets, setRowSelection],
+  );
+
+  const tableColumns = useMemo(
+    () => [
+      createDatasetSelectionColumn({
+        toggleRowSelected: selectionActions.toggleDatasetRowSelected,
+        toggleAllRowsSelected: selectionActions.toggleAllDatasetRowsSelected,
+      }),
+      ...columns,
+    ],
+    [columns, selectionActions],
+  );
 
   const tableOptions = useMemo(
     () => ({
       data: datasets,
-      columns,
+      columns: tableColumns,
       state: {
         sorting,
         columnVisibility,
-        rowSelection: selection.rowSelection,
+        rowSelection,
       },
       onSortingChange: setSorting,
-      onRowSelectionChange: selection.setRowSelection,
       getCoreRowModel: getCoreRowModel(),
       getRowId: (row: DatasetInfo) => row.id.toString(),
-      manualSorting: true,
+      enableRowSelection: true,
       autoResetRowSelection: false,
+      manualSorting: true,
     }),
     [
       datasets,
-      columns,
+      tableColumns,
       sorting,
       columnVisibility,
-      selection.rowSelection,
-      selection.setRowSelection,
+      rowSelection,
       setSorting,
     ],
   );
@@ -118,11 +165,11 @@ export function useDatasetTableController({
     virtualItems,
     virtualPaddingTop,
     virtualPaddingBottom,
-    rowSelection: selection.rowSelection,
-    setRowSelection: selection.setRowSelection,
-    registerRowElement: selection.registerRowElement,
-    handleRowPointerDown: selection.handleRowPointerDown,
-    handleRowPointerEnter: selection.handleRowPointerEnter,
-    handleRowKeyDown: selection.handleRowKeyDown,
+    rowSelection,
+    setRowSelection,
+    registerRowElement,
+    handleRowPointerDown,
+    handleRowPointerEnter,
+    handleRowKeyDown,
   };
 }
