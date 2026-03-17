@@ -1,18 +1,18 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DatasetInfo } from "../api/types";
 import { useDatasetTableData } from "../api/useDatasetTableData";
-import { DatasetTable } from "./DatasetTable";
+import {
+  COLUMN_VISIBILITY_STORAGE_KEY,
+  createMemoryStorage,
+  getRowByText,
+  makeDataset,
+  openColumnsMenu,
+  openRowContextMenu,
+  renderDatasetTable,
+  toggleColumn,
+} from "./test-utils";
 
-const COLUMN_VISIBILITY_STORAGE_KEY = "fricon.datasetTable.columnVisibility.v1";
 const { toastSuccess, toastError, toastWarning } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -45,132 +45,7 @@ vi.mock("@tanstack/react-virtual", () => ({
   }),
 }));
 
-function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
-  return {
-    id: 1,
-    name: "Dataset 1",
-    description: "desc",
-    favorite: false,
-    tags: ["vision"],
-    status: "Completed",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    ...overrides,
-  };
-}
-
 const useDatasetTableDataMock = vi.mocked(useDatasetTableData);
-
-function createMemoryStorage(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key: string) {
-      return store.get(key) ?? null;
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string) {
-      store.delete(key);
-    },
-    setItem(key: string, value: string) {
-      store.set(key, value);
-    },
-  };
-}
-
-function mockHookReturn(overrides: Record<string, unknown> = {}) {
-  const setSearchQuery = vi.fn();
-  const setSorting = vi.fn();
-  const setFavoriteOnly = vi.fn();
-  const toggleFavorite = vi.fn().mockResolvedValue(undefined);
-  const handleTagToggle = vi.fn();
-  const handleStatusToggle = vi.fn();
-  const clearFilters = vi.fn();
-  const loadNextPage = vi.fn().mockResolvedValue(undefined);
-  const deleteDatasets = vi.fn().mockResolvedValue(undefined);
-  const batchAddTags = vi.fn().mockResolvedValue([]);
-  const batchRemoveTags = vi.fn().mockResolvedValue([]);
-  const deleteTag = vi.fn().mockResolvedValue(undefined);
-  const renameTag = vi.fn().mockResolvedValue(undefined);
-  const mergeTag = vi.fn().mockResolvedValue(undefined);
-
-  const value = {
-    datasets: [makeDataset()],
-    searchQuery: "",
-    setSearchQuery,
-    selectedTags: [],
-    selectedStatuses: [],
-    sorting: [{ id: "id", desc: true }],
-    setSorting,
-    allTags: ["vision"],
-    favoriteOnly: false,
-    setFavoriteOnly,
-    hasMore: false,
-    hasActiveFilters: false,
-    toggleFavorite,
-    deleteDatasets,
-    isDeleting: false,
-    batchAddTags,
-    batchRemoveTags,
-    deleteTag,
-    renameTag,
-    mergeTag,
-    isUpdatingTags: false,
-    handleTagToggle,
-    handleStatusToggle,
-    clearFilters,
-    loadNextPage,
-    ...overrides,
-  };
-
-  useDatasetTableDataMock.mockReturnValue(
-    value as ReturnType<typeof useDatasetTableData>,
-  );
-  return value;
-}
-
-function renderDatasetTable(overrides: Record<string, unknown> = {}) {
-  const hook = mockHookReturn(overrides);
-  const onDatasetSelected = vi.fn();
-  render(<DatasetTable onDatasetSelected={onDatasetSelected} />);
-  return { hook, onDatasetSelected };
-}
-
-function getRowByText(text: string) {
-  const row = screen.getByText(text).closest("tr");
-  if (!(row instanceof HTMLElement)) {
-    throw new Error(`Row not found for text: ${text}`);
-  }
-  return row;
-}
-
-async function openRowContextMenu(name: string) {
-  const row = screen.getByText(name).closest("tr");
-  expect(row).not.toBeNull();
-  fireEvent.contextMenu(row!);
-  const menus = await screen.findAllByRole("menu");
-  return menus.at(-1)!;
-}
-
-async function openColumnsMenu(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /View/i }));
-  const menus = await screen.findAllByRole("menu");
-  return menus.at(-1)!;
-}
-
-async function toggleColumn(
-  user: ReturnType<typeof userEvent.setup>,
-  label: string,
-) {
-  const menu = await openColumnsMenu(user);
-  fireEvent.click(within(menu).getByRole("menuitemcheckbox", { name: label }));
-}
 
 describe("DatasetTable", () => {
   beforeEach(() => {
@@ -186,7 +61,7 @@ describe("DatasetTable", () => {
   });
 
   it("renders rows and selects dataset on row click", async () => {
-    const { onDatasetSelected } = renderDatasetTable();
+    const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock);
     const user = userEvent.setup();
 
     await user.click(screen.getByText("Dataset 1"));
@@ -195,13 +70,13 @@ describe("DatasetTable", () => {
   });
 
   it("moves selection down with ArrowDown and focuses the next row", async () => {
-    const user = userEvent.setup();
-    const { onDatasetSelected } = renderDatasetTable({
+    const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [
         makeDataset({ id: 1, name: "Dataset 1" }),
         makeDataset({ id: 2, name: "Dataset 2" }),
       ],
     });
+    const user = userEvent.setup();
 
     const firstRow = getRowByText("Dataset 1");
     const secondRow = getRowByText("Dataset 2");
@@ -218,13 +93,13 @@ describe("DatasetTable", () => {
   });
 
   it("moves selection up with ArrowUp and stops at table boundaries", async () => {
-    const user = userEvent.setup();
-    const { onDatasetSelected } = renderDatasetTable({
+    const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [
         makeDataset({ id: 1, name: "Dataset 1" }),
         makeDataset({ id: 2, name: "Dataset 2" }),
       ],
     });
+    const user = userEvent.setup();
 
     const firstRow = getRowByText("Dataset 1");
     const secondRow = getRowByText("Dataset 2");
@@ -250,10 +125,10 @@ describe("DatasetTable", () => {
   });
 
   it("keeps Enter and Space row activation working from the keyboard", async () => {
-    const user = userEvent.setup();
-    const { onDatasetSelected } = renderDatasetTable({
+    const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [makeDataset({ id: 7, name: "Dataset 7" })],
     });
+    const user = userEvent.setup();
 
     const row = getRowByText("Dataset 7");
     row.focus();
@@ -268,13 +143,13 @@ describe("DatasetTable", () => {
   });
 
   it("keeps existing multi-row selection when activating a row from the keyboard", async () => {
-    const user = userEvent.setup();
-    const { onDatasetSelected } = renderDatasetTable({
+    const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [
         makeDataset({ id: 1, name: "Dataset 1" }),
         makeDataset({ id: 2, name: "Dataset 2" }),
       ],
     });
+    const user = userEvent.setup();
 
     const rowCheckboxes = screen.getAllByLabelText("Select row");
     await user.click(rowCheckboxes[0]);
@@ -290,11 +165,14 @@ describe("DatasetTable", () => {
   });
 
   it("keeps keyboard activation working for interactive controls inside a row", async () => {
-    const user = userEvent.setup();
     const dataset = makeDataset({ id: 11, name: "Dataset 11" });
-    const { hook, onDatasetSelected } = renderDatasetTable({
-      datasets: [dataset],
-    });
+    const { hook, onDatasetSelected } = renderDatasetTable(
+      useDatasetTableDataMock,
+      {
+        datasets: [dataset],
+      },
+    );
+    const user = userEvent.setup();
 
     const checkbox = screen.getByLabelText("Select row");
     act(() => {
@@ -315,8 +193,8 @@ describe("DatasetTable", () => {
     expect(onDatasetSelected).not.toHaveBeenCalled();
   });
 
-  it("updates search query from input", async () => {
-    const { hook } = renderDatasetTable();
+  it("wires the toolbar search input to the dataset table hook", async () => {
+    const { hook } = renderDatasetTable(useDatasetTableDataMock);
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText("Filter datasets..."), "Alpha");
@@ -326,18 +204,9 @@ describe("DatasetTable", () => {
     });
   });
 
-  it("toggles the favorites-only filter from the toolbar", async () => {
-    const { hook } = renderDatasetTable();
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: /Favorites Only/i }));
-
-    expect(hook.setFavoriteOnly).toHaveBeenCalledWith(true, expect.any(Object));
-  });
-
   it("toggles favorite via row action", async () => {
     const dataset = makeDataset({ id: 11, name: "Pinned", favorite: true });
-    const { hook } = renderDatasetTable({
+    const { hook } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [dataset],
       favoriteOnly: true,
     });
@@ -349,7 +218,7 @@ describe("DatasetTable", () => {
   });
 
   it("exposes full dataset name on hover while using truncated cell text", () => {
-    mockHookReturn({
+    renderDatasetTable(useDatasetTableDataMock, {
       datasets: [
         makeDataset({
           id: 21,
@@ -357,8 +226,6 @@ describe("DatasetTable", () => {
         }),
       ],
     });
-
-    render(<DatasetTable onDatasetSelected={vi.fn()} />);
 
     const nameCell = screen
       .getByText("A very long dataset name for hover preview validation")
@@ -369,21 +236,8 @@ describe("DatasetTable", () => {
     );
   });
 
-  it("uses clear filters action from hook", async () => {
-    const { hook } = renderDatasetTable({
-      hasActiveFilters: true,
-      selectedTags: ["vision"],
-      searchQuery: "Alpha",
-    });
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "Reset" }));
-
-    expect(hook.clearFilters).toHaveBeenCalledTimes(1);
-  });
-
   it("triggers backend sorting state when clicking sortable header", async () => {
-    const { hook } = renderDatasetTable();
+    const { hook } = renderDatasetTable(useDatasetTableDataMock);
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /^ID/ }));
@@ -392,66 +246,15 @@ describe("DatasetTable", () => {
   });
 
   it("uses compact column visibility defaults on first render", () => {
-    renderDatasetTable();
+    renderDatasetTable(useDatasetTableDataMock);
 
-    expect(
-      screen.getByRole("columnheader", { name: /^ID/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^ID/ })).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: /^Name/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: /^Status/ }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("columnheader", { name: /^Tags/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("columnheader", { name: /^Created At/ }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("allows toggling column visibility and keeps name required", async () => {
-    renderDatasetTable();
-    const user = userEvent.setup();
-
-    const menu = await openColumnsMenu(user);
-
-    const nameCheckbox = within(menu).getByRole("menuitemcheckbox", {
-      name: "Name",
-    });
-    expect(nameCheckbox).toHaveAttribute("aria-disabled", "true");
-    expect(
-      screen.getByRole("columnheader", { name: /^Name/ }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      within(menu).getByRole("menuitemcheckbox", { name: "Tags" }),
-    );
-    expect(
-      screen.getByRole("columnheader", { name: /^Tags/ }),
-    ).toBeInTheDocument();
-  });
-
-  it("supports show all and reset default column actions", async () => {
-    renderDatasetTable();
-    const user = userEvent.setup();
-
-    let menu = await openColumnsMenu(user);
-    await user.click(within(menu).getByRole("menuitem", { name: /Show all/i }));
-
-    expect(
-      screen.getByRole("columnheader", { name: /^Tags/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("columnheader", { name: /^Created At/ }),
-    ).toBeInTheDocument();
-
-    menu = await openColumnsMenu(user);
-    await user.click(
-      within(menu).getByRole("menuitem", { name: /Reset default/i }),
-    );
-
     expect(
       screen.queryByRole("columnheader", { name: /^Tags/ }),
     ).not.toBeInTheDocument();
@@ -472,7 +275,8 @@ describe("DatasetTable", () => {
         createdAt: false,
       }),
     );
-    renderDatasetTable();
+
+    renderDatasetTable(useDatasetTableDataMock);
 
     expect(
       screen.getByRole("columnheader", { name: /^Name/ }),
@@ -486,7 +290,7 @@ describe("DatasetTable", () => {
   });
 
   it("persists column visibility changes to localStorage", async () => {
-    renderDatasetTable();
+    renderDatasetTable(useDatasetTableDataMock);
     const user = userEvent.setup();
 
     await toggleColumn(user, "Status");
@@ -497,6 +301,7 @@ describe("DatasetTable", () => {
       const parsed = stored
         ? (JSON.parse(stored) as Record<string, boolean>)
         : {};
+
       expect(parsed.status).toBe(false);
       expect(parsed.name).toBe(true);
     });
@@ -504,11 +309,10 @@ describe("DatasetTable", () => {
 
   it("falls back to defaults when localStorage data is invalid", () => {
     window.localStorage.setItem(COLUMN_VISIBILITY_STORAGE_KEY, "not-json");
-    renderDatasetTable();
 
-    expect(
-      screen.getByRole("columnheader", { name: /^ID/ }),
-    ).toBeInTheDocument();
+    renderDatasetTable(useDatasetTableDataMock);
+
+    expect(screen.getByRole("columnheader", { name: /^ID/ })).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: /^Status/ }),
     ).toBeInTheDocument();
@@ -520,37 +324,12 @@ describe("DatasetTable", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("toggles status filter via inline toggle group", async () => {
-    const { hook } = renderDatasetTable();
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: /Completed/i }));
-
-    expect(hook.handleStatusToggle).toHaveBeenCalledWith("Completed");
-  });
-
-  it("filters tags locally and supports toggling and clearing tag filters", async () => {
-    const { hook } = renderDatasetTable({
-      allTags: ["vision", "audio"],
-      selectedTags: ["vision"],
-    });
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: /Tags/i }));
-    await user.type(screen.getByPlaceholderText("Search tags"), "aud");
-    await user.click(screen.getByText("audio"));
-    await user.click(screen.getByRole("button", { name: /Clear filters/i }));
-
-    expect(hook.handleTagToggle).toHaveBeenCalledWith("audio");
-    expect(hook.handleTagToggle).toHaveBeenCalledWith("vision");
-  });
-
   it("deletes a dataset from the context menu and clears selection on success", async () => {
     const dataset = makeDataset({ id: 11, name: "Delete me" });
     const deleteDatasets = vi
       .fn()
       .mockResolvedValue([{ id: 11, success: true, error: null }]);
-    const { onDatasetSelected } = renderDatasetTable({
+    const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [dataset],
       deleteDatasets,
     });
@@ -585,7 +364,7 @@ describe("DatasetTable", () => {
       { id: 11, success: true, error: null },
       { id: 12, success: false, error: "locked" },
     ]);
-    renderDatasetTable({
+    renderDatasetTable(useDatasetTableDataMock, {
       datasets,
       deleteDatasets,
     });
@@ -619,7 +398,10 @@ describe("DatasetTable", () => {
 
   it("shows Add Tags sub-menu with available tags from the context menu", async () => {
     const dataset = makeDataset({ id: 5, name: "Tagged Dataset", tags: [] });
-    renderDatasetTable({ datasets: [dataset], allTags: ["vision", "audio"] });
+    renderDatasetTable(useDatasetTableDataMock, {
+      datasets: [dataset],
+      allTags: ["vision", "audio"],
+    });
 
     const menu = await openRowContextMenu("Tagged Dataset");
     expect(within(menu).getByText(/Add Tags/i)).toBeInTheDocument();
@@ -627,7 +409,10 @@ describe("DatasetTable", () => {
 
   it("shows Remove Tags sub-menu only when target datasets have tags", async () => {
     const dataset = makeDataset({ id: 7, name: "Has Tags", tags: ["vision"] });
-    renderDatasetTable({ datasets: [dataset], allTags: ["vision"] });
+    renderDatasetTable(useDatasetTableDataMock, {
+      datasets: [dataset],
+      allTags: ["vision"],
+    });
 
     const menu = await openRowContextMenu("Has Tags");
     expect(within(menu).getByText(/Remove Tags/i)).toBeInTheDocument();
@@ -635,7 +420,10 @@ describe("DatasetTable", () => {
 
   it("does not show Remove Tags sub-menu when target datasets have no tags", async () => {
     const dataset = makeDataset({ id: 8, name: "No Tags", tags: [] });
-    renderDatasetTable({ datasets: [dataset], allTags: ["vision"] });
+    renderDatasetTable(useDatasetTableDataMock, {
+      datasets: [dataset],
+      allTags: ["vision"],
+    });
 
     const menu = await openRowContextMenu("No Tags");
     expect(within(menu).queryByText(/Remove Tags/i)).not.toBeInTheDocument();
@@ -646,7 +434,10 @@ describe("DatasetTable", () => {
       makeDataset({ id: 10, name: "Dataset A", tags: [] }),
       makeDataset({ id: 11, name: "Dataset B", tags: [] }),
     ];
-    renderDatasetTable({ datasets, allTags: ["vision"] });
+    renderDatasetTable(useDatasetTableDataMock, {
+      datasets,
+      allTags: ["vision"],
+    });
     const user = userEvent.setup();
 
     const checkboxes = screen.getAllByLabelText("Select row");
@@ -658,37 +449,14 @@ describe("DatasetTable", () => {
     expect(within(menu).queryByText(/Remove Tags/i)).not.toBeInTheDocument();
   });
 
-  it("shows Manage Tags button inside the Tags filter popover", async () => {
-    renderDatasetTable();
+  it("opens the view menu from the table toolbar", async () => {
+    renderDatasetTable(useDatasetTableDataMock);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Tags/i }));
+    const menu = await openColumnsMenu(user);
 
     expect(
-      await screen.findByRole("button", { name: /Manage Tags/i }),
+      within(menu).getByRole("menuitemcheckbox", { name: "Status" }),
     ).toBeInTheDocument();
-  });
-
-  it("clears an active tag filter after deleting that tag from Manage Tags", async () => {
-    const deleteTag = vi.fn().mockResolvedValue(undefined);
-    renderDatasetTable({
-      selectedTags: ["vision"],
-      deleteTag,
-    });
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: /Tags/i }));
-    await user.click(
-      await screen.findByRole("button", { name: /Manage Tags/i }),
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    await user.click(
-      within(dialog).getByRole("button", { name: /Delete tag vision/i }),
-    );
-
-    await waitFor(() => {
-      expect(deleteTag).toHaveBeenCalledWith("vision");
-    });
   });
 });
