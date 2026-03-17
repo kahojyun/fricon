@@ -248,7 +248,9 @@ describe("DatasetTable", () => {
   it("uses compact column visibility defaults on first render", () => {
     renderDatasetTable(useDatasetTableDataMock);
 
-    expect(screen.getByRole("columnheader", { name: /^ID/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^ID/ }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: /^Name/ }),
     ).toBeInTheDocument();
@@ -312,7 +314,9 @@ describe("DatasetTable", () => {
 
     renderDatasetTable(useDatasetTableDataMock);
 
-    expect(screen.getByRole("columnheader", { name: /^ID/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^ID/ }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: /^Status/ }),
     ).toBeInTheDocument();

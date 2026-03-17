@@ -73,7 +73,10 @@ describe("DatasetTableToolbar", () => {
 
     await user.click(screen.getByRole("button", { name: /Favorites Only/i }));
 
-    expect(props.setFavoriteOnly).toHaveBeenCalledWith(true, expect.any(Object));
+    expect(props.setFavoriteOnly).toHaveBeenCalledWith(
+      true,
+      expect.any(Object),
+    );
   });
 
   it("shows the reset button only when filters are active", () => {
