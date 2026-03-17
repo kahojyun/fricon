@@ -43,7 +43,13 @@ export default defineConfig([
     },
   },
   {
-    files: ["**/*.test.ts", "**/*.test.tsx", "**/src/shared/test/**/*"],
+    files: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-utils.ts",
+      "**/test-utils.tsx",
+      "**/src/shared/test/**/*",
+    ],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -52,6 +58,7 @@ export default defineConfig([
     },
     rules: {
       "@eslint-react/component-hook-factories": "off",
+      "react-refresh/only-export-components": "off",
     },
   },
   {

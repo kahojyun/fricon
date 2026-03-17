@@ -9,6 +9,7 @@
 - The frontend uses vertical feature slices rooted under `src/features/`.
 - Inside `src/features/**`, use relative imports only. Do not import `@/features/**` from another feature.
 - `src/app/**` and `src/routes/**` should consume only feature barrel exports such as `@/features/<feature>`.
+- Test support modules should be named `test-utils.ts` or `test-utils.tsx`, colocated with the tests they support.
 
 ## Generated Files (Do Not Edit Manually)
 

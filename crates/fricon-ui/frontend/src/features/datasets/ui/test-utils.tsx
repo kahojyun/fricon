@@ -7,8 +7,7 @@ import type { DatasetInfo } from "../api/types";
 import type { DatasetColumnMeta } from "../model/datasetColumnMeta";
 import { DatasetTable } from "./DatasetTable";
 
-export const COLUMN_VISIBILITY_STORAGE_KEY =
-  "fricon.datasetTable.columnVisibility.v1";
+export { COLUMN_VISIBILITY_STORAGE_KEY } from "../model/useDatasetColumnVisibility";
 
 export function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
   return {

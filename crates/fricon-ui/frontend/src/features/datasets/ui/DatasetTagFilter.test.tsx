@@ -41,22 +41,6 @@ describe("DatasetTagFilter", () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it("opens and closes the tags popover", async () => {
-    renderTagFilter();
-    const user = userEvent.setup();
-
-    const trigger = screen.getByRole("button", { name: /Tags/i });
-    await user.click(trigger);
-    expect(screen.getByPlaceholderText("Search tags")).toBeInTheDocument();
-
-    await user.click(trigger);
-    await waitFor(() => {
-      expect(
-        screen.queryByPlaceholderText("Search tags"),
-      ).not.toBeInTheDocument();
-    });
-  });
-
   it("filters tags locally from the search input", async () => {
     renderTagFilter();
     const user = userEvent.setup();

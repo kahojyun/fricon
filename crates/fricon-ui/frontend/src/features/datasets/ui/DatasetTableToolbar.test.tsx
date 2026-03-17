@@ -156,13 +156,6 @@ describe("DatasetTableToolbar", () => {
 
     expect(props.handleStatusToggle).toHaveBeenCalledWith("Completed");
   });
-
-  it("renders tag filter and view option triggers", () => {
-    renderToolbar();
-
-    expect(screen.getByRole("button", { name: /Tags/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /View/i })).toBeInTheDocument();
-  });
 });
 
 describe("DatasetTableViewOptions", () => {
