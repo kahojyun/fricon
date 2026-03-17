@@ -2,12 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { listDatasetTags } from "./client";
 import { datasetKeys } from "./queryKeys";
 import { type UseDatasetTableDataResult } from "./datasetTableShared";
-import { useDatasetFavoriteMutation } from "./useDatasetFavoriteMutation";
-import { useDatasetDeleteMutation } from "./useDatasetDeleteMutation";
-import { useDatasetTagMutation } from "./useDatasetTagMutation";
 import { useDatasetTableFilters } from "./useDatasetTableFilters";
 import { useDatasetTableQuery } from "./useDatasetTableQuery";
 import { useDatasetTableRefreshSync } from "./useDatasetTableRefreshSync";
+import { useDatasetTableActions } from "./useDatasetTableActions";
 
 export function useDatasetTableData(): UseDatasetTableDataResult {
   const filters = useDatasetTableFilters();
@@ -24,28 +22,14 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   });
 
   useDatasetTableRefreshSync(datasets, refreshDatasets);
-  const { toggleFavorite } = useDatasetFavoriteMutation(
+  const actions = useDatasetTableActions({
     datasetQueryKey,
     refreshDatasets,
-  );
-  const { deleteDatasets, isDeleting } =
-    useDatasetDeleteMutation(refreshDatasets);
-  const {
-    batchAddTags,
-    batchRemoveTags,
-    deleteTag,
-    renameTag,
-    mergeTag,
-    isUpdatingTags,
-  } = useDatasetTagMutation(refreshDatasets);
+    removeSelectedTag: filters.removeSelectedTag,
+    replaceSelectedTag: filters.replaceSelectedTag,
+  });
 
   const allTags = tagsQuery.data ?? [];
-  const normalizedTagFilterQuery = filters.tagFilterQuery.trim().toLowerCase();
-  const filteredTagOptions = normalizedTagFilterQuery
-    ? allTags.filter((tag) =>
-        tag.toLowerCase().includes(normalizedTagFilterQuery),
-      )
-    : allTags;
 
   return {
     datasets,
@@ -53,25 +37,22 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     setSearchQuery: filters.setSearchQuery,
     selectedTags: filters.selectedTags,
     selectedStatuses: filters.selectedStatuses,
-    tagFilterQuery: filters.tagFilterQuery,
-    setTagFilterQuery: filters.setTagFilterQuery,
     sorting: filters.sorting,
     setSorting: filters.setSorting,
-    filteredTagOptions,
     allTags,
     favoriteOnly: filters.favoriteOnly,
     setFavoriteOnly: filters.setFavoriteOnly,
     hasMore,
     hasActiveFilters: filters.hasActiveFilters,
-    toggleFavorite,
-    deleteDatasets,
-    isDeleting,
-    batchAddTags,
-    batchRemoveTags,
-    deleteTag,
-    renameTag,
-    mergeTag,
-    isUpdatingTags,
+    toggleFavorite: actions.toggleFavorite,
+    deleteDatasets: actions.deleteDatasets,
+    isDeleting: actions.isDeleting,
+    batchAddTags: actions.batchAddTags,
+    batchRemoveTags: actions.batchRemoveTags,
+    deleteTag: actions.deleteTag,
+    renameTag: actions.renameTag,
+    mergeTag: actions.mergeTag,
+    isUpdatingTags: actions.isUpdatingTags,
     handleTagToggle: filters.handleTagToggle,
     handleStatusToggle: filters.handleStatusToggle,
     clearFilters: filters.clearFilters,

@@ -13,8 +13,6 @@ interface DatasetTableFiltersResult {
   selectedStatuses: DatasetStatus[];
   favoriteOnly: boolean;
   setFavoriteOnly: (next: boolean) => void;
-  tagFilterQuery: string;
-  setTagFilterQuery: (next: string) => void;
   sorting: SortingState;
   setSorting: (
     updater: SortingState | ((prev: SortingState) => SortingState),
@@ -24,6 +22,8 @@ interface DatasetTableFiltersResult {
   loadNextPage: () => Promise<void>;
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
+  removeSelectedTag: (tag: string) => void;
+  replaceSelectedTag: (oldName: string, newName: string) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
 }
@@ -35,7 +35,6 @@ export function useDatasetTableFilters(): DatasetTableFiltersResult {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<DatasetStatus[]>([]);
   const [favoriteOnly, setFavoriteOnly] = useState(false);
-  const [tagFilterQuery, setTagFilterQuery] = useState("");
   const [sortingState, setSortingState] =
     useState<SortingState>(DEFAULT_SORTING);
   const [visibleCount, setVisibleCount] = useState(DATASET_PAGE_SIZE);
@@ -104,7 +103,21 @@ export function useDatasetTableFilters(): DatasetTableFiltersResult {
     setSelectedTags([]);
     setSelectedStatuses([]);
     setFavoriteOnly(false);
-    setTagFilterQuery("");
+  };
+
+  const removeSelectedTag = (tag: string) => {
+    setSelectedTags((prev) => prev.filter((item) => item !== tag));
+  };
+
+  const replaceSelectedTag = (oldName: string, newName: string) => {
+    setSelectedTags((prev) => {
+      if (!prev.includes(oldName)) {
+        return prev;
+      }
+
+      const next = prev.map((item) => (item === oldName ? newName : item));
+      return next.filter((item, index) => next.indexOf(item) === index);
+    });
   };
 
   const hasActiveFilters =
@@ -125,8 +138,6 @@ export function useDatasetTableFilters(): DatasetTableFiltersResult {
     selectedStatuses,
     favoriteOnly,
     setFavoriteOnly,
-    tagFilterQuery,
-    setTagFilterQuery,
     sorting: sortingState,
     setSorting,
     debouncedQueryParams,
@@ -134,6 +145,8 @@ export function useDatasetTableFilters(): DatasetTableFiltersResult {
     loadNextPage,
     handleTagToggle,
     handleStatusToggle,
+    removeSelectedTag,
+    replaceSelectedTag,
     clearFilters,
     hasActiveFilters,
   };

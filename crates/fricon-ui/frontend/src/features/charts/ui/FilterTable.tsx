@@ -542,7 +542,7 @@ export function FilterTable({
                 onFocusColumnItem={focusSplitColumnItem}
               />
               {index < data.fields.length - 1 ? (
-                <Separator orientation="vertical" className="bg-border/60" />
+                <Separator orientation="vertical" />
               ) : null}
             </div>
           ))}

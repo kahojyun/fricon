@@ -1,30 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useMemo, useRef } from "react";
+import { flexRender } from "@tanstack/react-table";
+import { toast } from "sonner";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import { useDatasetColumnVisibility } from "../model/useDatasetColumnVisibility";
 import { createDatasetColumns } from "./DatasetTableColumns";
+import { DatasetTableBody } from "./DatasetTableBody";
 import { DatasetTableToolbar } from "./DatasetTableToolbar";
-import { TooltipProvider } from "@/shared/ui/tooltip";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/shared/ui/table";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/shared/ui/context-menu";
+import { useDatasetTableController } from "./useDatasetTableController";
+import { useDatasetDeleteFlow } from "./useDatasetDeleteFlow";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,23 +18,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { DatasetRowTagMenus } from "./DatasetTableTagMenu";
-import {
-  deriveDatasetTagMenuTarget,
-  runDatasetTagMutation,
-} from "../model/datasetTableTagMenuLogic";
+import { Table, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
+import { TooltipProvider } from "@/shared/ui/tooltip";
 
 interface DatasetTableProps {
   selectedDatasetId?: number;
   onDatasetSelected: (id?: number) => void;
-}
-
-function isMacPlatform() {
-  const platform = navigator.userAgent;
-
-  return platform.toUpperCase().includes("MAC");
 }
 
 export function DatasetTable({
@@ -64,11 +36,8 @@ export function DatasetTable({
     setSearchQuery,
     selectedTags,
     selectedStatuses,
-    tagFilterQuery,
-    setTagFilterQuery,
     sorting,
     setSorting,
-    filteredTagOptions,
     allTags,
     favoriteOnly,
     setFavoriteOnly,
@@ -89,23 +58,7 @@ export function DatasetTable({
     isUpdatingTags,
   } = useDatasetTableData();
 
-  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
-  const [idsToDelete, setIdsToDelete] = useState<number[]>([]);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [anchorId, setAnchorId] = useState<string | null>(null);
-  const [dragState, setDragState] = useState<{
-    initialSelection: Record<string, boolean>;
-    mode: "replace" | "toggle";
-    targetValue?: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    const handleMouseUp = () => setDragState(null);
-    window.addEventListener("pointerup", handleMouseUp);
-    return () => window.removeEventListener("pointerup", handleMouseUp);
-  }, []);
-
-  const columns = useMemo(
+  const dataColumns = useMemo(
     () => createDatasetColumns({ toggleFavorite }),
     [toggleFavorite],
   );
@@ -115,377 +68,44 @@ export function DatasetTable({
     resetColumnVisibilityToDefault,
     showAllColumns,
     handleColumnVisibilityChange,
-  } = useDatasetColumnVisibility(columns);
+  } = useDatasetColumnVisibility(dataColumns);
 
-  const tableOptions = useMemo(
-    () => ({
-      data: datasets,
-      columns,
-      state: {
-        sorting,
-        columnVisibility,
-        rowSelection,
-      },
-      onSortingChange: setSorting,
-      onRowSelectionChange: setRowSelection,
-      getCoreRowModel: getCoreRowModel(),
-      getRowId: (row: (typeof datasets)[0]) => row.id.toString(),
-      autoResetRowSelection: false,
-    }),
-    [datasets, columns, sorting, columnVisibility, rowSelection, setSorting],
-  );
-
-  // TanStack Table is an intentional compiler boundary for this component.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable(tableOptions);
-
-  const { rows } = table.getRowModel();
-  const visibleColumnCount = table.getVisibleLeafColumns().length;
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const rowElementMapRef = useRef(new Map<string, HTMLTableRowElement>());
-  const pendingFocusRowIdRef = useRef<string | null>(null);
-
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 36,
-    overscan: 8,
+  const controller = useDatasetTableController({
+    datasets,
+    columns: dataColumns,
+    sorting,
+    setSorting,
+    columnVisibility,
+    hasMore,
+    loadNextPage,
+    onDatasetSelected,
+    tableContainerRef,
   });
 
-  const virtualItems = rowVirtualizer.getVirtualItems();
-
-  useEffect(() => {
-    const last = virtualItems.at(-1);
-    if (!last) return;
-    if (hasMore && last.index >= rows.length - 10) {
-      void loadNextPage();
-    }
-  }, [hasMore, loadNextPage, virtualItems, rows.length]);
-
-  const virtualPaddingTop =
-    virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
-  const virtualPaddingBottom =
-    virtualItems.length > 0
-      ? rowVirtualizer.getTotalSize() -
-        (virtualItems[virtualItems.length - 1]?.end ?? 0)
-      : 0;
-
-  const focusRow = (rowId: string) => {
-    pendingFocusRowIdRef.current = rowId;
-    const rowElement = rowElementMapRef.current.get(rowId);
-    if (!rowElement) return;
-    rowElement.focus();
-    pendingFocusRowIdRef.current = null;
-  };
-
-  const registerRowElement = (
-    rowId: string,
-    rowElement: HTMLTableRowElement | null,
-  ) => {
-    if (!rowElement) {
-      rowElementMapRef.current.delete(rowId);
-      return;
-    }
-
-    rowElementMapRef.current.set(rowId, rowElement);
-    rowVirtualizer.measureElement(rowElement);
-
-    if (pendingFocusRowIdRef.current === rowId) {
-      rowElement.focus();
-      pendingFocusRowIdRef.current = null;
-    }
-  };
-
-  const selectSingleDatasetRow = (
-    rowIndex: number,
-    options: {
-      focus?: boolean;
-      scroll?: boolean;
-    } = {},
-  ) => {
-    const row = rows[rowIndex];
-    if (!row) return;
-
-    if (options.scroll) {
-      rowVirtualizer.scrollToIndex?.(rowIndex, { align: "auto" });
-    }
-
-    setRowSelection({ [row.id]: true });
-    setAnchorId(row.id);
-    setDragState(null);
-    onDatasetSelected(row.original.id);
-
-    if (options.focus) {
-      focusRow(row.id);
-    }
-  };
-
-  const handleRowKeyDown = (
-    event: React.KeyboardEvent<HTMLTableRowElement>,
-    rowIndex: number,
-  ) => {
-    if (event.target !== event.currentTarget) {
-      return;
-    }
-
-    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-      event.preventDefault();
-
-      const nextRowIndex =
-        event.key === "ArrowUp"
-          ? Math.max(rowIndex - 1, 0)
-          : Math.min(rowIndex + 1, rows.length - 1);
-
-      if (nextRowIndex !== rowIndex) {
-        selectSingleDatasetRow(nextRowIndex, {
-          focus: true,
-          scroll: true,
-        });
-      }
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      const row = rows[rowIndex];
-      if (!row) return;
-      onDatasetSelected(row.original.id);
-      focusRow(row.id);
-    }
-  };
-
-  const handleRowPointerDown = (
-    e: React.PointerEvent<HTMLTableRowElement>,
-    rowIndex: number,
-    rowId: string,
-    datasetId: number,
-  ) => {
-    if (e.button !== 0) return;
-
-    // Don't interfere with buttons or links
-    if ((e.target as HTMLElement).closest('button:not([role="checkbox"]), a'))
-      return;
-
-    const isCheckbox = (e.target as HTMLElement).closest(
-      'button[role="checkbox"], [data-slot="checkbox"], [data-slot="checkbox-indicator"]',
-    );
-
-    if (isCheckbox) {
-      // Return completely so that native checkbox handlers assume full control
-      return;
-    }
-
-    e.currentTarget.focus();
-
-    const isMac = isMacPlatform();
-
-    if (e.shiftKey) {
-      e.preventDefault();
-      const effectiveAnchorIndex = anchorId
-        ? rows.findIndex((r) => r.id === anchorId)
-        : -1;
-      const start =
-        effectiveAnchorIndex !== -1
-          ? Math.min(effectiveAnchorIndex, rowIndex)
-          : rowIndex;
-      const end =
-        effectiveAnchorIndex !== -1
-          ? Math.max(effectiveAnchorIndex, rowIndex)
-          : rowIndex;
-
-      const newSelection: Record<string, boolean> = {};
-      for (let i = start; i <= end; i++) {
-        const id = rows[i]?.id;
-        if (id) newSelection[id] = true;
-      }
-      setRowSelection(newSelection);
-      setDragState({
-        initialSelection: {},
-        mode: "replace",
-      });
-      if (effectiveAnchorIndex === -1) {
-        setAnchorId(rowId);
-      }
-      if (!isCheckbox) {
-        onDatasetSelected(datasetId);
-      }
-      return;
-    }
-
-    // On macOS, Ctrl+click is secondary click.
-    if (isMac && e.ctrlKey) {
-      // Let the browser handle context menu
-      return;
-    }
-
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const isSelected = !!rowSelection[rowId];
-      const nextValue = !isSelected;
-
-      setRowSelection((prev) => {
-        const next = { ...prev };
-        if (nextValue) {
-          next[rowId] = true;
-        } else {
-          delete next[rowId];
-        }
-        return next;
-      });
-
-      setAnchorId(rowId);
-
-      setDragState({
-        initialSelection: rowSelection,
-        mode: "toggle",
-        targetValue: nextValue,
-      });
-
-      onDatasetSelected(datasetId);
-      return;
-    }
-
-    // Normal click
-    setRowSelection({ [rowId]: true });
-    setAnchorId(rowId);
-    setDragState({
-      initialSelection: {},
-      mode: "replace",
-    });
-    onDatasetSelected(datasetId);
-  };
-
-  const handleRowPointerEnter = (rowIndex: number) => {
-    if (!dragState) return;
-
-    const effectiveAnchorIndex = anchorId
-      ? rows.findIndex((r) => r.id === anchorId)
-      : -1;
-
-    if (dragState.mode === "replace") {
-      const start =
-        effectiveAnchorIndex !== -1
-          ? Math.min(effectiveAnchorIndex, rowIndex)
-          : rowIndex;
-      const end =
-        effectiveAnchorIndex !== -1
-          ? Math.max(effectiveAnchorIndex, rowIndex)
-          : rowIndex;
-      const nextSelection: Record<string, boolean> = {};
-      for (let i = start; i <= end; i++) {
-        const id = rows[i]?.id;
-        if (id) nextSelection[id] = true;
-      }
-      setRowSelection(nextSelection);
-    } else if (dragState.mode === "toggle") {
-      const start =
-        effectiveAnchorIndex !== -1
-          ? Math.min(effectiveAnchorIndex, rowIndex)
-          : rowIndex;
-      const end =
-        effectiveAnchorIndex !== -1
-          ? Math.max(effectiveAnchorIndex, rowIndex)
-          : rowIndex;
-      const nextSelection = { ...dragState.initialSelection };
-      for (let i = start; i <= end; i++) {
-        const id = rows[i]?.id;
-        if (id) {
-          if (dragState.targetValue) {
-            nextSelection[id] = true;
-          } else {
-            delete nextSelection[id];
-          }
-        }
-      }
-      setRowSelection(nextSelection);
-    }
-  };
-
-  const handleDeleteClick = (ids: number[]) => {
-    setIdsToDelete(ids);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const buildSelectionFromIds = (ids: number[]) =>
-    ids.reduce<Record<string, boolean>>((selection, id) => {
-      selection[id.toString()] = true;
-      return selection;
-    }, {});
-
-  const confirmDelete = async () => {
-    try {
-      const results = await deleteDatasets(idsToDelete);
-
-      const successIds = results.filter((r) => r.success).map((r) => r.id);
-      const failedResults = results.filter((r) => !r.success);
-      const failedIds = failedResults.map((r) => r.id);
-
-      // Invalidate selection if it was deleted
-      if (selectedDatasetId && successIds.includes(selectedDatasetId)) {
-        onDatasetSelected(undefined);
-      }
-
-      if (failedResults.length === 0) {
-        setRowSelection({});
-        setIdsToDelete([]);
-        setIsDeleteDialogOpen(false);
-        toast.success(`Successfully deleted ${successIds.length} dataset(s)`);
-      } else if (successIds.length === 0) {
-        setRowSelection(buildSelectionFromIds(failedIds));
-        // All failed
-        toast.error(`Failed to delete ${failedResults.length} dataset(s)`);
-      } else {
-        // Partial success
-        setRowSelection(buildSelectionFromIds(failedIds));
-        setIdsToDelete(failedIds);
-        toast.warning(
-          `Successfully deleted ${successIds.length} dataset(s), but ${failedResults.length} failed.`,
-          {
-            description: failedResults
-              .map((r) => `ID ${r.id}: ${r.error}`)
-              .join("\n"),
-          },
-        );
-      }
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete dataset(s)",
-      );
-    }
-  };
-
-  const handleBatchTagMutation = async (
-    operation: "add" | "remove",
-    targetIds: number[],
-    tag: string,
-  ) => {
-    await runDatasetTagMutation({
-      operation,
-      targetIds,
-      tag,
-      batchAddTags,
-      batchRemoveTags,
-      notify: toast,
-    });
-  };
+  const deleteFlow = useDatasetDeleteFlow({
+    deleteDatasets,
+    isDeleting,
+    selectedDatasetId,
+    onDatasetSelected,
+    setRowSelection: controller.setRowSelection,
+    notify: toast,
+  });
 
   return (
     <TooltipProvider>
       <div className="flex h-full min-h-0 flex-col bg-background">
         <DatasetTableToolbar
-          table={table}
+          table={controller.table}
           hasActiveFilters={hasActiveFilters}
           selectedTags={selectedTags}
           selectedStatuses={selectedStatuses}
           favoriteOnly={favoriteOnly}
           searchQuery={searchQuery}
-          tagFilterQuery={tagFilterQuery}
-          filteredTagOptions={filteredTagOptions}
           allTags={allTags}
           isUpdatingTags={isUpdatingTags}
           setFavoriteOnly={setFavoriteOnly}
           setSearchQuery={setSearchQuery}
-          setTagFilterQuery={setTagFilterQuery}
           handleTagToggle={handleTagToggle}
           handleStatusToggle={handleStatusToggle}
           clearFilters={clearFilters}
@@ -502,197 +122,73 @@ export function DatasetTable({
         >
           <Table withContainer={false}>
             <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
-              {table.getHeaderGroups().map((headerGroup) => (
+              {controller.table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead
-                        key={header.id}
-                        style={{ width: header.getSize() }}
-                        className="text-muted-foreground"
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </TableHead>
-                    );
-                  })}
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      style={{ width: header.getSize() }}
+                      className="text-muted-foreground"
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </TableHead>
+                  ))}
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={visibleColumnCount}
-                    className="h-24 text-center"
-                  >
-                    No datasets matched the current filters.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                <>
-                  {virtualPaddingTop > 0 && (
-                    <TableRow className="h-0 border-0 hover:bg-transparent">
-                      <TableCell
-                        colSpan={visibleColumnCount}
-                        style={{ height: `${virtualPaddingTop}px`, padding: 0 }}
-                        className="border-0 p-0"
-                      />
-                    </TableRow>
-                  )}
-                  {virtualItems.map((virtualRow) => {
-                    const row = rows[virtualRow.index];
-                    if (!row) return null;
-                    const dataset = row.original;
-                    const isSelected = dataset.id === selectedDatasetId;
-                    const isRowSelected = row.getIsSelected();
-                    const selectedRows =
-                      table.getFilteredSelectedRowModel().rows;
-                    const selectedCount = selectedRows.length;
-                    const target = deriveDatasetTagMenuTarget(
-                      dataset,
-                      selectedRows.map((selectedRow) => selectedRow.original),
-                    );
-
-                    return (
-                      <ContextMenu key={row.id}>
-                        <ContextMenuTrigger
-                          render={
-                            <TableRow
-                              data-state={
-                                (isSelected && "selected") ||
-                                (isRowSelected && "selected")
-                              }
-                              ref={(element) =>
-                                registerRowElement(row.id, element)
-                              }
-                              data-index={virtualRow.index}
-                              className="cursor-pointer select-none"
-                              onPointerDown={(e) =>
-                                handleRowPointerDown(
-                                  e,
-                                  virtualRow.index,
-                                  row.id,
-                                  dataset.id,
-                                )
-                              }
-                              onPointerEnter={() =>
-                                handleRowPointerEnter(virtualRow.index)
-                              }
-                              onKeyDown={(event) =>
-                                handleRowKeyDown(event, virtualRow.index)
-                              }
-                              tabIndex={0}
-                            >
-                              {row.getVisibleCells().map((cell) => (
-                                <TableCell key={cell.id}>
-                                  {flexRender(
-                                    cell.column.columnDef.cell,
-                                    cell.getContext(),
-                                  )}
-                                </TableCell>
-                              ))}
-                            </TableRow>
-                          }
-                        />
-                        <ContextMenuContent className="w-64">
-                          <ContextMenuItem
-                            onClick={() => onDatasetSelected(dataset.id)}
-                          >
-                            View Details
-                          </ContextMenuItem>
-                          <ContextMenuSeparator />
-                          <DatasetRowTagMenus
-                            allTags={allTags}
-                            isUpdatingTags={isUpdatingTags}
-                            target={target}
-                            onAddTag={(tag) => {
-                              void handleBatchTagMutation(
-                                "add",
-                                target.targetIds,
-                                tag,
-                              );
-                            }}
-                            onRemoveTag={(tag) => {
-                              void handleBatchTagMutation(
-                                "remove",
-                                target.targetIds,
-                                tag,
-                              );
-                            }}
-                          />
-                          <ContextMenuSeparator />
-                          <ContextMenuItem
-                            variant="destructive"
-                            onClick={() => handleDeleteClick([dataset.id])}
-                          >
-                            <Trash2 data-icon="inline-start" />
-                            Delete
-                          </ContextMenuItem>
-                          {selectedCount > 1 &&
-                            selectedRows.some(
-                              (r) => r.original.id === dataset.id,
-                            ) && (
-                              <ContextMenuItem
-                                variant="destructive"
-                                onClick={() =>
-                                  handleDeleteClick(
-                                    selectedRows.map((r) => r.original.id),
-                                  )
-                                }
-                              >
-                                <Trash2 data-icon="inline-start" />
-                                Delete Selected ({selectedCount})
-                              </ContextMenuItem>
-                            )}
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    );
-                  })}
-                  {virtualPaddingBottom > 0 && (
-                    <TableRow className="h-0 border-0 hover:bg-transparent">
-                      <TableCell
-                        colSpan={visibleColumnCount}
-                        style={{
-                          height: `${virtualPaddingBottom}px`,
-                          padding: 0,
-                        }}
-                        className="border-0 p-0"
-                      />
-                    </TableRow>
-                  )}
-                </>
-              )}
-            </TableBody>
+            <DatasetTableBody
+              rows={controller.rows}
+              rowSelection={controller.rowSelection}
+              visibleColumnCount={controller.visibleColumnCount}
+              virtualItems={controller.virtualItems}
+              virtualPaddingTop={controller.virtualPaddingTop}
+              virtualPaddingBottom={controller.virtualPaddingBottom}
+              selectedDatasetId={selectedDatasetId}
+              allTags={allTags}
+              isUpdatingTags={isUpdatingTags}
+              registerRowElement={controller.registerRowElement}
+              handleRowPointerDown={controller.handleRowPointerDown}
+              handleRowPointerEnter={controller.handleRowPointerEnter}
+              handleRowKeyDown={controller.handleRowKeyDown}
+              onDatasetSelected={onDatasetSelected}
+              openDeleteDialog={deleteFlow.openDeleteDialog}
+              batchAddTags={batchAddTags}
+              batchRemoveTags={batchRemoveTags}
+            />
           </Table>
         </div>
       </div>
 
       <AlertDialog
-        open={isDeleteDialogOpen}
+        open={deleteFlow.isDeleteDialogOpen}
         onOpenChange={(open) => {
-          if (!open && isDeleting) return;
-          setIsDeleteDialogOpen(open);
+          if (!open) {
+            deleteFlow.closeDeleteDialog();
+            return;
+          }
+
+          deleteFlow.setIsDeleteDialogOpen(true);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Dataset</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {idsToDelete.length} dataset(s)?
-              This action cannot be undone.
+              Are you sure you want to delete {deleteFlow.idsToDelete.length}{" "}
+              dataset(s)? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void confirmDelete();
+              onClick={(event) => {
+                event.preventDefault();
+                void deleteFlow.confirmDelete();
               }}
               disabled={isDeleting}
               className="text-destructive-foreground bg-destructive hover:bg-destructive/90"

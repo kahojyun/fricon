@@ -26,6 +26,11 @@ interface CreateDatasetColumnsOptions {
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;
 }
 
+interface CreateDatasetSelectionColumnOptions {
+  toggleRowSelected: (rowId: string, isSelected: boolean) => void;
+  toggleAllRowsSelected: (isSelected: boolean) => void;
+}
+
 function renderSortableHeader({
   column,
   label,
@@ -60,29 +65,6 @@ export function createDatasetColumns({
   toggleFavorite,
 }: CreateDatasetColumnsOptions): ColumnDef<DatasetInfo>[] {
   return [
-    {
-      id: "select",
-      size: 40,
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-          className="translate-y-0.5"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          onClick={(event) => event.stopPropagation()}
-          aria-label="Select row"
-          className="translate-y-0.5"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
     {
       id: "favorite",
       accessorKey: "favorite",
@@ -221,4 +203,37 @@ export function createDatasetColumns({
       ),
     },
   ];
+}
+
+export function createDatasetSelectionColumn({
+  toggleRowSelected,
+  toggleAllRowsSelected,
+}: CreateDatasetSelectionColumnOptions): ColumnDef<DatasetInfo> {
+  return {
+    id: "select",
+    size: 40,
+    header: ({ table }) => (
+      <Checkbox
+        checked={table.getIsAllPageRowsSelected()}
+        onCheckedChange={(value) => {
+          toggleAllRowsSelected(!!value);
+        }}
+        aria-label="Select all"
+        className="translate-y-0.5"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => {
+          toggleRowSelected(row.id, !!value);
+        }}
+        onClick={(event) => event.stopPropagation()}
+        aria-label="Select row"
+        className="translate-y-0.5"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  };
 }
