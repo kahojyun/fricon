@@ -20,7 +20,7 @@ function renderTagFilter(
   overrides: Partial<ComponentProps<typeof DatasetTagFilter>> = {},
 ) {
   const props = {
-    selectedTags: [],
+    activeTags: [],
     allTags: ["vision", "audio"],
     isUpdatingTags: false,
     onToggleTag: vi.fn(),
@@ -64,7 +64,7 @@ describe("DatasetTagFilter", () => {
 
   it("clears all selected tags", async () => {
     const props = renderTagFilter({
-      selectedTags: ["vision", "audio"],
+      activeTags: ["vision", "audio"],
     });
     const user = userEvent.setup();
 

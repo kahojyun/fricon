@@ -148,7 +148,7 @@ describe("DatasetTable", () => {
     const dataset = makeDataset({ id: 11, name: "Pinned", favorite: true });
     const { hook } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [dataset],
-      favoriteOnly: true,
+      showFavoritesOnly: true,
     });
     const user = userEvent.setup();
 

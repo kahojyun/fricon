@@ -7,8 +7,8 @@ import { useDatasetTagMutation } from "./useDatasetTagMutation";
 interface UseDatasetTableActionsArgs {
   datasetQueryKey: DatasetQueryKey;
   refreshDatasets: () => Promise<void>;
-  removeSelectedTag: (tag: string) => void;
-  replaceSelectedTag: (oldName: string, newName: string) => void;
+  removeActiveTag: (tag: string) => void;
+  replaceActiveTag: (oldName: string, newName: string) => void;
 }
 
 export interface UseDatasetTableActionsResult {
@@ -32,8 +32,8 @@ export interface UseDatasetTableActionsResult {
 export function useDatasetTableActions({
   datasetQueryKey,
   refreshDatasets,
-  removeSelectedTag,
-  replaceSelectedTag,
+  removeActiveTag,
+  replaceActiveTag,
 }: UseDatasetTableActionsArgs): UseDatasetTableActionsResult {
   const { toggleFavorite } = useDatasetFavoriteMutation(
     datasetQueryKey,
@@ -52,17 +52,17 @@ export function useDatasetTableActions({
 
   const deleteTag = async (tag: string) => {
     await deleteTagMutation(tag);
-    removeSelectedTag(tag);
+    removeActiveTag(tag);
   };
 
   const renameTag = async (oldName: string, newName: string) => {
     await renameTagMutation(oldName, newName);
-    replaceSelectedTag(oldName, newName);
+    replaceActiveTag(oldName, newName);
   };
 
   const mergeTag = async (source: string, target: string) => {
     await mergeTagMutation(source, target);
-    replaceSelectedTag(source, target);
+    replaceActiveTag(source, target);
   };
 
   return {

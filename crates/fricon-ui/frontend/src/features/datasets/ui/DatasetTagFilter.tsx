@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import { Separator } from "@/shared/ui/separator";
 
 interface DatasetTagFilterProps {
-  selectedTags: string[];
+  activeTags: string[];
   allTags: string[];
   isUpdatingTags: boolean;
   onToggleTag: (tag: string) => void;
@@ -26,7 +26,7 @@ interface DatasetTagFilterProps {
 }
 
 export function DatasetTagFilter({
-  selectedTags,
+  activeTags,
   allTags,
   isUpdatingTags,
   onToggleTag,
@@ -35,16 +35,16 @@ export function DatasetTagFilter({
   onMergeTag,
 }: DatasetTagFilterProps) {
   const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [tagSearchInput, setTagSearchInput] = useState("");
 
   const filteredTags = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const normalizedQuery = tagSearchInput.trim().toLowerCase();
     if (!normalizedQuery) {
       return allTags;
     }
 
     return allTags.filter((tag) => tag.toLowerCase().includes(normalizedQuery));
-  }, [allTags, searchQuery]);
+  }, [allTags, tagSearchInput]);
 
   const emptyLabel =
     allTags.length === 0 ? "No tags in workspace." : "No tags found.";
@@ -55,7 +55,7 @@ export function DatasetTagFilter({
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
         if (!nextOpen) {
-          setSearchQuery("");
+          setTagSearchInput("");
         }
       }}
     >
@@ -64,19 +64,17 @@ export function DatasetTagFilter({
       >
         <PlusCircle data-icon="inline-start" />
         Tags
-        {selectedTags.length > 0 && (
+        {activeTags.length > 0 && (
           <>
             <Separator orientation="vertical" className="mx-2 h-4" />
             <Badge variant="secondary" className="lg:hidden">
-              {selectedTags.length}
+              {activeTags.length}
             </Badge>
             <div className="hidden flex-wrap gap-1 lg:flex">
-              {selectedTags.length > 2 ? (
-                <Badge variant="secondary">
-                  {selectedTags.length} selected
-                </Badge>
+              {activeTags.length > 2 ? (
+                <Badge variant="secondary">{activeTags.length} selected</Badge>
               ) : (
-                selectedTags.map((tag) => (
+                activeTags.map((tag) => (
                   <Badge
                     key={tag}
                     variant="secondary"
@@ -97,8 +95,8 @@ export function DatasetTagFilter({
         >
           <CommandInput
             placeholder="Search tags"
-            value={searchQuery}
-            onValueChange={setSearchQuery}
+            value={tagSearchInput}
+            onValueChange={setTagSearchInput}
           />
           <CommandList className="max-h-56">
             <CommandEmpty>{emptyLabel}</CommandEmpty>
@@ -107,7 +105,7 @@ export function DatasetTagFilter({
                 <CommandItem
                   key={tag}
                   value={tag}
-                  data-checked={selectedTags.includes(tag) ? "true" : undefined}
+                  data-checked={activeTags.includes(tag) ? "true" : undefined}
                   onSelect={() => onToggleTag(tag)}
                 >
                   {tag}
@@ -115,7 +113,7 @@ export function DatasetTagFilter({
               ))}
             </CommandGroup>
           </CommandList>
-          {selectedTags.length > 0 && (
+          {activeTags.length > 0 && (
             <>
               <CommandSeparator />
               <div className="p-1 pt-0">
@@ -123,7 +121,7 @@ export function DatasetTagFilter({
                   variant="ghost"
                   className="w-full justify-center"
                   onClick={() => {
-                    selectedTags.forEach((tag) => onToggleTag(tag));
+                    activeTags.forEach((tag) => onToggleTag(tag));
                   }}
                 >
                   Clear filters

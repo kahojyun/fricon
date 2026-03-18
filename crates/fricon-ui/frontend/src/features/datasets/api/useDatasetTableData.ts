@@ -1,20 +1,119 @@
-import { useQuery } from "@tanstack/react-query";
-import { listDatasetTags } from "./client";
+import { useEffect, useReducer } from "react";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import type { SortingState } from "@tanstack/react-table";
+import { listDatasets, listDatasetTags } from "./client";
 import { datasetKeys } from "./queryKeys";
-import { type UseDatasetTableDataResult } from "./datasetTableShared";
-import { useDatasetTableFilters } from "./useDatasetTableFilters";
-import { useDatasetTableQuery } from "./useDatasetTableQuery";
+import {
+  buildDatasetListOptions,
+  deriveHasMore,
+  type DatasetQueryKey,
+  type DatasetQueryParams,
+  type UseDatasetTableDataResult,
+} from "./datasetTableShared";
 import { useDatasetTableRefreshSync } from "./useDatasetTableRefreshSync";
 import { useDatasetTableActions } from "./useDatasetTableActions";
+import type { DatasetStatus } from "./types";
+import {
+  createInitialDatasetTableState,
+  datasetTableStateReducer,
+} from "../model/datasetTableStateReducer";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 export function useDatasetTableData(): UseDatasetTableDataResult {
-  const filters = useDatasetTableFilters();
-  const { datasetQueryKey, datasets, hasMore, refreshDatasets, loadNextPage } =
-    useDatasetTableQuery(
-      filters.debouncedQueryParams,
-      filters.visibleCount,
-      filters.loadNextPage,
-    );
+  const [state, dispatch] = useReducer(
+    datasetTableStateReducer,
+    undefined,
+    createInitialDatasetTableState,
+  );
+  const debouncedSearchInput = useDebouncedValue(state.searchInput, 300);
+
+  useEffect(() => {
+    if (debouncedSearchInput !== state.appliedSearchQuery) {
+      dispatch({ type: "commit_search_input" });
+    }
+  }, [debouncedSearchInput, state.appliedSearchQuery]);
+
+  const queryClient = useQueryClient();
+  const datasetQueryParams: DatasetQueryParams = {
+    search: state.appliedSearchQuery,
+    tags: state.activeTags,
+    favoriteOnly: state.showFavoritesOnly,
+    statuses: state.activeStatuses,
+    sorting: state.sorting,
+  };
+  const datasetQueryKey: DatasetQueryKey = datasetKeys.list(
+    datasetQueryParams,
+    state.queryLimit,
+  );
+  const datasetsQuery = useQuery({
+    queryKey: datasetQueryKey,
+    queryFn: () =>
+      listDatasets(
+        buildDatasetListOptions(datasetQueryParams, {
+          limit: state.queryLimit,
+          offset: 0,
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+  const datasets = datasetsQuery.data ?? [];
+  const refreshDatasets = async () => {
+    await queryClient.invalidateQueries({ queryKey: datasetQueryKey });
+  };
+  const hasMore = datasetsQuery.isPlaceholderData
+    ? true
+    : deriveHasMore(datasets.length, state.queryLimit);
+
+  const setSearchInput = (next: string) => {
+    dispatch({ type: "set_search_input", next });
+  };
+
+  const setSorting = (
+    updater: SortingState | ((prev: SortingState) => SortingState),
+  ) => {
+    dispatch({ type: "set_sorting", updater });
+  };
+
+  const handleTagToggle = (tag: string) => {
+    dispatch({ type: "toggle_tag", tag });
+  };
+
+  const handleStatusToggle = (status: DatasetStatus) => {
+    dispatch({ type: "toggle_status", status });
+  };
+
+  const clearFilters = () => {
+    dispatch({ type: "clear_filters" });
+  };
+
+  const removeActiveTag = (tag: string) => {
+    dispatch({ type: "remove_active_tag", tag });
+  };
+
+  const replaceActiveTag = (oldName: string, newName: string) => {
+    dispatch({ type: "replace_active_tag", oldName, newName });
+  };
+
+  const setShowFavoritesOnly = (next: boolean) => {
+    dispatch({ type: "set_show_favorites_only", next });
+  };
+
+  const loadNextPage = () => {
+    if (
+      state.searchInput !== state.appliedSearchQuery ||
+      datasetsQuery.isFetching ||
+      !hasMore
+    ) {
+      return Promise.resolve();
+    }
+
+    dispatch({ type: "load_next_page" });
+    return Promise.resolve();
+  };
 
   const tagsQuery = useQuery({
     queryKey: datasetKeys.tags(),
@@ -25,25 +124,29 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
   const actions = useDatasetTableActions({
     datasetQueryKey,
     refreshDatasets,
-    removeSelectedTag: filters.removeSelectedTag,
-    replaceSelectedTag: filters.replaceSelectedTag,
+    removeActiveTag,
+    replaceActiveTag,
   });
 
   const allTags = tagsQuery.data ?? [];
 
   return {
     datasets,
-    searchQuery: filters.searchQuery,
-    setSearchQuery: filters.setSearchQuery,
-    selectedTags: filters.selectedTags,
-    selectedStatuses: filters.selectedStatuses,
-    sorting: filters.sorting,
-    setSorting: filters.setSorting,
+    searchInput: state.searchInput,
+    setSearchInput,
+    activeTags: state.activeTags,
+    activeStatuses: state.activeStatuses,
+    sorting: state.sorting,
+    setSorting,
     allTags,
-    favoriteOnly: filters.favoriteOnly,
-    setFavoriteOnly: filters.setFavoriteOnly,
+    showFavoritesOnly: state.showFavoritesOnly,
+    setShowFavoritesOnly,
     hasMore,
-    hasActiveFilters: filters.hasActiveFilters,
+    hasActiveFilters:
+      state.searchInput.trim().length > 0 ||
+      state.showFavoritesOnly ||
+      state.activeTags.length > 0 ||
+      state.activeStatuses.length > 0,
     toggleFavorite: actions.toggleFavorite,
     deleteDatasets: actions.deleteDatasets,
     isDeleting: actions.isDeleting,
@@ -53,9 +156,9 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     renameTag: actions.renameTag,
     mergeTag: actions.mergeTag,
     isUpdatingTags: actions.isUpdatingTags,
-    handleTagToggle: filters.handleTagToggle,
-    handleStatusToggle: filters.handleStatusToggle,
-    clearFilters: filters.clearFilters,
+    handleTagToggle,
+    handleStatusToggle,
+    clearFilters,
     loadNextPage,
   };
 }

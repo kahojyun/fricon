@@ -11,14 +11,14 @@ import { X } from "lucide-react";
 interface DatasetTableToolbarProps {
   table: Table<DatasetInfo>;
   hasActiveFilters: boolean;
-  selectedTags: string[];
-  selectedStatuses: DatasetStatus[];
-  favoriteOnly: boolean;
-  searchQuery: string;
+  activeTags: string[];
+  activeStatuses: DatasetStatus[];
+  showFavoritesOnly: boolean;
+  searchInput: string;
   allTags: string[];
   isUpdatingTags: boolean;
-  setFavoriteOnly: (next: boolean) => void;
-  setSearchQuery: (next: string) => void;
+  setShowFavoritesOnly: (next: boolean) => void;
+  setSearchInput: (next: string) => void;
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
   clearFilters: () => void;
@@ -33,14 +33,14 @@ interface DatasetTableToolbarProps {
 export function DatasetTableToolbar({
   table,
   hasActiveFilters,
-  selectedTags,
-  selectedStatuses,
-  favoriteOnly,
-  searchQuery,
+  activeTags,
+  activeStatuses,
+  showFavoritesOnly,
+  searchInput,
   allTags,
   isUpdatingTags,
-  setFavoriteOnly,
-  setSearchQuery,
+  setShowFavoritesOnly,
+  setSearchInput,
   handleTagToggle,
   handleStatusToggle,
   clearFilters,
@@ -56,13 +56,13 @@ export function DatasetTableToolbar({
       <div className="flex flex-1 flex-wrap items-center gap-1.5">
         <Input
           placeholder="Filter datasets..."
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
           className="w-full max-w-62.5 min-w-37.5"
         />
 
         <DatasetTagFilter
-          selectedTags={selectedTags}
+          activeTags={activeTags}
           allTags={allTags}
           isUpdatingTags={isUpdatingTags}
           onToggleTag={handleTagToggle}
@@ -72,15 +72,15 @@ export function DatasetTableToolbar({
         />
 
         <DatasetStatusFilter
-          selectedStatuses={selectedStatuses}
+          activeStatuses={activeStatuses}
           onToggleStatus={handleStatusToggle}
         />
 
         <Toggle
           variant="outline"
-          pressed={favoriteOnly}
+          pressed={showFavoritesOnly}
           className="border-dashed"
-          onPressedChange={setFavoriteOnly}
+          onPressedChange={setShowFavoritesOnly}
         >
           Favorites Only
         </Toggle>

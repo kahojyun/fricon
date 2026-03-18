@@ -32,15 +32,15 @@ export function DatasetTable({
 }: DatasetTableProps) {
   const {
     datasets,
-    searchQuery,
-    setSearchQuery,
-    selectedTags,
-    selectedStatuses,
+    searchInput,
+    setSearchInput,
+    activeTags,
+    activeStatuses,
     sorting,
     setSorting,
     allTags,
-    favoriteOnly,
-    setFavoriteOnly,
+    showFavoritesOnly,
+    setShowFavoritesOnly,
     hasMore,
     hasActiveFilters,
     toggleFavorite,
@@ -98,14 +98,14 @@ export function DatasetTable({
         <DatasetTableToolbar
           table={controller.table}
           hasActiveFilters={hasActiveFilters}
-          selectedTags={selectedTags}
-          selectedStatuses={selectedStatuses}
-          favoriteOnly={favoriteOnly}
-          searchQuery={searchQuery}
+          activeTags={activeTags}
+          activeStatuses={activeStatuses}
+          showFavoritesOnly={showFavoritesOnly}
+          searchInput={searchInput}
           allTags={allTags}
           isUpdatingTags={isUpdatingTags}
-          setFavoriteOnly={setFavoriteOnly}
-          setSearchQuery={setSearchQuery}
+          setShowFavoritesOnly={setShowFavoritesOnly}
+          setSearchInput={setSearchInput}
           handleTagToggle={handleTagToggle}
           handleStatusToggle={handleStatusToggle}
           clearFilters={clearFilters}
