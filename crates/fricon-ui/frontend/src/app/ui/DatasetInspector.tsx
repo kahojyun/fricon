@@ -8,13 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 
 interface DatasetInspectorProps {
   datasetId?: number;
-  onDatasetUpdated?: () => void;
 }
 
-export function DatasetInspector({
-  datasetId,
-  onDatasetUpdated,
-}: DatasetInspectorProps) {
+export function DatasetInspector({ datasetId }: DatasetInspectorProps) {
   if (!datasetId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -29,22 +25,15 @@ export function DatasetInspector({
     );
   }
 
-  return (
-    <SelectedDatasetInspector
-      datasetId={datasetId}
-      onDatasetUpdated={onDatasetUpdated}
-    />
-  );
+  return <SelectedDatasetInspector datasetId={datasetId} />;
 }
 
 interface SelectedDatasetInspectorProps {
   datasetId: number;
-  onDatasetUpdated?: () => void;
 }
 
 function SelectedDatasetInspector({
   datasetId,
-  onDatasetUpdated,
 }: SelectedDatasetInspectorProps) {
   const detailQuery = useDatasetDetailQuery(datasetId);
   const detail = detailQuery.data ?? null;
@@ -77,7 +66,6 @@ function SelectedDatasetInspector({
             detail={detail}
             isLoading={detailQuery.isLoading}
             loadErrorMessage={loadErrorMessage}
-            onDatasetUpdated={onDatasetUpdated}
           />
         </TabsContent>
       </Tabs>
