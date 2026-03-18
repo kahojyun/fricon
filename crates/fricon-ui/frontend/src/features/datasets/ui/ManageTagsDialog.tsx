@@ -32,6 +32,30 @@ type TagAction =
   | { type: "rename"; tag: string }
   | { type: "merge"; tag: string };
 
+async function runTagAction({
+  tag,
+  setBusyTag,
+  action,
+  onSuccess,
+  onError,
+}: {
+  tag: string;
+  setBusyTag: (tag: string | null) => void;
+  action: () => Promise<void>;
+  onSuccess: () => void;
+  onError: (error: unknown) => void;
+}) {
+  setBusyTag(tag);
+  try {
+    await action();
+    onSuccess();
+  } catch (error) {
+    onError(error);
+  } finally {
+    setBusyTag(null);
+  }
+}
+
 export function ManageTagsDialog({
   allTags,
   isUpdatingTags,
@@ -75,21 +99,22 @@ export function ManageTagsDialog({
     setPendingAction((prev) => ({ ...prev, [tag]: { type: "merge", tag } }));
   };
 
-  const handleDelete = async (tag: string) => {
-    setBusyTag(tag);
-    try {
-      await onDeleteTag(tag);
-      toast.success(`Tag "${tag}" deleted.`);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to delete tag "${tag}".`,
-      );
-    } finally {
-      setBusyTag(null);
-    }
-  };
+  const handleDelete = (tag: string) =>
+    runTagAction({
+      tag,
+      setBusyTag,
+      action: () => onDeleteTag(tag),
+      onSuccess: () => {
+        toast.success(`Tag "${tag}" deleted.`);
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : `Failed to delete tag "${tag}".`,
+        );
+      },
+    });
 
   const handleRenameConfirm = async (tag: string) => {
     const newName = renameValues[tag]?.trim();
@@ -101,39 +126,43 @@ export function ManageTagsDialog({
       toast.error(`A tag named "${newName}" already exists.`);
       return;
     }
-    setBusyTag(tag);
-    try {
-      await onRenameTag(tag, newName);
-      toast.success(`Tag renamed to "${newName}".`);
-      clearAction(tag);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to rename tag "${tag}".`,
-      );
-    } finally {
-      setBusyTag(null);
-    }
+    await runTagAction({
+      tag,
+      setBusyTag,
+      action: () => onRenameTag(tag, newName),
+      onSuccess: () => {
+        toast.success(`Tag renamed to "${newName}".`);
+        clearAction(tag);
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : `Failed to rename tag "${tag}".`,
+        );
+      },
+    });
   };
 
   const handleMergeConfirm = async (tag: string) => {
     const target = mergeTargets[tag];
     if (!target) return;
-    setBusyTag(tag);
-    try {
-      await onMergeTag(tag, target);
-      toast.success(`Tag "${tag}" merged into "${target}".`);
-      clearAction(tag);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to merge tag "${tag}".`,
-      );
-    } finally {
-      setBusyTag(null);
-    }
+    await runTagAction({
+      tag,
+      setBusyTag,
+      action: () => onMergeTag(tag, target),
+      onSuccess: () => {
+        toast.success(`Tag "${tag}" merged into "${target}".`);
+        clearAction(tag);
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : `Failed to merge tag "${tag}".`,
+        );
+      },
+    });
   };
 
   return (
