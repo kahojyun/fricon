@@ -3,12 +3,12 @@ import { datasetStatusOptions } from "./DatasetTableColumns";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group";
 
 interface DatasetStatusFilterProps {
-  selectedStatuses: DatasetStatus[];
+  activeStatuses: DatasetStatus[];
   onToggleStatus: (status: DatasetStatus) => void;
 }
 
 export function DatasetStatusFilter({
-  selectedStatuses,
+  activeStatuses,
   onToggleStatus,
 }: DatasetStatusFilterProps) {
   return (
@@ -16,10 +16,10 @@ export function DatasetStatusFilter({
       <span className="text-xs text-muted-foreground">Status</span>
       <ToggleGroup
         multiple
-        value={selectedStatuses}
+        value={activeStatuses}
         onValueChange={(nextValues) => {
           const next = new Set(nextValues);
-          const current = new Set(selectedStatuses);
+          const current = new Set(activeStatuses);
 
           datasetStatusOptions.forEach((status) => {
             if (next.has(status) !== current.has(status)) {

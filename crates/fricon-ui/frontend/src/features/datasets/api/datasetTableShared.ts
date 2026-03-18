@@ -58,46 +58,21 @@ export function buildDatasetListOptions(
   };
 }
 
-function areStringArraysEqual(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-function areSortingStatesEqual(a: SortingState, b: SortingState): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((entry, index) => {
-    const other = b[index];
-    return entry.id === other?.id && entry.desc === other?.desc;
-  });
-}
-
-export function areDatasetQueryParamsEqual(
-  a: DatasetQueryParams,
-  b: DatasetQueryParams,
-): boolean {
-  return (
-    a.search === b.search &&
-    a.favoriteOnly === b.favoriteOnly &&
-    areStringArraysEqual(a.tags, b.tags) &&
-    areStringArraysEqual(a.statuses, b.statuses) &&
-    areSortingStatesEqual(a.sorting, b.sorting)
-  );
-}
-
 export type DatasetQueryKey = ReturnType<typeof datasetKeys.list>;
 
 export interface UseDatasetTableDataResult {
   datasets: DatasetInfo[];
-  searchQuery: string;
-  setSearchQuery: (next: string) => void;
-  selectedTags: string[];
-  selectedStatuses: DatasetStatus[];
+  searchInput: string;
+  setSearchInput: (next: string) => void;
+  activeTags: string[];
+  activeStatuses: DatasetStatus[];
   sorting: SortingState;
   setSorting: (
     updater: SortingState | ((prev: SortingState) => SortingState),
   ) => void;
   allTags: string[];
-  favoriteOnly: boolean;
-  setFavoriteOnly: (next: boolean) => void;
+  showFavoritesOnly: boolean;
+  setShowFavoritesOnly: (next: boolean) => void;
   hasMore: boolean;
   hasActiveFilters: boolean;
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;

@@ -12,14 +12,14 @@ function renderToolbar(
   const props = {
     table: createMockTable(),
     hasActiveFilters: false,
-    selectedTags: [],
-    selectedStatuses: [],
-    favoriteOnly: false,
-    searchQuery: "",
+    activeTags: [],
+    activeStatuses: [],
+    showFavoritesOnly: false,
+    searchInput: "",
     allTags: ["vision", "audio"],
     isUpdatingTags: false,
-    setFavoriteOnly: vi.fn(),
-    setSearchQuery: vi.fn(),
+    setShowFavoritesOnly: vi.fn(),
+    setSearchInput: vi.fn(),
     handleTagToggle: vi.fn(),
     handleStatusToggle: vi.fn(),
     clearFilters: vi.fn(),
@@ -56,24 +56,24 @@ describe("DatasetTableToolbar", () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it("calls setSearchQuery from the search input", async () => {
+  it("calls setSearchInput from the search input", async () => {
     const props = renderToolbar();
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText("Filter datasets..."), "Alpha");
 
     await waitFor(() => {
-      expect(props.setSearchQuery).toHaveBeenCalled();
+      expect(props.setSearchInput).toHaveBeenCalled();
     });
   });
 
-  it("calls setFavoriteOnly from the favorites toggle", async () => {
+  it("calls setShowFavoritesOnly from the favorites toggle", async () => {
     const props = renderToolbar();
     const user = userEvent.setup();
 
     await user.click(screen.getByRole("button", { name: /Favorites Only/i }));
 
-    expect(props.setFavoriteOnly).toHaveBeenCalledWith(
+    expect(props.setShowFavoritesOnly).toHaveBeenCalledWith(
       true,
       expect.any(Object),
     );
@@ -84,14 +84,14 @@ describe("DatasetTableToolbar", () => {
       <DatasetTableToolbar
         table={createMockTable()}
         hasActiveFilters={false}
-        selectedTags={[]}
-        selectedStatuses={[]}
-        favoriteOnly={false}
-        searchQuery=""
+        activeTags={[]}
+        activeStatuses={[]}
+        showFavoritesOnly={false}
+        searchInput=""
         allTags={["vision"]}
         isUpdatingTags={false}
-        setFavoriteOnly={vi.fn()}
-        setSearchQuery={vi.fn()}
+        setShowFavoritesOnly={vi.fn()}
+        setSearchInput={vi.fn()}
         handleTagToggle={vi.fn()}
         handleStatusToggle={vi.fn()}
         clearFilters={vi.fn()}
@@ -112,14 +112,14 @@ describe("DatasetTableToolbar", () => {
       <DatasetTableToolbar
         table={createMockTable()}
         hasActiveFilters
-        selectedTags={["vision"]}
-        selectedStatuses={[]}
-        favoriteOnly={false}
-        searchQuery="Alpha"
+        activeTags={["vision"]}
+        activeStatuses={[]}
+        showFavoritesOnly={false}
+        searchInput="Alpha"
         allTags={["vision"]}
         isUpdatingTags={false}
-        setFavoriteOnly={vi.fn()}
-        setSearchQuery={vi.fn()}
+        setShowFavoritesOnly={vi.fn()}
+        setSearchInput={vi.fn()}
         handleTagToggle={vi.fn()}
         handleStatusToggle={vi.fn()}
         clearFilters={vi.fn()}
@@ -138,8 +138,8 @@ describe("DatasetTableToolbar", () => {
   it("calls clearFilters from the reset button", async () => {
     const props = renderToolbar({
       hasActiveFilters: true,
-      selectedTags: ["vision"],
-      searchQuery: "Alpha",
+      activeTags: ["vision"],
+      searchInput: "Alpha",
     });
     const user = userEvent.setup();
 

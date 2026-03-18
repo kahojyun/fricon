@@ -157,9 +157,10 @@ describe("useDatasetTableData", () => {
 
     vi.useFakeTimers();
     act(() => {
-      result.current.setSearchQuery("Alpha");
+      result.current.setSearchInput("Alpha");
     });
 
+    expect(result.current.searchInput).toBe("Alpha");
     expect(listDatasetsMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -362,7 +363,7 @@ describe("useDatasetTableData", () => {
 
     vi.useFakeTimers();
     act(() => {
-      result.current.setSearchQuery("Alpha");
+      result.current.setSearchInput("Alpha");
     });
 
     await act(async () => {
@@ -428,7 +429,7 @@ describe("useDatasetTableData", () => {
     vi.useFakeTimers();
 
     act(() => {
-      result.current.setSearchQuery("A");
+      result.current.setSearchInput("A");
     });
 
     await act(async () => {
@@ -447,7 +448,7 @@ describe("useDatasetTableData", () => {
     });
 
     act(() => {
-      result.current.setSearchQuery("AB");
+      result.current.setSearchInput("AB");
     });
 
     expect(listDatasetsMock).toHaveBeenCalledTimes(3);
@@ -489,7 +490,7 @@ describe("useDatasetTableData", () => {
 
     vi.useFakeTimers();
     act(() => {
-      result.current.setSearchQuery("Alpha");
+      result.current.setSearchInput("Alpha");
     });
 
     await act(async () => {
@@ -674,7 +675,7 @@ describe("useDatasetTableData", () => {
     });
 
     act(() => {
-      result.current.setFavoriteOnly(true);
+      result.current.setShowFavoritesOnly(true);
     });
 
     await waitFor(() => {
@@ -747,6 +748,88 @@ describe("useDatasetTableData", () => {
         offset: 0,
       });
     });
+  });
+
+  it("clears filters while preserving the current sorting", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 12, name: "Alpha dataset" })])
+      .mockResolvedValueOnce([makeDataset({ id: 13, name: "Vision dataset" })])
+      .mockResolvedValueOnce([makeDataset({ id: 14, name: "Sorted dataset" })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(1, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+
+    act(() => {
+      result.current.setSorting([{ id: "name", desc: false }]);
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "name",
+        sortDir: "asc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+
+    act(() => {
+      result.current.handleTagToggle("vision");
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+        search: "",
+        tags: ["vision"],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "name",
+        sortDir: "asc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+
+    act(() => {
+      result.current.clearFilters();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(4, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "name",
+        sortDir: "asc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+
+    expect(result.current.searchInput).toBe("");
   });
 
   it("refreshes datasets on create event instead of prepending locally", async () => {

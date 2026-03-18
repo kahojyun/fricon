@@ -82,8 +82,8 @@ describe("useDatasetTableActions", () => {
   });
 
   it("forwards favorite, delete, and batch tag actions", async () => {
-    const removeSelectedTag = vi.fn();
-    const replaceSelectedTag = vi.fn();
+    const removeActiveTag = vi.fn();
+    const replaceActiveTag = vi.fn();
     const dataset = {
       id: 11,
       favorite: false,
@@ -102,8 +102,8 @@ describe("useDatasetTableActions", () => {
           3,
         ),
         refreshDatasets: refreshDatasetsMock,
-        removeSelectedTag,
-        replaceSelectedTag,
+        removeActiveTag,
+        replaceActiveTag,
       }),
     );
 
@@ -118,13 +118,13 @@ describe("useDatasetTableActions", () => {
     expect(deleteDatasetsMock).toHaveBeenCalledWith([11, 12]);
     expect(batchAddTagsMock).toHaveBeenCalledWith([11], ["vision"]);
     expect(batchRemoveTagsMock).toHaveBeenCalledWith([11], ["vision"]);
-    expect(removeSelectedTag).not.toHaveBeenCalled();
-    expect(replaceSelectedTag).not.toHaveBeenCalled();
+    expect(removeActiveTag).not.toHaveBeenCalled();
+    expect(replaceActiveTag).not.toHaveBeenCalled();
   });
 
   it("removes a selected tag after delete", async () => {
-    const removeSelectedTag = vi.fn();
-    const replaceSelectedTag = vi.fn();
+    const removeActiveTag = vi.fn();
+    const replaceActiveTag = vi.fn();
 
     const { result } = renderHook(() =>
       useDatasetTableActions({
@@ -139,8 +139,8 @@ describe("useDatasetTableActions", () => {
           3,
         ),
         refreshDatasets: refreshDatasetsMock,
-        removeSelectedTag,
-        replaceSelectedTag,
+        removeActiveTag,
+        replaceActiveTag,
       }),
     );
 
@@ -149,13 +149,13 @@ describe("useDatasetTableActions", () => {
     });
 
     expect(deleteTagMock).toHaveBeenCalledWith("vision");
-    expect(removeSelectedTag).toHaveBeenCalledWith("vision");
-    expect(replaceSelectedTag).not.toHaveBeenCalled();
+    expect(removeActiveTag).toHaveBeenCalledWith("vision");
+    expect(replaceActiveTag).not.toHaveBeenCalled();
   });
 
   it("replaces the selected tag after rename and merge", async () => {
-    const removeSelectedTag = vi.fn();
-    const replaceSelectedTag = vi.fn();
+    const removeActiveTag = vi.fn();
+    const replaceActiveTag = vi.fn();
 
     const { result } = renderHook(() =>
       useDatasetTableActions({
@@ -170,8 +170,8 @@ describe("useDatasetTableActions", () => {
           3,
         ),
         refreshDatasets: refreshDatasetsMock,
-        removeSelectedTag,
-        replaceSelectedTag,
+        removeActiveTag,
+        replaceActiveTag,
       }),
     );
 
@@ -182,9 +182,9 @@ describe("useDatasetTableActions", () => {
 
     expect(renameTagMock).toHaveBeenCalledWith("vision", "images");
     expect(mergeTagMock).toHaveBeenCalledWith("images", "archive");
-    expect(replaceSelectedTag).toHaveBeenNthCalledWith(1, "vision", "images");
-    expect(replaceSelectedTag).toHaveBeenNthCalledWith(2, "images", "archive");
-    expect(removeSelectedTag).not.toHaveBeenCalled();
+    expect(replaceActiveTag).toHaveBeenNthCalledWith(1, "vision", "images");
+    expect(replaceActiveTag).toHaveBeenNthCalledWith(2, "images", "archive");
+    expect(removeActiveTag).not.toHaveBeenCalled();
   });
 
   it("reflects underlying delete and tag loading flags", () => {
@@ -204,8 +204,8 @@ describe("useDatasetTableActions", () => {
           3,
         ),
         refreshDatasets: refreshDatasetsMock,
-        removeSelectedTag: vi.fn(),
-        replaceSelectedTag: vi.fn(),
+        removeActiveTag: vi.fn(),
+        replaceActiveTag: vi.fn(),
       }),
     );
 
