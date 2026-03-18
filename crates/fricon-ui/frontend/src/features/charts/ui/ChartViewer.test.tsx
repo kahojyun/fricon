@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { describe, expect, it, vi } from "vitest";
@@ -48,6 +48,15 @@ function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
     columns: [],
     ...overrides,
   };
+}
+
+async function getSelectTrigger(label: string) {
+  const fieldLabel = await screen.findByText(label);
+  const container = fieldLabel.parentElement;
+  if (!(container instanceof HTMLElement)) {
+    throw new Error(`Container not found for select label: ${label}`);
+  }
+  return within(container).getByRole("combobox");
 }
 
 describe("ChartViewer", () => {
@@ -116,15 +125,9 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const chartTypeLabel = await screen.findByText("Chart Type");
-    const chartTypeTrigger = chartTypeLabel
-      .closest("div")
-      ?.querySelector('[data-slot="select-trigger"]');
-    if (!(chartTypeTrigger instanceof HTMLElement)) {
-      throw new Error("Chart type trigger not found");
-    }
+    const chartTypeTrigger = await getSelectTrigger("Chart Type");
     await user.click(chartTypeTrigger);
-    await user.click(await screen.findByText("heatmap"));
+    await user.click(await screen.findByRole("option", { name: "heatmap" }));
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);
@@ -283,15 +286,9 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const chartTypeLabel = await screen.findByText("Chart Type");
-    const chartTypeTrigger = chartTypeLabel
-      .closest("div")
-      ?.querySelector('[data-slot="select-trigger"]');
-    if (!(chartTypeTrigger instanceof HTMLElement)) {
-      throw new Error("Chart type trigger not found");
-    }
+    const chartTypeTrigger = await getSelectTrigger("Chart Type");
     await user.click(chartTypeTrigger);
-    await user.click(await screen.findByText("scatter"));
+    await user.click(await screen.findByRole("option", { name: "scatter" }));
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);
@@ -305,22 +302,9 @@ describe("ChartViewer", () => {
       expect(options.excludeColumns).toEqual(["idxB"]);
     });
 
-    const excludeLabel = await screen.findByText("Index Column (excluded)");
-    const excludeTrigger = excludeLabel
-      .closest("div")
-      ?.querySelector('[data-slot="select-trigger"]');
-    if (!(excludeTrigger instanceof HTMLElement)) {
-      throw new Error("Excluded index trigger not found");
-    }
+    const excludeTrigger = await getSelectTrigger("Index Column (excluded)");
     await user.click(excludeTrigger);
-    const idxAChoices = await screen.findAllByText("idxA");
-    const idxAOption = idxAChoices.find((choice) =>
-      choice.closest('[role="option"]'),
-    );
-    if (!(idxAOption instanceof HTMLElement)) {
-      throw new Error("idxA option not found");
-    }
-    await user.click(idxAOption);
+    await user.click(await screen.findByRole("option", { name: "idxA" }));
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);
