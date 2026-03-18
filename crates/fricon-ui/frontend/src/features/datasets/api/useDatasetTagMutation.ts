@@ -9,6 +9,21 @@ import {
 import { datasetKeys } from "./queryKeys";
 import type { DatasetDeleteResult } from "./types";
 
+async function runTagMutation<T>({
+  setIsUpdatingTags,
+  work,
+}: {
+  setIsUpdatingTags: (next: boolean) => void;
+  work: () => Promise<T>;
+}): Promise<T> {
+  setIsUpdatingTags(true);
+  try {
+    return await work();
+  } finally {
+    setIsUpdatingTags(false);
+  }
+}
+
 export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
   const queryClient = useQueryClient();
   const [isUpdatingTags, setIsUpdatingTags] = useState(false);
@@ -26,71 +41,66 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
   const batchAddTags = async (
     ids: number[],
     tags: string[],
-  ): Promise<DatasetDeleteResult[]> => {
-    setIsUpdatingTags(true);
-    try {
-      const results = await batchUpdateDatasetTagsApi(ids, tags, []);
-      // Invalidate detail queries for affected datasets
-      ids.forEach((id) => {
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
+  ): Promise<DatasetDeleteResult[]> =>
+    runTagMutation({
+      setIsUpdatingTags,
+      work: async () => {
+        const results = await batchUpdateDatasetTagsApi(ids, tags, []);
+        // Invalidate detail queries for affected datasets
+        ids.forEach((id) => {
+          void queryClient.invalidateQueries({
+            queryKey: datasetKeys.detail(id),
+          });
         });
-      });
-      await invalidateAfterTagChange();
-      return results;
-    } finally {
-      setIsUpdatingTags(false);
-    }
-  };
+        await invalidateAfterTagChange();
+        return results;
+      },
+    });
 
   const batchRemoveTags = async (
     ids: number[],
     tags: string[],
-  ): Promise<DatasetDeleteResult[]> => {
-    setIsUpdatingTags(true);
-    try {
-      const results = await batchUpdateDatasetTagsApi(ids, [], tags);
-      ids.forEach((id) => {
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
+  ): Promise<DatasetDeleteResult[]> =>
+    runTagMutation({
+      setIsUpdatingTags,
+      work: async () => {
+        const results = await batchUpdateDatasetTagsApi(ids, [], tags);
+        ids.forEach((id) => {
+          void queryClient.invalidateQueries({
+            queryKey: datasetKeys.detail(id),
+          });
         });
-      });
-      await invalidateAfterTagChange();
-      return results;
-    } finally {
-      setIsUpdatingTags(false);
-    }
-  };
+        await invalidateAfterTagChange();
+        return results;
+      },
+    });
 
-  const deleteTag = async (tag: string): Promise<void> => {
-    setIsUpdatingTags(true);
-    try {
-      await deleteTagApi(tag);
-      await invalidateAfterTagChange(true);
-    } finally {
-      setIsUpdatingTags(false);
-    }
-  };
+  const deleteTag = (tag: string): Promise<void> =>
+    runTagMutation({
+      setIsUpdatingTags,
+      work: async () => {
+        await deleteTagApi(tag);
+        await invalidateAfterTagChange(true);
+      },
+    });
 
-  const renameTag = async (oldName: string, newName: string): Promise<void> => {
-    setIsUpdatingTags(true);
-    try {
-      await renameTagApi(oldName, newName);
-      await invalidateAfterTagChange(true);
-    } finally {
-      setIsUpdatingTags(false);
-    }
-  };
+  const renameTag = (oldName: string, newName: string): Promise<void> =>
+    runTagMutation({
+      setIsUpdatingTags,
+      work: async () => {
+        await renameTagApi(oldName, newName);
+        await invalidateAfterTagChange(true);
+      },
+    });
 
-  const mergeTag = async (source: string, target: string): Promise<void> => {
-    setIsUpdatingTags(true);
-    try {
-      await mergeTagApi(source, target);
-      await invalidateAfterTagChange(true);
-    } finally {
-      setIsUpdatingTags(false);
-    }
-  };
+  const mergeTag = (source: string, target: string): Promise<void> =>
+    runTagMutation({
+      setIsUpdatingTags,
+      work: async () => {
+        await mergeTagApi(source, target);
+        await invalidateAfterTagChange(true);
+      },
+    });
 
   return {
     batchAddTags,
