@@ -44,7 +44,7 @@ vi.mock("@/shared/ui/select", async () => {
     children,
     className,
   }: React.PropsWithChildren<{ className?: string }>) {
-    const context = react.useContext(SelectContext);
+    const context = react.use(SelectContext);
     return react.createElement(
       "button",
       {
@@ -57,7 +57,7 @@ vi.mock("@/shared/ui/select", async () => {
   }
 
   function SelectValue({ placeholder }: { placeholder?: string }) {
-    const context = react.useContext(SelectContext);
+    const context = react.use(SelectContext);
     return react.createElement(
       "span",
       null,
@@ -74,7 +74,7 @@ vi.mock("@/shared/ui/select", async () => {
     children,
     className,
   }: React.PropsWithChildren<{ value: string; className?: string }>) {
-    const context = react.useContext(SelectContext);
+    const context = react.use(SelectContext);
     return react.createElement(
       "button",
       {
@@ -125,14 +125,18 @@ describe("ManageTagsDialog", () => {
     const user = userEvent.setup();
 
     await openDialog(user);
-    await user.click(screen.getByRole("button", { name: /Rename tag vision/i }));
+    await user.click(
+      screen.getByRole("button", { name: /Rename tag vision/i }),
+    );
     await user.click(screen.getByRole("button", { name: "Confirm rename" }));
 
     expect(props.onRenameTag).not.toHaveBeenCalled();
     expect(
       screen.queryByRole("button", { name: "Confirm rename" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Rename tag vision/i })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /Rename tag vision/i }),
+    ).toBeVisible();
   });
 
   it("rejects duplicate tag renames locally", async () => {
@@ -140,7 +144,9 @@ describe("ManageTagsDialog", () => {
     const user = userEvent.setup();
 
     await openDialog(user);
-    await user.click(screen.getByRole("button", { name: /Rename tag vision/i }));
+    await user.click(
+      screen.getByRole("button", { name: /Rename tag vision/i }),
+    );
 
     const input = screen.getByDisplayValue("vision");
     await user.clear(input);
@@ -148,8 +154,12 @@ describe("ManageTagsDialog", () => {
     await user.click(screen.getByRole("button", { name: "Confirm rename" }));
 
     expect(props.onRenameTag).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith('A tag named "audio" already exists.');
-    expect(screen.getByRole("button", { name: "Confirm rename" })).toBeVisible();
+    expect(toastError).toHaveBeenCalledWith(
+      'A tag named "audio" already exists.',
+    );
+    expect(
+      screen.getByRole("button", { name: "Confirm rename" }),
+    ).toBeVisible();
   });
 
   it("requires a merge target and calls the merge mutation once selected", async () => {
@@ -184,7 +194,9 @@ describe("ManageTagsDialog", () => {
 
     await openDialog(user);
 
-    await user.click(screen.getByRole("button", { name: /Rename tag vision/i }));
+    await user.click(
+      screen.getByRole("button", { name: /Rename tag vision/i }),
+    );
     const input = screen.getByDisplayValue("vision");
     await user.clear(input);
     await user.type(input, "images");
@@ -218,7 +230,9 @@ describe("ManageTagsDialog", () => {
     const user = userEvent.setup();
 
     await openDialog(user);
-    await user.click(screen.getByRole("button", { name: /Rename tag vision/i }));
+    await user.click(
+      screen.getByRole("button", { name: /Rename tag vision/i }),
+    );
 
     const input = screen.getByDisplayValue("vision");
     await user.clear(input);
@@ -230,8 +244,12 @@ describe("ManageTagsDialog", () => {
     });
 
     expect(screen.getByDisplayValue("images")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Confirm rename" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Cancel rename" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Confirm rename" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Cancel rename" }),
+    ).toBeDisabled();
 
     resolveRename?.();
 

@@ -39,16 +39,13 @@ function createWrapper() {
       },
     },
   });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 
   return {
     queryClient,
-    wrapper({ children }: { children: ReactNode }) {
-      return (
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      );
-    },
+    wrapper,
   };
 }
 
@@ -116,7 +113,10 @@ describe("DatasetPropertiesPanel", () => {
     await user.clear(await screen.findByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Dataset 1 (edited)");
     await user.clear(screen.getByLabelText("Description"));
-    await user.type(screen.getByLabelText("Description"), "Updated description");
+    await user.type(
+      screen.getByLabelText("Description"),
+      "Updated description",
+    );
     await user.clear(screen.getByPlaceholderText("Comma separated tags"));
     await user.type(
       screen.getByPlaceholderText("Comma separated tags"),

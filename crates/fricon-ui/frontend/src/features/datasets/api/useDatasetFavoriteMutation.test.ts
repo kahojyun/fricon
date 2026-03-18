@@ -121,7 +121,9 @@ describe("useDatasetFavoriteMutation", () => {
         },
       },
     });
-    const refreshDatasets = vi.fn().mockRejectedValue(new Error("refresh failed"));
+    const refreshDatasets = vi
+      .fn()
+      .mockRejectedValue(new Error("refresh failed"));
     const dataset = makeDataset({ id: 1, favorite: false });
     queryClient.setQueryData(datasetQueryKey, [dataset]);
     updateDatasetFavoriteMock.mockResolvedValue(undefined);
