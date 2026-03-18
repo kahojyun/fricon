@@ -39,7 +39,6 @@ interface DatasetPropertiesPanelProps {
   detail: DatasetDetail | null;
   isLoading: boolean;
   loadErrorMessage: string | null;
-  onDatasetUpdated?: () => void;
 }
 
 export function DatasetPropertiesPanel({
@@ -47,7 +46,6 @@ export function DatasetPropertiesPanel({
   detail,
   isLoading,
   loadErrorMessage,
-  onDatasetUpdated,
 }: DatasetPropertiesPanelProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-1">
@@ -60,7 +58,6 @@ export function DatasetPropertiesPanel({
           key={buildDatasetDetailEditorKey(datasetId, detail)}
           datasetId={datasetId}
           detail={detail}
-          onDatasetUpdated={onDatasetUpdated}
         />
       ) : null}
 
@@ -76,7 +73,6 @@ export function DatasetPropertiesPanel({
 interface DatasetDetailEditorProps {
   datasetId: number;
   detail: DatasetDetail;
-  onDatasetUpdated?: () => void;
 }
 
 interface DatasetDetailEditorDraft {
@@ -87,11 +83,7 @@ interface DatasetDetailEditorDraft {
   normalizedTags: string[];
 }
 
-function DatasetDetailEditor({
-  datasetId,
-  detail,
-  onDatasetUpdated,
-}: DatasetDetailEditorProps) {
+function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
   const queryClient = useQueryClient();
   const initialDraft = createDatasetDetailEditorDraft(detail);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
@@ -139,8 +131,6 @@ function DatasetDetailEditor({
       );
       return;
     }
-
-    onDatasetUpdated?.();
   };
 
   return (
