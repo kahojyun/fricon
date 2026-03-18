@@ -10,11 +10,17 @@ import { useDatasetTableActions } from "./useDatasetTableActions";
 export function useDatasetTableData(): UseDatasetTableDataResult {
   const filters = useDatasetTableFilters();
   const { datasetQueryKey, datasets, hasMore, refreshDatasets, loadNextPage } =
-    useDatasetTableQuery(
-      filters.debouncedQueryParams,
-      filters.visibleCount,
-      filters.loadNextPage,
-    );
+    useDatasetTableQuery({
+      searchQuery: filters.searchQuery,
+      selectedTags: filters.selectedTags,
+      selectedStatuses: filters.selectedStatuses,
+      favoriteOnly: filters.favoriteOnly,
+      sorting: filters.sorting,
+      visibleCount: filters.visibleCount,
+      searchTransitionVisibleCount: filters.searchTransitionVisibleCount,
+      clearSearchTransition: filters.clearSearchTransition,
+      incrementVisibleCount: filters.loadNextPage,
+    });
 
   const tagsQuery = useQuery({
     queryKey: datasetKeys.tags(),

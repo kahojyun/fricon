@@ -160,6 +160,8 @@ describe("useDatasetTableData", () => {
       result.current.setSearchQuery("Alpha");
     });
 
+    expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300);
     });
@@ -306,7 +308,7 @@ describe("useDatasetTableData", () => {
     expect(listDatasetsMock).toHaveBeenCalledTimes(2);
   });
 
-  it("resets the query limit when debounced filters change", async () => {
+  it("resets the query limit when the debounced search changes", async () => {
     listDatasetsMock
       .mockResolvedValueOnce([
         makeDataset({ id: 1 }),
@@ -376,6 +378,371 @@ describe("useDatasetTableData", () => {
         statuses: [],
         sortBy: "id",
         sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+  });
+
+  it("does not reuse a stale pre-search limit for later searches", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 9, name: "A dataset" })])
+      .mockResolvedValueOnce([makeDataset({ id: 10, name: "AB dataset" })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    vi.useFakeTimers();
+
+    act(() => {
+      result.current.setSearchQuery("A");
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+      search: "A",
+      tags: [],
+      favoriteOnly: false,
+      statuses: [],
+      sortBy: "id",
+      sortDir: "desc",
+      limit: 3,
+      offset: 0,
+    });
+
+    act(() => {
+      result.current.setSearchQuery("AB");
+    });
+
+    expect(listDatasetsMock).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    vi.useRealTimers();
+
+    expect(listDatasetsMock).toHaveBeenNthCalledWith(4, {
+      search: "AB",
+      tags: [],
+      favoriteOnly: false,
+      statuses: [],
+      sortBy: "id",
+      sortDir: "desc",
+      limit: 3,
+      offset: 0,
+    });
+  });
+
+  it("ignores loadNextPage while a search debounce is pending", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 9, name: "Alpha dataset" })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setSearchQuery("Alpha");
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    expect(listDatasetsMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "Alpha",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+  });
+
+  it("applies tag filters immediately and resets the query limit", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 9, tags: ["vision"] })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    act(() => {
+      result.current.handleTagToggle("vision");
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+        search: "",
+        tags: ["vision"],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+  });
+
+  it("applies status filters immediately and resets the query limit", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 10, status: "Writing" })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    act(() => {
+      result.current.handleStatusToggle("Writing");
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: ["Writing"],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+  });
+
+  it("applies favorite-only filters immediately and resets the query limit", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 11, favorite: true })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    act(() => {
+      result.current.setFavoriteOnly(true);
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+        search: "",
+        tags: [],
+        favoriteOnly: true,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 3,
+        offset: 0,
+      });
+    });
+  });
+
+  it("applies sorting changes immediately and resets the query limit", async () => {
+    listDatasetsMock
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+      ])
+      .mockResolvedValueOnce([
+        makeDataset({ id: 1 }),
+        makeDataset({ id: 2 }),
+        makeDataset({ id: 3 }),
+        makeDataset({ id: 4 }),
+      ])
+      .mockResolvedValueOnce([makeDataset({ id: 12, name: "Alpha dataset" })]);
+
+    const { result } = renderHook(() => useDatasetTableData(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.loadNextPage();
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "id",
+        sortDir: "desc",
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    act(() => {
+      result.current.setSorting([{ id: "name", desc: false }]);
+    });
+
+    await waitFor(() => {
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
+        search: "",
+        tags: [],
+        favoriteOnly: false,
+        statuses: [],
+        sortBy: "name",
+        sortDir: "asc",
         limit: 3,
         offset: 0,
       });

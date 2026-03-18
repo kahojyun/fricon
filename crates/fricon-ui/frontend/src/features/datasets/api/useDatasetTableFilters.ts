@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useReducer } from "react";
 import type { SortingState } from "@tanstack/react-table";
-import { DATASET_PAGE_SIZE, type DatasetStatus } from "./types";
+import type { DatasetStatus } from "./types";
 import {
-  areDatasetQueryParamsEqual,
-  type DatasetQueryParams,
-} from "./datasetTableShared";
+  createInitialDatasetTableFiltersState,
+  datasetTableFiltersReducer,
+} from "../model/datasetTableFiltersReducer";
 
 interface DatasetTableFiltersResult {
   searchQuery: string;
@@ -17,8 +17,9 @@ interface DatasetTableFiltersResult {
   setSorting: (
     updater: SortingState | ((prev: SortingState) => SortingState),
   ) => void;
-  debouncedQueryParams: DatasetQueryParams;
   visibleCount: number;
+  searchTransitionVisibleCount: number | null;
+  clearSearchTransition: () => void;
   loadNextPage: () => Promise<void>;
   handleTagToggle: (tag: string) => void;
   handleStatusToggle: (status: DatasetStatus) => void;
@@ -28,120 +29,74 @@ interface DatasetTableFiltersResult {
   hasActiveFilters: boolean;
 }
 
-const DEFAULT_SORTING: SortingState = [{ id: "id", desc: true }];
-
 export function useDatasetTableFilters(): DatasetTableFiltersResult {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<DatasetStatus[]>([]);
-  const [favoriteOnly, setFavoriteOnly] = useState(false);
-  const [sortingState, setSortingState] =
-    useState<SortingState>(DEFAULT_SORTING);
-  const [visibleCount, setVisibleCount] = useState(DATASET_PAGE_SIZE);
-  const [debouncedQueryParams, setDebouncedQueryParams] =
-    useState<DatasetQueryParams>(() => ({
-      search: searchQuery,
-      tags: selectedTags,
-      favoriteOnly,
-      statuses: selectedStatuses,
-      sorting: sortingState,
-    }));
-  const latestDebouncedQueryParamsRef = useRef(debouncedQueryParams);
+  const [state, dispatch] = useReducer(
+    datasetTableFiltersReducer,
+    undefined,
+    createInitialDatasetTableFiltersState,
+  );
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const nextDebouncedQueryParams = {
-        search: searchQuery,
-        tags: selectedTags,
-        favoriteOnly,
-        statuses: selectedStatuses,
-        sorting: sortingState,
-      };
-      const didQueryParamsChange = !areDatasetQueryParamsEqual(
-        latestDebouncedQueryParamsRef.current,
-        nextDebouncedQueryParams,
-      );
-
-      setDebouncedQueryParams(nextDebouncedQueryParams);
-      latestDebouncedQueryParamsRef.current = nextDebouncedQueryParams;
-
-      if (didQueryParamsChange) {
-        setVisibleCount(DATASET_PAGE_SIZE);
-      }
-    }, 300);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [searchQuery, selectedTags, favoriteOnly, selectedStatuses, sortingState]);
+  const handleSearchQueryChange = (next: string) => {
+    dispatch({ type: "set_search_query", next });
+  };
 
   const setSorting = (
     updater: SortingState | ((prev: SortingState) => SortingState),
   ) => {
-    setSortingState((prev) => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      const first = next[0];
-      return first ? [first] : [];
-    });
+    dispatch({ type: "set_sorting", updater });
   };
 
   const handleTagToggle = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag],
-    );
+    dispatch({ type: "toggle_tag", tag });
   };
 
   const handleStatusToggle = (status: DatasetStatus) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(status)
-        ? prev.filter((item) => item !== status)
-        : [...prev, status],
-    );
+    dispatch({ type: "toggle_status", status });
   };
 
   const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedTags([]);
-    setSelectedStatuses([]);
-    setFavoriteOnly(false);
+    dispatch({ type: "clear_filters" });
   };
 
   const removeSelectedTag = (tag: string) => {
-    setSelectedTags((prev) => prev.filter((item) => item !== tag));
+    dispatch({ type: "remove_selected_tag", tag });
   };
 
   const replaceSelectedTag = (oldName: string, newName: string) => {
-    setSelectedTags((prev) => {
-      if (!prev.includes(oldName)) {
-        return prev;
-      }
+    dispatch({ type: "replace_selected_tag", oldName, newName });
+  };
 
-      const next = prev.map((item) => (item === oldName ? newName : item));
-      return next.filter((item, index) => next.indexOf(item) === index);
-    });
+  const handleFavoriteOnlyChange = (next: boolean) => {
+    dispatch({ type: "set_favorite_only", next });
   };
 
   const hasActiveFilters =
-    searchQuery.trim().length > 0 ||
-    favoriteOnly ||
-    selectedTags.length > 0 ||
-    selectedStatuses.length > 0;
+    state.searchQuery.trim().length > 0 ||
+    state.favoriteOnly ||
+    state.selectedTags.length > 0 ||
+    state.selectedStatuses.length > 0;
 
   const loadNextPage = () => {
-    setVisibleCount((current) => current + DATASET_PAGE_SIZE);
+    dispatch({ type: "load_next_page" });
     return Promise.resolve();
   };
 
+  const clearSearchTransition = () => {
+    dispatch({ type: "clear_search_transition" });
+  };
+
   return {
-    searchQuery,
-    setSearchQuery,
-    selectedTags,
-    selectedStatuses,
-    favoriteOnly,
-    setFavoriteOnly,
-    sorting: sortingState,
+    searchQuery: state.searchQuery,
+    setSearchQuery: handleSearchQueryChange,
+    selectedTags: state.selectedTags,
+    selectedStatuses: state.selectedStatuses,
+    favoriteOnly: state.favoriteOnly,
+    setFavoriteOnly: handleFavoriteOnlyChange,
+    sorting: state.sorting,
     setSorting,
-    debouncedQueryParams,
-    visibleCount,
+    visibleCount: state.visibleCount,
+    searchTransitionVisibleCount: state.searchTransitionVisibleCount,
+    clearSearchTransition,
     loadNextPage,
     handleTagToggle,
     handleStatusToggle,
