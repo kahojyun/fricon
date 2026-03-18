@@ -20,6 +20,25 @@ interface UseDatasetDeleteFlowArgs {
   notify: DatasetDeleteFlowNotifier;
 }
 
+async function requestDatasetDelete({
+  deleteDatasets,
+  ids,
+  notify,
+}: {
+  deleteDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
+  ids: number[];
+  notify: DatasetDeleteFlowNotifier;
+}): Promise<DatasetDeleteResult[] | null> {
+  try {
+    return await deleteDatasets(ids);
+  } catch (error) {
+    notify.error(
+      error instanceof Error ? error.message : "Failed to delete dataset(s)",
+    );
+    return null;
+  }
+}
+
 export function useDatasetDeleteFlow({
   deleteDatasets,
   isDeleting,
@@ -45,50 +64,52 @@ export function useDatasetDeleteFlow({
   };
 
   const confirmDelete = async () => {
-    try {
-      const results = await deleteDatasets(idsToDelete);
-      const summary = summarizeDatasetDeleteResults(results);
-
-      if (
-        selectedDatasetId !== undefined &&
-        summary.successIds.includes(selectedDatasetId)
-      ) {
-        onDatasetSelected(undefined);
-      }
-
-      if (summary.outcome === "success") {
-        setRowSelection({});
-        setIdsToDelete([]);
-        setIsDeleteDialogOpen(false);
-        notify.success(
-          `Successfully deleted ${summary.successIds.length} dataset(s)`,
-        );
-        return;
-      }
-
-      if (summary.outcome === "failure") {
-        setRowSelection(buildSelectionFromIds(summary.failedIds));
-        notify.error(
-          `Failed to delete ${summary.failedResults.length} dataset(s)`,
-        );
-        return;
-      }
-
-      setRowSelection(buildSelectionFromIds(summary.failedIds));
-      setIdsToDelete(summary.failedIds);
-      notify.warning(
-        `Successfully deleted ${summary.successIds.length} dataset(s), but ${summary.failedResults.length} failed.`,
-        {
-          description: summary.failedResults
-            .map((result) => `ID ${result.id}: ${result.error}`)
-            .join("\n"),
-        },
-      );
-    } catch (error) {
-      notify.error(
-        error instanceof Error ? error.message : "Failed to delete dataset(s)",
-      );
+    const results = await requestDatasetDelete({
+      deleteDatasets,
+      ids: idsToDelete,
+      notify,
+    });
+    if (!results) {
+      return;
     }
+
+    const summary = summarizeDatasetDeleteResults(results);
+
+    if (
+      selectedDatasetId !== undefined &&
+      summary.successIds.includes(selectedDatasetId)
+    ) {
+      onDatasetSelected(undefined);
+    }
+
+    if (summary.outcome === "success") {
+      setRowSelection({});
+      setIdsToDelete([]);
+      setIsDeleteDialogOpen(false);
+      notify.success(
+        `Successfully deleted ${summary.successIds.length} dataset(s)`,
+      );
+      return;
+    }
+
+    if (summary.outcome === "failure") {
+      setRowSelection(buildSelectionFromIds(summary.failedIds));
+      notify.error(
+        `Failed to delete ${summary.failedResults.length} dataset(s)`,
+      );
+      return;
+    }
+
+    setRowSelection(buildSelectionFromIds(summary.failedIds));
+    setIdsToDelete(summary.failedIds);
+    notify.warning(
+      `Successfully deleted ${summary.successIds.length} dataset(s), but ${summary.failedResults.length} failed.`,
+      {
+        description: summary.failedResults
+          .map((result) => `ID ${result.id}: ${result.error}`)
+          .join("\n"),
+      },
+    );
   };
 
   return {
