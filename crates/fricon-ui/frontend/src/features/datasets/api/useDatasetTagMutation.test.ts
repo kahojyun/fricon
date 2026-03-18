@@ -123,8 +123,10 @@ describe("useDatasetTagMutation", () => {
       queryKey: datasetKeys.detail(1),
     });
 
-    resolveRefresh?.();
-    await expect(mutationPromise).resolves.toEqual(results);
+    await act(async () => {
+      resolveRefresh?.();
+      await expect(mutationPromise).resolves.toEqual(results);
+    });
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
       queryKey: datasetKeys.tags(),
     });
@@ -270,8 +272,10 @@ describe("useDatasetTagMutation", () => {
       expect(result.current.isUpdatingTags).toBe(true);
     });
 
-    rejectMerge?.(new Error("merge failed"));
-    await expect(mutationPromise).rejects.toThrow("merge failed");
+    await act(async () => {
+      rejectMerge?.(new Error("merge failed"));
+      await expect(mutationPromise).rejects.toThrow("merge failed");
+    });
     await waitFor(() => {
       expect(result.current.isUpdatingTags).toBe(false);
     });

@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
-import { RouterProvider } from "@tanstack/react-router";
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRouter,
+} from "@tanstack/react-router";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { router } from "./router";
+import { routeTree } from "@/routeTree.gen";
 
 const { datasetCreatedListenMock, datasetUpdatedListenMock } = vi.hoisted(
   () => ({
@@ -71,11 +75,8 @@ describe("router app shell", () => {
     datasetUpdatedListenMock.mockReset();
     datasetCreatedListenMock.mockResolvedValue(() => undefined);
     datasetUpdatedListenMock.mockResolvedValue(() => undefined);
-    window.history.pushState({}, "", "/");
-    if (typeof window.localStorage?.removeItem === "function") {
-      for (const key of Object.keys(window.localStorage)) {
-        window.localStorage.removeItem(key);
-      }
+    if (typeof window.localStorage?.clear === "function") {
+      window.localStorage.clear();
     }
     Element.prototype.scrollIntoView = vi.fn();
 
@@ -105,11 +106,16 @@ describe("router app shell", () => {
 
   afterEach(() => {
     clearMocks();
-    window.history.pushState({}, "", "/");
   });
 
   it("renders the real app shell and navigates between root and credits", async () => {
     const user = userEvent.setup();
+    const router = createRouter({
+      routeTree,
+      history: createMemoryHistory({
+        initialEntries: ["/"],
+      }),
+    });
 
     await act(async () => {
       render(<RouterProvider router={router} />);
@@ -126,35 +132,34 @@ describe("router app shell", () => {
     const creditsLink = screen.getByRole("button", { name: "Credits" });
     expect(dataLink).toHaveAttribute("data-active", "true");
     expect(creditsLink).not.toHaveAttribute("data-active", "true");
+    expect(dataLink).toHaveAttribute("href", "/");
+    expect(creditsLink).toHaveAttribute("href", "/credits");
+    expect(router.state.location.pathname).toBe("/");
 
-    await act(async () => {
-      await user.click(creditsLink);
-    });
+    await user.click(creditsLink);
 
     expect(
       await screen.findByRole("button", {
         name: "Computer icons created by Freepik - Flaticon",
       }),
     ).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/credits");
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Credits" })).toHaveAttribute(
         "data-active",
         "true",
       );
     });
+    expect(router.state.location.pathname).toBe("/credits");
 
-    await act(async () => {
-      await user.click(screen.getByRole("button", { name: "Data" }));
-    });
+    await user.click(screen.getByRole("button", { name: "Data" }));
 
     expect(await screen.findByText("No dataset selected")).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/");
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Data" })).toHaveAttribute(
         "data-active",
         "true",
       );
     });
+    expect(router.state.location.pathname).toBe("/");
   });
 });

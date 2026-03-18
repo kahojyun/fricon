@@ -76,7 +76,7 @@ describe("DatasetPropertiesPanel", () => {
     render(
       <DatasetPropertiesPanel
         datasetId={1}
-        detail={makeDetail({ tags: ["alpha", "alpha"] })}
+        detail={makeDetail({ tags: ["alpha"] })}
         isLoading={false}
         loadErrorMessage={null}
       />,
@@ -88,7 +88,7 @@ describe("DatasetPropertiesPanel", () => {
 
     const tagsInput = screen.getByPlaceholderText("Comma separated tags");
     await user.clear(tagsInput);
-    await user.type(tagsInput, " alpha ");
+    await user.type(tagsInput, " alpha, alpha ");
 
     expect(saveButton).toBeDisabled();
   });

@@ -90,10 +90,8 @@ describe("DatasetExplorerScreen integration", () => {
     datasetUpdatedListenMock.mockReset();
     datasetCreatedListenMock.mockResolvedValue(() => undefined);
     datasetUpdatedListenMock.mockResolvedValue(() => undefined);
-    if (typeof window.localStorage?.removeItem === "function") {
-      for (const key of Object.keys(window.localStorage)) {
-        window.localStorage.removeItem(key);
-      }
+    if (typeof window.localStorage?.clear === "function") {
+      window.localStorage.clear();
     }
     Element.prototype.scrollIntoView = vi.fn();
 
