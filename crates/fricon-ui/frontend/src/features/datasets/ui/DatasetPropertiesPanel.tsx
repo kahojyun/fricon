@@ -133,12 +133,14 @@ function DatasetDetailEditor({
         queryKey: datasetKeys.detail(datasetId),
       });
       setSuccessMessage("Dataset updated.");
-      onDatasetUpdated?.();
     } catch (error) {
       setSaveErrorMessage(
         error instanceof Error ? error.message : String(error),
       );
+      return;
     }
+
+    onDatasetUpdated?.();
   };
 
   return (

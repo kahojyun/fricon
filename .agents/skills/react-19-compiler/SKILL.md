@@ -79,6 +79,9 @@ Removing legacy memoization can change compiler output. Keep it unless tests or 
 6. Use lint-driven incremental adoption.
 Upgrade `eslint-plugin-react-hooks`, then fix purity, immutability, refs, unsupported syntax, static component, and render/effect state issues over time. Compiler diagnostics skip only the unsafe components and hooks.
 
+7. Enable `react-hooks/todo` intentionally when you want hidden compiler bailouts surfaced in normal lint.
+The standard `recommended` and `recommended-latest` presets do not currently enable `react-hooks/todo`. Turn it on explicitly, usually as `warn`, to expose compiler TODO diagnostics that are otherwise easy to miss, especially unsupported `try/catch/finally` lowering paths.
+
 ## High-Value Interpretations
 
 1. In React 19 codebases with the compiler enabled, plain code is the baseline.
@@ -103,4 +106,5 @@ Conditional or looped `use(...)` does not relax the ordinary Rules of Hooks for 
 - Render-time side effects, mutation, and ref access remain high-signal causes of compiler skips and lint findings.
 - Removing effect dependencies or old manual memoization without proof can change behavior.
 - `react-hooks/incompatible-library` means compiler memoization is unavailable for that boundary; do not mechanically apply or remove `useMemo` / `useCallback` based on compiler-era heuristics alone. Follow the library's own contract instead.
+- If a component or hook is skipped by the compiler but ordinary lint is clean, check whether `react-hooks/todo` is enabled before assuming there is no actionable compiler diagnostic.
 - Libraries that depend on React internals or outdated test infrastructure remain upgrade and compatibility risks.
