@@ -44,7 +44,7 @@ function sortStateToAriaSort(sorted: false | "asc" | "desc") {
   if (sorted === "desc") {
     return "descending";
   }
-  return "none";
+  return undefined;
 }
 
 export function DatasetTable({

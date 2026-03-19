@@ -194,6 +194,9 @@ describe("DatasetTable", () => {
       "descending",
     );
     expect(
+      screen.getByRole("columnheader", { name: /^Name/ }),
+    ).not.toHaveAttribute("aria-sort");
+    expect(
       screen.getByRole("columnheader", { name: "Status" }),
     ).not.toHaveAttribute("aria-sort");
 
@@ -206,6 +209,9 @@ describe("DatasetTable", () => {
       "aria-sort",
       "ascending",
     );
+    expect(
+      screen.getByRole("columnheader", { name: /^Name/ }),
+    ).not.toHaveAttribute("aria-sort");
     expect(
       screen.getByRole("columnheader", { name: "Status" }),
     ).not.toHaveAttribute("aria-sort");
