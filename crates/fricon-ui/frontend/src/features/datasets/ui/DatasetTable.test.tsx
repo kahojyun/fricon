@@ -50,6 +50,7 @@ describe("DatasetTable", () => {
     toastSuccess.mockReset();
     toastError.mockReset();
     toastWarning.mockReset();
+    window.localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
   });
 
