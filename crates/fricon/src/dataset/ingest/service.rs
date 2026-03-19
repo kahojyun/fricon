@@ -6,7 +6,7 @@ use crate::{
     dataset::{
         events::DatasetEventPublisher,
         ingest::{
-            CreateDatasetInputSource, CreateDatasetRequest, DatasetIngestRepository, IngestError,
+            CreateDatasetInput, CreateDatasetRequest, DatasetIngestRepository, IngestError,
             WriteSessionRegistry, create,
         },
         model::DatasetRecord,
@@ -35,12 +35,16 @@ impl DatasetIngestService {
         }
     }
 
-    pub(crate) fn create_dataset<S: CreateDatasetInputSource, P: DatasetEventPublisher>(
+    pub(crate) fn create_dataset<P, F>(
         &self,
         request: &CreateDatasetRequest,
-        input_source: &mut S,
+        next_input: F,
         events: &P,
-    ) -> Result<DatasetRecord, IngestError> {
+    ) -> Result<DatasetRecord, IngestError>
+    where
+        P: DatasetEventPublisher,
+        F: FnMut() -> Option<CreateDatasetInput>,
+    {
         let dataset_name = request.name.clone();
 
         create::create_dataset_with(
@@ -49,7 +53,7 @@ impl DatasetIngestService {
             events,
             &self.write_sessions,
             request,
-            input_source,
+            next_input,
         )
         .inspect_err(|e| {
             error!(error = %e, dataset.name = %dataset_name, "Dataset creation failed");

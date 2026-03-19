@@ -18,10 +18,10 @@ pub use self::{
     app::{AppHandle, AppManager},
     client::{Client, Dataset, DatasetWriter, ExistingUiProbeResult},
     dataset::{
-        CreateDatasetInput, CreateDatasetRequest, DatasetArray, DatasetDataType, DatasetEvent,
-        DatasetId, DatasetListQuery, DatasetMetadata, DatasetReader, DatasetRecord, DatasetRow,
-        DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus, DatasetUpdate, FixedStepTrace,
-        ScalarArray, ScalarKind, SelectOptions, SortDirection, TraceKind, VariableStepTrace,
+        DatasetArray, DatasetDataType, DatasetEvent, DatasetId, DatasetListQuery, DatasetMetadata,
+        DatasetReader, DatasetRecord, DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy,
+        DatasetStatus, DatasetUpdate, FixedStepTrace, ScalarArray, ScalarKind, SelectOptions,
+        SortDirection, TraceKind, VariableStepTrace,
     },
     workspace::{WorkspaceRoot, get_log_dir},
 };

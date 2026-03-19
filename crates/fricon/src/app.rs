@@ -1,7 +1,6 @@
 mod server;
 
 use std::{
-    collections::VecDeque,
     path::PathBuf,
     sync::{Arc, Weak},
     time::Duration,
@@ -25,9 +24,7 @@ use crate::{
         DatasetReader, DatasetRecord, DatasetUpdate,
         catalog::{CatalogError, DatasetCatalogService},
         events::DatasetEventPublisher,
-        ingest::{
-            CreateDatasetInputSource, DatasetIngestService, IngestError, WriteSessionRegistry,
-        },
+        ingest::{DatasetIngestService, IngestError, WriteSessionRegistry},
         read::{DatasetReadService, ReadError},
     },
     workspace::{WorkspacePaths, WorkspaceRoot},
@@ -88,34 +85,6 @@ struct BroadcastDatasetEvents {
 impl DatasetEventPublisher for BroadcastDatasetEvents {
     fn publish(&self, event: DatasetEvent) {
         let _ = self.sender.send(event);
-    }
-}
-
-struct VecCreateDatasetInputSource {
-    inputs: VecDeque<CreateDatasetInput>,
-}
-
-impl VecCreateDatasetInputSource {
-    fn new(inputs: Vec<CreateDatasetInput>) -> Self {
-        Self {
-            inputs: VecDeque::from(inputs),
-        }
-    }
-}
-
-impl CreateDatasetInputSource for VecCreateDatasetInputSource {
-    fn next_input(&mut self) -> Option<CreateDatasetInput> {
-        self.inputs.pop_front()
-    }
-}
-
-struct ReceiverCreateDatasetInputSource {
-    receiver: mpsc::Receiver<CreateDatasetInput>,
-}
-
-impl CreateDatasetInputSource for ReceiverCreateDatasetInputSource {
-    fn next_input(&mut self) -> Option<CreateDatasetInput> {
-        self.receiver.blocking_recv()
     }
 }
 
@@ -378,11 +347,17 @@ impl AppHandle {
             .map_err(|error| read_join_error(error, "failed to join dataset read task"))?
     }
 
-    pub async fn create_dataset(
+    pub async fn create_empty_dataset(
         &self,
-        request: CreateDatasetRequest,
-        inputs: Vec<CreateDatasetInput>,
+        name: String,
+        description: String,
+        tags: Vec<String>,
     ) -> Result<DatasetRecord, IngestError> {
+        let request = CreateDatasetRequest {
+            name,
+            description,
+            tags,
+        };
         let state = self.state().map_err(|_| ingest_state_dropped())?;
         let tracker = state.tracker.clone();
         let ingest = state.dataset_ingest.clone();
@@ -391,8 +366,19 @@ impl AppHandle {
         };
         tracker
             .spawn_blocking(move || {
-                let mut input_source = VecCreateDatasetInputSource::new(inputs);
-                ingest.create_dataset(&request, &mut input_source, &events)
+                let mut sent_finish = false;
+                ingest.create_dataset(
+                    &request,
+                    || {
+                        if sent_finish {
+                            None
+                        } else {
+                            sent_finish = true;
+                            Some(CreateDatasetInput::Finish)
+                        }
+                    },
+                    &events,
+                )
             })
             .await
             .map_err(|error| ingest_join_error(error, "failed to join dataset create task"))?
@@ -401,7 +387,7 @@ impl AppHandle {
     pub(crate) async fn create_dataset_from_receiver(
         &self,
         request: CreateDatasetRequest,
-        receiver: mpsc::Receiver<CreateDatasetInput>,
+        mut receiver: mpsc::Receiver<CreateDatasetInput>,
     ) -> Result<DatasetRecord, IngestError> {
         let state = self.state().map_err(|_| ingest_state_dropped())?;
         let tracker = state.tracker.clone();
@@ -411,8 +397,7 @@ impl AppHandle {
         };
         tracker
             .spawn_blocking(move || {
-                let mut input_source = ReceiverCreateDatasetInputSource { receiver };
-                ingest.create_dataset(&request, &mut input_source, &events)
+                ingest.create_dataset(&request, || receiver.blocking_recv(), &events)
             })
             .await
             .map_err(|error| ingest_join_error(error, "failed to join dataset create task"))?

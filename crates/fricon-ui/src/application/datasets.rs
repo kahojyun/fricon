@@ -303,9 +303,7 @@ pub(crate) async fn merge_tag(
 
 #[cfg(test)]
 mod tests {
-    use fricon::{
-        AppManager, CreateDatasetInput, CreateDatasetRequest, DatasetListQuery, WorkspaceRoot,
-    };
+    use fricon::{AppManager, DatasetListQuery, WorkspaceRoot};
     use tempfile::TempDir;
 
     use super::delete_datasets;
@@ -317,13 +315,10 @@ mod tests {
     ) -> anyhow::Result<i32> {
         let dataset = session
             .app()
-            .create_dataset(
-                CreateDatasetRequest {
-                    name: name.to_string(),
-                    description: "test dataset".to_string(),
-                    tags: vec!["test".to_string()],
-                },
-                vec![CreateDatasetInput::Finish],
+            .create_empty_dataset(
+                name.to_string(),
+                "test dataset".to_string(),
+                vec!["test".to_string()],
             )
             .await?;
 
