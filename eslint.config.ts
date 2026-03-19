@@ -83,6 +83,36 @@ export default defineConfig([
     },
   },
   {
+    files: ["crates/fricon-ui/frontend/src/**/use*.{ts,tsx}"],
+    ignores: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-utils.ts",
+      "**/test-utils.tsx",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@tanstack/react-table",
+              importNames: ["useReactTable"],
+              message:
+                "Keep compiler-incompatible table hooks in a leaf render component instead of a custom hook file.",
+            },
+            {
+              name: "@tanstack/react-virtual",
+              importNames: ["useVirtualizer", "useWindowVirtualizer"],
+              message:
+                "Keep compiler-incompatible virtualizer hooks in a leaf render component instead of a custom hook file.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
       "crates/fricon-ui/frontend/src/app/**/*.{ts,tsx}",
       "crates/fricon-ui/frontend/src/routes/**/*.{ts,tsx}",

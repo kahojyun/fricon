@@ -65,9 +65,11 @@ export function renderDatasetTable(
   const onDatasetSelected = vi.fn();
 
   useDatasetTableDataMock.mockReturnValue(hook);
-  render(<DatasetTable onDatasetSelected={onDatasetSelected} />);
+  const renderResult = render(
+    <DatasetTable onDatasetSelected={onDatasetSelected} />,
+  );
 
-  return { hook, onDatasetSelected };
+  return { ...renderResult, hook, onDatasetSelected };
 }
 
 export function getRowByText(text: string) {
