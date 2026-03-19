@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import {
   COLUMN_VISIBILITY_STORAGE_KEY,
-  createMemoryStorage,
   getRowByText,
   makeDataset,
   openRowContextMenu,
@@ -51,10 +50,7 @@ describe("DatasetTable", () => {
     toastSuccess.mockReset();
     toastError.mockReset();
     toastWarning.mockReset();
-    Object.defineProperty(window, "localStorage", {
-      value: createMemoryStorage(),
-      configurable: true,
-    });
+    window.localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
   });
 

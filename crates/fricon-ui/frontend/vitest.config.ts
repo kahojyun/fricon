@@ -10,6 +10,7 @@ export default mergeConfig(
       setupFiles: "./src/shared/test/setup.ts",
       css: true,
       globals: true,
+      execArgv: ["--no-experimental-webstorage"],
     },
   }),
 );

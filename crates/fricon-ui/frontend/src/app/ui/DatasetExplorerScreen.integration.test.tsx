@@ -90,9 +90,7 @@ describe("DatasetExplorerScreen integration", () => {
     datasetUpdatedListenMock.mockReset();
     datasetCreatedListenMock.mockResolvedValue(() => undefined);
     datasetUpdatedListenMock.mockResolvedValue(() => undefined);
-    if (typeof window.localStorage?.clear === "function") {
-      window.localStorage.clear();
-    }
+    window.localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
 
     mockIPC((cmd, payload) => {

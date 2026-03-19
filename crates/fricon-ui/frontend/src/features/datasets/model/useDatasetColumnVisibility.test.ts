@@ -6,30 +6,6 @@ import {
   useDatasetColumnVisibility,
 } from "./useDatasetColumnVisibility";
 
-function createMemoryStorage(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key: string) {
-      return store.get(key) ?? null;
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string) {
-      store.delete(key);
-    },
-    setItem(key: string, value: string) {
-      store.set(key, value);
-    },
-  };
-}
-
 function createColumns() {
   return createDatasetColumns({
     toggleFavorite: vi.fn().mockResolvedValue(undefined),
@@ -38,10 +14,7 @@ function createColumns() {
 
 describe("useDatasetColumnVisibility", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createMemoryStorage(),
-      configurable: true,
-    });
+    window.localStorage.clear();
   });
 
   it("uses column metadata defaults and always keeps the name column visible", () => {
