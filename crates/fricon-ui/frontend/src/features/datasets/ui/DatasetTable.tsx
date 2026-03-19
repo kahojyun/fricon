@@ -242,9 +242,11 @@ export function DatasetTable({
                       key={header.id}
                       style={{ width: header.getSize() }}
                       className="text-muted-foreground"
-                      aria-sort={sortStateToAriaSort(
-                        header.column.getIsSorted(),
-                      )}
+                      aria-sort={
+                        header.column.getCanSort()
+                          ? sortStateToAriaSort(header.column.getIsSorted())
+                          : undefined
+                      }
                     >
                       {header.isPlaceholder
                         ? null

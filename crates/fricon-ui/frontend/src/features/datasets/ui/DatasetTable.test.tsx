@@ -193,6 +193,9 @@ describe("DatasetTable", () => {
       "aria-sort",
       "descending",
     );
+    expect(
+      screen.getByRole("columnheader", { name: "Status" }),
+    ).not.toHaveAttribute("aria-sort");
 
     currentHook = buildDatasetTableDataValue({
       sorting: [{ id: "id", desc: false }],
@@ -203,6 +206,9 @@ describe("DatasetTable", () => {
       "aria-sort",
       "ascending",
     );
+    expect(
+      screen.getByRole("columnheader", { name: "Status" }),
+    ).not.toHaveAttribute("aria-sort");
   });
 
   it("keeps column visibility controls in sync with the current table state", async () => {

@@ -7,6 +7,29 @@ import tseslint from "typescript-eslint";
 import { defineConfig, globalIgnores } from "eslint/config";
 import prettier from "eslint-config-prettier";
 
+const featureImportIsolationPatterns = [
+  {
+    group: ["@/app/**", "@/routes/**", "@/features/**"],
+    message:
+      "Feature files must use relative imports within the feature and may not import app, routes, or other features.",
+  },
+];
+
+const compilerIncompatibleHookImportPaths = [
+  {
+    name: "@tanstack/react-table",
+    importNames: ["useReactTable"],
+    message:
+      "Keep compiler-incompatible table hooks in a leaf render component instead of a custom hook file.",
+  },
+  {
+    name: "@tanstack/react-virtual",
+    importNames: ["useVirtualizer", "useWindowVirtualizer"],
+    message:
+      "Keep compiler-incompatible virtualizer hooks in a leaf render component instead of a custom hook file.",
+  },
+];
+
 export default defineConfig([
   globalIgnores([
     "dist",
@@ -71,19 +94,31 @@ export default defineConfig([
       "no-restricted-imports": [
         "error",
         {
-          patterns: [
-            {
-              group: ["@/app/**", "@/routes/**", "@/features/**"],
-              message:
-                "Feature files must use relative imports within the feature and may not import app, routes, or other features.",
-            },
-          ],
+          patterns: featureImportIsolationPatterns,
         },
       ],
     },
   },
   {
     files: ["crates/fricon-ui/frontend/src/**/use*.{ts,tsx}"],
+    ignores: [
+      "crates/fricon-ui/frontend/src/features/**",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/test-utils.ts",
+      "**/test-utils.tsx",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: compilerIncompatibleHookImportPaths,
+        },
+      ],
+    },
+  },
+  {
+    files: ["crates/fricon-ui/frontend/src/features/**/use*.{ts,tsx}"],
     ignores: [
       "**/*.test.ts",
       "**/*.test.tsx",
@@ -94,20 +129,8 @@ export default defineConfig([
       "no-restricted-imports": [
         "error",
         {
-          paths: [
-            {
-              name: "@tanstack/react-table",
-              importNames: ["useReactTable"],
-              message:
-                "Keep compiler-incompatible table hooks in a leaf render component instead of a custom hook file.",
-            },
-            {
-              name: "@tanstack/react-virtual",
-              importNames: ["useVirtualizer", "useWindowVirtualizer"],
-              message:
-                "Keep compiler-incompatible virtualizer hooks in a leaf render component instead of a custom hook file.",
-            },
-          ],
+          patterns: featureImportIsolationPatterns,
+          paths: compilerIncompatibleHookImportPaths,
         },
       ],
     },
