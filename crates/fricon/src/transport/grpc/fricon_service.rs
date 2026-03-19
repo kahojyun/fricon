@@ -3,7 +3,7 @@ use tracing::warn;
 
 use crate::{
     VERSION,
-    app::{AppError, AppEvent, AppHandle},
+    app::{AppError, AppHandle},
     proto::{
         ShowUiRequest, ShowUiResponse, VersionRequest, VersionResponse,
         fricon_service_server::FriconService,
@@ -25,20 +25,16 @@ impl FriconService for Fricon {
     }
 
     async fn show_ui(&self, _request: Request<ShowUiRequest>) -> Result<Response<ShowUiResponse>> {
-        self.app
-            .send_event(AppEvent::ShowUiRequest)
-            .map_err(|err| match err {
-                AppError::EventUndelivered => {
-                    warn!("ShowUiRequest received but no desktop UI subscriber is attached");
-                    Status::failed_precondition(
-                        "desktop UI is not attached to this workspace server",
-                    )
-                }
-                AppError::StateDropped => {
-                    warn!("ShowUiRequest received while workspace server is shutting down");
-                    Status::unavailable("workspace server is shutting down")
-                }
-            })?;
+        self.app.request_show_ui().map_err(|err| match err {
+            AppError::UiCommandUndelivered => {
+                warn!("ShowUiRequest received but no desktop UI subscriber is attached");
+                Status::failed_precondition("desktop UI is not attached to this workspace server")
+            }
+            AppError::StateDropped => {
+                warn!("ShowUiRequest received while workspace server is shutting down");
+                Status::unavailable("workspace server is shutting down")
+            }
+        })?;
         Ok(Response::new(ShowUiResponse {}))
     }
 }

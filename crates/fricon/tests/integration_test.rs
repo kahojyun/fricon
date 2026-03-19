@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use arrow_array::{Array, Float64Array, RecordBatch};
 use fricon::{
-    AppEvent, AppManager, Client, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar,
-    DatasetStatus, ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace,
-    WorkspaceRoot,
+    AppManager, Client, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar, DatasetStatus,
+    ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace, WorkspaceRoot,
+    app::UiCommand,
 };
 use indexmap::IndexMap;
 use num::complex::Complex64;
@@ -172,8 +172,8 @@ async fn wait_for_dataset_status(
 ) -> anyhow::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        let dataset_catalog = app_manager.handle().dataset_catalog();
-        let datasets = dataset_catalog
+        let datasets = app_manager
+            .handle()
             .list_datasets(DatasetListQuery {
                 search: Some(dataset_name.to_string()),
                 ..DatasetListQuery::default()
@@ -216,13 +216,14 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
     let test_schema = test_rows[0].to_schema();
 
     // Create dataset through client
-    let mut writer = client.create_dataset(
-        "test_dataset".to_string(),
-        "Test dataset for integration test".to_string(),
-        vec!["test".to_string(), "integration".to_string()],
-        test_schema.clone(),
-        &tokio::runtime::Handle::current(),
-    )?;
+    let mut writer = client
+        .create_dataset(
+            "test_dataset".to_string(),
+            "Test dataset for integration test".to_string(),
+            vec!["test".to_string(), "integration".to_string()],
+            test_schema.clone(),
+        )
+        .await?;
 
     // Write the test rows
     for row in test_rows {
@@ -238,8 +239,8 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
     assert_eq!(dataset.status(), DatasetStatus::Completed);
 
     // Load dataset using DatasetManager directly
-    let dataset_read = app_manager.handle().dataset_read();
-    let reader = dataset_read
+    let reader = app_manager
+        .handle()
         .get_dataset_reader(DatasetId::Id(dataset.id()))
         .await?;
     let loaded_batches: Vec<RecordBatch> = reader.batches();
@@ -308,13 +309,14 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
     let test_rows = create_test_rows();
     let test_schema = test_rows[0].to_schema();
 
-    let mut writer = client.create_dataset(
-        "aborted_dataset_by_method".to_string(),
-        "This dataset is aborted explicitly".to_string(),
-        vec!["test".to_string(), "abort".to_string()],
-        test_schema,
-        &tokio::runtime::Handle::current(),
-    )?;
+    let mut writer = client
+        .create_dataset(
+            "aborted_dataset_by_method".to_string(),
+            "This dataset is aborted explicitly".to_string(),
+            vec!["test".to_string(), "abort".to_string()],
+            test_schema,
+        )
+        .await?;
 
     writer.write(create_test_rows().remove(0)).await?;
     let dataset = writer.abort().await?;
@@ -322,8 +324,8 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
     assert_eq!(dataset.name(), "aborted_dataset_by_method");
     assert_eq!(dataset.status(), DatasetStatus::Aborted);
 
-    let dataset_catalog = app_manager.handle().dataset_catalog();
-    let datasets = dataset_catalog
+    let datasets = app_manager
+        .handle()
         .list_datasets(DatasetListQuery {
             search: Some("aborted_dataset_by_method".to_string()),
             ..DatasetListQuery::default()
@@ -359,13 +361,14 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
     let test_schema = test_rows[0].to_schema();
 
     // Create dataset through client
-    let mut writer = client.create_dataset(
-        "aborted_dataset".to_string(),
-        "This dataset will be aborted".to_string(),
-        vec!["test".to_string(), "abort".to_string()],
-        test_schema.clone(),
-        &tokio::runtime::Handle::current(),
-    )?;
+    let mut writer = client
+        .create_dataset(
+            "aborted_dataset".to_string(),
+            "This dataset will be aborted".to_string(),
+            vec!["test".to_string(), "abort".to_string()],
+            test_schema.clone(),
+        )
+        .await?;
 
     // Write a row
     // We recreate test_rows to avoid needing to clone it, since DatasetRow doesn't
@@ -435,12 +438,12 @@ async fn test_probe_existing_ui_delegates_when_subscriber_is_attached() -> anyho
 
     let app_manager =
         AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
-    let mut event_rx = app_manager.handle().subscribe_to_events()?;
+    let mut event_rx = app_manager.handle().subscribe_ui_commands()?;
 
     let probe_result = Client::probe_existing_ui(workspace_path).await?;
 
     assert_eq!(probe_result, ExistingUiProbeResult::UiShown);
-    assert!(matches!(event_rx.recv().await?, AppEvent::ShowUiRequest));
+    assert!(matches!(event_rx.recv().await?, UiCommand::ShowUi));
 
     app_manager.shutdown().await;
     temp_dir.close()?;

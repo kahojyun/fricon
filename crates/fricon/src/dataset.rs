@@ -9,13 +9,13 @@ mod tag;
 
 pub(crate) use self::tag::NormalizedTag;
 pub use self::{
-    catalog::DatasetCatalogService,
-    ingest::{CreateDatasetRequest, DatasetIngestService},
+    events::DatasetEvent,
+    ingest::{CreateDatasetInput, CreateDatasetRequest},
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
         DatasetUpdate, SortDirection,
     },
-    read::{DatasetReadService, DatasetReader, SelectOptions},
+    read::{DatasetReader, SelectOptions},
     schema::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,

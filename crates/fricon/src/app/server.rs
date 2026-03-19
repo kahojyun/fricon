@@ -23,11 +23,7 @@ pub(crate) fn start(
     cancellation_token: CancellationToken,
     runtime: &Handle,
 ) -> Result<()> {
-    let storage = Storage::new(
-        app.dataset_catalog(),
-        app.dataset_ingest(),
-        cancellation_token.clone(),
-    );
+    let storage = Storage::new(app.clone(), cancellation_token.clone());
     let service = DatasetServiceServer::new(storage);
     let listener = ipc::listen(ipc_file, runtime)?;
 

@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
-use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
 use crate::{
     dataset::{
-        events::AppEvent,
+        events::{DatasetEventPublisher, dataset_created_event},
         ingest::{
-            CreateDatasetRequest, CreateIngestEvent, CreateTerminal, DatasetIngestRepository,
-            IngestError, WriteSessionGuard, WriteSessionRegistry,
+            CreateDatasetInput, CreateDatasetInputSource, CreateDatasetRequest,
+            DatasetIngestRepository, IngestError, WriteSessionGuard, WriteSessionRegistry,
         },
         model::{DatasetId, DatasetRecord, DatasetStatus},
         storage,
@@ -27,17 +26,6 @@ impl DatasetStore for WorkspacePaths {
         let path = self.dataset_path_from_uid(uid);
         storage::create_dataset(&path)?;
         Ok(path)
-    }
-}
-
-#[cfg_attr(test, mockall::automock)]
-pub(super) trait DatasetEvents {
-    fn send_dataset_created(&self, event: AppEvent);
-}
-
-impl DatasetEvents for broadcast::Sender<AppEvent> {
-    fn send_dataset_created(&self, event: AppEvent) {
-        let _ = self.send(event);
     }
 }
 
@@ -83,7 +71,7 @@ impl WriteSessions for WriteSessionRegistry {
 }
 
 #[instrument(
-    skip(repo, store, events, write_sessions, events_rx, request),
+    skip(repo, store, events, write_sessions, input_source, request),
     fields(dataset.name = %request.name, tags.count = request.tags.len())
 )]
 pub(super) fn create_dataset_with<R, S, E, W>(
@@ -92,12 +80,12 @@ pub(super) fn create_dataset_with<R, S, E, W>(
     events: &E,
     write_sessions: &W,
     request: &CreateDatasetRequest,
-    mut events_rx: mpsc::Receiver<CreateIngestEvent>,
+    input_source: &mut impl CreateDatasetInputSource,
 ) -> Result<DatasetRecord, IngestError>
 where
     R: DatasetIngestRepository + ?Sized,
     S: DatasetStore,
-    E: DatasetEvents,
+    E: DatasetEventPublisher,
     W: WriteSessions,
 {
     let uid = Uuid::new_v4();
@@ -106,24 +94,16 @@ where
     let dataset_record = repo.create_dataset_record(request, uid)?;
     info!(dataset.id = dataset_record.id, %uid, name = %request.name, "Dataset record created");
 
-    events.send_dataset_created(AppEvent::DatasetCreated {
-        id: dataset_record.id,
-        name: dataset_record.metadata.name.clone(),
-        description: dataset_record.metadata.description.clone(),
-        favorite: dataset_record.metadata.favorite,
-        tags: dataset_record.metadata.tags.clone(),
-        status: dataset_record.metadata.status,
-        created_at: dataset_record.metadata.created_at,
-    });
+    events.publish(dataset_created_event(dataset_record.clone()));
 
     let mut session = None;
     let terminal = loop {
-        let Some(event) = events_rx.blocking_recv() else {
-            break CreateTerminal::Abort;
+        let Some(event) = input_source.next_input() else {
+            break CreateDatasetInput::Abort;
         };
 
         match event {
-            CreateIngestEvent::Batch(batch) => {
+            CreateDatasetInput::Batch(batch) => {
                 let session_ref = session.get_or_insert_with(|| {
                     write_sessions.start_session(
                         dataset_record.id,
@@ -133,15 +113,15 @@ where
                 });
                 if let Err(error) = session_ref.write(batch) {
                     debug!(error = %error, "Failed to write batch into dataset session");
-                    break CreateTerminal::Abort;
+                    break CreateDatasetInput::Abort;
                 }
             }
-            CreateIngestEvent::Terminal(terminal) => break terminal,
+            CreateDatasetInput::Finish | CreateDatasetInput::Abort => break event,
         }
     };
 
     match terminal {
-        CreateTerminal::Finish => {
+        CreateDatasetInput::Finish => {
             if let Some(session) = session.take()
                 && let Err(error) = session.commit()
             {
@@ -153,7 +133,7 @@ where
             info!(dataset.id = dataset_record.id, %uid, "Dataset write completed");
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
-        CreateTerminal::Abort => {
+        CreateDatasetInput::Abort => {
             if let Some(session) = session.take()
                 && let Err(error) = session.abort()
             {
@@ -163,5 +143,6 @@ where
             info!(dataset.id = dataset_record.id, "Dataset write aborted");
             repo.get_dataset(DatasetId::Id(dataset_record.id))
         }
+        CreateDatasetInput::Batch(_) => unreachable!("batch cannot terminate dataset creation"),
     }
 }

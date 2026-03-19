@@ -16,14 +16,13 @@ mod utils;
 pub mod workspace;
 
 pub use self::{
-    app::{AppEvent, AppHandle, AppManager},
+    app::{AppHandle, AppManager},
     client::{Client, Dataset, DatasetWriter, ExistingUiProbeResult},
     dataset::{
-        CreateDatasetRequest, DatasetArray, DatasetCatalogService, DatasetDataType, DatasetId,
-        DatasetIngestService, DatasetListQuery, DatasetMetadata, DatasetReadService, DatasetReader,
-        DatasetRecord, DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus,
-        DatasetUpdate, FixedStepTrace, ScalarArray, ScalarKind, SelectOptions, SortDirection,
-        TraceKind, VariableStepTrace,
+        CreateDatasetInput, CreateDatasetRequest, DatasetArray, DatasetDataType, DatasetEvent,
+        DatasetId, DatasetListQuery, DatasetMetadata, DatasetReader, DatasetRecord, DatasetRow,
+        DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus, DatasetUpdate, FixedStepTrace,
+        ScalarArray, ScalarKind, SelectOptions, SortDirection, TraceKind, VariableStepTrace,
     },
     workspace::{WorkspaceRoot, get_log_dir},
 };

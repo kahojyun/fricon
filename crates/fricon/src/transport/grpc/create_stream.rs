@@ -7,13 +7,13 @@ use tonic::{Code, Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
-    dataset::ingest::{CreateDatasetRequest, CreateIngestEvent, CreateTerminal},
+    dataset::{CreateDatasetInput, CreateDatasetRequest},
     proto::{CreateMetadata, CreateRequest, create_request::CreateMessage},
 };
 
 pub(crate) struct CreateStreamParts {
     pub request: CreateDatasetRequest,
-    pub events_rx: mpsc::Receiver<CreateIngestEvent>,
+    pub events_rx: mpsc::Receiver<CreateDatasetInput>,
     pub events_task: JoinHandle<Result<(), Status>>,
 }
 
@@ -59,7 +59,7 @@ pub(crate) async fn parse_create_stream(
 async fn produce_create_events<S>(
     mut stream: S,
     shutdown_token: CancellationToken,
-    events_tx: mpsc::Sender<CreateIngestEvent>,
+    events_tx: mpsc::Sender<CreateDatasetInput>,
 ) -> Result<(), Status>
 where
     S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
@@ -103,7 +103,7 @@ where
 
                 if let Some(terminal) = terminal {
                     events_tx
-                        .send(CreateIngestEvent::Terminal(terminal))
+                        .send(terminal)
                         .await
                         .map_err(|_| Status::internal("create ingest receiver dropped"))?;
                     return Ok(());
@@ -126,11 +126,11 @@ where
 }
 
 async fn send_abort_and_error(
-    events_tx: &mpsc::Sender<CreateIngestEvent>,
+    events_tx: &mpsc::Sender<CreateDatasetInput>,
     status: Status,
 ) -> Result<(), Status> {
     events_tx
-        .send(CreateIngestEvent::Terminal(CreateTerminal::Abort))
+        .send(CreateDatasetInput::Abort)
         .await
         .map_err(|_| Status::internal("create ingest receiver dropped"))?;
     Err(status)
@@ -139,8 +139,8 @@ async fn send_abort_and_error(
 async fn handle_stream_message(
     message: Option<CreateMessage>,
     decoder: &mut StreamDecoder,
-    events_tx: &mpsc::Sender<CreateIngestEvent>,
-) -> Result<Option<CreateTerminal>, Status> {
+    events_tx: &mpsc::Sender<CreateDatasetInput>,
+) -> Result<Option<CreateDatasetInput>, Status> {
     match message {
         Some(CreateMessage::Payload(payload)) => decode_payload(payload, decoder, events_tx).await,
         Some(CreateMessage::Metadata(_)) => {
@@ -150,7 +150,7 @@ async fn handle_stream_message(
             ))
         }
         Some(CreateMessage::Finish(_)) => match decoder.finish() {
-            Ok(()) => Ok(Some(CreateTerminal::Finish)),
+            Ok(()) => Ok(Some(CreateDatasetInput::Finish)),
             Err(error) => {
                 error!(error = %error, "Failed to finalize Arrow stream on CreateFinish");
                 Err(Status::invalid_argument(
@@ -158,7 +158,7 @@ async fn handle_stream_message(
                 ))
             }
         },
-        Some(CreateMessage::Abort(_)) => Ok(Some(CreateTerminal::Abort)),
+        Some(CreateMessage::Abort(_)) => Ok(Some(CreateDatasetInput::Abort)),
         None => {
             warn!("Received empty CreateRequest message");
             Err(Status::invalid_argument(
@@ -171,14 +171,14 @@ async fn handle_stream_message(
 async fn decode_payload(
     payload: bytes::Bytes,
     decoder: &mut StreamDecoder,
-    events_tx: &mpsc::Sender<CreateIngestEvent>,
-) -> Result<Option<CreateTerminal>, Status> {
+    events_tx: &mpsc::Sender<CreateDatasetInput>,
+) -> Result<Option<CreateDatasetInput>, Status> {
     let mut buffer = Buffer::from(payload);
     while !buffer.is_empty() {
         match decoder.decode(&mut buffer) {
             Ok(Some(batch)) => {
                 events_tx
-                    .send(CreateIngestEvent::Batch(batch))
+                    .send(CreateDatasetInput::Batch(batch))
                     .await
                     .map_err(|_| Status::internal("create ingest receiver dropped"))?;
             }
@@ -250,7 +250,7 @@ mod tests {
     async fn collect_events(
         stream: impl Stream<Item = Result<CreateRequest, Status>> + Unpin,
         shutdown_token: CancellationToken,
-    ) -> (Vec<CreateIngestEvent>, Result<(), Status>) {
+    ) -> (Vec<CreateDatasetInput>, Result<(), Status>) {
         let (tx, mut rx) = mpsc::channel(16);
         let result = produce_create_events(stream, shutdown_token, tx).await;
         let mut events = Vec::new();
@@ -270,12 +270,9 @@ mod tests {
         assert!(
             events
                 .iter()
-                .any(|event| matches!(event, CreateIngestEvent::Batch(_)))
+                .any(|event| matches!(event, CreateDatasetInput::Batch(_)))
         );
-        assert!(matches!(
-            events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Finish))
-        ));
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Finish)));
     }
 
     #[tokio::test]
@@ -288,10 +285,7 @@ mod tests {
             Code::InvalidArgument
         );
 
-        assert!(matches!(
-            events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
-        ));
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Abort)));
     }
 
     #[tokio::test]
@@ -301,10 +295,7 @@ mod tests {
         let (events, result) = collect_events(stream, CancellationToken::new()).await;
         assert!(result.is_ok());
 
-        assert!(matches!(
-            events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
-        ));
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Abort)));
     }
 
     #[tokio::test]
@@ -316,10 +307,7 @@ mod tests {
             Code::InvalidArgument
         );
 
-        assert!(matches!(
-            events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
-        ));
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Abort)));
     }
 
     #[tokio::test]
@@ -333,10 +321,7 @@ mod tests {
         let (events, result) = collect_events(stream, CancellationToken::new()).await;
         assert!(result.is_ok());
 
-        assert!(matches!(
-            events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Finish))
-        ));
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Finish)));
     }
 
     #[tokio::test]
@@ -351,10 +336,7 @@ mod tests {
             Code::InvalidArgument
         );
 
-        assert!(matches!(
-            events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
-        ));
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Abort)));
     }
 
     #[tokio::test]
@@ -365,10 +347,7 @@ mod tests {
         let (events, result) = collect_events(stream, token).await;
         assert_eq!(result.expect_err("should fail").code(), Code::Unavailable);
 
-        assert!(matches!(
-            events.last(),
-            Some(CreateIngestEvent::Terminal(CreateTerminal::Abort))
-        ));
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Abort)));
     }
 
     #[tokio::test]

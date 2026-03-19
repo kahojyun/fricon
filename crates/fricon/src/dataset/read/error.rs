@@ -1,5 +1,3 @@
-use tokio::task::JoinError;
-
 use crate::dataset::{schema::DatasetError, storage::error::DatasetFsError};
 
 #[derive(Debug, thiserror::Error)]
@@ -12,8 +10,6 @@ pub enum ReadError {
     Dataset(#[from] DatasetError),
     #[error(transparent)]
     DatasetFs(#[from] DatasetFsError),
-    #[error(transparent)]
-    TaskJoin(#[from] JoinError),
     #[error(transparent)]
     Unexpected(#[from] anyhow::Error),
 }

@@ -8,9 +8,10 @@ mod storage;
 use arrow_array::RecordBatch;
 use uuid::Uuid;
 
-pub use self::{error::IngestError, service::DatasetIngestService};
+pub use self::error::IngestError;
 pub(crate) use self::{
     registry::{WriteSessionGuard, WriteSessionRegistry},
+    service::DatasetIngestService,
     session::WriteSessionHandle,
 };
 use crate::dataset::model::{DatasetId, DatasetRecord, DatasetStatus};
@@ -34,13 +35,12 @@ pub struct CreateDatasetRequest {
 }
 
 #[derive(Debug)]
-pub enum CreateIngestEvent {
+pub enum CreateDatasetInput {
     Batch(RecordBatch),
-    Terminal(CreateTerminal),
-}
-
-#[derive(Debug, Clone)]
-pub enum CreateTerminal {
     Finish,
     Abort,
+}
+
+pub(crate) trait CreateDatasetInputSource {
+    fn next_input(&mut self) -> Option<CreateDatasetInput>;
 }

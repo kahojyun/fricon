@@ -78,7 +78,6 @@ pub(crate) async fn list_datasets(
 ) -> anyhow::Result<Vec<DatasetRecord>> {
     session
         .app()
-        .dataset_catalog()
         .list_datasets(query)
         .await
         .context("Failed to list datasets.")
@@ -87,7 +86,6 @@ pub(crate) async fn list_datasets(
 pub(crate) async fn list_dataset_tags(session: &WorkspaceSession) -> anyhow::Result<Vec<String>> {
     session
         .app()
-        .dataset_catalog()
         .list_dataset_tags()
         .await
         .context("Failed to list dataset tags.")
@@ -99,7 +97,6 @@ pub(crate) async fn get_dataset_detail(
 ) -> anyhow::Result<DatasetDetail> {
     let record = session
         .app()
-        .dataset_catalog()
         .get_dataset(DatasetId::Id(id))
         .await
         .context("Failed to load dataset metadata.")?;
@@ -137,7 +134,6 @@ pub(crate) async fn update_dataset_favorite(
 ) -> anyhow::Result<()> {
     session
         .app()
-        .dataset_catalog()
         .update_dataset(
             id,
             DatasetUpdate {
@@ -155,24 +151,23 @@ pub(crate) async fn update_dataset_info(
     id: i32,
     update: DatasetInfoUpdate,
 ) -> anyhow::Result<()> {
-    let dataset_catalog = session.app().dataset_catalog();
+    let app = session.app();
 
-    let current = dataset_catalog
+    let current = app
         .get_dataset(DatasetId::Id(id))
         .await
         .context("Failed to load current dataset metadata.")?;
 
-    dataset_catalog
-        .update_dataset(
-            id,
-            DatasetUpdate {
-                name: update.name,
-                description: update.description,
-                favorite: update.favorite,
-            },
-        )
-        .await
-        .context("Failed to update dataset metadata.")?;
+    app.update_dataset(
+        id,
+        DatasetUpdate {
+            name: update.name,
+            description: update.description,
+            favorite: update.favorite,
+        },
+    )
+    .await
+    .context("Failed to update dataset metadata.")?;
 
     if let Some(next_tags_raw) = update.tags {
         let next_tags = normalize_tags(next_tags_raw);
@@ -183,15 +178,13 @@ pub(crate) async fn update_dataset_info(
         let to_remove: Vec<String> = current_tags.difference(&next_tags_set).cloned().collect();
 
         if !to_add.is_empty() {
-            dataset_catalog
-                .add_tags(id, to_add)
+            app.add_dataset_tags(id, to_add)
                 .await
                 .context("Failed to add dataset tags.")?;
         }
 
         if !to_remove.is_empty() {
-            dataset_catalog
-                .remove_tags(id, to_remove)
+            app.remove_dataset_tags(id, to_remove)
                 .await
                 .context("Failed to remove dataset tags.")?;
         }
@@ -216,10 +209,10 @@ pub(crate) async fn delete_datasets(
     session: &WorkspaceSession,
     ids: Vec<i32>,
 ) -> Vec<DatasetDeleteResult> {
-    let dataset_catalog = session.app().dataset_catalog();
+    let app = session.app();
     let mut results = Vec::with_capacity(ids.len());
     for id in ids {
-        match dataset_catalog.delete_dataset(id).await {
+        match app.delete_dataset(id).await {
             Ok(()) => results.push(DatasetDeleteResult {
                 id,
                 success: true,
@@ -246,7 +239,7 @@ pub(crate) async fn batch_update_dataset_tags(
     session: &WorkspaceSession,
     update: BatchTagUpdate,
 ) -> Vec<DatasetDeleteResult> {
-    let dataset_catalog = session.app().dataset_catalog();
+    let app = session.app();
     let add = normalize_tags(update.add);
     let remove = normalize_tags(update.remove);
     let mut results = Vec::with_capacity(update.ids.len());
@@ -254,12 +247,12 @@ pub(crate) async fn batch_update_dataset_tags(
         let add_result = if add.is_empty() {
             Ok(())
         } else {
-            dataset_catalog.add_tags(id, add.clone()).await
+            app.add_dataset_tags(id, add.clone()).await
         };
         let remove_result = if remove.is_empty() {
             Ok(())
         } else {
-            dataset_catalog.remove_tags(id, remove.clone()).await
+            app.remove_dataset_tags(id, remove.clone()).await
         };
         let error = match (add_result, remove_result) {
             (Ok(()), Ok(())) => None,
@@ -279,7 +272,6 @@ pub(crate) async fn batch_update_dataset_tags(
 pub(crate) async fn delete_tag(session: &WorkspaceSession, tag: String) -> anyhow::Result<()> {
     session
         .app()
-        .dataset_catalog()
         .delete_tag(tag)
         .await
         .context("Failed to delete tag.")
@@ -292,7 +284,6 @@ pub(crate) async fn rename_tag(
 ) -> anyhow::Result<()> {
     session
         .app()
-        .dataset_catalog()
         .rename_tag(old_name, new_name)
         .await
         .context("Failed to rename tag.")
@@ -305,7 +296,6 @@ pub(crate) async fn merge_tag(
 ) -> anyhow::Result<()> {
     session
         .app()
-        .dataset_catalog()
         .merge_tag(source, target)
         .await
         .context("Failed to merge tag.")
@@ -314,11 +304,9 @@ pub(crate) async fn merge_tag(
 #[cfg(test)]
 mod tests {
     use fricon::{
-        AppManager, CreateDatasetRequest, DatasetListQuery, WorkspaceRoot,
-        dataset::ingest::{CreateIngestEvent, CreateTerminal},
+        AppManager, CreateDatasetInput, CreateDatasetRequest, DatasetListQuery, WorkspaceRoot,
     };
     use tempfile::TempDir;
-    use tokio::sync::mpsc;
 
     use super::delete_datasets;
     use crate::application::session::WorkspaceSession;
@@ -327,22 +315,15 @@ mod tests {
         session: &WorkspaceSession,
         name: &str,
     ) -> anyhow::Result<i32> {
-        let (events_tx, events_rx) = mpsc::channel::<CreateIngestEvent>(1);
-        events_tx
-            .send(CreateIngestEvent::Terminal(CreateTerminal::Finish))
-            .await
-            .expect("test event channel should accept finish event");
-
         let dataset = session
             .app()
-            .dataset_ingest()
             .create_dataset(
                 CreateDatasetRequest {
                     name: name.to_string(),
                     description: "test dataset".to_string(),
                     tags: vec!["test".to_string()],
                 },
-                events_rx,
+                vec![CreateDatasetInput::Finish],
             )
             .await?;
 
@@ -371,7 +352,6 @@ mod tests {
 
         let remaining = session
             .app()
-            .dataset_catalog()
             .list_datasets(DatasetListQuery::default())
             .await?;
         assert!(remaining.is_empty());

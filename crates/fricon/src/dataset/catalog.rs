@@ -1,7 +1,8 @@
 mod error;
 mod service;
 
-pub use self::{error::CatalogError, service::DatasetCatalogService};
+pub use self::error::CatalogError;
+pub(crate) use self::service::DatasetCatalogService;
 use crate::dataset::{
     NormalizedTag,
     model::{DatasetId, DatasetListQuery, DatasetRecord, DatasetUpdate},

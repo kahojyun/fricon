@@ -1,41 +1,21 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use crate::dataset::model::DatasetRecord;
 
-use crate::dataset::model::{DatasetRecord, DatasetStatus};
+#[derive(Clone, Debug)]
+pub enum DatasetEvent {
+    Created(DatasetRecord),
+    Updated(DatasetRecord),
+}
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum AppEvent {
-    DatasetCreated {
-        id: i32,
-        name: String,
-        description: String,
-        favorite: bool,
-        tags: Vec<String>,
-        status: DatasetStatus,
-        created_at: DateTime<Utc>,
-    },
-    DatasetUpdated {
-        id: i32,
-        name: String,
-        description: String,
-        favorite: bool,
-        tags: Vec<String>,
-        status: DatasetStatus,
-        created_at: DateTime<Utc>,
-    },
-    ShowUiRequest,
+pub(crate) trait DatasetEventPublisher {
+    fn publish(&self, event: DatasetEvent);
 }
 
 #[must_use]
-pub(crate) fn dataset_updated_event(record: DatasetRecord) -> AppEvent {
-    let DatasetRecord { id, metadata } = record;
-    AppEvent::DatasetUpdated {
-        id,
-        name: metadata.name,
-        description: metadata.description,
-        favorite: metadata.favorite,
-        tags: metadata.tags,
-        status: metadata.status,
-        created_at: metadata.created_at,
-    }
+pub(crate) fn dataset_created_event(record: DatasetRecord) -> DatasetEvent {
+    DatasetEvent::Created(record)
+}
+
+#[must_use]
+pub(crate) fn dataset_updated_event(record: DatasetRecord) -> DatasetEvent {
+    DatasetEvent::Updated(record)
 }
