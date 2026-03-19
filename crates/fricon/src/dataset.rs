@@ -7,10 +7,8 @@ pub mod schema;
 pub mod storage;
 mod tag;
 
-pub(crate) use self::tag::NormalizedTag;
 pub use self::{
     events::DatasetEvent,
-    ingest::{CreateDatasetInput, CreateDatasetRequest},
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
         DatasetUpdate, SortDirection,
@@ -20,4 +18,8 @@ pub use self::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
+};
+pub(crate) use self::{
+    ingest::{CreateDatasetInput, CreateDatasetRequest},
+    tag::NormalizedTag,
 };

@@ -6,7 +6,7 @@ use crate::{
     dataset::{
         NormalizedTag,
         catalog::{CatalogError, DatasetCatalogRepository},
-        events::{DatasetEventPublisher, dataset_updated_event},
+        events::{DatasetEvent, DatasetEventPublisher},
         model::{DatasetId, DatasetListQuery, DatasetRecord, DatasetUpdate},
         storage,
     },
@@ -55,7 +55,7 @@ impl DatasetCatalogService {
     ) -> Result<(), CatalogError> {
         self.repository.update_dataset(id, update_payload)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(dataset_updated_event(record));
+        events.publish(DatasetEvent::Updated(record));
         Ok(())
     }
 
@@ -72,7 +72,7 @@ impl DatasetCatalogService {
         }
         self.repository.add_tags(id, &tags)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(dataset_updated_event(record));
+        events.publish(DatasetEvent::Updated(record));
         Ok(())
     }
 
@@ -89,7 +89,7 @@ impl DatasetCatalogService {
         }
         self.repository.remove_tags(id, &tags)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(dataset_updated_event(record));
+        events.publish(DatasetEvent::Updated(record));
         Ok(())
     }
 

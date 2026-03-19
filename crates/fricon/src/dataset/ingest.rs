@@ -10,9 +10,7 @@ use uuid::Uuid;
 
 pub use self::error::IngestError;
 pub(crate) use self::{
-    registry::{WriteSessionGuard, WriteSessionRegistry},
-    service::DatasetIngestService,
-    session::WriteSessionHandle,
+    registry::WriteSessionRegistry, service::DatasetIngestService, session::WriteSessionHandle,
 };
 use crate::dataset::model::{DatasetId, DatasetRecord, DatasetStatus};
 
@@ -28,19 +26,15 @@ pub(crate) trait DatasetIngestRepository: Send + Sync {
 }
 
 #[derive(Debug, Clone)]
-pub struct CreateDatasetRequest {
-    pub name: String,
-    pub description: String,
-    pub tags: Vec<String>,
+pub(crate) struct CreateDatasetRequest {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) tags: Vec<String>,
 }
 
 #[derive(Debug)]
-pub enum CreateDatasetInput {
+pub(crate) enum CreateDatasetInput {
     Batch(RecordBatch),
     Finish,
     Abort,
-}
-
-pub(crate) trait CreateDatasetInputSource {
-    fn next_input(&mut self) -> Option<CreateDatasetInput>;
 }
