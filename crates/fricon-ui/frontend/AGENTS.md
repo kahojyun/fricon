@@ -9,7 +9,7 @@
 - Shared helpers live under `src/shared/lib/`.
 - Feature internals should default to `ui/`, `api/`, `model/`, and `hooks/`.
 - The frontend uses vertical feature slices rooted under `src/features/`.
-- Inside `src/features/**`, use relative imports only. Do not import `@/features/**` from another feature.
+- Slice boundaries between `src/app/**`, `src/routes/**`, and `src/features/**` are enforced with `dependency-cruiser`.
 - `src/app/**` and `src/routes/**` should consume only feature barrel exports such as `@/features/<feature>`.
 - Test support modules should be named `test-utils.ts` or `test-utils.tsx`, colocated with the tests they support.
 

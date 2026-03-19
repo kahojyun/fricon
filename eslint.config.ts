@@ -7,14 +7,6 @@ import tseslint from "typescript-eslint";
 import { defineConfig, globalIgnores } from "eslint/config";
 import prettier from "eslint-config-prettier";
 
-const featureImportIsolationPatterns = [
-  {
-    group: ["@/app/**", "@/routes/**", "@/features/**"],
-    message:
-      "Feature files must use relative imports within the feature and may not import app, routes, or other features.",
-  },
-];
-
 const compilerIncompatibleHookImportPaths = [
   {
     name: "@tanstack/react-table",
@@ -38,6 +30,7 @@ export default defineConfig([
     "site/**",
     "target/**",
     "**/node_modules/**",
+    "crates/fricon-ui/frontend/.dependency-cruiser.cjs",
     "**/src/shared/lib/bindings.ts",
     // shadcn/ui source files live here; keep repo-owned shared components elsewhere so they remain linted.
     "crates/fricon-ui/frontend/src/shared/ui/**",
@@ -89,20 +82,8 @@ export default defineConfig([
     },
   },
   {
-    files: ["crates/fricon-ui/frontend/src/features/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: featureImportIsolationPatterns,
-        },
-      ],
-    },
-  },
-  {
     files: ["crates/fricon-ui/frontend/src/**/use*.{ts,tsx}"],
     ignores: [
-      "crates/fricon-ui/frontend/src/features/**",
       "**/*.test.ts",
       "**/*.test.tsx",
       "**/test-utils.ts",
@@ -113,49 +94,6 @@ export default defineConfig([
         "error",
         {
           paths: compilerIncompatibleHookImportPaths,
-        },
-      ],
-    },
-  },
-  {
-    files: ["crates/fricon-ui/frontend/src/features/**/use*.{ts,tsx}"],
-    ignores: [
-      "**/*.test.ts",
-      "**/*.test.tsx",
-      "**/test-utils.ts",
-      "**/test-utils.tsx",
-    ],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: featureImportIsolationPatterns,
-          paths: compilerIncompatibleHookImportPaths,
-        },
-      ],
-    },
-  },
-  {
-    files: [
-      "crates/fricon-ui/frontend/src/app/**/*.{ts,tsx}",
-      "crates/fricon-ui/frontend/src/routes/**/*.{ts,tsx}",
-    ],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: [
-                "@/features/*/api/**",
-                "@/features/*/hooks/**",
-                "@/features/*/model/**",
-                "@/features/*/ui/**",
-              ],
-              message:
-                "App and routes must import features through their public barrel exports.",
-            },
-          ],
         },
       ],
     },
