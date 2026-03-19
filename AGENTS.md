@@ -19,6 +19,6 @@
   use `pnpm run check` as the default frontend quality gate; run
   `pnpm run [type-check|lint|format:check|depcruise:frontend|test --run]`
   individually when needed.
-- Follow the existing vertical slice boundaries. Add code within the owning domain/feature, keep feature-local layering when possible, and avoid cross-feature or cross-layer shortcuts.
-- Extract shared code to top-level modules only after it is stable across multiple features. Prefer short-term duplication inside a feature over premature shared abstractions.
-- `crates/fricon` is transitioning toward runtime-agnostic feature services. Existing Tokio- or transport-coupled feature code is migration debt, not a precedent; follow `crates/fricon/AGENTS.md` as the target standard and keep temporary compatibility shims narrow and removable.
+- Follow the existing vertical slice boundaries and add code within the owning domain/feature. Keep boundaries and data ownership clear, and avoid cross-feature or cross-layer shortcuts.
+- Keep internal structure lightweight: prefer straightforward local implementations, feature-local duplication, and explicit types over premature shared abstractions or generic extension points.
+- Add traits only for real boundaries or capabilities with multiple plausible implementations, not as a default pattern for mocking.
