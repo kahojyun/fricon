@@ -12,7 +12,6 @@ mod database;
 pub mod dataset;
 mod proto;
 mod transport;
-mod utils;
 pub mod workspace;
 
 pub use self::{
