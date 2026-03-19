@@ -1,14 +1,17 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import {
   COLUMN_VISIBILITY_STORAGE_KEY,
+  buildDatasetTableDataValue,
   getRowByText,
+  openColumnsMenu,
   makeDataset,
   openRowContextMenu,
   renderDatasetTable,
 } from "./test-utils";
+import { DatasetTable } from "./DatasetTable";
 
 const { toastSuccess, toastError, toastWarning } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
@@ -173,6 +176,106 @@ describe("DatasetTable", () => {
     expect(
       screen.getByRole("columnheader", { name: /^Tags/ }),
     ).toBeInTheDocument();
+  });
+
+  it("updates sortable header state when sorting changes on rerender", () => {
+    let currentHook = buildDatasetTableDataValue({
+      sorting: [{ id: "id", desc: true }],
+    });
+    useDatasetTableDataMock.mockImplementation(() => currentHook);
+
+    const onDatasetSelected = vi.fn();
+    const { rerender } = render(
+      <DatasetTable onDatasetSelected={onDatasetSelected} />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: /^ID/ })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    expect(
+      screen.getByRole("columnheader", { name: /^Name/ }),
+    ).not.toHaveAttribute("aria-sort");
+    expect(
+      screen.getByRole("columnheader", { name: "Status" }),
+    ).not.toHaveAttribute("aria-sort");
+
+    currentHook = buildDatasetTableDataValue({
+      sorting: [{ id: "id", desc: false }],
+    });
+    rerender(<DatasetTable onDatasetSelected={onDatasetSelected} />);
+
+    expect(screen.getByRole("columnheader", { name: /^ID/ })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    expect(
+      screen.getByRole("columnheader", { name: /^Name/ }),
+    ).not.toHaveAttribute("aria-sort");
+    expect(
+      screen.getByRole("columnheader", { name: "Status" }),
+    ).not.toHaveAttribute("aria-sort");
+  });
+
+  it("keeps column visibility controls in sync with the current table state", async () => {
+    window.localStorage.setItem(
+      COLUMN_VISIBILITY_STORAGE_KEY,
+      JSON.stringify({
+        favorite: true,
+        id: true,
+        name: true,
+        status: true,
+        tags: true,
+        createdAt: false,
+      }),
+    );
+
+    renderDatasetTable(useDatasetTableDataMock);
+    const user = userEvent.setup();
+
+    const menu = await openColumnsMenu(user);
+
+    expect(
+      within(menu).getByRole("menuitemcheckbox", { name: "Tags" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      within(menu).getByRole("menuitemcheckbox", { name: "Created At" }),
+    ).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("loads the next page when the virtualized rows reach the fetch threshold", async () => {
+    const datasets = Array.from({ length: 20 }, (_, index) =>
+      makeDataset({ id: index + 1, name: `Dataset ${index + 1}` }),
+    );
+    const loadNextPage = vi.fn().mockResolvedValue(undefined);
+
+    renderDatasetTable(useDatasetTableDataMock, {
+      datasets,
+      hasMore: true,
+      loadNextPage,
+    });
+
+    await waitFor(() => {
+      expect(loadNextPage).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not fetch another page when there are no more backend pages", async () => {
+    const datasets = Array.from({ length: 20 }, (_, index) =>
+      makeDataset({ id: index + 1, name: `Dataset ${index + 1}` }),
+    );
+    const loadNextPage = vi.fn().mockResolvedValue(undefined);
+
+    renderDatasetTable(useDatasetTableDataMock, {
+      datasets,
+      hasMore: false,
+      loadNextPage,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Dataset 20")).toBeInTheDocument();
+    });
+    expect(loadNextPage).not.toHaveBeenCalled();
   });
 
   it("deletes a dataset from the context menu and clears selection on success", async () => {

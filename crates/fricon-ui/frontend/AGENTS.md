@@ -1,6 +1,7 @@
 ## Package-Specific Constraints
 
 - **React Compiler is enabled.** Prefer compiler-led memoization and do not add `useMemo`, `useCallback`, or `React.memo` by default. Exception: if `eslint-plugin-react-hooks` reports `react-hooks/incompatible-library`, treat the affected component or hook as outside React Compiler optimization and follow the library's own usage and performance guidance instead of compiler assumptions. Prefer compiler-compatible alternative APIs when the library provides one.
+- If a library hook needs `react-hooks/incompatible-library`, keep that hook in a leaf render component. Custom hooks may still own app state and event logic around that library, but they must not create and return mutable library instances. When introducing a new incompatible-library hook, add a matching ESLint restriction in the same change so custom hook files cannot hide it behind another boundary.
 - `react-hooks/todo` is intentionally enabled in the repo lint config because it exposes React Compiler bailout diagnostics that are otherwise easy to miss, including unsupported `try/catch/finally` shapes.
 - Prefer shadcn/ui components
 - `src/shared/ui/` is reserved for shadcn/ui primitives and thin local patches to those files.
