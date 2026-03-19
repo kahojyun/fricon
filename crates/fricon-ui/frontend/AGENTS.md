@@ -10,6 +10,7 @@
 - Feature internals should default to `ui/`, `api/`, `model/`, and `hooks/`.
 - The frontend uses vertical feature slices rooted under `src/features/`.
 - Slice boundaries between `src/app/**`, `src/routes/**`, and `src/features/**` are enforced with `dependency-cruiser`.
+- Validate frontend slice-boundary changes with `pnpm run depcruise:frontend` or the repo-root `pnpm run check`.
 - `src/app/**` and `src/routes/**` should consume only feature barrel exports such as `@/features/<feature>`.
 - Test support modules should be named `test-utils.ts` or `test-utils.tsx`, colocated with the tests they support.
 

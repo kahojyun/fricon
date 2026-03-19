@@ -46,10 +46,8 @@ jobs:
         run: |
           rustup toolchain install nightly --component rustfmt
           cargo +nightly fmt --all --check
-      - name: Frontend type check
-        run: pnpm run type-check
-      - name: Frontend lint
-        run: pnpm run lint
+      - name: Frontend check
+        run: pnpm run check
       - name: Frontend format check
         run: pnpm run format:check
       - name: Check route tree is up-to-date
