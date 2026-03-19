@@ -17,7 +17,9 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
    - `strict` once before opening/updating a PR
 3. Map changed files to checks using `references/checklist-matrix.md`.
 4. Run selected checks in fail-fast order:
-   - format/type/lint first
+   - run format and static checks first
+   - for frontend changes, prefer `pnpm run check` as the default combined gate
+   - split frontend commands only when diagnosing a failure or when you intentionally need a narrower rerun (`type-check`, `lint`, or `depcruise:frontend`)
    - build/test next
    - strict-only checks last (dependency/license checks included)
 5. If Rust IPC signatures changed, run:
@@ -31,6 +33,7 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 - Prefer `pnpm` and `uv` for package management commands.
 - Run `uv run maturin develop` before `uv run pytest` for Python binding tests.
 - Never hand-edit `crates/fricon-ui/frontend/src/shared/lib/bindings.ts`; regenerate it.
+- Treat `pnpm run check` as the default frontend gate and ensure frontend slice-boundary validation is covered by it or by `pnpm run depcruise:frontend` when commands are split.
 
 ## Optional Alternatives
 

@@ -16,5 +16,7 @@
 - Python bindings and tests (from repo root):
   run `uv run maturin develop` before `uv run pytest` when Rust bindings may be stale.
 - Frontend checks (from repo root):
-  `pnpm run [type-check|lint|format:check|test --run]`.
+  use `pnpm run check` as the default frontend quality gate; run
+  `pnpm run [type-check|lint|format:check|depcruise:frontend|test --run]`
+  individually when needed.
 - Follow the existing vertical slice boundaries. Add code within the owning domain/feature, follow the surrounding module/file layout, and avoid cross-feature or cross-layer shortcuts.
