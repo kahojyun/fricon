@@ -76,11 +76,16 @@ Python:
 
 Frontend (UI):
 
-    pnpm run type-check
-    pnpm run lint
+Use `pnpm run check` as the default frontend validation command. It runs the
+main static checks, including the dependency-cruiser boundary check.
+
+Common frontend commands:
+
+    pnpm run check
     pnpm run format:check
     pnpm run format
     pnpm run lint:fix
+    pnpm run depcruise:frontend
     pnpm tauri dev
 
 ## Database migrations
@@ -108,9 +113,14 @@ Python:
 
 Frontend:
 
-    pnpm run type-check
-    pnpm run lint
+For frontend changes, start with:
+
+    pnpm run check
+
+Then use narrower commands when needed:
+
     pnpm run format:check
+    pnpm run depcruise:frontend
     git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 
 Docs:
@@ -123,6 +133,7 @@ Docs:
 - Use conventional commits: `type(scope): description` (feat, fix, docs, style, refactor, test, chore).
 - Add tests for new features when possible.
 - Run relevant linters and tests before opening a PR.
+- For frontend work, start with `pnpm run check`, then run narrower commands only if you need to investigate a specific failure.
 
 PR checklist (recommended):
 
