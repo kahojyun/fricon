@@ -5,11 +5,8 @@ use uuid::Uuid;
 
 use super::create_stream;
 use crate::{
-    dataset::{
-        catalog::{CatalogError, DatasetCatalogService},
-        ingest::DatasetIngestService,
-        model::{DatasetId, DatasetListQuery, DatasetUpdate},
-    },
+    app::AppHandle,
+    dataset::{DatasetId, DatasetListQuery, DatasetUpdate, catalog::CatalogError},
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
         DeleteResponse, GetRequest, GetResponse, RemoveTagsRequest, RemoveTagsResponse,
@@ -19,20 +16,14 @@ use crate::{
 };
 
 pub(crate) struct Storage {
-    catalog: DatasetCatalogService,
-    ingest: DatasetIngestService,
+    app: AppHandle,
     shutdown_token: CancellationToken,
 }
 
 impl Storage {
-    pub(crate) fn new(
-        catalog: DatasetCatalogService,
-        ingest: DatasetIngestService,
-        shutdown_token: CancellationToken,
-    ) -> Self {
+    pub(crate) fn new(app: AppHandle, shutdown_token: CancellationToken) -> Self {
         Self {
-            catalog,
-            ingest,
+            app,
             shutdown_token,
         }
     }
@@ -51,8 +42,8 @@ impl DatasetService for Storage {
             create_stream::parse_create_stream(stream, self.shutdown_token.clone()).await?;
         debug!(name = %create.request.name, "RPC create: received dataset stream");
         let record_result = self
-            .ingest
-            .create_dataset(create.request, create.events_rx)
+            .app
+            .create_dataset_from_receiver(create.request, create.events_rx)
             .await;
         let producer_result = create.events_task.await.map_err(|e| {
             error!(error = %e, "Create stream event producer task panicked");
@@ -97,7 +88,7 @@ impl DatasetService for Storage {
                 DatasetId::Uid(uid)
             }
         };
-        let record = self.catalog.get_dataset(dataset_id).await.map_err(|e| {
+        let record = self.app.get_dataset(dataset_id).await.map_err(|e| {
             error!(error = %e, "Failed to get dataset");
             match e {
                 CatalogError::NotFound { .. } => Status::not_found("dataset not found"),
@@ -116,7 +107,7 @@ impl DatasetService for Storage {
         request: Request<AddTagsRequest>,
     ) -> Result<Response<AddTagsResponse>> {
         let AddTagsRequest { id, tags } = request.into_inner();
-        self.catalog.add_tags(id, tags).await.map_err(|e| {
+        self.app.add_dataset_tags(id, tags).await.map_err(|e| {
             error!(error = %e, dataset.id = id, "Failed to add tags");
             Status::internal(e.to_string())
         })?;
@@ -129,7 +120,7 @@ impl DatasetService for Storage {
         request: Request<RemoveTagsRequest>,
     ) -> Result<Response<RemoveTagsResponse>> {
         let RemoveTagsRequest { id, tags } = request.into_inner();
-        self.catalog.remove_tags(id, tags).await.map_err(|e| {
+        self.app.remove_dataset_tags(id, tags).await.map_err(|e| {
             error!(error = %e, dataset.id = id, "Failed to remove tags");
             Status::internal(e.to_string())
         })?;
@@ -149,7 +140,7 @@ impl DatasetService for Storage {
             description,
             favorite,
         };
-        self.catalog.update_dataset(id, update).await.map_err(|e| {
+        self.app.update_dataset(id, update).await.map_err(|e| {
             error!(error = %e, dataset.id = id, "Failed to update dataset");
             Status::internal(e.to_string())
         })?;
@@ -159,7 +150,7 @@ impl DatasetService for Storage {
     #[instrument(skip_all, fields(rpc.method = "dataset.delete"))]
     async fn delete(&self, request: Request<DeleteRequest>) -> Result<Response<DeleteResponse>> {
         let DeleteRequest { id } = request.into_inner();
-        self.catalog.delete_dataset(id).await.map_err(|e| {
+        self.app.delete_dataset(id).await.map_err(|e| {
             error!(error = %e, dataset.id = id, "Failed to delete dataset");
             Status::internal(e.to_string())
         })?;
@@ -189,7 +180,7 @@ impl DatasetService for Storage {
             )
         };
         let records = self
-            .catalog
+            .app
             .list_datasets(DatasetListQuery {
                 limit,
                 offset,

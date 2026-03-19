@@ -539,13 +539,12 @@ impl DatasetWriter {
                 let row = convert::build_row(py, values)?;
                 let schema = row.to_schema();
                 let writer = py.detach(|| -> Result<_> {
-                    let mut writer = client.create_dataset(
+                    let mut writer = get_runtime().block_on(client.create_dataset(
                         name,
                         description,
                         tags,
                         schema,
-                        get_runtime().handle(),
-                    )?;
+                    ))?;
                     get_runtime().block_on(writer.write(row))?;
                     Ok(writer)
                 })?;

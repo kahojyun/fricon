@@ -24,7 +24,7 @@ impl DatasetReaderCache {
             return Ok(current_dataset);
         }
 
-        let dataset = app.dataset_read().get_dataset_reader(id.into()).await?;
+        let dataset = app.get_dataset_reader(id.into()).await?;
         let dataset = Arc::new(dataset);
         *self
             .current_dataset

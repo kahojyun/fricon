@@ -8,7 +8,8 @@ use std::ops::Bound;
 use arrow_array::RecordBatch;
 use uuid::Uuid;
 
-pub use self::{error::ReadError, reader::DatasetReader, service::DatasetReadService};
+pub(crate) use self::service::DatasetReadService;
+pub use self::{error::ReadError, reader::DatasetReader};
 use crate::dataset::model::DatasetId;
 
 #[derive(Debug, Clone, Copy)]

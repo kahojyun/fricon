@@ -50,7 +50,6 @@ mod tests {
                 .expect("Lock file should be creatable in test environment");
             assert!(lock_path.exists());
         }
-        // File should be removed after drop
         assert!(!lock_path.exists());
     }
 
@@ -60,7 +59,6 @@ mod tests {
         let lock_path = dir.path().join("double.lock");
         let _first_lock = FileLock::new(&lock_path)
             .expect("First lock should be acquired successfully in test environment");
-        // Attempting to acquire the same lock again should fail
         let second_lock = FileLock::new(&lock_path);
         assert!(
             second_lock.is_err(),

@@ -1,3 +1,5 @@
+mod lock;
+
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},
@@ -11,7 +13,7 @@ use tempfile::NamedTempFile;
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
-use crate::utils::FileLock;
+use self::lock::FileLock;
 
 const WORKSPACE_VERSION: Version = Version::new(0, 1, 0);
 

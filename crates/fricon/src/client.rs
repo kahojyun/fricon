@@ -82,13 +82,16 @@ impl Client {
         })
     }
 
-    pub fn create_dataset(
+    #[expect(
+        clippy::unused_async,
+        reason = "The async constructor is the intended public API after the refactor"
+    )]
+    pub async fn create_dataset(
         &self,
         name: String,
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
-        runtime: &tokio::runtime::Handle,
     ) -> Result<DatasetWriter> {
         Ok(DatasetWriter::new(
             self.clone(),
@@ -96,7 +99,7 @@ impl Client {
             description,
             tags,
             schema,
-            runtime.clone(),
+            tokio::runtime::Handle::current(),
         ))
     }
 
