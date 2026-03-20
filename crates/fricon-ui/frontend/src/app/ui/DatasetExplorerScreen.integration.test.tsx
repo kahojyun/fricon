@@ -107,6 +107,7 @@ describe("DatasetExplorerScreen integration", () => {
               tags: ["vision"],
               status: "Completed",
               createdAt: "2026-01-01T00:00:00Z",
+              trashedAt: null,
             },
           ];
         case "list_dataset_tags":
@@ -120,6 +121,7 @@ describe("DatasetExplorerScreen integration", () => {
             tags: ["vision"],
             status: "Completed",
             createdAt: "2026-01-01T00:00:00Z",
+            trashedAt: null,
             columns: [
               {
                 name: "t",

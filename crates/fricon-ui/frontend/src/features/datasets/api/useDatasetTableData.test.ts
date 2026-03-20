@@ -79,6 +79,23 @@ function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
   };
 }
 
+function expectedListDatasetsOptions(
+  overrides: Partial<ListDatasetsOptions> = {},
+): ListDatasetsOptions {
+  return {
+    search: "",
+    tags: [],
+    favoriteOnly: false,
+    statuses: [],
+    trashed: false,
+    sortBy: "id",
+    sortDir: "desc",
+    limit: 3,
+    offset: 0,
+    ...overrides,
+  };
+}
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -133,16 +150,9 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenCalledWith({
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenCalledWith(
+        expectedListDatasetsOptions(),
+      );
     });
     expect(listDatasetTagsMock).toHaveBeenCalledTimes(1);
   });
@@ -172,16 +182,9 @@ describe("useDatasetTableData", () => {
       await vi.advanceTimersByTimeAsync(300);
     });
 
-    expect(listDatasetsMock).toHaveBeenLastCalledWith({
-      search: "Alpha",
-      tags: [],
-      favoriteOnly: false,
-      statuses: [],
-      sortBy: "id",
-      sortDir: "desc",
-      limit: 3,
-      offset: 0,
-    });
+    expect(listDatasetsMock).toHaveBeenLastCalledWith(
+      expectedListDatasetsOptions({ search: "Alpha" }),
+    );
   });
 
   it("expands query limit when loading the next page", async () => {
@@ -198,16 +201,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(1, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        1,
+        expectedListDatasetsOptions(),
+      );
     });
     await waitFor(() => {
       expect(result.current.hasMore).toBe(true);
@@ -217,16 +214,10 @@ describe("useDatasetTableData", () => {
       await result.current.loadNextPage();
     });
 
-    expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-      search: "",
-      tags: [],
-      favoriteOnly: false,
-      statuses: [],
-      sortBy: "id",
-      sortDir: "desc",
-      limit: 6,
-      offset: 0,
-    });
+    expect(listDatasetsMock).toHaveBeenNthCalledWith(
+      2,
+      expectedListDatasetsOptions({ limit: 6 }),
+    );
   });
 
   it("keeps hasMore true while the next page is loading with placeholder data", async () => {
@@ -295,16 +286,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 6,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ limit: 6 }),
+      );
     });
 
     await act(async () => {
@@ -334,16 +319,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(1, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        1,
+        expectedListDatasetsOptions(),
+      );
     });
     await waitFor(() => {
       expect(result.current.hasMore).toBe(true);
@@ -354,16 +333,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 6,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ limit: 6 }),
+      );
     });
 
     vi.useFakeTimers();
@@ -377,16 +350,10 @@ describe("useDatasetTableData", () => {
     vi.useRealTimers();
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
-        search: "Alpha",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        3,
+        expectedListDatasetsOptions({ search: "Alpha" }),
+      );
     });
   });
 
@@ -419,16 +386,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 6,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ limit: 6 }),
+      );
     });
 
     vi.useFakeTimers();
@@ -441,16 +402,10 @@ describe("useDatasetTableData", () => {
       await vi.advanceTimersByTimeAsync(300);
     });
 
-    expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
-      search: "A",
-      tags: [],
-      favoriteOnly: false,
-      statuses: [],
-      sortBy: "id",
-      sortDir: "desc",
-      limit: 3,
-      offset: 0,
-    });
+    expect(listDatasetsMock).toHaveBeenNthCalledWith(
+      3,
+      expectedListDatasetsOptions({ search: "A" }),
+    );
 
     act(() => {
       result.current.setSearchInput("AB");
@@ -463,16 +418,10 @@ describe("useDatasetTableData", () => {
     });
     vi.useRealTimers();
 
-    expect(listDatasetsMock).toHaveBeenNthCalledWith(4, {
-      search: "AB",
-      tags: [],
-      favoriteOnly: false,
-      statuses: [],
-      sortBy: "id",
-      sortDir: "desc",
-      limit: 3,
-      offset: 0,
-    });
+    expect(listDatasetsMock).toHaveBeenNthCalledWith(
+      4,
+      expectedListDatasetsOptions({ search: "AB" }),
+    );
   });
 
   it("ignores loadNextPage while a search debounce is pending", async () => {
@@ -510,16 +459,10 @@ describe("useDatasetTableData", () => {
     vi.useRealTimers();
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "Alpha",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ search: "Alpha" }),
+      );
     });
   });
 
@@ -551,16 +494,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 6,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ limit: 6 }),
+      );
     });
 
     act(() => {
@@ -568,16 +505,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
-        search: "",
-        tags: ["vision"],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        3,
+        expectedListDatasetsOptions({ tags: ["vision"] }),
+      );
     });
   });
 
@@ -609,16 +540,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 6,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ limit: 6 }),
+      );
     });
 
     act(() => {
@@ -626,16 +551,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: ["Writing"],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        3,
+        expectedListDatasetsOptions({ statuses: ["Writing"] }),
+      );
     });
   });
 
@@ -667,16 +586,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 6,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ limit: 6 }),
+      );
     });
 
     act(() => {
@@ -684,16 +597,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
-        search: "",
-        tags: [],
-        favoriteOnly: true,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        3,
+        expectedListDatasetsOptions({ favoriteOnly: true }),
+      );
     });
   });
 
@@ -725,16 +632,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 6,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({ limit: 6 }),
+      );
     });
 
     act(() => {
@@ -742,16 +643,13 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "name",
-        sortDir: "asc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        3,
+        expectedListDatasetsOptions({
+          sortBy: "name",
+          sortDir: "asc",
+        }),
+      );
     });
   });
 
@@ -771,16 +669,10 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(1, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "id",
-        sortDir: "desc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        1,
+        expectedListDatasetsOptions(),
+      );
     });
 
     act(() => {
@@ -788,16 +680,13 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(2, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "name",
-        sortDir: "asc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        2,
+        expectedListDatasetsOptions({
+          sortBy: "name",
+          sortDir: "asc",
+        }),
+      );
     });
 
     act(() => {
@@ -805,16 +694,14 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(3, {
-        search: "",
-        tags: ["vision"],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "name",
-        sortDir: "asc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        3,
+        expectedListDatasetsOptions({
+          tags: ["vision"],
+          sortBy: "name",
+          sortDir: "asc",
+        }),
+      );
     });
 
     act(() => {
@@ -822,16 +709,13 @@ describe("useDatasetTableData", () => {
     });
 
     await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenNthCalledWith(4, {
-        search: "",
-        tags: [],
-        favoriteOnly: false,
-        statuses: [],
-        sortBy: "name",
-        sortDir: "asc",
-        limit: 3,
-        offset: 0,
-      });
+      expect(listDatasetsMock).toHaveBeenNthCalledWith(
+        4,
+        expectedListDatasetsOptions({
+          sortBy: "name",
+          sortDir: "asc",
+        }),
+      );
     });
 
     expect(result.current.searchInput).toBe("");
