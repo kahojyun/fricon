@@ -178,6 +178,16 @@ fn map_datasets_with_tags(
         .collect())
 }
 
+fn list_all_dataset_records(
+    conn: &mut SqliteConnection,
+    query_options: &DatasetListQuery,
+) -> Result<Vec<DatasetRecord>, anyhow::Error> {
+    let mut unbounded_query = query_options.clone();
+    unbounded_query.limit = Some(i64::MAX);
+    unbounded_query.offset = Some(0);
+    list_dataset_records(conn, &unbounded_query)
+}
+
 #[instrument(skip(conn, query_options))]
 fn list_dataset_records(
     conn: &mut SqliteConnection,
@@ -374,16 +384,19 @@ impl DatasetCatalogRepository for DatasetRepository {
 
     fn purge_trashed_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        let trashed_datasets = list_dataset_records(
-            &mut conn,
-            &DatasetListQuery {
-                trashed: Some(true),
-                ..DatasetListQuery::default()
-            },
-        )
-        .map_err(CatalogError::from)?;
-        Dataset::delete_trashed(&mut conn).map_err(anyhow::Error::from)?;
-        Ok(trashed_datasets)
+        conn.immediate_transaction(|conn| {
+            let trashed_datasets = list_all_dataset_records(
+                conn,
+                &DatasetListQuery {
+                    trashed: Some(true),
+                    ..DatasetListQuery::default()
+                },
+            )?;
+            let ids: Vec<i32> = trashed_datasets.iter().map(|record| record.id).collect();
+            Dataset::delete_batch(conn, &ids)?;
+            Ok::<Vec<DatasetRecord>, anyhow::Error>(trashed_datasets)
+        })
+        .map_err(CatalogError::from)
     }
 
     fn delete_tag(&self, tag: &NormalizedTag) -> Result<(), CatalogError> {

@@ -132,11 +132,19 @@ impl DatasetCatalogService {
     pub(crate) fn empty_trash(&self) -> Result<usize, CatalogError> {
         let records = self.repository.purge_trashed_datasets()?;
         let count = records.len();
+        let mut failed_deletions = 0;
         for record in records {
             let dataset_path = self.paths.dataset_path_from_uid(record.metadata.uid);
-            storage::delete_dataset(&dataset_path).inspect_err(|e| {
-                error!(error = %e, dataset.id = record.id, "Dataset purge failed");
-            })?;
+            if let Err(error) = storage::delete_dataset(&dataset_path) {
+                failed_deletions += 1;
+                error!(error = %error, dataset.id = record.id, "Dataset purge failed");
+            }
+        }
+        if failed_deletions > 0 {
+            error!(
+                failed.deletions = failed_deletions,
+                "Dataset purge completed with file cleanup failures"
+            );
         }
         Ok(count)
     }
@@ -169,5 +177,81 @@ impl DatasetCatalogService {
             return Err(anyhow::anyhow!("source tag and target tag must differ").into());
         }
         self.repository.merge_tag(&source, &target)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, sync::Arc};
+
+    use chrono::Utc;
+    use tempfile::tempdir;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::dataset::{
+        catalog::MockDatasetCatalogRepository,
+        model::{DatasetMetadata, DatasetStatus},
+    };
+
+    fn dataset_record(id: i32, uid: Uuid) -> DatasetRecord {
+        DatasetRecord {
+            id,
+            metadata: DatasetMetadata {
+                uid,
+                name: format!("dataset-{id}"),
+                description: String::new(),
+                favorite: false,
+                status: DatasetStatus::Completed,
+                created_at: Utc::now(),
+                trashed_at: Some(Utc::now()),
+                tags: Vec::new(),
+            },
+        }
+    }
+
+    #[test]
+    fn empty_trash_continues_after_file_cleanup_failure() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let bad_uid = Uuid::new_v4();
+        let good_uid = Uuid::new_v4();
+        let bad_path = paths.dataset_path_from_uid(bad_uid);
+        let good_path = paths.dataset_path_from_uid(good_uid);
+
+        fs::create_dir_all(
+            bad_path
+                .parent()
+                .expect("dataset path should have a parent directory"),
+        )
+        .expect("bad dataset parent directory should be created");
+        fs::write(&bad_path, b"not a directory")
+            .expect("bad dataset path should be created as a file");
+        fs::create_dir_all(&good_path).expect("good dataset directory should be created");
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_purge_trashed_datasets()
+            .once()
+            .return_once(move || {
+                Ok(vec![
+                    dataset_record(1, bad_uid),
+                    dataset_record(2, good_uid),
+                ])
+            });
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+
+        let deleted_count = service.empty_trash().expect("empty trash should succeed");
+
+        assert_eq!(deleted_count, 2);
+        assert!(
+            bad_path.exists(),
+            "failed cleanup should leave the bad path behind"
+        );
+        assert!(
+            !good_path.exists(),
+            "cleanup should continue and remove later dataset directories"
+        );
     }
 }

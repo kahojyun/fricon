@@ -69,9 +69,19 @@ export function useDatasetDeleteMutation(refreshDatasets: () => Promise<void>) {
 }
 
 export function useDatasetTrashMutation(refreshDatasets: () => Promise<void>) {
+  const queryClient = useQueryClient();
   const [isRefreshingAfterTrash, setIsRefreshingAfterTrash] = useState(false);
   const trashMutation = useMutation({
     mutationFn: (ids: number[]) => trashDatasetsApi(ids),
+    onSuccess: (_, ids) => {
+      void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
+
+      ids.forEach((id) => {
+        void queryClient.invalidateQueries({
+          queryKey: datasetKeys.detail(id),
+        });
+      });
+    },
   });
 
   const trashDatasets = (ids: number[]) =>
@@ -91,10 +101,20 @@ export function useDatasetTrashMutation(refreshDatasets: () => Promise<void>) {
 export function useDatasetRestoreMutation(
   refreshDatasets: () => Promise<void>,
 ) {
+  const queryClient = useQueryClient();
   const [isRefreshingAfterRestore, setIsRefreshingAfterRestore] =
     useState(false);
   const restoreMutation = useMutation({
     mutationFn: (ids: number[]) => restoreDatasetsApi(ids),
+    onSuccess: (_, ids) => {
+      void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
+
+      ids.forEach((id) => {
+        void queryClient.invalidateQueries({
+          queryKey: datasetKeys.detail(id),
+        });
+      });
+    },
   });
 
   const restoreDatasets = (ids: number[]) =>

@@ -101,10 +101,17 @@ impl Dataset {
         Self::set_trashed(conn, dataset_id, None)
     }
 
-    pub(super) fn delete_trashed(conn: &mut SqliteConnection) -> QueryResult<usize> {
-        use schema::datasets::dsl::{datasets, trashed_at};
+    pub(super) fn delete_batch(
+        conn: &mut SqliteConnection,
+        dataset_ids: &[i32],
+    ) -> QueryResult<usize> {
+        use schema::datasets::dsl::{datasets, id};
 
-        diesel::delete(datasets.filter(trashed_at.is_not_null())).execute(conn)
+        if dataset_ids.is_empty() {
+            return Ok(0);
+        }
+
+        diesel::delete(datasets.filter(id.eq_any(dataset_ids))).execute(conn)
     }
 
     pub(super) fn load_tags(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Tag>> {
@@ -336,7 +343,8 @@ mod tests {
                 description TEXT NOT NULL,
                 favorite BOOLEAN NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                trashed_at TIMESTAMP NULL
             );
             CREATE TABLE tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

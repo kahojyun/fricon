@@ -406,7 +406,13 @@ export function DatasetTable({
 
       <AlertDialog
         open={isEmptyTrashDialogOpen}
-        onOpenChange={setIsEmptyTrashDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isMutatingDatasets) {
+            return;
+          }
+
+          setIsEmptyTrashDialogOpen(open);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
