@@ -122,42 +122,24 @@ pub(crate) struct DatasetInfo {
     pub(crate) trashed_at: Option<DateTime<Utc>>,
 }
 
-impl DatasetInfo {
-    pub(crate) fn new(
-        id: i32,
-        name: String,
-        description: String,
-        favorite: bool,
-        tags: Vec<String>,
-        status: UiDatasetStatus,
-        created_at: DateTime<Utc>,
-        trashed_at: Option<DateTime<Utc>>,
-    ) -> Self {
+impl From<&DatasetRecord> for DatasetInfo {
+    fn from(record: &DatasetRecord) -> Self {
         Self {
-            id,
-            name,
-            description,
-            favorite,
-            tags,
-            status,
-            created_at,
-            trashed_at,
+            id: record.id,
+            name: record.metadata.name.clone(),
+            description: record.metadata.description.clone(),
+            favorite: record.metadata.favorite,
+            tags: record.metadata.tags.clone(),
+            status: record.metadata.status.into(),
+            created_at: record.metadata.created_at,
+            trashed_at: record.metadata.trashed_at,
         }
     }
 }
 
 impl From<DatasetRecord> for DatasetInfo {
     fn from(record: DatasetRecord) -> Self {
-        Self::new(
-            record.id,
-            record.metadata.name,
-            record.metadata.description,
-            record.metadata.favorite,
-            record.metadata.tags,
-            record.metadata.status.into(),
-            record.metadata.created_at,
-            record.metadata.trashed_at,
-        )
+        Self::from(&record)
     }
 }
 

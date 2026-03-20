@@ -140,10 +140,10 @@ fn normalize_statuses(statuses: Option<&[DatasetStatus]>) -> Option<Vec<DbDatase
     })
 }
 
-fn apply_trashed_filter<'a>(
-    query: schema::datasets::BoxedQuery<'a, diesel::sqlite::Sqlite>,
+fn apply_trashed_filter(
+    query: schema::datasets::BoxedQuery<'_, diesel::sqlite::Sqlite>,
     trashed: Option<bool>,
-) -> schema::datasets::BoxedQuery<'a, diesel::sqlite::Sqlite> {
+) -> schema::datasets::BoxedQuery<'_, diesel::sqlite::Sqlite> {
     match trashed {
         Some(true) => query.filter(schema::datasets::trashed_at.is_not_null()),
         Some(false) => query.filter(schema::datasets::trashed_at.is_null()),

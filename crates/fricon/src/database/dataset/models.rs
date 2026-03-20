@@ -129,6 +129,11 @@ pub(super) struct DatasetUpdate {
     pub(super) description: Option<String>,
     pub(super) favorite: Option<bool>,
     pub(super) status: Option<DbDatasetStatus>,
+    #[expect(
+        clippy::option_option,
+        reason = "Diesel changesets need tri-state semantics for unchanged, NULL, and concrete \
+                  values"
+    )]
     pub(super) trashed_at: Option<Option<NaiveDateTime>>,
 }
 
