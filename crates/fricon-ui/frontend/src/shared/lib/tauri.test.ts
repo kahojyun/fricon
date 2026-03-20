@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCreatedAtDate, toDate, unwrapResult } from "./tauri";
+import {
+  normalizeCreatedAtDate,
+  normalizeDatasetDates,
+  toDate,
+  unwrapResult,
+} from "./tauri";
 
 describe("tauri helpers", () => {
   it("unwraps ok results", () => {
@@ -29,5 +34,19 @@ describe("tauri helpers", () => {
 
     expect(normalized.createdAt).toBeInstanceOf(Date);
     expect(normalized.createdAt.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("normalizes createdAt and trashedAt to Date values", () => {
+    const normalized = normalizeDatasetDates({
+      id: 1,
+      createdAt: "2026-01-01T00:00:00Z",
+      trashedAt: "2026-01-02T03:04:05Z",
+    });
+
+    expect(normalized.createdAt).toBeInstanceOf(Date);
+    expect(normalized.trashedAt).toBeInstanceOf(Date);
+    expect(normalized.trashedAt?.toISOString()).toBe(
+      "2026-01-02T03:04:05.000Z",
+    );
   });
 });

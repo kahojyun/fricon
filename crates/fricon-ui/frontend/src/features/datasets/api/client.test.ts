@@ -37,6 +37,7 @@ describe("dataset client", () => {
           tags: ["vision"],
           status: "Completed",
           createdAt: "2026-01-01T00:00:00Z",
+          trashedAt: null,
         },
       ],
     });
@@ -67,6 +68,7 @@ describe("dataset client", () => {
         id: 1,
         name: "Dataset Alpha",
         createdAt: new Date("2026-01-01T00:00:00Z"),
+        trashedAt: null,
       }),
     ]);
   });
@@ -82,6 +84,7 @@ describe("dataset client", () => {
         tags: [],
         status: "Completed",
         createdAt: "2026-01-02T03:04:05Z",
+        trashedAt: "2026-01-03T04:05:06Z",
         columns: [],
       },
     });
@@ -91,6 +94,8 @@ describe("dataset client", () => {
     expect(datasetDetailCommandMock).toHaveBeenCalledWith(7);
     expect(result.createdAt).toBeInstanceOf(Date);
     expect(result.createdAt.toISOString()).toBe("2026-01-02T03:04:05.000Z");
+    expect(result.trashedAt).toBeInstanceOf(Date);
+    expect(result.trashedAt?.toISOString()).toBe("2026-01-03T04:05:06.000Z");
   });
 
   it("propagates dataset command error envelopes", async () => {

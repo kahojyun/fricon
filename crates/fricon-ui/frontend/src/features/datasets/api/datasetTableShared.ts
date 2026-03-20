@@ -4,6 +4,7 @@ import {
   type DatasetInfo,
   type DatasetListSortBy,
   type DatasetStatus,
+  type DatasetViewMode,
 } from "./types";
 import { datasetKeys } from "./queryKeys";
 
@@ -38,6 +39,7 @@ export interface DatasetQueryParams {
   tags: string[];
   favoriteOnly: boolean;
   statuses: DatasetStatus[];
+  viewMode: DatasetViewMode;
   sorting: SortingState;
 }
 
@@ -51,6 +53,7 @@ export function buildDatasetListOptions(
     tags: params.tags,
     favoriteOnly: params.favoriteOnly,
     statuses: params.statuses,
+    trashed: params.viewMode === "trash",
     sortBy,
     sortDir,
     limit: pagination.limit,
@@ -62,6 +65,8 @@ export type DatasetQueryKey = ReturnType<typeof datasetKeys.list>;
 
 export interface UseDatasetTableDataResult {
   datasets: DatasetInfo[];
+  viewMode: DatasetViewMode;
+  setViewMode: (next: DatasetViewMode) => void;
   searchInput: string;
   setSearchInput: (next: string) => void;
   activeTags: string[];
@@ -76,8 +81,11 @@ export interface UseDatasetTableDataResult {
   hasMore: boolean;
   hasActiveFilters: boolean;
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;
+  trashDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
+  restoreDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
   deleteDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
-  isDeleting: boolean;
+  emptyTrash: () => Promise<{ deletedCount: number }>;
+  isMutatingDatasets: boolean;
   batchAddTags: (
     ids: number[],
     tags: string[],

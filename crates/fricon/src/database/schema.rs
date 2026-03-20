@@ -9,6 +9,7 @@ diesel::table! {
         favorite -> Bool,
         status -> Text,
         created_at -> Timestamp,
+        trashed_at -> Nullable<Timestamp>,
     }
 }
 

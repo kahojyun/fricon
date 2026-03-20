@@ -11,6 +11,7 @@ function renderToolbar(
 ) {
   const props = {
     table: createMockTable(),
+    viewMode: "active" as const,
     hasActiveFilters: false,
     activeTags: [],
     activeStatuses: [],
@@ -18,7 +19,9 @@ function renderToolbar(
     searchInput: "",
     allTags: ["vision", "audio"],
     isUpdatingTags: false,
+    isMutatingDatasets: false,
     setShowFavoritesOnly: vi.fn(),
+    setViewMode: vi.fn(),
     setSearchInput: vi.fn(),
     handleTagToggle: vi.fn(),
     handleStatusToggle: vi.fn(),
@@ -29,6 +32,7 @@ function renderToolbar(
     onDeleteTag: vi.fn().mockResolvedValue(undefined),
     onRenameTag: vi.fn().mockResolvedValue(undefined),
     onMergeTag: vi.fn().mockResolvedValue(undefined),
+    onEmptyTrash: vi.fn(),
     ...overrides,
   };
 
@@ -83,6 +87,7 @@ describe("DatasetTableToolbar", () => {
     const { rerender } = render(
       <DatasetTableToolbar
         table={createMockTable()}
+        viewMode="active"
         hasActiveFilters={false}
         activeTags={[]}
         activeStatuses={[]}
@@ -90,7 +95,9 @@ describe("DatasetTableToolbar", () => {
         searchInput=""
         allTags={["vision"]}
         isUpdatingTags={false}
+        isMutatingDatasets={false}
         setShowFavoritesOnly={vi.fn()}
+        setViewMode={vi.fn()}
         setSearchInput={vi.fn()}
         handleTagToggle={vi.fn()}
         handleStatusToggle={vi.fn()}
@@ -101,6 +108,7 @@ describe("DatasetTableToolbar", () => {
         onDeleteTag={vi.fn().mockResolvedValue(undefined)}
         onRenameTag={vi.fn().mockResolvedValue(undefined)}
         onMergeTag={vi.fn().mockResolvedValue(undefined)}
+        onEmptyTrash={vi.fn()}
       />,
     );
 
@@ -111,6 +119,7 @@ describe("DatasetTableToolbar", () => {
     rerender(
       <DatasetTableToolbar
         table={createMockTable()}
+        viewMode="active"
         hasActiveFilters
         activeTags={["vision"]}
         activeStatuses={[]}
@@ -118,7 +127,9 @@ describe("DatasetTableToolbar", () => {
         searchInput="Alpha"
         allTags={["vision"]}
         isUpdatingTags={false}
+        isMutatingDatasets={false}
         setShowFavoritesOnly={vi.fn()}
+        setViewMode={vi.fn()}
         setSearchInput={vi.fn()}
         handleTagToggle={vi.fn()}
         handleStatusToggle={vi.fn()}
@@ -129,6 +140,7 @@ describe("DatasetTableToolbar", () => {
         onDeleteTag={vi.fn().mockResolvedValue(undefined)}
         onRenameTag={vi.fn().mockResolvedValue(undefined)}
         onMergeTag={vi.fn().mockResolvedValue(undefined)}
+        onEmptyTrash={vi.fn()}
       />,
     );
 

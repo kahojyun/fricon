@@ -4,18 +4,24 @@ import type {
   DatasetDetail as WireDatasetDetail,
   DatasetInfo as WireDatasetInfo,
   DatasetInfoUpdate,
+  EmptyTrashResult,
   UiDatasetSortBy as DatasetListSortBy,
   UiDatasetStatus as DatasetStatus,
   UiSortDirection as DatasetListSortDir,
 } from "@/shared/lib/bindings";
-import { normalizeCreatedAtDate } from "@/shared/lib/tauri";
+import { normalizeDatasetDates } from "@/shared/lib/tauri";
 
-export type DatasetInfo = Omit<WireDatasetInfo, "createdAt"> & {
+export type DatasetInfo = Omit<WireDatasetInfo, "createdAt" | "trashedAt"> & {
   createdAt: Date;
+  trashedAt: Date | null;
 };
 
-export type DatasetDetail = Omit<WireDatasetDetail, "createdAt"> & {
+export type DatasetDetail = Omit<
+  WireDatasetDetail,
+  "createdAt" | "trashedAt"
+> & {
   createdAt: Date;
+  trashedAt: Date | null;
 };
 
 export const DATASET_PAGE_SIZE = 200;
@@ -27,13 +33,17 @@ export type {
   DatasetListSortBy,
   DatasetListSortDir,
   DatasetStatus,
+  EmptyTrashResult,
 };
+
+export type DatasetViewMode = "active" | "trash";
 
 export interface ListDatasetsOptions {
   search?: string;
   tags?: string[];
   favoriteOnly?: boolean;
   statuses?: DatasetStatus[];
+  trashed?: boolean;
   sortBy?: DatasetListSortBy;
   sortDir?: DatasetListSortDir;
   limit?: number;
@@ -41,11 +51,11 @@ export interface ListDatasetsOptions {
 }
 
 export function normalizeDataset(value: WireDatasetInfo): DatasetInfo {
-  return normalizeCreatedAtDate(value);
+  return normalizeDatasetDates(value);
 }
 
 export function normalizeDatasetDetail(
   value: WireDatasetDetail,
 ): DatasetDetail {
-  return normalizeCreatedAtDate(value);
+  return normalizeDatasetDates(value);
 }

@@ -74,15 +74,7 @@ fn dataset_info_from_event(event: &DatasetEvent) -> DatasetInfo {
     let record = match event {
         DatasetEvent::Created(record) | DatasetEvent::Updated(record) => record,
     };
-    DatasetInfo::new(
-        record.id,
-        record.metadata.name.clone(),
-        record.metadata.description.clone(),
-        record.metadata.favorite,
-        record.metadata.tags.clone(),
-        record.metadata.status.into(),
-        record.metadata.created_at,
-    )
+    DatasetInfo::from(record)
 }
 
 async fn forward_ui_commands(

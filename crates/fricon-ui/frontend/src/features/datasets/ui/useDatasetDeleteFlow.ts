@@ -11,6 +11,13 @@ interface DatasetDeleteFlowNotifier {
   warning: (message: string, options?: { description?: string }) => void;
 }
 
+interface DatasetDeleteFlowMessages {
+  actionLabel: string;
+  success: (count: number) => string;
+  failure: (count: number) => string;
+  partial: (successCount: number, failureCount: number) => string;
+}
+
 interface UseDatasetDeleteFlowArgs {
   deleteDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
   isDeleting: boolean;
@@ -18,6 +25,7 @@ interface UseDatasetDeleteFlowArgs {
   onDatasetSelected: (id?: number) => void;
   setRowSelection: (selection: Record<string, boolean>) => void;
   notify: DatasetDeleteFlowNotifier;
+  messages: DatasetDeleteFlowMessages;
 }
 
 async function requestDatasetDelete({
@@ -46,6 +54,7 @@ export function useDatasetDeleteFlow({
   onDatasetSelected,
   setRowSelection,
   notify,
+  messages,
 }: UseDatasetDeleteFlowArgs) {
   const [idsToDelete, setIdsToDelete] = useState<number[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -63,10 +72,13 @@ export function useDatasetDeleteFlow({
     setIsDeleteDialogOpen(false);
   };
 
-  const confirmDelete = async () => {
+  const executeDelete = async (
+    ids: number[],
+    closeDialogOnSuccess: boolean,
+  ) => {
     const results = await requestDatasetDelete({
       deleteDatasets,
-      ids: idsToDelete,
+      ids,
       notify,
     });
     if (!results) {
@@ -84,26 +96,26 @@ export function useDatasetDeleteFlow({
 
     if (summary.outcome === "success") {
       setRowSelection({});
-      setIdsToDelete([]);
-      setIsDeleteDialogOpen(false);
-      notify.success(
-        `Successfully deleted ${summary.successIds.length} dataset(s)`,
-      );
+      if (closeDialogOnSuccess) {
+        setIdsToDelete([]);
+        setIsDeleteDialogOpen(false);
+      }
+      notify.success(messages.success(summary.successIds.length));
       return;
     }
 
     if (summary.outcome === "failure") {
       setRowSelection(buildSelectionFromIds(summary.failedIds));
-      notify.error(
-        `Failed to delete ${summary.failedResults.length} dataset(s)`,
-      );
+      notify.error(messages.failure(summary.failedResults.length));
       return;
     }
 
     setRowSelection(buildSelectionFromIds(summary.failedIds));
-    setIdsToDelete(summary.failedIds);
+    if (closeDialogOnSuccess) {
+      setIdsToDelete(summary.failedIds);
+    }
     notify.warning(
-      `Successfully deleted ${summary.successIds.length} dataset(s), but ${summary.failedResults.length} failed.`,
+      messages.partial(summary.successIds.length, summary.failedResults.length),
       {
         description: summary.failedResults
           .map((result) => `ID ${result.id}: ${result.error}`)
@@ -112,12 +124,22 @@ export function useDatasetDeleteFlow({
     );
   };
 
+  const confirmDelete = async () => {
+    await executeDelete(idsToDelete, true);
+  };
+
+  const performDelete = async (ids: number[]) => {
+    await executeDelete(ids, false);
+  };
+
   return {
+    actionLabel: messages.actionLabel,
     idsToDelete,
     isDeleteDialogOpen,
     openDeleteDialog,
     closeDeleteDialog,
     setIsDeleteDialogOpen,
     confirmDelete,
+    performDelete,
   };
 }

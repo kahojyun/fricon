@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -54,6 +54,8 @@ export function DatasetTable({
   "use no memo";
   const {
     datasets,
+    viewMode,
+    setViewMode,
     searchInput,
     setSearchInput,
     activeTags,
@@ -66,12 +68,15 @@ export function DatasetTable({
     hasMore,
     hasActiveFilters,
     toggleFavorite,
+    trashDatasets,
+    restoreDatasets,
     handleTagToggle,
     handleStatusToggle,
     clearFilters,
     loadNextPage,
     deleteDatasets,
-    isDeleting,
+    emptyTrash,
+    isMutatingDatasets,
     batchAddTags,
     batchRemoveTags,
     deleteTag,
@@ -188,6 +193,19 @@ export function DatasetTable({
     }
   }, [hasMore, loadNextPage, rows.length, virtualItems]);
 
+  useEffect(() => {
+    setRowSelection({});
+  }, [setRowSelection, viewMode]);
+
+  useEffect(() => {
+    if (
+      selectedDatasetId !== undefined &&
+      !datasets.some((dataset) => dataset.id === selectedDatasetId)
+    ) {
+      onDatasetSelected(undefined);
+    }
+  }, [datasets, onDatasetSelected, selectedDatasetId]);
+
   const virtualPaddingTop =
     virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
   const virtualPaddingBottom =
@@ -196,20 +214,76 @@ export function DatasetTable({
         (virtualItems[virtualItems.length - 1]?.end ?? 0)
       : 0;
 
-  const deleteFlow = useDatasetDeleteFlow({
-    deleteDatasets,
-    isDeleting,
+  const trashFlow = useDatasetDeleteFlow({
+    deleteDatasets: trashDatasets,
+    isDeleting: isMutatingDatasets,
     selectedDatasetId,
     onDatasetSelected,
     setRowSelection,
     notify: toast,
+    messages: {
+      actionLabel: "Move to Trash",
+      success: (count) => `Moved ${count} dataset(s) to trash`,
+      failure: (count) => `Failed to move ${count} dataset(s) to trash`,
+      partial: (successCount, failureCount) =>
+        `Moved ${successCount} dataset(s) to trash, but ${failureCount} failed.`,
+    },
   });
+
+  const restoreFlow = useDatasetDeleteFlow({
+    deleteDatasets: restoreDatasets,
+    isDeleting: isMutatingDatasets,
+    selectedDatasetId,
+    onDatasetSelected,
+    setRowSelection,
+    notify: toast,
+    messages: {
+      actionLabel: "Restore",
+      success: (count) => `Restored ${count} dataset(s)`,
+      failure: (count) => `Failed to restore ${count} dataset(s)`,
+      partial: (successCount, failureCount) =>
+        `Restored ${successCount} dataset(s), but ${failureCount} failed.`,
+    },
+  });
+
+  const purgeFlow = useDatasetDeleteFlow({
+    deleteDatasets,
+    isDeleting: isMutatingDatasets,
+    selectedDatasetId,
+    onDatasetSelected,
+    setRowSelection,
+    notify: toast,
+    messages: {
+      actionLabel: "Permanently Delete",
+      success: (count) => `Permanently deleted ${count} dataset(s)`,
+      failure: (count) => `Failed to permanently delete ${count} dataset(s)`,
+      partial: (successCount, failureCount) =>
+        `Permanently deleted ${successCount} dataset(s), but ${failureCount} failed.`,
+    },
+  });
+
+  const [isEmptyTrashDialogOpen, setIsEmptyTrashDialogOpen] = useState(false);
+
+  const handleEmptyTrash = async () => {
+    try {
+      const result = await emptyTrash();
+      setRowSelection({});
+      onDatasetSelected(undefined);
+      setIsEmptyTrashDialogOpen(false);
+      toast.success(`Permanently deleted ${result.deletedCount} dataset(s)`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to empty trash",
+      );
+    }
+  };
 
   return (
     <TooltipProvider>
       <div className="flex h-full min-h-0 flex-col bg-background">
         <DatasetTableToolbar
           table={table}
+          viewMode={viewMode}
           hasActiveFilters={hasActiveFilters}
           activeTags={activeTags}
           activeStatuses={activeStatuses}
@@ -217,7 +291,9 @@ export function DatasetTable({
           searchInput={searchInput}
           allTags={allTags}
           isUpdatingTags={isUpdatingTags}
+          isMutatingDatasets={isMutatingDatasets}
           setShowFavoritesOnly={setShowFavoritesOnly}
+          setViewMode={setViewMode}
           setSearchInput={setSearchInput}
           handleTagToggle={handleTagToggle}
           handleStatusToggle={handleStatusToggle}
@@ -228,6 +304,7 @@ export function DatasetTable({
           onDeleteTag={deleteTag}
           onRenameTag={renameTag}
           onMergeTag={mergeTag}
+          onEmptyTrash={() => setIsEmptyTrashDialogOpen(true)}
         />
         <div
           className="min-h-0 flex-1 overflow-auto bg-background"
@@ -261,6 +338,7 @@ export function DatasetTable({
             </TableHeader>
             <DatasetTableBody
               rows={rows}
+              viewMode={viewMode}
               rowSelection={rowSelection}
               visibleColumnCount={visibleColumnCount}
               virtualItems={virtualItems}
@@ -274,7 +352,13 @@ export function DatasetTable({
               handleRowPointerEnter={handleRowPointerEnter}
               handleRowKeyDown={handleRowKeyDown}
               onDatasetSelected={onDatasetSelected}
-              openDeleteDialog={deleteFlow.openDeleteDialog}
+              onTrash={(ids) => {
+                void trashFlow.performDelete(ids);
+              }}
+              onRestore={(ids) => {
+                void restoreFlow.performDelete(ids);
+              }}
+              onPermanentDelete={purgeFlow.openDeleteDialog}
               batchAddTags={batchAddTags}
               batchRemoveTags={batchRemoveTags}
             />
@@ -283,35 +367,74 @@ export function DatasetTable({
       </div>
 
       <AlertDialog
-        open={deleteFlow.isDeleteDialogOpen}
+        open={purgeFlow.isDeleteDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            deleteFlow.closeDeleteDialog();
+            purgeFlow.closeDeleteDialog();
             return;
           }
 
-          deleteFlow.setIsDeleteDialogOpen(true);
+          purgeFlow.setIsDeleteDialogOpen(true);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Dataset</AlertDialogTitle>
+            <AlertDialogTitle>Permanently Delete Dataset</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {deleteFlow.idsToDelete.length}{" "}
-              dataset(s)? This action cannot be undone.
+              Are you sure you want to permanently delete{" "}
+              {purgeFlow.idsToDelete.length} dataset(s)? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isMutatingDatasets}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={(event) => {
                 event.preventDefault();
-                void deleteFlow.confirmDelete();
+                void purgeFlow.confirmDelete();
               }}
-              disabled={isDeleting}
+              disabled={isMutatingDatasets}
               className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isMutatingDatasets ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={isEmptyTrashDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isMutatingDatasets) {
+            return;
+          }
+
+          setIsEmptyTrashDialogOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Empty Trash</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete all datasets currently in trash? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isMutatingDatasets}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleEmptyTrash();
+              }}
+              disabled={isMutatingDatasets}
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+            >
+              {isMutatingDatasets ? "Deleting..." : "Empty Trash"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

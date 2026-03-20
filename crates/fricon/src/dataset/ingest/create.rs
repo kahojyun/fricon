@@ -139,6 +139,7 @@ mod tests {
                             favorite: false,
                             status: DatasetStatus::Writing,
                             created_at: Utc::now(),
+                            trashed_at: None,
                             tags: vec!["tag".to_string()],
                         },
                     },

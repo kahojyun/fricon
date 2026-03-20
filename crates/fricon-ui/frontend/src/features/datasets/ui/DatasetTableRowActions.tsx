@@ -1,6 +1,10 @@
 import type { ReactElement } from "react";
-import { Trash2 } from "lucide-react";
-import type { DatasetDeleteResult, DatasetInfo } from "../api/types";
+import { RotateCcw, Trash2 } from "lucide-react";
+import type {
+  DatasetDeleteResult,
+  DatasetInfo,
+  DatasetViewMode,
+} from "../api/types";
 import { DatasetRowTagMenus } from "./DatasetTableTagMenu";
 import {
   deriveDatasetTagMenuTarget,
@@ -17,11 +21,14 @@ import { toast } from "sonner";
 
 interface DatasetTableRowActionsProps {
   dataset: DatasetInfo;
+  viewMode: DatasetViewMode;
   selectedDatasets: DatasetInfo[];
   allTags: string[];
   isUpdatingTags: boolean;
   onDatasetSelected: (id?: number) => void;
-  openDeleteDialog: (ids: number[]) => void;
+  onTrash: (ids: number[]) => void;
+  onRestore: (ids: number[]) => void;
+  onPermanentDelete: (ids: number[]) => void;
   batchAddTags: (
     ids: number[],
     tags: string[],
@@ -35,11 +42,14 @@ interface DatasetTableRowActionsProps {
 
 export function DatasetTableRowActions({
   dataset,
+  viewMode,
   selectedDatasets,
   allTags,
   isUpdatingTags,
   onDatasetSelected,
-  openDeleteDialog,
+  onTrash,
+  onRestore,
+  onPermanentDelete,
   batchAddTags,
   batchRemoveTags,
   children,
@@ -49,6 +59,9 @@ export function DatasetTableRowActions({
   const includesDataset = selectedDatasets.some(
     (selectedDataset) => selectedDataset.id === dataset.id,
   );
+  const targetIds = includesDataset
+    ? selectedDatasets.map((selectedDataset) => selectedDataset.id)
+    : [dataset.id];
 
   const handleBatchTagMutation = async (
     operation: "add" | "remove",
@@ -84,24 +97,33 @@ export function DatasetTableRowActions({
           }}
         />
         <ContextMenuSeparator />
-        <ContextMenuItem
-          variant="destructive"
-          onClick={() => openDeleteDialog([dataset.id])}
-        >
-          <Trash2 data-icon="inline-start" />
-          Delete
-        </ContextMenuItem>
-        {selectedCount > 1 && includesDataset && (
+        {viewMode === "trash" ? (
+          <>
+            <ContextMenuItem onClick={() => onRestore(targetIds)}>
+              <RotateCcw data-icon="inline-start" />
+              {selectedCount > 1 && includesDataset
+                ? `Restore Selected (${selectedCount})`
+                : "Restore"}
+            </ContextMenuItem>
+            <ContextMenuItem
+              variant="destructive"
+              onClick={() => onPermanentDelete(targetIds)}
+            >
+              <Trash2 data-icon="inline-start" />
+              {selectedCount > 1 && includesDataset
+                ? `Permanently Delete Selected (${selectedCount})`
+                : "Permanently Delete"}
+            </ContextMenuItem>
+          </>
+        ) : (
           <ContextMenuItem
             variant="destructive"
-            onClick={() =>
-              openDeleteDialog(
-                selectedDatasets.map((selectedDataset) => selectedDataset.id),
-              )
-            }
+            onClick={() => onTrash(targetIds)}
           >
             <Trash2 data-icon="inline-start" />
-            Delete Selected ({selectedCount})
+            {selectedCount > 1 && includesDataset
+              ? `Move Selected to Trash (${selectedCount})`
+              : "Move to Trash"}
           </ContextMenuItem>
         )}
       </ContextMenuContent>

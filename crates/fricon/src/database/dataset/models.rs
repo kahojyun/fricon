@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use diesel::{
     prelude::*,
     sqlite::{Sqlite, SqliteConnection},
@@ -18,6 +18,7 @@ pub(super) struct Dataset {
     pub(super) favorite: bool,
     pub(super) status: DbDatasetStatus,
     pub(super) created_at: NaiveDateTime,
+    pub(super) trashed_at: Option<NaiveDateTime>,
 }
 
 impl Dataset {
@@ -80,6 +81,39 @@ impl Dataset {
         diesel::delete(datasets.find(dataset_id)).execute(conn)
     }
 
+    pub(super) fn set_trashed(
+        conn: &mut SqliteConnection,
+        dataset_id: i32,
+        trashed_at_value: Option<NaiveDateTime>,
+    ) -> QueryResult<usize> {
+        use schema::datasets::dsl::{datasets, trashed_at};
+
+        diesel::update(datasets.find(dataset_id))
+            .set(trashed_at.eq(trashed_at_value))
+            .execute(conn)
+    }
+
+    pub(super) fn trash(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<usize> {
+        Self::set_trashed(conn, dataset_id, Some(Utc::now().naive_utc()))
+    }
+
+    pub(super) fn restore(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<usize> {
+        Self::set_trashed(conn, dataset_id, None)
+    }
+
+    pub(super) fn delete_batch(
+        conn: &mut SqliteConnection,
+        dataset_ids: &[i32],
+    ) -> QueryResult<usize> {
+        use schema::datasets::dsl::{datasets, id};
+
+        if dataset_ids.is_empty() {
+            return Ok(0);
+        }
+
+        diesel::delete(datasets.filter(id.eq_any(dataset_ids))).execute(conn)
+    }
+
     pub(super) fn load_tags(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Tag>> {
         DatasetTag::belonging_to(self)
             .inner_join(schema::tags::table)
@@ -95,6 +129,12 @@ pub(super) struct DatasetUpdate {
     pub(super) description: Option<String>,
     pub(super) favorite: Option<bool>,
     pub(super) status: Option<DbDatasetStatus>,
+    #[expect(
+        clippy::option_option,
+        reason = "Diesel changesets need tri-state semantics for unchanged, NULL, and concrete \
+                  values"
+    )]
+    pub(super) trashed_at: Option<Option<NaiveDateTime>>,
 }
 
 #[derive(Debug, Insertable)]
@@ -308,7 +348,8 @@ mod tests {
                 description TEXT NOT NULL,
                 favorite BOOLEAN NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                trashed_at TIMESTAMP NULL
             );
             CREATE TABLE tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

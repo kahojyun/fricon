@@ -1,5 +1,9 @@
 import { flexRender, type Row } from "@tanstack/react-table";
-import type { DatasetDeleteResult, DatasetInfo } from "../api/types";
+import type {
+  DatasetDeleteResult,
+  DatasetInfo,
+  DatasetViewMode,
+} from "../api/types";
 import { DatasetTableRowActions } from "./DatasetTableRowActions";
 import { TableBody, TableCell, TableRow } from "@/shared/ui/table";
 
@@ -11,6 +15,7 @@ interface VirtualRowLike {
 
 interface DatasetTableBodyProps {
   rows: Row<DatasetInfo>[];
+  viewMode: DatasetViewMode;
   rowSelection: Record<string, boolean>;
   visibleColumnCount: number;
   virtualItems: VirtualRowLike[];
@@ -35,7 +40,9 @@ interface DatasetTableBodyProps {
     rowIndex: number,
   ) => void;
   onDatasetSelected: (id?: number) => void;
-  openDeleteDialog: (ids: number[]) => void;
+  onTrash: (ids: number[]) => void;
+  onRestore: (ids: number[]) => void;
+  onPermanentDelete: (ids: number[]) => void;
   batchAddTags: (
     ids: number[],
     tags: string[],
@@ -48,6 +55,7 @@ interface DatasetTableBodyProps {
 
 export function DatasetTableBody({
   rows,
+  viewMode,
   rowSelection,
   visibleColumnCount,
   virtualItems,
@@ -61,7 +69,9 @@ export function DatasetTableBody({
   handleRowPointerEnter,
   handleRowKeyDown,
   onDatasetSelected,
-  openDeleteDialog,
+  onTrash,
+  onRestore,
+  onPermanentDelete,
   batchAddTags,
   batchRemoveTags,
 }: DatasetTableBodyProps) {
@@ -102,11 +112,14 @@ export function DatasetTableBody({
               <DatasetTableRowActions
                 key={row.id}
                 dataset={dataset}
+                viewMode={viewMode}
                 selectedDatasets={selectedDatasets}
                 allTags={allTags}
                 isUpdatingTags={isUpdatingTags}
                 onDatasetSelected={onDatasetSelected}
-                openDeleteDialog={openDeleteDialog}
+                onTrash={onTrash}
+                onRestore={onRestore}
+                onPermanentDelete={onPermanentDelete}
                 batchAddTags={batchAddTags}
                 batchRemoveTags={batchRemoveTags}
               >

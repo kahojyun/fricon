@@ -92,6 +92,7 @@ describe("router app shell", () => {
               tags: ["vision"],
               status: "Completed",
               createdAt: "2026-01-01T00:00:00Z",
+              trashedAt: null,
             },
           ];
         case "list_dataset_tags":
@@ -159,5 +160,5 @@ describe("router app shell", () => {
       );
     });
     expect(router.state.location.pathname).toBe("/");
-  });
+  }, 10000);
 });

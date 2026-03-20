@@ -2,16 +2,25 @@ import { createElement, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useDatasetDeleteMutation } from "./useDatasetDeleteMutation";
+import {
+  useDatasetDeleteMutation,
+  useDatasetRestoreMutation,
+  useDatasetTrashMutation,
+} from "./useDatasetDeleteMutation";
 import { datasetKeys } from "./queryKeys";
 import type { DatasetDeleteResult } from "./types";
 
-type DeleteDatasetsFn = (ids: number[]) => Promise<DatasetDeleteResult[]>;
+type DatasetMutationFn = (ids: number[]) => Promise<DatasetDeleteResult[]>;
 
-const deleteDatasetsMock = vi.fn<DeleteDatasetsFn>();
+const deleteDatasetsMock = vi.fn<DatasetMutationFn>();
+const trashDatasetsMock = vi.fn<DatasetMutationFn>();
+const restoreDatasetsMock = vi.fn<DatasetMutationFn>();
 
 vi.mock("./client", () => ({
   deleteDatasets: (ids: number[]) => deleteDatasetsMock(ids),
+  trashDatasets: (ids: number[]) => trashDatasetsMock(ids),
+  restoreDatasets: (ids: number[]) => restoreDatasetsMock(ids),
+  emptyTrash: vi.fn(),
 }));
 
 function createWrapper(queryClient: QueryClient) {
@@ -29,6 +38,8 @@ describe("useDatasetDeleteMutation", () => {
 
   beforeEach(() => {
     deleteDatasetsMock.mockReset();
+    trashDatasetsMock.mockReset();
+    restoreDatasetsMock.mockReset();
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {
       return undefined;
     });
@@ -187,6 +198,76 @@ describe("useDatasetDeleteMutation", () => {
     ]);
     await waitFor(() => {
       expect(result.current.isDeleting).toBe(false);
+    });
+  });
+
+  it("invalidates tags and detail queries after trashing datasets", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
+    const results: DatasetDeleteResult[] = [
+      { id: 3, success: true, error: null },
+      { id: 4, success: true, error: null },
+    ];
+
+    trashDatasetsMock.mockResolvedValue(results);
+
+    const { result } = renderHook(
+      () => useDatasetTrashMutation(refreshDatasets),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await act(async () => {
+      await result.current.trashDatasets([3, 4]);
+    });
+
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: datasetKeys.tags(),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: datasetKeys.detail(3),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: datasetKeys.detail(4),
+    });
+  });
+
+  it("invalidates tags and detail queries after restoring datasets", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
+    const results: DatasetDeleteResult[] = [
+      { id: 5, success: true, error: null },
+    ];
+
+    restoreDatasetsMock.mockResolvedValue(results);
+
+    const { result } = renderHook(
+      () => useDatasetRestoreMutation(refreshDatasets),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await act(async () => {
+      await result.current.restoreDatasets([5]);
+    });
+
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: datasetKeys.tags(),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: datasetKeys.detail(5),
     });
   });
 });

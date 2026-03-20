@@ -81,6 +81,7 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
             favorite: metadata.favorite,
             status,
             created_at,
+            trashed_at: None,
             tags: metadata.tags,
         })
     }
