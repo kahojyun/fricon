@@ -4,6 +4,7 @@ import type {
   DatasetDetail as WireDatasetDetail,
   DatasetInfo as WireDatasetInfo,
   DatasetInfoUpdate,
+  EmptyTrashResult,
   UiDatasetSortBy as DatasetListSortBy,
   UiDatasetStatus as DatasetStatus,
   UiSortDirection as DatasetListSortDir,
@@ -27,13 +28,17 @@ export type {
   DatasetListSortBy,
   DatasetListSortDir,
   DatasetStatus,
+  EmptyTrashResult,
 };
+
+export type DatasetViewMode = "active" | "trash";
 
 export interface ListDatasetsOptions {
   search?: string;
   tags?: string[];
   favoriteOnly?: boolean;
   statuses?: DatasetStatus[];
+  trashed?: boolean;
   sortBy?: DatasetListSortBy;
   sortDir?: DatasetListSortDir;
   limit?: number;

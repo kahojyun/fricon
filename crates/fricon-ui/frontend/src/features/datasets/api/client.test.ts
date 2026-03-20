@@ -37,6 +37,7 @@ describe("dataset client", () => {
           tags: ["vision"],
           status: "Completed",
           createdAt: "2026-01-01T00:00:00Z",
+          trashedAt: null,
         },
       ],
     });
@@ -82,6 +83,7 @@ describe("dataset client", () => {
         tags: [],
         status: "Completed",
         createdAt: "2026-01-02T03:04:05Z",
+        trashedAt: null,
         columns: [],
       },
     });

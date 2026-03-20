@@ -104,6 +104,43 @@ impl DatasetCatalogService {
         Ok(())
     }
 
+    #[instrument(skip(self, events), fields(dataset.id = id))]
+    pub(crate) fn trash_dataset<P: DatasetEventPublisher>(
+        &self,
+        id: i32,
+        events: &P,
+    ) -> Result<(), CatalogError> {
+        self.repository.trash_dataset(id)?;
+        let record = self.repository.get_dataset(DatasetId::Id(id))?;
+        events.publish(DatasetEvent::Updated(record));
+        Ok(())
+    }
+
+    #[instrument(skip(self, events), fields(dataset.id = id))]
+    pub(crate) fn restore_dataset<P: DatasetEventPublisher>(
+        &self,
+        id: i32,
+        events: &P,
+    ) -> Result<(), CatalogError> {
+        self.repository.restore_dataset(id)?;
+        let record = self.repository.get_dataset(DatasetId::Id(id))?;
+        events.publish(DatasetEvent::Updated(record));
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub(crate) fn empty_trash(&self) -> Result<usize, CatalogError> {
+        let records = self.repository.purge_trashed_datasets()?;
+        let count = records.len();
+        for record in records {
+            let dataset_path = self.paths.dataset_path_from_uid(record.metadata.uid);
+            storage::delete_dataset(&dataset_path).inspect_err(|e| {
+                error!(error = %e, dataset.id = record.id, "Dataset purge failed");
+            })?;
+        }
+        Ok(count)
+    }
+
     #[instrument(skip(self, tag), fields(tag.name = %tag))]
     pub(crate) fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {
         let tag = NormalizedTag::parse(tag)?;

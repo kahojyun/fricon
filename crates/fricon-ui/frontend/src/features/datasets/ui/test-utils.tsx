@@ -18,6 +18,7 @@ export function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
     tags: ["vision"],
     status: "Completed",
     createdAt: new Date("2026-01-01T00:00:00Z"),
+    trashedAt: null,
     ...overrides,
   };
 }
@@ -27,6 +28,8 @@ export function buildDatasetTableDataValue(
 ): UseDatasetTableDataResult {
   return {
     datasets: [makeDataset()],
+    viewMode: "active",
+    setViewMode: vi.fn(),
     searchInput: "",
     setSearchInput: vi.fn(),
     activeTags: [],
@@ -39,8 +42,11 @@ export function buildDatasetTableDataValue(
     hasMore: false,
     hasActiveFilters: false,
     toggleFavorite: vi.fn().mockResolvedValue(undefined),
+    trashDatasets: vi.fn().mockResolvedValue([]),
+    restoreDatasets: vi.fn().mockResolvedValue([]),
     deleteDatasets: vi.fn().mockResolvedValue([]),
-    isDeleting: false,
+    emptyTrash: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+    isMutatingDatasets: false,
     batchAddTags: vi.fn().mockResolvedValue([]),
     batchRemoveTags: vi.fn().mockResolvedValue([]),
     deleteTag: vi.fn().mockResolvedValue(undefined),

@@ -17,6 +17,7 @@ pub struct DatasetMetadata {
     pub favorite: bool,
     pub status: DatasetStatus,
     pub created_at: DateTime<Utc>,
+    pub trashed_at: Option<DateTime<Utc>>,
     pub tags: Vec<String>,
 }
 
@@ -56,6 +57,7 @@ pub struct DatasetListQuery {
     pub tags: Option<Vec<String>>,
     pub favorite_only: bool,
     pub statuses: Option<Vec<DatasetStatus>>,
+    pub trashed: Option<bool>,
     pub sort_by: DatasetSortBy,
     pub sort_direction: SortDirection,
     pub limit: Option<i64>,
@@ -69,6 +71,7 @@ impl Default for DatasetListQuery {
             tags: None,
             favorite_only: false,
             statuses: None,
+            trashed: Some(false),
             sort_by: DatasetSortBy::Id,
             sort_direction: SortDirection::Desc,
             limit: None,

@@ -82,6 +82,7 @@ fn dataset_info_from_event(event: &DatasetEvent) -> DatasetInfo {
         record.metadata.tags.clone(),
         record.metadata.status.into(),
         record.metadata.created_at,
+        record.metadata.trashed_at,
     )
 }
 

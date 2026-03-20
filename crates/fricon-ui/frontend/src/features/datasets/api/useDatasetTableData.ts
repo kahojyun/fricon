@@ -43,6 +43,7 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     tags: state.activeTags,
     favoriteOnly: state.showFavoritesOnly,
     statuses: state.activeStatuses,
+    viewMode: state.viewMode,
     sorting: state.sorting,
   };
   const datasetQueryKey: DatasetQueryKey = datasetKeys.list(
@@ -70,6 +71,10 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
 
   const setSearchInput = (next: string) => {
     dispatch({ type: "set_search_input", next });
+  };
+
+  const setViewMode = (next: "active" | "trash") => {
+    dispatch({ type: "set_view_mode", next });
   };
 
   const setSorting = (
@@ -132,6 +137,8 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
 
   return {
     datasets,
+    viewMode: state.viewMode,
+    setViewMode,
     searchInput: state.searchInput,
     setSearchInput,
     activeTags: state.activeTags,
@@ -148,8 +155,11 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
       state.activeTags.length > 0 ||
       state.activeStatuses.length > 0,
     toggleFavorite: actions.toggleFavorite,
+    trashDatasets: actions.trashDatasets,
+    restoreDatasets: actions.restoreDatasets,
     deleteDatasets: actions.deleteDatasets,
-    isDeleting: actions.isDeleting,
+    emptyTrash: actions.emptyTrash,
+    isMutatingDatasets: actions.isMutatingDatasets,
     batchAddTags: actions.batchAddTags,
     batchRemoveTags: actions.batchRemoveTags,
     deleteTag: actions.deleteTag,

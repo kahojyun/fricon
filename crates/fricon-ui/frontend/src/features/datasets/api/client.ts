@@ -11,6 +11,7 @@ import {
   normalizeDataset,
   normalizeDatasetDetail,
   type DatasetDetail,
+  type EmptyTrashResult,
   type DatasetInfo,
   type DatasetInfoUpdate,
   type ListDatasetsOptions,
@@ -24,6 +25,7 @@ export async function listDatasets(
     tags,
     favoriteOnly,
     statuses,
+    trashed,
     sortBy,
     sortDir,
     limit,
@@ -34,6 +36,7 @@ export async function listDatasets(
     tags: tags && tags.length > 0 ? tags : undefined,
     favoriteOnly: favoriteOnly ? true : undefined,
     statuses: statuses && statuses.length > 0 ? statuses : undefined,
+    trashed,
     sortBy,
     sortDir,
     limit,
@@ -73,6 +76,22 @@ export async function deleteDatasets(
   ids: number[],
 ): Promise<DatasetDeleteResult[]> {
   return invoke(commands.deleteDatasets(ids));
+}
+
+export async function trashDatasets(
+  ids: number[],
+): Promise<DatasetDeleteResult[]> {
+  return invoke(commands.trashDatasets(ids));
+}
+
+export async function restoreDatasets(
+  ids: number[],
+): Promise<DatasetDeleteResult[]> {
+  return invoke(commands.restoreDatasets(ids));
+}
+
+export async function emptyTrash(): Promise<EmptyTrashResult> {
+  return invoke(commands.emptyTrash());
 }
 
 export async function batchUpdateDatasetTags(

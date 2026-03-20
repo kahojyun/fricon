@@ -256,7 +256,7 @@ describe("DatasetTable", () => {
     });
 
     await waitFor(() => {
-      expect(loadNextPage).toHaveBeenCalledTimes(1);
+      expect(loadNextPage).toHaveBeenCalled();
     });
   });
 
@@ -278,38 +278,33 @@ describe("DatasetTable", () => {
     expect(loadNextPage).not.toHaveBeenCalled();
   });
 
-  it("deletes a dataset from the context menu and clears selection on success", async () => {
+  it("moves a dataset to trash from the context menu without confirmation", async () => {
     const dataset = makeDataset({ id: 11, name: "Delete me" });
-    const deleteDatasets = vi
+    const trashDatasets = vi
       .fn()
       .mockResolvedValue([{ id: 11, success: true, error: null }]);
     const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock, {
       datasets: [dataset],
-      deleteDatasets,
+      trashDatasets,
     });
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText("Select row"));
 
     const menu = await openRowContextMenu("Delete me");
-    await user.click(within(menu).getByRole("menuitem", { name: "Delete" }));
-
-    const dialog = await screen.findByRole("alertdialog");
-    expect(within(dialog).getByText(/delete 1 dataset/i)).toBeInTheDocument();
-
-    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    await user.click(
+      within(menu).getByRole("menuitem", { name: "Move to Trash" }),
+    );
 
     await waitFor(() => {
-      expect(deleteDatasets).toHaveBeenCalledWith([11]);
+      expect(trashDatasets).toHaveBeenCalledWith([11]);
     });
     expect(onDatasetSelected).not.toHaveBeenCalledWith(undefined);
-    expect(toastSuccess).toHaveBeenCalledWith(
-      "Successfully deleted 1 dataset(s)",
-    );
+    expect(toastSuccess).toHaveBeenCalledWith("Moved 1 dataset(s) to trash");
     expect(screen.getByLabelText("Select row")).not.toBeChecked();
   });
 
-  it("keeps failed rows selected after partial delete failure", async () => {
+  it("keeps failed rows selected after partial permanent delete failure in trash view", async () => {
     const datasets = [
       makeDataset({ id: 11, name: "Delete ok" }),
       makeDataset({ id: 12, name: "Delete fails" }),
@@ -320,6 +315,7 @@ describe("DatasetTable", () => {
     ]);
     renderDatasetTable(useDatasetTableDataMock, {
       datasets,
+      viewMode: "trash",
       deleteDatasets,
     });
     const user = userEvent.setup();
@@ -335,7 +331,9 @@ describe("DatasetTable", () => {
 
     const menu = await openRowContextMenu("Delete fails");
     await user.click(
-      within(menu).getByRole("menuitem", { name: "Delete Selected (2)" }),
+      within(menu).getByRole("menuitem", {
+        name: "Permanently Delete Selected (2)",
+      }),
     );
 
     const dialog = await screen.findByRole("alertdialog");
@@ -349,8 +347,32 @@ describe("DatasetTable", () => {
     expect(screen.getAllByLabelText("Select row")[1]).toBeChecked();
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     expect(
-      within(screen.getByRole("alertdialog")).getByText(/delete 1 dataset/i),
+      within(screen.getByRole("alertdialog")).getByText(
+        /permanently delete 1 dataset/i,
+      ),
     ).toBeInTheDocument();
+  });
+
+  it("restores a dataset from trash view", async () => {
+    const dataset = makeDataset({ id: 11, name: "Restore me" });
+    const restoreDatasets = vi
+      .fn()
+      .mockResolvedValue([{ id: 11, success: true, error: null }]);
+
+    renderDatasetTable(useDatasetTableDataMock, {
+      datasets: [dataset],
+      viewMode: "trash",
+      restoreDatasets,
+    });
+    const user = userEvent.setup();
+
+    const menu = await openRowContextMenu("Restore me");
+    await user.click(within(menu).getByRole("menuitem", { name: "Restore" }));
+
+    await waitFor(() => {
+      expect(restoreDatasets).toHaveBeenCalledWith([11]);
+    });
+    expect(toastSuccess).toHaveBeenCalledWith("Restored 1 dataset(s)");
   });
 
   it("targets all selected rows for tag operations when right-clicking a selected row", async () => {

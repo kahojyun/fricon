@@ -28,6 +28,13 @@ describe("useDatasetDeleteFlow", () => {
         onDatasetSelected,
         setRowSelection,
         notify: notifier,
+        messages: {
+          actionLabel: "Delete",
+          success: (count) => `Deleted ${count} dataset(s)`,
+          failure: (count) => `Failed to delete ${count} dataset(s)`,
+          partial: (successCount, failureCount) =>
+            `Deleted ${successCount} dataset(s), but ${failureCount} failed.`,
+        },
       }),
     );
 
@@ -42,9 +49,7 @@ describe("useDatasetDeleteFlow", () => {
     expect(deleteDatasets).toHaveBeenCalledWith([11, 12]);
     expect(setRowSelection).toHaveBeenCalledWith({});
     expect(onDatasetSelected).toHaveBeenCalledWith(undefined);
-    expect(notifier.success).toHaveBeenCalledWith(
-      "Successfully deleted 2 dataset(s)",
-    );
+    expect(notifier.success).toHaveBeenCalledWith("Deleted 2 dataset(s)");
     expect(result.current.idsToDelete).toEqual([]);
     expect(result.current.isDeleteDialogOpen).toBe(false);
   });
@@ -63,6 +68,13 @@ describe("useDatasetDeleteFlow", () => {
         onDatasetSelected: vi.fn(),
         setRowSelection,
         notify: notifier,
+        messages: {
+          actionLabel: "Delete",
+          success: (count) => `Deleted ${count} dataset(s)`,
+          failure: (count) => `Failed to delete ${count} dataset(s)`,
+          partial: (successCount, failureCount) =>
+            `Deleted ${successCount} dataset(s), but ${failureCount} failed.`,
+        },
       }),
     );
 
@@ -99,6 +111,13 @@ describe("useDatasetDeleteFlow", () => {
         onDatasetSelected,
         setRowSelection,
         notify: notifier,
+        messages: {
+          actionLabel: "Delete",
+          success: (count) => `Deleted ${count} dataset(s)`,
+          failure: (count) => `Failed to delete ${count} dataset(s)`,
+          partial: (successCount, failureCount) =>
+            `Deleted ${successCount} dataset(s), but ${failureCount} failed.`,
+        },
       }),
     );
 
@@ -113,7 +132,7 @@ describe("useDatasetDeleteFlow", () => {
     expect(setRowSelection).toHaveBeenCalledWith({ "12": true });
     expect(onDatasetSelected).toHaveBeenCalledWith(undefined);
     expect(notifier.warning).toHaveBeenCalledWith(
-      "Successfully deleted 1 dataset(s), but 1 failed.",
+      "Deleted 1 dataset(s), but 1 failed.",
       {
         description: "ID 12: locked",
       },

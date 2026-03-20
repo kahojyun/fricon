@@ -1,6 +1,11 @@
 import type { DatasetDeleteResult, DatasetInfo } from "./types";
 import type { DatasetQueryKey } from "./datasetTableShared";
-import { useDatasetDeleteMutation } from "./useDatasetDeleteMutation";
+import {
+  useDatasetDeleteMutation,
+  useDatasetRestoreMutation,
+  useDatasetTrashMutation,
+  useEmptyTrashMutation,
+} from "./useDatasetDeleteMutation";
 import { useDatasetFavoriteMutation } from "./useDatasetFavoriteMutation";
 import { useDatasetTagMutation } from "./useDatasetTagMutation";
 
@@ -13,8 +18,11 @@ interface UseDatasetTableActionsArgs {
 
 export interface UseDatasetTableActionsResult {
   toggleFavorite: (dataset: DatasetInfo) => Promise<void>;
+  trashDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
+  restoreDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
   deleteDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
-  isDeleting: boolean;
+  emptyTrash: () => Promise<{ deletedCount: number }>;
+  isMutatingDatasets: boolean;
   batchAddTags: (
     ids: number[],
     tags: string[],
@@ -39,8 +47,14 @@ export function useDatasetTableActions({
     datasetQueryKey,
     refreshDatasets,
   );
+  const { trashDatasets, isTrashing } =
+    useDatasetTrashMutation(refreshDatasets);
+  const { restoreDatasets, isRestoring } =
+    useDatasetRestoreMutation(refreshDatasets);
   const { deleteDatasets, isDeleting } =
     useDatasetDeleteMutation(refreshDatasets);
+  const { emptyTrash, isEmptyingTrash } =
+    useEmptyTrashMutation(refreshDatasets);
   const {
     batchAddTags,
     batchRemoveTags,
@@ -67,8 +81,12 @@ export function useDatasetTableActions({
 
   return {
     toggleFavorite,
+    trashDatasets,
+    restoreDatasets,
     deleteDatasets,
-    isDeleting,
+    emptyTrash,
+    isMutatingDatasets:
+      isTrashing || isRestoring || isDeleting || isEmptyingTrash,
     batchAddTags,
     batchRemoveTags,
     deleteTag,

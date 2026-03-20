@@ -307,6 +307,42 @@ impl AppHandle {
             .map_err(|error| catalog_join_error(error, "failed to join dataset delete task"))?
     }
 
+    pub async fn trash_dataset(&self, id: i32) -> Result<(), CatalogError> {
+        let state = self.state().map_err(|_| catalog_state_dropped())?;
+        let tracker = state.tracker.clone();
+        let catalog = state.dataset_catalog.clone();
+        let events = BroadcastDatasetEvents {
+            sender: state.dataset_event_sender.clone(),
+        };
+        tracker
+            .spawn_blocking(move || catalog.trash_dataset(id, &events))
+            .await
+            .map_err(|error| catalog_join_error(error, "failed to join dataset trash task"))?
+    }
+
+    pub async fn restore_dataset(&self, id: i32) -> Result<(), CatalogError> {
+        let state = self.state().map_err(|_| catalog_state_dropped())?;
+        let tracker = state.tracker.clone();
+        let catalog = state.dataset_catalog.clone();
+        let events = BroadcastDatasetEvents {
+            sender: state.dataset_event_sender.clone(),
+        };
+        tracker
+            .spawn_blocking(move || catalog.restore_dataset(id, &events))
+            .await
+            .map_err(|error| catalog_join_error(error, "failed to join dataset restore task"))?
+    }
+
+    pub async fn empty_trash(&self) -> Result<usize, CatalogError> {
+        let state = self.state().map_err(|_| catalog_state_dropped())?;
+        let tracker = state.tracker.clone();
+        let catalog = state.dataset_catalog.clone();
+        tracker
+            .spawn_blocking(move || catalog.empty_trash())
+            .await
+            .map_err(|error| catalog_join_error(error, "failed to join empty trash task"))?
+    }
+
     pub async fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {
         let state = self.state().map_err(|_| catalog_state_dropped())?;
         let tracker = state.tracker.clone();

@@ -44,6 +44,7 @@ fn dataset_record_from_models(dataset: Dataset, tags: Vec<Tag>) -> DatasetRecord
         favorite: dataset.favorite,
         status: dataset.status.0,
         created_at: dataset.created_at.and_utc(),
+        trashed_at: dataset.trashed_at.map(|value| value.and_utc()),
         tags: tags.into_iter().map(|tag| tag.name).collect(),
     };
 
@@ -139,6 +140,17 @@ fn normalize_statuses(statuses: Option<&[DatasetStatus]>) -> Option<Vec<DbDatase
     })
 }
 
+fn apply_trashed_filter<'a>(
+    query: schema::datasets::BoxedQuery<'a, diesel::sqlite::Sqlite>,
+    trashed: Option<bool>,
+) -> schema::datasets::BoxedQuery<'a, diesel::sqlite::Sqlite> {
+    match trashed {
+        Some(true) => query.filter(schema::datasets::trashed_at.is_not_null()),
+        Some(false) => query.filter(schema::datasets::trashed_at.is_null()),
+        None => query,
+    }
+}
+
 fn map_datasets_with_tags(
     conn: &mut SqliteConnection,
     all_datasets: Vec<Dataset>,
@@ -193,6 +205,7 @@ fn list_dataset_records(
     if let Some(statuses) = statuses {
         query = query.filter(schema::datasets::status.eq_any(statuses));
     }
+    query = apply_trashed_filter(query, query_options.trashed);
 
     query = match (query_options.sort_by, query_options.sort_direction) {
         (DatasetSortBy::Id, SortDirection::Asc) => query.order(schema::datasets::id.asc()),
@@ -303,6 +316,7 @@ impl DatasetCatalogRepository for DatasetRepository {
             description: update.description,
             favorite: update.favorite,
             status: None,
+            trashed_at: None,
         };
         Dataset::update_metadata(&mut conn, id, &db_update).map_err(anyhow::Error::from)?;
         debug!(dataset.id = id, "Dataset metadata updated");
@@ -344,6 +358,32 @@ impl DatasetCatalogRepository for DatasetRepository {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
         Dataset::delete_from_db(&mut conn, id).map_err(anyhow::Error::from)?;
         Ok(())
+    }
+
+    fn trash_dataset(&self, id: i32) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        Dataset::trash(&mut conn, id).map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
+    fn restore_dataset(&self, id: i32) -> Result<(), CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        Dataset::restore(&mut conn, id).map_err(anyhow::Error::from)?;
+        Ok(())
+    }
+
+    fn purge_trashed_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let trashed_datasets = list_dataset_records(
+            &mut conn,
+            &DatasetListQuery {
+                trashed: Some(true),
+                ..DatasetListQuery::default()
+            },
+        )
+        .map_err(CatalogError::from)?;
+        Dataset::delete_trashed(&mut conn).map_err(anyhow::Error::from)?;
+        Ok(trashed_datasets)
     }
 
     fn delete_tag(&self, tag: &NormalizedTag) -> Result<(), CatalogError> {

@@ -27,6 +27,7 @@ pub(crate) struct DatasetDetail {
     pub(crate) tags: Vec<String>,
     pub(crate) status: DatasetStatus,
     pub(crate) created_at: DateTime<Utc>,
+    pub(crate) trashed_at: Option<DateTime<Utc>>,
     pub(crate) columns: Vec<ColumnInfo>,
 }
 
@@ -123,6 +124,7 @@ pub(crate) async fn get_dataset_detail(
         tags: record.metadata.tags,
         status: record.metadata.status,
         created_at: record.metadata.created_at,
+        trashed_at: record.metadata.trashed_at,
         columns,
     })
 }
@@ -228,6 +230,60 @@ pub(crate) async fn delete_datasets(
     results
 }
 
+pub(crate) async fn trash_datasets(
+    session: &WorkspaceSession,
+    ids: Vec<i32>,
+) -> Vec<DatasetDeleteResult> {
+    let app = session.app();
+    let mut results = Vec::with_capacity(ids.len());
+    for id in ids {
+        match app.trash_dataset(id).await {
+            Ok(()) => results.push(DatasetDeleteResult {
+                id,
+                success: true,
+                error: None,
+            }),
+            Err(e) => results.push(DatasetDeleteResult {
+                id,
+                success: false,
+                error: Some(e.to_string()),
+            }),
+        }
+    }
+    results
+}
+
+pub(crate) async fn restore_datasets(
+    session: &WorkspaceSession,
+    ids: Vec<i32>,
+) -> Vec<DatasetDeleteResult> {
+    let app = session.app();
+    let mut results = Vec::with_capacity(ids.len());
+    for id in ids {
+        match app.restore_dataset(id).await {
+            Ok(()) => results.push(DatasetDeleteResult {
+                id,
+                success: true,
+                error: None,
+            }),
+            Err(e) => results.push(DatasetDeleteResult {
+                id,
+                success: false,
+                error: Some(e.to_string()),
+            }),
+        }
+    }
+    results
+}
+
+pub(crate) async fn empty_trash(session: &WorkspaceSession) -> anyhow::Result<usize> {
+    session
+        .app()
+        .empty_trash()
+        .await
+        .context("Failed to empty trash.")
+}
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct BatchTagUpdate {
     pub(crate) ids: Vec<i32>,
@@ -303,10 +359,10 @@ pub(crate) async fn merge_tag(
 
 #[cfg(test)]
 mod tests {
-    use fricon::{AppManager, DatasetListQuery, WorkspaceRoot};
+    use fricon::{AppManager, DatasetId, DatasetListQuery, WorkspaceRoot};
     use tempfile::TempDir;
 
-    use super::delete_datasets;
+    use super::{delete_datasets, empty_trash, restore_datasets, trash_datasets};
     use crate::application::session::WorkspaceSession;
 
     async fn create_completed_dataset(
@@ -350,6 +406,100 @@ mod tests {
             .list_datasets(DatasetListQuery::default())
             .await?;
         assert!(remaining.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn trash_and_restore_datasets_switches_between_active_and_trash_views()
+    -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let dataset_id = create_completed_dataset(&session, "trash-me").await?;
+
+        let trash_results = trash_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(trash_results.len(), 1);
+        assert!(trash_results[0].success);
+
+        let active_after_trash = session
+            .app()
+            .list_datasets(DatasetListQuery::default())
+            .await?;
+        assert!(active_after_trash.is_empty());
+
+        let trashed_after_trash = session
+            .app()
+            .list_datasets(DatasetListQuery {
+                trashed: Some(true),
+                ..DatasetListQuery::default()
+            })
+            .await?;
+        assert_eq!(trashed_after_trash.len(), 1);
+        assert_eq!(trashed_after_trash[0].id, dataset_id);
+
+        let restore_results = restore_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(restore_results.len(), 1);
+        assert!(restore_results[0].success);
+
+        let active_after_restore = session
+            .app()
+            .list_datasets(DatasetListQuery::default())
+            .await?;
+        assert_eq!(active_after_restore.len(), 1);
+        assert_eq!(active_after_restore[0].id, dataset_id);
+
+        let trashed_after_restore = session
+            .app()
+            .list_datasets(DatasetListQuery {
+                trashed: Some(true),
+                ..DatasetListQuery::default()
+            })
+            .await?;
+        assert!(trashed_after_restore.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn empty_trash_removes_trashed_datasets_from_db_and_disk() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let dataset_id = create_completed_dataset(&session, "purge-me").await?;
+        let record = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        let dataset_path = session
+            .app()
+            .paths()?
+            .dataset_path_from_uid(record.metadata.uid);
+        assert!(dataset_path.exists());
+
+        let trash_results = trash_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(trash_results.len(), 1);
+        assert!(trash_results[0].success);
+
+        let deleted_count = empty_trash(&session).await?;
+        assert_eq!(deleted_count, 1);
+        assert!(!dataset_path.exists());
+
+        let active = session
+            .app()
+            .list_datasets(DatasetListQuery::default())
+            .await?;
+        assert!(active.is_empty());
+
+        let trashed = session
+            .app()
+            .list_datasets(DatasetListQuery {
+                trashed: Some(true),
+                ..DatasetListQuery::default()
+            })
+            .await?;
+        assert!(trashed.is_empty());
 
         Ok(())
     }

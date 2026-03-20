@@ -1,0 +1,1 @@
+ALTER TABLE datasets ADD COLUMN trashed_at TIMESTAMP NULL;

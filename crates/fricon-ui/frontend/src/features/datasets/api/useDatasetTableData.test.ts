@@ -35,6 +35,10 @@ vi.mock("./client", () => ({
   listDatasetTags: () => listDatasetTagsMock(),
   updateDatasetFavorite: (id: number, favorite: boolean) =>
     updateDatasetFavoriteMock(id, favorite),
+  deleteDatasets: vi.fn(),
+  trashDatasets: vi.fn(),
+  restoreDatasets: vi.fn(),
+  emptyTrash: vi.fn(),
   deleteTag: (tag: string) => deleteTagMock(tag),
   renameTag: (oldName: string, newName: string) =>
     renameTagMock(oldName, newName),
@@ -70,6 +74,7 @@ function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
     tags: [],
     status: "Completed",
     createdAt: new Date("2026-01-01T00:00:00Z"),
+    trashedAt: null,
     ...overrides,
   };
 }

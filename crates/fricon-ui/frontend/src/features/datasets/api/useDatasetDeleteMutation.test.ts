@@ -12,6 +12,9 @@ const deleteDatasetsMock = vi.fn<DeleteDatasetsFn>();
 
 vi.mock("./client", () => ({
   deleteDatasets: (ids: number[]) => deleteDatasetsMock(ids),
+  trashDatasets: vi.fn(),
+  restoreDatasets: vi.fn(),
+  emptyTrash: vi.fn(),
 }));
 
 function createWrapper(queryClient: QueryClient) {

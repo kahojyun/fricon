@@ -85,6 +85,30 @@ async deleteDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], Taur
     else return { status: "error", error: e  as any };
 }
 },
+async trashDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("trash_datasets", { ids }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async restoreDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("restore_datasets", { ids }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async emptyTrash() : Promise<Result<EmptyTrashResult, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("empty_trash") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async batchUpdateDatasetTags(update: BatchTagUpdateOptions) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("batch_update_dataset_tags", { update }) };
@@ -145,13 +169,14 @@ export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
 export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
 export type DatasetCreated = DatasetInfo
 export type DatasetDeleteResult = { id: number; success: boolean; error: string | null }
-export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; columns: ColumnInfo[] }
+export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; trashedAt: string | null; columns: ColumnInfo[] }
 export type DatasetFavoriteUpdate = { favorite: boolean }
-export type DatasetInfo = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string }
+export type DatasetInfo = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; trashedAt: string | null }
 export type DatasetInfoUpdate = { name?: string | null; description?: string | null; favorite?: boolean | null; tags?: string[] | null }
-export type DatasetListOptions = { search?: string | null; tags?: string[] | null; favoriteOnly?: boolean | null; statuses?: UiDatasetStatus[] | null; sortBy?: UiDatasetSortBy | null; sortDir?: UiSortDirection | null; limit?: number | null; offset?: number | null }
+export type DatasetListOptions = { search?: string | null; tags?: string[] | null; favoriteOnly?: boolean | null; statuses?: UiDatasetStatus[] | null; trashed?: boolean | null; sortBy?: UiDatasetSortBy | null; sortDir?: UiSortDirection | null; limit?: number | null; offset?: number | null }
 export type DatasetUpdated = DatasetInfo
 export type DatasetWriteStatus = { rowCount: number; isComplete: boolean }
+export type EmptyTrashResult = { deletedCount: number }
 export type FilterTableOptions = { excludeColumns?: string[] | null }
 export type HeatmapChartDataOptions = ({ start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }) & { series: string; xColumn: string | null; yColumn: string; complexViewSingle: ComplexViewOption | null }
 export type LineChartDataOptions = ({ start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }) & { series: string; xColumn: string | null; complexViews: ComplexViewOption[] | null }

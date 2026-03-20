@@ -1,7 +1,12 @@
 import type { SortingState } from "@tanstack/react-table";
-import { DATASET_PAGE_SIZE, type DatasetStatus } from "../api/types";
+import {
+  DATASET_PAGE_SIZE,
+  type DatasetStatus,
+  type DatasetViewMode,
+} from "../api/types";
 
 export interface DatasetTableState {
+  viewMode: DatasetViewMode;
   searchInput: string;
   appliedSearchQuery: string;
   activeTags: string[];
@@ -12,6 +17,7 @@ export interface DatasetTableState {
 }
 
 export type DatasetTableStateAction =
+  | { type: "set_view_mode"; next: DatasetViewMode }
   | { type: "set_search_input"; next: string }
   | { type: "commit_search_input" }
   | { type: "toggle_tag"; tag: string }
@@ -47,6 +53,7 @@ function normalizeSortingState(
 
 export function createInitialDatasetTableState(): DatasetTableState {
   return {
+    viewMode: "active",
     searchInput: "",
     appliedSearchQuery: "",
     activeTags: [],
@@ -69,6 +76,17 @@ export function datasetTableStateReducer(
   action: DatasetTableStateAction,
 ): DatasetTableState {
   switch (action.type) {
+    case "set_view_mode": {
+      if (action.next === state.viewMode) {
+        return state;
+      }
+
+      return resetQueryLimit({
+        ...state,
+        viewMode: action.next,
+      });
+    }
+
     case "set_search_input": {
       if (action.next === state.searchInput) {
         return state;

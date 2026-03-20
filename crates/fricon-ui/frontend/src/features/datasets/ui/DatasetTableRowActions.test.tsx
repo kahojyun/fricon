@@ -34,11 +34,14 @@ function renderRowActions(
   ];
   const props = {
     dataset: makeDataset({ id: 11, name: "Dataset B", tags: ["vision"] }),
+    viewMode: "active" as const,
     selectedDatasets,
     allTags: ["vision", "audio"],
     isUpdatingTags: false,
     onDatasetSelected: vi.fn(),
-    openDeleteDialog: vi.fn(),
+    onTrash: vi.fn(),
+    onRestore: vi.fn(),
+    onPermanentDelete: vi.fn(),
     batchAddTags: vi
       .fn()
       .mockResolvedValue([
@@ -85,17 +88,21 @@ describe("DatasetTableRowActions", () => {
 
     expect(within(menu).getByText(/Add Tags \(2\)/i)).toBeInTheDocument();
     expect(
-      within(menu).getByRole("menuitem", { name: "Delete Selected (2)" }),
+      within(menu).getByRole("menuitem", {
+        name: "Move Selected to Trash (2)",
+      }),
     ).toBeInTheDocument();
 
     await user.click(
-      within(menu).getByRole("menuitem", { name: "Delete Selected (2)" }),
+      within(menu).getByRole("menuitem", {
+        name: "Move Selected to Trash (2)",
+      }),
     );
 
-    expect(props.openDeleteDialog).toHaveBeenCalledWith([10, 11]);
+    expect(props.onTrash).toHaveBeenCalledWith([10, 11]);
   });
 
-  it("shows only single-row delete when the clicked row is outside the multi-selection", async () => {
+  it("shows only single-row trash action when the clicked row is outside the multi-selection", async () => {
     renderRowActions({
       selectedDatasets: [makeDataset({ id: 10, name: "Dataset A", tags: [] })],
     });
@@ -104,11 +111,25 @@ describe("DatasetTableRowActions", () => {
     const menu = await openRowActions(user);
 
     expect(
-      within(menu).getByRole("menuitem", { name: "Delete" }),
+      within(menu).getByRole("menuitem", { name: "Move to Trash" }),
     ).toBeInTheDocument();
     expect(
-      within(menu).queryByRole("menuitem", { name: /Delete Selected/i }),
+      within(menu).queryByRole("menuitem", { name: /Move Selected to Trash/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows restore and permanent delete actions in trash view", async () => {
+    renderRowActions({ viewMode: "trash" });
+    const user = userEvent.setup();
+
+    const menu = await openRowActions(user);
+
+    expect(
+      within(menu).getByRole("menuitem", { name: "Restore" }),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Permanently Delete" }),
+    ).toBeInTheDocument();
   });
 
   it("wires tag add and remove actions through the batch mutation boundary", async () => {

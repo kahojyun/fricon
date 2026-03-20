@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use diesel::{
     prelude::*,
     sqlite::{Sqlite, SqliteConnection},
@@ -18,6 +18,7 @@ pub(super) struct Dataset {
     pub(super) favorite: bool,
     pub(super) status: DbDatasetStatus,
     pub(super) created_at: NaiveDateTime,
+    pub(super) trashed_at: Option<NaiveDateTime>,
 }
 
 impl Dataset {
@@ -80,6 +81,32 @@ impl Dataset {
         diesel::delete(datasets.find(dataset_id)).execute(conn)
     }
 
+    pub(super) fn set_trashed(
+        conn: &mut SqliteConnection,
+        dataset_id: i32,
+        trashed_at_value: Option<NaiveDateTime>,
+    ) -> QueryResult<usize> {
+        use schema::datasets::dsl::{datasets, trashed_at};
+
+        diesel::update(datasets.find(dataset_id))
+            .set(trashed_at.eq(trashed_at_value))
+            .execute(conn)
+    }
+
+    pub(super) fn trash(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<usize> {
+        Self::set_trashed(conn, dataset_id, Some(Utc::now().naive_utc()))
+    }
+
+    pub(super) fn restore(conn: &mut SqliteConnection, dataset_id: i32) -> QueryResult<usize> {
+        Self::set_trashed(conn, dataset_id, None)
+    }
+
+    pub(super) fn delete_trashed(conn: &mut SqliteConnection) -> QueryResult<usize> {
+        use schema::datasets::dsl::{datasets, trashed_at};
+
+        diesel::delete(datasets.filter(trashed_at.is_not_null())).execute(conn)
+    }
+
     pub(super) fn load_tags(&self, conn: &mut SqliteConnection) -> QueryResult<Vec<Tag>> {
         DatasetTag::belonging_to(self)
             .inner_join(schema::tags::table)
@@ -95,6 +122,7 @@ pub(super) struct DatasetUpdate {
     pub(super) description: Option<String>,
     pub(super) favorite: Option<bool>,
     pub(super) status: Option<DbDatasetStatus>,
+    pub(super) trashed_at: Option<Option<NaiveDateTime>>,
 }
 
 #[derive(Debug, Insertable)]
