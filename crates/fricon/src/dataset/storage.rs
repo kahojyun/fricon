@@ -17,6 +17,17 @@ pub(crate) fn delete_dataset(dir_path: &Path) -> Result<(), DatasetFsError> {
     }
 }
 
+pub(crate) fn move_dataset(from_path: &Path, to_path: &Path) -> Result<(), DatasetFsError> {
+    if to_path.exists() {
+        return Err(DatasetFsError::AlreadyExist(to_path.to_owned()));
+    }
+    if let Some(parent) = to_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::rename(from_path, to_path)?;
+    Ok(())
+}
+
 pub(crate) fn create_dataset(dataset_path: &Path) -> Result<(), DatasetFsError> {
     if dataset_path.exists() {
         warn!("Dataset path already exists: {}", dataset_path.display());

@@ -84,7 +84,7 @@ export interface UseDatasetTableDataResult {
   trashDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
   restoreDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
   deleteDatasets: (ids: number[]) => Promise<DatasetDeleteResult[]>;
-  emptyTrash: () => Promise<{ deletedCount: number }>;
+  emptyTrash: () => Promise<DatasetDeleteResult[]>;
   isMutatingDatasets: boolean;
   batchAddTags: (
     ids: number[],

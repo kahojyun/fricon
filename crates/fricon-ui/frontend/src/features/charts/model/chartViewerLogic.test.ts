@@ -46,6 +46,7 @@ function makeState(
 function makeDatasetDetail(columns: ColumnInfo[]): DatasetDetail {
   return {
     status: "Completed",
+    payloadAvailable: true,
     columns,
   };
 }

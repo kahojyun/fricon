@@ -41,6 +41,7 @@ describe("tauri helpers", () => {
       id: 1,
       createdAt: "2026-01-01T00:00:00Z",
       trashedAt: "2026-01-02T03:04:05Z",
+      deletedAt: null,
     });
 
     expect(normalized.createdAt).toBeInstanceOf(Date);
@@ -48,5 +49,6 @@ describe("tauri helpers", () => {
     expect(normalized.trashedAt?.toISOString()).toBe(
       "2026-01-02T03:04:05.000Z",
     );
+    expect(normalized.deletedAt).toBeNull();
   });
 });

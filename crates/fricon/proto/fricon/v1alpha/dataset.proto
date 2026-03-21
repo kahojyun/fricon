@@ -122,4 +122,6 @@ message DatasetMetadata {
   google.protobuf.Timestamp created_at = 5;
   repeated string tags = 6;
   DatasetStatus status = 7;
+  optional google.protobuf.Timestamp trashed_at = 8;
+  optional google.protobuf.Timestamp deleted_at = 9;
 }

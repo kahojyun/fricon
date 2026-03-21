@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -108,6 +108,7 @@ describe("DatasetExplorerScreen integration", () => {
               status: "Completed",
               createdAt: "2026-01-01T00:00:00Z",
               trashedAt: null,
+              deletedAt: null,
             },
           ];
         case "list_dataset_tags":
@@ -122,6 +123,8 @@ describe("DatasetExplorerScreen integration", () => {
             status: "Completed",
             createdAt: "2026-01-01T00:00:00Z",
             trashedAt: null,
+            deletedAt: null,
+            payloadAvailable: true,
             columns: [
               {
                 name: "t",
@@ -180,12 +183,16 @@ describe("DatasetExplorerScreen integration", () => {
     });
 
     expect(screen.getByText("No dataset selected")).toBeInTheDocument();
-    const datasetRow = await screen.findByRole("row", {
-      name: /Dataset Alpha/,
+    await screen.findByText("Dataset Alpha");
+    const datasetRow = await waitFor(() => {
+      const row = document.querySelector(
+        'tr[data-slot="context-menu-trigger"]',
+      );
+      expect(row).not.toBeNull();
+      return row;
     });
-    expect(datasetRow).toBeInTheDocument();
-
-    await user.click(within(datasetRow).getByText("Dataset Alpha"));
+    expect(datasetRow).not.toBeNull();
+    fireEvent.pointerDown(datasetRow!, { button: 0 });
 
     expect(
       await screen.findByRole("tab", { name: "Charts" }),

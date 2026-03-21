@@ -11,7 +11,6 @@ import {
   normalizeDataset,
   normalizeDatasetDetail,
   type DatasetDetail,
-  type EmptyTrashResult,
   type DatasetInfo,
   type DatasetInfoUpdate,
   type ListDatasetsOptions,
@@ -90,7 +89,7 @@ export async function restoreDatasets(
   return invoke(commands.restoreDatasets(ids));
 }
 
-export async function emptyTrash(): Promise<EmptyTrashResult> {
+export async function emptyTrash(): Promise<DatasetDeleteResult[]> {
   return invoke(commands.emptyTrash());
 }
 

@@ -19,6 +19,7 @@ export function makeDataset(overrides: Partial<DatasetInfo> = {}): DatasetInfo {
     status: "Completed",
     createdAt: new Date("2026-01-01T00:00:00Z"),
     trashedAt: null,
+    deletedAt: null,
     ...overrides,
   };
 }
@@ -45,7 +46,7 @@ export function buildDatasetTableDataValue(
     trashDatasets: vi.fn().mockResolvedValue([]),
     restoreDatasets: vi.fn().mockResolvedValue([]),
     deleteDatasets: vi.fn().mockResolvedValue([]),
-    emptyTrash: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+    emptyTrash: vi.fn().mockResolvedValue([]),
     isMutatingDatasets: false,
     batchAddTags: vi.fn().mockResolvedValue([]),
     batchRemoveTags: vi.fn().mockResolvedValue([]),

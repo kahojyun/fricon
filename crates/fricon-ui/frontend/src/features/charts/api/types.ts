@@ -22,6 +22,7 @@ export type {
 
 export interface DatasetDetail {
   status: DatasetStatus;
+  payloadAvailable: boolean;
   columns: ColumnInfo[];
 }
 

@@ -176,13 +176,23 @@ impl DatasetManager {
                          description,
                          favorite,
                          created_at,
+                         deleted_at,
                          tags,
                          ..
                      },
                  ..
              }| {
                 let uid = uid.simple().to_string();
-                (id, uid, name, description, favorite, created_at, tags)
+                (
+                    id,
+                    uid,
+                    name,
+                    description,
+                    favorite,
+                    created_at,
+                    deleted_at,
+                    tags,
+                )
             },
         );
         let py_records = PyList::new(py, py_records)?;
@@ -197,6 +207,7 @@ impl DatasetManager {
                 "description",
                 "favorite",
                 "created_at",
+                "deleted_at",
                 "tags",
             ],
         )?;
@@ -355,6 +366,18 @@ impl Dataset {
     #[getter]
     pub const fn created_at(&self) -> DateTime<Utc> {
         self.inner.created_at()
+    }
+
+    /// Permanent deletion timestamp of the dataset payload, if any.
+    #[getter]
+    pub const fn deleted_at(&self) -> Option<DateTime<Utc>> {
+        self.inner.deleted_at()
+    }
+
+    /// Whether the dataset payload has been permanently deleted.
+    #[getter]
+    pub const fn is_deleted(&self) -> bool {
+        self.inner.is_deleted()
     }
 
     /// Status of the dataset.

@@ -95,6 +95,11 @@ impl WorkspacePaths {
     }
 
     #[must_use]
+    pub fn graveyard_dir(&self) -> PathBuf {
+        self.data_dir().join(".graveyard")
+    }
+
+    #[must_use]
     pub fn log_dir(&self) -> PathBuf {
         self.root.join("log")
     }
@@ -140,10 +145,16 @@ impl WorkspacePaths {
         data_dir.push(dataset_path_from_uid(uid));
         data_dir
     }
+
+    #[must_use]
+    pub fn graveyard_dataset_path_from_uid(&self, uid: Uuid) -> PathBuf {
+        self.graveyard_dir().join(uid.to_string())
+    }
 }
 
 fn init_workspace_dirs(paths: &WorkspacePaths) -> Result<()> {
     fs::create_dir(paths.data_dir())?;
+    fs::create_dir(paths.graveyard_dir())?;
     fs::create_dir(paths.log_dir())?;
     fs::create_dir(paths.backup_dir())?;
     Ok(())
