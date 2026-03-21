@@ -1,0 +1,4 @@
+interface:
+  display_name: "Diesel Migration"
+  short_description: "Maintain Fricon SQLite schema with Diesel CLI"
+  default_prompt: "Use $diesel-migration to update the Fricon database schema with Diesel CLI and keep the Rust persistence code in sync."
