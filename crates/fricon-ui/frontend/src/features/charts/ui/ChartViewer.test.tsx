@@ -45,6 +45,7 @@ function createQueryClient() {
 function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
   return {
     status: "Completed",
+    payloadAvailable: true,
     columns: [],
     ...overrides,
   };

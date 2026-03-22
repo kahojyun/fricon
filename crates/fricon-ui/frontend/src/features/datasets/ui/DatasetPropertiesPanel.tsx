@@ -86,6 +86,7 @@ interface DatasetDetailEditorDraft {
 function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
   const queryClient = useQueryClient();
   const initialDraft = createDatasetDetailEditorDraft(detail);
+  const isReadOnly = !detail.payloadAvailable;
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formName, setFormName] = useState(initialDraft.name);
@@ -145,7 +146,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
             <CardAction>
               <Button
                 type="button"
-                disabled={!hasChanges || isSaving}
+                disabled={isReadOnly || !hasChanges || isSaving}
                 onClick={() => void handleSave()}
               >
                 {isSaving ? "Saving..." : "Save"}
@@ -165,6 +166,15 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                 <AlertDescription>{successMessage}</AlertDescription>
               </Alert>
             ) : null}
+            {isReadOnly ? (
+              <Alert>
+                <AlertTitle>Metadata Only</AlertTitle>
+                <AlertDescription>
+                  This dataset payload has been permanently deleted. Metadata is
+                  retained as a read-only tombstone.
+                </AlertDescription>
+              </Alert>
+            ) : null}
 
             <FieldGroup>
               <Field>
@@ -172,6 +182,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                 <FieldContent>
                   <Input
                     id="dataset-name"
+                    disabled={isReadOnly}
                     value={formName}
                     onChange={(event) => setFormName(event.target.value)}
                   />
@@ -186,6 +197,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                   <Textarea
                     id="dataset-description"
                     rows={4}
+                    disabled={isReadOnly}
                     value={formDescription}
                     onChange={(event) => setFormDescription(event.target.value)}
                   />
@@ -198,6 +210,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                   <Input
                     id="dataset-tags"
                     placeholder="Comma separated tags"
+                    disabled={isReadOnly}
                     value={formTagsText}
                     onChange={(event) => setFormTagsText(event.target.value)}
                   />
@@ -219,6 +232,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                 </FieldContent>
                 <Switch
                   id="dataset-favorite"
+                  disabled={isReadOnly}
                   checked={formFavorite}
                   onCheckedChange={setFormFavorite}
                 />
@@ -249,6 +263,22 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                 <span className="font-medium">Created:</span>{" "}
                 {detail.createdAt.toLocaleString()}
               </div>
+              <div>
+                <span className="font-medium">Payload:</span>{" "}
+                {detail.payloadAvailable ? "Available" : "Deleted"}
+              </div>
+              {detail.trashedAt ? (
+                <div>
+                  <span className="font-medium">Trashed:</span>{" "}
+                  {detail.trashedAt.toLocaleString()}
+                </div>
+              ) : null}
+              {detail.deletedAt ? (
+                <div>
+                  <span className="font-medium">Deleted:</span>{" "}
+                  {detail.deletedAt.toLocaleString()}
+                </div>
+              ) : null}
             </div>
 
             <Separator />
@@ -275,38 +305,46 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
         <CardHeader className="border-b">
           <CardTitle>Columns</CardTitle>
           <CardDescription>
-            {detail.columns.length} columns detected in this dataset.
+            {detail.payloadAvailable
+              ? `${detail.columns.length} columns detected in this dataset.`
+              : "Column metadata is unavailable because the payload has been deleted."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-hidden rounded-md border">
-            <Table>
-              <TableHeader className="bg-muted/40 text-muted-foreground">
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Index</TableHead>
-                  <TableHead>Type</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {detail.columns.map((column) => (
-                  <TableRow key={column.name}>
-                    <TableCell>{column.name}</TableCell>
-                    <TableCell>{column.isIndex ? "✓" : ""}</TableCell>
-                    <TableCell>
-                      {column.isTrace ? (
-                        <Badge variant="secondary">Trace</Badge>
-                      ) : column.isComplex ? (
-                        <Badge variant="outline">Complex</Badge>
-                      ) : (
-                        <Badge variant="secondary">Scalar</Badge>
-                      )}
-                    </TableCell>
+          {detail.payloadAvailable ? (
+            <div className="overflow-hidden rounded-md border">
+              <Table>
+                <TableHeader className="bg-muted/40 text-muted-foreground">
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Index</TableHead>
+                    <TableHead>Type</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {detail.columns.map((column) => (
+                    <TableRow key={column.name}>
+                      <TableCell>{column.name}</TableCell>
+                      <TableCell>{column.isIndex ? "✓" : ""}</TableCell>
+                      <TableCell>
+                        {column.isTrace ? (
+                          <Badge variant="secondary">Trace</Badge>
+                        ) : column.isComplex ? (
+                          <Badge variant="outline">Complex</Badge>
+                        ) : (
+                          <Badge variant="secondary">Scalar</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">
+              The dataset payload has been removed from the workspace.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

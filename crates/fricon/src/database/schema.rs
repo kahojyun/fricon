@@ -10,6 +10,7 @@ diesel::table! {
         status -> Text,
         created_at -> Timestamp,
         trashed_at -> Nullable<Timestamp>,
+        deleted_at -> Nullable<Timestamp>,
     }
 }
 

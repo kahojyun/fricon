@@ -486,6 +486,16 @@ impl Dataset {
     }
 
     #[must_use]
+    pub const fn deleted_at(&self) -> Option<DateTime<Utc>> {
+        self.record.metadata.deleted_at
+    }
+
+    #[must_use]
+    pub const fn is_deleted(&self) -> bool {
+        self.record.metadata.deleted_at.is_some()
+    }
+
+    #[must_use]
     pub fn status(&self) -> DatasetStatus {
         self.record.metadata.status
     }

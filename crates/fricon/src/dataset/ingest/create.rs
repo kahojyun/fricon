@@ -140,6 +140,7 @@ mod tests {
                             status: DatasetStatus::Writing,
                             created_at: Utc::now(),
                             trashed_at: None,
+                            deleted_at: None,
                             tags: vec!["tag".to_string()],
                         },
                     },

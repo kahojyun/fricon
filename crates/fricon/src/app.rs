@@ -120,6 +120,13 @@ impl AppState {
         let dataset_read =
             DatasetReadService::new(dataset_repository, root.paths().clone(), write_sessions);
 
+        if let Err(error) = dataset_catalog.reconcile_deleted_datasets() {
+            error!(error = %error, "Failed to reconcile deleted datasets");
+        }
+        if let Err(error) = dataset_catalog.garbage_collect_deleted_datasets() {
+            error!(error = %error, "Failed to garbage collect deleted dataset payloads");
+        }
+
         Ok(Arc::new(Self {
             root,
             dataset_catalog,
@@ -301,8 +308,11 @@ impl AppHandle {
         let state = self.state().map_err(|_| catalog_state_dropped())?;
         let tracker = state.tracker.clone();
         let catalog = state.dataset_catalog.clone();
+        let events = BroadcastDatasetEvents {
+            sender: state.dataset_event_sender.clone(),
+        };
         tracker
-            .spawn_blocking(move || catalog.delete_dataset(id))
+            .spawn_blocking(move || catalog.delete_dataset(id, &events))
             .await
             .map_err(|error| catalog_join_error(error, "failed to join dataset delete task"))?
     }
@@ -331,16 +341,6 @@ impl AppHandle {
             .spawn_blocking(move || catalog.restore_dataset(id, &events))
             .await
             .map_err(|error| catalog_join_error(error, "failed to join dataset restore task"))?
-    }
-
-    pub async fn empty_trash(&self) -> Result<usize, CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.empty_trash())
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join empty trash task"))?
     }
 
     pub async fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {

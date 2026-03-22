@@ -120,6 +120,7 @@ pub(crate) struct DatasetInfo {
     pub(crate) status: UiDatasetStatus,
     pub(crate) created_at: DateTime<Utc>,
     pub(crate) trashed_at: Option<DateTime<Utc>>,
+    pub(crate) deleted_at: Option<DateTime<Utc>>,
 }
 
 impl From<&DatasetRecord> for DatasetInfo {
@@ -133,6 +134,7 @@ impl From<&DatasetRecord> for DatasetInfo {
             status: record.metadata.status.into(),
             created_at: record.metadata.created_at,
             trashed_at: record.metadata.trashed_at,
+            deleted_at: record.metadata.deleted_at,
         }
     }
 }
@@ -174,6 +176,8 @@ pub(crate) struct DatasetDetail {
     pub(crate) status: UiDatasetStatus,
     pub(crate) created_at: DateTime<Utc>,
     pub(crate) trashed_at: Option<DateTime<Utc>>,
+    pub(crate) deleted_at: Option<DateTime<Utc>>,
+    pub(crate) payload_available: bool,
     pub(crate) columns: Vec<ColumnInfo>,
 }
 
@@ -188,15 +192,11 @@ impl From<app::DatasetDetail> for DatasetDetail {
             status: value.status.into(),
             created_at: value.created_at,
             trashed_at: value.trashed_at,
+            deleted_at: value.deleted_at,
+            payload_available: value.payload_available,
             columns: value.columns.into_iter().map(Into::into).collect(),
         }
     }
-}
-
-#[derive(Serialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct EmptyTrashResult {
-    pub(crate) deleted_count: usize,
 }
 
 #[derive(Serialize, specta::Type)]
@@ -359,9 +359,9 @@ pub(crate) async fn restore_datasets(
 #[specta::specta]
 pub(crate) async fn empty_trash(
     state: State<'_, AppState>,
-) -> Result<EmptyTrashResult, TauriCommandError> {
-    let deleted_count = app::empty_trash(state.session()).await?;
-    Ok(EmptyTrashResult { deleted_count })
+) -> Result<Vec<DatasetDeleteResult>, TauriCommandError> {
+    let results = app::empty_trash(state.session()).await?;
+    Ok(results.into_iter().map(DatasetDeleteResult::from).collect())
 }
 
 #[derive(Debug, Deserialize, specta::Type)]

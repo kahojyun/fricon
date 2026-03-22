@@ -18,6 +18,7 @@ pub struct DatasetMetadata {
     pub status: DatasetStatus,
     pub created_at: DateTime<Utc>,
     pub trashed_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
     pub tags: Vec<String>,
 }
 

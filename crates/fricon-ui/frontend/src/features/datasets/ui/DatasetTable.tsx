@@ -17,6 +17,7 @@ import { DatasetTableBody } from "./DatasetTableBody";
 import { DatasetTableToolbar } from "./DatasetTableToolbar";
 import { useDatasetDeleteFlow } from "./useDatasetDeleteFlow";
 import { useDatasetTableSelection } from "./useDatasetTableSelection";
+import { summarizeDatasetDeleteResults } from "../model/datasetTableDeleteFlowLogic";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -266,11 +267,51 @@ export function DatasetTable({
 
   const handleEmptyTrash = async () => {
     try {
-      const result = await emptyTrash();
-      setRowSelection({});
-      onDatasetSelected(undefined);
-      setIsEmptyTrashDialogOpen(false);
-      toast.success(`Permanently deleted ${result.deletedCount} dataset(s)`);
+      const results = await emptyTrash();
+      const summary = summarizeDatasetDeleteResults(results);
+
+      if (
+        selectedDatasetId !== undefined &&
+        summary.successIds.includes(selectedDatasetId)
+      ) {
+        onDatasetSelected(undefined);
+      }
+
+      if (summary.outcome === "success") {
+        setRowSelection({});
+        setIsEmptyTrashDialogOpen(false);
+        toast.success(
+          `Permanently deleted ${summary.successIds.length} dataset(s)`,
+        );
+        return;
+      }
+
+      setRowSelection(
+        Object.fromEntries(
+          summary.failedIds.map((id) => [id.toString(), true]),
+        ),
+      );
+
+      if (summary.outcome === "failure") {
+        toast.error(
+          `Failed to permanently delete ${summary.failedResults.length} dataset(s)`,
+          {
+            description: summary.failedResults
+              .map((result) => `ID ${result.id}: ${result.error}`)
+              .join("\n"),
+          },
+        );
+        return;
+      }
+
+      toast.warning(
+        `Permanently deleted ${summary.successIds.length} dataset(s), but ${summary.failedResults.length} failed.`,
+        {
+          description: summary.failedResults
+            .map((result) => `ID ${result.id}: ${result.error}`)
+            .join("\n"),
+        },
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to empty trash",
