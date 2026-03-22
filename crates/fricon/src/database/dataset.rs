@@ -194,9 +194,7 @@ fn list_all_dataset_records_including_deleted(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
 ) -> Result<Vec<DatasetRecord>, anyhow::Error> {
-    let mut unbounded_query = query_options.clone();
-    unbounded_query.limit = Some(i64::MAX);
-    unbounded_query.offset = Some(0);
+    let unbounded_query = query_options.clone().unbounded();
     list_dataset_records_with_deleted_filter(conn, &unbounded_query, None)
 }
 
@@ -322,18 +320,18 @@ impl DatasetCatalogRepository for DatasetRepository {
 
     fn list_all_datasets_including_deleted(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        list_all_dataset_records_including_deleted(&mut conn, &DatasetListQuery::default())
-            .map_err(CatalogError::from)
+        list_all_dataset_records_including_deleted(
+            &mut conn,
+            &DatasetListQuery::default().include_trashed(),
+        )
+        .map_err(CatalogError::from)
     }
 
     fn list_deleted_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
         list_dataset_records_with_deleted_filter(
             &mut conn,
-            &DatasetListQuery {
-                trashed: None,
-                ..DatasetListQuery::default()
-            },
+            &DatasetListQuery::default().include_trashed().unbounded(),
             Some(true),
         )
         .map_err(CatalogError::from)

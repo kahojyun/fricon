@@ -112,9 +112,11 @@ impl DatasetCatalogService {
         let graveyard_path = self
             .paths
             .graveyard_dataset_path_from_uid(record.metadata.uid);
-        storage::move_dataset(&dataset_path, &graveyard_path).inspect_err(|e| {
-            error!(error = %e, dataset.id = id, "Dataset graveyard staging failed");
-        })?;
+        if dataset_path.exists() {
+            storage::move_dataset(&dataset_path, &graveyard_path).inspect_err(|e| {
+                error!(error = %e, dataset.id = id, "Dataset graveyard staging failed");
+            })?;
+        }
 
         let deleted_record = self.repository.mark_dataset_deleted(id)?;
         events.publish(DatasetEvent::Updated(deleted_record));
@@ -279,7 +281,10 @@ impl DatasetCatalogService {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, sync::Arc};
+    use std::{
+        fs,
+        sync::{Arc, Mutex},
+    };
 
     use chrono::Utc;
     use tempfile::tempdir;
@@ -288,8 +293,23 @@ mod tests {
     use super::*;
     use crate::dataset::{
         catalog::MockDatasetCatalogRepository,
-        model::{DatasetMetadata, DatasetStatus},
+        events::DatasetEvent,
+        model::{DatasetId, DatasetMetadata, DatasetStatus},
     };
+
+    #[derive(Default)]
+    struct CollectEvents {
+        events: Mutex<Vec<DatasetEvent>>,
+    }
+
+    impl DatasetEventPublisher for CollectEvents {
+        fn publish(&self, event: DatasetEvent) {
+            self.events
+                .lock()
+                .expect("events mutex should lock")
+                .push(event);
+        }
+    }
 
     fn dataset_record(id: i32, uid: Uuid) -> DatasetRecord {
         DatasetRecord {
@@ -335,5 +355,48 @@ mod tests {
             .expect("reconciliation should succeed");
 
         assert_eq!(reconciled, 1);
+    }
+
+    #[test]
+    fn delete_dataset_marks_record_deleted_when_live_directory_is_missing() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let record = dataset_record(1, uid);
+        let deleted_record = DatasetRecord {
+            metadata: DatasetMetadata {
+                deleted_at: Some(Utc::now()),
+                ..record.metadata.clone()
+            },
+            ..record.clone()
+        };
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_get_dataset()
+            .once()
+            .withf(|id| matches!(id, DatasetId::Id(1)))
+            .return_once(move |_| Ok(record));
+        repository
+            .expect_mark_dataset_deleted()
+            .once()
+            .withf(|id| *id == 1)
+            .return_once(move |_| Ok(deleted_record.clone()));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+        let events = CollectEvents::default();
+
+        service
+            .delete_dataset(1, &events)
+            .expect("delete should succeed when live directory is already missing");
+
+        let published = events.events.lock().expect("events mutex should lock");
+        assert_eq!(published.len(), 1);
+        match &published[0] {
+            DatasetEvent::Updated(record) => assert_eq!(record.id, 1),
+            DatasetEvent::Created(record) => {
+                panic!("unexpected created event for dataset {}", record.id)
+            }
+        }
     }
 }

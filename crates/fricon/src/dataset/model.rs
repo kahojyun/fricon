@@ -81,8 +81,35 @@ impl Default for DatasetListQuery {
     }
 }
 
+impl DatasetListQuery {
+    pub(crate) fn include_trashed(mut self) -> Self {
+        self.trashed = None;
+        self
+    }
+
+    pub(crate) fn unbounded(mut self) -> Self {
+        self.limit = Some(i64::MAX);
+        self.offset = Some(0);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Copy, From)]
 pub enum DatasetId {
     Id(i32),
     Uid(Uuid),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DatasetListQuery;
+
+    #[test]
+    fn unbounded_include_trashed_query_overrides_default_visibility_and_paging() {
+        let query = DatasetListQuery::default().include_trashed().unbounded();
+
+        assert_eq!(query.trashed, None);
+        assert_eq!(query.limit, Some(i64::MAX));
+        assert_eq!(query.offset, Some(0));
+    }
 }
