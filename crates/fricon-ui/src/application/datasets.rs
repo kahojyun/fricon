@@ -292,6 +292,8 @@ pub(crate) async fn empty_trash(
         .app()
         .list_datasets(DatasetListQuery {
             trashed: Some(true),
+            limit: Some(i64::MAX),
+            offset: Some(0),
             ..DatasetListQuery::default()
         })
         .await
@@ -536,6 +538,46 @@ mod tests {
 
         let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
         assert!(tombstone.metadata.deleted_at.is_some());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn empty_trash_deletes_more_than_default_page_size() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let mut dataset_ids = Vec::new();
+        for index in 0..205 {
+            let dataset_id = create_completed_dataset(&session, &format!("trash-{index}")).await?;
+            dataset_ids.push(dataset_id);
+        }
+
+        let trash_results = trash_datasets(&session, dataset_ids.clone()).await;
+        assert_eq!(trash_results.len(), dataset_ids.len());
+        assert!(trash_results.iter().all(|result| result.success));
+
+        let delete_results = empty_trash(&session).await?;
+        assert_eq!(delete_results.len(), dataset_ids.len());
+        assert!(delete_results.iter().all(|result| result.success));
+
+        let trashed = session
+            .app()
+            .list_datasets(DatasetListQuery {
+                trashed: Some(true),
+                limit: Some(i64::MAX),
+                offset: Some(0),
+                ..DatasetListQuery::default()
+            })
+            .await?;
+        assert!(trashed.is_empty());
+
+        for dataset_id in dataset_ids {
+            let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+            assert!(tombstone.metadata.deleted_at.is_some());
+        }
 
         Ok(())
     }
