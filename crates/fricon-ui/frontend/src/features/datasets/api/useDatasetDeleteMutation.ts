@@ -7,10 +7,7 @@ import {
   trashDatasets as trashDatasetsApi,
 } from "./client";
 import { datasetKeys } from "./queryKeys";
-
-interface EmptyTrashResult {
-  deletedCount: number;
-}
+import type { DatasetDeleteResult } from "./types";
 
 async function executeDeleteMutation<T>({
   ids,
@@ -142,7 +139,7 @@ export function useEmptyTrashMutation(refreshDatasets: () => Promise<void>) {
     },
   });
 
-  const emptyTrash = async (): Promise<EmptyTrashResult> => {
+  const emptyTrash = async (): Promise<DatasetDeleteResult[]> => {
     setIsRefreshingAfterEmptyTrash(true);
 
     return emptyTrashMutation

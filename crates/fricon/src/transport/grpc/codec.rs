@@ -31,16 +31,7 @@ impl TryFrom<proto::Dataset> for DatasetRecord {
 
 impl From<DatasetMetadata> for proto::DatasetMetadata {
     fn from(metadata: DatasetMetadata) -> Self {
-        use prost_types::Timestamp;
-
-        let created_at = Timestamp {
-            seconds: metadata.created_at.timestamp(),
-            #[expect(
-                clippy::cast_possible_wrap,
-                reason = "Nanos are always less than 2e9 and within i32 range"
-            )]
-            nanos: metadata.created_at.timestamp_subsec_nanos() as i32,
-        };
+        let created_at = to_proto_timestamp(metadata.created_at);
         Self {
             uid: metadata.uid.simple().to_string(),
             name: metadata.name,
@@ -49,6 +40,8 @@ impl From<DatasetMetadata> for proto::DatasetMetadata {
             created_at: Some(created_at),
             tags: metadata.tags,
             status: proto::DatasetStatus::from(metadata.status) as i32,
+            trashed_at: metadata.trashed_at.map(to_proto_timestamp),
+            deleted_at: metadata.deleted_at.map(to_proto_timestamp),
         }
     }
 }
@@ -58,18 +51,11 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
 
     fn try_from(metadata: proto::DatasetMetadata) -> Result<Self, Self::Error> {
         let uid = metadata.uid.parse()?;
-        let created_at = metadata.created_at.context("created_at is required")?;
-        let seconds = created_at.seconds;
-        #[expect(
-            clippy::cast_sign_loss,
-            reason = "Negative values are explicitly checked and rejected above"
-        )]
-        let nanos = if created_at.nanos < 0 {
-            bail!("invalid created_at")
-        } else {
-            created_at.nanos as u32
-        };
-        let created_at = DateTime::from_timestamp(seconds, nanos).context("invalid created_at")?;
+        let created_at = metadata
+            .created_at
+            .map(from_proto_timestamp)
+            .transpose()?
+            .context("created_at is required")?;
         let proto_status =
             proto::DatasetStatus::try_from(metadata.status).context("Invalid dataset status")?;
         let status = DatasetStatus::try_from(proto_status)?;
@@ -81,10 +67,37 @@ impl TryFrom<proto::DatasetMetadata> for DatasetMetadata {
             favorite: metadata.favorite,
             status,
             created_at,
-            trashed_at: None,
+            trashed_at: metadata.trashed_at.map(from_proto_timestamp).transpose()?,
+            deleted_at: metadata.deleted_at.map(from_proto_timestamp).transpose()?,
             tags: metadata.tags,
         })
     }
+}
+
+fn to_proto_timestamp(value: DateTime<chrono::Utc>) -> prost_types::Timestamp {
+    prost_types::Timestamp {
+        seconds: value.timestamp(),
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "Nanos are always less than 2e9 and within i32 range"
+        )]
+        nanos: value.timestamp_subsec_nanos() as i32,
+    }
+}
+
+fn from_proto_timestamp(
+    value: prost_types::Timestamp,
+) -> Result<DateTime<chrono::Utc>, anyhow::Error> {
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "Negative values are explicitly checked and rejected above"
+    )]
+    let nanos = if value.nanos < 0 {
+        bail!("invalid timestamp")
+    } else {
+        value.nanos as u32
+    };
+    DateTime::from_timestamp(value.seconds, nanos).context("invalid timestamp")
 }
 
 impl From<DatasetStatus> for proto::DatasetStatus {

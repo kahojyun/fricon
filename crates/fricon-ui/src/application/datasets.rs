@@ -28,6 +28,8 @@ pub(crate) struct DatasetDetail {
     pub(crate) status: DatasetStatus,
     pub(crate) created_at: DateTime<Utc>,
     pub(crate) trashed_at: Option<DateTime<Utc>>,
+    pub(crate) deleted_at: Option<DateTime<Utc>>,
+    pub(crate) payload_available: bool,
     pub(crate) columns: Vec<ColumnInfo>,
 }
 
@@ -101,20 +103,25 @@ pub(crate) async fn get_dataset_detail(
         .get_dataset(DatasetId::Id(id))
         .await
         .context("Failed to load dataset metadata.")?;
-    let reader = session.dataset(id).await?;
-    let schema = reader.schema();
-    let index = reader.index_columns();
-    let columns = schema
-        .columns()
-        .iter()
-        .enumerate()
-        .map(|(i, (name, data_type))| ColumnInfo {
-            name: name.to_owned(),
-            is_complex: data_type.is_complex(),
-            is_trace: matches!(data_type, DatasetDataType::Trace(_, _)),
-            is_index: index.as_ref().is_some_and(|index| index.contains(&i)),
-        })
-        .collect();
+    let payload_available = record.metadata.deleted_at.is_none();
+    let columns = if payload_available {
+        let reader = session.dataset(id).await?;
+        let schema = reader.schema();
+        let index = reader.index_columns();
+        schema
+            .columns()
+            .iter()
+            .enumerate()
+            .map(|(i, (name, data_type))| ColumnInfo {
+                name: name.to_owned(),
+                is_complex: data_type.is_complex(),
+                is_trace: matches!(data_type, DatasetDataType::Trace(_, _)),
+                is_index: index.as_ref().is_some_and(|index| index.contains(&i)),
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     Ok(DatasetDetail {
         id: record.id,
@@ -125,6 +132,8 @@ pub(crate) async fn get_dataset_detail(
         status: record.metadata.status,
         created_at: record.metadata.created_at,
         trashed_at: record.metadata.trashed_at,
+        deleted_at: record.metadata.deleted_at,
+        payload_available,
         columns,
     })
 }
@@ -276,12 +285,24 @@ pub(crate) async fn restore_datasets(
     results
 }
 
-pub(crate) async fn empty_trash(session: &WorkspaceSession) -> anyhow::Result<usize> {
-    session
+pub(crate) async fn empty_trash(
+    session: &WorkspaceSession,
+) -> anyhow::Result<Vec<DatasetDeleteResult>> {
+    let ids = session
         .app()
-        .empty_trash()
+        .list_datasets(DatasetListQuery {
+            trashed: Some(true),
+            limit: Some(i64::MAX),
+            offset: Some(0),
+            ..DatasetListQuery::default()
+        })
         .await
-        .context("Failed to empty trash.")
+        .context("Failed to list trashed datasets.")?
+        .into_iter()
+        .map(|record| record.id)
+        .collect();
+
+    Ok(delete_datasets(session, ids).await)
 }
 
 #[derive(Debug, Clone, Default)]
@@ -362,7 +383,10 @@ mod tests {
     use fricon::{AppManager, DatasetId, DatasetListQuery, WorkspaceRoot};
     use tempfile::TempDir;
 
-    use super::{delete_datasets, empty_trash, restore_datasets, trash_datasets};
+    use super::{
+        BatchTagUpdate, batch_update_dataset_tags, delete_datasets, empty_trash, restore_datasets,
+        trash_datasets, update_dataset_info,
+    };
     use crate::application::session::WorkspaceSession;
 
     async fn create_completed_dataset(
@@ -391,6 +415,10 @@ mod tests {
         let existing_id = create_completed_dataset(&session, "delete-me").await?;
         let missing_id = existing_id + 10_000;
 
+        let trash_results = trash_datasets(&session, vec![existing_id]).await;
+        assert_eq!(trash_results.len(), 1);
+        assert!(trash_results[0].success);
+
         let results = delete_datasets(&session, vec![existing_id, missing_id]).await;
 
         assert_eq!(results.len(), 2);
@@ -406,6 +434,12 @@ mod tests {
             .list_datasets(DatasetListQuery::default())
             .await?;
         assert!(remaining.is_empty());
+
+        let deleted = session
+            .app()
+            .get_dataset(DatasetId::Id(existing_id))
+            .await?;
+        assert!(deleted.metadata.deleted_at.is_some());
 
         Ok(())
     }
@@ -464,7 +498,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn empty_trash_removes_trashed_datasets_from_db_and_disk() -> anyhow::Result<()> {
+    async fn empty_trash_tombstones_trashed_datasets() -> anyhow::Result<()> {
         let temp_dir = TempDir::new()?;
         WorkspaceRoot::create_new(temp_dir.path())?;
         let app_manager = AppManager::new_with_path(temp_dir.path())?;
@@ -482,8 +516,9 @@ mod tests {
         assert_eq!(trash_results.len(), 1);
         assert!(trash_results[0].success);
 
-        let deleted_count = empty_trash(&session).await?;
-        assert_eq!(deleted_count, 1);
+        let delete_results = empty_trash(&session).await?;
+        assert_eq!(delete_results.len(), 1);
+        assert!(delete_results[0].success);
         assert!(!dataset_path.exists());
 
         let active = session
@@ -500,6 +535,137 @@ mod tests {
             })
             .await?;
         assert!(trashed.is_empty());
+
+        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        assert!(tombstone.metadata.deleted_at.is_some());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn empty_trash_deletes_more_than_default_page_size() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let mut dataset_ids = Vec::new();
+        for index in 0..205 {
+            let dataset_id = create_completed_dataset(&session, &format!("trash-{index}")).await?;
+            dataset_ids.push(dataset_id);
+        }
+
+        let trash_results = trash_datasets(&session, dataset_ids.clone()).await;
+        assert_eq!(trash_results.len(), dataset_ids.len());
+        assert!(trash_results.iter().all(|result| result.success));
+
+        let delete_results = empty_trash(&session).await?;
+        assert_eq!(delete_results.len(), dataset_ids.len());
+        assert!(delete_results.iter().all(|result| result.success));
+
+        let trashed = session
+            .app()
+            .list_datasets(DatasetListQuery {
+                trashed: Some(true),
+                limit: Some(i64::MAX),
+                offset: Some(0),
+                ..DatasetListQuery::default()
+            })
+            .await?;
+        assert!(trashed.is_empty());
+
+        for dataset_id in dataset_ids {
+            let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+            assert!(tombstone.metadata.deleted_at.is_some());
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn deleted_datasets_still_allow_metadata_mutation() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let dataset_id = create_completed_dataset(&session, "before-delete").await?;
+
+        let trash_results = trash_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(trash_results.len(), 1);
+        assert!(trash_results[0].success);
+
+        let delete_results = delete_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(delete_results.len(), 1);
+        assert!(delete_results[0].success);
+
+        update_dataset_info(
+            &session,
+            dataset_id,
+            super::DatasetInfoUpdate {
+                name: Some("after-delete".to_string()),
+                description: Some("updated tombstone".to_string()),
+                favorite: Some(true),
+                tags: Some(vec!["updated".to_string(), "retained".to_string()]),
+            },
+        )
+        .await?;
+
+        let add_tag_results = batch_update_dataset_tags(
+            &session,
+            BatchTagUpdate {
+                ids: vec![dataset_id],
+                add: vec!["extra".to_string()],
+                remove: vec!["updated".to_string()],
+            },
+        )
+        .await;
+        assert_eq!(add_tag_results.len(), 1);
+        assert!(add_tag_results[0].success);
+
+        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        assert_eq!(tombstone.metadata.name, "after-delete");
+        assert_eq!(tombstone.metadata.description, "updated tombstone");
+        assert!(tombstone.metadata.favorite);
+        assert!(tombstone.metadata.deleted_at.is_some());
+        assert_eq!(
+            tombstone.metadata.tags,
+            vec!["retained".to_string(), "extra".to_string()]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn deleted_datasets_cannot_be_restored() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let dataset_id = create_completed_dataset(&session, "cannot-restore").await?;
+
+        let trash_results = trash_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(trash_results.len(), 1);
+        assert!(trash_results[0].success);
+
+        let delete_results = delete_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(delete_results.len(), 1);
+        assert!(delete_results[0].success);
+
+        let restore_results = restore_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(restore_results.len(), 1);
+        assert!(!restore_results[0].success);
+        assert!(
+            restore_results[0]
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("deleted"))
+        );
+
+        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        assert!(tombstone.metadata.deleted_at.is_some());
+        assert!(tombstone.metadata.trashed_at.is_some());
 
         Ok(())
     }

@@ -24,10 +24,11 @@ export function useChartViewerData({
   selectedComplexView,
   selectedComplexViewSingle,
 }: UseChartViewerDataArgs) {
+  const payloadAvailable = datasetDetail?.payloadAvailable ?? false;
   const filterTableQuery = useFilterTableDataQuery(
     datasetId,
     derived.excludeColumns,
-    Boolean(datasetDetail),
+    payloadAvailable,
   );
   const filterTableData = filterTableQuery.data ?? null;
 
@@ -36,7 +37,10 @@ export function useChartViewerData({
   const hasFilters = (filterTableData?.fields.length ?? 0) > 0;
   const indexFilters = hasFilters ? filterRow?.valueIndices : undefined;
 
-  useDatasetWriteStatusQuery(datasetId, datasetDetail?.status === "Writing");
+  useDatasetWriteStatusQuery(
+    datasetId,
+    payloadAvailable && datasetDetail?.status === "Writing",
+  );
 
   const chartRequest = buildChartRequest({
     datasetDetail,
@@ -49,13 +53,20 @@ export function useChartViewerData({
     derived,
   });
 
-  const chartQuery = useChartDataQuery(datasetId, chartRequest);
+  const chartQuery = useChartDataQuery(
+    datasetId,
+    payloadAvailable ? chartRequest : null,
+  );
   const chartData = chartQuery.data;
-  const chartError = chartQuery.error
-    ? chartQuery.error instanceof Error
-      ? chartQuery.error.message
-      : "Failed to load chart data."
-    : null;
+  const chartError = !payloadAvailable
+    ? datasetDetail
+      ? "Dataset payload has been permanently deleted."
+      : null
+    : chartQuery.error
+      ? chartQuery.error instanceof Error
+        ? chartQuery.error.message
+        : "Failed to load chart data."
+      : null;
 
   return {
     chartData,

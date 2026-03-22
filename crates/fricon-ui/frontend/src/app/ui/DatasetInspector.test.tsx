@@ -48,6 +48,8 @@ function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
     status: "Completed",
     createdAt: new Date("2026-01-01T00:00:00Z"),
     trashedAt: null,
+    deletedAt: null,
+    payloadAvailable: true,
     columns: [],
     ...overrides,
   };

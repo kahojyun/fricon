@@ -1,0 +1,1 @@
+ALTER TABLE datasets ADD COLUMN deleted_at TIMESTAMP NULL;

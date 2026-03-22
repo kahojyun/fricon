@@ -15,14 +15,15 @@ pub(crate) trait DatasetCatalogRepository: Send + Sync {
         &self,
         query_options: DatasetListQuery,
     ) -> Result<Vec<DatasetRecord>, CatalogError>;
+    fn list_all_datasets_including_deleted(&self) -> Result<Vec<DatasetRecord>, CatalogError>;
+    fn list_deleted_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError>;
     fn list_dataset_tags(&self) -> Result<Vec<String>, CatalogError>;
     fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), CatalogError>;
     fn add_tags(&self, id: i32, tags: &[NormalizedTag]) -> Result<(), CatalogError>;
     fn remove_tags(&self, id: i32, tags: &[NormalizedTag]) -> Result<(), CatalogError>;
-    fn delete_dataset(&self, id: i32) -> Result<(), CatalogError>;
+    fn mark_dataset_deleted(&self, id: i32) -> Result<DatasetRecord, CatalogError>;
     fn trash_dataset(&self, id: i32) -> Result<(), CatalogError>;
     fn restore_dataset(&self, id: i32) -> Result<(), CatalogError>;
-    fn purge_trashed_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError>;
     fn delete_tag(&self, tag: &NormalizedTag) -> Result<(), CatalogError>;
     fn rename_tag(
         &self,

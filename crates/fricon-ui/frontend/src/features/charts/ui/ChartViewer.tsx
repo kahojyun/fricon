@@ -27,6 +27,20 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
     selectedComplexViewSingle: selection.controlState.selectedComplexViewSingle,
   });
 
+  if (datasetDetail && !datasetDetail.payloadAvailable) {
+    return (
+      <div className="flex size-full min-h-0 flex-col overflow-hidden p-1.5">
+        <Alert>
+          <AlertTitle>Dataset Payload Deleted</AlertTitle>
+          <AlertDescription>
+            This dataset is retained as a tombstone. Charts and data access are
+            no longer available.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="flex size-full min-h-0 flex-col overflow-hidden">
       <ChartViewerControls

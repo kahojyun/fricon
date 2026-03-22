@@ -45,6 +45,7 @@ fn dataset_record_from_models(dataset: Dataset, tags: Vec<Tag>) -> DatasetRecord
         status: dataset.status.0,
         created_at: dataset.created_at.and_utc(),
         trashed_at: dataset.trashed_at.map(|value| value.and_utc()),
+        deleted_at: dataset.deleted_at.map(|value| value.and_utc()),
         tags: tags.into_iter().map(|tag| tag.name).collect(),
     };
 
@@ -151,6 +152,17 @@ fn apply_trashed_filter(
     }
 }
 
+fn apply_deleted_filter(
+    query: schema::datasets::BoxedQuery<'_, diesel::sqlite::Sqlite>,
+    deleted: Option<bool>,
+) -> schema::datasets::BoxedQuery<'_, diesel::sqlite::Sqlite> {
+    match deleted {
+        Some(true) => query.filter(schema::datasets::deleted_at.is_not_null()),
+        Some(false) => query.filter(schema::datasets::deleted_at.is_null()),
+        None => query,
+    }
+}
+
 fn map_datasets_with_tags(
     conn: &mut SqliteConnection,
     all_datasets: Vec<Dataset>,
@@ -178,20 +190,27 @@ fn map_datasets_with_tags(
         .collect())
 }
 
-fn list_all_dataset_records(
+fn list_all_dataset_records_including_deleted(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
 ) -> Result<Vec<DatasetRecord>, anyhow::Error> {
-    let mut unbounded_query = query_options.clone();
-    unbounded_query.limit = Some(i64::MAX);
-    unbounded_query.offset = Some(0);
-    list_dataset_records(conn, &unbounded_query)
+    let unbounded_query = query_options.clone().unbounded();
+    list_dataset_records_with_deleted_filter(conn, &unbounded_query, None)
 }
 
 #[instrument(skip(conn, query_options))]
 fn list_dataset_records(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
+) -> Result<Vec<DatasetRecord>, anyhow::Error> {
+    list_dataset_records_with_deleted_filter(conn, query_options, Some(false))
+}
+
+#[instrument(skip(conn, query_options))]
+fn list_dataset_records_with_deleted_filter(
+    conn: &mut SqliteConnection,
+    query_options: &DatasetListQuery,
+    deleted: Option<bool>,
 ) -> Result<Vec<DatasetRecord>, anyhow::Error> {
     let search = normalize_search(query_options.search.as_deref());
     let tag_filters = normalize_tag_filters(query_options.tags.as_deref());
@@ -216,6 +235,7 @@ fn list_dataset_records(
         query = query.filter(schema::datasets::status.eq_any(statuses));
     }
     query = apply_trashed_filter(query, query_options.trashed);
+    query = apply_deleted_filter(query, deleted);
 
     query = match (query_options.sort_by, query_options.sort_direction) {
         (DatasetSortBy::Id, SortDirection::Asc) => query.order(schema::datasets::id.asc()),
@@ -262,17 +282,6 @@ fn get_dataset_record(
     Ok(Some(dataset_record_from_models(dataset, tags)))
 }
 
-#[instrument(skip(conn, id), fields(dataset.id = ?id))]
-fn get_dataset_location(
-    conn: &mut SqliteConnection,
-    id: DatasetId,
-) -> Result<Option<DatasetLocation>, anyhow::Error> {
-    let Some(dataset) = get_dataset_model(conn, id)? else {
-        return Ok(None);
-    };
-    Ok(Some(dataset_location_from_model(&dataset)))
-}
-
 pub(crate) fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, anyhow::Error> {
     use schema::datasets::dsl::{datasets, status};
 
@@ -309,10 +318,32 @@ impl DatasetCatalogRepository for DatasetRepository {
         list_dataset_records(&mut conn, &query_options).map_err(CatalogError::from)
     }
 
+    fn list_all_datasets_including_deleted(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        list_all_dataset_records_including_deleted(
+            &mut conn,
+            &DatasetListQuery::default().include_trashed(),
+        )
+        .map_err(CatalogError::from)
+    }
+
+    fn list_deleted_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        list_dataset_records_with_deleted_filter(
+            &mut conn,
+            &DatasetListQuery::default().include_trashed().unbounded(),
+            Some(true),
+        )
+        .map_err(CatalogError::from)
+    }
+
     fn list_dataset_tags(&self) -> Result<Vec<String>, CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
         let tags = schema::tags::table
+            .inner_join(schema::datasets_tags::table.inner_join(schema::datasets::table))
+            .filter(schema::datasets::deleted_at.is_null())
             .select(schema::tags::name)
+            .distinct()
             .order(schema::tags::name.asc())
             .load(&mut conn)
             .map_err(anyhow::Error::from)?;
@@ -327,6 +358,7 @@ impl DatasetCatalogRepository for DatasetRepository {
             favorite: update.favorite,
             status: None,
             trashed_at: None,
+            deleted_at: None,
         };
         Dataset::update_metadata(&mut conn, id, &db_update).map_err(anyhow::Error::from)?;
         debug!(dataset.id = id, "Dataset metadata updated");
@@ -364,10 +396,14 @@ impl DatasetCatalogRepository for DatasetRepository {
         Ok(())
     }
 
-    fn delete_dataset(&self, id: i32) -> Result<(), CatalogError> {
+    fn mark_dataset_deleted(&self, id: i32) -> Result<DatasetRecord, CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        Dataset::delete_from_db(&mut conn, id).map_err(anyhow::Error::from)?;
-        Ok(())
+        conn.immediate_transaction(|conn| {
+            Dataset::mark_deleted(conn, id)?;
+            get_dataset_record(conn, DatasetId::Id(id))?
+                .ok_or_else(|| anyhow::anyhow!("dataset should exist after tombstoning"))
+        })
+        .map_err(CatalogError::from)
     }
 
     fn trash_dataset(&self, id: i32) -> Result<(), CatalogError> {
@@ -380,23 +416,6 @@ impl DatasetCatalogRepository for DatasetRepository {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
         Dataset::restore(&mut conn, id).map_err(anyhow::Error::from)?;
         Ok(())
-    }
-
-    fn purge_trashed_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        conn.immediate_transaction(|conn| {
-            let trashed_datasets = list_all_dataset_records(
-                conn,
-                &DatasetListQuery {
-                    trashed: Some(true),
-                    ..DatasetListQuery::default()
-                },
-            )?;
-            let ids: Vec<i32> = trashed_datasets.iter().map(|record| record.id).collect();
-            Dataset::delete_batch(conn, &ids)?;
-            Ok::<Vec<DatasetRecord>, anyhow::Error>(trashed_datasets)
-        })
-        .map_err(CatalogError::from)
     }
 
     fn delete_tag(&self, tag: &NormalizedTag) -> Result<(), CatalogError> {
@@ -459,10 +478,20 @@ impl DatasetIngestRepository for DatasetRepository {
 impl DatasetReadRepository for DatasetRepository {
     fn resolve_dataset(&self, id: DatasetId) -> Result<DatasetLocation, ReadError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        let location = get_dataset_location(&mut conn, id).map_err(ReadError::from)?;
-        location.ok_or_else(|| ReadError::NotFound {
-            id: dataset_not_found(id),
-        })
+        let Some(dataset) = get_dataset_model(&mut conn, id)
+            .map_err(anyhow::Error::from)
+            .map_err(ReadError::from)?
+        else {
+            return Err(ReadError::NotFound {
+                id: dataset_not_found(id),
+            });
+        };
+        if dataset.deleted_at.is_some() {
+            return Err(ReadError::Deleted {
+                id: dataset_not_found(id),
+            });
+        }
+        Ok(dataset_location_from_model(&dataset))
     }
 }
 

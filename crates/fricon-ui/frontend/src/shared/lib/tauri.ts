@@ -35,16 +35,22 @@ export function normalizeCreatedAtDate<T extends { createdAt: string }>(
 }
 
 export function normalizeDatasetDates<
-  T extends { createdAt: string; trashedAt: string | null },
+  T extends {
+    createdAt: string;
+    trashedAt: string | null;
+    deletedAt: string | null;
+  },
 >(
   value: T,
-): Omit<T, "createdAt" | "trashedAt"> & {
+): Omit<T, "createdAt" | "trashedAt" | "deletedAt"> & {
   createdAt: Date;
   trashedAt: Date | null;
+  deletedAt: Date | null;
 } {
   return {
     ...value,
     createdAt: toDate(value.createdAt),
     trashedAt: value.trashedAt === null ? null : toDate(value.trashedAt),
+    deletedAt: value.deletedAt === null ? null : toDate(value.deletedAt),
   };
 }
