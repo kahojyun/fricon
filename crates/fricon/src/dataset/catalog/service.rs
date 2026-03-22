@@ -53,7 +53,6 @@ impl DatasetCatalogService {
         update_payload: DatasetUpdate,
         events: &P,
     ) -> Result<(), CatalogError> {
-        self.ensure_not_deleted(id)?;
         self.repository.update_dataset(id, update_payload)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
         events.publish(DatasetEvent::Updated(record));
@@ -67,7 +66,6 @@ impl DatasetCatalogService {
         tags: Vec<String>,
         events: &P,
     ) -> Result<(), CatalogError> {
-        self.ensure_not_deleted(id)?;
         let tags = NormalizedTag::parse_many(tags);
         if tags.is_empty() {
             return Ok(());
@@ -85,7 +83,6 @@ impl DatasetCatalogService {
         tags: Vec<String>,
         events: &P,
     ) -> Result<(), CatalogError> {
-        self.ensure_not_deleted(id)?;
         let tags = NormalizedTag::parse_many(tags);
         if tags.is_empty() {
             return Ok(());

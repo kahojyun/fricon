@@ -381,7 +381,10 @@ mod tests {
     use fricon::{AppManager, DatasetId, DatasetListQuery, WorkspaceRoot};
     use tempfile::TempDir;
 
-    use super::{delete_datasets, empty_trash, restore_datasets, trash_datasets};
+    use super::{
+        BatchTagUpdate, batch_update_dataset_tags, delete_datasets, empty_trash, restore_datasets,
+        trash_datasets, update_dataset_info,
+    };
     use crate::application::session::WorkspaceSession;
 
     async fn create_completed_dataset(
@@ -533,6 +536,94 @@ mod tests {
 
         let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
         assert!(tombstone.metadata.deleted_at.is_some());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn deleted_datasets_still_allow_metadata_mutation() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let dataset_id = create_completed_dataset(&session, "before-delete").await?;
+
+        let trash_results = trash_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(trash_results.len(), 1);
+        assert!(trash_results[0].success);
+
+        let delete_results = delete_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(delete_results.len(), 1);
+        assert!(delete_results[0].success);
+
+        update_dataset_info(
+            &session,
+            dataset_id,
+            super::DatasetInfoUpdate {
+                name: Some("after-delete".to_string()),
+                description: Some("updated tombstone".to_string()),
+                favorite: Some(true),
+                tags: Some(vec!["updated".to_string(), "retained".to_string()]),
+            },
+        )
+        .await?;
+
+        let add_tag_results = batch_update_dataset_tags(
+            &session,
+            BatchTagUpdate {
+                ids: vec![dataset_id],
+                add: vec!["extra".to_string()],
+                remove: vec!["updated".to_string()],
+            },
+        )
+        .await;
+        assert_eq!(add_tag_results.len(), 1);
+        assert!(add_tag_results[0].success);
+
+        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        assert_eq!(tombstone.metadata.name, "after-delete");
+        assert_eq!(tombstone.metadata.description, "updated tombstone");
+        assert!(tombstone.metadata.favorite);
+        assert!(tombstone.metadata.deleted_at.is_some());
+        assert_eq!(
+            tombstone.metadata.tags,
+            vec!["retained".to_string(), "extra".to_string()]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn deleted_datasets_cannot_be_restored() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let dataset_id = create_completed_dataset(&session, "cannot-restore").await?;
+
+        let trash_results = trash_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(trash_results.len(), 1);
+        assert!(trash_results[0].success);
+
+        let delete_results = delete_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(delete_results.len(), 1);
+        assert!(delete_results[0].success);
+
+        let restore_results = restore_datasets(&session, vec![dataset_id]).await;
+        assert_eq!(restore_results.len(), 1);
+        assert!(!restore_results[0].success);
+        assert!(
+            restore_results[0]
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("deleted"))
+        );
+
+        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        assert!(tombstone.metadata.deleted_at.is_some());
+        assert!(tombstone.metadata.trashed_at.is_some());
 
         Ok(())
     }
