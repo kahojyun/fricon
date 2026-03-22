@@ -24,6 +24,8 @@ use crate::dataset::model::{DatasetMetadata, DatasetStatus};
 const METADATA_ENTRY: &str = "metadata.json";
 /// Prefix used for data chunk files inside the archive.
 const DATA_PREFIX: &str = "data/";
+const MAX_ARCHIVE_NAME_CHARS: usize = 64;
+const FALLBACK_ARCHIVE_NAME: &str = "dataset";
 
 #[derive(Debug, Error)]
 pub enum PortabilityError {
@@ -120,10 +122,7 @@ pub fn export_dataset(
 ) -> Result<PathBuf, PortabilityError> {
     fs::create_dir_all(output_dir)?;
 
-    let archive_name = build_archive_name(&metadata.created_at, &metadata.name);
-    let archive_path = output_dir.join(&archive_name);
-
-    let out_file = File::create(&archive_path)?;
+    let (out_file, archive_path) = create_archive_file(output_dir, metadata)?;
     let zstd_encoder = zstd::Encoder::new(out_file, 0).map_err(PortabilityError::Zstd)?;
     let mut tar = tar::Builder::new(zstd_encoder);
 
@@ -293,29 +292,107 @@ pub fn discard_staged_import(staged_dir: &Path) -> Result<(), PortabilityError> 
 }
 
 /// Build the user-friendly archive filename.
-fn build_archive_name(created_at: &DateTime<Utc>, name: &str) -> String {
+fn build_archive_name(created_at: &DateTime<Utc>, uid: Uuid, name: &str) -> String {
     let timestamp = created_at.format("%Y%m%d_%H%M%S");
     let safe_name = sanitize_name(name);
-    format!("{timestamp}_{safe_name}.tar.zst")
+    let uid_fragment = uid.simple().to_string();
+    format!("{timestamp}_{}_{safe_name}.tar.zst", &uid_fragment[..8])
 }
 
-/// Collapse any characters that are not ASCII alphanumeric, `-`, or `_` into
-/// `_`, and truncate to 64 characters to keep paths sane.
-fn sanitize_name(name: &str) -> String {
-    let mut sanitized = String::with_capacity(name.len());
-    let mut last_was_underscore = false;
+/// Create a new archive file path without overwriting an existing export.
+fn create_archive_file(
+    output_dir: &Path,
+    metadata: &DatasetMetadata,
+) -> Result<(File, PathBuf), PortabilityError> {
+    let base_name = build_archive_name(&metadata.created_at, metadata.uid, &metadata.name);
+    let base_stem = base_name.trim_end_matches(".tar.zst");
 
-    for c in name.chars() {
-        if c.is_ascii_alphanumeric() || c == '-' {
-            sanitized.push(c);
-            last_was_underscore = false;
-        } else if !last_was_underscore {
-            sanitized.push('_');
-            last_was_underscore = true;
+    for attempt in 0.. {
+        let archive_name = if attempt == 0 {
+            base_name.clone()
+        } else {
+            format!("{base_stem}_{attempt}.tar.zst")
+        };
+        let archive_path = output_dir.join(archive_name);
+        match File::options()
+            .write(true)
+            .create_new(true)
+            .open(&archive_path)
+        {
+            Ok(file) => return Ok((file, archive_path)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(PortabilityError::Io(error)),
         }
     }
 
-    sanitized.chars().take(64).collect()
+    unreachable!("archive file creation should always return or error")
+}
+
+/// Sanitize a dataset name for cross-platform archive filenames.
+///
+/// Unicode letters and numbers are preserved. Whitespace and other unsafe
+/// characters collapse into `_`. ASCII `-` is preserved only when it sits
+/// between alphanumeric characters, so separator runs normalize consistently.
+fn sanitize_name(name: &str) -> String {
+    let trimmed = name.trim_matches(|c: char| c == '.' || c.is_whitespace());
+    let chars: Vec<char> = trimmed.chars().collect();
+    let mut sanitized = String::with_capacity(chars.len().min(MAX_ARCHIVE_NAME_CHARS));
+    let mut sanitized_len = 0usize;
+    let mut pending_separator = false;
+
+    for (idx, c) in chars.iter().copied().enumerate() {
+        if c == '\0' || c.is_ascii_control() {
+            continue;
+        }
+
+        if c.is_alphanumeric() {
+            if pending_separator && !sanitized.is_empty() && sanitized_len < MAX_ARCHIVE_NAME_CHARS
+            {
+                sanitized.push('_');
+                sanitized_len += 1;
+            }
+            pending_separator = false;
+
+            if sanitized_len == MAX_ARCHIVE_NAME_CHARS {
+                break;
+            }
+            sanitized.push(c);
+            sanitized_len += 1;
+            continue;
+        }
+
+        if is_preserved_hyphen(&chars, idx, pending_separator) {
+            if sanitized_len == MAX_ARCHIVE_NAME_CHARS {
+                break;
+            }
+            sanitized.push('-');
+            sanitized_len += 1;
+            pending_separator = false;
+            continue;
+        }
+
+        pending_separator = !sanitized.is_empty();
+    }
+
+    if sanitized.is_empty() {
+        FALLBACK_ARCHIVE_NAME.to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn is_preserved_hyphen(chars: &[char], idx: usize, pending_separator: bool) -> bool {
+    if pending_separator || chars[idx] != '-' {
+        return false;
+    }
+
+    let prev_is_word = idx
+        .checked_sub(1)
+        .and_then(|prev| chars.get(prev))
+        .is_some_and(|c| c.is_alphanumeric());
+    let next_is_word = chars.get(idx + 1).is_some_and(|c| c.is_alphanumeric());
+
+    prev_is_word && next_is_word
 }
 
 /// Create a hidden unique sibling directory name under `parent_dir`.
@@ -355,9 +432,7 @@ fn read_metadata_from_archive(archive_path: &Path) -> Result<ExportedMetadata, P
 
 /// Extract all entries from a tar+zstd archive into `dest_dir`.
 ///
-/// Only `metadata.json` and `data/*.arrow` entries are extracted:
-/// - `metadata.json` → `{dest_dir}/metadata.json`
-/// - `data/data_chunk_*.arrow` → `{dest_dir}/data_chunk_*.arrow`
+/// Only `data/data_chunk_*.arrow` entries are extracted.
 fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), PortabilityError> {
     let file = File::open(archive_path)?;
     let reader = BufReader::new(file);
@@ -371,14 +446,8 @@ fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), Portabili
             continue;
         };
 
-        let dest_file_path = if path_str == METADATA_ENTRY {
-            dest_dir.join("metadata.json")
-        } else if let Some(file_name) = path_str.strip_prefix(DATA_PREFIX) {
-            let is_data_chunk = file_name.starts_with("data_chunk_");
-            let is_arrow = Path::new(file_name)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
-            if is_data_chunk && is_arrow {
+        let dest_file_path = if let Some(file_name) = path_str.strip_prefix(DATA_PREFIX) {
+            if is_safe_archive_chunk_name(file_name) {
                 dest_dir.join(file_name)
             } else {
                 continue;
@@ -392,6 +461,16 @@ fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), Portabili
     }
 
     Ok(())
+}
+
+fn is_safe_archive_chunk_name(file_name: &str) -> bool {
+    let is_data_chunk = file_name.starts_with("data_chunk_");
+    let is_arrow = Path::new(file_name)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
+    let has_path_separators = file_name.contains('/') || file_name.contains('\\');
+
+    is_data_chunk && is_arrow && !has_path_separators
 }
 
 /// Compute field-level diffs between `existing` and `incoming` metadata.
@@ -500,6 +579,26 @@ mod tests {
             name.contains("my-dataset"),
             "name should contain dataset name"
         );
+        assert!(name.contains(&uid.simple().to_string()[..8]));
+    }
+
+    #[test]
+    fn export_uses_unique_archive_names_for_repeated_exports() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "duplicate-name");
+        let output_dir = tmp.path().join("exports");
+
+        let first = export_dataset(&meta, &ds_dir, &output_dir).expect("first export");
+        let second = export_dataset(&meta, &ds_dir, &output_dir).expect("second export");
+
+        assert_ne!(first, second, "repeated exports should not overwrite");
+        assert!(first.exists(), "first archive should still exist");
+        assert!(second.exists(), "second archive should exist");
     }
 
     #[test]
@@ -600,8 +699,78 @@ mod tests {
             "chunk file should be extracted to staging"
         );
         assert!(
+            !staged.staging_dir.join("metadata.json").exists(),
+            "metadata file should not be extracted into staging"
+        );
+        assert!(
             !dest.exists(),
             "live dataset directory should not be created during staging"
+        );
+    }
+
+    #[test]
+    fn stage_import_ignores_nested_data_entry_paths() {
+        let tmp = TempDir::new().expect("temp dir");
+        let archive = tmp.path().join("nested.tar.zst");
+        let exported = ExportedMetadata {
+            uid: Uuid::new_v4(),
+            name: "nested".to_string(),
+            description: "nested".to_string(),
+            favorite: false,
+            status: DatasetStatus::Completed,
+            created_at: Utc::now(),
+            tags: Vec::new(),
+        };
+
+        let out_file = File::create(&archive).expect("archive file");
+        let zstd_encoder = zstd::Encoder::new(out_file, 0).expect("encoder");
+        let mut tar = tar::Builder::new(zstd_encoder);
+
+        let json_bytes = serde_json::to_vec_pretty(&exported).expect("metadata");
+        let mut metadata_header = tar::Header::new_gnu();
+        metadata_header.set_size(json_bytes.len() as u64);
+        metadata_header.set_mode(0o644);
+        metadata_header.set_cksum();
+        tar.append_data(&mut metadata_header, METADATA_ENTRY, json_bytes.as_slice())
+            .expect("metadata entry");
+
+        let good_bytes = b"GOOD";
+        let mut good_header = tar::Header::new_gnu();
+        good_header.set_size(good_bytes.len() as u64);
+        good_header.set_mode(0o644);
+        good_header.set_cksum();
+        tar.append_data(
+            &mut good_header,
+            "data/data_chunk_0.arrow",
+            good_bytes.as_slice(),
+        )
+        .expect("good entry");
+
+        let nested_bytes = b"BAD";
+        let mut nested_header = tar::Header::new_gnu();
+        nested_header.set_size(nested_bytes.len() as u64);
+        nested_header.set_mode(0o644);
+        nested_header.set_cksum();
+        tar.append_data(
+            &mut nested_header,
+            "data/data_chunk_0.arrow/evil.arrow",
+            nested_bytes.as_slice(),
+        )
+        .expect("nested entry");
+
+        let zstd_encoder = tar.into_inner().expect("tar finalize");
+        zstd_encoder.finish().expect("zstd finish");
+
+        let dest = tmp.path().join("cc").join(exported.uid.to_string());
+        let staged = stage_import(&archive, &dest).expect("stage import");
+
+        assert!(
+            staged.staging_dir.join("data_chunk_0.arrow").exists(),
+            "valid chunk should be extracted"
+        );
+        assert!(
+            !staged.staging_dir.join("evil.arrow").exists(),
+            "nested chunk path should be ignored"
         );
     }
 
@@ -707,14 +876,64 @@ mod tests {
     // ── sanitize_name ─────────────────────────────────────────────────────────
 
     #[test]
-    fn sanitize_replaces_spaces_and_special_chars() {
-        let result = sanitize_name("hello world! @2025");
-        assert_eq!(result, "hello_world_2025");
+    fn sanitize_preserves_cjk_letters() {
+        let result = sanitize_name("中文数据集");
+        assert_eq!(result, "中文数据集");
+    }
+
+    #[test]
+    fn sanitize_preserves_internal_hyphens_in_mixed_unicode_names() {
+        let result = sanitize_name("dataset-中文-01");
+        assert_eq!(result, "dataset-中文-01");
+    }
+
+    #[test]
+    fn sanitize_replaces_unsafe_chars_and_collapses_separators() {
+        let result = sanitize_name("bad<name>:a\"b/c\\d|e?f*g");
+        assert_eq!(result, "bad_name_a_b_c_d_e_f_g");
+    }
+
+    #[test]
+    fn sanitize_normalizes_whitespace_runs() {
+        let result = sanitize_name("hello \t \n world");
+        assert_eq!(result, "hello_world");
+    }
+
+    #[test]
+    fn sanitize_falls_back_when_name_becomes_empty() {
+        let result = sanitize_name("  ./\\***??  ");
+        assert_eq!(result, "dataset");
+    }
+
+    #[test]
+    fn sanitize_removes_leading_and_trailing_dots_and_spaces() {
+        let result = sanitize_name("  ..hello world..  ");
+        assert_eq!(result, "hello_world");
     }
 
     #[test]
     fn sanitize_truncates_long_names() {
-        let long_name = "a".repeat(100);
-        assert_eq!(sanitize_name(&long_name).len(), 64);
+        let long_name = "中".repeat(100);
+        assert_eq!(sanitize_name(&long_name).chars().count(), 64);
+    }
+
+    #[test]
+    fn export_preserves_unicode_name_in_archive_filename() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "dataset-中文-01");
+        let output_dir = tmp.path().join("exports");
+
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+        let name = archive.file_name().and_then(|n| n.to_str()).expect("name");
+
+        assert!(
+            name.contains("dataset-中文-01"),
+            "archive filename should preserve unicode dataset names"
+        );
     }
 }
