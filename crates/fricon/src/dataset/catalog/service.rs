@@ -368,95 +368,22 @@ impl DatasetCatalogService {
             };
 
         let result = if let Some(existing_record) = existing_record {
-            {
-                let revive_graveyard_dir = existing_record
-                    .metadata
-                    .deleted_at
-                    .is_some()
-                    .then(|| self.paths.graveyard_dataset_path_from_uid(uid));
-                let record = self
-                    .repository
-                    .replace_imported_dataset_record(existing_record.id, &staged.metadata);
-                match record {
-                    Ok(record) => {
-                        if let Err(error) =
-                            portability::finalize_promoted_import(backup_dir.as_deref())
-                        {
-                            warn!(
-                                error = %error,
-                                uid = %uid,
-                                "Failed to finalize import backup cleanup; import succeeded"
-                            );
-                        }
-                        if let Some(graveyard_dir) = revive_graveyard_dir.as_deref()
-                            && let Err(error) = storage::delete_dataset(graveyard_dir)
-                        {
-                            warn!(
-                                error = %error,
-                                uid = %uid,
-                                "Failed to remove stale graveyard payload after reviving dataset"
-                            );
-                        }
-                        info!(
-                            dataset.id = record.id,
-                            uid = %uid,
-                            "Dataset force-imported from archive"
-                        );
-                        events.publish(DatasetEvent::Updated(record.clone()));
-                        Ok(record)
-                    }
-                    Err(error) => {
-                        if let Err(rollback_error) =
-                            portability::rollback_promoted_import(&dest_dir, backup_dir.as_deref())
-                        {
-                            error!(
-                                error = %rollback_error,
-                                uid = %uid,
-                                "Failed to roll back dataset import after repository error"
-                            );
-                        }
-                        Err(error)
-                    }
-                }
-            }
+            self.finish_replaced_import(
+                &existing_record,
+                &staged.metadata,
+                &dest_dir,
+                backup_dir.as_ref(),
+                uid,
+                events,
+            )
         } else {
-            {
-                let record = self
-                    .repository
-                    .insert_imported_dataset_record(&staged.metadata);
-                match record {
-                    Ok(record) => {
-                        if let Err(error) =
-                            portability::finalize_promoted_import(backup_dir.as_deref())
-                        {
-                            warn!(
-                                error = %error,
-                                uid = %uid,
-                                "Failed to finalize import backup cleanup; import succeeded"
-                            );
-                        }
-                        info!(
-                            dataset.id = record.id,
-                            uid = %uid,
-                            "Dataset imported from archive"
-                        );
-                        events.publish(DatasetEvent::Created(record.clone()));
-                        Ok(record)
-                    }
-                    Err(error) => {
-                        if let Err(rollback_error) =
-                            portability::rollback_promoted_import(&dest_dir, backup_dir.as_deref())
-                        {
-                            error!(
-                                error = %rollback_error,
-                                uid = %uid,
-                                "Failed to clean up dataset import after repository error"
-                            );
-                        }
-                        Err(error)
-                    }
-                }
-            }
+            self.finish_inserted_import(
+                &staged.metadata,
+                &dest_dir,
+                backup_dir.as_ref(),
+                uid,
+                events,
+            )
         };
 
         if let Err(error) = portability::discard_staged_import(&staged.staging_dir) {
@@ -468,6 +395,111 @@ impl DatasetCatalogService {
         }
 
         result
+    }
+
+    fn finish_replaced_import<P: DatasetEventPublisher>(
+        &self,
+        existing_record: &DatasetRecord,
+        metadata: &portability::ExportedMetadata,
+        dest_dir: &Path,
+        backup_dir: Option<&std::path::PathBuf>,
+        uid: uuid::Uuid,
+        events: &P,
+    ) -> Result<DatasetRecord, CatalogError> {
+        let revive_graveyard_dir = existing_record
+            .metadata
+            .deleted_at
+            .is_some()
+            .then(|| self.paths.graveyard_dataset_path_from_uid(uid));
+        let record = self
+            .repository
+            .replace_imported_dataset_record(existing_record.id, metadata);
+        match record {
+            Ok(record) => {
+                Self::finalize_import_backup(uid, backup_dir.map(std::path::PathBuf::as_path));
+                Self::cleanup_revived_graveyard(uid, revive_graveyard_dir.as_deref());
+                info!(
+                    dataset.id = record.id,
+                    uid = %uid,
+                    "Dataset force-imported from archive"
+                );
+                events.publish(DatasetEvent::Updated(record.clone()));
+                Ok(record)
+            }
+            Err(error) => {
+                Self::rollback_import(
+                    dest_dir,
+                    backup_dir.map(std::path::PathBuf::as_path),
+                    uid,
+                    "Failed to roll back dataset import after repository error",
+                );
+                Err(error)
+            }
+        }
+    }
+
+    fn finish_inserted_import<P: DatasetEventPublisher>(
+        &self,
+        metadata: &portability::ExportedMetadata,
+        dest_dir: &Path,
+        backup_dir: Option<&std::path::PathBuf>,
+        uid: uuid::Uuid,
+        events: &P,
+    ) -> Result<DatasetRecord, CatalogError> {
+        let record = self.repository.insert_imported_dataset_record(metadata);
+        match record {
+            Ok(record) => {
+                Self::finalize_import_backup(uid, backup_dir.map(std::path::PathBuf::as_path));
+                info!(
+                    dataset.id = record.id,
+                    uid = %uid,
+                    "Dataset imported from archive"
+                );
+                events.publish(DatasetEvent::Created(record.clone()));
+                Ok(record)
+            }
+            Err(error) => {
+                Self::rollback_import(
+                    dest_dir,
+                    backup_dir.map(std::path::PathBuf::as_path),
+                    uid,
+                    "Failed to clean up dataset import after repository error",
+                );
+                Err(error)
+            }
+        }
+    }
+
+    fn finalize_import_backup(uid: uuid::Uuid, backup_dir: Option<&Path>) {
+        if let Err(error) = portability::finalize_promoted_import(backup_dir) {
+            warn!(
+                error = %error,
+                uid = %uid,
+                "Failed to finalize import backup cleanup; import succeeded"
+            );
+        }
+    }
+
+    fn cleanup_revived_graveyard(uid: uuid::Uuid, graveyard_dir: Option<&Path>) {
+        if let Some(graveyard_dir) = graveyard_dir
+            && let Err(error) = storage::delete_dataset(graveyard_dir)
+        {
+            warn!(
+                error = %error,
+                uid = %uid,
+                "Failed to remove stale graveyard payload after reviving dataset"
+            );
+        }
+    }
+
+    fn rollback_import(dest_dir: &Path, backup_dir: Option<&Path>, uid: uuid::Uuid, message: &str) {
+        if let Err(rollback_error) = portability::rollback_promoted_import(dest_dir, backup_dir) {
+            error!(
+                error = %rollback_error,
+                uid = %uid,
+                "{message}"
+            );
+        }
     }
 }
 
