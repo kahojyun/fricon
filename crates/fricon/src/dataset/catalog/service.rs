@@ -369,13 +369,34 @@ impl DatasetCatalogService {
 
         let result = if let Some(existing_record) = existing_record {
             {
+                let revive_graveyard_dir = existing_record
+                    .metadata
+                    .deleted_at
+                    .is_some()
+                    .then(|| self.paths.graveyard_dataset_path_from_uid(uid));
                 let record = self
                     .repository
                     .replace_imported_dataset_record(existing_record.id, &staged.metadata);
                 match record {
                     Ok(record) => {
-                        portability::finalize_promoted_import(backup_dir.as_deref())
-                            .map_err(|error| CatalogError::from(anyhow::Error::from(error)))?;
+                        if let Err(error) =
+                            portability::finalize_promoted_import(backup_dir.as_deref())
+                        {
+                            warn!(
+                                error = %error,
+                                uid = %uid,
+                                "Failed to finalize import backup cleanup; import succeeded"
+                            );
+                        }
+                        if let Some(graveyard_dir) = revive_graveyard_dir.as_deref()
+                            && let Err(error) = storage::delete_dataset(graveyard_dir)
+                        {
+                            warn!(
+                                error = %error,
+                                uid = %uid,
+                                "Failed to remove stale graveyard payload after reviving dataset"
+                            );
+                        }
                         info!(
                             dataset.id = record.id,
                             uid = %uid,
@@ -405,6 +426,15 @@ impl DatasetCatalogService {
                     .insert_imported_dataset_record(&staged.metadata);
                 match record {
                     Ok(record) => {
+                        if let Err(error) =
+                            portability::finalize_promoted_import(backup_dir.as_deref())
+                        {
+                            warn!(
+                                error = %error,
+                                uid = %uid,
+                                "Failed to finalize import backup cleanup; import succeeded"
+                            );
+                        }
                         info!(
                             dataset.id = record.id,
                             uid = %uid,
@@ -415,7 +445,7 @@ impl DatasetCatalogService {
                     }
                     Err(error) => {
                         if let Err(rollback_error) =
-                            portability::rollback_promoted_import(&dest_dir, None)
+                            portability::rollback_promoted_import(&dest_dir, backup_dir.as_deref())
                         {
                             error!(
                                 error = %rollback_error,
@@ -673,6 +703,10 @@ mod tests {
             !live_dir.join("old.arrow").exists(),
             "old payload should be replaced"
         );
+        assert!(
+            !live_dir.join("metadata.json").exists(),
+            "live payload should not retain archive metadata sidecar files"
+        );
         let published = events.events.lock().expect("events");
         assert_eq!(published.len(), 1);
         match &published[0] {
@@ -689,6 +723,9 @@ mod tests {
         let paths = WorkspacePaths::new(temp_dir.path());
         let uid = Uuid::new_v4();
         let archive = create_import_archive(temp_dir.path(), uid, "revived");
+        let graveyard_dir = paths.graveyard_dataset_path_from_uid(uid);
+        fs::create_dir_all(&graveyard_dir).expect("graveyard dir");
+        fs::write(graveyard_dir.join("old.arrow"), b"OLD").expect("graveyard payload");
 
         let mut existing_record = dataset_record(9, uid);
         existing_record.metadata.trashed_at = Some(Utc::now());
@@ -738,6 +775,10 @@ mod tests {
                 .exists(),
             "revived dataset should have live payload"
         );
+        assert!(
+            !graveyard_dir.exists(),
+            "revived dataset should clean up any stale graveyard payload"
+        );
         let published = events.events.lock().expect("events");
         assert_eq!(published.len(), 1);
         match &published[0] {
@@ -782,6 +823,130 @@ mod tests {
         assert!(
             live_dir.join("old.arrow").exists(),
             "old payload should be restored after rollback"
+        );
+        assert!(
+            !live_dir.join("data_chunk_0.arrow").exists(),
+            "promoted payload should be removed after rollback"
+        );
+        assert!(
+            events.events.lock().expect("events").is_empty(),
+            "no events should be published on rollback"
+        );
+    }
+
+    #[test]
+    fn import_dataset_cleans_orphaned_live_dir_when_forced_insert_succeeds() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let archive = create_import_archive(temp_dir.path(), uid, "imported");
+        let live_dir = paths.dataset_path_from_uid(uid);
+        fs::create_dir_all(&live_dir).expect("live dir");
+        fs::write(live_dir.join("orphaned.arrow"), b"OLD").expect("orphaned payload");
+
+        let inserted_record = DatasetRecord {
+            id: 13,
+            metadata: DatasetMetadata {
+                uid,
+                name: "imported".to_string(),
+                description: "imported imported".to_string(),
+                favorite: true,
+                status: DatasetStatus::Completed,
+                created_at: Utc::now(),
+                trashed_at: None,
+                deleted_at: None,
+                tags: vec!["alpha".to_string(), "beta".to_string()],
+            },
+        };
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_find_dataset_by_uid()
+            .once()
+            .withf(move |candidate| *candidate == uid)
+            .return_once(move |_| Ok(None));
+        repository
+            .expect_insert_imported_dataset_record()
+            .once()
+            .withf(move |metadata| metadata.uid == uid && metadata.name == "imported")
+            .return_once(move |_| Ok(inserted_record.clone()));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+        let events = CollectEvents::default();
+
+        let record = service
+            .import_dataset(&archive, true, &events)
+            .expect("forced import should succeed");
+
+        assert_eq!(record.id, 13);
+        assert!(
+            live_dir.join("data_chunk_0.arrow").exists(),
+            "imported payload should be promoted into the live path"
+        );
+        assert!(
+            !live_dir.join("orphaned.arrow").exists(),
+            "orphaned live payload should be removed after successful import"
+        );
+        let siblings = fs::read_dir(
+            live_dir
+                .parent()
+                .expect("dataset path should have a parent directory"),
+        )
+        .expect("data shard directory should be readable")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("data shard directory entries");
+        assert!(
+            siblings.iter().all(|entry| {
+                !entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("import-backup")
+            }),
+            "forced import should clean up any temporary backup directory"
+        );
+        let published = events.events.lock().expect("events");
+        assert_eq!(published.len(), 1);
+        match &published[0] {
+            DatasetEvent::Created(record) => assert_eq!(record.id, 13),
+            DatasetEvent::Updated(record) => {
+                panic!("unexpected updated event for dataset {}", record.id)
+            }
+        }
+    }
+
+    #[test]
+    fn import_dataset_restores_orphaned_live_dir_when_forced_insert_fails() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let archive = create_import_archive(temp_dir.path(), uid, "rollback");
+        let live_dir = paths.dataset_path_from_uid(uid);
+        fs::create_dir_all(&live_dir).expect("live dir");
+        fs::write(live_dir.join("orphaned.arrow"), b"OLD").expect("orphaned payload");
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_find_dataset_by_uid()
+            .once()
+            .withf(move |candidate| *candidate == uid)
+            .return_once(move |_| Ok(None));
+        repository
+            .expect_insert_imported_dataset_record()
+            .once()
+            .return_once(move |_| Err(anyhow::anyhow!("insert failed").into()));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+        let events = CollectEvents::default();
+
+        let result = service.import_dataset(&archive, true, &events);
+
+        assert!(
+            result.is_err(),
+            "forced import should fail when repository insert fails"
+        );
+        assert!(
+            live_dir.join("orphaned.arrow").exists(),
+            "orphaned live payload should be restored after rollback"
         );
         assert!(
             !live_dir.join("data_chunk_0.arrow").exists(),
