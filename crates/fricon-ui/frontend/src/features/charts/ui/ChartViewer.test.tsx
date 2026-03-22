@@ -61,6 +61,24 @@ async function getSelectTrigger(label: string) {
 }
 
 describe("ChartViewer", () => {
+  it("does not show a tombstone error while dataset detail is loading", () => {
+    mockIPC(() => null);
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer datasetId={1} datasetDetail={null} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByText("Chart load failed")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Dataset payload has been permanently deleted."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("chart")).toHaveTextContent("empty");
+
+    clearMocks();
+  });
+
   it("uses trailing Y default for trace heatmap without X axis", async () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {

@@ -59,7 +59,9 @@ export function useChartViewerData({
   );
   const chartData = chartQuery.data;
   const chartError = !payloadAvailable
-    ? "Dataset payload has been permanently deleted."
+    ? datasetDetail
+      ? "Dataset payload has been permanently deleted."
+      : null
     : chartQuery.error
       ? chartQuery.error instanceof Error
         ? chartQuery.error.message
