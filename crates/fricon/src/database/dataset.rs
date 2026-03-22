@@ -20,6 +20,7 @@ use crate::{
             DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy,
             DatasetStatus, DatasetUpdate, SortDirection,
         },
+        portability::ExportedMetadata,
         read::{DatasetLocation, DatasetReadRepository, ReadError},
     },
 };
@@ -357,6 +358,7 @@ impl DatasetCatalogRepository for DatasetRepository {
             description: update.description,
             favorite: update.favorite,
             status: None,
+            created_at: None,
             trashed_at: None,
             deleted_at: None,
         };
@@ -446,6 +448,91 @@ impl DatasetCatalogRepository for DatasetRepository {
             .map_err(anyhow::Error::from)?;
         Ok(())
     }
+
+    fn insert_imported_dataset_record(
+        &self,
+        metadata: &ExportedMetadata,
+    ) -> Result<DatasetRecord, CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let (dataset, tags) = conn
+            .immediate_transaction(|conn| {
+                let new_dataset = NewDataset {
+                    uid: SimpleUuid(metadata.uid),
+                    name: &metadata.name,
+                    description: &metadata.description,
+                    favorite: metadata.favorite,
+                    status: DbDatasetStatus::from(metadata.status),
+                    created_at: metadata.created_at.naive_utc(),
+                };
+                let dataset: Dataset = diesel::insert_into(schema::datasets::table)
+                    .values(new_dataset)
+                    .returning(Dataset::as_returning())
+                    .get_result(conn)?;
+                let tags = if metadata.tags.is_empty() {
+                    vec![]
+                } else {
+                    let created_tags = Tag::find_or_create_batch(conn, &metadata.tags)?;
+                    let tag_ids: Vec<i32> = created_tags.iter().map(|tag| tag.id).collect();
+                    DatasetTag::create_associations(conn, dataset.id, &tag_ids)?;
+                    created_tags
+                };
+                Ok::<(Dataset, Vec<Tag>), diesel::result::Error>((dataset, tags))
+            })
+            .map_err(anyhow::Error::from)?;
+        let record = dataset_record_from_models(dataset, tags);
+        debug!(dataset.id = record.id, uid = %metadata.uid, "Dataset record imported");
+        Ok(record)
+    }
+
+    fn replace_imported_dataset_record(
+        &self,
+        id: i32,
+        metadata: &ExportedMetadata,
+    ) -> Result<DatasetRecord, CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let (dataset, tags) = conn
+            .immediate_transaction(|conn| {
+                let db_update = DbDatasetUpdate {
+                    name: Some(metadata.name.clone()),
+                    description: Some(metadata.description.clone()),
+                    favorite: Some(metadata.favorite),
+                    status: Some(DbDatasetStatus::from(metadata.status)),
+                    created_at: Some(metadata.created_at.naive_utc()),
+                    trashed_at: Some(None),
+                    deleted_at: Some(None),
+                };
+                Dataset::update_metadata(conn, id, &db_update)?;
+
+                DatasetTag::clear_associations(conn, id)?;
+                let tags = if metadata.tags.is_empty() {
+                    vec![]
+                } else {
+                    let created_tags = Tag::find_or_create_batch(conn, &metadata.tags)?;
+                    let tag_ids: Vec<i32> = created_tags.iter().map(|tag| tag.id).collect();
+                    DatasetTag::create_associations(conn, id, &tag_ids)?;
+                    created_tags
+                };
+                let dataset = Dataset::find_by_id(conn, id)?
+                    .ok_or(diesel::result::Error::NotFound)?;
+                Ok::<(Dataset, Vec<Tag>), diesel::result::Error>((dataset, tags))
+            })
+            .map_err(anyhow::Error::from)?;
+        let record = dataset_record_from_models(dataset, tags);
+        debug!(dataset.id = record.id, uid = %metadata.uid, "Dataset record replaced from import");
+        Ok(record)
+    }
+
+    fn find_dataset_by_uid(
+        &self,
+        uid: Uuid,
+    ) -> Result<Option<DatasetRecord>, CatalogError> {
+        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let Some(dataset) = Dataset::find_by_uid(&mut conn, uid).map_err(anyhow::Error::from)? else {
+            return Ok(None);
+        };
+        let tags = dataset.load_tags(&mut conn).map_err(anyhow::Error::from)?;
+        Ok(Some(dataset_record_from_models(dataset, tags)))
+    }
 }
 
 impl DatasetIngestRepository for DatasetRepository {
@@ -505,7 +592,9 @@ fn create_dataset_db_record(
             uid: SimpleUuid(uid),
             name: &request.name,
             description: &request.description,
+            favorite: false,
             status: DbDatasetStatus::from(DatasetStatus::Writing),
+            created_at: chrono::Utc::now().naive_utc(),
         };
 
         let dataset = diesel::insert_into(schema::datasets::table)
@@ -525,4 +614,101 @@ fn create_dataset_db_record(
         Ok::<(Dataset, Vec<Tag>), diesel::result::Error>((dataset, tags))
     })
     .map_err(anyhow::Error::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::{Duration, Utc};
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::database::core;
+
+    struct RepoFixture {
+        _tmp: TempDir,
+        repo: DatasetRepository,
+    }
+
+    impl RepoFixture {
+        fn new() -> Self {
+            let tmp = TempDir::new().expect("temp dir");
+            let db_path = tmp.path().join("fricon.sqlite3");
+            let backup_path = tmp.path().join("fricon-backup.sqlite3");
+            let pool = core::connect(&db_path, backup_path).expect("database");
+            Self {
+                _tmp: tmp,
+                repo: DatasetRepository::new(pool),
+            }
+        }
+    }
+
+    #[test]
+    fn insert_imported_dataset_record_preserves_created_at() {
+        let fixture = RepoFixture::new();
+        let created_at = Utc::now() - Duration::days(5);
+        let metadata = ExportedMetadata {
+            uid: Uuid::new_v4(),
+            name: "imported".to_string(),
+            description: "imported dataset".to_string(),
+            favorite: true,
+            status: DatasetStatus::Completed,
+            created_at,
+            tags: vec!["alpha".to_string()],
+        };
+
+        let record = fixture
+            .repo
+            .insert_imported_dataset_record(&metadata)
+            .expect("insert imported dataset");
+
+        assert_eq!(record.metadata.created_at, created_at);
+        assert_eq!(record.metadata.tags, vec!["alpha"]);
+        assert!(record.metadata.favorite);
+    }
+
+    #[test]
+    fn replace_imported_dataset_record_rewrites_tags_and_revives_dataset() {
+        let fixture = RepoFixture::new();
+        let uid = Uuid::new_v4();
+        let request = CreateDatasetRequest {
+            name: "existing".to_string(),
+            description: "existing dataset".to_string(),
+            tags: vec!["old".to_string(), "stale".to_string()],
+        };
+        let existing = DatasetIngestRepository::create_dataset_record(&fixture.repo, &request, uid)
+            .expect("create dataset");
+        fixture
+            .repo
+            .trash_dataset(existing.id)
+            .expect("trash dataset");
+        fixture
+            .repo
+            .mark_dataset_deleted(existing.id)
+            .expect("mark deleted");
+
+        let created_at = Utc::now() - Duration::days(2);
+        let metadata = ExportedMetadata {
+            uid,
+            name: "replacement".to_string(),
+            description: "replacement dataset".to_string(),
+            favorite: true,
+            status: DatasetStatus::Completed,
+            created_at,
+            tags: vec!["fresh".to_string()],
+        };
+
+        let replaced = fixture
+            .repo
+            .replace_imported_dataset_record(existing.id, &metadata)
+            .expect("replace imported dataset");
+
+        assert_eq!(replaced.id, existing.id);
+        assert_eq!(replaced.metadata.name, "replacement");
+        assert_eq!(replaced.metadata.description, "replacement dataset");
+        assert_eq!(replaced.metadata.created_at, created_at);
+        assert_eq!(replaced.metadata.tags, vec!["fresh"]);
+        assert!(replaced.metadata.favorite);
+        assert!(replaced.metadata.trashed_at.is_none());
+        assert!(replaced.metadata.deleted_at.is_none());
+    }
 }

@@ -1,0 +1,707 @@
+use std::{
+    fs::{self, File},
+    io::{self, BufReader, Read},
+    path::{Path, PathBuf},
+};
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use uuid::Uuid;
+
+use crate::dataset::model::{DatasetMetadata, DatasetStatus};
+
+// ─── Archive constants ───────────────────────────────────────────────────────
+
+/// Entry name for the metadata file inside the archive.
+const METADATA_ENTRY: &str = "metadata.json";
+/// Prefix used for data chunk files inside the archive.
+const DATA_PREFIX: &str = "data/";
+
+// ─── Error ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Error)]
+pub enum PortabilityError {
+    #[error("I/O error: {0}")]
+    Io(#[from] io::Error),
+    #[error("JSON serialization error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("Zstd error: {0}")]
+    Zstd(io::Error),
+    #[error("Archive does not contain a metadata entry")]
+    MissingMetadata,
+    #[error("Dataset already exists (uuid {uid}); use force=true to overwrite")]
+    UuidConflict { uid: Uuid },
+}
+
+// ─── Data types ──────────────────────────────────────────────────────────────
+
+/// Metadata stored inside the archive.  No internal DB id is included.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportedMetadata {
+    pub uid: Uuid,
+    pub name: String,
+    pub description: String,
+    pub favorite: bool,
+    pub status: DatasetStatus,
+    pub created_at: DateTime<Utc>,
+    pub tags: Vec<String>,
+}
+
+impl ExportedMetadata {
+    /// Build from a live [`DatasetMetadata`].
+    #[must_use]
+    pub fn from_metadata(m: &DatasetMetadata) -> Self {
+        Self {
+            uid: m.uid,
+            name: m.name.clone(),
+            description: m.description.clone(),
+            favorite: m.favorite,
+            status: m.status,
+            created_at: m.created_at,
+            tags: m.tags.clone(),
+        }
+    }
+}
+
+/// A single field difference between the existing dataset and the archive.
+#[derive(Debug, Clone)]
+pub struct FieldDiff {
+    pub field: String,
+    pub existing_value: String,
+    pub incoming_value: String,
+}
+
+/// Information about a uuid conflict found during import preview.
+#[derive(Debug, Clone)]
+pub struct ImportConflict {
+    pub existing: ExportedMetadata,
+    pub diffs: Vec<FieldDiff>,
+}
+
+/// Result of inspecting an archive before actually importing it.
+#[derive(Debug, Clone)]
+pub struct ImportPreview {
+    pub metadata: ExportedMetadata,
+    /// Present only when a dataset with the same uuid already exists.
+    pub conflict: Option<ImportConflict>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StagedImport {
+    pub metadata: ExportedMetadata,
+    pub staging_dir: PathBuf,
+}
+
+// ─── Export ──────────────────────────────────────────────────────────────────
+
+/// Export a single dataset to a `.tar.zst` archive inside `output_dir`.
+///
+/// The archive name is `{created_at:%Y%m%d_%H%M%S}_{sanitized_name}.tar.zst`.
+///
+/// Returns the path of the created archive file.
+///
+/// # Errors
+///
+/// Returns [`PortabilityError`] on I/O, JSON, or zstd failures.
+pub fn export_dataset(
+    metadata: &DatasetMetadata,
+    dataset_dir: &Path,
+    output_dir: &Path,
+) -> Result<PathBuf, PortabilityError> {
+    fs::create_dir_all(output_dir)?;
+
+    let archive_name = build_archive_name(&metadata.created_at, &metadata.name);
+    let archive_path = output_dir.join(&archive_name);
+
+    let out_file = File::create(&archive_path)?;
+    let zstd_encoder =
+        zstd::Encoder::new(out_file, 0).map_err(PortabilityError::Zstd)?;
+    let mut tar = tar::Builder::new(zstd_encoder);
+
+    // --- metadata.json ---
+    let exported = ExportedMetadata::from_metadata(metadata);
+    let json_bytes = serde_json::to_vec_pretty(&exported)?;
+    let mut header = tar::Header::new_gnu();
+    header.set_size(json_bytes.len() as u64);
+    header.set_mode(0o644);
+    header.set_cksum();
+    tar.append_data(&mut header, METADATA_ENTRY, json_bytes.as_slice())?;
+
+    // --- data chunk files ---
+    if dataset_dir.is_dir() {
+        let mut entries: Vec<_> = fs::read_dir(dataset_dir)?
+            .filter_map(Result::ok)
+            .filter(|e| {
+                let path = e.path();
+                let is_data_chunk = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("data_chunk_"));
+                let is_arrow = path
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
+                is_data_chunk && is_arrow
+            })
+            .collect();
+        // Sort for deterministic archive order.
+        entries.sort_by_key(std::fs::DirEntry::file_name);
+
+        for entry in entries {
+            let entry_path = entry.path();
+            let file_name = entry.file_name();
+            let archive_entry_name =
+                format!("{}{}", DATA_PREFIX, file_name.to_string_lossy());
+            tar.append_path_with_name(&entry_path, &archive_entry_name)?;
+        }
+    }
+
+    // Finish the zstd stream properly.
+    let zstd_encoder = tar.into_inner()?;
+    zstd_encoder.finish().map_err(PortabilityError::Zstd)?;
+
+    Ok(archive_path)
+}
+
+// ─── Import preview ──────────────────────────────────────────────────────────
+
+/// Read archive metadata without extracting data files.
+///
+/// If `existing` is provided (i.e. a dataset with the same uuid was found in
+/// the DB), a conflict diff is included in the result.
+///
+/// # Errors
+///
+/// Returns [`PortabilityError`] on I/O, JSON, or archive parsing failures.
+pub fn preview_import(
+    archive_path: &Path,
+    existing: Option<&DatasetMetadata>,
+) -> Result<ImportPreview, PortabilityError> {
+    let metadata = read_metadata_from_archive(archive_path)?;
+
+    let conflict = existing.map(|ex| {
+        let existing_exported = ExportedMetadata::from_metadata(ex);
+        let diffs = compute_diffs(&existing_exported, &metadata);
+        ImportConflict {
+            existing: existing_exported,
+            diffs,
+        }
+    });
+
+    Ok(ImportPreview { metadata, conflict })
+}
+
+// ─── Import ──────────────────────────────────────────────────────────────────
+
+/// Extract an archive into a temporary sibling directory of `dest_dir`.
+///
+/// # Errors
+///
+/// Returns [`PortabilityError`] on I/O, JSON, or archive failures.
+pub fn stage_import(
+    archive_path: &Path,
+    dest_dir: &Path,
+) -> Result<StagedImport, PortabilityError> {
+    let metadata = read_metadata_from_archive(archive_path)?;
+    let parent_dir = dest_dir.parent().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "dataset destination must have a parent directory",
+        )
+    })?;
+    fs::create_dir_all(parent_dir)?;
+    let staging_dir = unique_sibling_dir(parent_dir, "import-staging");
+    fs::create_dir_all(&staging_dir)?;
+    extract_archive(archive_path, &staging_dir).inspect_err(|_| {
+        let _ = fs::remove_dir_all(&staging_dir);
+    })?;
+    Ok(StagedImport {
+        metadata,
+        staging_dir,
+    })
+}
+
+/// Promote a staged import into the live dataset location.
+///
+/// Returns the backup directory path when an existing live directory was moved
+/// aside during a force overwrite.
+pub fn promote_staged_import(
+    staged_dir: &Path,
+    dest_dir: &Path,
+    force: bool,
+    uid: Uuid,
+) -> Result<Option<PathBuf>, PortabilityError> {
+    if !dest_dir.exists() {
+        fs::rename(staged_dir, dest_dir)?;
+        return Ok(None);
+    }
+    if !force {
+        return Err(PortabilityError::UuidConflict { uid });
+    }
+
+    let parent_dir = dest_dir.parent().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "dataset destination must have a parent directory",
+        )
+    })?;
+    let backup_dir = unique_sibling_dir(parent_dir, "import-backup");
+    fs::rename(dest_dir, &backup_dir)?;
+    if let Err(error) = fs::rename(staged_dir, dest_dir) {
+        let _ = fs::rename(&backup_dir, dest_dir);
+        return Err(PortabilityError::Io(error));
+    }
+
+    Ok(Some(backup_dir))
+}
+
+/// Roll back a promoted import after a later failure.
+pub fn rollback_promoted_import(
+    dest_dir: &Path,
+    backup_dir: Option<&Path>,
+) -> Result<(), PortabilityError> {
+    remove_dir_if_exists(dest_dir)?;
+    if let Some(backup_dir) = backup_dir
+        && backup_dir.exists()
+    {
+        fs::rename(backup_dir, dest_dir)?;
+    }
+    Ok(())
+}
+
+/// Finalize a promoted import by deleting any backup payload.
+pub fn finalize_promoted_import(backup_dir: Option<&Path>) -> Result<(), PortabilityError> {
+    if let Some(backup_dir) = backup_dir {
+        remove_dir_if_exists(backup_dir)?;
+    }
+    Ok(())
+}
+
+/// Remove a staged import directory if it still exists.
+pub fn discard_staged_import(staged_dir: &Path) -> Result<(), PortabilityError> {
+    remove_dir_if_exists(staged_dir)
+}
+
+// ─── Internal helpers ────────────────────────────────────────────────────────
+
+/// Build the user-friendly archive filename.
+fn build_archive_name(created_at: &DateTime<Utc>, name: &str) -> String {
+    let timestamp = created_at.format("%Y%m%d_%H%M%S");
+    let safe_name = sanitize_name(name);
+    format!("{timestamp}_{safe_name}.tar.zst")
+}
+
+/// Collapse any characters that are not ASCII alphanumeric, `-`, or `_` into
+/// `_`, and truncate to 64 characters to keep paths sane.
+fn sanitize_name(name: &str) -> String {
+    let mut sanitized = String::with_capacity(name.len());
+    let mut last_was_underscore = false;
+
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() || c == '-' {
+            sanitized.push(c);
+            last_was_underscore = false;
+        } else if !last_was_underscore {
+            sanitized.push('_');
+            last_was_underscore = true;
+        }
+    }
+
+    sanitized.chars().take(64).collect()
+}
+
+fn unique_sibling_dir(parent_dir: &Path, prefix: &str) -> PathBuf {
+    parent_dir.join(format!(".{prefix}-{}", Uuid::new_v4().simple()))
+}
+
+fn remove_dir_if_exists(path: &Path) -> Result<(), PortabilityError> {
+    match fs::remove_dir_all(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(PortabilityError::Io(error)),
+    }
+}
+
+/// Open a tar+zstd archive and read only the `metadata.json` entry.
+fn read_metadata_from_archive(archive_path: &Path) -> Result<ExportedMetadata, PortabilityError> {
+    let file = File::open(archive_path)?;
+    let reader = BufReader::new(file);
+    let decoder = zstd::Decoder::new(reader).map_err(PortabilityError::Zstd)?;
+    let mut tar = tar::Archive::new(decoder);
+
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?.into_owned();
+        if path.to_str() == Some(METADATA_ENTRY) {
+            let mut buf = String::new();
+            entry.read_to_string(&mut buf)?;
+            let m: ExportedMetadata = serde_json::from_str(&buf)?;
+            return Ok(m);
+        }
+    }
+
+    Err(PortabilityError::MissingMetadata)
+}
+
+/// Extract all entries from a tar+zstd archive into `dest_dir`.
+///
+/// Only `metadata.json` and `data/*.arrow` entries are extracted:
+/// - `metadata.json` → `{dest_dir}/metadata.json`
+/// - `data/data_chunk_*.arrow` → `{dest_dir}/data_chunk_*.arrow`
+fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), PortabilityError> {
+    let file = File::open(archive_path)?;
+    let reader = BufReader::new(file);
+    let decoder = zstd::Decoder::new(reader).map_err(PortabilityError::Zstd)?;
+    let mut tar = tar::Archive::new(decoder);
+
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?.into_owned();
+        let Some(path_str) = path.to_str() else {
+            continue;
+        };
+
+        let dest_file_path = if path_str == METADATA_ENTRY {
+            dest_dir.join("metadata.json")
+        } else if let Some(file_name) = path_str.strip_prefix(DATA_PREFIX) {
+            let is_data_chunk = file_name.starts_with("data_chunk_");
+            let is_arrow = Path::new(file_name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
+            if is_data_chunk && is_arrow {
+                dest_dir.join(file_name)
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        };
+
+        let mut dest_file = File::create(&dest_file_path)?;
+        io::copy(&mut entry, &mut dest_file)?;
+    }
+
+    Ok(())
+}
+
+/// Compute field-level diffs between `existing` and `incoming` metadata.
+fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Vec<FieldDiff> {
+    let mut diffs = Vec::new();
+
+    // name
+    if existing.name != incoming.name {
+        diffs.push(FieldDiff {
+            field: "name".to_string(),
+            existing_value: existing.name.clone(),
+            incoming_value: incoming.name.clone(),
+        });
+    }
+    // description
+    if existing.description != incoming.description {
+        diffs.push(FieldDiff {
+            field: "description".to_string(),
+            existing_value: existing.description.clone(),
+            incoming_value: incoming.description.clone(),
+        });
+    }
+    // favorite
+    if existing.favorite != incoming.favorite {
+        diffs.push(FieldDiff {
+            field: "favorite".to_string(),
+            existing_value: existing.favorite.to_string(),
+            incoming_value: incoming.favorite.to_string(),
+        });
+    }
+    // status
+    if existing.status != incoming.status {
+        diffs.push(FieldDiff {
+            field: "status".to_string(),
+            existing_value: format!("{:?}", existing.status),
+            incoming_value: format!("{:?}", incoming.status),
+        });
+    }
+    // created_at
+    if existing.created_at != incoming.created_at {
+        diffs.push(FieldDiff {
+            field: "created_at".to_string(),
+            existing_value: existing.created_at.to_rfc3339(),
+            incoming_value: incoming.created_at.to_rfc3339(),
+        });
+    }
+    // tags
+    let mut ex_tags = existing.tags.clone();
+    let mut in_tags = incoming.tags.clone();
+    ex_tags.sort_unstable();
+    in_tags.sort_unstable();
+    if ex_tags != in_tags {
+        diffs.push(FieldDiff {
+            field: "tags".to_string(),
+            existing_value: ex_tags.join(", "),
+            incoming_value: in_tags.join(", "),
+        });
+    }
+
+    diffs
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use chrono::Utc;
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::dataset::model::{DatasetMetadata, DatasetStatus};
+
+    fn make_metadata(uid: Uuid, name: &str) -> DatasetMetadata {
+        DatasetMetadata {
+            uid,
+            name: name.to_string(),
+            description: "test description".to_string(),
+            favorite: true,
+            status: DatasetStatus::Completed,
+            created_at: Utc::now(),
+            trashed_at: None,
+            deleted_at: None,
+            tags: vec!["alpha".to_string(), "beta".to_string()],
+        }
+    }
+
+    fn dummy_chunk_file(dir: &Path) {
+        let chunk_path = dir.join("data_chunk_0.arrow");
+        fs::write(chunk_path, b"ARROW_DUMMY_DATA").expect("write chunk");
+    }
+
+    // ── export ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn export_creates_archive_with_correct_name() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "my-dataset");
+        let output_dir = tmp.path().join("exports");
+
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+
+        assert!(archive.exists(), "archive file should exist");
+        let name = archive.file_name().and_then(|n| n.to_str()).expect("name");
+        assert!(name.ends_with(".tar.zst"), "should end with .tar.zst");
+        assert!(name.contains("my-dataset"), "name should contain dataset name");
+    }
+
+    #[test]
+    fn exported_metadata_excludes_id_field() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "noidstest");
+        let output_dir = tmp.path().join("exports");
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+
+        // Reopen and read metadata.json raw.
+        let file = fs::File::open(&archive).expect("open archive");
+        let decoder = zstd::Decoder::new(std::io::BufReader::new(file)).expect("decoder");
+        let mut tar = tar::Archive::new(decoder);
+        for entry in tar.entries().expect("entries") {
+            let mut entry = entry.expect("entry");
+            let path = entry.path().expect("path").into_owned();
+            if path.to_str() == Some(METADATA_ENTRY) {
+                let mut buf = String::new();
+                entry.read_to_string(&mut buf).expect("read");
+                // JSON must not contain any "id" key at top level
+                let val: serde_json::Value = serde_json::from_str(&buf).expect("parse");
+                assert!(
+                    val.get("id").is_none(),
+                    "exported metadata must not contain 'id' field"
+                );
+                return;
+            }
+        }
+        panic!("metadata.json not found in archive");
+    }
+
+    // ── preview ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn preview_reads_metadata_from_archive() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "preview-test");
+        let output_dir = tmp.path().join("exports");
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+
+        let preview = preview_import(&archive, None).expect("preview");
+
+        assert_eq!(preview.metadata.uid, uid);
+        assert_eq!(preview.metadata.name, "preview-test");
+        assert!(preview.conflict.is_none());
+    }
+
+    #[test]
+    fn preview_detects_conflict_with_name_diff() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "incoming-name");
+        let output_dir = tmp.path().join("exports");
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+
+        let existing = make_metadata(uid, "existing-name");
+        let preview = preview_import(&archive, Some(&existing)).expect("preview");
+
+        assert!(preview.conflict.is_some());
+        let conflict = preview.conflict.unwrap();
+        assert!(
+            conflict.diffs.iter().any(|d| d.field == "name"),
+            "should see a name diff"
+        );
+    }
+
+    // ── import staging / promotion ───────────────────────────────────────────
+
+    #[test]
+    fn stage_import_extracts_data_files_to_staging_dir() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "import-test");
+        let output_dir = tmp.path().join("exports");
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+
+        let dest = tmp.path().join("aa").join(uid.to_string());
+        let staged = stage_import(&archive, &dest).expect("stage import");
+
+        assert_eq!(staged.metadata.uid, uid);
+        assert!(
+            staged.staging_dir.join("data_chunk_0.arrow").exists(),
+            "chunk file should be extracted to staging"
+        );
+        assert!(
+            !dest.exists(),
+            "live dataset directory should not be created during staging"
+        );
+    }
+
+    #[test]
+    fn stage_import_failure_leaves_existing_live_dir_untouched() {
+        let tmp = TempDir::new().expect("temp dir");
+        let archive = tmp.path().join("broken.tar.zst");
+        fs::write(&archive, b"not a real archive").expect("write archive");
+
+        let dest = tmp.path().join("bb").join(Uuid::new_v4().to_string());
+        fs::create_dir_all(&dest).expect("create live dir");
+        fs::write(dest.join("old.arrow"), b"OLD").expect("write live payload");
+
+        let result = stage_import(&archive, &dest);
+
+        assert!(result.is_err(), "broken archive should fail staging");
+        assert!(
+            dest.join("old.arrow").exists(),
+            "existing live payload should remain untouched"
+        );
+    }
+
+    #[test]
+    fn promote_without_force_fails_when_live_dir_exists() {
+        let tmp = TempDir::new().expect("temp dir");
+        let staged = tmp.path().join("stage");
+        fs::create_dir_all(&staged).expect("create staged dir");
+        fs::write(staged.join("data_chunk_0.arrow"), b"NEW").expect("write staged payload");
+
+        let dest = tmp.path().join("live");
+        fs::create_dir_all(&dest).expect("create live dir");
+        fs::write(dest.join("old.arrow"), b"OLD").expect("write live payload");
+
+        let uid = Uuid::new_v4();
+        let result = promote_staged_import(&staged, &dest, false, uid);
+
+        assert!(
+            matches!(result, Err(PortabilityError::UuidConflict { uid: conflict_uid }) if conflict_uid == uid),
+            "should return conflict error"
+        );
+        assert!(staged.exists(), "staged dir should remain for caller cleanup");
+        assert!(
+            dest.join("old.arrow").exists(),
+            "existing live payload should remain untouched"
+        );
+    }
+
+    #[test]
+    fn rollback_promoted_overwrite_restores_previous_live_dir() {
+        let tmp = TempDir::new().expect("temp dir");
+        let staged = tmp.path().join("stage");
+        fs::create_dir_all(&staged).expect("create staged dir");
+        fs::write(staged.join("data_chunk_0.arrow"), b"NEW").expect("write staged payload");
+
+        let dest = tmp.path().join("live");
+        fs::create_dir_all(&dest).expect("create live dir");
+        fs::write(dest.join("old.arrow"), b"OLD").expect("write live payload");
+
+        let backup_dir =
+            promote_staged_import(&staged, &dest, true, Uuid::new_v4()).expect("promote");
+        assert!(
+            dest.join("data_chunk_0.arrow").exists(),
+            "new payload should be live after promotion"
+        );
+
+        rollback_promoted_import(&dest, backup_dir.as_deref()).expect("rollback");
+
+        assert!(
+            dest.join("old.arrow").exists(),
+            "rollback should restore the original live payload"
+        );
+        assert!(
+            !dest.join("data_chunk_0.arrow").exists(),
+            "rollback should remove the promoted payload"
+        );
+    }
+
+    #[test]
+    fn rollback_promoted_fresh_import_removes_new_live_dir() {
+        let tmp = TempDir::new().expect("temp dir");
+        let staged = tmp.path().join("stage");
+        fs::create_dir_all(&staged).expect("create staged dir");
+        fs::write(staged.join("data_chunk_0.arrow"), b"NEW").expect("write staged payload");
+
+        let dest = tmp.path().join("live");
+        promote_staged_import(&staged, &dest, false, Uuid::new_v4()).expect("promote");
+        rollback_promoted_import(&dest, None).expect("rollback");
+
+        assert!(
+            !dest.exists(),
+            "rollback should remove a freshly promoted live directory"
+        );
+    }
+
+    // ── sanitize_name ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn sanitize_replaces_spaces_and_special_chars() {
+        let result = sanitize_name("hello world! @2025");
+        assert_eq!(result, "hello_world_2025");
+    }
+
+    #[test]
+    fn sanitize_truncates_long_names() {
+        let long_name = "a".repeat(100);
+        assert_eq!(sanitize_name(&long_name).len(), 64);
+    }
+}
