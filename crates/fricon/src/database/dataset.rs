@@ -512,8 +512,8 @@ impl DatasetCatalogRepository for DatasetRepository {
                     DatasetTag::create_associations(conn, id, &tag_ids)?;
                     created_tags
                 };
-                let dataset = Dataset::find_by_id(conn, id)?
-                    .ok_or(diesel::result::Error::NotFound)?;
+                let dataset =
+                    Dataset::find_by_id(conn, id)?.ok_or(diesel::result::Error::NotFound)?;
                 Ok::<(Dataset, Vec<Tag>), diesel::result::Error>((dataset, tags))
             })
             .map_err(anyhow::Error::from)?;
@@ -522,12 +522,10 @@ impl DatasetCatalogRepository for DatasetRepository {
         Ok(record)
     }
 
-    fn find_dataset_by_uid(
-        &self,
-        uid: Uuid,
-    ) -> Result<Option<DatasetRecord>, CatalogError> {
+    fn find_dataset_by_uid(&self, uid: Uuid) -> Result<Option<DatasetRecord>, CatalogError> {
         let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        let Some(dataset) = Dataset::find_by_uid(&mut conn, uid).map_err(anyhow::Error::from)? else {
+        let Some(dataset) = Dataset::find_by_uid(&mut conn, uid).map_err(anyhow::Error::from)?
+        else {
             return Ok(None);
         };
         let tags = dataset.load_tags(&mut conn).map_err(anyhow::Error::from)?;

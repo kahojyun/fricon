@@ -33,23 +33,29 @@ pub(crate) trait DatasetCatalogRepository: Send + Sync {
     ) -> Result<(), CatalogError>;
     fn merge_tag(&self, source: &NormalizedTag, target: &NormalizedTag)
     -> Result<(), CatalogError>;
+
     /// Insert a new dataset record using the uid and metadata from an imported
-    /// archive.  Tags in `metadata.tags` are created if they don't exist.
+    /// archive.
+    ///
+    /// Implementations create any missing tags from `metadata.tags` and must
+    /// preserve the imported `created_at`, `favorite`, and `status` fields.
     fn insert_imported_dataset_record(
         &self,
         metadata: &ExportedMetadata,
     ) -> Result<DatasetRecord, CatalogError>;
+
     /// Replace an existing dataset record in place using metadata from an
-    /// imported archive. The existing record id is preserved and trashed/deleted
-    /// state is cleared.
+    /// imported archive.
+    ///
+    /// The existing record id must be preserved. Any trashed/deleted state is
+    /// cleared so the imported dataset becomes live again, and tag
+    /// associations are rebuilt from `metadata.tags`.
     fn replace_imported_dataset_record(
         &self,
         id: i32,
         metadata: &ExportedMetadata,
     ) -> Result<DatasetRecord, CatalogError>;
+
     /// Find a dataset record by its uuid without requiring the DB id.
-    fn find_dataset_by_uid(
-        &self,
-        uid: uuid::Uuid,
-    ) -> Result<Option<DatasetRecord>, CatalogError>;
+    fn find_dataset_by_uid(&self, uid: uuid::Uuid) -> Result<Option<DatasetRecord>, CatalogError>;
 }

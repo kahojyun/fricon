@@ -1,3 +1,12 @@
+//! Archive import/export helpers for dataset portability.
+//!
+//! This module owns the archive format and filesystem-side import workflow.
+//! Database writes and event publishing stay in higher layers.
+//!
+//! The import flow is intentionally split into preview, stage, promote,
+//! finalize, and rollback steps so callers can coordinate filesystem changes
+//! with repository updates.
+
 use std::{
     fs::{self, File},
     io::{self, BufReader, Read},
@@ -11,14 +20,10 @@ use uuid::Uuid;
 
 use crate::dataset::model::{DatasetMetadata, DatasetStatus};
 
-// ─── Archive constants ───────────────────────────────────────────────────────
-
 /// Entry name for the metadata file inside the archive.
 const METADATA_ENTRY: &str = "metadata.json";
 /// Prefix used for data chunk files inside the archive.
 const DATA_PREFIX: &str = "data/";
-
-// ─── Error ───────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Error)]
 pub enum PortabilityError {
@@ -34,9 +39,10 @@ pub enum PortabilityError {
     UuidConflict { uid: Uuid },
 }
 
-// ─── Data types ──────────────────────────────────────────────────────────────
-
-/// Metadata stored inside the archive.  No internal DB id is included.
+/// Metadata stored inside a portable archive.
+///
+/// Internal database ids are intentionally excluded so imports can recreate or
+/// replace records without trusting archive-local ids.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedMetadata {
     pub uid: Uuid,
@@ -89,13 +95,16 @@ pub struct ImportPreview {
 
 #[derive(Debug, Clone)]
 pub struct StagedImport {
+    /// Metadata read from the archive before extraction.
     pub metadata: ExportedMetadata,
+    /// Temporary sibling directory that holds extracted files until promotion.
     pub staging_dir: PathBuf,
 }
 
-// ─── Export ──────────────────────────────────────────────────────────────────
-
 /// Export a single dataset to a `.tar.zst` archive inside `output_dir`.
+///
+/// The archive contains `metadata.json` plus `data_chunk_*.arrow` files copied
+/// from `dataset_dir`.
 ///
 /// The archive name is `{created_at:%Y%m%d_%H%M%S}_{sanitized_name}.tar.zst`.
 ///
@@ -115,8 +124,7 @@ pub fn export_dataset(
     let archive_path = output_dir.join(&archive_name);
 
     let out_file = File::create(&archive_path)?;
-    let zstd_encoder =
-        zstd::Encoder::new(out_file, 0).map_err(PortabilityError::Zstd)?;
+    let zstd_encoder = zstd::Encoder::new(out_file, 0).map_err(PortabilityError::Zstd)?;
     let mut tar = tar::Builder::new(zstd_encoder);
 
     // --- metadata.json ---
@@ -150,8 +158,7 @@ pub fn export_dataset(
         for entry in entries {
             let entry_path = entry.path();
             let file_name = entry.file_name();
-            let archive_entry_name =
-                format!("{}{}", DATA_PREFIX, file_name.to_string_lossy());
+            let archive_entry_name = format!("{}{}", DATA_PREFIX, file_name.to_string_lossy());
             tar.append_path_with_name(&entry_path, &archive_entry_name)?;
         }
     }
@@ -163,12 +170,10 @@ pub fn export_dataset(
     Ok(archive_path)
 }
 
-// ─── Import preview ──────────────────────────────────────────────────────────
-
 /// Read archive metadata without extracting data files.
 ///
-/// If `existing` is provided (i.e. a dataset with the same uuid was found in
-/// the DB), a conflict diff is included in the result.
+/// If `existing` is provided, the result includes field-level diffs between the
+/// live dataset metadata and the incoming archive metadata.
 ///
 /// # Errors
 ///
@@ -191,9 +196,10 @@ pub fn preview_import(
     Ok(ImportPreview { metadata, conflict })
 }
 
-// ─── Import ──────────────────────────────────────────────────────────────────
-
 /// Extract an archive into a temporary sibling directory of `dest_dir`.
+///
+/// This does not modify `dest_dir`. Callers can safely inspect the staged
+/// result and then either promote or discard it.
 ///
 /// # Errors
 ///
@@ -223,8 +229,9 @@ pub fn stage_import(
 
 /// Promote a staged import into the live dataset location.
 ///
-/// Returns the backup directory path when an existing live directory was moved
-/// aside during a force overwrite.
+/// If `dest_dir` already exists and `force` is `true`, the existing live
+/// dataset directory is moved aside first and the backup path is returned so
+/// the caller can later finalize or roll back the replacement.
 pub fn promote_staged_import(
     staged_dir: &Path,
     dest_dir: &Path,
@@ -256,6 +263,9 @@ pub fn promote_staged_import(
 }
 
 /// Roll back a promoted import after a later failure.
+///
+/// If `backup_dir` is present, the previous live dataset payload is restored.
+/// Otherwise the newly promoted live directory is removed.
 pub fn rollback_promoted_import(
     dest_dir: &Path,
     backup_dir: Option<&Path>,
@@ -269,7 +279,7 @@ pub fn rollback_promoted_import(
     Ok(())
 }
 
-/// Finalize a promoted import by deleting any backup payload.
+/// Finalize a promoted import by deleting any displaced live payload.
 pub fn finalize_promoted_import(backup_dir: Option<&Path>) -> Result<(), PortabilityError> {
     if let Some(backup_dir) = backup_dir {
         remove_dir_if_exists(backup_dir)?;
@@ -281,8 +291,6 @@ pub fn finalize_promoted_import(backup_dir: Option<&Path>) -> Result<(), Portabi
 pub fn discard_staged_import(staged_dir: &Path) -> Result<(), PortabilityError> {
     remove_dir_if_exists(staged_dir)
 }
-
-// ─── Internal helpers ────────────────────────────────────────────────────────
 
 /// Build the user-friendly archive filename.
 fn build_archive_name(created_at: &DateTime<Utc>, name: &str) -> String {
@@ -310,10 +318,12 @@ fn sanitize_name(name: &str) -> String {
     sanitized.chars().take(64).collect()
 }
 
+/// Create a hidden unique sibling directory name under `parent_dir`.
 fn unique_sibling_dir(parent_dir: &Path, prefix: &str) -> PathBuf {
     parent_dir.join(format!(".{prefix}-{}", Uuid::new_v4().simple()))
 }
 
+/// Remove a directory tree when it exists, ignoring missing paths.
 fn remove_dir_if_exists(path: &Path) -> Result<(), PortabilityError> {
     match fs::remove_dir_all(path) {
         Ok(()) => Ok(()),
@@ -388,7 +398,6 @@ fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), Portabili
 fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Vec<FieldDiff> {
     let mut diffs = Vec::new();
 
-    // name
     if existing.name != incoming.name {
         diffs.push(FieldDiff {
             field: "name".to_string(),
@@ -396,7 +405,6 @@ fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Ve
             incoming_value: incoming.name.clone(),
         });
     }
-    // description
     if existing.description != incoming.description {
         diffs.push(FieldDiff {
             field: "description".to_string(),
@@ -404,7 +412,6 @@ fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Ve
             incoming_value: incoming.description.clone(),
         });
     }
-    // favorite
     if existing.favorite != incoming.favorite {
         diffs.push(FieldDiff {
             field: "favorite".to_string(),
@@ -412,7 +419,6 @@ fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Ve
             incoming_value: incoming.favorite.to_string(),
         });
     }
-    // status
     if existing.status != incoming.status {
         diffs.push(FieldDiff {
             field: "status".to_string(),
@@ -420,7 +426,6 @@ fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Ve
             incoming_value: format!("{:?}", incoming.status),
         });
     }
-    // created_at
     if existing.created_at != incoming.created_at {
         diffs.push(FieldDiff {
             field: "created_at".to_string(),
@@ -428,7 +433,6 @@ fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Ve
             incoming_value: incoming.created_at.to_rfc3339(),
         });
     }
-    // tags
     let mut ex_tags = existing.tags.clone();
     let mut in_tags = incoming.tags.clone();
     ex_tags.sort_unstable();
@@ -443,8 +447,6 @@ fn compute_diffs(existing: &ExportedMetadata, incoming: &ExportedMetadata) -> Ve
 
     diffs
 }
-
-// ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -494,7 +496,10 @@ mod tests {
         assert!(archive.exists(), "archive file should exist");
         let name = archive.file_name().and_then(|n| n.to_str()).expect("name");
         assert!(name.ends_with(".tar.zst"), "should end with .tar.zst");
-        assert!(name.contains("my-dataset"), "name should contain dataset name");
+        assert!(
+            name.contains("my-dataset"),
+            "name should contain dataset name"
+        );
     }
 
     #[test]
@@ -634,10 +639,18 @@ mod tests {
         let result = promote_staged_import(&staged, &dest, false, uid);
 
         assert!(
-            matches!(result, Err(PortabilityError::UuidConflict { uid: conflict_uid }) if conflict_uid == uid),
+            matches!(
+                result,
+                Err(PortabilityError::UuidConflict {
+                    uid: conflict_uid,
+                }) if conflict_uid == uid
+            ),
             "should return conflict error"
         );
-        assert!(staged.exists(), "staged dir should remain for caller cleanup");
+        assert!(
+            staged.exists(),
+            "staged dir should remain for caller cleanup"
+        );
         assert!(
             dest.join("old.arrow").exists(),
             "existing live payload should remain untouched"

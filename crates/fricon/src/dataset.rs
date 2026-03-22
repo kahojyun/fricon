@@ -14,9 +14,7 @@ pub use self::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
         DatasetUpdate, SortDirection,
     },
-    portability::{
-        ExportedMetadata, FieldDiff, ImportConflict, ImportPreview, PortabilityError,
-    },
+    portability::{ExportedMetadata, FieldDiff, ImportConflict, ImportPreview, PortabilityError},
     read::{DatasetReader, SelectOptions},
     schema::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,

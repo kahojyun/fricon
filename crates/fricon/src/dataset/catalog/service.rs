@@ -279,11 +279,10 @@ impl DatasetCatalogService {
         Ok(())
     }
 
-    // ── Portability ──────────────────────────────────────────────────────────
-
     /// Export a dataset to a tar+zstd archive in `output_dir`.
     ///
-    /// Returns the path of the created archive.
+    /// This is a read-only catalog operation. It does not change repository
+    /// state or publish dataset events.
     #[instrument(skip(self, id, output_dir), fields(dataset.id = ?id))]
     pub(crate) fn export_dataset(
         &self,
@@ -298,6 +297,9 @@ impl DatasetCatalogService {
 
     /// Inspect an archive and return metadata + optional conflict info without
     /// modifying any state.
+    ///
+    /// If the archive uuid already exists in the repository, this method
+    /// enriches the preview with field-level diffs against the live record.
     #[instrument(skip(self, archive_path))]
     pub(crate) fn preview_import(
         &self,
@@ -307,9 +309,7 @@ impl DatasetCatalogService {
         let preview = portability::preview_import(archive_path, None)
             .map_err(|e| CatalogError::from(anyhow::Error::from(e)))?;
         // Check whether that uuid is already in the DB.
-        let existing_record = self
-            .repository
-            .find_dataset_by_uid(preview.metadata.uid)?;
+        let existing_record = self.repository.find_dataset_by_uid(preview.metadata.uid)?;
         if let Some(record) = existing_record {
             // Re-run with existing metadata so the diff is populated.
             let preview_with_conflict =
@@ -323,7 +323,17 @@ impl DatasetCatalogService {
     /// Import a dataset from a tar+zstd archive.
     ///
     /// If `force` is `false` and a dataset with the same uuid already exists,
-    /// an error is returned.  Set `force = true` to replace the existing data.
+    /// an error is returned. Set `force = true` to replace the existing data.
+    ///
+    /// The workflow is:
+    /// 1. preview archive metadata to resolve the destination uid
+    /// 2. stage archive files without touching the live directory
+    /// 3. promote the staged payload into the live directory
+    /// 4. insert or replace the repository record
+    /// 5. publish the resulting dataset event
+    ///
+    /// If repository updates fail after promotion, the live filesystem state is
+    /// rolled back before the error is returned.
     #[instrument(skip(self, archive_path, events))]
     pub(crate) fn import_dataset<P: DatasetEventPublisher>(
         &self,
@@ -348,29 +358,24 @@ impl DatasetCatalogService {
         let staged = portability::stage_import(archive_path, &dest_dir)
             .map_err(|e| CatalogError::from(anyhow::Error::from(e)))?;
 
-        let backup_dir = match portability::promote_staged_import(
-            &staged.staging_dir,
-            &dest_dir,
-            force,
-            uid,
-        ) {
-            Ok(backup_dir) => backup_dir,
-            Err(error) => {
-                let _ = portability::discard_staged_import(&staged.staging_dir);
-                return Err(CatalogError::from(anyhow::Error::from(error)));
-            }
-        };
+        let backup_dir =
+            match portability::promote_staged_import(&staged.staging_dir, &dest_dir, force, uid) {
+                Ok(backup_dir) => backup_dir,
+                Err(error) => {
+                    let _ = portability::discard_staged_import(&staged.staging_dir);
+                    return Err(CatalogError::from(anyhow::Error::from(error)));
+                }
+            };
 
-        let result = match existing_record {
-            Some(existing_record) => {
+        let result = if let Some(existing_record) = existing_record {
+            {
                 let record = self
                     .repository
                     .replace_imported_dataset_record(existing_record.id, &staged.metadata);
                 match record {
                     Ok(record) => {
-                        portability::finalize_promoted_import(backup_dir.as_deref()).map_err(
-                            |error| CatalogError::from(anyhow::Error::from(error)),
-                        )?;
+                        portability::finalize_promoted_import(backup_dir.as_deref())
+                            .map_err(|error| CatalogError::from(anyhow::Error::from(error)))?;
                         info!(
                             dataset.id = record.id,
                             uid = %uid,
@@ -380,10 +385,9 @@ impl DatasetCatalogService {
                         Ok(record)
                     }
                     Err(error) => {
-                        if let Err(rollback_error) = portability::rollback_promoted_import(
-                            &dest_dir,
-                            backup_dir.as_deref(),
-                        ) {
+                        if let Err(rollback_error) =
+                            portability::rollback_promoted_import(&dest_dir, backup_dir.as_deref())
+                        {
                             error!(
                                 error = %rollback_error,
                                 uid = %uid,
@@ -394,7 +398,8 @@ impl DatasetCatalogService {
                     }
                 }
             }
-            None => {
+        } else {
+            {
                 let record = self
                     .repository
                     .insert_imported_dataset_record(&staged.metadata);
@@ -439,8 +444,8 @@ impl DatasetCatalogService {
 #[cfg(test)]
 mod tests {
     use std::{
-        path::Path,
         fs,
+        path::Path,
         sync::{Arc, Mutex},
     };
 
@@ -656,7 +661,10 @@ mod tests {
             .import_dataset(&archive, true, &events)
             .expect("force import should succeed");
 
-        assert_eq!(record.id, 7, "force import should reuse the existing record id");
+        assert_eq!(
+            record.id, 7,
+            "force import should reuse the existing record id"
+        );
         assert!(
             live_dir.join("data_chunk_0.arrow").exists(),
             "new payload should be promoted into the live path"
@@ -767,7 +775,10 @@ mod tests {
 
         let result = service.import_dataset(&archive, true, &events);
 
-        assert!(result.is_err(), "force import should fail when repository replace fails");
+        assert!(
+            result.is_err(),
+            "force import should fail when repository replace fails"
+        );
         assert!(
             live_dir.join("old.arrow").exists(),
             "old payload should be restored after rollback"
