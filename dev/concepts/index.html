@@ -637,15 +637,17 @@ one data table based on the Arrow format with additional metadata.</p>
 <h2 id="desktop-ui-architecture">Desktop UI Architecture</h2>
 <p><code>fricon-ui</code> is organized as vertical feature slices across the Rust and React boundary.</p>
 <p>Rust dependency flow:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>desktop_runtime -&gt; api::&lt;feature&gt; -&gt; application::&lt;feature&gt; -&gt; fricon
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>desktop_runtime -&gt; tauri_api -&gt; features/&lt;feature&gt;/tauri -&gt; features/&lt;feature&gt;/workflow -&gt; fricon
 </span></code></pre></div>
 <p>Frontend dependency flow:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>app/routes -&gt; features/&lt;feature&gt; -&gt; feature-local api -&gt; shared/lib/tauri.ts -&gt; generated bindings
 </span></code></pre></div>
 <p>The important boundary rules are:</p>
 <ul>
-<li>Rust <code>src/api/*.rs</code> files are Tauri adapters only. They own commands, events, and exported DTOs.</li>
-<li>Rust <code>src/application/*.rs</code> files own feature orchestration and should not depend on Tauri types.</li>
+<li>Rust <code>src/tauri_api.rs</code> owns global Tauri/Specta binding export and command/event aggregation.</li>
+<li>Rust <code>src/features/&lt;feature&gt;/tauri.rs</code> files are Tauri adapters only. They own commands, events, exported DTOs, and native dialogs.</li>
+<li>Rust <code>src/features/&lt;feature&gt;/workflow.rs</code> files own feature orchestration and should not depend on Tauri types.</li>
+<li>Pure Rust data shaping helpers stay inside the owning feature slice, for example <code>src/features/charts/transform.rs</code>.</li>
 <li>Frontend features own their own <code>api/</code>, <code>ui/</code>, <code>model/</code>, and <code>hooks/</code> modules.</li>
 <li>Files under <code>frontend/src/features/**</code> use relative imports only.</li>
 <li><code>frontend/src/app/**</code> and <code>frontend/src/routes/**</code> import features only through public barrels such as <code>@/features/&lt;feature&gt;</code>.</li>
