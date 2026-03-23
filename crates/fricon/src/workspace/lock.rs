@@ -1,3 +1,9 @@
+//! Workspace lock file lifecycle.
+//!
+//! This module owns the file-backed exclusivity guard used when opening a
+//! workspace. Holding [`FileLock`] keeps the lock file open; dropping it best
+//! effort removes the lock file path.
+
 use std::{
     fs::{self, File},
     path::PathBuf,
@@ -6,6 +12,11 @@ use std::{
 use anyhow::{Context as _, Result};
 use tracing::warn;
 
+/// Exclusive file-backed lock for a workspace root.
+///
+/// Creating the lock opens/truncates the lock file and acquires an exclusive
+/// OS-level file lock. Dropping the guard releases the lock by closing the
+/// file and then attempts to remove the lock file path.
 #[derive(Debug)]
 pub(crate) struct FileLock {
     _file: File,
@@ -13,6 +24,10 @@ pub(crate) struct FileLock {
 }
 
 impl FileLock {
+    /// Acquire an exclusive lock for the given file path.
+    ///
+    /// The returned guard must stay alive for as long as exclusive workspace
+    /// access is required.
     pub(crate) fn new(path: impl Into<PathBuf>) -> Result<Self> {
         let path = path.into();
         let file = fs::OpenOptions::new()

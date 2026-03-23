@@ -9,10 +9,10 @@
 //!
 //! # Invariants
 //!
-//! Events are published only after the primary state change (database +
-//! filesystem) has succeeded. Consumers must not assume that receiving an
-//! event means no later rollback occurred at a higher level — but in
-//! practice the service layer guarantees this ordering.
+//! The catalog and ingest services publish events only after the primary
+//! state change they own has succeeded. Publishers are best-effort, so
+//! consumers can treat events as notifications of committed state, not as a
+//! durable delivery log.
 
 use crate::dataset::model::DatasetRecord;
 

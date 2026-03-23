@@ -14,7 +14,8 @@
 //!   guarantee atomicity.
 //! - Import operations (`insert_imported_dataset_record`,
 //!   `replace_imported_dataset_record`) preserve the archive’s `uid`,
-//!   `created_at`, `favorite`, `status`, and `tags` exactly.
+//!   `created_at`, `favorite`, `status`, and `tags` from [`ExportedMetadata`]
+//!   exactly.
 //! - `replace_imported_dataset_record` clears `trashed_at` / `deleted_at` so a
 //!   re-imported dataset becomes live again.
 //!

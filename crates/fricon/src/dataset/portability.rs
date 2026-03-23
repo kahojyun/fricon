@@ -12,12 +12,12 @@
 //! The import flow is intentionally split into discrete steps so callers
 //! can coordinate filesystem changes with repository updates:
 //!
-//! 1. [`preview_import`] — read metadata, detect uuid conflicts.
-//! 2. [`stage_import`] — extract archive into a temp sibling directory.
-//! 3. [`promote_staged_import`] — move staged data into the live location
+//! 1. [`preview_import`] - read metadata and detect uuid conflicts.
+//! 2. [`stage_import`] - extract the archive into a temp sibling directory.
+//! 3. [`promote_staged_import`] - move staged data into the live location
 //!    (backing up the existing directory when force-replacing).
 //! 4. Caller commits repository changes.
-//! 5. [`finalize_promoted_import`] / [`rollback_promoted_import`] — depending
+//! 5. [`finalize_promoted_import`] / [`rollback_promoted_import`] - depending
 //!    on whether the repository commit succeeded.
 //!
 //! # Archive format

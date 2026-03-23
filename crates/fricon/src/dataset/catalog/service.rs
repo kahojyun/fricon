@@ -1,4 +1,4 @@
-//! Dataset catalog service — orchestrates repository, filesystem, and event
+//! Dataset catalog service - orchestrates repository, filesystem, and event
 //! side effects for dataset lifecycle operations.
 //!
 //! # Ownership
@@ -135,10 +135,10 @@ impl DatasetCatalogService {
     ///
     /// # Sequencing
     ///
-    /// 1. Move live directory → graveyard (filesystem).
+    /// 1. Move live directory -> graveyard (filesystem).
     /// 2. Mark record deleted (database) and publish `Updated` event.
     /// 3. Best-effort graveyard cleanup (filesystem). Failures are logged but
-    ///    do not fail the operation — `garbage_collect_deleted_datasets` will
+    ///    do not fail the operation; `garbage_collect_deleted_datasets` will
     ///    retry later.
     #[instrument(skip(self, events), fields(dataset.id = id))]
     pub(crate) fn delete_dataset<P: DatasetEventPublisher>(

@@ -1,4 +1,4 @@
-//! Dataset catalog module — defines the repository port and re-exports the
+//! Dataset catalog module - defines the repository port and re-exports the
 //! catalog service and error types.
 //!
 //! The [`DatasetCatalogRepository`] trait is the persistence boundary for all
@@ -32,7 +32,7 @@ use crate::dataset::{
 ///   atomically.
 /// - Import methods (`insert_imported_dataset_record`,
 ///   `replace_imported_dataset_record`) must preserve the archive's `uid`,
-///   `created_at`, `favorite`, and `status` fields exactly.
+///   `created_at`, `favorite`, `status`, and tags from the archive metadata.
 ///
 /// # Extension notes
 ///
@@ -63,7 +63,7 @@ pub(crate) trait DatasetCatalogRepository: Send + Sync {
     /// that was just written.
     fn mark_dataset_deleted(&self, id: i32) -> Result<DatasetRecord, CatalogError>;
     /// Set `trashed_at` to the current timestamp. Does not touch the live
-    /// filesystem — the service layer decides when to move data.
+    /// filesystem; the service layer decides when to move data.
     fn trash_dataset(&self, id: i32) -> Result<(), CatalogError>;
     /// Clear `trashed_at`, making the dataset live again.
     fn restore_dataset(&self, id: i32) -> Result<(), CatalogError>;
