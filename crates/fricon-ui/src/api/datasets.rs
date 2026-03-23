@@ -509,13 +509,13 @@ pub(crate) struct UiPreviewImportResult {
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn export_dataset_dialog(
+pub(crate) async fn export_datasets_dialog(
     state: State<'_, AppState>,
-    id: i32,
-) -> Result<Option<String>, TauriCommandError> {
+    ids: Vec<i32>,
+) -> Result<Option<Vec<String>>, TauriCommandError> {
     let result = tokio::task::spawn_blocking(|| {
         rfd::FileDialog::new()
-            .set_title("Export Dataset")
+            .set_title("Export Datasets")
             .pick_folder()
     })
     .await
@@ -524,13 +524,17 @@ pub(crate) async fn export_dataset_dialog(
     })?;
 
     if let Some(path) = result {
-        let out_path = state
-            .session()
-            .app()
-            .export_dataset(fricon::DatasetId::Id(id), path)
-            .await
-            .map_err(anyhow::Error::from)?;
-        Ok(Some(out_path.to_string_lossy().to_string()))
+        let mut out_paths = Vec::new();
+        for id in ids {
+            let out_path = state
+                .session()
+                .app()
+                .export_dataset(fricon::DatasetId::Id(id), path.clone())
+                .await
+                .map_err(anyhow::Error::from)?;
+            out_paths.push(out_path.to_string_lossy().to_string());
+        }
+        Ok(Some(out_paths))
     } else {
         Ok(None)
     }
@@ -540,29 +544,33 @@ pub(crate) async fn export_dataset_dialog(
 #[specta::specta]
 pub(crate) async fn preview_import_dialog(
     state: State<'_, AppState>,
-) -> Result<Option<UiPreviewImportResult>, TauriCommandError> {
+) -> Result<Option<Vec<UiPreviewImportResult>>, TauriCommandError> {
     let result = tokio::task::spawn_blocking(|| {
         rfd::FileDialog::new()
-            .set_title("Import Dataset")
+            .set_title("Import Datasets")
             .add_filter("Archive", &["tar.zst"])
-            .pick_file()
+            .pick_files()
     })
     .await
     .map_err(|e| TauriCommandError {
         message: format!("Failed to open dialog: {e}"),
     })?;
 
-    if let Some(path) = result {
-        let preview = state
-            .session()
-            .app()
-            .preview_import(path.clone())
-            .await
-            .map_err(anyhow::Error::from)?;
-        Ok(Some(UiPreviewImportResult {
-            archive_path: path.to_string_lossy().to_string(),
-            preview: preview.into(),
-        }))
+    if let Some(paths) = result {
+        let mut previews = Vec::new();
+        for path in paths {
+            let preview = state
+                .session()
+                .app()
+                .preview_import(path.clone())
+                .await
+                .map_err(anyhow::Error::from)?;
+            previews.push(UiPreviewImportResult {
+                archive_path: path.to_string_lossy().to_string(),
+                preview: preview.into(),
+            });
+        }
+        Ok(Some(previews))
     } else {
         Ok(None)
     }
@@ -570,20 +578,24 @@ pub(crate) async fn preview_import_dialog(
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn preview_import_file(
+pub(crate) async fn preview_import_files(
     state: State<'_, AppState>,
-    path: String,
-) -> Result<UiPreviewImportResult, TauriCommandError> {
-    let preview = state
-        .session()
-        .app()
-        .preview_import(std::path::PathBuf::from(&path))
-        .await
-        .map_err(anyhow::Error::from)?;
-    Ok(UiPreviewImportResult {
-        archive_path: path,
-        preview: preview.into(),
-    })
+    paths: Vec<String>,
+) -> Result<Vec<UiPreviewImportResult>, TauriCommandError> {
+    let mut previews = Vec::new();
+    for path in paths {
+        let preview = state
+            .session()
+            .app()
+            .preview_import(std::path::PathBuf::from(&path))
+            .await
+            .map_err(anyhow::Error::from)?;
+        previews.push(UiPreviewImportResult {
+            archive_path: path,
+            preview: preview.into(),
+        });
+    }
+    Ok(previews)
 }
 
 #[tauri::command]

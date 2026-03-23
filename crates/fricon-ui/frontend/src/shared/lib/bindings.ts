@@ -141,15 +141,15 @@ async mergeTag(source: string, target: string) : Promise<Result<null, TauriComma
     else return { status: "error", error: e  as any };
 }
 },
-async exportDatasetDialog(id: number) : Promise<Result<string | null, TauriCommandError>> {
+async exportDatasetsDialog(ids: number[]) : Promise<Result<string[] | null, TauriCommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("export_dataset_dialog", { id }) };
+    return { status: "ok", data: await TAURI_INVOKE("export_datasets_dialog", { ids }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async previewImportDialog() : Promise<Result<UiPreviewImportResult | null, TauriCommandError>> {
+async previewImportDialog() : Promise<Result<UiPreviewImportResult[] | null, TauriCommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("preview_import_dialog") };
 } catch (e) {
@@ -157,9 +157,9 @@ async previewImportDialog() : Promise<Result<UiPreviewImportResult | null, Tauri
     else return { status: "error", error: e  as any };
 }
 },
-async previewImportFile(path: string) : Promise<Result<UiPreviewImportResult, TauriCommandError>> {
+async previewImportFiles(paths: string[]) : Promise<Result<UiPreviewImportResult[], TauriCommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("preview_import_file", { path }) };
+    return { status: "ok", data: await TAURI_INVOKE("preview_import_files", { paths }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

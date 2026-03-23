@@ -80,10 +80,10 @@ export function DatasetTableRowActions({
 
   const handleExport = () => {
     commands
-      .exportDatasetDialog(dataset.id)
+      .exportDatasetsDialog(targetIds)
       .then((result) => {
         if (result.status === "ok" && result.data) {
-          toast.success(`Dataset exported to ${result.data}`);
+          toast.success(`Exported ${result.data.length} dataset(s)`);
         } else if (result.status === "error") {
           toast.error(`Export failed: ${result.error.message}`);
         }
@@ -117,7 +117,9 @@ export function DatasetTableRowActions({
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => void handleExport()}>
           <Download data-icon="inline-start" />
-          Export Dataset
+          {selectedCount > 1 && includesDataset
+            ? `Export Selected (${selectedCount})`
+            : "Export Dataset"}
         </ContextMenuItem>
         <ContextMenuSeparator />
         {viewMode === "trash" ? (

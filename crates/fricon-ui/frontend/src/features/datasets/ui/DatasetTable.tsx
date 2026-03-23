@@ -271,9 +271,9 @@ export function DatasetTable({
   useEffect(() => {
     const unlistenPromise = getCurrentWindow().onDragDropEvent((event) => {
       if (event.payload.type === "drop") {
-        const file = event.payload.paths[0];
-        if (file?.endsWith(".tar.zst")) {
-          importFlow.startImportFromFile(file);
+        const files = event.payload.paths.filter(p => p.endsWith(".tar.zst"));
+        if (files.length > 0) {
+          importFlow.startImportFromFiles(files);
         }
       }
     });
@@ -508,7 +508,7 @@ export function DatasetTable({
             importFlow.setIsDialogOpen();
           }
         }}
-        previewResult={importFlow.previewResult}
+        previewResults={importFlow.previewResults}
         isImporting={importFlow.isImporting}
         onConfirm={() => {
           void importFlow.confirmImport();

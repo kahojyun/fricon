@@ -48,9 +48,9 @@ pub(crate) fn specta_builder() -> Builder {
             datasets::delete_tag,
             datasets::rename_tag,
             datasets::merge_tag,
-            datasets::export_dataset_dialog,
+            datasets::export_datasets_dialog,
             datasets::preview_import_dialog,
-            datasets::preview_import_file,
+            datasets::preview_import_files,
             datasets::import_dataset
         ])
         .events(collect_events![DatasetCreated, DatasetUpdated])
