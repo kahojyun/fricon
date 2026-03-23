@@ -49,9 +49,9 @@ export function ImportDatasetDialog({
 
         <div className="text-sm my-4 space-y-2">
           <div className="rounded-md bg-muted p-3">
-            <p><strong>Name:</strong> {metadata.name}</p>
-            <p><strong>UUID:</strong> <span className="text-xs font-mono">{metadata.uid}</span></p>
-            <p className="text-muted-foreground">{metadata.description}</p>
+            <p><strong>Name:</strong> <span className="break-all">{metadata.name}</span></p>
+            <p><strong>UUID:</strong> <span className="text-xs font-mono break-all">{metadata.uid}</span></p>
+            <p className="text-muted-foreground break-all">{metadata.description}</p>
           </div>
 
           {hasConflict && (
@@ -68,8 +68,8 @@ export function ImportDatasetDialog({
                     {conflict.diffs.map((diff) => (
                       <div key={`diff-${diff.field}`} className="mb-2 last:mb-0">
                         <div className="font-semibold">{diff.field}:</div>
-                        <div className="text-red-700/80 dark:text-red-400 line-through">- {diff.existingValue}</div>
-                        <div className="text-green-700/80 dark:text-green-400">+ {diff.incomingValue}</div>
+                        <div className="text-red-700/80 dark:text-red-400 line-through break-all">- {diff.existingValue}</div>
+                        <div className="text-green-700/80 dark:text-green-400 break-all">+ {diff.incomingValue}</div>
                       </div>
                     ))}
                   </div>
