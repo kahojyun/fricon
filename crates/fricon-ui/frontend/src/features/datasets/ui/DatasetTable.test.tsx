@@ -57,6 +57,12 @@ describe("DatasetTable", () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
+  it("mounts without a live Tauri window", () => {
+    renderDatasetTable(useDatasetTableDataMock);
+
+    expect(screen.getByText("Dataset 1")).toBeInTheDocument();
+  });
+
   it("selects the dataset when a row is clicked", async () => {
     const { onDatasetSelected } = renderDatasetTable(useDatasetTableDataMock);
     const user = userEvent.setup();

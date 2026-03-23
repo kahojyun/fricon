@@ -269,16 +269,25 @@ export function DatasetTable({
   const importFlow = useDatasetImportFlow();
 
   useEffect(() => {
-    const unlistenPromise = getCurrentWindow().onDragDropEvent((event) => {
-      if (event.payload.type === "drop") {
-        const files = event.payload.paths.filter(p => p.endsWith(".tar.zst"));
-        if (files.length > 0) {
-          importFlow.startImportFromFiles(files);
+    let unlistenPromise: Promise<() => void> | undefined;
+
+    try {
+      unlistenPromise = getCurrentWindow().onDragDropEvent((event) => {
+        if (event.payload.type === "drop") {
+          const files = event.payload.paths.filter((path) =>
+            path.endsWith(".tar.zst"),
+          );
+          if (files.length > 0) {
+            importFlow.startImportFromFiles(files);
+          }
         }
-      }
-    });
+      });
+    } catch {
+      return;
+    }
+
     return () => {
-      unlistenPromise.then((unlisten) => unlisten()).catch(console.error);
+      unlistenPromise?.then((unlisten) => unlisten()).catch(console.error);
     };
   }, [importFlow]);
 
@@ -509,6 +518,7 @@ export function DatasetTable({
           }
         }}
         previewResults={importFlow.previewResults}
+        duplicateBatchConflicts={importFlow.duplicateBatchConflicts}
         isImporting={importFlow.isImporting}
         onConfirm={() => {
           void importFlow.confirmImport();
