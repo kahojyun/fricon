@@ -1,3 +1,32 @@
+//! Diesel-backed adapter for dataset persistence.
+//!
+//! # Ownership
+//!
+//! This module implements [`DatasetCatalogRepository`],
+//! [`DatasetIngestRepository`], and [`DatasetReadRepository`] using SQLite
+//! via Diesel. All SQL queries and Diesel model conversions live here; the
+//! service layer never sees Diesel types directly.
+//!
+//! # Invariants
+//!
+//! - Tag mutations (`add_tags`, `remove_tags`, `delete_tag`, `rename_tag`,
+//!   `merge_tag`) and import operations run inside `immediate_transaction` to
+//!   guarantee atomicity.
+//! - Import operations (`insert_imported_dataset_record`,
+//!   `replace_imported_dataset_record`) preserve the archive’s `uid`,
+//!   `created_at`, `favorite`, `status`, and `tags` from [`ExportedMetadata`]
+//!   exactly.
+//! - `replace_imported_dataset_record` clears `trashed_at` / `deleted_at` so a
+//!   re-imported dataset becomes live again.
+//!
+//! # Extension notes
+//!
+//! - Adding a metadata field requires updating [`DbDatasetUpdate`],
+//!   [`NewDataset`], [`dataset_record_from_models`], both import methods, and
+//!   the Diesel schema in `database::schema`.
+//! - Adding a new status variant requires a corresponding [`DbDatasetStatus`]
+//!   mapping.
+
 mod models;
 mod types;
 
@@ -25,6 +54,10 @@ use crate::{
     },
 };
 
+/// Diesel-backed dataset repository.
+///
+/// Holds a connection pool. All public methods acquire a connection from the
+/// pool, run queries, and release it. Thread-safe via `Pool`.
 #[derive(Clone)]
 pub(crate) struct DatasetRepository {
     pool: Pool,
@@ -37,6 +70,9 @@ impl DatasetRepository {
     }
 }
 
+/// Convert Diesel models into the domain [`DatasetRecord`].
+///
+/// Tags are passed separately because they are loaded via a grouped join.
 fn dataset_record_from_models(dataset: Dataset, tags: Vec<Tag>) -> DatasetRecord {
     let metadata = DatasetMetadata {
         uid: dataset.uid.0,
@@ -107,6 +143,11 @@ fn normalize_tag_filters(tags: Option<&[String]>) -> Option<Vec<String>> {
     })
 }
 
+/// Resolve dataset ids that match *any* of the given tag names.
+///
+/// Returns `None` when no tag filter is active (all datasets pass).
+/// Returns `Some(vec![])` when filters are active but no datasets match
+/// (short-circuit the caller to return an empty result).
 fn resolve_tagged_dataset_ids(
     conn: &mut SqliteConnection,
     tag_filters: Option<&[String]>,
@@ -164,6 +205,11 @@ fn apply_deleted_filter(
     }
 }
 
+/// Eagerly load tags for a batch of datasets using a grouped join.
+///
+/// Diesel’s `grouped_by` requires the parent records to be in the same
+/// order as the query result; callers must not re-sort `all_datasets`
+/// before passing them here.
 fn map_datasets_with_tags(
     conn: &mut SqliteConnection,
     all_datasets: Vec<Dataset>,
@@ -283,6 +329,10 @@ fn get_dataset_record(
     Ok(Some(dataset_record_from_models(dataset, tags)))
 }
 
+/// Mark all datasets currently in `Writing` status as `Aborted`.
+///
+/// Called at startup to recover from unclean shutdowns where ingest was
+/// interrupted. Returns the number of records updated.
 pub(crate) fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, anyhow::Error> {
     use schema::datasets::dsl::{datasets, status};
 

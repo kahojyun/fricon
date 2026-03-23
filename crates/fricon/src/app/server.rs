@@ -1,3 +1,5 @@
+//! gRPC server startup for a workspace-backed app instance.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -15,6 +17,12 @@ use crate::{
     transport::{grpc, ipc},
 };
 
+/// Start the workspace gRPC server on the IPC listener and register the task
+/// with the shared tracker.
+///
+/// This composes the dataset and fricon RPC services, binds them to the
+/// workspace-specific IPC transport, and arranges graceful shutdown through
+/// `cancellation_token`.
 #[instrument(skip(app, task_tracker, cancellation_token), fields(ipc_file = %ipc_file.display()))]
 pub(crate) fn start(
     ipc_file: PathBuf,

@@ -1,3 +1,10 @@
+//! Dataset ingest workflow helper.
+//!
+//! This module owns the stage -> stream -> finalize sequencing for dataset
+//! creation. It creates the dataset directory and record, publishes the
+//! `Created` event after the record exists, then drives the write session to a
+//! terminal `Completed` or `Aborted` state.
+
 use std::path::PathBuf;
 
 use tracing::{debug, info, instrument};
@@ -16,6 +23,21 @@ use crate::{
     workspace::WorkspacePaths,
 };
 
+/// Create a dataset record and drive its write session to a terminal status.
+///
+/// # Sequencing
+///
+/// 1. Create the dataset directory.
+/// 2. Insert the dataset record in `Writing` status.
+/// 3. Publish `DatasetEvent::Created` for the new record.
+/// 4. Consume streamed inputs into a write session until `Finish`, `Abort`, or
+///    end-of-stream.
+/// 5. Commit to `Completed` or abort to `Aborted`, then re-read the final
+///    stored record.
+///
+/// End-of-stream is treated as `Abort`. If session commit fails after the
+/// record exists, the workflow best-effort marks the dataset `Aborted`
+/// before returning the error.
 #[instrument(
     skip(repo, paths, events, write_sessions, next_input, request),
     fields(dataset.name = %request.name, tags.count = request.tags.len())
@@ -92,6 +114,11 @@ where
     }
 }
 
+/// Create the dataset directory before the ingest record is inserted.
+///
+/// The workflow stages filesystem creation first so later write-session work
+/// has a concrete destination. Failures abort ingest before any database
+/// record is created.
 fn create_dataset_dir(paths: &WorkspacePaths, uid: Uuid) -> Result<PathBuf, IngestError> {
     let path = paths.dataset_path_from_uid(uid);
     storage::create_dataset(&path)?;

@@ -1,3 +1,9 @@
+//! gRPC adapter for dataset RPCs.
+//!
+//! This module translates between tonic request/response types and the app's
+//! dataset operations. It owns request parsing, error/status mapping, and
+//! stream assembly for create/search/get/update/delete endpoints.
+
 use tokio_util::sync::CancellationToken;
 use tonic::{Request, Response, Result, Status, Streaming};
 use tracing::{debug, error, instrument, warn};
@@ -15,12 +21,17 @@ use crate::{
     },
 };
 
+/// Tonic dataset-service adapter backed by [`AppHandle`].
+///
+/// This type owns RPC-level request parsing and status mapping while the app
+/// layer owns business behavior.
 pub(crate) struct Storage {
     app: AppHandle,
     shutdown_token: CancellationToken,
 }
 
 impl Storage {
+    /// Build the dataset gRPC adapter around the shared application handle.
     pub(crate) fn new(app: AppHandle, shutdown_token: CancellationToken) -> Self {
         Self {
             app,

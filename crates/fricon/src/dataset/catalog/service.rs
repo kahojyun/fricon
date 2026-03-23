@@ -1,3 +1,31 @@
+//! Dataset catalog service - orchestrates repository, filesystem, and event
+//! side effects for dataset lifecycle operations.
+//!
+//! # Ownership
+//!
+//! This service owns the high-level dataset lifecycle (CRUD, trash/restore,
+//! delete, import/export, tag management, reconciliation, and garbage
+//! collection). It coordinates three collaborators:
+//!
+//! - **Repository** ([`DatasetCatalogRepository`]): owns database state.
+//! - **Storage** ([`storage`]): owns live and graveyard filesystem layouts.
+//! - **Events** ([`DatasetEventPublisher`]): notifies downstream consumers
+//!   after successful state changes.
+//!
+//! # Sequencing & rollback conventions
+//!
+//! Multi-step workflows (delete, import) follow a stage -> commit -> finalize
+//! pattern so that a failure at any point leaves the system in a recoverable
+//! state. See individual methods for step-by-step sequencing notes.
+//!
+//! # Extension notes
+//!
+//! - Adding a field to [`DatasetRecord`] / [`DatasetMetadata`] may require
+//!   updates in [`ExportedMetadata`], [`portability::compute_diffs`], and the
+//!   repository adapter in `database::dataset`.
+//! - New event variants should be published only after the primary state change
+//!   has succeeded.
+
 use std::{path::Path, sync::Arc};
 
 use tracing::{error, info, instrument, warn};
@@ -14,6 +42,11 @@ use crate::{
     workspace::WorkspacePaths,
 };
 
+/// Stateless service coordinating dataset catalog operations.
+///
+/// Holds a shared repository handle and workspace paths. All mutation methods
+/// accept an `&P: DatasetEventPublisher` so the caller controls event
+/// dispatch lifetime.
 #[derive(Clone)]
 pub(crate) struct DatasetCatalogService {
     repository: Arc<dyn DatasetCatalogRepository>,
@@ -94,6 +127,19 @@ impl DatasetCatalogService {
         Ok(())
     }
 
+    /// Permanently delete a dataset that is already in trash.
+    ///
+    /// # Preconditions
+    ///
+    /// The dataset must be trashed (`trashed_at` set) and not yet deleted.
+    ///
+    /// # Sequencing
+    ///
+    /// 1. Move live directory -> graveyard (filesystem).
+    /// 2. Mark record deleted (database) and publish `Updated` event.
+    /// 3. Best-effort graveyard cleanup (filesystem). Failures are logged but
+    ///    do not fail the operation; `garbage_collect_deleted_datasets` will
+    ///    retry later.
     #[instrument(skip(self, events), fields(dataset.id = id))]
     pub(crate) fn delete_dataset<P: DatasetEventPublisher>(
         &self,
@@ -162,6 +208,13 @@ impl DatasetCatalogService {
         Ok(())
     }
 
+    /// Scan all non-deleted datasets and mark any that only exist in the
+    /// graveyard as deleted.
+    ///
+    /// This repairs inconsistencies where the live directory was removed
+    /// (e.g. external filesystem changes) but the database record was not
+    /// tombstoned. Datasets present in both live and graveyard are left
+    /// untouched and logged as warnings.
     #[instrument(skip(self))]
     pub(crate) fn reconcile_deleted_datasets(&self) -> Result<usize, CatalogError> {
         let records = self.repository.list_all_datasets_including_deleted()?;
@@ -200,6 +253,10 @@ impl DatasetCatalogService {
         Ok(reconciled)
     }
 
+    /// Remove graveyard directories for datasets already marked deleted in
+    /// the database.
+    ///
+    /// Best-effort: individual failures are logged but do not abort the sweep.
     #[instrument(skip(self))]
     pub(crate) fn garbage_collect_deleted_datasets(&self) -> Result<usize, CatalogError> {
         let records = self.repository.list_deleted_datasets()?;
@@ -398,6 +455,13 @@ impl DatasetCatalogService {
         result
     }
 
+    /// Complete a force-import that replaces an existing dataset record.
+    ///
+    /// On repository success: finalizes backup, cleans up any stale graveyard
+    /// entry (for previously deleted datasets being revived), and publishes
+    /// an `Updated` event.
+    ///
+    /// On repository failure: rolls back filesystem to the pre-import state.
     fn finish_replaced_import<P: DatasetEventPublisher>(
         &self,
         existing_record: &DatasetRecord,
@@ -439,6 +503,10 @@ impl DatasetCatalogService {
         }
     }
 
+    /// Complete an import that inserts a new dataset record.
+    ///
+    /// On repository success: finalizes backup and publishes a `Created` event.
+    /// On repository failure: rolls back filesystem to the pre-import state.
     fn finish_inserted_import<P: DatasetEventPublisher>(
         &self,
         metadata: &portability::ExportedMetadata,
@@ -471,6 +539,8 @@ impl DatasetCatalogService {
         }
     }
 
+    /// Best-effort removal of the displaced backup directory after a
+    /// successful import. Failures are logged but do not fail the import.
     fn finalize_import_backup(uid: uuid::Uuid, backup_dir: Option<&Path>) {
         if let Err(error) = portability::finalize_promoted_import(backup_dir) {
             warn!(
@@ -481,6 +551,8 @@ impl DatasetCatalogService {
         }
     }
 
+    /// Best-effort removal of graveyard data for a dataset that was
+    /// previously deleted and is now being revived by an import.
     fn cleanup_revived_graveyard(uid: uuid::Uuid, graveyard_dir: Option<&Path>) {
         if let Some(graveyard_dir) = graveyard_dir
             && let Err(error) = storage::delete_dataset(graveyard_dir)
@@ -493,6 +565,9 @@ impl DatasetCatalogService {
         }
     }
 
+    /// Roll back a promoted import after a repository error by restoring the
+    /// previous live directory (if backed up) or removing the newly promoted
+    /// directory. Rollback failures are logged as errors.
     fn rollback_import(dest_dir: &Path, backup_dir: Option<&Path>, uid: uuid::Uuid, message: &str) {
         if let Err(rollback_error) = portability::rollback_promoted_import(dest_dir, backup_dir) {
             error!(

@@ -1,11 +1,42 @@
 //! Archive import/export helpers for dataset portability.
 //!
-//! This module owns the archive format and filesystem-side import workflow.
-//! Database writes and event publishing stay in higher layers.
+//! # Ownership
 //!
-//! The import flow is intentionally split into preview, stage, promote,
-//! finalize, and rollback steps so callers can coordinate filesystem changes
-//! with repository updates.
+//! This module owns the archive format (tar+zstd with `metadata.json` +
+//! `data/data_chunk_*.arrow` entries) and the filesystem-side import
+//! workflow. Database writes and event publishing stay in higher layers
+//! ([`DatasetCatalogService`](super::catalog::DatasetCatalogService)).
+//!
+//! # Import workflow (caller-driven)
+//!
+//! The import flow is intentionally split into discrete steps so callers
+//! can coordinate filesystem changes with repository updates:
+//!
+//! 1. [`preview_import`] - read metadata and detect uuid conflicts.
+//! 2. [`stage_import`] - extract the archive into a temp sibling directory.
+//! 3. [`promote_staged_import`] - move staged data into the live location
+//!    (backing up the existing directory when force-replacing).
+//! 4. Caller commits repository changes.
+//! 5. [`finalize_promoted_import`] / [`rollback_promoted_import`] - depending
+//!    on whether the repository commit succeeded.
+//!
+//! # Archive format
+//!
+//! ```text
+//! metadata.json            <- ExportedMetadata (JSON)
+//! data/data_chunk_0.arrow  <- Arrow IPC chunk files
+//! data/data_chunk_1.arrow
+//! …
+//! ```
+//!
+//! # Extension notes
+//!
+//! - Adding a metadata field to [`ExportedMetadata`] requires updating
+//!   [`compute_diffs`] and the repository import methods in
+//!   `database::dataset`.
+//! - The archive extraction allowlist in [`extract_archive`] only unpacks
+//!   `data/data_chunk_*.arrow` entries. New file types need an explicit entry
+//!   in the allowlist.
 
 use std::{
     fs::{self, File},
@@ -78,6 +109,8 @@ impl ExportedMetadata {
 }
 
 /// A single field difference between the existing dataset and the archive.
+///
+/// Used by [`ImportPreview`] to show the user what would change on import.
 #[derive(Debug, Clone)]
 pub struct FieldDiff {
     pub field: String,
@@ -100,6 +133,11 @@ pub struct ImportPreview {
     pub conflict: Option<ImportConflict>,
 }
 
+/// Staged import data held between [`stage_import`] and
+/// [`promote_staged_import`].
+///
+/// The caller must eventually call either [`promote_staged_import`] or
+/// [`discard_staged_import`] to clean up the temporary directory.
 #[derive(Debug, Clone)]
 pub struct StagedImport {
     /// Metadata read from the archive before extraction.
@@ -466,6 +504,10 @@ fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), Portabili
     Ok(())
 }
 
+/// Validate that a data chunk filename is safe to extract.
+///
+/// Guards against path traversal: only `data_chunk_*.arrow` basenames
+/// without path separators are allowed.
 fn is_safe_archive_chunk_name(file_name: &str) -> bool {
     let is_data_chunk = file_name.starts_with("data_chunk_");
     let is_arrow = Path::new(file_name)
