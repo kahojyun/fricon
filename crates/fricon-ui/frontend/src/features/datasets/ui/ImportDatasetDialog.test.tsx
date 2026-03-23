@@ -69,9 +69,13 @@ describe("ImportDatasetDialog", () => {
 
     expect(screen.getByText("Duplicate Dataset UUIDs")).toBeInTheDocument();
     expect(
-      screen.getByText(/remove duplicate archives before importing this batch/i),
+      screen.getByText(
+        /remove duplicate archives before importing this batch/i,
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/alpha\.tar\.zst, beta\.tar\.zst/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/alpha\.tar\.zst, beta\.tar\.zst/i),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Import Dataset(s)" }),
     ).toBeDisabled();
@@ -80,7 +84,9 @@ describe("ImportDatasetDialog", () => {
   it("keeps a non-duplicate batch confirmable", () => {
     renderDialog();
 
-    expect(screen.queryByText("Duplicate Dataset UUIDs")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Duplicate Dataset UUIDs"),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Import Dataset(s)" }),
     ).toBeEnabled();
@@ -113,7 +119,9 @@ describe("ImportDatasetDialog", () => {
       ],
     });
 
-    expect(screen.queryByText("Duplicate Dataset UUIDs")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Duplicate Dataset UUIDs"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Conflict Detected")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Overwrite & Import" }),

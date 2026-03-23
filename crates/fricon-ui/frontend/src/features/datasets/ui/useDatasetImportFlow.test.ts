@@ -4,7 +4,10 @@ import { useDatasetImportFlow } from "./useDatasetImportFlow";
 import type { UiPreviewImportResult } from "../api/types";
 
 type PreviewImportFilesFn = (paths: string[]) => Promise<unknown>;
-type ImportDatasetFn = (archivePath: string, force: boolean) => Promise<unknown>;
+type ImportDatasetFn = (
+  archivePath: string,
+  force: boolean,
+) => Promise<unknown>;
 
 const { previewImportFilesMock, importDatasetMock, toastError, toastSuccess } =
   vi.hoisted(() => ({

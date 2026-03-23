@@ -44,7 +44,7 @@ export function ImportDatasetDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md max-h-[80vh] flex flex-col">
+      <AlertDialogContent className="flex max-h-[80vh] max-w-md flex-col">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <DownloadCloud className="h-5 w-5" />
@@ -55,15 +55,15 @@ export function ImportDatasetDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="text-sm my-4 space-y-4 overflow-y-auto flex-1 pr-2">
+        <div className="my-4 flex-1 space-y-4 overflow-y-auto pr-2 text-sm">
           {hasDuplicateBatchConflicts && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Duplicate Dataset UUIDs</AlertTitle>
               <AlertDescription className="mt-2 space-y-2">
                 <p>
-                  Multiple selected archives target the same dataset UUID. Remove
-                  duplicate archives before importing this batch.
+                  Multiple selected archives target the same dataset UUID.
+                  Remove duplicate archives before importing this batch.
                 </p>
                 <div className="space-y-2">
                   {duplicateBatchConflicts.map((conflict) => (
@@ -97,11 +97,11 @@ export function ImportDatasetDialog({
                   </p>
                   <p>
                     <strong>UUID:</strong>{" "}
-                    <span className="text-xs font-mono break-all">
+                    <span className="font-mono text-xs break-all">
                       {metadata.uid}
                     </span>
                   </p>
-                  <p className="text-muted-foreground break-all">
+                  <p className="break-all text-muted-foreground">
                     {metadata.description}
                   </p>
                 </div>
@@ -116,14 +116,17 @@ export function ImportDatasetDialog({
                         overwrite the existing dataset&apos;s metadata and data.
                       </p>
                       {conflict.diffs.length > 0 && (
-                        <div className="bg-destructive/10 text-destructive rounded-sm p-2 text-xs font-mono max-h-32 overflow-y-auto">
+                        <div className="max-h-32 overflow-y-auto rounded-sm bg-destructive/10 p-2 font-mono text-xs text-destructive">
                           {conflict.diffs.map((diff) => (
-                            <div key={`diff-${diff.field}`} className="mb-2 last:mb-0">
+                            <div
+                              key={`diff-${diff.field}`}
+                              className="mb-2 last:mb-0"
+                            >
                               <div className="font-semibold">{diff.field}:</div>
-                              <div className="text-red-700/80 dark:text-red-400 line-through break-all">
+                              <div className="break-all text-red-700/80 line-through dark:text-red-400">
                                 - {diff.existingValue}
                               </div>
-                              <div className="text-green-700/80 dark:text-green-400 break-all">
+                              <div className="break-all text-green-700/80 dark:text-green-400">
                                 + {diff.incomingValue}
                               </div>
                             </div>
@@ -148,7 +151,7 @@ export function ImportDatasetDialog({
             disabled={isImporting || hasDuplicateBatchConflicts}
             className={
               hasConflict
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                ? "text-destructive-foreground bg-destructive hover:bg-destructive/90"
                 : ""
             }
           >

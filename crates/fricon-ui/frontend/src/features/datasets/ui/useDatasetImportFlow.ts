@@ -115,7 +115,9 @@ export function useDatasetImportFlow() {
     if (successCount > 0 && failCount === 0) {
       toast.success(`Successfully imported ${successCount} dataset(s)`);
     } else if (successCount > 0 && failCount > 0) {
-      toast.warning(`Imported ${successCount} dataset(s), but ${failCount} failed.`);
+      toast.warning(
+        `Imported ${successCount} dataset(s), but ${failCount} failed.`,
+      );
     }
   };
 
