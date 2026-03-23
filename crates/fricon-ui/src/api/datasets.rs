@@ -423,3 +423,181 @@ pub(crate) async fn merge_tag(
     app::merge_tag(state.session(), source, target).await?;
     Ok(())
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UiExportedMetadata {
+    pub(crate) uid: String,
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) favorite: bool,
+    pub(crate) status: UiDatasetStatus,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) tags: Vec<String>,
+}
+
+impl From<fricon::dataset::ExportedMetadata> for UiExportedMetadata {
+    fn from(value: fricon::dataset::ExportedMetadata) -> Self {
+        Self {
+            uid: value.uid.to_string(),
+            name: value.name,
+            description: value.description,
+            favorite: value.favorite,
+            status: value.status.into(),
+            created_at: value.created_at,
+            tags: value.tags,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UiFieldDiff {
+    pub(crate) field: String,
+    pub(crate) existing_value: String,
+    pub(crate) incoming_value: String,
+}
+
+impl From<fricon::dataset::FieldDiff> for UiFieldDiff {
+    fn from(value: fricon::dataset::FieldDiff) -> Self {
+        Self {
+            field: value.field,
+            existing_value: value.existing_value,
+            incoming_value: value.incoming_value,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UiImportConflict {
+    pub(crate) existing: UiExportedMetadata,
+    pub(crate) diffs: Vec<UiFieldDiff>,
+}
+
+impl From<fricon::dataset::ImportConflict> for UiImportConflict {
+    fn from(value: fricon::dataset::ImportConflict) -> Self {
+        Self {
+            existing: value.existing.into(),
+            diffs: value.diffs.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UiImportPreview {
+    pub(crate) metadata: UiExportedMetadata,
+    pub(crate) conflict: Option<UiImportConflict>,
+}
+
+impl From<fricon::dataset::ImportPreview> for UiImportPreview {
+    fn from(value: fricon::dataset::ImportPreview) -> Self {
+        Self {
+            metadata: value.metadata.into(),
+            conflict: value.conflict.map(Into::into),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UiPreviewImportResult {
+    pub(crate) archive_path: String,
+    pub(crate) preview: UiImportPreview,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn export_dataset_dialog(
+    state: State<'_, AppState>,
+    id: i32,
+) -> Result<Option<String>, TauriCommandError> {
+    let result = tokio::task::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Export Dataset")
+            .pick_folder()
+    })
+    .await
+    .map_err(|e| TauriCommandError {
+        message: format!("Failed to open dialog: {e}"),
+    })?;
+
+    if let Some(path) = result {
+        let out_path = state
+            .session()
+            .app()
+            .export_dataset(fricon::DatasetId::Id(id), path)
+            .await
+            .map_err(anyhow::Error::from)?;
+        Ok(Some(out_path.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn preview_import_dialog(
+    state: State<'_, AppState>,
+) -> Result<Option<UiPreviewImportResult>, TauriCommandError> {
+    let result = tokio::task::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Import Dataset")
+            .add_filter("Archive", &["tar.zst"])
+            .pick_file()
+    })
+    .await
+    .map_err(|e| TauriCommandError {
+        message: format!("Failed to open dialog: {e}"),
+    })?;
+
+    if let Some(path) = result {
+        let preview = state
+            .session()
+            .app()
+            .preview_import(path.clone())
+            .await
+            .map_err(anyhow::Error::from)?;
+        Ok(Some(UiPreviewImportResult {
+            archive_path: path.to_string_lossy().to_string(),
+            preview: preview.into(),
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn preview_import_file(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<UiPreviewImportResult, TauriCommandError> {
+    let preview = state
+        .session()
+        .app()
+        .preview_import(std::path::PathBuf::from(&path))
+        .await
+        .map_err(anyhow::Error::from)?;
+    Ok(UiPreviewImportResult {
+        archive_path: path,
+        preview: preview.into(),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn import_dataset(
+    state: State<'_, AppState>,
+    archive_path: String,
+    force: bool,
+) -> Result<DatasetInfo, TauriCommandError> {
+    let record = state
+        .session()
+        .app()
+        .import_dataset(std::path::PathBuf::from(archive_path), force)
+        .await
+        .map_err(anyhow::Error::from)?;
+    Ok(record.into())
+}

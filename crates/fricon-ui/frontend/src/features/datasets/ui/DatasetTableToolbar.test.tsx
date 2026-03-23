@@ -33,6 +33,7 @@ function renderToolbar(
     onRenameTag: vi.fn().mockResolvedValue(undefined),
     onMergeTag: vi.fn().mockResolvedValue(undefined),
     onEmptyTrash: vi.fn(),
+    onImportDataset: vi.fn(),
     ...overrides,
   };
 
@@ -109,6 +110,7 @@ describe("DatasetTableToolbar", () => {
         onRenameTag={vi.fn().mockResolvedValue(undefined)}
         onMergeTag={vi.fn().mockResolvedValue(undefined)}
         onEmptyTrash={vi.fn()}
+        onImportDataset={vi.fn()}
       />,
     );
 
@@ -141,6 +143,7 @@ describe("DatasetTableToolbar", () => {
         onRenameTag={vi.fn().mockResolvedValue(undefined)}
         onMergeTag={vi.fn().mockResolvedValue(undefined)}
         onEmptyTrash={vi.fn()}
+        onImportDataset={vi.fn()}
       />,
     );
 

@@ -17,7 +17,10 @@ import { DatasetTableBody } from "./DatasetTableBody";
 import { DatasetTableToolbar } from "./DatasetTableToolbar";
 import { useDatasetDeleteFlow } from "./useDatasetDeleteFlow";
 import { useDatasetTableSelection } from "./useDatasetTableSelection";
+import { useDatasetImportFlow } from "./useDatasetImportFlow";
+import { ImportDatasetDialog } from "./ImportDatasetDialog";
 import { summarizeDatasetDeleteResults } from "../model/datasetTableDeleteFlowLogic";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -263,6 +266,22 @@ export function DatasetTable({
     },
   });
 
+  const importFlow = useDatasetImportFlow();
+
+  useEffect(() => {
+    const unlistenPromise = getCurrentWindow().onDragDropEvent((event) => {
+      if (event.payload.type === "drop") {
+        const file = event.payload.paths[0];
+        if (file?.endsWith(".tar.zst")) {
+          importFlow.startImportFromFile(file);
+        }
+      }
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten()).catch(console.error);
+    };
+  }, [importFlow]);
+
   const [isEmptyTrashDialogOpen, setIsEmptyTrashDialogOpen] = useState(false);
 
   const handleEmptyTrash = async () => {
@@ -346,6 +365,7 @@ export function DatasetTable({
           onRenameTag={renameTag}
           onMergeTag={mergeTag}
           onEmptyTrash={() => setIsEmptyTrashDialogOpen(true)}
+          onImportDataset={importFlow.startImportDialog}
         />
         <div
           className="min-h-0 flex-1 overflow-auto bg-background"
@@ -480,6 +500,20 @@ export function DatasetTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportDatasetDialog
+        open={importFlow.isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            importFlow.setIsDialogOpen();
+          }
+        }}
+        previewResult={importFlow.previewResult}
+        isImporting={importFlow.isImporting}
+        onConfirm={() => {
+          void importFlow.confirmImport();
+        }}
+      />
     </TooltipProvider>
   );
 }

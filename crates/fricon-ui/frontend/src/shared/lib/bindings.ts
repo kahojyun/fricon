@@ -140,6 +140,38 @@ async mergeTag(source: string, target: string) : Promise<Result<null, TauriComma
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async exportDatasetDialog(id: number) : Promise<Result<string | null, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_dataset_dialog", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async previewImportDialog() : Promise<Result<UiPreviewImportResult | null, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_import_dialog") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async previewImportFile(path: string) : Promise<Result<UiPreviewImportResult, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_import_file", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async importDataset(archivePath: string, force: boolean) : Promise<Result<DatasetInfo, TauriCommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_dataset", { archivePath, force }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -187,6 +219,11 @@ export type TableData = { fields: string[]; rows: Row[]; columnUniqueValues: Par
 export type TauriCommandError = { message: string }
 export type UiDatasetSortBy = "id" | "name" | "createdAt"
 export type UiDatasetStatus = "Writing" | "Completed" | "Aborted"
+export type UiExportedMetadata = { uid: string; name: string; description: string; favorite: boolean; status: UiDatasetStatus; createdAt: string; tags: string[] }
+export type UiFieldDiff = { field: string; existingValue: string; incomingValue: string }
+export type UiImportConflict = { existing: UiExportedMetadata; diffs: UiFieldDiff[] }
+export type UiImportPreview = { metadata: UiExportedMetadata; conflict: UiImportConflict | null }
+export type UiPreviewImportResult = { archivePath: string; preview: UiImportPreview }
 export type UiSortDirection = "asc" | "desc"
 export type WorkspaceInfo = { path: string }
 

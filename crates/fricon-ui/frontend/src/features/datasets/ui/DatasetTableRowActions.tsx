@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { Download, RotateCcw, Trash2 } from "lucide-react";
 import type {
   DatasetDeleteResult,
   DatasetInfo,
@@ -18,6 +18,7 @@ import {
   ContextMenuTrigger,
 } from "@/shared/ui/context-menu";
 import { toast } from "sonner";
+import { commands } from "@/shared/lib/bindings";
 
 interface DatasetTableRowActionsProps {
   dataset: DatasetInfo;
@@ -77,6 +78,23 @@ export function DatasetTableRowActions({
     });
   };
 
+  const handleExport = () => {
+    commands
+      .exportDatasetDialog(dataset.id)
+      .then((result) => {
+        if (result.status === "ok" && result.data) {
+          toast.success(`Dataset exported to ${result.data}`);
+        } else if (result.status === "error") {
+          toast.error(`Export failed: ${result.error.message}`);
+        }
+      })
+      .catch((e) => {
+        toast.error(
+          `Export failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      });
+  };
+
   return (
     <ContextMenu>
       <ContextMenuTrigger render={children} />
@@ -96,6 +114,11 @@ export function DatasetTableRowActions({
             void handleBatchTagMutation("remove", tag);
           }}
         />
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => void handleExport()}>
+          <Download data-icon="inline-start" />
+          Export Dataset
+        </ContextMenuItem>
         <ContextMenuSeparator />
         {viewMode === "trash" ? (
           <>
