@@ -124,6 +124,7 @@ pub(super) struct DatasetUpdate {
     pub(super) description: Option<String>,
     pub(super) favorite: Option<bool>,
     pub(super) status: Option<DbDatasetStatus>,
+    pub(super) created_at: Option<NaiveDateTime>,
     #[expect(
         clippy::option_option,
         reason = "Diesel changesets need tri-state semantics for unchanged, NULL, and concrete \
@@ -144,7 +145,9 @@ pub(super) struct NewDataset<'a> {
     pub(super) uid: SimpleUuid,
     pub(super) name: &'a str,
     pub(super) description: &'a str,
+    pub(super) favorite: bool,
     pub(super) status: DbDatasetStatus,
+    pub(super) created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
@@ -319,10 +322,22 @@ impl DatasetTag {
             .filter(tag_id.eq_any(tag_ids))
             .execute(conn)
     }
+
+    pub(super) fn clear_associations(
+        conn: &mut SqliteConnection,
+        ds_id: i32,
+    ) -> QueryResult<usize> {
+        use schema::datasets_tags::dsl::{dataset_id, datasets_tags};
+
+        diesel::delete(datasets_tags)
+            .filter(dataset_id.eq(ds_id))
+            .execute(conn)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
     use diesel::{
         Connection, ExpressionMethods, QueryDsl, RunQueryDsl, connection::SimpleConnection,
     };
@@ -373,7 +388,9 @@ mod tests {
             uid: SimpleUuid(Uuid::new_v4()),
             name,
             description: "",
+            favorite: false,
             status: DbDatasetStatus::from(DatasetStatus::Writing),
+            created_at: Utc::now().naive_utc(),
         };
         diesel::insert_into(schema::datasets::table)
             .values(&dataset)

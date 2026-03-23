@@ -21,7 +21,7 @@ use crate::{
     database::{core, dataset as database_dataset},
     dataset::{
         CreateDatasetInput, CreateDatasetRequest, DatasetEvent, DatasetId, DatasetListQuery,
-        DatasetReader, DatasetRecord, DatasetUpdate,
+        DatasetReader, DatasetRecord, DatasetUpdate, ImportPreview,
         catalog::{CatalogError, DatasetCatalogService},
         events::DatasetEventPublisher,
         ingest::{DatasetIngestService, IngestError, WriteSessionRegistry},
@@ -437,6 +437,50 @@ impl AppHandle {
             })
             .await
             .map_err(|error| ingest_join_error(error, "failed to join dataset create task"))?
+    }
+
+    pub async fn export_dataset(
+        &self,
+        id: DatasetId,
+        output_dir: std::path::PathBuf,
+    ) -> Result<std::path::PathBuf, CatalogError> {
+        let state = self.state().map_err(|_| catalog_state_dropped())?;
+        let tracker = state.tracker.clone();
+        let catalog = state.dataset_catalog.clone();
+        tracker
+            .spawn_blocking(move || catalog.export_dataset(id, &output_dir))
+            .await
+            .map_err(|error| catalog_join_error(error, "failed to join dataset export task"))?
+    }
+
+    pub async fn preview_import(
+        &self,
+        archive_path: std::path::PathBuf,
+    ) -> Result<ImportPreview, CatalogError> {
+        let state = self.state().map_err(|_| catalog_state_dropped())?;
+        let tracker = state.tracker.clone();
+        let catalog = state.dataset_catalog.clone();
+        tracker
+            .spawn_blocking(move || catalog.preview_import(&archive_path))
+            .await
+            .map_err(|error| catalog_join_error(error, "failed to join import preview task"))?
+    }
+
+    pub async fn import_dataset(
+        &self,
+        archive_path: std::path::PathBuf,
+        force: bool,
+    ) -> Result<DatasetRecord, CatalogError> {
+        let state = self.state().map_err(|_| catalog_state_dropped())?;
+        let tracker = state.tracker.clone();
+        let catalog = state.dataset_catalog.clone();
+        let events = BroadcastDatasetEvents {
+            sender: state.dataset_event_sender.clone(),
+        };
+        tracker
+            .spawn_blocking(move || catalog.import_dataset(&archive_path, force, &events))
+            .await
+            .map_err(|error| catalog_join_error(error, "failed to join dataset import task"))?
     }
 }
 

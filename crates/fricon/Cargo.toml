@@ -40,6 +40,7 @@ prost-types = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
@@ -50,6 +51,7 @@ tonic-prost = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["fast-rng", "serde", "v4"] }
+zstd = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }
