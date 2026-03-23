@@ -1,4 +1,7 @@
-use crate::dataset::{schema::DatasetError, storage::error::DatasetFsError};
+use crate::{
+    database::core::DatabaseError,
+    dataset::{schema::DatasetError, storage::error::DatasetFsError},
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReadError {
@@ -8,10 +11,14 @@ pub enum ReadError {
     Deleted { id: String },
     #[error("No dataset file found.")]
     EmptyDataset,
+    #[error("App state has been dropped")]
+    StateDropped,
+    #[error("Background task panicked")]
+    TaskPanic,
     #[error(transparent)]
     Dataset(#[from] DatasetError),
     #[error(transparent)]
     DatasetFs(#[from] DatasetFsError),
     #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
+    Database(#[from] DatabaseError),
 }

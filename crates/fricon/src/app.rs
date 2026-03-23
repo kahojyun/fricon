@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use chrono::Local;
 use thiserror::Error;
 use tokio::{
@@ -165,27 +165,27 @@ fn map_recv_error(error: &broadcast::error::RecvError) -> SubscriptionError {
 }
 
 fn catalog_state_dropped() -> CatalogError {
-    anyhow!("app state has been dropped").into()
+    CatalogError::StateDropped
 }
 
 fn ingest_state_dropped() -> IngestError {
-    anyhow!("app state has been dropped").into()
+    IngestError::StateDropped
 }
 
 fn read_state_dropped() -> ReadError {
-    anyhow!("app state has been dropped").into()
+    ReadError::StateDropped
 }
 
-fn catalog_join_error(error: tokio::task::JoinError, context: &'static str) -> CatalogError {
-    anyhow::Error::new(error).context(context).into()
+fn catalog_join_error(_error: tokio::task::JoinError, _context: &'static str) -> CatalogError {
+    CatalogError::TaskPanic
 }
 
-fn ingest_join_error(error: tokio::task::JoinError, context: &'static str) -> IngestError {
-    anyhow::Error::new(error).context(context).into()
+fn ingest_join_error(_error: tokio::task::JoinError, _context: &'static str) -> IngestError {
+    IngestError::TaskPanic
 }
 
-fn read_join_error(error: tokio::task::JoinError, context: &'static str) -> ReadError {
-    anyhow::Error::new(error).context(context).into()
+fn read_join_error(_error: tokio::task::JoinError, _context: &'static str) -> ReadError {
+    ReadError::TaskPanic
 }
 
 #[derive(Clone)]

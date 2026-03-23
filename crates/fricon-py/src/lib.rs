@@ -54,6 +54,7 @@ use pyo3::{
     sync::PyOnceLock,
     types::{PyDict, PyList},
 };
+// Removed From<ClientError> implementation
 use pyo3_async_runtimes::tokio::get_runtime;
 
 /// A client of fricon workspace server.
@@ -164,8 +165,9 @@ impl DatasetManager {
         static FROM_RECORDS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
         let client = self.workspace.client.clone();
-        let records =
-            py.detach(|| get_runtime().block_on(client.list_all_datasets(limit, offset)))?;
+        let records = py
+            .detach(|| get_runtime().block_on(client.list_all_datasets(limit, offset)))
+            .map_err(anyhow::Error::from)?;
         let py_records = records.into_iter().map(
             |DatasetRecord {
                  id,
@@ -298,13 +300,17 @@ impl Dataset {
     }
 
     #[pyo3(signature = (*tag))]
-    pub fn add_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> Result<()> {
+    pub fn add_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> PyResult<()> {
         py.detach(|| get_runtime().block_on(self.inner.add_tags(tag)))
+            .map_err(anyhow::Error::from)?;
+        Ok(())
     }
 
     #[pyo3(signature = (*tag))]
-    pub fn remove_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> Result<()> {
+    pub fn remove_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> PyResult<()> {
         py.detach(|| get_runtime().block_on(self.inner.remove_tags(tag)))
+            .map_err(anyhow::Error::from)?;
+        Ok(())
     }
 
     #[pyo3(signature = (*, name = None, description = None, favorite = None))]
@@ -314,10 +320,12 @@ impl Dataset {
         name: Option<String>,
         description: Option<String>,
         favorite: Option<bool>,
-    ) -> Result<()> {
+    ) -> PyResult<()> {
         py.detach(|| {
             get_runtime().block_on(self.inner.update_metadata(name, description, favorite))
         })
+        .map_err(anyhow::Error::from)?;
+        Ok(())
     }
 
     /// Name of the dataset.

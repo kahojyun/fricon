@@ -1,21 +1,21 @@
 use std::{
-    fs,
+    fs, io,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use anyhow::{Context, Result, bail, ensure};
 use arrow_array::RecordBatch;
 use arrow_ipc::writer::StreamWriter;
-use arrow_schema::SchemaRef;
+use arrow_schema::{ArrowError, SchemaRef};
 use async_stream::stream;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use semver::Version;
+use thiserror::Error;
 use tokio::{sync::mpsc, task::JoinHandle};
-use tonic::{Code, Request, transport::Channel};
+use tonic::{Code, Request, Status, transport::Channel};
 use tower::service_fn;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
@@ -33,8 +33,49 @@ use crate::{
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
     transport::{ipc, ipc::error::ConnectError},
-    workspace::{WorkspacePaths, WorkspaceRoot},
+    workspace::{WorkspaceError, WorkspacePaths, WorkspaceRoot},
 };
+
+/// Errors that can occur in [`Client`], [`DatasetWriter`], and [`Dataset`]
+/// operations.
+#[derive(Debug, Error)]
+pub enum ClientError {
+    /// No fricon server is running at the given workspace path.
+    #[error("No fricon server is running at the workspace path")]
+    NotRunning,
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Workspace(#[from] WorkspaceError),
+    #[error("Transport error: {0}")]
+    Transport(#[from] tonic::transport::Error),
+    #[error("RPC error: {0}")]
+    Status(#[from] Status),
+    #[error("Version parse error: {0}")]
+    VersionParse(#[from] semver::Error),
+    #[error("Server version {server} does not match client version {client}")]
+    VersionMismatch { server: Version, client: Version },
+    #[error("Arrow error: {0}")]
+    Arrow(#[from] ArrowError),
+    /// Proto message conversion failed.
+    #[error("Proto conversion failed: {0}")]
+    ProtoConversion(#[source] anyhow::Error),
+    /// The dataset writer has been closed already (via finish or abort).
+    #[error("Dataset writer is already closed")]
+    WriterClosed,
+    /// finish/abort was called more than once.
+    #[error("Dataset write operation has already finished or been aborted")]
+    AlreadyFinished,
+    #[error("Schema mismatch: expected {expected:?}, got {got:?}")]
+    SchemaMismatch {
+        expected: Box<DatasetSchema>,
+        got: Box<DatasetSchema>,
+    },
+    #[error("Expected dataset in response but none was returned")]
+    MissingResponse,
+    #[error("Connector task panicked")]
+    ConnectorPanic,
+}
 
 const MAX_PAYLOAD_CHUNK_SIZE: usize = 1024 * 1024;
 
@@ -53,22 +94,24 @@ pub struct Client {
 
 impl Client {
     #[instrument(skip(path), fields(workspace.path = ?path.as_ref()))]
-    pub async fn probe_existing_ui(path: impl AsRef<Path>) -> Result<ExistingUiProbeResult> {
+    pub async fn probe_existing_ui(
+        path: impl AsRef<Path>,
+    ) -> Result<ExistingUiProbeResult, ClientError> {
         match Self::connect(path).await {
             Ok(client) => match client.show_ui().await {
                 Ok(()) => Ok(ExistingUiProbeResult::UiShown),
-                Err(err) if show_ui_requires_desktop_ui(&err) => {
+                Err(ClientError::Status(s)) if s.code() == Code::FailedPrecondition => {
                     Ok(ExistingUiProbeResult::UiUnavailable)
                 }
-                Err(err) => Err(err.context("Failed to delegate launch to existing workspace UI")),
+                Err(err) => Err(err),
             },
-            Err(err) if connect_target_missing(&err) => Ok(ExistingUiProbeResult::NotRunning),
-            Err(err) => Err(err.context("Failed to connect to existing workspace server")),
+            Err(ClientError::NotRunning) => Ok(ExistingUiProbeResult::NotRunning),
+            Err(err) => Err(err),
         }
     }
 
     #[instrument(skip(path), fields(workspace.path = ?path.as_ref()))]
-    pub async fn connect(path: impl AsRef<Path>) -> Result<Self> {
+    pub async fn connect(path: impl AsRef<Path>) -> Result<Self, ClientError> {
         let path = fs::canonicalize(path)?;
         WorkspaceRoot::validate(path.clone())?;
         let workspace_paths = WorkspacePaths::new(path);
@@ -92,7 +135,7 @@ impl Client {
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
-    ) -> Result<DatasetWriter> {
+    ) -> Result<DatasetWriter, ClientError> {
         Ok(DatasetWriter::new(
             self.clone(),
             name,
@@ -103,11 +146,11 @@ impl Client {
         ))
     }
 
-    pub async fn get_dataset_by_id(&self, id: i32) -> Result<Dataset> {
+    pub async fn get_dataset_by_id(&self, id: i32) -> Result<Dataset, ClientError> {
         self.get_dataset_by_id_enum(IdEnum::Id(id)).await
     }
 
-    pub async fn get_dataset_by_uid(&self, uid: String) -> Result<Dataset> {
+    pub async fn get_dataset_by_uid(&self, uid: String) -> Result<Dataset, ClientError> {
         self.get_dataset_by_id_enum(IdEnum::Uid(uid)).await
     }
 
@@ -115,7 +158,7 @@ impl Client {
         &self,
         limit: Option<i64>,
         offset: Option<i64>,
-    ) -> Result<Vec<DatasetRecord>> {
+    ) -> Result<Vec<DatasetRecord>, ClientError> {
         let limit = limit.unwrap_or(DEFAULT_DATASET_LIST_LIMIT).max(0);
         let page_size = i32::try_from(limit).unwrap_or(i32::MAX);
         let page_token = offset.unwrap_or(0).max(0).to_string();
@@ -125,23 +168,27 @@ impl Client {
         };
         let response = self.dataset_service().search(request).await?;
         let records = response.into_inner().datasets;
-        records.into_iter().map(TryInto::try_into).collect()
+        records
+            .into_iter()
+            .map(|r| r.try_into().map_err(ClientError::ProtoConversion))
+            .collect()
     }
 
-    async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<Dataset> {
+    async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<Dataset, ClientError> {
         let request = GetRequest { id_enum: Some(id) };
         let response = self.dataset_service().get(request).await?;
         let record = response
             .into_inner()
             .dataset
-            .context("No dataset returned.")?;
+            .ok_or(ClientError::MissingResponse)?;
+        let record: DatasetRecord = record.try_into().map_err(ClientError::ProtoConversion)?;
         Ok(Dataset {
             client: self.clone(),
-            record: record.try_into().context("Invalid dataset record.")?,
+            record,
         })
     }
 
-    pub async fn show_ui(&self) -> Result<()> {
+    pub async fn show_ui(&self) -> Result<(), ClientError> {
         let request = crate::proto::ShowUiRequest {};
         let mut client = FriconServiceClient::new(self.channel.clone());
         client.show_ui(request).await?;
@@ -153,21 +200,18 @@ impl Client {
     }
 }
 
-fn connect_target_missing(err: &anyhow::Error) -> bool {
-    err.chain().any(|cause| {
-        cause
+fn connect_target_missing(err: &tonic::transport::Error) -> bool {
+    let mut current: Option<&(dyn std::error::Error + 'static)> = Some(err);
+    while let Some(error) = current {
+        if error
             .downcast_ref::<ConnectError>()
             .is_some_and(|connect_error| matches!(connect_error, ConnectError::NotFound(_)))
-            || cause.to_string().contains("Connect target not found")
-    })
-}
-
-fn show_ui_requires_desktop_ui(err: &anyhow::Error) -> bool {
-    err.chain().any(|cause| {
-        cause
-            .downcast_ref::<tonic::Status>()
-            .is_some_and(|status| status.code() == Code::FailedPrecondition)
-    })
+        {
+            return true;
+        }
+        current = error.source();
+    }
+    false
 }
 
 #[derive(Debug)]
@@ -181,7 +225,7 @@ pub struct DatasetWriter {
     schema: DatasetSchema,
     arrow_schema: SchemaRef,
     tx: Option<mpsc::Sender<StreamMessage>>,
-    connection_handle: Option<JoinHandle<Result<CreateResponse>>>,
+    connection_handle: Option<JoinHandle<Result<CreateResponse, ClientError>>>,
     runtime: tokio::runtime::Handle,
     client: Client,
 }
@@ -218,17 +262,16 @@ impl DatasetWriter {
         }
     }
 
-    pub async fn write(&mut self, row: DatasetRow) -> Result<()> {
+    pub async fn write(&mut self, row: DatasetRow) -> Result<(), ClientError> {
         let Some(tx) = self.tx.as_mut() else {
-            bail!("Writer closed.");
+            return Err(ClientError::WriterClosed);
         };
         let row_schema = row.to_schema();
         if row_schema != self.schema {
-            bail!(
-                "Schema mismatch. expected {:?}, got {:?}",
-                self.schema,
-                row_schema
-            );
+            return Err(ClientError::SchemaMismatch {
+                expected: Box::new(self.schema.clone()),
+                got: Box::new(row_schema),
+            });
         }
         let columns = self
             .schema
@@ -236,48 +279,46 @@ impl DatasetWriter {
             .iter()
             .map(|(name, _)| DatasetArray::from(row.0[name].clone()).into())
             .collect();
-        let batch = RecordBatch::try_new(self.arrow_schema.clone(), columns)
-            .context("Failed to create RecordBatch")?;
+        let batch = RecordBatch::try_new(self.arrow_schema.clone(), columns)?;
         if tx.send(StreamMessage::Batch(batch)).await.is_ok() {
             Ok(())
         } else {
             let connection_handle = self
                 .connection_handle
                 .take()
-                .context("Connection closed unexpectedly.")?;
-            let connection_result = connection_handle.await.context("Connector panicked.")?;
-            if let Err(error) = connection_result {
-                return Err(error.context("Connection failed."));
-            }
-            bail!("Writer closed.");
+                .ok_or(ClientError::ConnectorPanic)?;
+            let connection_result = connection_handle
+                .await
+                .map_err(|_| ClientError::ConnectorPanic)?;
+            connection_result?;
+            Err(ClientError::WriterClosed)
         }
     }
 
     #[instrument(skip(self))]
-    pub async fn finish(self) -> Result<Dataset> {
+    pub async fn finish(self) -> Result<Dataset, ClientError> {
         self.complete(StreamMessage::Finish).await
     }
 
     #[instrument(skip(self))]
-    pub async fn abort(self) -> Result<Dataset> {
+    pub async fn abort(self) -> Result<Dataset, ClientError> {
         self.complete(StreamMessage::Abort).await
     }
 
-    async fn complete(mut self, message: StreamMessage) -> Result<Dataset> {
-        let tx = self.tx.take().context("Already finished.")?;
+    async fn complete(mut self, message: StreamMessage) -> Result<Dataset, ClientError> {
+        let tx = self.tx.take().ok_or(ClientError::AlreadyFinished)?;
         let _ = tx.send(message).await;
         drop(tx);
 
-        let connection_handle = self.connection_handle.take().context("Already finished.")?;
-        let dataset = connection_handle
+        let connection_handle = self
+            .connection_handle
+            .take()
+            .ok_or(ClientError::AlreadyFinished)?;
+        let response = connection_handle
             .await
-            .context("Connector panicked.")?
-            .context("Connection failed.")?
-            .dataset
-            .context("No dataset returned.")?;
-        let record: DatasetRecord = dataset
-            .try_into()
-            .context("Failed to convert dataset record")?;
+            .map_err(|_| ClientError::ConnectorPanic)??;
+        let dataset = response.dataset.ok_or(ClientError::MissingResponse)?;
+        let record: DatasetRecord = dataset.try_into().map_err(ClientError::ProtoConversion)?;
         info!(dataset.id = record.id, "Dataset write finished");
         Ok(Dataset {
             client: self.client.clone(),
@@ -424,16 +465,23 @@ fn split_payload_chunk(chunk: Bytes) -> impl Iterator<Item = Bytes> {
     })
 }
 
-async fn connect_ipc_channel(path: PathBuf) -> Result<Channel> {
+async fn connect_ipc_channel(path: PathBuf) -> Result<Channel, ClientError> {
     let channel = Channel::from_static("https://ignored.com:50051")
         .connect_with_connector(service_fn(move |_| {
             let path = path.clone();
             async move {
                 let stream = ipc::connect(path).await?;
-                anyhow::Ok(TokioIo::new(stream))
+                Ok::<_, ConnectError>(TokioIo::new(stream))
             }
         }))
-        .await?;
+        .await
+        .map_err(|error| {
+            if connect_target_missing(&error) {
+                ClientError::NotRunning
+            } else {
+                ClientError::Transport(error)
+            }
+        })?;
     Ok(channel)
 }
 
@@ -500,7 +548,7 @@ impl Dataset {
         self.record.metadata.status
     }
 
-    pub async fn add_tags(&self, tags: Vec<String>) -> Result<()> {
+    pub async fn add_tags(&self, tags: Vec<String>) -> Result<(), ClientError> {
         let request = AddTagsRequest {
             id: self.record.id,
             tags,
@@ -509,7 +557,7 @@ impl Dataset {
         Ok(())
     }
 
-    pub async fn remove_tags(&self, tags: Vec<String>) -> Result<()> {
+    pub async fn remove_tags(&self, tags: Vec<String>) -> Result<(), ClientError> {
         let request = RemoveTagsRequest {
             id: self.record.id,
             tags,
@@ -523,7 +571,7 @@ impl Dataset {
         name: Option<String>,
         description: Option<String>,
         favorite: Option<bool>,
-    ) -> Result<()> {
+    ) -> Result<(), ClientError> {
         let request = UpdateRequest {
             id: self.record.id,
             name,
@@ -536,16 +584,18 @@ impl Dataset {
 }
 
 #[instrument(skip(channel))]
-async fn check_server_version(channel: Channel) -> Result<()> {
+async fn check_server_version(channel: Channel) -> Result<(), ClientError> {
     let request = VersionRequest {};
     let response = FriconServiceClient::new(channel).version(request).await?;
     let server_version = response.into_inner().version;
     let server_version: Version = server_version.parse()?;
     let client_version: Version = VERSION.parse()?;
-    ensure!(
-        client_version == server_version,
-        "Server and client version mismatch. Server: {server_version}, Client: {client_version}"
-    );
+    if client_version != server_version {
+        return Err(ClientError::VersionMismatch {
+            server: server_version,
+            client: client_version,
+        });
+    }
     debug!(server_version = %server_version, client_version = %client_version, "Server version check passed");
     Ok(())
 }

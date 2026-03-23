@@ -18,7 +18,7 @@ use thiserror::Error;
 use tracing::info;
 
 #[derive(Debug, Error)]
-pub(crate) enum DatabaseError {
+pub enum DatabaseError {
     #[error("Invalid backup path encoding.")]
     InvalidBackupPath,
     #[error("Migration failed: {0}")]
@@ -27,8 +27,6 @@ pub(crate) enum DatabaseError {
     Pool(#[from] r2d2::PoolError),
     #[error(transparent)]
     Query(#[from] DieselError),
-    #[error(transparent)]
-    General(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Clone)]

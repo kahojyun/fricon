@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use arrow_array::{Array, Float64Array, RecordBatch};
 use fricon::{
-    AppManager, Client, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar, DatasetStatus,
-    ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace, WorkspaceRoot,
-    app::UiCommand,
+    AppManager, Client, ClientError, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar,
+    DatasetStatus, ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace,
+    WorkspaceRoot, app::UiCommand,
 };
 use indexmap::IndexMap;
 use num::complex::Complex64;
@@ -420,9 +420,9 @@ async fn test_show_ui_requires_attached_ui_subscriber() -> anyhow::Result<()> {
         .show_ui()
         .await
         .expect_err("show_ui should fail when no UI subscriber is attached");
-    let status = error
-        .downcast_ref::<tonic::Status>()
-        .expect("show_ui should return tonic::Status");
+    let ClientError::Status(status) = &error else {
+        panic!("show_ui should return ClientError::Status, got: {error:?}");
+    };
     assert_eq!(status.code(), Code::FailedPrecondition);
 
     app_manager.shutdown().await;
