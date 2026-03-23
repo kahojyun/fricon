@@ -64,6 +64,15 @@ function makePreviewResult(
   };
 }
 
+function createDeferredPromise<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+
+  return { promise, resolve };
+}
+
 describe("useDatasetImportFlow", () => {
   beforeEach(() => {
     previewImportDialogMock.mockReset();
@@ -154,5 +163,51 @@ describe("useDatasetImportFlow", () => {
     expect(toastSuccess).toHaveBeenCalledWith(
       "Successfully imported 2 dataset(s)",
     );
+  });
+
+  it("ignores new preview requests while an import is in progress", async () => {
+    const importDeferred = createDeferredPromise<void>();
+    previewImportFilesMock.mockResolvedValueOnce([
+      makePreviewResult("/tmp/alpha.tar.zst", "uid-a", { name: "Alpha" }),
+    ]);
+    importDatasetMock.mockImplementation(() => importDeferred.promise);
+
+    const { result } = renderHook(() => useDatasetImportFlow());
+
+    act(() => {
+      result.current.startImportFromFiles(["/tmp/alpha.tar.zst"]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.previewResults).toHaveLength(1);
+      expect(result.current.isDialogOpen).toBe(true);
+    });
+
+    let confirmImportPromise!: Promise<void>;
+    act(() => {
+      confirmImportPromise = result.current.confirmImport();
+    });
+
+    expect(result.current.isImporting).toBe(true);
+
+    act(() => {
+      result.current.startImportFromFiles(["/tmp/beta.tar.zst"]);
+    });
+
+    expect(previewImportFilesMock).toHaveBeenCalledTimes(1);
+    expect(result.current.previewResults).toEqual([
+      makePreviewResult("/tmp/alpha.tar.zst", "uid-a", { name: "Alpha" }),
+    ]);
+
+    await act(async () => {
+      importDeferred.resolve();
+      await confirmImportPromise;
+    });
+
+    await waitFor(() => {
+      expect(result.current.isImporting).toBe(false);
+      expect(result.current.isDialogOpen).toBe(false);
+      expect(result.current.previewResults).toEqual([]);
+    });
   });
 });

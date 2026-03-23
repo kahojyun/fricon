@@ -523,7 +523,7 @@ export function DatasetTable({
         open={importFlow.isDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            importFlow.setIsDialogOpen();
+            importFlow.closeDialog();
           }
         }}
         previewResults={importFlow.previewResults}

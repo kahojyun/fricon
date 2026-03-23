@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   importDataset,
@@ -38,67 +38,96 @@ export function useDatasetImportFlow() {
   );
   const [isImporting, setIsImporting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const activeFlowIdRef = useRef(0);
+  const isImportingRef = useRef(false);
   const duplicateBatchConflicts = getDuplicateBatchConflicts(previewResults);
   const hasDuplicateBatchConflicts = duplicateBatchConflicts.length > 0;
 
-  const startImportDialog = () => {
-    previewImportDialog()
+  const clearDialogState = () => {
+    setIsDialogOpen(false);
+    setPreviewResults([]);
+  };
+
+  const setImportingState = (value: boolean) => {
+    isImportingRef.current = value;
+    setIsImporting(value);
+  };
+
+  const startPreviewFlow = (
+    loadPreview: () => Promise<UiPreviewImportResult[] | null | undefined>,
+  ) => {
+    if (isImportingRef.current) {
+      return;
+    }
+
+    const flowId = activeFlowIdRef.current + 1;
+    activeFlowIdRef.current = flowId;
+
+    loadPreview()
       .then((results) => {
+        if (flowId !== activeFlowIdRef.current || isImportingRef.current) {
+          return;
+        }
+
         if (results && results.length > 0) {
           setPreviewResults(results);
           setIsDialogOpen(true);
         }
       })
       .catch((e) => {
+        if (flowId !== activeFlowIdRef.current || isImportingRef.current) {
+          return;
+        }
+
         toast.error(
           `Import error: ${e instanceof Error ? e.message : String(e)}`,
         );
       });
+  };
+
+  const startImportDialog = () => {
+    startPreviewFlow(() => previewImportDialog());
   };
 
   const startImportFromFiles = (paths: string[]) => {
-    previewImportFiles(paths)
-      .then((results) => {
-        if (results.length > 0) {
-          setPreviewResults(results);
-          setIsDialogOpen(true);
-        }
-      })
-      .catch((e) => {
-        toast.error(
-          `Import error: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      });
+    startPreviewFlow(() => previewImportFiles(paths));
   };
 
   const confirmImport = async () => {
+    if (isImportingRef.current) return;
     if (previewResults.length === 0) return;
     if (hasDuplicateBatchConflicts) {
       toast.error("Remove duplicate dataset UUIDs before importing.");
       return;
     }
 
-    setIsImporting(true);
+    const flowId = activeFlowIdRef.current;
+    const previewBatch = previewResults;
+
+    setImportingState(true);
 
     let successCount = 0;
     let failCount = 0;
 
-    for (const p of previewResults) {
-      const force = p.preview.conflict !== null;
-      try {
-        await importDataset(p.archivePath, force);
-        successCount++;
-      } catch (e) {
-        failCount++;
-        toast.error(
-          `Error importing ${p.preview.metadata.name}: ${e instanceof Error ? e.message : String(e)}`,
-        );
+    await (async () => {
+      for (const p of previewBatch) {
+        const force = p.preview.conflict !== null;
+        try {
+          await importDataset(p.archivePath, force);
+          successCount = successCount + 1;
+        } catch (e) {
+          failCount = failCount + 1;
+          toast.error(
+            `Error importing ${p.preview.metadata.name}: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
       }
-    }
-
-    setIsImporting(false);
-    setIsDialogOpen(false);
-    setPreviewResults([]);
+    })().finally(() => {
+      setImportingState(false);
+      if (flowId === activeFlowIdRef.current) {
+        clearDialogState();
+      }
+    });
 
     if (successCount > 0 && failCount === 0) {
       toast.success(`Successfully imported ${successCount} dataset(s)`);
@@ -110,8 +139,12 @@ export function useDatasetImportFlow() {
   };
 
   const closeDialog = () => {
-    setIsDialogOpen(false);
-    setPreviewResults([]);
+    if (isImportingRef.current) {
+      return;
+    }
+
+    activeFlowIdRef.current += 1;
+    clearDialogState();
   };
 
   return {
@@ -120,7 +153,7 @@ export function useDatasetImportFlow() {
     isDialogOpen,
     duplicateBatchConflicts,
     hasDuplicateBatchConflicts,
-    setIsDialogOpen: closeDialog,
+    closeDialog,
     startImportDialog,
     startImportFromFiles,
     confirmImport,

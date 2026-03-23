@@ -25,14 +25,14 @@ const {
   startImportFromFilesMock,
   startImportDialogMock,
   confirmImportMock,
-  setImportDialogOpenMock,
+  closeImportDialogMock,
   useDatasetImportFlowMock,
 } = vi.hoisted(() => ({
   onDatasetArchiveDropMock: vi.fn(),
   startImportFromFilesMock: vi.fn(),
   startImportDialogMock: vi.fn(),
   confirmImportMock: vi.fn(),
-  setImportDialogOpenMock: vi.fn(),
+  closeImportDialogMock: vi.fn(),
   useDatasetImportFlowMock: vi.fn(),
 }));
 
@@ -87,7 +87,7 @@ function buildImportFlow(
     isDialogOpen: overrides.isDialogOpen ?? false,
     duplicateBatchConflicts: overrides.duplicateBatchConflicts ?? [],
     hasDuplicateBatchConflicts: overrides.hasDuplicateBatchConflicts ?? false,
-    setIsDialogOpen: setImportDialogOpenMock,
+    closeDialog: closeImportDialogMock,
     startImportDialog: startImportDialogMock,
     startImportFromFiles: startImportFromFilesMock,
     confirmImport: confirmImportMock,
@@ -102,7 +102,7 @@ describe("DatasetTable", () => {
     startImportFromFilesMock.mockReset();
     startImportDialogMock.mockReset();
     confirmImportMock.mockReset();
-    setImportDialogOpenMock.mockReset();
+    closeImportDialogMock.mockReset();
     useDatasetImportFlowMock.mockReset();
     useDatasetImportFlowMock.mockReturnValue(buildImportFlow());
     toastSuccess.mockReset();
