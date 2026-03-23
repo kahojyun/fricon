@@ -1,4 +1,4 @@
-import type { DatasetDetail } from "../api/types";
+import type { ChartViewerAvailability, DatasetDetail } from "../api/types";
 import type { ComplexViewOption } from "@/shared/lib/chartTypes";
 import { useChartDataQuery } from "../api/useChartDataQuery";
 import { useDatasetWriteStatusQuery } from "../api/useDatasetWriteStatusQuery";
@@ -11,6 +11,7 @@ import {
 
 interface UseChartViewerDataArgs {
   datasetId: number;
+  availability: ChartViewerAvailability;
   datasetDetail: DatasetDetail | null;
   derived: ReturnType<typeof deriveChartViewerState>;
   selectedComplexView: ComplexViewOption[];
@@ -19,16 +20,17 @@ interface UseChartViewerDataArgs {
 
 export function useChartViewerData({
   datasetId,
+  availability,
   datasetDetail,
   derived,
   selectedComplexView,
   selectedComplexViewSingle,
 }: UseChartViewerDataArgs) {
-  const payloadAvailable = datasetDetail?.payloadAvailable ?? false;
+  const queriesEnabled = availability === "available";
   const filterTableQuery = useFilterTableDataQuery(
     datasetId,
     derived.excludeColumns,
-    payloadAvailable,
+    queriesEnabled,
   );
   const filterTableData = filterTableQuery.data ?? null;
 
@@ -39,7 +41,7 @@ export function useChartViewerData({
 
   useDatasetWriteStatusQuery(
     datasetId,
-    payloadAvailable && datasetDetail?.status === "Writing",
+    queriesEnabled && datasetDetail?.status === "Writing",
   );
 
   const chartRequest = buildChartRequest({
@@ -55,13 +57,11 @@ export function useChartViewerData({
 
   const chartQuery = useChartDataQuery(
     datasetId,
-    payloadAvailable ? chartRequest : null,
+    queriesEnabled ? chartRequest : null,
   );
   const chartData = chartQuery.data;
-  const chartError = !payloadAvailable
-    ? datasetDetail
-      ? "Dataset payload has been permanently deleted."
-      : null
+  const chartError = !queriesEnabled
+    ? null
     : chartQuery.error
       ? chartQuery.error instanceof Error
         ? chartQuery.error.message

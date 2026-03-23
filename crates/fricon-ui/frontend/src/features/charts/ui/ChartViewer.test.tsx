@@ -61,7 +61,7 @@ async function getSelectTrigger(label: string) {
 }
 
 describe("ChartViewer", () => {
-  it("does not show a tombstone error while dataset detail is loading", () => {
+  it("renders a neutral loading state while dataset detail is loading", () => {
     mockIPC(() => null);
 
     render(
@@ -70,11 +70,67 @@ describe("ChartViewer", () => {
       </QueryClientProvider>,
     );
 
+    expect(screen.getByText("Loading dataset...")).toBeInTheDocument();
+    expect(screen.queryByTestId("chart")).not.toBeInTheDocument();
     expect(screen.queryByText("Chart load failed")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("Dataset payload has been permanently deleted."),
+      screen.queryByText("Dataset Payload Deleted"),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("chart")).toHaveTextContent("empty");
+
+    clearMocks();
+  });
+
+  it("renders tombstone alert when payload is not available", () => {
+    mockIPC(() => null);
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({ payloadAvailable: false })}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Dataset Payload Deleted")).toBeInTheDocument();
+    expect(screen.queryByTestId("chart")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chart load failed")).not.toBeInTheDocument();
+
+    clearMocks();
+  });
+
+  it("renders chart error alert on query failure", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "get_filter_table_data") {
+        return { fields: [], rows: [], columnUniqueValues: {} };
+      }
+      if (cmd === "dataset_chart_data") {
+        throw new Error("Internal Server Error");
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 0, isComplete: true };
+      }
+      return null;
+    });
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              { name: "v", isComplex: false, isTrace: false, isIndex: false },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("Chart load failed");
+    expect(
+      screen.queryByText("Dataset Payload Deleted"),
+    ).not.toBeInTheDocument();
 
     clearMocks();
   });

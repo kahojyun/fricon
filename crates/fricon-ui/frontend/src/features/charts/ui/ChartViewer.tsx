@@ -1,4 +1,4 @@
-import type { DatasetDetail } from "../api/types";
+import type { ChartViewerAvailability, DatasetDetail } from "../api/types";
 import { useChartViewerData } from "../hooks/useChartViewerData";
 import { useChartViewerSelection } from "../hooks/useChartViewerSelection";
 import { ChartViewerControls } from "./ChartViewerControls";
@@ -17,17 +17,25 @@ interface ChartViewerProps {
 }
 
 export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
+  const availability: ChartViewerAvailability =
+    datasetDetail === null
+      ? "loading"
+      : datasetDetail.payloadAvailable
+        ? "available"
+        : "tombstone";
+
   const columns = datasetDetail?.columns ?? [];
   const selection = useChartViewerSelection(columns);
   const { chartData, chartError, filterTableProps } = useChartViewerData({
     datasetId,
+    availability,
     datasetDetail,
     derived: selection.derived,
     selectedComplexView: selection.controlState.selectedComplexView,
     selectedComplexViewSingle: selection.controlState.selectedComplexViewSingle,
   });
 
-  if (datasetDetail && !datasetDetail.payloadAvailable) {
+  if (availability === "tombstone") {
     return (
       <div className="flex size-full min-h-0 flex-col overflow-hidden p-1.5">
         <Alert>
@@ -37,6 +45,14 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
             no longer available.
           </AlertDescription>
         </Alert>
+      </div>
+    );
+  }
+
+  if (availability === "loading") {
+    return (
+      <div className="flex size-full items-center justify-center">
+        <div className="text-xs text-muted-foreground">Loading dataset...</div>
       </div>
     );
   }
