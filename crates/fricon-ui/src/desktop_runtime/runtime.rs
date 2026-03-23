@@ -12,7 +12,6 @@ use tokio::signal;
 use tracing::error;
 
 use crate::{
-    api,
     desktop_runtime::{
         app_state::AppState,
         event_forwarder::start_event_forwarder,
@@ -24,6 +23,7 @@ use crate::{
         LaunchContext, WorkspaceLaunchError,
         resolve::{resolve_workspace_path, select_workspace_path},
     },
+    tauri_api,
 };
 
 pub(crate) fn run_with_context_terminal_mode(context: &LaunchContext) -> Result<()> {
@@ -131,7 +131,7 @@ where
 }
 
 fn run_with_app_state(app_state: AppState) -> Result<()> {
-    let specta_builder = api::specta_builder();
+    let specta_builder = tauri_api::specta_builder();
     #[expect(clippy::exit, reason = "Required by Tauri framework")]
     let tauri_app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

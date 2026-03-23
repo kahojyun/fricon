@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ChartType {
     Line,
@@ -8,7 +10,7 @@ pub(crate) enum ChartType {
     Scatter,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ComplexViewOption {
     Real,
@@ -17,37 +19,37 @@ pub(crate) enum ComplexViewOption {
     Arg,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChartCommonOptions {
-    pub start: Option<usize>,
-    pub end: Option<usize>,
-    pub index_filters: Option<Vec<usize>>,
-    pub exclude_columns: Option<Vec<String>>,
+    pub(crate) start: Option<usize>,
+    pub(crate) end: Option<usize>,
+    pub(crate) index_filters: Option<Vec<usize>>,
+    pub(crate) exclude_columns: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LineChartDataOptions {
-    pub series: String,
-    pub x_column: Option<String>,
-    pub complex_views: Option<Vec<ComplexViewOption>>,
+    pub(crate) series: String,
+    pub(crate) x_column: Option<String>,
+    pub(crate) complex_views: Option<Vec<ComplexViewOption>>,
     #[serde(flatten)]
-    pub common: ChartCommonOptions,
+    pub(crate) common: ChartCommonOptions,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HeatmapChartDataOptions {
-    pub series: String,
-    pub x_column: Option<String>,
-    pub y_column: String,
-    pub complex_view_single: Option<ComplexViewOption>,
+    pub(crate) series: String,
+    pub(crate) x_column: Option<String>,
+    pub(crate) y_column: String,
+    pub(crate) complex_view_single: Option<ComplexViewOption>,
     #[serde(flatten)]
-    pub common: ChartCommonOptions,
+    pub(crate) common: ChartCommonOptions,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub(crate) enum ScatterModeOptions {
     Complex {
@@ -69,15 +71,15 @@ pub(crate) enum ScatterModeOptions {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ScatterChartDataOptions {
-    pub scatter: ScatterModeOptions,
+    pub(crate) scatter: ScatterModeOptions,
     #[serde(flatten)]
-    pub common: ChartCommonOptions,
+    pub(crate) common: ChartCommonOptions,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(tag = "chartType", rename_all = "snake_case")]
 pub(crate) enum DatasetChartDataOptions {
     Line(LineChartDataOptions),
@@ -103,22 +105,52 @@ impl DatasetChartDataOptions {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Series {
-    pub name: String,
-    pub data: Vec<Vec<f64>>,
+    pub(crate) name: String,
+    pub(crate) data: Vec<Vec<f64>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChartDataResponse {
-    pub r#type: ChartType,
-    pub x_name: String,
-    pub y_name: Option<String>,
-    pub x_categories: Option<Vec<f64>>,
-    pub y_categories: Option<Vec<f64>>,
-    pub series: Vec<Series>,
+    pub(crate) r#type: ChartType,
+    pub(crate) x_name: String,
+    pub(crate) y_name: Option<String>,
+    pub(crate) x_categories: Option<Vec<f64>>,
+    pub(crate) y_categories: Option<Vec<f64>>,
+    pub(crate) series: Vec<Series>,
+}
+
+#[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Row {
+    pub(crate) display_values: Vec<String>,
+    pub(crate) value_indices: Vec<usize>,
+    pub(crate) index: usize,
+}
+
+#[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ColumnUniqueValue {
+    pub(crate) index: usize,
+    pub(crate) display_value: String,
+}
+
+#[derive(Serialize, Debug, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TableData {
+    pub(crate) fields: Vec<String>,
+    pub(crate) rows: Vec<Row>,
+    pub(crate) column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
+}
+
+#[derive(Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FilterTableOptions {
+    #[specta(optional)]
+    pub(crate) exclude_columns: Option<Vec<String>>,
 }
 
 pub(crate) fn transform_complex_values(

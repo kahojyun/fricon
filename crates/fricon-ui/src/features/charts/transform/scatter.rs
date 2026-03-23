@@ -171,7 +171,7 @@ mod tests {
     use num::complex::Complex64;
 
     use super::*;
-    use crate::chart_data::{ChartCommonOptions, DatasetChartDataOptions};
+    use crate::features::charts::transform::{ChartCommonOptions, DatasetChartDataOptions};
 
     #[test]
     fn test_build_scatter_series_complex_scalar_and_trace() {

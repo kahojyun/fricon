@@ -1,4 +1,4 @@
-import type { TauriCommandError as WireError } from "@/shared/lib/bindings";
+import type { ApiError as WireError } from "@/shared/lib/bindings";
 
 export function unwrapResult<T>(
   result: { status: "ok"; data: T } | { status: "error"; error: WireError },
@@ -6,7 +6,7 @@ export function unwrapResult<T>(
   if (result.status === "ok") {
     return result.data;
   }
-  throw new Error(result.error.message);
+  throw new Error(`[${result.error.code}] ${result.error.message}`);
 }
 
 export async function invoke<T>(

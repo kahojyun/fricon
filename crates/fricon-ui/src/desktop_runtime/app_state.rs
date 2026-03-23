@@ -2,7 +2,7 @@ use anyhow::Result;
 use fricon::AppManager;
 use tauri::async_runtime;
 
-use crate::{application::session::WorkspaceSession, desktop_runtime::runtime_owner::RuntimeOwner};
+use crate::desktop_runtime::{runtime_owner::RuntimeOwner, session::WorkspaceSession};
 
 pub(crate) struct AppState {
     runtime: RuntimeOwner,

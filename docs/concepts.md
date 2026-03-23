@@ -66,7 +66,7 @@ Users can open a dataset by either `uid` or `id`.
 Rust dependency flow:
 
 ```text
-desktop_runtime -> api::<feature> -> application::<feature> -> fricon
+desktop_runtime -> tauri_api -> features/<feature>/tauri -> features/<feature>/workflow -> fricon
 ```
 
 Frontend dependency flow:
@@ -77,8 +77,10 @@ app/routes -> features/<feature> -> feature-local api -> shared/lib/tauri.ts -> 
 
 The important boundary rules are:
 
-- Rust `src/api/*.rs` files are Tauri adapters only. They own commands, events, and exported DTOs.
-- Rust `src/application/*.rs` files own feature orchestration and should not depend on Tauri types.
+- Rust `src/tauri_api.rs` owns global Tauri/Specta binding export and command/event aggregation.
+- Rust `src/features/<feature>/tauri.rs` files are Tauri adapters only. They own commands, events, exported DTOs, and native dialogs.
+- Rust `src/features/<feature>/workflow.rs` files own feature orchestration and should not depend on Tauri types.
+- Pure Rust data shaping helpers stay inside the owning feature slice, for example `src/features/charts/transform.rs`.
 - Frontend features own their own `api/`, `ui/`, `model/`, and `hooks/` modules.
 - Files under `frontend/src/features/**` use relative imports only.
 - `frontend/src/app/**` and `frontend/src/routes/**` import features only through public barrels such as `@/features/<feature>`.

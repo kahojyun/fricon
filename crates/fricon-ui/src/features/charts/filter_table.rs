@@ -12,27 +12,10 @@ use arrow_buffer::NullBuffer;
 use arrow_schema::{DataType, Fields, SchemaRef};
 use fricon::{DatasetDataType, ScalarKind, SelectOptions};
 
-use crate::application::session::WorkspaceSession;
-
-#[derive(Clone, PartialEq, Debug)]
-pub(crate) struct Row {
-    pub(crate) display_values: Vec<String>,
-    pub(crate) value_indices: Vec<usize>,
-    pub(crate) index: usize,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub(crate) struct ColumnUniqueValue {
-    pub(crate) index: usize,
-    pub(crate) display_value: String,
-}
-
-#[derive(Debug)]
-pub(crate) struct TableData {
-    pub(crate) fields: Vec<String>,
-    pub(crate) rows: Vec<Row>,
-    pub(crate) column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
-}
+use crate::{
+    desktop_runtime::session::WorkspaceSession,
+    features::charts::types::{ColumnUniqueValue, Row, TableData},
+};
 
 pub(crate) struct ProcessedFilterRows {
     pub(crate) unique_rows: Vec<Row>,
