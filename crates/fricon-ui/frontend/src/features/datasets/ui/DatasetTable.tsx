@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "sonner";
+import { onDatasetArchiveDrop } from "../api/events";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import type { DatasetInfo } from "../api/types";
 import { useDatasetColumnVisibility } from "../model/useDatasetColumnVisibility";
@@ -17,6 +18,8 @@ import { DatasetTableBody } from "./DatasetTableBody";
 import { DatasetTableToolbar } from "./DatasetTableToolbar";
 import { useDatasetDeleteFlow } from "./useDatasetDeleteFlow";
 import { useDatasetTableSelection } from "./useDatasetTableSelection";
+import { useDatasetImportFlow } from "./useDatasetImportFlow";
+import { ImportDatasetDialog } from "./ImportDatasetDialog";
 import { summarizeDatasetDeleteResults } from "../model/datasetTableDeleteFlowLogic";
 import {
   AlertDialog,
@@ -263,6 +266,40 @@ export function DatasetTable({
     },
   });
 
+  const importFlow = useDatasetImportFlow();
+  const handleDatasetArchiveDrop = useEffectEvent((paths: string[]) => {
+    importFlow.startImportFromFiles(paths);
+  });
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let active = true;
+
+    try {
+      void onDatasetArchiveDrop((paths) => {
+        if (!active) {
+          return;
+        }
+        handleDatasetArchiveDrop(paths);
+      })
+        .then((nextUnlisten) => {
+          if (!active) {
+            nextUnlisten();
+            return;
+          }
+          unlisten = nextUnlisten;
+        })
+        .catch(() => undefined);
+    } catch {
+      return;
+    }
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
+
   const [isEmptyTrashDialogOpen, setIsEmptyTrashDialogOpen] = useState(false);
 
   const handleEmptyTrash = async () => {
@@ -346,6 +383,7 @@ export function DatasetTable({
           onRenameTag={renameTag}
           onMergeTag={mergeTag}
           onEmptyTrash={() => setIsEmptyTrashDialogOpen(true)}
+          onImportDataset={importFlow.startImportDialog}
         />
         <div
           className="min-h-0 flex-1 overflow-auto bg-background"
@@ -480,6 +518,21 @@ export function DatasetTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportDatasetDialog
+        open={importFlow.isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            importFlow.closeDialog();
+          }
+        }}
+        previewResults={importFlow.previewResults}
+        duplicateBatchConflicts={importFlow.duplicateBatchConflicts}
+        isImporting={importFlow.isImporting}
+        onConfirm={() => {
+          void importFlow.confirmImport();
+        }}
+      />
     </TooltipProvider>
   );
 }

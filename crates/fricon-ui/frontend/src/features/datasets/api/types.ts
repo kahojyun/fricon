@@ -7,6 +7,11 @@ import type {
   UiDatasetSortBy as DatasetListSortBy,
   UiDatasetStatus as DatasetStatus,
   UiSortDirection as DatasetListSortDir,
+  UiPreviewImportResult,
+  UiImportPreview,
+  UiImportConflict,
+  UiFieldDiff,
+  UiExportedMetadata,
 } from "@/shared/lib/bindings";
 import { normalizeDatasetDates } from "@/shared/lib/tauri";
 
@@ -37,6 +42,11 @@ export type {
   DatasetListSortBy,
   DatasetListSortDir,
   DatasetStatus,
+  UiPreviewImportResult,
+  UiImportPreview,
+  UiImportConflict,
+  UiFieldDiff,
+  UiExportedMetadata,
 };
 
 export type DatasetViewMode = "active" | "trash";

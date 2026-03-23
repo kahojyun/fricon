@@ -1,10 +1,11 @@
 import type { ReactElement } from "react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { Download, RotateCcw, Trash2 } from "lucide-react";
 import type {
   DatasetDeleteResult,
   DatasetInfo,
   DatasetViewMode,
 } from "../api/types";
+import { exportDatasetsDialog } from "../api/client";
 import { DatasetRowTagMenus } from "./DatasetTableTagMenu";
 import {
   deriveDatasetTagMenuTarget,
@@ -77,6 +78,19 @@ export function DatasetTableRowActions({
     });
   };
 
+  const handleExport = async () => {
+    try {
+      const exportedPaths = await exportDatasetsDialog(targetIds);
+      if (exportedPaths) {
+        toast.success(`Exported ${exportedPaths.length} dataset(s)`);
+      }
+    } catch (e) {
+      toast.error(
+        `Export failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
+
   return (
     <ContextMenu>
       <ContextMenuTrigger render={children} />
@@ -96,6 +110,13 @@ export function DatasetTableRowActions({
             void handleBatchTagMutation("remove", tag);
           }}
         />
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => void handleExport()}>
+          <Download data-icon="inline-start" />
+          {selectedCount > 1 && includesDataset
+            ? `Export Selected (${selectedCount})`
+            : "Export Dataset"}
+        </ContextMenuItem>
         <ContextMenuSeparator />
         {viewMode === "trash" ? (
           <>

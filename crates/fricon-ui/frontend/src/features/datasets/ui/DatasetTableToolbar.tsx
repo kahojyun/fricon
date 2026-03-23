@@ -32,6 +32,7 @@ interface DatasetTableToolbarProps {
   onRenameTag: (oldName: string, newName: string) => Promise<void>;
   onMergeTag: (source: string, target: string) => Promise<void>;
   onEmptyTrash: () => void;
+  onImportDataset: () => void;
 }
 
 export function DatasetTableToolbar({
@@ -58,6 +59,7 @@ export function DatasetTableToolbar({
   onRenameTag,
   onMergeTag,
   onEmptyTrash,
+  onImportDataset,
 }: DatasetTableToolbarProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-1.5 border-b px-2.5 py-1.5">
@@ -133,6 +135,15 @@ export function DatasetTableToolbar({
             className="shrink-0"
           >
             Empty Trash
+          </Button>
+        )}
+        {viewMode === "active" && (
+          <Button
+            variant="outline"
+            onClick={onImportDataset}
+            className="shrink-0"
+          >
+            Import Dataset
           </Button>
         )}
       </div>

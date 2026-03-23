@@ -14,6 +14,7 @@ import {
   type DatasetInfo,
   type DatasetInfoUpdate,
   type ListDatasetsOptions,
+  type UiPreviewImportResult,
 } from "./types";
 
 export async function listDatasets(
@@ -114,4 +115,29 @@ export async function renameTag(
 
 export async function mergeTag(source: string, target: string): Promise<void> {
   await invoke(commands.mergeTag(source, target));
+}
+
+export async function exportDatasetsDialog(
+  ids: number[],
+): Promise<string[] | null> {
+  return invoke(commands.exportDatasetsDialog(ids));
+}
+
+export async function previewImportDialog(): Promise<
+  UiPreviewImportResult[] | null
+> {
+  return invoke(commands.previewImportDialog());
+}
+
+export async function previewImportFiles(
+  paths: string[],
+): Promise<UiPreviewImportResult[]> {
+  return invoke(commands.previewImportFiles(paths));
+}
+
+export async function importDataset(
+  archivePath: string,
+  force: boolean,
+): Promise<void> {
+  await invoke(commands.importDataset(archivePath, force));
 }
