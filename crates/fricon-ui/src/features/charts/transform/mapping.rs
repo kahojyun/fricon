@@ -1,7 +1,7 @@
 use anyhow::Context;
 use fricon::{DatasetDataType, DatasetSchema};
 
-use crate::features::charts::transform::{
+use crate::features::charts::types::{
     DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
     ScatterChartDataOptions, ScatterModeOptions,
 };
@@ -125,7 +125,7 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::build_chart_selected_columns;
-    use crate::features::charts::transform::{
+    use crate::features::charts::types::{
         ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
         ScatterChartDataOptions, ScatterModeOptions,
     };

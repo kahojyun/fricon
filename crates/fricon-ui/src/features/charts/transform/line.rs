@@ -3,7 +3,7 @@ use arrow_array::{ArrayRef, RecordBatch};
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::{debug, warn};
 
-use super::{
+use crate::features::charts::types::{
     ChartDataResponse, ChartType, ComplexViewOption, LineChartDataOptions, Series,
     complex_view_label, transform_complex_values,
 };
@@ -196,7 +196,7 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::*;
-    use crate::features::charts::transform::ChartCommonOptions;
+    use crate::features::charts::types::ChartCommonOptions;
 
     #[test]
     fn test_build_line_series_numeric() {

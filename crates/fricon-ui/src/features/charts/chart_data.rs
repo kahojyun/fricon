@@ -9,9 +9,12 @@ use tracing::{debug, error, instrument};
 use super::{filter_table::build_filter_batch, types::DatasetChartDataOptions};
 use crate::{
     desktop_runtime::session::WorkspaceSession,
-    features::charts::transform::{
-        ChartDataResponse, build_heatmap_series, build_line_series, build_scatter_series,
-        mapping::build_chart_selected_columns,
+    features::charts::{
+        transform::{
+            build_heatmap_series, build_line_series, build_scatter_series,
+            mapping::build_chart_selected_columns,
+        },
+        types::ChartDataResponse,
     },
 };
 
