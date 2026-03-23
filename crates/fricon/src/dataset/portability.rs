@@ -39,6 +39,11 @@ pub enum PortabilityError {
     MissingMetadata,
     #[error("Dataset already exists (uuid {uid}); use force=true to overwrite")]
     UuidConflict { uid: Uuid },
+    #[error(
+        "Dataset storage directory already exists for uuid {uid}; use force=true to overwrite the \
+         on-disk data"
+    )]
+    FilesystemConflict { uid: Uuid },
 }
 
 /// Metadata stored inside a portable archive.
@@ -137,20 +142,18 @@ pub fn export_dataset(
 
     // --- data chunk files ---
     if dataset_dir.is_dir() {
-        let mut entries: Vec<_> = fs::read_dir(dataset_dir)?
-            .filter_map(Result::ok)
-            .filter(|e| {
-                let path = e.path();
-                let is_data_chunk = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("data_chunk_"));
-                let is_arrow = path
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
-                is_data_chunk && is_arrow
-            })
-            .collect();
+        let mut entries = fs::read_dir(dataset_dir)?.collect::<Result<Vec<_>, _>>()?;
+        entries.retain(|e| {
+            let path = e.path();
+            let is_data_chunk = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("data_chunk_"));
+            let is_arrow = path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
+            is_data_chunk && is_arrow
+        });
         // Sort for deterministic archive order.
         entries.sort_by_key(std::fs::DirEntry::file_name);
 
@@ -242,7 +245,7 @@ pub fn promote_staged_import(
         return Ok(None);
     }
     if !force {
-        return Err(PortabilityError::UuidConflict { uid });
+        return Err(PortabilityError::FilesystemConflict { uid });
     }
 
     let parent_dir = dest_dir.parent().ok_or_else(|| {
@@ -794,7 +797,7 @@ mod tests {
     }
 
     #[test]
-    fn promote_without_force_fails_when_live_dir_exists() {
+    fn promote_without_force_returns_filesystem_conflict_when_live_dir_exists() {
         let tmp = TempDir::new().expect("temp dir");
         let staged = tmp.path().join("stage");
         fs::create_dir_all(&staged).expect("create staged dir");
@@ -810,11 +813,11 @@ mod tests {
         assert!(
             matches!(
                 result,
-                Err(PortabilityError::UuidConflict {
+                Err(PortabilityError::FilesystemConflict {
                     uid: conflict_uid,
                 }) if conflict_uid == uid
             ),
-            "should return conflict error"
+            "should return filesystem conflict error"
         );
         assert!(
             staged.exists(),

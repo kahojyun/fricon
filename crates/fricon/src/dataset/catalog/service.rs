@@ -290,6 +290,7 @@ impl DatasetCatalogService {
         output_dir: &Path,
     ) -> Result<std::path::PathBuf, CatalogError> {
         let record = self.repository.get_dataset(id)?;
+        Self::ensure_not_deleted_record(&record)?;
         let dataset_dir = self.paths.dataset_path_from_uid(record.metadata.uid);
         portability::export_dataset(&record.metadata, &dataset_dir, output_dir)
             .map_err(|e| CatalogError::from(anyhow::Error::from(e)))
@@ -677,6 +678,36 @@ mod tests {
     }
 
     #[test]
+    fn export_dataset_rejects_deleted_dataset() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let mut record = dataset_record(5, uid);
+        record.metadata.deleted_at = Some(Utc::now());
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_get_dataset()
+            .once()
+            .withf(|id| matches!(id, DatasetId::Id(5)))
+            .return_once(move |_| Ok(record));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths.clone());
+        let export_dir = temp_dir.path().join("exports");
+
+        let result = service.export_dataset(DatasetId::Id(5), &export_dir);
+
+        assert!(
+            matches!(result, Err(CatalogError::Deleted { .. })),
+            "deleted datasets should not be exportable"
+        );
+        assert!(
+            !export_dir.exists(),
+            "export directory should not be created when export is rejected"
+        );
+    }
+
+    #[test]
     fn force_import_reuses_existing_record_and_publishes_updated() {
         let temp_dir = tempdir().expect("temp dir should be created");
         let paths = WorkspacePaths::new(temp_dir.path());
@@ -944,6 +975,44 @@ mod tests {
                 panic!("unexpected updated event for dataset {}", record.id)
             }
         }
+    }
+
+    #[test]
+    fn import_dataset_without_force_returns_filesystem_conflict_for_orphaned_live_dir() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let archive = create_import_archive(temp_dir.path(), uid, "orphaned");
+        let live_dir = paths.dataset_path_from_uid(uid);
+        fs::create_dir_all(&live_dir).expect("live dir");
+        fs::write(live_dir.join("orphaned.arrow"), b"OLD").expect("orphaned payload");
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_find_dataset_by_uid()
+            .once()
+            .withf(move |candidate| *candidate == uid)
+            .return_once(move |_| Ok(None));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths.clone());
+        let events = CollectEvents::default();
+
+        let result = service.import_dataset(&archive, false, &events);
+        let error = result.expect_err("orphaned live dir should block non-force import");
+        let error_text = error.to_string();
+
+        assert!(
+            error_text.contains("storage directory already exists"),
+            "error should describe the on-disk conflict: {error_text}"
+        );
+        assert!(
+            live_dir.join("orphaned.arrow").exists(),
+            "existing on-disk payload should remain untouched"
+        );
+        assert!(
+            events.events.lock().expect("events").is_empty(),
+            "no events should be published on filesystem conflict"
+        );
     }
 
     #[test]
