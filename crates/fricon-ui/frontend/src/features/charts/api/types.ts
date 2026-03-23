@@ -26,6 +26,8 @@ export interface DatasetDetail {
   columns: ColumnInfo[];
 }
 
+export type ChartViewerAvailability = "loading" | "available" | "tombstone";
+
 export interface FilterTableData {
   fields: string[];
   rows: FilterTableRow[];
