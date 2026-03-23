@@ -4,26 +4,31 @@ import { useDatasetImportFlow } from "./useDatasetImportFlow";
 import type { UiPreviewImportResult } from "../api/types";
 
 type PreviewImportFilesFn = (paths: string[]) => Promise<unknown>;
+type PreviewImportDialogFn = () => Promise<unknown>;
 type ImportDatasetFn = (
   archivePath: string,
   force: boolean,
 ) => Promise<unknown>;
 
-const { previewImportFilesMock, importDatasetMock, toastError, toastSuccess } =
-  vi.hoisted(() => ({
-    previewImportFilesMock: vi.fn<PreviewImportFilesFn>(),
-    importDatasetMock: vi.fn<ImportDatasetFn>(),
-    toastError: vi.fn(),
-    toastSuccess: vi.fn(),
-  }));
+const {
+  previewImportDialogMock,
+  previewImportFilesMock,
+  importDatasetMock,
+  toastError,
+  toastSuccess,
+} = vi.hoisted(() => ({
+  previewImportDialogMock: vi.fn<PreviewImportDialogFn>(),
+  previewImportFilesMock: vi.fn<PreviewImportFilesFn>(),
+  importDatasetMock: vi.fn<ImportDatasetFn>(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
 
-vi.mock("@/shared/lib/bindings", () => ({
-  commands: {
-    previewImportDialog: vi.fn(),
-    previewImportFiles: (paths: string[]) => previewImportFilesMock(paths),
-    importDataset: (archivePath: string, force: boolean) =>
-      importDatasetMock(archivePath, force),
-  },
+vi.mock("../api/client", () => ({
+  previewImportDialog: () => previewImportDialogMock(),
+  previewImportFiles: (paths: string[]) => previewImportFilesMock(paths),
+  importDataset: (archivePath: string, force: boolean) =>
+    importDatasetMock(archivePath, force),
 }));
 
 vi.mock("sonner", () => ({
@@ -61,6 +66,7 @@ function makePreviewResult(
 
 describe("useDatasetImportFlow", () => {
   beforeEach(() => {
+    previewImportDialogMock.mockReset();
     previewImportFilesMock.mockReset();
     importDatasetMock.mockReset();
     toastError.mockReset();
@@ -68,13 +74,10 @@ describe("useDatasetImportFlow", () => {
   });
 
   it("blocks confirm when the preview batch contains duplicate UUIDs", async () => {
-    previewImportFilesMock.mockResolvedValue({
-      status: "ok",
-      data: [
-        makePreviewResult("/tmp/alpha.tar.zst", "dup-uid", { name: "Alpha" }),
-        makePreviewResult("/tmp/beta.tar.zst", "dup-uid", { name: "Beta" }),
-      ],
-    });
+    previewImportFilesMock.mockResolvedValue([
+      makePreviewResult("/tmp/alpha.tar.zst", "dup-uid", { name: "Alpha" }),
+      makePreviewResult("/tmp/beta.tar.zst", "dup-uid", { name: "Beta" }),
+    ]);
 
     const { result } = renderHook(() => useDatasetImportFlow());
 
@@ -100,31 +103,25 @@ describe("useDatasetImportFlow", () => {
   });
 
   it("allows a non-duplicate batch and forces only workspace conflicts", async () => {
-    previewImportFilesMock.mockResolvedValue({
-      status: "ok",
-      data: [
-        makePreviewResult("/tmp/alpha.tar.zst", "uid-a", { name: "Alpha" }),
-        makePreviewResult("/tmp/beta.tar.zst", "uid-b", {
-          name: "Beta",
-          conflict: {
-            existing: {
-              uid: "uid-b",
-              name: "Existing Beta",
-              description: "existing",
-              favorite: false,
-              status: "Completed",
-              createdAt: "2026-01-01T00:00:00Z",
-              tags: [],
-            },
-            diffs: [],
+    previewImportFilesMock.mockResolvedValue([
+      makePreviewResult("/tmp/alpha.tar.zst", "uid-a", { name: "Alpha" }),
+      makePreviewResult("/tmp/beta.tar.zst", "uid-b", {
+        name: "Beta",
+        conflict: {
+          existing: {
+            uid: "uid-b",
+            name: "Existing Beta",
+            description: "existing",
+            favorite: false,
+            status: "Completed",
+            createdAt: "2026-01-01T00:00:00Z",
+            tags: [],
           },
-        }),
-      ],
-    });
-    importDatasetMock.mockResolvedValue({
-      status: "ok",
-      data: null,
-    });
+          diffs: [],
+        },
+      }),
+    ]);
+    importDatasetMock.mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useDatasetImportFlow());
 

@@ -1,6 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { commands } from "@/shared/lib/bindings";
+import {
+  importDataset,
+  previewImportDialog,
+  previewImportFiles,
+} from "../api/client";
 import type { UiPreviewImportResult } from "../api/types";
 
 export interface DuplicateBatchConflict {
@@ -34,21 +38,15 @@ export function useDatasetImportFlow() {
   );
   const [isImporting, setIsImporting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const duplicateBatchConflicts = useMemo(
-    () => getDuplicateBatchConflicts(previewResults),
-    [previewResults],
-  );
+  const duplicateBatchConflicts = getDuplicateBatchConflicts(previewResults);
   const hasDuplicateBatchConflicts = duplicateBatchConflicts.length > 0;
 
   const startImportDialog = () => {
-    commands
-      .previewImportDialog()
-      .then((result) => {
-        if (result.status === "ok" && result.data && result.data.length > 0) {
-          setPreviewResults(result.data);
+    previewImportDialog()
+      .then((results) => {
+        if (results && results.length > 0) {
+          setPreviewResults(results);
           setIsDialogOpen(true);
-        } else if (result.status === "error") {
-          toast.error(`Import preview failed: ${result.error.message}`);
         }
       })
       .catch((e) => {
@@ -59,14 +57,11 @@ export function useDatasetImportFlow() {
   };
 
   const startImportFromFiles = (paths: string[]) => {
-    commands
-      .previewImportFiles(paths)
-      .then((result) => {
-        if (result.status === "ok" && result.data.length > 0) {
-          setPreviewResults(result.data);
+    previewImportFiles(paths)
+      .then((results) => {
+        if (results.length > 0) {
+          setPreviewResults(results);
           setIsDialogOpen(true);
-        } else if (result.status === "error") {
-          toast.error(`Import preview failed: ${result.error.message}`);
         }
       })
       .catch((e) => {
@@ -91,15 +86,8 @@ export function useDatasetImportFlow() {
     for (const p of previewResults) {
       const force = p.preview.conflict !== null;
       try {
-        const result = await commands.importDataset(p.archivePath, force);
-        if (result.status === "ok") {
-          successCount++;
-        } else {
-          failCount++;
-          toast.error(
-            `Failed to import ${p.preview.metadata.name}: ${result.error.message}`,
-          );
-        }
+        await importDataset(p.archivePath, force);
+        successCount++;
       } catch (e) {
         failCount++;
         toast.error(

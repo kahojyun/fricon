@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "sonner";
+import { onDatasetArchiveDrop } from "../api/events";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import type { DatasetInfo } from "../api/types";
 import { useDatasetColumnVisibility } from "../model/useDatasetColumnVisibility";
@@ -20,7 +21,6 @@ import { useDatasetTableSelection } from "./useDatasetTableSelection";
 import { useDatasetImportFlow } from "./useDatasetImportFlow";
 import { ImportDatasetDialog } from "./ImportDatasetDialog";
 import { summarizeDatasetDeleteResults } from "../model/datasetTableDeleteFlowLogic";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -267,29 +267,38 @@ export function DatasetTable({
   });
 
   const importFlow = useDatasetImportFlow();
+  const handleDatasetArchiveDrop = useEffectEvent((paths: string[]) => {
+    importFlow.startImportFromFiles(paths);
+  });
 
   useEffect(() => {
-    let unlistenPromise: Promise<() => void> | undefined;
+    let unlisten: (() => void) | undefined;
+    let active = true;
 
     try {
-      unlistenPromise = getCurrentWindow().onDragDropEvent((event) => {
-        if (event.payload.type === "drop") {
-          const files = event.payload.paths.filter((path) =>
-            path.endsWith(".tar.zst"),
-          );
-          if (files.length > 0) {
-            importFlow.startImportFromFiles(files);
-          }
+      void onDatasetArchiveDrop((paths) => {
+        if (!active) {
+          return;
         }
-      });
+        handleDatasetArchiveDrop(paths);
+      })
+        .then((nextUnlisten) => {
+          if (!active) {
+            nextUnlisten();
+            return;
+          }
+          unlisten = nextUnlisten;
+        })
+        .catch(() => undefined);
     } catch {
       return;
     }
 
     return () => {
-      unlistenPromise?.then((unlisten) => unlisten()).catch(console.error);
+      active = false;
+      unlisten?.();
     };
-  }, [importFlow]);
+  }, []);
 
   const [isEmptyTrashDialogOpen, setIsEmptyTrashDialogOpen] = useState(false);
 

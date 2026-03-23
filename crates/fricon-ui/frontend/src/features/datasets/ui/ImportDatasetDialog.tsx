@@ -89,7 +89,7 @@ export function ImportDatasetDialog({
           {previewResults.map((result) => {
             const { metadata, conflict } = result.preview;
             return (
-              <div key={metadata.uid} className="space-y-2">
+              <div key={result.archivePath} className="space-y-2">
                 <div className="rounded-md bg-muted p-3">
                   <p>
                     <strong>Name:</strong>{" "}

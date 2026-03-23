@@ -5,6 +5,7 @@ import type {
   DatasetInfo,
   DatasetViewMode,
 } from "../api/types";
+import { exportDatasetsDialog } from "../api/client";
 import { DatasetRowTagMenus } from "./DatasetTableTagMenu";
 import {
   deriveDatasetTagMenuTarget,
@@ -18,7 +19,6 @@ import {
   ContextMenuTrigger,
 } from "@/shared/ui/context-menu";
 import { toast } from "sonner";
-import { commands } from "@/shared/lib/bindings";
 
 interface DatasetTableRowActionsProps {
   dataset: DatasetInfo;
@@ -78,21 +78,17 @@ export function DatasetTableRowActions({
     });
   };
 
-  const handleExport = () => {
-    commands
-      .exportDatasetsDialog(targetIds)
-      .then((result) => {
-        if (result.status === "ok" && result.data) {
-          toast.success(`Exported ${result.data.length} dataset(s)`);
-        } else if (result.status === "error") {
-          toast.error(`Export failed: ${result.error.message}`);
-        }
-      })
-      .catch((e) => {
-        toast.error(
-          `Export failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      });
+  const handleExport = async () => {
+    try {
+      const exportedPaths = await exportDatasetsDialog(targetIds);
+      if (exportedPaths) {
+        toast.success(`Exported ${exportedPaths.length} dataset(s)`);
+      }
+    } catch (e) {
+      toast.error(
+        `Export failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   };
 
   return (

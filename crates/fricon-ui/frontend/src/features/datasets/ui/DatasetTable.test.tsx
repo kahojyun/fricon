@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DuplicateBatchConflict } from "./useDatasetImportFlow";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import {
   COLUMN_VISIBILITY_STORAGE_KEY,
@@ -19,8 +20,32 @@ const { toastSuccess, toastError, toastWarning } = vi.hoisted(() => ({
   toastWarning: vi.fn(),
 }));
 
+const {
+  onDatasetArchiveDropMock,
+  startImportFromFilesMock,
+  startImportDialogMock,
+  confirmImportMock,
+  setImportDialogOpenMock,
+  useDatasetImportFlowMock,
+} = vi.hoisted(() => ({
+  onDatasetArchiveDropMock: vi.fn(),
+  startImportFromFilesMock: vi.fn(),
+  startImportDialogMock: vi.fn(),
+  confirmImportMock: vi.fn(),
+  setImportDialogOpenMock: vi.fn(),
+  useDatasetImportFlowMock: vi.fn(),
+}));
+
 vi.mock("../api/useDatasetTableData", () => ({
   useDatasetTableData: vi.fn(),
+}));
+
+vi.mock("../api/events", () => ({
+  onDatasetArchiveDrop: onDatasetArchiveDropMock,
+}));
+
+vi.mock("./useDatasetImportFlow", () => ({
+  useDatasetImportFlow: useDatasetImportFlowMock,
 }));
 
 vi.mock("sonner", () => ({
@@ -47,9 +72,39 @@ vi.mock("@tanstack/react-virtual", () => ({
 
 const useDatasetTableDataMock = vi.mocked(useDatasetTableData);
 
+function buildImportFlow(
+  overrides: {
+    previewResults?: unknown[];
+    isImporting?: boolean;
+    isDialogOpen?: boolean;
+    duplicateBatchConflicts?: DuplicateBatchConflict[];
+    hasDuplicateBatchConflicts?: boolean;
+  } = {},
+) {
+  return {
+    previewResults: overrides.previewResults ?? [],
+    isImporting: overrides.isImporting ?? false,
+    isDialogOpen: overrides.isDialogOpen ?? false,
+    duplicateBatchConflicts: overrides.duplicateBatchConflicts ?? [],
+    hasDuplicateBatchConflicts: overrides.hasDuplicateBatchConflicts ?? false,
+    setIsDialogOpen: setImportDialogOpenMock,
+    startImportDialog: startImportDialogMock,
+    startImportFromFiles: startImportFromFilesMock,
+    confirmImport: confirmImportMock,
+  };
+}
+
 describe("DatasetTable", () => {
   beforeEach(() => {
     useDatasetTableDataMock.mockReset();
+    onDatasetArchiveDropMock.mockReset();
+    onDatasetArchiveDropMock.mockResolvedValue(vi.fn());
+    startImportFromFilesMock.mockReset();
+    startImportDialogMock.mockReset();
+    confirmImportMock.mockReset();
+    setImportDialogOpenMock.mockReset();
+    useDatasetImportFlowMock.mockReset();
+    useDatasetImportFlowMock.mockReturnValue(buildImportFlow());
     toastSuccess.mockReset();
     toastError.mockReset();
     toastWarning.mockReset();
@@ -61,6 +116,24 @@ describe("DatasetTable", () => {
     renderDatasetTable(useDatasetTableDataMock);
 
     expect(screen.getByText("Dataset 1")).toBeInTheDocument();
+  });
+
+  it("subscribes to archive drop events only once across rerenders", () => {
+    let importFlow = buildImportFlow();
+    useDatasetImportFlowMock.mockImplementation(() => importFlow);
+    useDatasetTableDataMock.mockReturnValue(buildDatasetTableDataValue());
+
+    const onDatasetSelected = vi.fn();
+    const { rerender } = render(
+      <DatasetTable onDatasetSelected={onDatasetSelected} />,
+    );
+
+    expect(onDatasetArchiveDropMock).toHaveBeenCalledTimes(1);
+
+    importFlow = buildImportFlow({ isDialogOpen: true });
+    rerender(<DatasetTable onDatasetSelected={onDatasetSelected} />);
+
+    expect(onDatasetArchiveDropMock).toHaveBeenCalledTimes(1);
   });
 
   it("selects the dataset when a row is clicked", async () => {
