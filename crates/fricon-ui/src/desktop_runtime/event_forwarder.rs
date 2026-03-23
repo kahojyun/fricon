@@ -7,9 +7,11 @@ use tauri_specta::Event;
 use tracing::{error, warn};
 
 use crate::{
-    api::datasets::{DatasetCreated, DatasetInfo, DatasetUpdated},
-    application::session::WorkspaceSession,
-    desktop_runtime::runtime::show_main_window,
+    desktop_runtime::{runtime::show_main_window, session::WorkspaceSession},
+    features::datasets::{
+        tauri::{DatasetCreated, DatasetUpdated},
+        types::DatasetInfo,
+    },
 };
 
 pub(crate) fn start_event_forwarder(session: &WorkspaceSession, app_handle: tauri::AppHandle) {

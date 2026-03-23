@@ -5,7 +5,7 @@
 
 
 export const commands = {
-async getWorkspaceInfo() : Promise<Result<WorkspaceInfo, TauriCommandError>> {
+async getWorkspaceInfo() : Promise<Result<WorkspaceInfo, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_workspace_info") };
 } catch (e) {
@@ -13,7 +13,7 @@ async getWorkspaceInfo() : Promise<Result<WorkspaceInfo, TauriCommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async listDatasets(options: DatasetListOptions | null) : Promise<Result<DatasetInfo[], TauriCommandError>> {
+async listDatasets(options: DatasetListOptions | null) : Promise<Result<DatasetInfo[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_datasets", { options }) };
 } catch (e) {
@@ -21,7 +21,7 @@ async listDatasets(options: DatasetListOptions | null) : Promise<Result<DatasetI
     else return { status: "error", error: e  as any };
 }
 },
-async listDatasetTags() : Promise<Result<string[], TauriCommandError>> {
+async listDatasetTags() : Promise<Result<string[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_dataset_tags") };
 } catch (e) {
@@ -29,7 +29,7 @@ async listDatasetTags() : Promise<Result<string[], TauriCommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async datasetDetail(id: number) : Promise<Result<DatasetDetail, TauriCommandError>> {
+async datasetDetail(id: number) : Promise<Result<DatasetDetail, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("dataset_detail", { id }) };
 } catch (e) {
@@ -37,7 +37,7 @@ async datasetDetail(id: number) : Promise<Result<DatasetDetail, TauriCommandErro
     else return { status: "error", error: e  as any };
 }
 },
-async datasetChartData(id: number, options: DatasetChartDataOptions) : Promise<Result<ChartDataResponse, TauriCommandError>> {
+async datasetChartData(id: number, options: DatasetChartDataOptions) : Promise<Result<ChartDataResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("dataset_chart_data", { id, options }) };
 } catch (e) {
@@ -45,7 +45,7 @@ async datasetChartData(id: number, options: DatasetChartDataOptions) : Promise<R
     else return { status: "error", error: e  as any };
 }
 },
-async getFilterTableData(id: number, options: FilterTableOptions) : Promise<Result<TableData, TauriCommandError>> {
+async getFilterTableData(id: number, options: FilterTableOptions) : Promise<Result<TableData, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_filter_table_data", { id, options }) };
 } catch (e) {
@@ -53,7 +53,7 @@ async getFilterTableData(id: number, options: FilterTableOptions) : Promise<Resu
     else return { status: "error", error: e  as any };
 }
 },
-async updateDatasetFavorite(id: number, update: DatasetFavoriteUpdate) : Promise<Result<null, TauriCommandError>> {
+async updateDatasetFavorite(id: number, update: DatasetFavoriteUpdate) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_dataset_favorite", { id, update }) };
 } catch (e) {
@@ -61,7 +61,7 @@ async updateDatasetFavorite(id: number, update: DatasetFavoriteUpdate) : Promise
     else return { status: "error", error: e  as any };
 }
 },
-async updateDatasetInfo(id: number, update: DatasetInfoUpdate) : Promise<Result<null, TauriCommandError>> {
+async updateDatasetInfo(id: number, update: DatasetInfoUpdate) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_dataset_info", { id, update }) };
 } catch (e) {
@@ -69,7 +69,7 @@ async updateDatasetInfo(id: number, update: DatasetInfoUpdate) : Promise<Result<
     else return { status: "error", error: e  as any };
 }
 },
-async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, TauriCommandError>> {
+async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_dataset_write_status", { id }) };
 } catch (e) {
@@ -77,7 +77,7 @@ async getDatasetWriteStatus(id: number) : Promise<Result<DatasetWriteStatus, Tau
     else return { status: "error", error: e  as any };
 }
 },
-async deleteDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+async deleteDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("delete_datasets", { ids }) };
 } catch (e) {
@@ -85,7 +85,7 @@ async deleteDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], Taur
     else return { status: "error", error: e  as any };
 }
 },
-async trashDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+async trashDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("trash_datasets", { ids }) };
 } catch (e) {
@@ -93,7 +93,7 @@ async trashDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], Tauri
     else return { status: "error", error: e  as any };
 }
 },
-async restoreDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+async restoreDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("restore_datasets", { ids }) };
 } catch (e) {
@@ -101,7 +101,7 @@ async restoreDatasets(ids: number[]) : Promise<Result<DatasetDeleteResult[], Tau
     else return { status: "error", error: e  as any };
 }
 },
-async emptyTrash() : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+async emptyTrash() : Promise<Result<DatasetDeleteResult[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("empty_trash") };
 } catch (e) {
@@ -109,7 +109,7 @@ async emptyTrash() : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async batchUpdateDatasetTags(update: BatchTagUpdateOptions) : Promise<Result<DatasetDeleteResult[], TauriCommandError>> {
+async batchUpdateDatasetTags(update: BatchTagUpdateOptions) : Promise<Result<DatasetDeleteResult[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("batch_update_dataset_tags", { update }) };
 } catch (e) {
@@ -117,7 +117,7 @@ async batchUpdateDatasetTags(update: BatchTagUpdateOptions) : Promise<Result<Dat
     else return { status: "error", error: e  as any };
 }
 },
-async deleteTag(tag: string) : Promise<Result<null, TauriCommandError>> {
+async deleteTag(tag: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("delete_tag", { tag }) };
 } catch (e) {
@@ -125,7 +125,7 @@ async deleteTag(tag: string) : Promise<Result<null, TauriCommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async renameTag(oldName: string, newName: string) : Promise<Result<null, TauriCommandError>> {
+async renameTag(oldName: string, newName: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("rename_tag", { oldName, newName }) };
 } catch (e) {
@@ -133,7 +133,7 @@ async renameTag(oldName: string, newName: string) : Promise<Result<null, TauriCo
     else return { status: "error", error: e  as any };
 }
 },
-async mergeTag(source: string, target: string) : Promise<Result<null, TauriCommandError>> {
+async mergeTag(source: string, target: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("merge_tag", { source, target }) };
 } catch (e) {
@@ -141,7 +141,7 @@ async mergeTag(source: string, target: string) : Promise<Result<null, TauriComma
     else return { status: "error", error: e  as any };
 }
 },
-async exportDatasetsDialog(ids: number[]) : Promise<Result<string[] | null, TauriCommandError>> {
+async exportDatasetsDialog(ids: number[]) : Promise<Result<string[] | null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("export_datasets_dialog", { ids }) };
 } catch (e) {
@@ -149,7 +149,7 @@ async exportDatasetsDialog(ids: number[]) : Promise<Result<string[] | null, Taur
     else return { status: "error", error: e  as any };
 }
 },
-async previewImportDialog() : Promise<Result<UiPreviewImportResult[] | null, TauriCommandError>> {
+async previewImportDialog() : Promise<Result<UiPreviewImportResult[] | null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("preview_import_dialog") };
 } catch (e) {
@@ -157,7 +157,7 @@ async previewImportDialog() : Promise<Result<UiPreviewImportResult[] | null, Tau
     else return { status: "error", error: e  as any };
 }
 },
-async previewImportFiles(paths: string[]) : Promise<Result<UiPreviewImportResult[], TauriCommandError>> {
+async previewImportFiles(paths: string[]) : Promise<Result<UiPreviewImportResult[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("preview_import_files", { paths }) };
 } catch (e) {
@@ -165,7 +165,7 @@ async previewImportFiles(paths: string[]) : Promise<Result<UiPreviewImportResult
     else return { status: "error", error: e  as any };
 }
 },
-async importDataset(archivePath: string, force: boolean) : Promise<Result<DatasetInfo, TauriCommandError>> {
+async importDataset(archivePath: string, force: boolean) : Promise<Result<DatasetInfo, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("import_dataset", { archivePath, force }) };
 } catch (e) {
@@ -192,6 +192,8 @@ datasetUpdated: "dataset-updated"
 
 /** user-defined types **/
 
+export type ApiError = { code: ApiErrorCode; message: string }
+export type ApiErrorCode = "workspace" | "datasets" | "charts" | "dialog" | "validation"
 export type BatchTagUpdateOptions = { ids: number[]; add?: string[] | null; remove?: string[] | null }
 export type ChartDataResponse = { type: ChartType; xName: string; yName: string | null; xCategories: number[] | null; yCategories: number[] | null; series: Series[] }
 export type ChartType = "line" | "heatmap" | "scatter"
@@ -216,7 +218,6 @@ export type ScatterChartDataOptions = ({ start: number | null; end: number | nul
 export type ScatterModeOptions = { mode: "complex"; series: string } | { mode: "trace_xy"; traceXColumn: string; traceYColumn: string } | { mode: "xy"; xColumn: string; yColumn: string; binColumn: string | null }
 export type Series = { name: string; data: number[][] }
 export type TableData = { fields: string[]; rows: Row[]; columnUniqueValues: Partial<{ [key in string]: ColumnUniqueValue[] }> }
-export type TauriCommandError = { message: string }
 export type UiDatasetSortBy = "id" | "name" | "createdAt"
 export type UiDatasetStatus = "Writing" | "Completed" | "Aborted"
 export type UiExportedMetadata = { uid: string; name: string; description: string; favorite: boolean; status: UiDatasetStatus; createdAt: string; tags: string[] }

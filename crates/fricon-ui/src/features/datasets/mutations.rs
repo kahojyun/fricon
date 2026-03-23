@@ -1,57 +1,16 @@
 use std::collections::BTreeSet;
 
 use anyhow::Context;
-use chrono::{DateTime, Utc};
-use fricon::{
-    DatasetDataType, DatasetListQuery, DatasetRecord, DatasetStatus, DatasetUpdate,
-    dataset::model::DatasetId,
-};
-use serde::Serialize;
+use fricon::{DatasetListQuery, DatasetUpdate, dataset::model::DatasetId};
 
-use crate::application::session::WorkspaceSession;
-
-#[derive(Debug, Clone)]
-pub(crate) struct ColumnInfo {
-    pub(crate) name: String,
-    pub(crate) is_complex: bool,
-    pub(crate) is_trace: bool,
-    pub(crate) is_index: bool,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct DatasetDetail {
-    pub(crate) id: i32,
-    pub(crate) name: String,
-    pub(crate) description: String,
-    pub(crate) favorite: bool,
-    pub(crate) tags: Vec<String>,
-    pub(crate) status: DatasetStatus,
-    pub(crate) created_at: DateTime<Utc>,
-    pub(crate) trashed_at: Option<DateTime<Utc>>,
-    pub(crate) deleted_at: Option<DateTime<Utc>>,
-    pub(crate) payload_available: bool,
-    pub(crate) columns: Vec<ColumnInfo>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct DatasetWriteStatus {
-    pub(crate) row_count: usize,
-    pub(crate) is_complete: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct DatasetDeleteResult {
-    pub(crate) id: i32,
-    pub(crate) success: bool,
-    pub(crate) error: Option<String>,
-}
+use super::types::{DatasetDeleteResult, DatasetInfoUpdate};
+use crate::desktop_runtime::session::WorkspaceSession;
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct DatasetInfoUpdate {
-    pub(crate) name: Option<String>,
-    pub(crate) description: Option<String>,
-    pub(crate) favorite: Option<bool>,
-    pub(crate) tags: Option<Vec<String>>,
+pub(crate) struct BatchTagUpdate {
+    pub(crate) ids: Vec<i32>,
+    pub(crate) add: Vec<String>,
+    pub(crate) remove: Vec<String>,
 }
 
 fn normalize_tags(tags: Vec<String>) -> Vec<String> {
@@ -63,79 +22,6 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
         }
     }
     unique.into_iter().collect()
-}
-
-pub(crate) fn validate_non_negative(
-    value: Option<i64>,
-    field_name: &str,
-) -> anyhow::Result<Option<i64>> {
-    match value {
-        Some(v) if v < 0 => anyhow::bail!("{field_name} must be non-negative"),
-        _ => Ok(value),
-    }
-}
-
-pub(crate) async fn list_datasets(
-    session: &WorkspaceSession,
-    query: DatasetListQuery,
-) -> anyhow::Result<Vec<DatasetRecord>> {
-    session
-        .app()
-        .list_datasets(query)
-        .await
-        .context("Failed to list datasets.")
-}
-
-pub(crate) async fn list_dataset_tags(session: &WorkspaceSession) -> anyhow::Result<Vec<String>> {
-    session
-        .app()
-        .list_dataset_tags()
-        .await
-        .context("Failed to list dataset tags.")
-}
-
-pub(crate) async fn get_dataset_detail(
-    session: &WorkspaceSession,
-    id: i32,
-) -> anyhow::Result<DatasetDetail> {
-    let record = session
-        .app()
-        .get_dataset(DatasetId::Id(id))
-        .await
-        .context("Failed to load dataset metadata.")?;
-    let payload_available = record.metadata.deleted_at.is_none();
-    let columns = if payload_available {
-        let reader = session.dataset(id).await?;
-        let schema = reader.schema();
-        let index = reader.index_columns();
-        schema
-            .columns()
-            .iter()
-            .enumerate()
-            .map(|(i, (name, data_type))| ColumnInfo {
-                name: name.to_owned(),
-                is_complex: data_type.is_complex(),
-                is_trace: matches!(data_type, DatasetDataType::Trace(_, _)),
-                is_index: index.as_ref().is_some_and(|index| index.contains(&i)),
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-
-    Ok(DatasetDetail {
-        id: record.id,
-        name: record.metadata.name,
-        description: record.metadata.description,
-        favorite: record.metadata.favorite,
-        tags: record.metadata.tags,
-        status: record.metadata.status,
-        created_at: record.metadata.created_at,
-        trashed_at: record.metadata.trashed_at,
-        deleted_at: record.metadata.deleted_at,
-        payload_available,
-        columns,
-    })
 }
 
 pub(crate) async fn update_dataset_favorite(
@@ -202,18 +88,6 @@ pub(crate) async fn update_dataset_info(
     }
 
     Ok(())
-}
-
-pub(crate) async fn get_dataset_write_status(
-    session: &WorkspaceSession,
-    id: i32,
-) -> anyhow::Result<DatasetWriteStatus> {
-    let dataset = session.dataset(id).await?;
-    let (row_count, is_complete) = dataset.write_status();
-    Ok(DatasetWriteStatus {
-        row_count,
-        is_complete,
-    })
 }
 
 pub(crate) async fn delete_datasets(
@@ -305,13 +179,6 @@ pub(crate) async fn empty_trash(
     Ok(delete_datasets(session, ids).await)
 }
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct BatchTagUpdate {
-    pub(crate) ids: Vec<i32>,
-    pub(crate) add: Vec<String>,
-    pub(crate) remove: Vec<String>,
-}
-
 pub(crate) async fn batch_update_dataset_tags(
     session: &WorkspaceSession,
     update: BatchTagUpdate,
@@ -387,7 +254,9 @@ mod tests {
         BatchTagUpdate, batch_update_dataset_tags, delete_datasets, empty_trash, restore_datasets,
         trash_datasets, update_dataset_info,
     };
-    use crate::application::session::WorkspaceSession;
+    use crate::{
+        desktop_runtime::session::WorkspaceSession, features::datasets::types::DatasetInfoUpdate,
+    };
 
     async fn create_completed_dataset(
         session: &WorkspaceSession,
@@ -602,7 +471,7 @@ mod tests {
         update_dataset_info(
             &session,
             dataset_id,
-            super::DatasetInfoUpdate {
+            DatasetInfoUpdate {
                 name: Some("after-delete".to_string()),
                 description: Some("updated tombstone".to_string()),
                 favorite: Some(true),

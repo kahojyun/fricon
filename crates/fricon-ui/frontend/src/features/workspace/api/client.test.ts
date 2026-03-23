@@ -33,9 +33,11 @@ describe("workspace client", () => {
   it("propagates backend error envelopes", async () => {
     getWorkspaceInfoCommandMock.mockResolvedValue({
       status: "error",
-      error: { message: "workspace unavailable" },
+      error: { code: "workspace", message: "workspace unavailable" },
     });
 
-    await expect(getWorkspaceInfo()).rejects.toThrow("workspace unavailable");
+    await expect(getWorkspaceInfo()).rejects.toThrow(
+      "[workspace] workspace unavailable",
+    );
   });
 });

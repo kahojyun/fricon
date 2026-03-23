@@ -2,7 +2,9 @@ use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 
-use super::{ChartDataResponse, ChartType, ScatterChartDataOptions, ScatterModeOptions, Series};
+use crate::features::charts::types::{
+    ChartDataResponse, ChartType, ScatterChartDataOptions, ScatterModeOptions, Series,
+};
 
 pub(crate) fn build_scatter_series(
     batch: &RecordBatch,
@@ -171,7 +173,7 @@ mod tests {
     use num::complex::Complex64;
 
     use super::*;
-    use crate::chart_data::{ChartCommonOptions, DatasetChartDataOptions};
+    use crate::features::charts::types::{ChartCommonOptions, DatasetChartDataOptions};
 
     #[test]
     fn test_build_scatter_series_complex_scalar_and_trace() {

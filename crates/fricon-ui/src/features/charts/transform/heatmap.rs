@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 
-use super::{
+use crate::features::charts::types::{
     ChartDataResponse, ChartType, ComplexViewOption, HeatmapChartDataOptions, Series,
     complex_view_label, transform_complex_values,
 };
@@ -242,7 +242,7 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::*;
-    use crate::chart_data::ChartCommonOptions;
+    use crate::features::charts::types::ChartCommonOptions;
 
     #[test]
     fn test_build_heatmap_series_numeric() {

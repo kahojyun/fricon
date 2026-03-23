@@ -8,23 +8,60 @@ use std::path::Path;
 
 use tauri_specta::{Builder, collect_commands, collect_events};
 
-pub(crate) mod charts;
-pub(crate) mod datasets;
-pub(crate) mod workspace;
+use crate::features::{
+    charts::tauri as charts,
+    datasets::{
+        tauri as datasets,
+        tauri::{DatasetCreated, DatasetUpdated},
+        types::DatasetInfo,
+    },
+    workspace::tauri as workspace,
+};
 
-use crate::api::datasets::{DatasetCreated, DatasetInfo, DatasetUpdated};
+#[derive(Debug, Clone, Copy, serde::Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ApiErrorCode {
+    Workspace,
+    Datasets,
+    Charts,
+    Dialog,
+    Validation,
+}
 
 #[derive(Debug, Clone, serde::Serialize, specta::Type, thiserror::Error)]
+#[serde(rename_all = "camelCase")]
 #[error("{message}")]
-pub(crate) struct TauriCommandError {
+pub(crate) struct ApiError {
+    code: ApiErrorCode,
     message: String,
 }
 
-impl From<anyhow::Error> for TauriCommandError {
-    fn from(value: anyhow::Error) -> Self {
+impl ApiError {
+    fn new(code: ApiErrorCode, message: impl Into<String>) -> Self {
         Self {
-            message: value.to_string(),
+            code,
+            message: message.into(),
         }
+    }
+
+    pub(crate) fn workspace(error: impl std::fmt::Display) -> Self {
+        Self::new(ApiErrorCode::Workspace, error.to_string())
+    }
+
+    pub(crate) fn datasets(error: impl std::fmt::Display) -> Self {
+        Self::new(ApiErrorCode::Datasets, error.to_string())
+    }
+
+    pub(crate) fn charts(error: impl std::fmt::Display) -> Self {
+        Self::new(ApiErrorCode::Charts, error.to_string())
+    }
+
+    pub(crate) fn dialog(message: impl Into<String>) -> Self {
+        Self::new(ApiErrorCode::Dialog, message)
+    }
+
+    pub(crate) fn validation(error: impl std::fmt::Display) -> Self {
+        Self::new(ApiErrorCode::Validation, error.to_string())
     }
 }
 

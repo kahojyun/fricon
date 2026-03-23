@@ -15,9 +15,9 @@ describe("tauri helpers", () => {
     expect(() =>
       unwrapResult({
         status: "error",
-        error: { message: "backend exploded" },
+        error: { code: "datasets", message: "backend exploded" },
       }),
-    ).toThrow("backend exploded");
+    ).toThrow("[datasets] backend exploded");
   });
 
   it("rejects invalid date values", () => {
