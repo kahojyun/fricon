@@ -248,7 +248,7 @@ impl Tag {
         let target_vec = Tag::find_or_create_batch(conn, &target_names)?;
         let target = &target_vec[0];
 
-        // Dataset IDs that already have the target tag — we must not insert duplicates.
+        // Dataset IDs that already have the target tag - we must not insert duplicates.
         let already_tagged: Vec<i32> = datasets_tags
             .filter(tag_id.eq(target.id))
             .select(dataset_id)

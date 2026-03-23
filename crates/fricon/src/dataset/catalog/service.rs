@@ -14,7 +14,7 @@
 //!
 //! # Sequencing & rollback conventions
 //!
-//! Multi-step workflows (delete, import) follow a stage → commit → finalize
+//! Multi-step workflows (delete, import) follow a stage -> commit -> finalize
 //! pattern so that a failure at any point leaves the system in a recoverable
 //! state. See individual methods for step-by-step sequencing notes.
 //!

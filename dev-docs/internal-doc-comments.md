@@ -14,9 +14,9 @@ Prefer deleting stale prose over keeping a misleading "helpful" comment.
 
 | Code type                                                                                         | Level of documentation                                               |
 | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Module (`//!`) with cross-layer coordination                                                      | **Always** — ownership, invariants, sequencing, extension notes      |
-| Trait or struct that defines a cross-layer boundary, lifecycle contract, or non-obvious ownership | **Always** — owns, reads/mutates, key invariants                     |
-| Multi-step workflow method                                                                        | **Always** — preconditions, step sequence, rollback semantics        |
+| Module (`//!`) with cross-layer coordination                                                      | **Always** - ownership, invariants, sequencing, extension notes      |
+| Trait or struct that defines a cross-layer boundary, lifecycle contract, or non-obvious ownership | **Always** - owns, reads/mutates, key invariants                     |
+| Multi-step workflow method                                                                        | **Always** - preconditions, step sequence, rollback semantics        |
 | Simple CRUD passthrough                                                                           | One-liner or skip                                                    |
 | Obvious local helper                                                                              | Skip                                                                 |
 | Public API or non-obvious call-order workflow                                                     | Add `# Examples` / doctests selectively when usage is easy to misuse |
@@ -29,17 +29,17 @@ line-by-line narration.
 For internal modules and important private helpers, prefer compact Rustdoc that
 explains:
 
-- **Summary sentence** — a first line that stands on its own in rustdoc,
+- **Summary sentence** - a first line that stands on its own in rustdoc,
   search results, and hovers.
-- **Ownership** — what the unit owns, what collaborators it delegates to.
-- **Reads / mutates** — what state (database, filesystem, events) the function
+- **Ownership** - what the unit owns, what collaborators it delegates to.
+- **Reads / mutates** - what state (database, filesystem, events) the function
   touches.
-- **Invariants** — what must be true before and after the call.
-- **Side effects** — events published, files written, etc.
-- **Sequencing & rollback** — step order for multi-step workflows, what happens
+- **Invariants** - what must be true before and after the call.
+- **Side effects** - events published, files written, etc.
+- **Sequencing & rollback** - step order for multi-step workflows, what happens
   on failure at each step.
-- **Error conditions** — which error variants are returned and when.
-- **Extension notes** — "if you change X, also update Y" guidance where a field
+- **Error conditions** - which error variants are returned and when.
+- **Extension notes** - "if you change X, also update Y" guidance where a field
   or format change requires coordinated updates in multiple locations and is
   easy to miss.
 

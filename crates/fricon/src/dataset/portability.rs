@@ -23,8 +23,8 @@
 //! # Archive format
 //!
 //! ```text
-//! metadata.json            ← ExportedMetadata (JSON)
-//! data/data_chunk_0.arrow  ← Arrow IPC chunk files
+//! metadata.json            <- ExportedMetadata (JSON)
+//! data/data_chunk_0.arrow  <- Arrow IPC chunk files
 //! data/data_chunk_1.arrow
 //! …
 //! ```
