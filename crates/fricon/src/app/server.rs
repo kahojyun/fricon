@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
 use grpc::{dataset_service::Storage, fricon_service::Fricon};
 use tokio::runtime::Handle;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
@@ -30,7 +29,7 @@ pub(crate) fn start(
     task_tracker: &TaskTracker,
     cancellation_token: CancellationToken,
     runtime: &Handle,
-) -> Result<()> {
+) -> Result<(), crate::app::AppError> {
     let storage = Storage::new(app.clone(), cancellation_token.clone());
     let service = DatasetServiceServer::new(storage);
     let listener = ipc::listen(ipc_file, runtime)?;

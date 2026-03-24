@@ -40,7 +40,10 @@ use self::{
 };
 use crate::{
     DEFAULT_DATASET_LIST_LIMIT,
-    database::{core::Pool, schema},
+    database::{
+        core::{DatabaseError, Pool},
+        schema,
+    },
     dataset::{
         NormalizedTag,
         catalog::{CatalogError, DatasetCatalogRepository},
@@ -151,7 +154,7 @@ fn normalize_tag_filters(tags: Option<&[String]>) -> Option<Vec<String>> {
 fn resolve_tagged_dataset_ids(
     conn: &mut SqliteConnection,
     tag_filters: Option<&[String]>,
-) -> Result<Option<Vec<i32>>, anyhow::Error> {
+) -> Result<Option<Vec<i32>>, DatabaseError> {
     let Some(tag_filters) = tag_filters else {
         return Ok(None);
     };
@@ -213,7 +216,7 @@ fn apply_deleted_filter(
 fn map_datasets_with_tags(
     conn: &mut SqliteConnection,
     all_datasets: Vec<Dataset>,
-) -> Result<Vec<DatasetRecord>, anyhow::Error> {
+) -> Result<Vec<DatasetRecord>, DatabaseError> {
     let dataset_tags = DatasetTag::belonging_to(&all_datasets)
         .inner_join(schema::tags::table)
         .select((DatasetTag::as_select(), Tag::as_select()))
@@ -240,7 +243,7 @@ fn map_datasets_with_tags(
 fn list_all_dataset_records_including_deleted(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
-) -> Result<Vec<DatasetRecord>, anyhow::Error> {
+) -> Result<Vec<DatasetRecord>, DatabaseError> {
     let unbounded_query = query_options.clone().unbounded();
     list_dataset_records_with_deleted_filter(conn, &unbounded_query, None)
 }
@@ -249,7 +252,7 @@ fn list_all_dataset_records_including_deleted(
 fn list_dataset_records(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
-) -> Result<Vec<DatasetRecord>, anyhow::Error> {
+) -> Result<Vec<DatasetRecord>, DatabaseError> {
     list_dataset_records_with_deleted_filter(conn, query_options, Some(false))
 }
 
@@ -258,7 +261,7 @@ fn list_dataset_records_with_deleted_filter(
     conn: &mut SqliteConnection,
     query_options: &DatasetListQuery,
     deleted: Option<bool>,
-) -> Result<Vec<DatasetRecord>, anyhow::Error> {
+) -> Result<Vec<DatasetRecord>, DatabaseError> {
     let search = normalize_search(query_options.search.as_deref());
     let tag_filters = normalize_tag_filters(query_options.tags.as_deref());
     let tagged_dataset_ids = resolve_tagged_dataset_ids(conn, tag_filters.as_deref())?;
@@ -321,7 +324,7 @@ fn list_dataset_records_with_deleted_filter(
 fn get_dataset_record(
     conn: &mut SqliteConnection,
     id: DatasetId,
-) -> Result<Option<DatasetRecord>, anyhow::Error> {
+) -> Result<Option<DatasetRecord>, DatabaseError> {
     let Some(dataset) = get_dataset_model(conn, id)? else {
         return Ok(None);
     };
@@ -333,7 +336,7 @@ fn get_dataset_record(
 ///
 /// Called at startup to recover from unclean shutdowns where ingest was
 /// interrupted. Returns the number of records updated.
-pub(crate) fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, anyhow::Error> {
+pub(crate) fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, DatabaseError> {
     use schema::datasets::dsl::{datasets, status};
 
     let mut conn = pool.get()?;
@@ -354,8 +357,8 @@ pub(crate) fn cleanup_writing_datasets(pool: &Pool) -> Result<usize, anyhow::Err
 
 impl DatasetCatalogRepository for DatasetRepository {
     fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        let record = get_dataset_record(&mut conn, id).map_err(CatalogError::from)?;
+        let mut conn = self.pool.get()?;
+        let record = get_dataset_record(&mut conn, id)?;
         record.ok_or_else(|| CatalogError::NotFound {
             id: dataset_not_found(id),
         })
@@ -365,31 +368,29 @@ impl DatasetCatalogRepository for DatasetRepository {
         &self,
         query_options: DatasetListQuery,
     ) -> Result<Vec<DatasetRecord>, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        list_dataset_records(&mut conn, &query_options).map_err(CatalogError::from)
+        let mut conn = self.pool.get()?;
+        Ok(list_dataset_records(&mut conn, &query_options)?)
     }
 
     fn list_all_datasets_including_deleted(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        list_all_dataset_records_including_deleted(
+        let mut conn = self.pool.get()?;
+        Ok(list_all_dataset_records_including_deleted(
             &mut conn,
             &DatasetListQuery::default().include_trashed(),
-        )
-        .map_err(CatalogError::from)
+        )?)
     }
 
     fn list_deleted_datasets(&self) -> Result<Vec<DatasetRecord>, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        list_dataset_records_with_deleted_filter(
+        let mut conn = self.pool.get()?;
+        Ok(list_dataset_records_with_deleted_filter(
             &mut conn,
             &DatasetListQuery::default().include_trashed().unbounded(),
             Some(true),
-        )
-        .map_err(CatalogError::from)
+        )?)
     }
 
     fn list_dataset_tags(&self) -> Result<Vec<String>, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         let tags = schema::tags::table
             .inner_join(schema::datasets_tags::table.inner_join(schema::datasets::table))
             .filter(schema::datasets::deleted_at.is_null())
@@ -397,12 +398,12 @@ impl DatasetCatalogRepository for DatasetRepository {
             .distinct()
             .order(schema::tags::name.asc())
             .load(&mut conn)
-            .map_err(anyhow::Error::from)?;
+            .map_err(DatabaseError::from)?;
         Ok(tags)
     }
 
     fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         let db_update = DbDatasetUpdate {
             name: update.name,
             description: update.description,
@@ -412,13 +413,13 @@ impl DatasetCatalogRepository for DatasetRepository {
             trashed_at: None,
             deleted_at: None,
         };
-        Dataset::update_metadata(&mut conn, id, &db_update).map_err(anyhow::Error::from)?;
+        Dataset::update_metadata(&mut conn, id, &db_update).map_err(DatabaseError::from)?;
         debug!(dataset.id = id, "Dataset metadata updated");
         Ok(())
     }
 
     fn add_tags(&self, id: i32, tags: &[NormalizedTag]) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         let tag_names: Vec<String> = tags.iter().map(|tag| tag.as_str().to_string()).collect();
         conn.immediate_transaction(|conn| {
             let created_tags = Tag::find_or_create_batch(conn, &tag_names)?;
@@ -426,13 +427,13 @@ impl DatasetCatalogRepository for DatasetRepository {
             DatasetTag::create_associations(conn, id, &tag_ids)?;
             Ok::<(), diesel::result::Error>(())
         })
-        .map_err(anyhow::Error::from)?;
+        .map_err(DatabaseError::from)?;
         debug!(dataset.id = id, ?tags, "Tags added to dataset");
         Ok(())
     }
 
     fn remove_tags(&self, id: i32, tags: &[NormalizedTag]) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         let tag_names: Vec<String> = tags.iter().map(|tag| tag.as_str().to_string()).collect();
         conn.immediate_transaction(|conn| {
             let tag_ids_to_delete = schema::tags::table
@@ -443,37 +444,38 @@ impl DatasetCatalogRepository for DatasetRepository {
             DatasetTag::remove_associations(conn, id, &tag_ids_to_delete)?;
             Ok::<(), diesel::result::Error>(())
         })
-        .map_err(anyhow::Error::from)?;
+        .map_err(DatabaseError::from)?;
         debug!(dataset.id = id, ?tags, "Tags removed from dataset");
         Ok(())
     }
 
     fn mark_dataset_deleted(&self, id: i32) -> Result<DatasetRecord, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        conn.immediate_transaction(|conn| {
-            Dataset::mark_deleted(conn, id)?;
-            get_dataset_record(conn, DatasetId::Id(id))?
-                .ok_or_else(|| anyhow::anyhow!("dataset should exist after tombstoning"))
-        })
-        .map_err(CatalogError::from)
+        let mut conn = self.pool.get()?;
+        let record =
+            conn.immediate_transaction(|conn| -> Result<DatasetRecord, DatabaseError> {
+                Dataset::mark_deleted(conn, id)?;
+                get_dataset_record(conn, DatasetId::Id(id))?
+                    .ok_or_else(|| DatabaseError::Query(diesel::result::Error::NotFound))
+            })?;
+        Ok(record)
     }
 
     fn trash_dataset(&self, id: i32) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        Dataset::trash(&mut conn, id).map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
+        Dataset::trash(&mut conn, id).map_err(DatabaseError::from)?;
         Ok(())
     }
 
     fn restore_dataset(&self, id: i32) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        Dataset::restore(&mut conn, id).map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
+        Dataset::restore(&mut conn, id).map_err(DatabaseError::from)?;
         Ok(())
     }
 
     fn delete_tag(&self, tag: &NormalizedTag) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         conn.immediate_transaction(|conn| Tag::delete_by_name(conn, tag.as_str()))
-            .map_err(anyhow::Error::from)?;
+            .map_err(DatabaseError::from)?;
         Ok(())
     }
 
@@ -482,9 +484,9 @@ impl DatasetCatalogRepository for DatasetRepository {
         old_name: &NormalizedTag,
         new_name: &NormalizedTag,
     ) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         conn.immediate_transaction(|conn| Tag::rename(conn, old_name.as_str(), new_name.as_str()))
-            .map_err(anyhow::Error::from)?;
+            .map_err(DatabaseError::from)?;
         Ok(())
     }
 
@@ -493,9 +495,9 @@ impl DatasetCatalogRepository for DatasetRepository {
         source: &NormalizedTag,
         target: &NormalizedTag,
     ) -> Result<(), CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         conn.immediate_transaction(|conn| Tag::merge_into(conn, source.as_str(), target.as_str()))
-            .map_err(anyhow::Error::from)?;
+            .map_err(DatabaseError::from)?;
         Ok(())
     }
 
@@ -503,7 +505,7 @@ impl DatasetCatalogRepository for DatasetRepository {
         &self,
         metadata: &ExportedMetadata,
     ) -> Result<DatasetRecord, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         let (dataset, tags) = conn
             .immediate_transaction(|conn| {
                 let new_dataset = NewDataset {
@@ -528,7 +530,7 @@ impl DatasetCatalogRepository for DatasetRepository {
                 };
                 Ok::<(Dataset, Vec<Tag>), diesel::result::Error>((dataset, tags))
             })
-            .map_err(anyhow::Error::from)?;
+            .map_err(DatabaseError::from)?;
         let record = dataset_record_from_models(dataset, tags);
         debug!(dataset.id = record.id, uid = %metadata.uid, "Dataset record imported");
         Ok(record)
@@ -539,7 +541,7 @@ impl DatasetCatalogRepository for DatasetRepository {
         id: i32,
         metadata: &ExportedMetadata,
     ) -> Result<DatasetRecord, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         let (dataset, tags) = conn
             .immediate_transaction(|conn| {
                 let db_update = DbDatasetUpdate {
@@ -566,19 +568,19 @@ impl DatasetCatalogRepository for DatasetRepository {
                     Dataset::find_by_id(conn, id)?.ok_or(diesel::result::Error::NotFound)?;
                 Ok::<(Dataset, Vec<Tag>), diesel::result::Error>((dataset, tags))
             })
-            .map_err(anyhow::Error::from)?;
+            .map_err(DatabaseError::from)?;
         let record = dataset_record_from_models(dataset, tags);
         debug!(dataset.id = record.id, uid = %metadata.uid, "Dataset record replaced from import");
         Ok(record)
     }
 
     fn find_dataset_by_uid(&self, uid: Uuid) -> Result<Option<DatasetRecord>, CatalogError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        let Some(dataset) = Dataset::find_by_uid(&mut conn, uid).map_err(anyhow::Error::from)?
+        let mut conn = self.pool.get()?;
+        let Some(dataset) = Dataset::find_by_uid(&mut conn, uid).map_err(DatabaseError::from)?
         else {
             return Ok(None);
         };
-        let tags = dataset.load_tags(&mut conn).map_err(anyhow::Error::from)?;
+        let tags = dataset.load_tags(&mut conn).map_err(DatabaseError::from)?;
         Ok(Some(dataset_record_from_models(dataset, tags)))
     }
 }
@@ -589,21 +591,21 @@ impl DatasetIngestRepository for DatasetRepository {
         request: &CreateDatasetRequest,
         uid: Uuid,
     ) -> Result<DatasetRecord, IngestError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         let (dataset, tags) = create_dataset_db_record(&mut conn, request, uid)?;
         Ok(dataset_record_from_models(dataset, tags))
     }
 
     fn update_status(&self, id: i32, status: DatasetStatus) -> Result<(), IngestError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
+        let mut conn = self.pool.get()?;
         Dataset::update_status(&mut conn, id, DbDatasetStatus::from(status))
-            .map_err(anyhow::Error::from)?;
+            .map_err(DatabaseError::from)?;
         Ok(())
     }
 
     fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, IngestError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        let record = get_dataset_record(&mut conn, id).map_err(IngestError::from)?;
+        let mut conn = self.pool.get()?;
+        let record = get_dataset_record(&mut conn, id)?;
         record.ok_or_else(|| IngestError::NotFound {
             id: dataset_not_found(id),
         })
@@ -612,11 +614,8 @@ impl DatasetIngestRepository for DatasetRepository {
 
 impl DatasetReadRepository for DatasetRepository {
     fn resolve_dataset(&self, id: DatasetId) -> Result<DatasetLocation, ReadError> {
-        let mut conn = self.pool.get().map_err(anyhow::Error::from)?;
-        let Some(dataset) = get_dataset_model(&mut conn, id)
-            .map_err(anyhow::Error::from)
-            .map_err(ReadError::from)?
-        else {
+        let mut conn = self.pool.get()?;
+        let Some(dataset) = get_dataset_model(&mut conn, id).map_err(DatabaseError::from)? else {
             return Err(ReadError::NotFound {
                 id: dataset_not_found(id),
             });
@@ -634,7 +633,7 @@ fn create_dataset_db_record(
     conn: &mut SqliteConnection,
     request: &CreateDatasetRequest,
     uid: Uuid,
-) -> Result<(Dataset, Vec<Tag>), anyhow::Error> {
+) -> Result<(Dataset, Vec<Tag>), DatabaseError> {
     conn.immediate_transaction(|conn| {
         let new_dataset = NewDataset {
             uid: SimpleUuid(uid),
@@ -661,7 +660,7 @@ fn create_dataset_db_record(
 
         Ok::<(Dataset, Vec<Tag>), diesel::result::Error>((dataset, tags))
     })
-    .map_err(anyhow::Error::from)
+    .map_err(DatabaseError::from)
 }
 
 #[cfg(test)]

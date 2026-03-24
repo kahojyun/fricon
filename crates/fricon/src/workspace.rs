@@ -1,3 +1,4 @@
+mod error;
 mod lock;
 
 use std::{
@@ -5,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail};
 use chrono::NaiveDateTime;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,7 @@ use tempfile::NamedTempFile;
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
+pub use self::error::WorkspaceError;
 use self::lock::FileLock;
 
 const WORKSPACE_VERSION: Version = Version::new(0, 1, 0);
@@ -23,22 +24,19 @@ pub(crate) enum VersionCheckResult {
     NeedsMigration,
 }
 
-pub fn get_log_dir(workspace_path: impl Into<PathBuf>) -> Result<PathBuf> {
+pub fn get_log_dir(workspace_path: impl Into<PathBuf>) -> Result<PathBuf, WorkspaceError> {
     Ok(WorkspaceRoot::validate(workspace_path)?.log_dir())
 }
 
-fn check_version(version: &Version) -> Result<VersionCheckResult> {
+fn check_version(version: &Version) -> Result<VersionCheckResult, WorkspaceError> {
     use std::cmp::Ordering;
 
     match version.cmp(&WORKSPACE_VERSION) {
         Ordering::Equal => Ok(VersionCheckResult::Current),
         Ordering::Less => Ok(VersionCheckResult::NeedsMigration),
-        Ordering::Greater => {
-            bail!(
-                "Workspace version {version} is newer than supported version {WORKSPACE_VERSION}. \
-                 Please update fricon."
-            );
-        }
+        Ordering::Greater => Err(WorkspaceError::VersionTooNew {
+            version: version.clone(),
+        }),
     }
 }
 
@@ -48,23 +46,18 @@ pub(crate) struct WorkspaceMetadata {
 }
 
 impl WorkspaceMetadata {
-    pub(crate) fn write_json(&self, path: impl AsRef<Path>) -> Result<()> {
+    pub(crate) fn write_json(&self, path: impl AsRef<Path>) -> Result<(), WorkspaceError> {
         let path = path.as_ref();
         let mut file = NamedTempFile::new_in(path.parent().expect("Should be workspace root."))?;
-        serde_json::to_writer_pretty(&mut file, self)
-            .with_context(|| format!("Failed to write workspace metadata to {}", path.display()))?;
+        serde_json::to_writer_pretty(&mut file, self)?;
         file.persist(path)?;
         Ok(())
     }
 
-    pub(crate) fn read_json(path: impl AsRef<Path>) -> Result<Self> {
+    pub(crate) fn read_json(path: impl AsRef<Path>) -> Result<Self, WorkspaceError> {
         let path = path.as_ref();
-        let file = File::open(path).with_context(|| {
-            format!("Failed to read workspace metadata from {}", path.display())
-        })?;
-        let metadata = serde_json::from_reader(file).with_context(|| {
-            format!("Failed to read workspace metadata from {}", path.display())
-        })?;
+        let file = File::open(path)?;
+        let metadata = serde_json::from_reader(file)?;
         Ok(metadata)
     }
 }
@@ -152,7 +145,7 @@ impl WorkspacePaths {
     }
 }
 
-fn init_workspace_dirs(paths: &WorkspacePaths) -> Result<()> {
+fn init_workspace_dirs(paths: &WorkspacePaths) -> Result<(), WorkspaceError> {
     fs::create_dir(paths.data_dir())?;
     fs::create_dir(paths.graveyard_dir())?;
     fs::create_dir(paths.log_dir())?;
@@ -182,7 +175,7 @@ impl WorkspaceRoot {
     ///
     /// If the workspace doesn't exist, it will be created.
     /// If it already exists, it will be opened.
-    pub fn create(path: impl Into<PathBuf>) -> Result<Self> {
+    pub fn create(path: impl Into<PathBuf>) -> Result<Self, WorkspaceError> {
         let paths = WorkspacePaths::new(path);
 
         // Check if workspace already exists by checking metadata file
@@ -205,7 +198,7 @@ impl WorkspaceRoot {
     ///
     /// This method will return an error if the directory already exists,
     /// unlike `create()` which will open an existing workspace.
-    pub fn create_new(path: impl Into<PathBuf>) -> Result<Self> {
+    pub fn create_new(path: impl Into<PathBuf>) -> Result<Self, WorkspaceError> {
         let paths = WorkspacePaths::new(path);
         Self::create_new_internal(paths)
     }
@@ -213,13 +206,13 @@ impl WorkspaceRoot {
     /// Open an existing workspace at the given path.
     ///
     /// Validates the workspace metadata and acquires an exclusive lock.
-    pub fn open(path: impl Into<PathBuf>) -> Result<Self> {
+    pub fn open(path: impl Into<PathBuf>) -> Result<Self, WorkspaceError> {
         let paths = WorkspacePaths::new(path);
         Self::open_internal(paths)
     }
 
     #[instrument(skip_all, fields(path = ?paths.root()))]
-    fn create_new_internal(paths: WorkspacePaths) -> Result<Self> {
+    fn create_new_internal(paths: WorkspacePaths) -> Result<Self, WorkspaceError> {
         let root = paths.root();
 
         // Check if directory exists and is not empty (excluding lock file)
@@ -237,15 +230,15 @@ impl WorkspaceRoot {
             }
 
             if has_non_lock_files {
-                bail!("Workspace already exists");
+                return Err(WorkspaceError::AlreadyExists);
             }
         }
 
-        fs::create_dir_all(root).context("Failed to create directory.")?;
+        fs::create_dir_all(root)?;
         let lock_file_path = paths.lock_file();
         let lock = FileLock::new(&lock_file_path)?;
 
-        init_workspace_dirs(&paths).context("Failed to initialize workspace directories.")?;
+        init_workspace_dirs(&paths)?;
 
         let metadata = WorkspaceMetadata {
             version: WORKSPACE_VERSION,
@@ -257,7 +250,7 @@ impl WorkspaceRoot {
     }
 
     #[instrument(skip_all, fields(path = ?paths.root()))]
-    fn open_internal(paths: WorkspacePaths) -> Result<Self> {
+    fn open_internal(paths: WorkspacePaths) -> Result<Self, WorkspaceError> {
         let lock = FileLock::new(paths.lock_file())?;
         let metadata = WorkspaceMetadata::read_json(paths.metadata_file())?;
         let mut root = Self { paths, _lock: lock };
@@ -279,11 +272,11 @@ impl WorkspaceRoot {
     ///
     /// This checks for the presence of required files and validates metadata
     /// without acquiring a lock.
-    pub fn validate(path: impl Into<PathBuf>) -> Result<WorkspacePaths> {
+    pub fn validate(path: impl Into<PathBuf>) -> Result<WorkspacePaths, WorkspaceError> {
         let paths = WorkspacePaths::new(path);
 
         if !paths.metadata_file().exists() {
-            bail!("Not a Fricon workspace: missing metadata file");
+            return Err(WorkspaceError::NotWorkspace);
         }
 
         let metadata = WorkspaceMetadata::read_json(paths.metadata_file())?;
@@ -299,7 +292,7 @@ impl WorkspaceRoot {
         &self.paths
     }
 
-    fn migrate_to_current(&mut self, version: &Version) -> Result<()> {
+    fn migrate_to_current(&mut self, version: &Version) -> Result<(), WorkspaceError> {
         if version < &WORKSPACE_VERSION {
             tracing::info!(
                 "Migrating workspace from version {} to {}",

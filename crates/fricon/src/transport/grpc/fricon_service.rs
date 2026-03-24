@@ -34,6 +34,10 @@ impl FriconService for Fricon {
                 warn!("ShowUiRequest received while workspace server is shutting down");
                 Status::unavailable("workspace server is shutting down")
             }
+            _ => {
+                warn!(error = %err, "ShowUiRequest failed with internal error");
+                Status::internal("internal server error")
+            }
         })?;
         Ok(Response::new(ShowUiResponse {}))
     }

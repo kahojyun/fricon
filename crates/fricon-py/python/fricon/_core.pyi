@@ -14,6 +14,7 @@ __all__ = [
     "Dataset",
     "DatasetManager",
     "DatasetWriter",
+    "FriconDatasetError",
     "ServerHandle",
     "Trace",
     "Workspace",
@@ -25,6 +26,10 @@ __all__ = [
 def main() -> int: ...
 def main_gui() -> int: ...
 def serve_workspace(path: StrPath) -> tuple[Workspace, ServerHandle]: ...
+
+class FriconDatasetError(Exception):
+    code: str
+    message: str
 
 @final
 class ServerHandle:

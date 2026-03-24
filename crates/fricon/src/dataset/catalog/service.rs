@@ -64,6 +64,16 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, id), fields(dataset.id = ?id))]
     pub(crate) fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, CatalogError> {
+        let record = self.repository.get_dataset(id)?;
+        Self::ensure_not_deleted_record(&record)?;
+        Ok(record)
+    }
+
+    #[instrument(skip(self, id), fields(dataset.id = ?id))]
+    pub(crate) fn get_dataset_including_deleted(
+        &self,
+        id: DatasetId,
+    ) -> Result<DatasetRecord, CatalogError> {
         self.repository.get_dataset(id)
     }
 
@@ -149,10 +159,7 @@ impl DatasetCatalogService {
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
         Self::ensure_not_deleted_record(&record)?;
         if record.metadata.trashed_at.is_none() {
-            return Err(anyhow::anyhow!(
-                "dataset must be moved to trash before permanent deletion"
-            )
-            .into());
+            return Err(CatalogError::NotTrashed);
         }
 
         let dataset_path = self.paths.dataset_path_from_uid(record.metadata.uid);
@@ -294,7 +301,7 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, tag), fields(tag.name = %tag))]
     pub(crate) fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {
-        let tag = NormalizedTag::parse(tag)?;
+        let tag = NormalizedTag::parse(tag).map_err(|_| CatalogError::EmptyTag)?;
         self.repository.delete_tag(&tag)
     }
 
@@ -304,20 +311,20 @@ impl DatasetCatalogService {
         old_name: String,
         new_name: String,
     ) -> Result<(), CatalogError> {
-        let old_name = NormalizedTag::parse(old_name)?;
-        let new_name = NormalizedTag::parse(new_name)?;
+        let old_name = NormalizedTag::parse(old_name).map_err(|_| CatalogError::EmptyTag)?;
+        let new_name = NormalizedTag::parse(new_name).map_err(|_| CatalogError::EmptyTag)?;
         if old_name == new_name {
-            return Err(anyhow::anyhow!("old tag name and new tag name must differ").into());
+            return Err(CatalogError::SameTagName);
         }
         self.repository.rename_tag(&old_name, &new_name)
     }
 
     #[instrument(skip(self, source, target), fields(tag.source = %source, tag.target = %target))]
     pub(crate) fn merge_tag(&self, source: String, target: String) -> Result<(), CatalogError> {
-        let source = NormalizedTag::parse(source)?;
-        let target = NormalizedTag::parse(target)?;
+        let source = NormalizedTag::parse(source).map_err(|_| CatalogError::EmptyTag)?;
+        let target = NormalizedTag::parse(target).map_err(|_| CatalogError::EmptyTag)?;
         if source == target {
-            return Err(anyhow::anyhow!("source tag and target tag must differ").into());
+            return Err(CatalogError::SameSourceTarget);
         }
         self.repository.merge_tag(&source, &target)
     }
@@ -349,8 +356,11 @@ impl DatasetCatalogService {
         let record = self.repository.get_dataset(id)?;
         Self::ensure_not_deleted_record(&record)?;
         let dataset_dir = self.paths.dataset_path_from_uid(record.metadata.uid);
-        portability::export_dataset(&record.metadata, &dataset_dir, output_dir)
-            .map_err(|e| CatalogError::from(anyhow::Error::from(e)))
+        Ok(portability::export_dataset(
+            &record.metadata,
+            &dataset_dir,
+            output_dir,
+        )?)
     }
 
     /// Inspect an archive and return metadata + optional conflict info without
@@ -364,15 +374,13 @@ impl DatasetCatalogService {
         archive_path: &Path,
     ) -> Result<ImportPreview, CatalogError> {
         // Peek at metadata to find the uuid.
-        let preview = portability::preview_import(archive_path, None)
-            .map_err(|e| CatalogError::from(anyhow::Error::from(e)))?;
+        let preview = portability::preview_import(archive_path, None)?;
         // Check whether that uuid is already in the DB.
         let existing_record = self.repository.find_dataset_by_uid(preview.metadata.uid)?;
         if let Some(record) = existing_record {
             // Re-run with existing metadata so the diff is populated.
             let preview_with_conflict =
-                portability::preview_import(archive_path, Some(&record.metadata))
-                    .map_err(|e| CatalogError::from(anyhow::Error::from(e)))?;
+                portability::preview_import(archive_path, Some(&record.metadata))?;
             return Ok(preview_with_conflict);
         }
         Ok(preview)
@@ -400,28 +408,26 @@ impl DatasetCatalogService {
         events: &P,
     ) -> Result<DatasetRecord, CatalogError> {
         // Peek metadata from archive to resolve dest dir and check conflict.
-        let preview = portability::preview_import(archive_path, None)
-            .map_err(|e| CatalogError::from(anyhow::Error::from(e)))?;
+        let preview = portability::preview_import(archive_path, None)?;
         let uid = preview.metadata.uid;
         let dest_dir = self.paths.dataset_path_from_uid(uid);
 
         // Determine if an existing record matches.
         let existing_record = self.repository.find_dataset_by_uid(uid)?;
         if existing_record.is_some() && !force {
-            return Err(CatalogError::from(anyhow::Error::from(
+            return Err(CatalogError::from(
                 portability::PortabilityError::UuidConflict { uid },
-            )));
+            ));
         }
 
-        let staged = portability::stage_import(archive_path, &dest_dir)
-            .map_err(|e| CatalogError::from(anyhow::Error::from(e)))?;
+        let staged = portability::stage_import(archive_path, &dest_dir)?;
 
         let backup_dir =
             match portability::promote_staged_import(&staged.staging_dir, &dest_dir, force, uid) {
                 Ok(backup_dir) => backup_dir,
                 Err(error) => {
                     let _ = portability::discard_staged_import(&staged.staging_dir);
-                    return Err(CatalogError::from(anyhow::Error::from(error)));
+                    return Err(CatalogError::from(error));
                 }
             };
 
@@ -753,6 +759,31 @@ mod tests {
     }
 
     #[test]
+    fn get_dataset_rejects_deleted_dataset() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let mut record = dataset_record(5, uid);
+        record.metadata.deleted_at = Some(Utc::now());
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_get_dataset()
+            .once()
+            .withf(|id| matches!(id, DatasetId::Id(5)))
+            .return_once(move |_| Ok(record));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+
+        let result = service.get_dataset(DatasetId::Id(5));
+
+        assert!(
+            matches!(result, Err(CatalogError::Deleted { .. })),
+            "deleted datasets should not be retrievable"
+        );
+    }
+
+    #[test]
     fn export_dataset_rejects_deleted_dataset() {
         let temp_dir = tempdir().expect("temp dir should be created");
         let paths = WorkspacePaths::new(temp_dir.path());
@@ -947,7 +978,11 @@ mod tests {
         repository
             .expect_replace_imported_dataset_record()
             .once()
-            .return_once(move |_, _| Err(anyhow::anyhow!("replace failed").into()));
+            .return_once(move |_, _| {
+                Err(CatalogError::NotFound {
+                    id: "mock".to_string(),
+                })
+            });
 
         let service = DatasetCatalogService::new(Arc::new(repository), paths);
         let events = CollectEvents::default();
@@ -1109,7 +1144,11 @@ mod tests {
         repository
             .expect_insert_imported_dataset_record()
             .once()
-            .return_once(move |_| Err(anyhow::anyhow!("insert failed").into()));
+            .return_once(move |_| {
+                Err(CatalogError::NotFound {
+                    id: "mock".to_string(),
+                })
+            });
 
         let service = DatasetCatalogService::new(Arc::new(repository), paths);
         let events = CollectEvents::default();

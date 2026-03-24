@@ -86,7 +86,7 @@ fn read_ipc_file_mmap(file_path: &Path) -> Result<Vec<RecordBatch>, DatasetFsErr
     })?;
     // SAFETY: Safe because we're only reading from the memory-mapped file and not
     // modifying it
-    let mmap = unsafe { memmap2::Mmap::map(&ipc_file) }.map_err(DatasetFsError::Io)?;
+    let mmap = unsafe { memmap2::Mmap::map(&ipc_file) }?;
 
     // Convert the mmap region to an Arrow `Buffer`
     let bytes = bytes::Bytes::from_owner(mmap);

@@ -6,7 +6,6 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, bail};
 use chrono::Local;
 use thiserror::Error;
 use tokio::{
@@ -18,7 +17,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info, instrument};
 
 use crate::{
-    database::{core, dataset as database_dataset},
+    database::{core, core::DatabaseError, dataset as database_dataset},
     dataset::{
         CreateDatasetInput, CreateDatasetRequest, DatasetEvent, DatasetId, DatasetListQuery,
         DatasetReader, DatasetRecord, DatasetUpdate, ImportPreview,
@@ -27,7 +26,7 @@ use crate::{
         ingest::{DatasetIngestService, IngestError, WriteSessionRegistry},
         read::{DatasetReadService, ReadError},
     },
-    workspace::{WorkspacePaths, WorkspaceRoot},
+    workspace::{WorkspaceError, WorkspacePaths, WorkspaceRoot},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +40,14 @@ pub enum AppError {
     StateDropped,
     #[error("UI command was not delivered to any subscribers")]
     UiCommandUndelivered,
+    #[error("App server is already started")]
+    AlreadyStarted,
+    #[error(transparent)]
+    Workspace(#[from] WorkspaceError),
+    #[error(transparent)]
+    Database(#[from] DatabaseError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 #[derive(Debug, Error)]
@@ -51,16 +58,49 @@ pub enum SubscriptionError {
     Closed,
 }
 
+#[derive(Debug, Error)]
+pub enum CatalogAppError {
+    #[error(transparent)]
+    Domain(#[from] CatalogError),
+    #[error("App state has been dropped")]
+    StateDropped,
+    #[error("Background task panicked while {operation}")]
+    TaskPanic { operation: &'static str },
+    #[error("Background task was cancelled while {operation}")]
+    TaskCancelled { operation: &'static str },
+}
+
+#[derive(Debug, Error)]
+pub enum ReadAppError {
+    #[error(transparent)]
+    Domain(#[from] ReadError),
+    #[error("App state has been dropped")]
+    StateDropped,
+    #[error("Background task panicked while {operation}")]
+    TaskPanic { operation: &'static str },
+    #[error("Background task was cancelled while {operation}")]
+    TaskCancelled { operation: &'static str },
+}
+
+#[derive(Debug, Error)]
+pub enum IngestAppError {
+    #[error(transparent)]
+    Domain(#[from] IngestError),
+    #[error("App state has been dropped")]
+    StateDropped,
+    #[error("Background task panicked while {operation}")]
+    TaskPanic { operation: &'static str },
+    #[error("Background task was cancelled while {operation}")]
+    TaskCancelled { operation: &'static str },
+}
+
 pub struct DatasetEventSubscription {
     inner: broadcast::Receiver<DatasetEvent>,
 }
 
 impl DatasetEventSubscription {
     pub async fn recv(&mut self) -> std::result::Result<DatasetEvent, SubscriptionError> {
-        self.inner
-            .recv()
-            .await
-            .map_err(|error| map_recv_error(&error))
+        self.inner.recv().await.map_err(Into::into)
     }
 }
 
@@ -70,10 +110,16 @@ pub struct UiCommandSubscription {
 
 impl UiCommandSubscription {
     pub async fn recv(&mut self) -> std::result::Result<UiCommand, SubscriptionError> {
-        self.inner
-            .recv()
-            .await
-            .map_err(|error| map_recv_error(&error))
+        self.inner.recv().await.map_err(Into::into)
+    }
+}
+
+impl From<broadcast::error::RecvError> for SubscriptionError {
+    fn from(error: broadcast::error::RecvError) -> Self {
+        match error {
+            broadcast::error::RecvError::Lagged(skipped) => Self::Lagged { skipped },
+            broadcast::error::RecvError::Closed => Self::Closed,
+        }
     }
 }
 
@@ -101,7 +147,7 @@ pub struct AppState {
 
 impl AppState {
     #[instrument(skip(root), fields(workspace.path = ?root.paths().root()))]
-    fn new(root: WorkspaceRoot) -> anyhow::Result<Arc<Self>> {
+    fn new(root: WorkspaceRoot) -> Result<Arc<Self>, DatabaseError> {
         let database = init_database(&root)?;
         let shutdown_token = CancellationToken::new();
         let tracker = TaskTracker::new();
@@ -140,7 +186,7 @@ impl AppState {
     }
 }
 
-fn init_database(root: &WorkspaceRoot) -> anyhow::Result<core::Pool> {
+fn init_database(root: &WorkspaceRoot) -> Result<core::Pool, DatabaseError> {
     let db_path = root.paths().database_file();
     let backup_path = root
         .paths()
@@ -155,37 +201,28 @@ fn init_database(root: &WorkspaceRoot) -> anyhow::Result<core::Pool> {
     Ok(database)
 }
 
-fn map_recv_error(error: &broadcast::error::RecvError) -> SubscriptionError {
-    match error {
-        broadcast::error::RecvError::Lagged(skipped) => {
-            SubscriptionError::Lagged { skipped: *skipped }
-        }
-        broadcast::error::RecvError::Closed => SubscriptionError::Closed,
+fn catalog_join_error(error: &tokio::task::JoinError, operation: &'static str) -> CatalogAppError {
+    if error.is_cancelled() {
+        CatalogAppError::TaskCancelled { operation }
+    } else {
+        CatalogAppError::TaskPanic { operation }
     }
 }
 
-fn catalog_state_dropped() -> CatalogError {
-    anyhow!("app state has been dropped").into()
+fn ingest_join_error(error: &tokio::task::JoinError, operation: &'static str) -> IngestAppError {
+    if error.is_cancelled() {
+        IngestAppError::TaskCancelled { operation }
+    } else {
+        IngestAppError::TaskPanic { operation }
+    }
 }
 
-fn ingest_state_dropped() -> IngestError {
-    anyhow!("app state has been dropped").into()
-}
-
-fn read_state_dropped() -> ReadError {
-    anyhow!("app state has been dropped").into()
-}
-
-fn catalog_join_error(error: tokio::task::JoinError, context: &'static str) -> CatalogError {
-    anyhow::Error::new(error).context(context).into()
-}
-
-fn ingest_join_error(error: tokio::task::JoinError, context: &'static str) -> IngestError {
-    anyhow::Error::new(error).context(context).into()
-}
-
-fn read_join_error(error: tokio::task::JoinError, context: &'static str) -> ReadError {
-    anyhow::Error::new(error).context(context).into()
+fn read_join_error(error: &tokio::task::JoinError, operation: &'static str) -> ReadAppError {
+    if error.is_cancelled() {
+        ReadAppError::TaskCancelled { operation }
+    } else {
+        ReadAppError::TaskPanic { operation }
+    }
 }
 
 #[derive(Clone)]
@@ -200,6 +237,84 @@ impl AppHandle {
 
     fn state(&self) -> std::result::Result<Arc<AppState>, AppError> {
         self.state.upgrade().ok_or(AppError::StateDropped)
+    }
+
+    async fn run_catalog_task<T, F>(
+        &self,
+        operation: &'static str,
+        work: F,
+    ) -> Result<T, CatalogAppError>
+    where
+        T: Send + 'static,
+        F: FnOnce(DatasetCatalogService) -> Result<T, CatalogError> + Send + 'static,
+    {
+        let state = self.state.upgrade().ok_or(CatalogAppError::StateDropped)?;
+        let catalog = state.dataset_catalog.clone();
+        Ok(state
+            .tracker
+            .spawn_blocking(move || work(catalog))
+            .await
+            .map_err(|error| catalog_join_error(&error, operation))??)
+    }
+
+    async fn run_catalog_task_with_events<T, F>(
+        &self,
+        operation: &'static str,
+        work: F,
+    ) -> Result<T, CatalogAppError>
+    where
+        T: Send + 'static,
+        F: FnOnce(DatasetCatalogService, BroadcastDatasetEvents) -> Result<T, CatalogError>
+            + Send
+            + 'static,
+    {
+        let state = self.state.upgrade().ok_or(CatalogAppError::StateDropped)?;
+        let catalog = state.dataset_catalog.clone();
+        let events = BroadcastDatasetEvents {
+            sender: state.dataset_event_sender.clone(),
+        };
+        Ok(state
+            .tracker
+            .spawn_blocking(move || work(catalog, events))
+            .await
+            .map_err(|error| catalog_join_error(&error, operation))??)
+    }
+
+    async fn run_read_task<T, F>(&self, operation: &'static str, work: F) -> Result<T, ReadAppError>
+    where
+        T: Send + 'static,
+        F: FnOnce(DatasetReadService) -> Result<T, ReadError> + Send + 'static,
+    {
+        let state = self.state.upgrade().ok_or(ReadAppError::StateDropped)?;
+        let read = state.dataset_read.clone();
+        Ok(state
+            .tracker
+            .spawn_blocking(move || work(read))
+            .await
+            .map_err(|error| read_join_error(&error, operation))??)
+    }
+
+    async fn run_ingest_task<T, F>(
+        &self,
+        operation: &'static str,
+        work: F,
+    ) -> Result<T, IngestAppError>
+    where
+        T: Send + 'static,
+        F: FnOnce(DatasetIngestService, BroadcastDatasetEvents) -> Result<T, IngestError>
+            + Send
+            + 'static,
+    {
+        let state = self.state.upgrade().ok_or(IngestAppError::StateDropped)?;
+        let ingest = state.dataset_ingest.clone();
+        let events = BroadcastDatasetEvents {
+            sender: state.dataset_event_sender.clone(),
+        };
+        Ok(state
+            .tracker
+            .spawn_blocking(move || work(ingest, events))
+            .await
+            .map_err(|error| ingest_join_error(&error, operation))??)
     }
 
     pub fn paths(&self) -> std::result::Result<WorkspacePaths, AppError> {
@@ -228,159 +343,131 @@ impl AppHandle {
             .map_err(|_| AppError::UiCommandUndelivered)
     }
 
-    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.get_dataset(id))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset get task"))?
+    pub async fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, CatalogAppError> {
+        self.run_catalog_task("failed to join dataset get task", move |catalog| {
+            catalog.get_dataset(id)
+        })
+        .await
+    }
+
+    pub async fn get_dataset_including_deleted(
+        &self,
+        id: DatasetId,
+    ) -> Result<DatasetRecord, CatalogAppError> {
+        self.run_catalog_task(
+            "failed to join dataset get-including-deleted task",
+            move |catalog| catalog.get_dataset_including_deleted(id),
+        )
+        .await
     }
 
     pub async fn list_datasets(
         &self,
         query: DatasetListQuery,
-    ) -> Result<Vec<DatasetRecord>, CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.list_datasets(query))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset list task"))?
+    ) -> Result<Vec<DatasetRecord>, CatalogAppError> {
+        self.run_catalog_task("failed to join dataset list task", move |catalog| {
+            catalog.list_datasets(query)
+        })
+        .await
     }
 
-    pub async fn list_dataset_tags(&self) -> Result<Vec<String>, CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.list_dataset_tags())
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset tag list task"))?
+    pub async fn list_dataset_tags(&self) -> Result<Vec<String>, CatalogAppError> {
+        self.run_catalog_task("failed to join dataset tag list task", move |catalog| {
+            catalog.list_dataset_tags()
+        })
+        .await
     }
 
-    pub async fn update_dataset(&self, id: i32, update: DatasetUpdate) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || catalog.update_dataset(id, update, &events))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset update task"))?
+    pub async fn update_dataset(
+        &self,
+        id: i32,
+        update: DatasetUpdate,
+    ) -> Result<(), CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset update task",
+            move |catalog, events| catalog.update_dataset(id, update, &events),
+        )
+        .await
     }
 
-    pub async fn add_dataset_tags(&self, id: i32, tags: Vec<String>) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || catalog.add_tags(id, tags, &events))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset add-tags task"))?
+    pub async fn add_dataset_tags(
+        &self,
+        id: i32,
+        tags: Vec<String>,
+    ) -> Result<(), CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset add-tags task",
+            move |catalog, events| catalog.add_tags(id, tags, &events),
+        )
+        .await
     }
 
     pub async fn remove_dataset_tags(
         &self,
         id: i32,
         tags: Vec<String>,
-    ) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || catalog.remove_tags(id, tags, &events))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset remove-tags task"))?
+    ) -> Result<(), CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset remove-tags task",
+            move |catalog, events| catalog.remove_tags(id, tags, &events),
+        )
+        .await
     }
 
-    pub async fn delete_dataset(&self, id: i32) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || catalog.delete_dataset(id, &events))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset delete task"))?
+    pub async fn delete_dataset(&self, id: i32) -> Result<(), CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset delete task",
+            move |catalog, events| catalog.delete_dataset(id, &events),
+        )
+        .await
     }
 
-    pub async fn trash_dataset(&self, id: i32) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || catalog.trash_dataset(id, &events))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset trash task"))?
+    pub async fn trash_dataset(&self, id: i32) -> Result<(), CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset trash task",
+            move |catalog, events| catalog.trash_dataset(id, &events),
+        )
+        .await
     }
 
-    pub async fn restore_dataset(&self, id: i32) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || catalog.restore_dataset(id, &events))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset restore task"))?
+    pub async fn restore_dataset(&self, id: i32) -> Result<(), CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset restore task",
+            move |catalog, events| catalog.restore_dataset(id, &events),
+        )
+        .await
     }
 
-    pub async fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.delete_tag(tag))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join tag delete task"))?
+    pub async fn delete_tag(&self, tag: String) -> Result<(), CatalogAppError> {
+        self.run_catalog_task("failed to join tag delete task", move |catalog| {
+            catalog.delete_tag(tag)
+        })
+        .await
     }
 
-    pub async fn rename_tag(&self, old_name: String, new_name: String) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.rename_tag(old_name, new_name))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join tag rename task"))?
+    pub async fn rename_tag(
+        &self,
+        old_name: String,
+        new_name: String,
+    ) -> Result<(), CatalogAppError> {
+        self.run_catalog_task("failed to join tag rename task", move |catalog| {
+            catalog.rename_tag(old_name, new_name)
+        })
+        .await
     }
 
-    pub async fn merge_tag(&self, source: String, target: String) -> Result<(), CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.merge_tag(source, target))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join tag merge task"))?
+    pub async fn merge_tag(&self, source: String, target: String) -> Result<(), CatalogAppError> {
+        self.run_catalog_task("failed to join tag merge task", move |catalog| {
+            catalog.merge_tag(source, target)
+        })
+        .await
     }
 
-    pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, ReadError> {
-        let state = self.state().map_err(|_| read_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let read = state.dataset_read.clone();
-        tracker
-            .spawn_blocking(move || read.get_dataset_reader(id))
-            .await
-            .map_err(|error| read_join_error(error, "failed to join dataset read task"))?
+    pub async fn get_dataset_reader(&self, id: DatasetId) -> Result<DatasetReader, ReadAppError> {
+        self.run_read_task("failed to join dataset read task", move |read| {
+            read.get_dataset_reader(id)
+        })
+        .await
     }
 
     pub async fn create_empty_dataset(
@@ -388,20 +475,15 @@ impl AppHandle {
         name: String,
         description: String,
         tags: Vec<String>,
-    ) -> Result<DatasetRecord, IngestError> {
+    ) -> Result<DatasetRecord, IngestAppError> {
         let request = CreateDatasetRequest {
             name,
             description,
             tags,
         };
-        let state = self.state().map_err(|_| ingest_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let ingest = state.dataset_ingest.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || {
+        self.run_ingest_task(
+            "failed to join dataset create task",
+            move |ingest, events| {
                 let mut sent_finish = false;
                 ingest.create_dataset(
                     &request,
@@ -415,72 +497,56 @@ impl AppHandle {
                     },
                     &events,
                 )
-            })
-            .await
-            .map_err(|error| ingest_join_error(error, "failed to join dataset create task"))?
+            },
+        )
+        .await
     }
 
     pub(crate) async fn create_dataset_from_receiver(
         &self,
         request: CreateDatasetRequest,
         mut receiver: mpsc::Receiver<CreateDatasetInput>,
-    ) -> Result<DatasetRecord, IngestError> {
-        let state = self.state().map_err(|_| ingest_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let ingest = state.dataset_ingest.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || {
+    ) -> Result<DatasetRecord, IngestAppError> {
+        self.run_ingest_task(
+            "failed to join dataset create task",
+            move |ingest, events| {
                 ingest.create_dataset(&request, || receiver.blocking_recv(), &events)
-            })
-            .await
-            .map_err(|error| ingest_join_error(error, "failed to join dataset create task"))?
+            },
+        )
+        .await
     }
 
     pub async fn export_dataset(
         &self,
         id: DatasetId,
         output_dir: std::path::PathBuf,
-    ) -> Result<std::path::PathBuf, CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.export_dataset(id, &output_dir))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset export task"))?
+    ) -> Result<std::path::PathBuf, CatalogAppError> {
+        self.run_catalog_task("failed to join dataset export task", move |catalog| {
+            catalog.export_dataset(id, &output_dir)
+        })
+        .await
     }
 
     pub async fn preview_import(
         &self,
         archive_path: std::path::PathBuf,
-    ) -> Result<ImportPreview, CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        tracker
-            .spawn_blocking(move || catalog.preview_import(&archive_path))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join import preview task"))?
+    ) -> Result<ImportPreview, CatalogAppError> {
+        self.run_catalog_task("failed to join import preview task", move |catalog| {
+            catalog.preview_import(&archive_path)
+        })
+        .await
     }
 
     pub async fn import_dataset(
         &self,
         archive_path: std::path::PathBuf,
         force: bool,
-    ) -> Result<DatasetRecord, CatalogError> {
-        let state = self.state().map_err(|_| catalog_state_dropped())?;
-        let tracker = state.tracker.clone();
-        let catalog = state.dataset_catalog.clone();
-        let events = BroadcastDatasetEvents {
-            sender: state.dataset_event_sender.clone(),
-        };
-        tracker
-            .spawn_blocking(move || catalog.import_dataset(&archive_path, force, &events))
-            .await
-            .map_err(|error| catalog_join_error(error, "failed to join dataset import task"))?
+    ) -> Result<DatasetRecord, CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset import task",
+            move |catalog, events| catalog.import_dataset(&archive_path, force, &events),
+        )
+        .await
     }
 }
 
@@ -492,7 +558,7 @@ pub struct AppManager {
 
 impl AppManager {
     #[instrument(skip(root), fields(workspace.path = ?root.paths().root()))]
-    pub fn new(root: WorkspaceRoot) -> anyhow::Result<Self> {
+    pub fn new(root: WorkspaceRoot) -> Result<Self, AppError> {
         let state = AppState::new(root)?;
         let handle = AppHandle::new(Arc::downgrade(&state));
         Ok(Self {
@@ -502,15 +568,15 @@ impl AppManager {
         })
     }
 
-    pub fn new_with_path(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
+    pub fn new_with_path(path: impl Into<PathBuf>) -> Result<Self, AppError> {
         let root = WorkspaceRoot::create(path)?;
         Self::new(root)
     }
 
     #[instrument(skip(self, runtime), fields(workspace.path = ?self.handle.paths()?.root()))]
-    pub fn start(mut self, runtime: &Handle) -> anyhow::Result<Self> {
+    pub fn start(mut self, runtime: &Handle) -> Result<Self, AppError> {
         if self.started {
-            bail!("App server is already started");
+            return Err(AppError::AlreadyStarted);
         }
 
         let ipc_file = self.handle.paths()?.ipc_file();
@@ -556,5 +622,94 @@ impl AppManager {
     #[must_use]
     pub fn handle(&self) -> &AppHandle {
         &self.handle
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::runtime::Runtime;
+
+    use super::{catalog_join_error, ingest_join_error, read_join_error};
+    use crate::{
+        app::{CatalogAppError, IngestAppError, ReadAppError},
+        dataset::{catalog::CatalogError, ingest::IngestError, read::ReadError},
+    };
+
+    fn panic_join_error() -> tokio::task::JoinError {
+        Runtime::new()
+            .expect("runtime")
+            .block_on(async { tokio::spawn(async { panic!("boom") }).await.unwrap_err() })
+    }
+
+    fn cancelled_join_error() -> tokio::task::JoinError {
+        Runtime::new().expect("runtime").block_on(async {
+            let handle = tokio::spawn(async {
+                tokio::task::yield_now().await;
+            });
+            handle.abort();
+            handle.await.unwrap_err()
+        })
+    }
+
+    #[test]
+    fn catalog_join_error_preserves_panic_context() {
+        let error = catalog_join_error(&panic_join_error(), "joining catalog task");
+        assert!(matches!(
+            error,
+            CatalogAppError::TaskPanic {
+                operation: "joining catalog task"
+            }
+        ));
+    }
+
+    #[test]
+    fn ingest_join_error_preserves_cancel_context() {
+        let error = ingest_join_error(&cancelled_join_error(), "joining ingest task");
+        assert!(matches!(
+            error,
+            IngestAppError::TaskCancelled {
+                operation: "joining ingest task"
+            }
+        ));
+    }
+
+    #[test]
+    fn read_join_error_preserves_cancel_context() {
+        let error = read_join_error(&cancelled_join_error(), "joining read task");
+        assert!(matches!(
+            error,
+            ReadAppError::TaskCancelled {
+                operation: "joining read task"
+            }
+        ));
+    }
+
+    #[test]
+    fn catalog_app_error_wraps_domain_errors() {
+        let error = CatalogAppError::from(CatalogError::NotTrashed);
+        assert!(matches!(
+            error,
+            CatalogAppError::Domain(CatalogError::NotTrashed)
+        ));
+    }
+
+    #[test]
+    fn ingest_app_error_wraps_domain_errors() {
+        let error = IngestAppError::from(IngestError::NotFound {
+            id: "42".to_string(),
+        });
+        assert!(matches!(
+            error,
+            IngestAppError::Domain(IngestError::NotFound { .. })
+        ));
+    }
+
+    #[test]
+    fn read_app_error_wraps_domain_errors() {
+        let error = ReadAppError::from(ReadError::EmptyDataset);
+        assert!(matches!(
+            error,
+            ReadAppError::Domain(ReadError::EmptyDataset)
+        ));
     }
 }

@@ -1,4 +1,7 @@
-use crate::dataset::{schema::DatasetError, storage::error::DatasetFsError};
+use crate::{
+    database::core::DatabaseError,
+    dataset::{schema::DatasetError, storage::error::DatasetFsError},
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum IngestError {
@@ -9,5 +12,5 @@ pub enum IngestError {
     #[error(transparent)]
     DatasetFs(#[from] DatasetFsError),
     #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
+    Database(#[from] DatabaseError),
 }

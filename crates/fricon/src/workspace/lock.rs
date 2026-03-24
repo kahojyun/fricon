@@ -9,8 +9,9 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{Context as _, Result};
 use tracing::warn;
+
+use super::error::LockError;
 
 /// Exclusive file-backed lock for a workspace root.
 ///
@@ -28,7 +29,7 @@ impl FileLock {
     ///
     /// The returned guard must stay alive for as long as exclusive workspace
     /// access is required.
-    pub(crate) fn new(path: impl Into<PathBuf>) -> Result<Self> {
+    pub(crate) fn new(path: impl Into<PathBuf>) -> Result<Self, LockError> {
         let path = path.into();
         let file = fs::OpenOptions::new()
             .read(true)
@@ -36,8 +37,8 @@ impl FileLock {
             .create(true)
             .truncate(true)
             .open(&path)
-            .context("Failed to open file for locking.")?;
-        file.try_lock().context("Failed to acquire file lock.")?;
+            .map_err(LockError::Open)?;
+        file.try_lock().map_err(|e| LockError::Acquire(e.into()))?;
         Ok(Self { _file: file, path })
     }
 }

@@ -4,12 +4,13 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetTagMutation } from "./useDatasetTagMutation";
 import { datasetKeys } from "./queryKeys";
+import type { DatasetTagBatchResult } from "./types";
 
 type BatchUpdateDatasetTagsFn = (
   ids: number[],
   add?: string[],
   remove?: string[],
-) => Promise<{ id: number; success: boolean; error: string | null }[]>;
+) => Promise<DatasetTagBatchResult[]>;
 type DeleteTagFn = (tag: string) => Promise<void>;
 type RenameTagFn = (oldName: string, newName: string) => Promise<void>;
 type MergeTagFn = (source: string, target: string) => Promise<void>;
@@ -94,7 +95,9 @@ describe("useDatasetTagMutation", () => {
           resolveRefresh = resolve;
         }),
     );
-    const results = [{ id: 1, success: true, error: null }];
+    const results = [
+      { id: 1, success: true, addError: null, removeError: null },
+    ];
     batchUpdateDatasetTagsMock.mockResolvedValue(results);
 
     const { result } = renderHook(
@@ -104,9 +107,7 @@ describe("useDatasetTagMutation", () => {
       },
     );
 
-    let mutationPromise!: Promise<
-      { id: number; success: boolean; error: string | null }[]
-    >;
+    let mutationPromise!: Promise<DatasetTagBatchResult[]>;
     act(() => {
       mutationPromise = result.current.batchAddTags([1], ["vision"]);
     });
@@ -145,7 +146,9 @@ describe("useDatasetTagMutation", () => {
     });
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
     const refreshDatasets = vi.fn().mockResolvedValue(undefined);
-    const results = [{ id: 1, success: true, error: null }];
+    const results = [
+      { id: 1, success: true, addError: null, removeError: null },
+    ];
     batchUpdateDatasetTagsMock.mockResolvedValue(results);
 
     const { result } = renderHook(

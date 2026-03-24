@@ -107,11 +107,11 @@ describe("dataset client", () => {
   it("propagates dataset command error envelopes", async () => {
     listDatasetsCommandMock.mockResolvedValue({
       status: "error",
-      error: { code: "datasets", message: "dataset listing failed" },
+      error: { code: "dataset_not_found", message: "dataset listing failed" },
     });
 
     await expect(listDatasets()).rejects.toThrow(
-      "[datasets] dataset listing failed",
+      "[dataset_not_found] dataset listing failed",
     );
   });
 });

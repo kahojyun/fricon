@@ -57,9 +57,13 @@ describe("useDatasetDeleteFlow", () => {
   it("keeps failed ids selected after a full delete failure", async () => {
     const notifier = createNotifier();
     const setRowSelection = vi.fn();
-    const deleteDatasets = vi
-      .fn()
-      .mockResolvedValue([{ id: 12, success: false, error: "locked" }]);
+    const deleteDatasets = vi.fn().mockResolvedValue([
+      {
+        id: 12,
+        success: false,
+        error: { code: "internal", message: "locked" },
+      },
+    ]);
 
     const { result } = renderHook(() =>
       useDatasetDeleteFlow({
@@ -100,7 +104,11 @@ describe("useDatasetDeleteFlow", () => {
     const onDatasetSelected = vi.fn();
     const deleteDatasets = vi.fn().mockResolvedValue([
       { id: 11, success: true, error: null },
-      { id: 12, success: false, error: "locked" },
+      {
+        id: 12,
+        success: false,
+        error: { code: "internal", message: "locked" },
+      },
     ]);
 
     const { result } = renderHook(() =>

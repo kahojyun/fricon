@@ -334,7 +334,10 @@ export function DatasetTable({
           `Failed to permanently delete ${summary.failedResults.length} dataset(s)`,
           {
             description: summary.failedResults
-              .map((result) => `ID ${result.id}: ${result.error}`)
+              .map(
+                (result) =>
+                  `ID ${result.id}: ${result.error?.message ?? "Unknown error"}`,
+              )
               .join("\n"),
           },
         );
@@ -345,7 +348,10 @@ export function DatasetTable({
         `Permanently deleted ${summary.successIds.length} dataset(s), but ${summary.failedResults.length} failed.`,
         {
           description: summary.failedResults
-            .map((result) => `ID ${result.id}: ${result.error}`)
+            .map(
+              (result) =>
+                `ID ${result.id}: ${result.error?.message ?? "Unknown error"}`,
+            )
             .join("\n"),
         },
       );

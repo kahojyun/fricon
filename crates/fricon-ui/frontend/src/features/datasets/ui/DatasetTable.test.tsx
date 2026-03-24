@@ -390,7 +390,11 @@ describe("DatasetTable", () => {
     ];
     const deleteDatasets = vi.fn().mockResolvedValue([
       { id: 11, success: true, error: null },
-      { id: 12, success: false, error: "locked" },
+      {
+        id: 12,
+        success: false,
+        error: { code: "internal", message: "locked" },
+      },
     ]);
     renderDatasetTable(useDatasetTableDataMock, {
       datasets,

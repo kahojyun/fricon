@@ -4,6 +4,8 @@ use chrono::{DateTime, Utc};
 use fricon::{DatasetRecord, DatasetStatus};
 use serde::{Deserialize, Serialize};
 
+use crate::tauri_api::ApiErrorCode;
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, specta::Type)]
 pub(crate) enum UiDatasetStatus {
     Writing,
@@ -112,12 +114,28 @@ pub(crate) struct DatasetWriteStatus {
     pub(crate) is_complete: bool,
 }
 
-#[derive(Debug, Clone, Serialize, specta::Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DatasetOperationError {
+    pub(crate) code: ApiErrorCode,
+    pub(crate) message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DatasetDeleteResult {
     pub(crate) id: i32,
     pub(crate) success: bool,
-    pub(crate) error: Option<String>,
+    pub(crate) error: Option<DatasetOperationError>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DatasetTagBatchResult {
+    pub(crate) id: i32,
+    pub(crate) success: bool,
+    pub(crate) add_error: Option<DatasetOperationError>,
+    pub(crate) remove_error: Option<DatasetOperationError>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]

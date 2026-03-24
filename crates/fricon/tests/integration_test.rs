@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use arrow_array::{Array, Float64Array, RecordBatch};
 use fricon::{
-    AppManager, Client, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar, DatasetStatus,
-    ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace, WorkspaceRoot,
-    app::UiCommand,
+    AppManager, Client, ClientError, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar,
+    DatasetStatus, ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace,
+    WorkspaceRoot, app::UiCommand,
 };
 use indexmap::IndexMap;
 use num::complex::Complex64;
@@ -420,9 +420,9 @@ async fn test_show_ui_requires_attached_ui_subscriber() -> anyhow::Result<()> {
         .show_ui()
         .await
         .expect_err("show_ui should fail when no UI subscriber is attached");
-    let status = error
-        .downcast_ref::<tonic::Status>()
-        .expect("show_ui should return tonic::Status");
+    let ClientError::Status(status) = &error else {
+        panic!("show_ui should return ClientError::Status, got: {error:?}");
+    };
     assert_eq!(status.code(), Code::FailedPrecondition);
 
     app_manager.shutdown().await;
@@ -444,6 +444,64 @@ async fn test_probe_existing_ui_delegates_when_subscriber_is_attached() -> anyho
 
     assert_eq!(probe_result, ExistingUiProbeResult::UiShown);
     assert!(matches!(event_rx.recv().await?, UiCommand::ShowUi));
+
+    app_manager.shutdown().await;
+    temp_dir.close()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_missing_dataset_returns_typed_not_found_error() -> anyhow::Result<()> {
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+    WorkspaceRoot::create_new(workspace_path)?;
+
+    let app_manager =
+        AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
+    let client = Client::connect(workspace_path).await?;
+
+    let error = match client.get_dataset_by_id(999_999).await {
+        Ok(_) => anyhow::bail!("missing dataset should return a typed client error"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, ClientError::DatasetNotFound));
+
+    app_manager.shutdown().await;
+    temp_dir.close()?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_deleted_dataset_returns_typed_deleted_error() -> anyhow::Result<()> {
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+    WorkspaceRoot::create_new(workspace_path)?;
+
+    let app_manager =
+        AppManager::new_with_path(workspace_path)?.start(&tokio::runtime::Handle::current())?;
+    let client = Client::connect(workspace_path).await?;
+
+    let test_rows = create_test_rows();
+    let test_schema = test_rows[0].to_schema();
+    let mut writer = client
+        .create_dataset(
+            "deleted_dataset".to_string(),
+            "Dataset that will be deleted".to_string(),
+            vec!["test".to_string()],
+            test_schema,
+        )
+        .await?;
+    writer.write(create_test_rows().remove(0)).await?;
+    let dataset = writer.finish().await?;
+
+    app_manager.handle().trash_dataset(dataset.id()).await?;
+    app_manager.handle().delete_dataset(dataset.id()).await?;
+
+    let error = match client.get_dataset_by_id(dataset.id()).await {
+        Ok(_) => anyhow::bail!("deleted dataset should surface a typed client error"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, ClientError::DatasetDeleted));
 
     app_manager.shutdown().await;
     temp_dir.close()?;

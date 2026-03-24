@@ -1,16 +1,20 @@
 import { renderHook, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetTableActions } from "./useDatasetTableActions";
-import type { DatasetDeleteResult, DatasetInfo } from "./types";
+import type {
+  DatasetDeleteResult,
+  DatasetInfo,
+  DatasetTagBatchResult,
+} from "./types";
 import { datasetKeys } from "./queryKeys";
 
 type ToggleFavoriteFn = (dataset: DatasetInfo) => Promise<void>;
 type DeleteDatasetsFn = (ids: number[]) => Promise<DatasetDeleteResult[]>;
-type EmptyTrashFn = () => Promise<{ deletedCount: number }>;
+type EmptyTrashFn = () => Promise<DatasetDeleteResult[]>;
 type BatchTagMutationFn = (
   ids: number[],
   tags: string[],
-) => Promise<DatasetDeleteResult[]>;
+) => Promise<DatasetTagBatchResult[]>;
 type TagMutationFn = (...args: string[]) => Promise<void>;
 
 const toggleFavoriteMock = vi.fn<ToggleFavoriteFn>();
@@ -93,7 +97,7 @@ describe("useDatasetTableActions", () => {
     trashDatasetsMock.mockResolvedValue([]);
     restoreDatasetsMock.mockResolvedValue([]);
     deleteDatasetsMock.mockResolvedValue([]);
-    emptyTrashMock.mockResolvedValue({ deletedCount: 0 });
+    emptyTrashMock.mockResolvedValue([]);
     batchAddTagsMock.mockResolvedValue([]);
     batchRemoveTagsMock.mockResolvedValue([]);
     deleteTagMock.mockResolvedValue(undefined);

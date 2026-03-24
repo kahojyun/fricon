@@ -24,8 +24,8 @@ mod convert;
 mod _core {
     #[pymodule_export]
     use super::{
-        Dataset, DatasetManager, DatasetWriter, ServerHandle, Trace, Workspace, main, main_gui,
-        serve_workspace,
+        Dataset, DatasetManager, DatasetWriter, FriconDatasetError, ServerHandle, Trace, Workspace,
+        main, main_gui, serve_workspace,
     };
 }
 
@@ -37,10 +37,10 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use fricon::{
-    Client,
+    Client, ClientError,
     app::AppManager,
     dataset::{
         model::{DatasetMetadata, DatasetRecord, DatasetStatus},
@@ -50,11 +50,96 @@ use fricon::{
 use fricon_cli::clap::{Parser, error::ErrorKind};
 use indexmap::IndexMap;
 use pyo3::{
+    create_exception,
+    exceptions::{PyException, PyRuntimeError},
     prelude::*,
     sync::PyOnceLock,
     types::{PyDict, PyList},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
+
+create_exception!(fricon._core, FriconDatasetError, PyException);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PythonDatasetErrorCode {
+    DatasetNotFound,
+    DatasetDeleted,
+    DatasetNotTrashed,
+    InvalidTag,
+    SameTagName,
+    SameSourceTarget,
+    Internal,
+}
+
+impl PythonDatasetErrorCode {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::DatasetNotFound => "dataset_not_found",
+            Self::DatasetDeleted => "dataset_deleted",
+            Self::DatasetNotTrashed => "dataset_not_trashed",
+            Self::InvalidTag => "invalid_tag",
+            Self::SameTagName => "same_tag_name",
+            Self::SameSourceTarget => "same_source_target",
+            Self::Internal => "internal",
+        }
+    }
+}
+
+fn generic_py_err(error: impl std::fmt::Display) -> PyErr {
+    PyRuntimeError::new_err(error.to_string())
+}
+
+fn dataset_py_err(code: PythonDatasetErrorCode, message: impl Into<String>) -> PyErr {
+    let message = message.into();
+    Python::attach(|py| {
+        let err = FriconDatasetError::new_err((message.clone(),));
+        let value = err.value(py);
+        let _ = value.setattr("code", code.as_str());
+        let _ = value.setattr("message", message);
+        err
+    })
+}
+
+fn client_error_details(error: &ClientError) -> Option<(PythonDatasetErrorCode, String)> {
+    match error {
+        ClientError::DatasetNotFound => Some((
+            PythonDatasetErrorCode::DatasetNotFound,
+            "Dataset not found".to_string(),
+        )),
+        ClientError::DatasetDeleted => Some((
+            PythonDatasetErrorCode::DatasetDeleted,
+            "Dataset has been permanently deleted".to_string(),
+        )),
+        ClientError::DatasetNotTrashed => Some((
+            PythonDatasetErrorCode::DatasetNotTrashed,
+            "Dataset must be moved to trash before permanent deletion".to_string(),
+        )),
+        ClientError::InvalidTag => Some((
+            PythonDatasetErrorCode::InvalidTag,
+            "Tag name must not be empty".to_string(),
+        )),
+        ClientError::SameTagName => Some((
+            PythonDatasetErrorCode::SameTagName,
+            "Old tag name and new tag name must differ".to_string(),
+        )),
+        ClientError::SameSourceTarget => Some((
+            PythonDatasetErrorCode::SameSourceTarget,
+            "Source tag and target tag must differ".to_string(),
+        )),
+        ClientError::DatasetOperationFailed => Some((
+            PythonDatasetErrorCode::Internal,
+            "Dataset operation failed".to_string(),
+        )),
+        _ => None,
+    }
+}
+
+fn map_client_error(error: ClientError) -> PyErr {
+    match client_error_details(&error) {
+        Some((code, message)) => dataset_py_err(code, message),
+        None => generic_py_err(error),
+    }
+}
 
 /// A client of fricon workspace server.
 #[pyclass(module = "fricon._core", from_py_object)]
@@ -132,17 +217,21 @@ impl DatasetManager {
     ///     The requested dataset.
     ///
     /// Raises:
-    ///     RuntimeError: Dataset not found.
-    pub fn open(&self, py: Python<'_>, dataset_id: &Bound<'_, PyAny>) -> Result<Dataset> {
+    ///     FriconDatasetError: Dataset not found or otherwise unavailable.
+    pub fn open(&self, py: Python<'_>, dataset_id: &Bound<'_, PyAny>) -> PyResult<Dataset> {
         let client = self.workspace.client.clone();
         if let Ok(id) = dataset_id.extract::<i32>() {
-            let inner = py.detach(|| get_runtime().block_on(client.get_dataset_by_id(id)))?;
+            let inner = py
+                .detach(|| get_runtime().block_on(client.get_dataset_by_id(id)))
+                .map_err(map_client_error)?;
             Ok(Dataset { inner })
         } else if let Ok(uid) = dataset_id.extract::<String>() {
-            let inner = py.detach(|| get_runtime().block_on(client.get_dataset_by_uid(uid)))?;
+            let inner = py
+                .detach(|| get_runtime().block_on(client.get_dataset_by_uid(uid)))
+                .map_err(map_client_error)?;
             Ok(Dataset { inner })
         } else {
-            bail!("Invalid dataset id.")
+            Err(generic_py_err("Invalid dataset id."))
         }
     }
 
@@ -164,8 +253,9 @@ impl DatasetManager {
         static FROM_RECORDS: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
         let client = self.workspace.client.clone();
-        let records =
-            py.detach(|| get_runtime().block_on(client.list_all_datasets(limit, offset)))?;
+        let records = py
+            .detach(|| get_runtime().block_on(client.list_all_datasets(limit, offset)))
+            .map_err(map_client_error)?;
         let py_records = records.into_iter().map(
             |DatasetRecord {
                  id,
@@ -298,13 +388,17 @@ impl Dataset {
     }
 
     #[pyo3(signature = (*tag))]
-    pub fn add_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> Result<()> {
+    pub fn add_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> PyResult<()> {
         py.detach(|| get_runtime().block_on(self.inner.add_tags(tag)))
+            .map_err(map_client_error)?;
+        Ok(())
     }
 
     #[pyo3(signature = (*tag))]
-    pub fn remove_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> Result<()> {
+    pub fn remove_tags(&mut self, py: Python<'_>, tag: Vec<String>) -> PyResult<()> {
         py.detach(|| get_runtime().block_on(self.inner.remove_tags(tag)))
+            .map_err(map_client_error)?;
+        Ok(())
     }
 
     #[pyo3(signature = (*, name = None, description = None, favorite = None))]
@@ -314,10 +408,12 @@ impl Dataset {
         name: Option<String>,
         description: Option<String>,
         favorite: Option<bool>,
-    ) -> Result<()> {
+    ) -> PyResult<()> {
         py.detach(|| {
             get_runtime().block_on(self.inner.update_metadata(name, description, favorite))
         })
+        .map_err(map_client_error)?;
+        Ok(())
     }
 
     /// Name of the dataset.
@@ -486,7 +582,7 @@ impl DatasetWriter {
         }
     }
 
-    fn complete(&mut self, py: Python<'_>, abort: bool) -> Result<Py<Dataset>> {
+    fn complete(&mut self, py: Python<'_>, abort: bool) -> PyResult<Py<Dataset>> {
         if let Some(dataset) = self.dataset.as_ref() {
             return Ok(dataset.clone_ref(py));
         }
@@ -494,9 +590,11 @@ impl DatasetWriter {
         match mem::replace(&mut self.state, WriterState::Finished) {
             WriterState::Writing(writer) => {
                 let inner = if abort {
-                    py.detach(|| get_runtime().block_on(writer.abort()))?
+                    py.detach(|| get_runtime().block_on(writer.abort()))
+                        .map_err(map_client_error)?
                 } else {
-                    py.detach(|| get_runtime().block_on(writer.finish()))?
+                    py.detach(|| get_runtime().block_on(writer.finish()))
+                        .map_err(map_client_error)?
                 };
                 let dataset = Py::new(py, Dataset { inner })?;
                 self.dataset = Some(dataset.clone_ref(py));
@@ -514,9 +612,9 @@ impl DatasetWriter {
                     description,
                     tags,
                 };
-                bail!("No data to finalize.")
+                Err(generic_py_err("No data to finalize."))
             }
-            WriterState::Finished => bail!("Writer closed."),
+            WriterState::Finished => Err(generic_py_err("Writer closed.")),
         }
     }
 }
@@ -532,9 +630,9 @@ impl DatasetWriter {
         &mut self,
         py: Python<'_>,
         kwargs: Option<IndexMap<String, Py<PyAny>>>,
-    ) -> Result<()> {
+    ) -> PyResult<()> {
         let Some(values) = kwargs else {
-            bail!("No data to write.")
+            return Err(generic_py_err("No data to write."));
         };
         self.write_dict(py, values)
     }
@@ -547,9 +645,9 @@ impl DatasetWriter {
         &mut self,
         py: Python<'_>,
         values: IndexMap<String, Py<PyAny>>,
-    ) -> Result<()> {
+    ) -> PyResult<()> {
         if values.is_empty() {
-            bail!("No data to write.")
+            return Err(generic_py_err("No data to write."));
         }
 
         match mem::replace(&mut self.state, WriterState::Finished) {
@@ -561,28 +659,32 @@ impl DatasetWriter {
             } => {
                 let row = convert::build_row(py, values)?;
                 let schema = row.to_schema();
-                let writer = py.detach(|| -> Result<_> {
-                    let mut writer = get_runtime().block_on(client.create_dataset(
-                        name,
-                        description,
-                        tags,
-                        schema,
-                    ))?;
-                    get_runtime().block_on(writer.write(row))?;
-                    Ok(writer)
-                })?;
+                let writer = py
+                    .detach(|| -> std::result::Result<_, ClientError> {
+                        let mut writer = get_runtime().block_on(client.create_dataset(
+                            name,
+                            description,
+                            tags,
+                            schema,
+                        ))?;
+                        get_runtime().block_on(writer.write(row))?;
+                        Ok(writer)
+                    })
+                    .map_err(map_client_error)?;
                 self.state = WriterState::Writing(writer);
             }
             WriterState::Writing(mut writer) => {
                 let row = convert::build_row(py, values)?;
-                writer = py.detach(|| -> Result<_> {
-                    get_runtime().block_on(writer.write(row))?;
-                    Ok(writer)
-                })?;
+                writer = py
+                    .detach(|| -> std::result::Result<_, ClientError> {
+                        get_runtime().block_on(writer.write(row))?;
+                        Ok(writer)
+                    })
+                    .map_err(map_client_error)?;
                 self.state = WriterState::Writing(writer);
             }
             WriterState::Finished => {
-                bail!("Writer closed.")
+                return Err(generic_py_err("Writer closed."));
             }
         }
 
@@ -594,27 +696,27 @@ impl DatasetWriter {
     /// Raises:
     ///     RuntimeError: Writer is not closed yet.
     #[getter]
-    pub fn dataset(&self, py: Python<'_>) -> Result<Py<Dataset>> {
+    pub fn dataset(&self, py: Python<'_>) -> PyResult<Py<Dataset>> {
         let dataset = self
             .dataset
             .as_ref()
-            .context("Writer is not closed yet.")?
+            .ok_or_else(|| generic_py_err("Writer is not closed yet."))?
             .clone_ref(py);
         Ok(dataset)
     }
 
     /// Finish writing to dataset and return dataset metadata.
-    pub fn finish(&mut self, py: Python<'_>) -> Result<Py<Dataset>> {
+    pub fn finish(&mut self, py: Python<'_>) -> PyResult<Py<Dataset>> {
         self.complete(py, false)
     }
 
     /// Abort writing to dataset and return dataset metadata.
-    pub fn abort(&mut self, py: Python<'_>) -> Result<Py<Dataset>> {
+    pub fn abort(&mut self, py: Python<'_>) -> PyResult<Py<Dataset>> {
         self.complete(py, true)
     }
 
     /// Finish writing to dataset.
-    pub fn close(&mut self, py: Python<'_>) -> Result<()> {
+    pub fn close(&mut self, py: Python<'_>) -> PyResult<()> {
         if self.dataset.is_some() {
             return Ok(());
         }
@@ -641,7 +743,7 @@ impl DatasetWriter {
         exc_type: Py<PyAny>,
         _exc_value: Py<PyAny>,
         _traceback: Py<PyAny>,
-    ) -> Result<()> {
+    ) -> PyResult<()> {
         if exc_type.is_none(py) {
             self.close(py)
         } else {
@@ -797,9 +899,10 @@ pub fn serve_workspace(py: Python<'_>, path: PathBuf) -> Result<(Workspace, Serv
 
 #[cfg(test)]
 mod tests {
+    use fricon::ClientError;
     use fricon_cli::clap::error::ErrorKind;
 
-    use super::parse_error_exit_code;
+    use super::{PythonDatasetErrorCode, client_error_details, parse_error_exit_code};
 
     #[test]
     fn parse_help_and_version_return_success_exit_code() {
@@ -810,5 +913,27 @@ mod tests {
     #[test]
     fn parse_failure_returns_error_exit_code() {
         assert_eq!(parse_error_exit_code(ErrorKind::MissingRequiredArgument), 2);
+    }
+
+    #[test]
+    fn client_not_found_maps_to_python_dataset_error() {
+        let Some((code, message)) = client_error_details(&ClientError::DatasetNotFound) else {
+            panic!("expected dataset semantic mapping");
+        };
+        assert_eq!(code, PythonDatasetErrorCode::DatasetNotFound);
+        assert_eq!(message, "Dataset not found");
+    }
+
+    #[test]
+    fn client_deleted_maps_to_python_dataset_error() {
+        let Some((code, _)) = client_error_details(&ClientError::DatasetDeleted) else {
+            panic!("expected dataset semantic mapping");
+        };
+        assert_eq!(code, PythonDatasetErrorCode::DatasetDeleted);
+    }
+
+    #[test]
+    fn unknown_errors_stay_on_generic_runtime_error_path() {
+        assert!(client_error_details(&ClientError::NotRunning).is_none());
     }
 }

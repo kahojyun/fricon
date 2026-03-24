@@ -29,13 +29,23 @@ describe("datasetTableDeleteFlowLogic", () => {
   it("classifies all-failure delete results", () => {
     expect(
       summarizeDatasetDeleteResults([
-        { id: 11, success: false, error: "locked" },
+        {
+          id: 11,
+          success: false,
+          error: { code: "internal", message: "locked" },
+        },
       ]),
     ).toEqual({
       outcome: "failure",
       successIds: [],
       failedIds: [11],
-      failedResults: [{ id: 11, success: false, error: "locked" }],
+      failedResults: [
+        {
+          id: 11,
+          success: false,
+          error: { code: "internal", message: "locked" },
+        },
+      ],
     });
   });
 
@@ -43,13 +53,23 @@ describe("datasetTableDeleteFlowLogic", () => {
     expect(
       summarizeDatasetDeleteResults([
         { id: 11, success: true, error: null },
-        { id: 12, success: false, error: "locked" },
+        {
+          id: 12,
+          success: false,
+          error: { code: "internal", message: "locked" },
+        },
       ]),
     ).toEqual({
       outcome: "partial",
       successIds: [11],
       failedIds: [12],
-      failedResults: [{ id: 12, success: false, error: "locked" }],
+      failedResults: [
+        {
+          id: 12,
+          success: false,
+          error: { code: "internal", message: "locked" },
+        },
+      ],
     });
   });
 });

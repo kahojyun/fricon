@@ -1,15 +1,21 @@
 use std::collections::BTreeSet;
 
-use anyhow::bail;
+use thiserror::Error;
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub(crate) enum TagError {
+    #[error("tag must not be empty")]
+    Empty,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct NormalizedTag(String);
 
 impl NormalizedTag {
-    pub(crate) fn parse(value: impl AsRef<str>) -> anyhow::Result<Self> {
+    pub(crate) fn parse(value: impl AsRef<str>) -> Result<Self, TagError> {
         let normalized = value.as_ref().trim();
         if normalized.is_empty() {
-            bail!("tag must not be empty");
+            return Err(TagError::Empty);
         }
         Ok(Self(normalized.to_string()))
     }
@@ -39,16 +45,16 @@ impl std::fmt::Display for NormalizedTag {
 
 #[cfg(test)]
 mod tests {
-    use super::NormalizedTag;
+    use super::{NormalizedTag, TagError};
 
     #[test]
     fn parse_rejects_blank_tags() {
         let error = NormalizedTag::parse("   ").expect_err("blank tag should be rejected");
-        assert_eq!(error.to_string(), "tag must not be empty");
+        assert_eq!(error, TagError::Empty);
     }
 
     #[test]
-    fn parse_trims_tag_names() -> anyhow::Result<()> {
+    fn parse_trims_tag_names() -> Result<(), TagError> {
         let tag = NormalizedTag::parse(" vision ")?;
         assert_eq!(tag.as_str(), "vision");
         Ok(())

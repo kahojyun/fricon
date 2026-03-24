@@ -1,4 +1,4 @@
-import type { DatasetDeleteResult, DatasetInfo } from "../api/types";
+import type { DatasetInfo, DatasetTagBatchResult } from "../api/types";
 
 export type DatasetTagOperation = "add" | "remove";
 
@@ -21,11 +21,11 @@ interface RunDatasetTagMutationArgs {
   batchAddTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
   batchRemoveTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
   notify: DatasetTagMutationNotifier;
 }
 
@@ -50,17 +50,25 @@ export function deriveDatasetTagMenuTarget(
   };
 }
 
-function getTagMutationDescription(results: DatasetDeleteResult[]) {
+function getTagMutationDescription(results: DatasetTagBatchResult[]) {
   return results
-    .filter((result) => !result.success)
-    .map((result) => `ID ${result.id}: ${result.error ?? "Unknown error"}`)
+    .flatMap((result) => {
+      const messages: string[] = [];
+      if (result.addError) {
+        messages.push(`ID ${result.id}: add: ${result.addError.message}`);
+      }
+      if (result.removeError) {
+        messages.push(`ID ${result.id}: remove: ${result.removeError.message}`);
+      }
+      return messages;
+    })
     .join("\n");
 }
 
 export function notifyDatasetTagMutationResult(
   operation: DatasetTagOperation,
   tag: string,
-  results: DatasetDeleteResult[],
+  results: DatasetTagBatchResult[],
   notify: DatasetTagMutationNotifier,
 ) {
   const actionLabel = operation === "add" ? "Added" : "Removed";
