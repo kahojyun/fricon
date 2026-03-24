@@ -15,7 +15,7 @@ mod transport;
 pub mod workspace;
 
 pub use self::{
-    app::{AppHandle, AppManager},
+    app::{AppHandle, AppManager, CatalogAppError, IngestAppError, ReadAppError},
     client::{Client, ClientError, Dataset, DatasetWriter, ExistingUiProbeResult},
     dataset::{
         DatasetArray, DatasetDataType, DatasetEvent, DatasetId, DatasetListQuery, DatasetMetadata,

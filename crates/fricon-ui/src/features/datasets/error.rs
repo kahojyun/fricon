@@ -1,11 +1,11 @@
-use fricon::dataset::{catalog::CatalogError, read::ReadError};
+use fricon::{CatalogAppError, ReadAppError};
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum UiDatasetError {
     #[error(transparent)]
-    Catalog(#[from] CatalogError),
+    Catalog(#[from] CatalogAppError),
     #[error(transparent)]
-    Read(#[from] ReadError),
+    Read(#[from] ReadAppError),
     #[error("{message}")]
     Validation { message: String },
 }

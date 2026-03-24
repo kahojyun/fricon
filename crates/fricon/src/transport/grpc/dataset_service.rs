@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use super::create_stream;
 use crate::{
-    app::AppHandle,
+    app::{AppHandle, CatalogAppError, IngestAppError, ReadAppError},
     dataset::{
         DatasetId, DatasetListQuery, DatasetUpdate, catalog::CatalogError, ingest::IngestError,
         read::ReadError,
@@ -86,49 +86,51 @@ fn dataset_status(
     status
 }
 
-impl From<CatalogError> for Status {
-    fn from(error: CatalogError) -> Self {
+impl From<CatalogAppError> for Status {
+    fn from(error: CatalogAppError) -> Self {
         match error {
-            CatalogError::NotFound { .. } => dataset_status(
+            CatalogAppError::Domain(CatalogError::NotFound { .. }) => dataset_status(
                 Code::NotFound,
                 DatasetTransportErrorCode::DatasetNotFound,
                 "dataset not found",
             ),
-            CatalogError::EmptyTag => dataset_status(
+            CatalogAppError::Domain(CatalogError::EmptyTag) => dataset_status(
                 Code::InvalidArgument,
                 DatasetTransportErrorCode::InvalidTag,
-                error.to_string(),
+                CatalogError::EmptyTag.to_string(),
             ),
-            CatalogError::SameTagName => dataset_status(
+            CatalogAppError::Domain(CatalogError::SameTagName) => dataset_status(
                 Code::InvalidArgument,
                 DatasetTransportErrorCode::SameTagName,
-                error.to_string(),
+                CatalogError::SameTagName.to_string(),
             ),
-            CatalogError::SameSourceTarget => dataset_status(
+            CatalogAppError::Domain(CatalogError::SameSourceTarget) => dataset_status(
                 Code::InvalidArgument,
                 DatasetTransportErrorCode::SameSourceTarget,
-                error.to_string(),
+                CatalogError::SameSourceTarget.to_string(),
             ),
-            CatalogError::Deleted { .. } => dataset_status(
+            CatalogAppError::Domain(CatalogError::Deleted { id }) => dataset_status(
                 Code::FailedPrecondition,
                 DatasetTransportErrorCode::DatasetDeleted,
-                error.to_string(),
+                CatalogError::Deleted { id }.to_string(),
             ),
-            CatalogError::NotTrashed => dataset_status(
+            CatalogAppError::Domain(CatalogError::NotTrashed) => dataset_status(
                 Code::FailedPrecondition,
                 DatasetTransportErrorCode::DatasetNotTrashed,
-                error.to_string(),
+                CatalogError::NotTrashed.to_string(),
             ),
-            CatalogError::StateDropped
-            | CatalogError::TaskPanic { .. }
-            | CatalogError::TaskCancelled { .. } => dataset_status(
+            CatalogAppError::StateDropped
+            | CatalogAppError::TaskPanic { .. }
+            | CatalogAppError::TaskCancelled { .. } => dataset_status(
                 Code::Internal,
                 DatasetTransportErrorCode::Internal,
                 error.to_string(),
             ),
-            CatalogError::DatasetFs(_)
-            | CatalogError::Database(_)
-            | CatalogError::Portability(_) => dataset_status(
+            CatalogAppError::Domain(
+                CatalogError::DatasetFs(_)
+                | CatalogError::Database(_)
+                | CatalogError::Portability(_),
+            ) => dataset_status(
                 Code::Internal,
                 DatasetTransportErrorCode::Internal,
                 "dataset operation failed",
@@ -137,60 +139,60 @@ impl From<CatalogError> for Status {
     }
 }
 
-impl From<IngestError> for Status {
-    fn from(error: IngestError) -> Self {
+impl From<IngestAppError> for Status {
+    fn from(error: IngestAppError) -> Self {
         match error {
-            IngestError::NotFound { .. } => dataset_status(
+            IngestAppError::Domain(IngestError::NotFound { .. }) => dataset_status(
                 Code::NotFound,
                 DatasetTransportErrorCode::DatasetNotFound,
                 "dataset not found",
             ),
-            IngestError::StateDropped
-            | IngestError::TaskPanic { .. }
-            | IngestError::TaskCancelled { .. } => dataset_status(
+            IngestAppError::StateDropped
+            | IngestAppError::TaskPanic { .. }
+            | IngestAppError::TaskCancelled { .. } => dataset_status(
                 Code::Internal,
                 DatasetTransportErrorCode::Internal,
                 error.to_string(),
             ),
-            IngestError::Dataset(_) | IngestError::DatasetFs(_) | IngestError::Database(_) => {
-                dataset_status(
-                    Code::Internal,
-                    DatasetTransportErrorCode::Internal,
-                    "dataset ingestion failed",
-                )
-            }
+            IngestAppError::Domain(
+                IngestError::Dataset(_) | IngestError::DatasetFs(_) | IngestError::Database(_),
+            ) => dataset_status(
+                Code::Internal,
+                DatasetTransportErrorCode::Internal,
+                "dataset ingestion failed",
+            ),
         }
     }
 }
 
-impl From<ReadError> for Status {
-    fn from(error: ReadError) -> Self {
+impl From<ReadAppError> for Status {
+    fn from(error: ReadAppError) -> Self {
         match error {
-            ReadError::NotFound { .. } => dataset_status(
+            ReadAppError::Domain(ReadError::NotFound { .. }) => dataset_status(
                 Code::NotFound,
                 DatasetTransportErrorCode::DatasetNotFound,
                 "dataset not found",
             ),
-            ReadError::Deleted { .. } => dataset_status(
+            ReadAppError::Domain(ReadError::Deleted { id }) => dataset_status(
                 Code::FailedPrecondition,
                 DatasetTransportErrorCode::DatasetDeleted,
-                error.to_string(),
+                ReadError::Deleted { id }.to_string(),
             ),
-            ReadError::EmptyDataset
-            | ReadError::StateDropped
-            | ReadError::TaskPanic { .. }
-            | ReadError::TaskCancelled { .. } => dataset_status(
+            ReadAppError::Domain(ReadError::EmptyDataset)
+            | ReadAppError::StateDropped
+            | ReadAppError::TaskPanic { .. }
+            | ReadAppError::TaskCancelled { .. } => dataset_status(
                 Code::Internal,
                 DatasetTransportErrorCode::Internal,
                 error.to_string(),
             ),
-            ReadError::Dataset(_) | ReadError::DatasetFs(_) | ReadError::Database(_) => {
-                dataset_status(
-                    Code::Internal,
-                    DatasetTransportErrorCode::Internal,
-                    "dataset read failed",
-                )
-            }
+            ReadAppError::Domain(
+                ReadError::Dataset(_) | ReadError::DatasetFs(_) | ReadError::Database(_),
+            ) => dataset_status(
+                Code::Internal,
+                DatasetTransportErrorCode::Internal,
+                "dataset read failed",
+            ),
         }
     }
 }
@@ -374,6 +376,7 @@ mod tests {
 
     use super::{DATASET_ERROR_CODE_METADATA_KEY, DatasetTransportErrorCode};
     use crate::{
+        app::{CatalogAppError, IngestAppError, ReadAppError},
         database::core::DatabaseError,
         dataset::{
             catalog::CatalogError, ingest::IngestError, read::ReadError, schema::DatasetError,
@@ -390,9 +393,9 @@ mod tests {
 
     #[test]
     fn catalog_not_found_maps_to_not_found() {
-        let status = Status::from(CatalogError::NotFound {
+        let status = Status::from(CatalogAppError::Domain(CatalogError::NotFound {
             id: "42".to_string(),
-        });
+        }));
         assert_eq!(status.code(), Code::NotFound);
         assert_eq!(status.message(), "dataset not found");
         assert_eq!(
@@ -403,7 +406,7 @@ mod tests {
 
     #[test]
     fn catalog_empty_tag_maps_to_invalid_argument() {
-        let status = Status::from(CatalogError::EmptyTag);
+        let status = Status::from(CatalogAppError::Domain(CatalogError::EmptyTag));
         assert_eq!(status.code(), Code::InvalidArgument);
         assert_eq!(status.message(), "Tag name must not be empty");
         assert_eq!(
@@ -414,7 +417,7 @@ mod tests {
 
     #[test]
     fn catalog_delete_precondition_maps_to_failed_precondition() {
-        let status = Status::from(CatalogError::NotTrashed);
+        let status = Status::from(CatalogAppError::Domain(CatalogError::NotTrashed));
         assert_eq!(status.code(), Code::FailedPrecondition);
         assert_eq!(
             status.message(),
@@ -428,9 +431,9 @@ mod tests {
 
     #[test]
     fn catalog_deleted_maps_to_failed_precondition_with_metadata() {
-        let status = Status::from(CatalogError::Deleted {
+        let status = Status::from(CatalogAppError::Domain(CatalogError::Deleted {
             id: "9".to_string(),
-        });
+        }));
         assert_eq!(status.code(), Code::FailedPrecondition);
         assert_eq!(status.message(), "Dataset has been permanently deleted: 9");
         assert_eq!(
@@ -441,8 +444,8 @@ mod tests {
 
     #[test]
     fn catalog_internal_failure_maps_to_internal() {
-        let status = Status::from(CatalogError::Database(DatabaseError::Query(
-            diesel::result::Error::NotFound,
+        let status = Status::from(CatalogAppError::Domain(CatalogError::Database(
+            DatabaseError::Query(diesel::result::Error::NotFound),
         )));
         assert_eq!(status.code(), Code::Internal);
         assert_eq!(status.message(), "dataset operation failed");
@@ -454,7 +457,7 @@ mod tests {
 
     #[test]
     fn ingest_internal_metadata_maps_to_internal() {
-        let status = Status::from(IngestError::TaskCancelled {
+        let status = Status::from(IngestAppError::TaskCancelled {
             operation: "joining ingest task",
         });
         assert_eq!(status.code(), Code::Internal);
@@ -470,7 +473,9 @@ mod tests {
 
     #[test]
     fn ingest_internal_failure_maps_to_internal() {
-        let status = Status::from(IngestError::Dataset(DatasetError::SchemaMismatch));
+        let status = Status::from(IngestAppError::Domain(IngestError::Dataset(
+            DatasetError::SchemaMismatch,
+        )));
         assert_eq!(status.code(), Code::Internal);
         assert_eq!(status.message(), "dataset ingestion failed");
         assert_eq!(
@@ -481,9 +486,9 @@ mod tests {
 
     #[test]
     fn read_not_found_maps_to_not_found() {
-        let status = Status::from(ReadError::NotFound {
+        let status = Status::from(ReadAppError::Domain(ReadError::NotFound {
             id: "7".to_string(),
-        });
+        }));
         assert_eq!(status.code(), Code::NotFound);
         assert_eq!(status.message(), "dataset not found");
         assert_eq!(
@@ -494,9 +499,9 @@ mod tests {
 
     #[test]
     fn read_deleted_maps_to_failed_precondition() {
-        let status = Status::from(ReadError::Deleted {
+        let status = Status::from(ReadAppError::Domain(ReadError::Deleted {
             id: "9".to_string(),
-        });
+        }));
         assert_eq!(status.code(), Code::FailedPrecondition);
         assert_eq!(
             status.message(),
@@ -510,9 +515,19 @@ mod tests {
 
     #[test]
     fn read_empty_dataset_maps_to_internal() {
-        let status = Status::from(ReadError::EmptyDataset);
+        let status = Status::from(ReadAppError::Domain(ReadError::EmptyDataset));
         assert_eq!(status.code(), Code::Internal);
         assert_eq!(status.message(), "No dataset file found.");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::Internal.as_str())
+        );
+    }
+
+    #[test]
+    fn catalog_runtime_failure_maps_to_internal() {
+        let status = Status::from(CatalogAppError::StateDropped);
+        assert_eq!(status.code(), Code::Internal);
         assert_eq!(
             dataset_code(&status),
             Some(DatasetTransportErrorCode::Internal.as_str())

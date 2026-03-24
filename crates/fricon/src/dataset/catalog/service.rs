@@ -69,6 +69,14 @@ impl DatasetCatalogService {
         Ok(record)
     }
 
+    #[instrument(skip(self, id), fields(dataset.id = ?id))]
+    pub(crate) fn get_dataset_including_deleted(
+        &self,
+        id: DatasetId,
+    ) -> Result<DatasetRecord, CatalogError> {
+        self.repository.get_dataset(id)
+    }
+
     #[instrument(skip(self, query_options))]
     pub(crate) fn list_datasets(
         &self,

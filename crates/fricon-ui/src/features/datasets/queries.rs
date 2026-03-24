@@ -41,7 +41,10 @@ pub(crate) async fn get_dataset_detail(
     session: &WorkspaceSession,
     id: i32,
 ) -> Result<DatasetDetail, UiDatasetError> {
-    let record = session.app().get_dataset(DatasetId::Id(id)).await?;
+    let record = session
+        .app()
+        .get_dataset_including_deleted(DatasetId::Id(id))
+        .await?;
     let payload_available = record.metadata.deleted_at.is_none();
     let columns = if payload_available {
         let reader = session.dataset(id).await.map_err(UiDatasetError::from)?;

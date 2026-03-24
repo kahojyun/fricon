@@ -56,7 +56,7 @@ pub(crate) async fn update_dataset_info(
 ) -> Result<(), UiDatasetError> {
     let app = session.app();
 
-    let current = app.get_dataset(DatasetId::Id(id)).await?;
+    let current = app.get_dataset_including_deleted(DatasetId::Id(id)).await?;
 
     app.update_dataset(
         id,
@@ -316,7 +316,7 @@ mod tests {
 
         let deleted = session
             .app()
-            .get_dataset(DatasetId::Id(existing_id))
+            .get_dataset_including_deleted(DatasetId::Id(existing_id))
             .await?;
         assert!(deleted.metadata.deleted_at.is_some());
 
@@ -384,7 +384,10 @@ mod tests {
         let session = WorkspaceSession::new(app_manager.handle().clone());
 
         let dataset_id = create_completed_dataset(&session, "purge-me").await?;
-        let record = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        let record = session
+            .app()
+            .get_dataset_including_deleted(DatasetId::Id(dataset_id))
+            .await?;
         let dataset_path = session
             .app()
             .paths()?
@@ -415,7 +418,10 @@ mod tests {
             .await?;
         assert!(trashed.is_empty());
 
-        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        let tombstone = session
+            .app()
+            .get_dataset_including_deleted(DatasetId::Id(dataset_id))
+            .await?;
         assert!(tombstone.metadata.deleted_at.is_some());
 
         Ok(())
@@ -454,7 +460,10 @@ mod tests {
         assert!(trashed.is_empty());
 
         for dataset_id in dataset_ids {
-            let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+            let tombstone = session
+                .app()
+                .get_dataset_including_deleted(DatasetId::Id(dataset_id))
+                .await?;
             assert!(tombstone.metadata.deleted_at.is_some());
         }
 
@@ -502,7 +511,10 @@ mod tests {
         assert_eq!(add_tag_results.len(), 1);
         assert!(add_tag_results[0].success);
 
-        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        let tombstone = session
+            .app()
+            .get_dataset_including_deleted(DatasetId::Id(dataset_id))
+            .await?;
         assert_eq!(tombstone.metadata.name, "after-delete");
         assert_eq!(tombstone.metadata.description, "updated tombstone");
         assert!(tombstone.metadata.favorite);
@@ -542,7 +554,10 @@ mod tests {
                 .is_some_and(|error| error.code == ApiErrorCode::DatasetDeleted)
         );
 
-        let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
+        let tombstone = session
+            .app()
+            .get_dataset_including_deleted(DatasetId::Id(dataset_id))
+            .await?;
         assert!(tombstone.metadata.deleted_at.is_some());
         assert!(tombstone.metadata.trashed_at.is_some());
 

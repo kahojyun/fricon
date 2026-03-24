@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use fricon::{DatasetReader, app::AppHandle, dataset::read::ReadError};
+use fricon::{DatasetReader, ReadAppError, app::AppHandle};
 
 #[derive(Default)]
 pub(crate) struct DatasetReaderCache {
@@ -16,7 +16,7 @@ impl DatasetReaderCache {
         &self,
         app: &AppHandle,
         id: i32,
-    ) -> Result<Arc<DatasetReader>, ReadError> {
+    ) -> Result<Arc<DatasetReader>, ReadAppError> {
         if let Some((current_id, current_dataset)) = self
             .current_dataset
             .lock()
@@ -54,7 +54,7 @@ impl WorkspaceSession {
         &self.app
     }
 
-    pub(crate) async fn dataset(&self, id: i32) -> Result<Arc<DatasetReader>, ReadError> {
+    pub(crate) async fn dataset(&self, id: i32) -> Result<Arc<DatasetReader>, ReadAppError> {
         self.dataset_readers.get_or_load(&self.app, id).await
     }
 }

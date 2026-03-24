@@ -11,12 +11,6 @@ pub enum ReadError {
     Deleted { id: String },
     #[error("No dataset file found.")]
     EmptyDataset,
-    #[error("App state has been dropped")]
-    StateDropped,
-    #[error("Background task panicked while {operation}")]
-    TaskPanic { operation: &'static str },
-    #[error("Background task was cancelled while {operation}")]
-    TaskCancelled { operation: &'static str },
     #[error(transparent)]
     Dataset(#[from] DatasetError),
     #[error(transparent)]

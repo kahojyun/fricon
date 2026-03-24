@@ -7,12 +7,6 @@ use crate::{
 pub enum IngestError {
     #[error("Dataset not found: {id}")]
     NotFound { id: String },
-    #[error("App state has been dropped")]
-    StateDropped,
-    #[error("Background task panicked while {operation}")]
-    TaskPanic { operation: &'static str },
-    #[error("Background task was cancelled while {operation}")]
-    TaskCancelled { operation: &'static str },
     #[error(transparent)]
     Dataset(#[from] DatasetError),
     #[error(transparent)]

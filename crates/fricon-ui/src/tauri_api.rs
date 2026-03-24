@@ -6,7 +6,10 @@
 
 use std::path::Path;
 
-use fricon::dataset::{catalog::CatalogError, read::ReadError};
+use fricon::{
+    CatalogAppError, ReadAppError,
+    dataset::{catalog::CatalogError, read::ReadError},
+};
 use tauri_specta::{Builder, collect_commands, collect_events};
 
 use crate::features::{
@@ -83,14 +86,22 @@ impl ApiError {
             CatalogError::EmptyTag => ApiErrorCode::InvalidTag,
             CatalogError::SameTagName => ApiErrorCode::SameTagName,
             CatalogError::SameSourceTarget => ApiErrorCode::SameSourceTarget,
-            CatalogError::StateDropped
-            | CatalogError::TaskPanic { .. }
-            | CatalogError::TaskCancelled { .. }
-            | CatalogError::DatasetFs(_)
+            CatalogError::DatasetFs(_)
             | CatalogError::Database(_)
             | CatalogError::Portability(_) => ApiErrorCode::Internal,
         };
         Self::new(code, error.to_string())
+    }
+
+    pub(crate) fn from_catalog_app_error(error: &CatalogAppError) -> Self {
+        match error {
+            CatalogAppError::Domain(error) => Self::from_catalog_error(error),
+            CatalogAppError::StateDropped
+            | CatalogAppError::TaskPanic { .. }
+            | CatalogAppError::TaskCancelled { .. } => {
+                Self::new(ApiErrorCode::Internal, error.to_string())
+            }
+        }
     }
 
     pub(crate) fn from_read_error(error: &ReadError) -> Self {
@@ -98,9 +109,6 @@ impl ApiError {
             ReadError::NotFound { .. } => ApiErrorCode::DatasetNotFound,
             ReadError::Deleted { .. } => ApiErrorCode::DatasetDeleted,
             ReadError::EmptyDataset
-            | ReadError::StateDropped
-            | ReadError::TaskPanic { .. }
-            | ReadError::TaskCancelled { .. }
             | ReadError::Dataset(_)
             | ReadError::DatasetFs(_)
             | ReadError::Database(_) => ApiErrorCode::Internal,
@@ -108,10 +116,21 @@ impl ApiError {
         Self::new(code, error.to_string())
     }
 
+    pub(crate) fn from_read_app_error(error: &ReadAppError) -> Self {
+        match error {
+            ReadAppError::Domain(error) => Self::from_read_error(error),
+            ReadAppError::StateDropped
+            | ReadAppError::TaskPanic { .. }
+            | ReadAppError::TaskCancelled { .. } => {
+                Self::new(ApiErrorCode::Internal, error.to_string())
+            }
+        }
+    }
+
     pub(crate) fn from_dataset_error(error: &UiDatasetError) -> Self {
         match error {
-            UiDatasetError::Catalog(error) => Self::from_catalog_error(error),
-            UiDatasetError::Read(error) => Self::from_read_error(error),
+            UiDatasetError::Catalog(error) => Self::from_catalog_app_error(error),
+            UiDatasetError::Read(error) => Self::from_read_app_error(error),
             UiDatasetError::Validation { message } => {
                 Self::new(ApiErrorCode::Validation, message.clone())
             }
@@ -159,7 +178,10 @@ pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use fricon::dataset::{PortabilityError, catalog::CatalogError, read::ReadError};
+    use fricon::{
+        CatalogAppError, ReadAppError,
+        dataset::{PortabilityError, catalog::CatalogError, read::ReadError},
+    };
 
     use super::{ApiError, ApiErrorCode};
     use crate::features::datasets::error::UiDatasetError;
@@ -229,11 +251,27 @@ mod tests {
     }
 
     #[test]
-    fn dataset_error_downcasts_through_anyhow_context() {
-        let error =
-            UiDatasetError::Catalog(CatalogError::Portability(PortabilityError::MissingMetadata));
+    fn dataset_error_maps_runtime_failures_to_internal() {
+        let error = UiDatasetError::Catalog(CatalogAppError::TaskCancelled {
+            operation: "joining catalog task",
+        });
         let api_error = ApiError::from_dataset_error(&error);
         assert!(matches!(api_error.code, ApiErrorCode::Internal));
+    }
+
+    #[test]
+    fn catalog_app_error_maps_domain_variants() {
+        let error =
+            ApiError::from_catalog_app_error(&CatalogAppError::Domain(CatalogError::Deleted {
+                id: "42".to_string(),
+            }));
+        assert!(matches!(error.code, ApiErrorCode::DatasetDeleted));
+    }
+
+    #[test]
+    fn read_app_error_maps_runtime_variants_to_internal() {
+        let error = ApiError::from_read_app_error(&ReadAppError::StateDropped);
+        assert!(matches!(error.code, ApiErrorCode::Internal));
     }
 
     #[test]
