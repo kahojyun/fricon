@@ -1,7 +1,7 @@
 import { flexRender, type Row } from "@tanstack/react-table";
 import type {
-  DatasetDeleteResult,
   DatasetInfo,
+  DatasetTagBatchResult,
   DatasetViewMode,
 } from "../api/types";
 import { DatasetTableRowActions } from "./DatasetTableRowActions";
@@ -46,11 +46,11 @@ interface DatasetTableBodyProps {
   batchAddTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
   batchRemoveTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
 }
 
 export function DatasetTableBody({

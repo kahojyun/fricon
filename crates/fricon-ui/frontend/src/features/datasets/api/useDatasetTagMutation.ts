@@ -7,7 +7,7 @@ import {
   mergeTag as mergeTagApi,
 } from "./client";
 import { datasetKeys } from "./queryKeys";
-import type { DatasetDeleteResult } from "./types";
+import type { DatasetTagBatchResult } from "./types";
 
 async function runTagMutation<T>({
   setIsUpdatingTags,
@@ -41,7 +41,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
   const batchAddTags = async (
     ids: number[],
     tags: string[],
-  ): Promise<DatasetDeleteResult[]> =>
+  ): Promise<DatasetTagBatchResult[]> =>
     runTagMutation({
       setIsUpdatingTags,
       work: async () => {
@@ -60,7 +60,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
   const batchRemoveTags = async (
     ids: number[],
     tags: string[],
-  ): Promise<DatasetDeleteResult[]> =>
+  ): Promise<DatasetTagBatchResult[]> =>
     runTagMutation({
       setIsUpdatingTags,
       work: async () => {

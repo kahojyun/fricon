@@ -1,3 +1,4 @@
+pub(crate) mod error;
 mod mutations;
 mod queries;
 pub(crate) mod tauri;

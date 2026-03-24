@@ -1,8 +1,8 @@
 import type { ReactElement } from "react";
 import { Download, RotateCcw, Trash2 } from "lucide-react";
 import type {
-  DatasetDeleteResult,
   DatasetInfo,
+  DatasetTagBatchResult,
   DatasetViewMode,
 } from "../api/types";
 import { exportDatasetsDialog } from "../api/client";
@@ -33,11 +33,11 @@ interface DatasetTableRowActionsProps {
   batchAddTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
   batchRemoveTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
   children: ReactElement;
 }
 

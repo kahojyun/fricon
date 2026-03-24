@@ -4,6 +4,7 @@ import {
   type DatasetInfo,
   type DatasetListSortBy,
   type DatasetStatus,
+  type DatasetTagBatchResult,
   type DatasetViewMode,
 } from "./types";
 import { datasetKeys } from "./queryKeys";
@@ -89,11 +90,11 @@ export interface UseDatasetTableDataResult {
   batchAddTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
   batchRemoveTags: (
     ids: number[],
     tags: string[],
-  ) => Promise<DatasetDeleteResult[]>;
+  ) => Promise<DatasetTagBatchResult[]>;
   deleteTag: (tag: string) => Promise<void>;
   renameTag: (oldName: string, newName: string) => Promise<void>;
   mergeTag: (source: string, target: string) => Promise<void>;

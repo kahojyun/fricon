@@ -61,7 +61,11 @@ describe("useDatasetDeleteMutation", () => {
     const refreshDatasets = vi.fn().mockResolvedValue(undefined);
     const results: DatasetDeleteResult[] = [
       { id: 1, success: true, error: null },
-      { id: 2, success: false, error: "missing" },
+      {
+        id: 2,
+        success: false,
+        error: { code: "dataset_not_found", message: "missing" },
+      },
     ];
 
     deleteDatasetsMock.mockResolvedValue(results);

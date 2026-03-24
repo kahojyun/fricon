@@ -109,7 +109,7 @@ async emptyTrash() : Promise<Result<DatasetDeleteResult[], ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async batchUpdateDatasetTags(update: BatchTagUpdateOptions) : Promise<Result<DatasetDeleteResult[], ApiError>> {
+async batchUpdateDatasetTags(update: BatchTagUpdateOptions) : Promise<Result<DatasetTagBatchResult[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("batch_update_dataset_tags", { update }) };
 } catch (e) {
@@ -202,12 +202,14 @@ export type ColumnUniqueValue = { index: number; displayValue: string }
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
 export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
 export type DatasetCreated = DatasetInfo
-export type DatasetDeleteResult = { id: number; success: boolean; error: string | null }
+export type DatasetDeleteResult = { id: number; success: boolean; error: DatasetOperationError | null }
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; trashedAt: string | null; deletedAt: string | null; payloadAvailable: boolean; columns: ColumnInfo[] }
 export type DatasetFavoriteUpdate = { favorite: boolean }
 export type DatasetInfo = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; trashedAt: string | null; deletedAt: string | null }
 export type DatasetInfoUpdate = { name?: string | null; description?: string | null; favorite?: boolean | null; tags?: string[] | null }
 export type DatasetListOptions = { search?: string | null; tags?: string[] | null; favoriteOnly?: boolean | null; statuses?: UiDatasetStatus[] | null; trashed?: boolean | null; sortBy?: UiDatasetSortBy | null; sortDir?: UiSortDirection | null; limit?: number | null; offset?: number | null }
+export type DatasetOperationError = { code: ApiErrorCode; message: string }
+export type DatasetTagBatchResult = { id: number; success: boolean; addError: DatasetOperationError | null; removeError: DatasetOperationError | null }
 export type DatasetUpdated = DatasetInfo
 export type DatasetWriteStatus = { rowCount: number; isComplete: boolean }
 export type FilterTableOptions = { excludeColumns?: string[] | null }

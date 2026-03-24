@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DatasetDeleteResult, DatasetInfo } from "../api/types";
+import type { DatasetInfo, DatasetTagBatchResult } from "../api/types";
 import {
   deriveDatasetTagMenuTarget,
   runDatasetTagMutation,
@@ -61,7 +61,9 @@ describe("datasetTableTagMenuLogic", () => {
     const notifier = createNotifier();
     const batchAddTags = vi
       .fn()
-      .mockResolvedValue([{ id: 5, success: true, error: null }]);
+      .mockResolvedValue([
+        { id: 5, success: true, addError: null, removeError: null },
+      ]);
     const batchRemoveTags = vi.fn();
 
     const target = deriveDatasetTagMenuTarget(
@@ -86,9 +88,14 @@ describe("datasetTableTagMenuLogic", () => {
 
   it("adds a tag for all selected rows and reports partial failure", async () => {
     const notifier = createNotifier();
-    const results: DatasetDeleteResult[] = [
-      { id: 10, success: true, error: null },
-      { id: 11, success: false, error: "locked" },
+    const results: DatasetTagBatchResult[] = [
+      { id: 10, success: true, addError: null, removeError: null },
+      {
+        id: 11,
+        success: false,
+        addError: { code: "internal", message: "locked" },
+        removeError: null,
+      },
     ];
     const batchAddTags = vi.fn().mockResolvedValue(results);
     const batchRemoveTags = vi.fn();
@@ -109,7 +116,7 @@ describe("datasetTableTagMenuLogic", () => {
     expect(notifier.warning).toHaveBeenCalledWith(
       'Added tag "vision" to 1 dataset(s), but 1 failed.',
       {
-        description: "ID 11: locked",
+        description: "ID 11: add: locked",
       },
     );
   });
@@ -119,7 +126,9 @@ describe("datasetTableTagMenuLogic", () => {
     const batchAddTags = vi.fn();
     const batchRemoveTags = vi
       .fn()
-      .mockResolvedValue([{ id: 9, success: true, error: null }]);
+      .mockResolvedValue([
+        { id: 9, success: true, addError: null, removeError: null },
+      ]);
 
     await runDatasetTagMutation({
       operation: "remove",

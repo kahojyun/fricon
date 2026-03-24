@@ -1,6 +1,8 @@
 import type {
   ColumnInfo,
   DatasetDeleteResult,
+  DatasetOperationError,
+  DatasetTagBatchResult,
   DatasetDetail as WireDatasetDetail,
   DatasetInfo as WireDatasetInfo,
   DatasetInfoUpdate,
@@ -38,9 +40,11 @@ export const DATASET_PAGE_SIZE = 200;
 export type {
   ColumnInfo,
   DatasetDeleteResult,
+  DatasetOperationError,
   DatasetInfoUpdate,
   DatasetListSortBy,
   DatasetListSortDir,
+  DatasetTagBatchResult,
   DatasetStatus,
   UiPreviewImportResult,
   UiImportPreview,

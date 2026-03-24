@@ -6,21 +6,21 @@
 
 use std::path::Path;
 
-use anyhow::Error as AnyhowError;
 use fricon::dataset::{catalog::CatalogError, read::ReadError};
 use tauri_specta::{Builder, collect_commands, collect_events};
 
 use crate::features::{
     charts::tauri as charts,
     datasets::{
+        error::UiDatasetError,
         tauri as datasets,
         tauri::{DatasetCreated, DatasetUpdated},
-        types::DatasetInfo,
+        types::{DatasetInfo, DatasetOperationError},
     },
     workspace::tauri as workspace,
 };
 
-#[derive(Debug, Clone, Copy, serde::Serialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ApiErrorCode {
     DatasetNotFound,
@@ -68,6 +68,13 @@ impl ApiError {
         Self::new(ApiErrorCode::Validation, error.to_string())
     }
 
+    pub(crate) fn into_dataset_operation_error(self) -> DatasetOperationError {
+        DatasetOperationError {
+            code: self.code,
+            message: self.message,
+        }
+    }
+
     pub(crate) fn from_catalog_error(error: &CatalogError) -> Self {
         let code = match error {
             CatalogError::NotFound { .. } => ApiErrorCode::DatasetNotFound,
@@ -101,14 +108,14 @@ impl ApiError {
         Self::new(code, error.to_string())
     }
 
-    pub(crate) fn from_dataset_error(error: AnyhowError) -> Self {
-        if let Some(error) = error.downcast_ref::<CatalogError>() {
-            return Self::from_catalog_error(error);
+    pub(crate) fn from_dataset_error(error: &UiDatasetError) -> Self {
+        match error {
+            UiDatasetError::Catalog(error) => Self::from_catalog_error(error),
+            UiDatasetError::Read(error) => Self::from_read_error(error),
+            UiDatasetError::Validation { message } => {
+                Self::new(ApiErrorCode::Validation, message.clone())
+            }
         }
-        if let Some(error) = error.downcast_ref::<ReadError>() {
-            return Self::from_read_error(error);
-        }
-        Self::new(ApiErrorCode::Internal, error.to_string())
     }
 }
 
@@ -155,6 +162,7 @@ mod tests {
     use fricon::dataset::{PortabilityError, catalog::CatalogError, read::ReadError};
 
     use super::{ApiError, ApiErrorCode};
+    use crate::features::datasets::error::UiDatasetError;
 
     #[test]
     fn catalog_not_found_maps_to_dataset_not_found() {
@@ -223,17 +231,16 @@ mod tests {
     #[test]
     fn dataset_error_downcasts_through_anyhow_context() {
         let error =
-            anyhow::Error::new(CatalogError::Portability(PortabilityError::MissingMetadata))
-                .context("Failed to list datasets.");
-        let api_error = ApiError::from_dataset_error(error);
+            UiDatasetError::Catalog(CatalogError::Portability(PortabilityError::MissingMetadata));
+        let api_error = ApiError::from_dataset_error(&error);
         assert!(matches!(api_error.code, ApiErrorCode::Internal));
     }
 
     #[test]
-    fn non_dataset_anyhow_errors_fall_back_to_internal() {
-        let error = anyhow::Error::new(std::io::Error::other("backend exploded"));
-        let api_error = ApiError::from_dataset_error(error);
-        assert!(matches!(api_error.code, ApiErrorCode::Internal));
+    fn validation_dataset_errors_map_to_validation() {
+        let error = UiDatasetError::validation("limit must be non-negative");
+        let api_error = ApiError::from_dataset_error(&error);
+        assert!(matches!(api_error.code, ApiErrorCode::Validation));
     }
 
     #[test]

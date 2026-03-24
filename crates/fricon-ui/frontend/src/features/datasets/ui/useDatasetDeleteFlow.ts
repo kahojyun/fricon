@@ -118,7 +118,10 @@ export function useDatasetDeleteFlow({
       messages.partial(summary.successIds.length, summary.failedResults.length),
       {
         description: summary.failedResults
-          .map((result) => `ID ${result.id}: ${result.error}`)
+          .map(
+            (result) =>
+              `ID ${result.id}: ${result.error?.message ?? "Unknown error"}`,
+          )
           .join("\n"),
       },
     );

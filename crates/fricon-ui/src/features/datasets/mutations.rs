@@ -1,10 +1,12 @@
 use std::collections::BTreeSet;
 
-use anyhow::Context;
 use fricon::{DatasetListQuery, DatasetUpdate, dataset::model::DatasetId};
 
-use super::types::{DatasetDeleteResult, DatasetInfoUpdate};
-use crate::desktop_runtime::session::WorkspaceSession;
+use super::{
+    error::UiDatasetError,
+    types::{DatasetDeleteResult, DatasetInfoUpdate, DatasetOperationError, DatasetTagBatchResult},
+};
+use crate::{desktop_runtime::session::WorkspaceSession, tauri_api::ApiError};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct BatchTagUpdate {
@@ -24,11 +26,15 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
     unique.into_iter().collect()
 }
 
+fn dataset_operation_error(error: &UiDatasetError) -> DatasetOperationError {
+    ApiError::from_dataset_error(error).into_dataset_operation_error()
+}
+
 pub(crate) async fn update_dataset_favorite(
     session: &WorkspaceSession,
     id: i32,
     favorite: bool,
-) -> anyhow::Result<()> {
+) -> Result<(), UiDatasetError> {
     session
         .app()
         .update_dataset(
@@ -39,21 +45,18 @@ pub(crate) async fn update_dataset_favorite(
                 favorite: Some(favorite),
             },
         )
-        .await
-        .context("Failed to update dataset favorite status.")
+        .await?;
+    Ok(())
 }
 
 pub(crate) async fn update_dataset_info(
     session: &WorkspaceSession,
     id: i32,
     update: DatasetInfoUpdate,
-) -> anyhow::Result<()> {
+) -> Result<(), UiDatasetError> {
     let app = session.app();
 
-    let current = app
-        .get_dataset(DatasetId::Id(id))
-        .await
-        .context("Failed to load current dataset metadata.")?;
+    let current = app.get_dataset(DatasetId::Id(id)).await?;
 
     app.update_dataset(
         id,
@@ -63,8 +66,7 @@ pub(crate) async fn update_dataset_info(
             favorite: update.favorite,
         },
     )
-    .await
-    .context("Failed to update dataset metadata.")?;
+    .await?;
 
     if let Some(next_tags_raw) = update.tags {
         let next_tags = normalize_tags(next_tags_raw);
@@ -75,15 +77,11 @@ pub(crate) async fn update_dataset_info(
         let to_remove: Vec<String> = current_tags.difference(&next_tags_set).cloned().collect();
 
         if !to_add.is_empty() {
-            app.add_dataset_tags(id, to_add)
-                .await
-                .context("Failed to add dataset tags.")?;
+            app.add_dataset_tags(id, to_add).await?;
         }
 
         if !to_remove.is_empty() {
-            app.remove_dataset_tags(id, to_remove)
-                .await
-                .context("Failed to remove dataset tags.")?;
+            app.remove_dataset_tags(id, to_remove).await?;
         }
     }
 
@@ -103,11 +101,14 @@ pub(crate) async fn delete_datasets(
                 success: true,
                 error: None,
             }),
-            Err(e) => results.push(DatasetDeleteResult {
-                id,
-                success: false,
-                error: Some(e.to_string()),
-            }),
+            Err(error) => {
+                let error = UiDatasetError::from(error);
+                results.push(DatasetDeleteResult {
+                    id,
+                    success: false,
+                    error: Some(dataset_operation_error(&error)),
+                });
+            }
         }
     }
     results
@@ -126,11 +127,14 @@ pub(crate) async fn trash_datasets(
                 success: true,
                 error: None,
             }),
-            Err(e) => results.push(DatasetDeleteResult {
-                id,
-                success: false,
-                error: Some(e.to_string()),
-            }),
+            Err(error) => {
+                let error = UiDatasetError::from(error);
+                results.push(DatasetDeleteResult {
+                    id,
+                    success: false,
+                    error: Some(dataset_operation_error(&error)),
+                });
+            }
         }
     }
     results
@@ -149,11 +153,14 @@ pub(crate) async fn restore_datasets(
                 success: true,
                 error: None,
             }),
-            Err(e) => results.push(DatasetDeleteResult {
-                id,
-                success: false,
-                error: Some(e.to_string()),
-            }),
+            Err(error) => {
+                let error = UiDatasetError::from(error);
+                results.push(DatasetDeleteResult {
+                    id,
+                    success: false,
+                    error: Some(dataset_operation_error(&error)),
+                });
+            }
         }
     }
     results
@@ -161,7 +168,7 @@ pub(crate) async fn restore_datasets(
 
 pub(crate) async fn empty_trash(
     session: &WorkspaceSession,
-) -> anyhow::Result<Vec<DatasetDeleteResult>> {
+) -> Result<Vec<DatasetDeleteResult>, UiDatasetError> {
     let ids = session
         .app()
         .list_datasets(DatasetListQuery {
@@ -170,8 +177,7 @@ pub(crate) async fn empty_trash(
             offset: Some(0),
             ..DatasetListQuery::default()
         })
-        .await
-        .context("Failed to list trashed datasets.")?
+        .await?
         .into_iter()
         .map(|record| record.id)
         .collect();
@@ -182,7 +188,7 @@ pub(crate) async fn empty_trash(
 pub(crate) async fn batch_update_dataset_tags(
     session: &WorkspaceSession,
     update: BatchTagUpdate,
-) -> Vec<DatasetDeleteResult> {
+) -> Vec<DatasetTagBatchResult> {
     let app = session.app();
     let add = normalize_tags(update.add);
     let remove = normalize_tags(update.remove);
@@ -198,51 +204,54 @@ pub(crate) async fn batch_update_dataset_tags(
         } else {
             app.remove_dataset_tags(id, remove.clone()).await
         };
-        let error = match (add_result, remove_result) {
-            (Ok(()), Ok(())) => None,
-            (Err(e), Ok(())) => Some(format!("add tags failed: {e}")),
-            (Ok(()), Err(e)) => Some(format!("remove tags failed: {e}")),
-            (Err(e1), Err(e2)) => Some(format!("add tags failed: {e1}; remove tags failed: {e2}")),
+        let add_error = match add_result {
+            Ok(()) => None,
+            Err(error) => {
+                let error = UiDatasetError::from(error);
+                Some(dataset_operation_error(&error))
+            }
         };
-        results.push(DatasetDeleteResult {
+        let remove_error = match remove_result {
+            Ok(()) => None,
+            Err(error) => {
+                let error = UiDatasetError::from(error);
+                Some(dataset_operation_error(&error))
+            }
+        };
+        results.push(DatasetTagBatchResult {
             id,
-            success: error.is_none(),
-            error,
+            success: add_error.is_none() && remove_error.is_none(),
+            add_error,
+            remove_error,
         });
     }
     results
 }
 
-pub(crate) async fn delete_tag(session: &WorkspaceSession, tag: String) -> anyhow::Result<()> {
-    session
-        .app()
-        .delete_tag(tag)
-        .await
-        .context("Failed to delete tag.")
+pub(crate) async fn delete_tag(
+    session: &WorkspaceSession,
+    tag: String,
+) -> Result<(), UiDatasetError> {
+    session.app().delete_tag(tag).await?;
+    Ok(())
 }
 
 pub(crate) async fn rename_tag(
     session: &WorkspaceSession,
     old_name: String,
     new_name: String,
-) -> anyhow::Result<()> {
-    session
-        .app()
-        .rename_tag(old_name, new_name)
-        .await
-        .context("Failed to rename tag.")
+) -> Result<(), UiDatasetError> {
+    session.app().rename_tag(old_name, new_name).await?;
+    Ok(())
 }
 
 pub(crate) async fn merge_tag(
     session: &WorkspaceSession,
     source: String,
     target: String,
-) -> anyhow::Result<()> {
-    session
-        .app()
-        .merge_tag(source, target)
-        .await
-        .context("Failed to merge tag.")
+) -> Result<(), UiDatasetError> {
+    session.app().merge_tag(source, target).await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -256,6 +265,7 @@ mod tests {
     };
     use crate::{
         desktop_runtime::session::WorkspaceSession, features::datasets::types::DatasetInfoUpdate,
+        tauri_api::ApiErrorCode,
     };
 
     async fn create_completed_dataset(
@@ -528,13 +538,50 @@ mod tests {
         assert!(
             restore_results[0]
                 .error
-                .as_deref()
-                .is_some_and(|error| error.contains("deleted"))
+                .as_ref()
+                .is_some_and(|error| error.code == ApiErrorCode::DatasetDeleted)
         );
 
         let tombstone = session.app().get_dataset(DatasetId::Id(dataset_id)).await?;
         assert!(tombstone.metadata.deleted_at.is_some());
         assert!(tombstone.metadata.trashed_at.is_some());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn batch_update_dataset_tags_reports_add_and_remove_errors_separately()
+    -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+        drop(app_manager);
+
+        let results = batch_update_dataset_tags(
+            &session,
+            BatchTagUpdate {
+                ids: vec![1],
+                add: vec!["added".to_string()],
+                remove: vec!["removed".to_string()],
+            },
+        )
+        .await;
+
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert!(
+            results[0]
+                .add_error
+                .as_ref()
+                .is_some_and(|error| error.code == ApiErrorCode::Internal)
+        );
+        assert!(
+            results[0]
+                .remove_error
+                .as_ref()
+                .is_some_and(|error| error.code == ApiErrorCode::Internal)
+        );
 
         Ok(())
     }

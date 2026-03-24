@@ -5,6 +5,7 @@ import {
   type DatasetFavoriteUpdate,
   type DatasetInfo as WireDatasetInfo,
   type DatasetListOptions as WireDatasetListOptions,
+  type DatasetTagBatchResult,
 } from "@/shared/lib/bindings";
 import { invoke } from "@/shared/lib/tauri";
 import {
@@ -98,7 +99,7 @@ export async function batchUpdateDatasetTags(
   ids: number[],
   add: string[] = [],
   remove: string[] = [],
-): Promise<DatasetDeleteResult[]> {
+): Promise<DatasetTagBatchResult[]> {
   return invoke(commands.batchUpdateDatasetTags({ ids, add, remove }));
 }
 

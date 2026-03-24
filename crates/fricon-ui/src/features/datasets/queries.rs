@@ -1,15 +1,19 @@
-use anyhow::Context;
 use fricon::{DatasetDataType, DatasetListQuery, dataset::model::DatasetId};
 
-use super::types::{ColumnInfo, DatasetDetail, DatasetInfo, DatasetWriteStatus};
+use super::{
+    error::UiDatasetError,
+    types::{ColumnInfo, DatasetDetail, DatasetInfo, DatasetWriteStatus},
+};
 use crate::desktop_runtime::session::WorkspaceSession;
 
 pub(crate) fn validate_non_negative(
     value: Option<i64>,
     field_name: &str,
-) -> anyhow::Result<Option<i64>> {
+) -> Result<Option<i64>, UiDatasetError> {
     match value {
-        Some(v) if v < 0 => anyhow::bail!("{field_name} must be non-negative"),
+        Some(v) if v < 0 => Err(UiDatasetError::validation(format!(
+            "{field_name} must be non-negative"
+        ))),
         _ => Ok(value),
     }
 }
@@ -17,35 +21,30 @@ pub(crate) fn validate_non_negative(
 pub(crate) async fn list_datasets(
     session: &WorkspaceSession,
     query: DatasetListQuery,
-) -> anyhow::Result<Vec<DatasetInfo>> {
-    session
+) -> Result<Vec<DatasetInfo>, UiDatasetError> {
+    Ok(session
         .app()
         .list_datasets(query)
-        .await
-        .context("Failed to list datasets.")
-        .map(|records| records.into_iter().map(Into::into).collect())
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect())
 }
 
-pub(crate) async fn list_dataset_tags(session: &WorkspaceSession) -> anyhow::Result<Vec<String>> {
-    session
-        .app()
-        .list_dataset_tags()
-        .await
-        .context("Failed to list dataset tags.")
+pub(crate) async fn list_dataset_tags(
+    session: &WorkspaceSession,
+) -> Result<Vec<String>, UiDatasetError> {
+    Ok(session.app().list_dataset_tags().await?)
 }
 
 pub(crate) async fn get_dataset_detail(
     session: &WorkspaceSession,
     id: i32,
-) -> anyhow::Result<DatasetDetail> {
-    let record = session
-        .app()
-        .get_dataset(DatasetId::Id(id))
-        .await
-        .context("Failed to load dataset metadata.")?;
+) -> Result<DatasetDetail, UiDatasetError> {
+    let record = session.app().get_dataset(DatasetId::Id(id)).await?;
     let payload_available = record.metadata.deleted_at.is_none();
     let columns = if payload_available {
-        let reader = session.dataset(id).await?;
+        let reader = session.dataset(id).await.map_err(UiDatasetError::from)?;
         let schema = reader.schema();
         let index = reader.index_columns();
         schema
@@ -81,8 +80,8 @@ pub(crate) async fn get_dataset_detail(
 pub(crate) async fn get_dataset_write_status(
     session: &WorkspaceSession,
     id: i32,
-) -> anyhow::Result<DatasetWriteStatus> {
-    let dataset = session.dataset(id).await?;
+) -> Result<DatasetWriteStatus, UiDatasetError> {
+    let dataset = session.dataset(id).await.map_err(UiDatasetError::from)?;
     let (row_count, is_complete) = dataset.write_status();
     Ok(DatasetWriteStatus {
         row_count,
