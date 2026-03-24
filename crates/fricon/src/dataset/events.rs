@@ -36,7 +36,7 @@ pub(crate) trait DatasetEventPublisher {
 }
 
 #[cfg(test)]
-pub(crate) mod test_support {
+pub(crate) mod test_utils {
     use std::sync::Mutex;
 
     use super::{DatasetEvent, DatasetEventPublisher};

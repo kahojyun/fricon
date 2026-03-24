@@ -596,7 +596,7 @@ mod tests {
     use super::*;
     use crate::dataset::{
         catalog::MockDatasetCatalogRepository,
-        events::{DatasetEvent, test_support::CollectEvents},
+        events::{DatasetEvent, test_utils::CollectEvents},
         model::{DatasetId, DatasetMetadata, DatasetStatus},
         portability,
     };

@@ -137,7 +137,7 @@ mod tests {
     use super::*;
     use crate::{
         dataset::{
-            events::DatasetEvent,
+            events::{DatasetEvent, test_utils::CollectEvents},
             model::{DatasetMetadata, DatasetStatus},
         },
         workspace::WorkspaceRoot,
@@ -224,8 +224,6 @@ mod tests {
             Ok(state.record.clone())
         }
     }
-
-    use crate::dataset::events::test_support::CollectEvents;
 
     fn create_request() -> CreateDatasetRequest {
         CreateDatasetRequest {
