@@ -89,3 +89,14 @@ pub(crate) async fn get_dataset_write_status(
         is_complete,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::validate_non_negative;
+
+    #[test]
+    fn validate_non_negative_rejects_negative_values() {
+        let error = validate_non_negative(Some(-1), "limit").expect_err("expected error");
+        assert_eq!(error.to_string(), "limit must be non-negative");
+    }
+}
