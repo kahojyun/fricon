@@ -233,7 +233,7 @@ fn process_scalar_heatmap(
 mod tests {
     use std::sync::Arc;
 
-    use arrow_array::{Array, ArrayRef, Float64Array, RecordBatch};
+    use arrow_array::{ArrayRef, Float64Array};
     use arrow_schema::{DataType, Field};
     use fricon::{
         DatasetArray, DatasetDataType, DatasetScalar, DatasetSchema, ScalarArray, ScalarKind,
@@ -242,37 +242,19 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::*;
-    use crate::features::charts::types::ChartCommonOptions;
+    use crate::features::charts::{
+        transform::test_utils::{numeric_batch, numeric_schema},
+        types::ChartCommonOptions,
+    };
 
     #[test]
     fn test_build_heatmap_series_numeric() {
-        let x_vals = vec![1.0, 2.0];
-        let y_vals = vec![10.0, 10.0];
-        let z_vals = vec![100.0, 200.0];
-        let array_x = Arc::new(Float64Array::from(x_vals));
-        let array_y = Arc::new(Float64Array::from(y_vals));
-        let array_z = Arc::new(Float64Array::from(z_vals));
-        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
-            Field::new("x", DataType::Float64, false),
-            Field::new("y", DataType::Float64, false),
-            Field::new("z", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y, array_z]).unwrap();
-
-        let mut columns = IndexMap::new();
-        columns.insert(
-            "x".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "y".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "z".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        let schema = DatasetSchema::new(columns);
+        let batch = numeric_batch(&[
+            ("x", &[1.0, 2.0]),
+            ("y", &[10.0, 10.0]),
+            ("z", &[100.0, 200.0]),
+        ]);
+        let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
             series: "z".to_string(),
@@ -294,33 +276,12 @@ mod tests {
 
     #[test]
     fn test_build_heatmap_series_maps_1_based_indexes() {
-        let x_vals = vec![1.0, 2.0, 1.0];
-        let y_vals = vec![1.0, 1.0, 2.0];
-        let z_vals = vec![10.0, 20.0, 30.0];
-        let array_x = Arc::new(Float64Array::from(x_vals));
-        let array_y = Arc::new(Float64Array::from(y_vals));
-        let array_z = Arc::new(Float64Array::from(z_vals));
-        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
-            Field::new("x", DataType::Float64, false),
-            Field::new("y", DataType::Float64, false),
-            Field::new("z", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y, array_z]).unwrap();
-
-        let mut columns = IndexMap::new();
-        columns.insert(
-            "x".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "y".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "z".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        let schema = DatasetSchema::new(columns);
+        let batch = numeric_batch(&[
+            ("x", &[1.0, 2.0, 1.0]),
+            ("y", &[1.0, 1.0, 2.0]),
+            ("z", &[10.0, 20.0, 30.0]),
+        ]);
+        let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
             series: "z".to_string(),
@@ -345,33 +306,12 @@ mod tests {
 
     #[test]
     fn test_build_heatmap_series_maps_non_contiguous_indexes() {
-        let x_vals = vec![10.0, 20.0, 40.0];
-        let y_vals = vec![5.0, 5.0, 9.0];
-        let z_vals = vec![1.0, 2.0, 3.0];
-        let array_x = Arc::new(Float64Array::from(x_vals));
-        let array_y = Arc::new(Float64Array::from(y_vals));
-        let array_z = Arc::new(Float64Array::from(z_vals));
-        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
-            Field::new("x", DataType::Float64, false),
-            Field::new("y", DataType::Float64, false),
-            Field::new("z", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y, array_z]).unwrap();
-
-        let mut columns = IndexMap::new();
-        columns.insert(
-            "x".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "y".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "z".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        let schema = DatasetSchema::new(columns);
+        let batch = numeric_batch(&[
+            ("x", &[10.0, 20.0, 40.0]),
+            ("y", &[5.0, 5.0, 9.0]),
+            ("z", &[1.0, 2.0, 3.0]),
+        ]);
+        let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
             series: "z".to_string(),

@@ -163,7 +163,7 @@ fn process_xy_scatter(
 mod tests {
     use std::sync::Arc;
 
-    use arrow_array::{Array, ArrayRef, Float64Array, RecordBatch, StructArray};
+    use arrow_array::{Array, ArrayRef, Float64Array, StructArray};
     use arrow_schema::{DataType, Field};
     use fricon::{
         DatasetArray, DatasetDataType, DatasetScalar, DatasetSchema, ScalarArray, ScalarKind,
@@ -173,7 +173,10 @@ mod tests {
     use num::complex::Complex64;
 
     use super::*;
-    use crate::features::charts::types::{ChartCommonOptions, DatasetChartDataOptions};
+    use crate::features::charts::{
+        transform::test_utils::{numeric_batch, numeric_schema},
+        types::{ChartCommonOptions, DatasetChartDataOptions},
+    };
 
     #[test]
     fn test_build_scatter_series_complex_scalar_and_trace() {
@@ -295,26 +298,8 @@ mod tests {
 
     #[test]
     fn test_build_scatter_series_xy() {
-        let x_vals = vec![1.0, 2.0];
-        let y_vals = vec![10.0, 20.0];
-        let array_x = Arc::new(Float64Array::from(x_vals));
-        let array_y = Arc::new(Float64Array::from(y_vals));
-        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
-            Field::new("x", DataType::Float64, false),
-            Field::new("y", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(arrow_schema, vec![array_x, array_y]).unwrap();
-
-        let mut columns = IndexMap::new();
-        columns.insert(
-            "x".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "y".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        let schema = DatasetSchema::new(columns);
+        let batch = numeric_batch(&[("x", &[1.0, 2.0]), ("y", &[10.0, 20.0])]);
+        let schema = numeric_schema(&["x", "y"]);
 
         let options = ScatterChartDataOptions {
             scatter: ScatterModeOptions::Xy {
