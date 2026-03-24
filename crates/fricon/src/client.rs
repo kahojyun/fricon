@@ -32,7 +32,7 @@ use crate::{
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
-    transport::{ipc, ipc::error::ConnectError},
+    transport::{grpc::codec::CodecError, ipc, ipc::error::ConnectError},
     workspace::{WorkspaceError, WorkspacePaths, WorkspaceRoot},
 };
 
@@ -59,7 +59,7 @@ pub enum ClientError {
     Arrow(#[from] ArrowError),
     /// Proto message conversion failed.
     #[error("Proto conversion failed: {0}")]
-    ProtoConversion(#[from] crate::transport::grpc::codec::CodecError),
+    ProtoConversion(#[from] CodecError),
     /// The dataset writer has been closed already (via finish or abort).
     #[error("Dataset writer is already closed")]
     WriterClosed,
