@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context as _, Result, bail};
 use fricon::ExistingUiProbeResult;
@@ -67,67 +67,33 @@ pub(crate) fn run_with_context_dialog_mode(context: &LaunchContext) -> Result<()
     }
 }
 
-#[derive(Debug)]
-enum WorkspaceLaunchOutcome<LogSession = WorkspaceLogSession, State = AppState> {
+enum WorkspaceLaunchOutcome {
     Delegated,
     Start {
-        log_session: LogSession,
-        app_state: State,
+        log_session: WorkspaceLogSession,
+        app_state: AppState,
     },
 }
 
 fn prepare_workspace_runtime(workspace_path: &Path) -> Result<WorkspaceLaunchOutcome> {
     let probe_result =
         tauri::async_runtime::block_on(fricon::Client::probe_existing_ui(workspace_path))?;
-    prepare_workspace_runtime_from_probe(probe_result, || {
-        build_new_workspace_runtime(workspace_path)
-    })
-}
-
-fn prepare_workspace_runtime_from_probe<LogSession, State, BuildRuntime>(
-    probe_result: ExistingUiProbeResult,
-    build_runtime: BuildRuntime,
-) -> Result<WorkspaceLaunchOutcome<LogSession, State>>
-where
-    BuildRuntime: FnOnce() -> Result<(LogSession, State)>,
-{
     match probe_result {
         ExistingUiProbeResult::UiShown => Ok(WorkspaceLaunchOutcome::Delegated),
         ExistingUiProbeResult::UiUnavailable => {
             bail!("workspace is already served by another process without a desktop UI attached")
         }
         ExistingUiProbeResult::NotRunning => {
-            let (log_session, app_state) = build_runtime()?;
+            let log_session = attach_workspace_file_logging(workspace_path)
+                .context("Failed to initialize workspace logging")?;
+            let app_state =
+                AppState::new(workspace_path.to_path_buf()).context("Failed to open workspace")?;
             Ok(WorkspaceLaunchOutcome::Start {
                 log_session,
                 app_state,
             })
         }
     }
-}
-
-fn build_new_workspace_runtime(workspace_path: &Path) -> Result<(WorkspaceLogSession, AppState)> {
-    build_new_workspace_runtime_with(
-        workspace_path,
-        |path| {
-            attach_workspace_file_logging(path).context("Failed to initialize workspace logging")
-        },
-        |path| AppState::new(path).context("Failed to open workspace"),
-    )
-}
-
-fn build_new_workspace_runtime_with<LogSession, State, AttachLogging, BuildState>(
-    workspace_path: &Path,
-    attach_logging: AttachLogging,
-    build_state: BuildState,
-) -> Result<(LogSession, State)>
-where
-    AttachLogging: FnOnce(&Path) -> Result<LogSession>,
-    BuildState: FnOnce(PathBuf) -> Result<State>,
-{
-    let log_session = attach_logging(workspace_path)?;
-    let app_state = build_state(workspace_path.to_path_buf())?;
-    Ok((log_session, app_state))
 }
 
 fn run_with_app_state(app_state: AppState) -> Result<()> {
@@ -235,77 +201,4 @@ fn install_ctrl_c_handler(app: &mut tauri::App) {
             }
         }
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    };
-
-    use super::*;
-
-    #[test]
-    fn prepare_workspace_runtime_from_probe_delegates_without_building() {
-        let built = AtomicBool::new(false);
-
-        let outcome = prepare_workspace_runtime_from_probe(ExistingUiProbeResult::UiShown, || {
-            built.store(true, Ordering::SeqCst);
-            Ok::<_, anyhow::Error>(("log", "state"))
-        })
-        .expect("delegation should succeed");
-
-        assert!(matches!(outcome, WorkspaceLaunchOutcome::Delegated));
-        assert!(!built.load(Ordering::SeqCst));
-    }
-
-    #[test]
-    fn prepare_workspace_runtime_from_probe_errors_for_non_ui_server() {
-        let built = AtomicBool::new(false);
-
-        let error =
-            prepare_workspace_runtime_from_probe(ExistingUiProbeResult::UiUnavailable, || {
-                built.store(true, Ordering::SeqCst);
-                Ok::<_, anyhow::Error>(("log", "state"))
-            })
-            .expect_err("non-UI server should block desktop startup");
-
-        assert!(error.to_string().contains("without a desktop UI attached"));
-        assert!(!built.load(Ordering::SeqCst));
-    }
-
-    #[test]
-    fn build_new_workspace_runtime_with_attaches_logging_before_app_state() {
-        let order = Arc::new(std::sync::Mutex::new(Vec::new()));
-        let workspace_path = Path::new("/tmp/fricon-workspace");
-
-        let (log_session, app_state) = build_new_workspace_runtime_with(
-            workspace_path,
-            {
-                let order = Arc::clone(&order);
-                move |path| {
-                    order.lock().expect("order lock").push("attach_logging");
-                    assert_eq!(path, workspace_path);
-                    Ok::<_, anyhow::Error>("log")
-                }
-            },
-            {
-                let order = Arc::clone(&order);
-                move |path| {
-                    order.lock().expect("order lock").push("build_state");
-                    assert_eq!(path, workspace_path.to_path_buf());
-                    Ok::<_, anyhow::Error>("state")
-                }
-            },
-        )
-        .expect("runtime should build");
-
-        assert_eq!(log_session, "log");
-        assert_eq!(app_state, "state");
-        assert_eq!(
-            *order.lock().expect("order lock"),
-            vec!["attach_logging", "build_state"]
-        );
-    }
 }
