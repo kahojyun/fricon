@@ -75,6 +75,10 @@ enum WorkspaceLaunchOutcome {
     },
 }
 
+// Single-instance invariant: probe *before* starting a new server, because
+// `AppState::new` binds the IPC listener and replaces any existing socket file.
+// If we bound first, we would silently take over a workspace already served by
+// another process.
 fn prepare_workspace_runtime(workspace_path: &Path) -> Result<WorkspaceLaunchOutcome> {
     let probe_result =
         tauri::async_runtime::block_on(fricon::Client::probe_existing_ui(workspace_path))?;
