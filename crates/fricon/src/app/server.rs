@@ -32,7 +32,7 @@ pub(crate) fn start(
 ) -> Result<(), crate::app::AppError> {
     let storage = Storage::new(app.clone(), cancellation_token.clone());
     let service = DatasetServiceServer::new(storage);
-    let listener = ipc::listen(ipc_file, runtime).map_err(crate::app::AppError::Io)?;
+    let listener = ipc::listen(ipc_file, runtime)?;
 
     info!("Starting gRPC server");
     let app_for_fricon = app.clone();

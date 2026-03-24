@@ -47,7 +47,7 @@ pub(crate) async fn get_dataset_detail(
         .await?;
     let payload_available = record.metadata.deleted_at.is_none();
     let columns = if payload_available {
-        let reader = session.dataset(id).await.map_err(UiDatasetError::from)?;
+        let reader = session.dataset(id).await?;
         let schema = reader.schema();
         let index = reader.index_columns();
         schema
@@ -84,7 +84,7 @@ pub(crate) async fn get_dataset_write_status(
     session: &WorkspaceSession,
     id: i32,
 ) -> Result<DatasetWriteStatus, UiDatasetError> {
-    let dataset = session.dataset(id).await.map_err(UiDatasetError::from)?;
+    let dataset = session.dataset(id).await?;
     let (row_count, is_complete) = dataset.write_status();
     Ok(DatasetWriteStatus {
         row_count,

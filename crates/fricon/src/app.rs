@@ -100,10 +100,7 @@ pub struct DatasetEventSubscription {
 
 impl DatasetEventSubscription {
     pub async fn recv(&mut self) -> std::result::Result<DatasetEvent, SubscriptionError> {
-        self.inner
-            .recv()
-            .await
-            .map_err(|error| map_recv_error(&error))
+        self.inner.recv().await.map_err(Into::into)
     }
 }
 
@@ -113,10 +110,16 @@ pub struct UiCommandSubscription {
 
 impl UiCommandSubscription {
     pub async fn recv(&mut self) -> std::result::Result<UiCommand, SubscriptionError> {
-        self.inner
-            .recv()
-            .await
-            .map_err(|error| map_recv_error(&error))
+        self.inner.recv().await.map_err(Into::into)
+    }
+}
+
+impl From<broadcast::error::RecvError> for SubscriptionError {
+    fn from(error: broadcast::error::RecvError) -> Self {
+        match error {
+            broadcast::error::RecvError::Lagged(skipped) => Self::Lagged { skipped },
+            broadcast::error::RecvError::Closed => Self::Closed,
+        }
     }
 }
 
@@ -196,15 +199,6 @@ fn init_database(root: &WorkspaceRoot) -> Result<core::Pool, DatabaseError> {
     }
 
     Ok(database)
-}
-
-fn map_recv_error(error: &broadcast::error::RecvError) -> SubscriptionError {
-    match error {
-        broadcast::error::RecvError::Lagged(skipped) => {
-            SubscriptionError::Lagged { skipped: *skipped }
-        }
-        broadcast::error::RecvError::Closed => SubscriptionError::Closed,
-    }
 }
 
 fn catalog_join_error(error: &tokio::task::JoinError, operation: &'static str) -> CatalogAppError {

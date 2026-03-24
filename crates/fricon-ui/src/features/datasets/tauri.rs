@@ -106,17 +106,13 @@ pub(crate) async fn list_datasets(
         offset: queries::validate_non_negative(options.offset, "offset")
             .map_err(ApiError::validation)?,
     };
-    queries::list_datasets(state.session(), query)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))
+    Ok(queries::list_datasets(state.session(), query).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn list_dataset_tags(state: State<'_, AppState>) -> Result<Vec<String>, ApiError> {
-    queries::list_dataset_tags(state.session())
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))
+    Ok(queries::list_dataset_tags(state.session()).await?)
 }
 
 #[tauri::command]
@@ -125,9 +121,7 @@ pub(crate) async fn dataset_detail(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<DatasetDetail, ApiError> {
-    queries::get_dataset_detail(state.session(), id)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))
+    Ok(queries::get_dataset_detail(state.session(), id).await?)
 }
 
 #[tauri::command]
@@ -137,9 +131,7 @@ pub(crate) async fn update_dataset_favorite(
     id: i32,
     update: DatasetFavoriteUpdate,
 ) -> Result<(), ApiError> {
-    mutations::update_dataset_favorite(state.session(), id, update.favorite)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))?;
+    mutations::update_dataset_favorite(state.session(), id, update.favorite).await?;
     Ok(())
 }
 
@@ -150,9 +142,7 @@ pub(crate) async fn update_dataset_info(
     id: i32,
     update: DatasetInfoUpdate,
 ) -> Result<(), ApiError> {
-    mutations::update_dataset_info(state.session(), id, update)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))?;
+    mutations::update_dataset_info(state.session(), id, update).await?;
     Ok(())
 }
 
@@ -162,9 +152,7 @@ pub(crate) async fn get_dataset_write_status(
     state: State<'_, AppState>,
     id: i32,
 ) -> Result<DatasetWriteStatus, ApiError> {
-    queries::get_dataset_write_status(state.session(), id)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))
+    Ok(queries::get_dataset_write_status(state.session(), id).await?)
 }
 
 #[tauri::command]
@@ -199,9 +187,7 @@ pub(crate) async fn restore_datasets(
 pub(crate) async fn empty_trash(
     state: State<'_, AppState>,
 ) -> Result<Vec<DatasetDeleteResult>, ApiError> {
-    mutations::empty_trash(state.session())
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))
+    Ok(mutations::empty_trash(state.session()).await?)
 }
 
 #[derive(Debug, Deserialize, specta::Type)]
@@ -234,9 +220,7 @@ pub(crate) async fn batch_update_dataset_tags(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn delete_tag(state: State<'_, AppState>, tag: String) -> Result<(), ApiError> {
-    mutations::delete_tag(state.session(), tag)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))?;
+    mutations::delete_tag(state.session(), tag).await?;
     Ok(())
 }
 
@@ -247,9 +231,7 @@ pub(crate) async fn rename_tag(
     old_name: String,
     new_name: String,
 ) -> Result<(), ApiError> {
-    mutations::rename_tag(state.session(), old_name, new_name)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))?;
+    mutations::rename_tag(state.session(), old_name, new_name).await?;
     Ok(())
 }
 
@@ -260,9 +242,7 @@ pub(crate) async fn merge_tag(
     source: String,
     target: String,
 ) -> Result<(), ApiError> {
-    mutations::merge_tag(state.session(), source, target)
-        .await
-        .map_err(|error| ApiError::from_dataset_error(&error))?;
+    mutations::merge_tag(state.session(), source, target).await?;
     Ok(())
 }
 
@@ -289,8 +269,7 @@ pub(crate) async fn export_datasets_dialog(
 
     if let Some(path) = result {
         let out_paths = transfer::export_datasets(state.session(), ids, path)
-            .await
-            .map_err(|error| ApiError::from_dataset_error(&error))?
+            .await?
             .into_iter()
             .map(|out_path| out_path.to_string_lossy().to_string())
             .collect();
@@ -316,8 +295,7 @@ pub(crate) async fn preview_import_dialog(
 
     if let Some(paths) = result {
         let previews = transfer::preview_import_files(state.session(), paths)
-            .await
-            .map_err(|error| ApiError::from_dataset_error(&error))?
+            .await?
             .into_iter()
             .map(UiPreviewImportResult::from)
             .collect();
@@ -333,18 +311,15 @@ pub(crate) async fn preview_import_files(
     state: State<'_, AppState>,
     paths: Vec<String>,
 ) -> Result<Vec<UiPreviewImportResult>, ApiError> {
-    transfer::preview_import_files(
+    let results = transfer::preview_import_files(
         state.session(),
         paths.into_iter().map(std::path::PathBuf::from).collect(),
     )
-    .await
-    .map(|results| {
-        results
-            .into_iter()
-            .map(UiPreviewImportResult::from)
-            .collect()
-    })
-    .map_err(|error| ApiError::from_dataset_error(&error))
+    .await?;
+    Ok(results
+        .into_iter()
+        .map(UiPreviewImportResult::from)
+        .collect())
 }
 
 #[tauri::command]
@@ -354,13 +329,12 @@ pub(crate) async fn import_dataset(
     archive_path: String,
     force: bool,
 ) -> Result<DatasetInfo, ApiError> {
-    transfer::import_dataset(
+    Ok(transfer::import_dataset(
         state.session(),
         std::path::PathBuf::from(archive_path),
         force,
     )
-    .await
-    .map_err(|error| ApiError::from_dataset_error(&error))
+    .await?)
 }
 
 impl From<PreviewImportResult> for UiPreviewImportResult {

@@ -77,8 +77,10 @@ impl ApiError {
             message: self.message,
         }
     }
+}
 
-    pub(crate) fn from_catalog_error(error: &CatalogError) -> Self {
+impl From<CatalogError> for ApiError {
+    fn from(error: CatalogError) -> Self {
         let code = match error {
             CatalogError::NotFound { .. } => ApiErrorCode::DatasetNotFound,
             CatalogError::Deleted { .. } => ApiErrorCode::DatasetDeleted,
@@ -90,12 +92,14 @@ impl ApiError {
             | CatalogError::Database(_)
             | CatalogError::Portability(_) => ApiErrorCode::Internal,
         };
-        Self::new(code, error.to_string())
+        ApiError::new(code, error.to_string())
     }
+}
 
-    pub(crate) fn from_catalog_app_error(error: &CatalogAppError) -> Self {
+impl From<CatalogAppError> for ApiError {
+    fn from(error: CatalogAppError) -> Self {
         match error {
-            CatalogAppError::Domain(error) => Self::from_catalog_error(error),
+            CatalogAppError::Domain(error) => Self::from(error),
             CatalogAppError::StateDropped
             | CatalogAppError::TaskPanic { .. }
             | CatalogAppError::TaskCancelled { .. } => {
@@ -103,8 +107,10 @@ impl ApiError {
             }
         }
     }
+}
 
-    pub(crate) fn from_read_error(error: &ReadError) -> Self {
+impl From<ReadError> for ApiError {
+    fn from(error: ReadError) -> Self {
         let code = match error {
             ReadError::NotFound { .. } => ApiErrorCode::DatasetNotFound,
             ReadError::Deleted { .. } => ApiErrorCode::DatasetDeleted,
@@ -113,12 +119,14 @@ impl ApiError {
             | ReadError::DatasetFs(_)
             | ReadError::Database(_) => ApiErrorCode::Internal,
         };
-        Self::new(code, error.to_string())
+        ApiError::new(code, error.to_string())
     }
+}
 
-    pub(crate) fn from_read_app_error(error: &ReadAppError) -> Self {
+impl From<ReadAppError> for ApiError {
+    fn from(error: ReadAppError) -> Self {
         match error {
-            ReadAppError::Domain(error) => Self::from_read_error(error),
+            ReadAppError::Domain(error) => Self::from(error),
             ReadAppError::StateDropped
             | ReadAppError::TaskPanic { .. }
             | ReadAppError::TaskCancelled { .. } => {
@@ -126,14 +134,14 @@ impl ApiError {
             }
         }
     }
+}
 
-    pub(crate) fn from_dataset_error(error: &UiDatasetError) -> Self {
+impl From<UiDatasetError> for ApiError {
+    fn from(error: UiDatasetError) -> Self {
         match error {
-            UiDatasetError::Catalog(error) => Self::from_catalog_app_error(error),
-            UiDatasetError::Read(error) => Self::from_read_app_error(error),
-            UiDatasetError::Validation { message } => {
-                Self::new(ApiErrorCode::Validation, message.clone())
-            }
+            UiDatasetError::Catalog(error) => Self::from(error),
+            UiDatasetError::Read(error) => Self::from(error),
+            UiDatasetError::Validation { message } => Self::new(ApiErrorCode::Validation, message),
         }
     }
 }
@@ -188,7 +196,7 @@ mod tests {
 
     #[test]
     fn catalog_not_found_maps_to_dataset_not_found() {
-        let error = ApiError::from_catalog_error(&CatalogError::NotFound {
+        let error = ApiError::from(CatalogError::NotFound {
             id: "42".to_string(),
         });
         assert!(matches!(error.code, ApiErrorCode::DatasetNotFound));
@@ -196,7 +204,7 @@ mod tests {
 
     #[test]
     fn catalog_deleted_maps_to_dataset_deleted() {
-        let error = ApiError::from_catalog_error(&CatalogError::Deleted {
+        let error = ApiError::from(CatalogError::Deleted {
             id: "42".to_string(),
         });
         assert!(matches!(error.code, ApiErrorCode::DatasetDeleted));
@@ -204,31 +212,31 @@ mod tests {
 
     #[test]
     fn not_trashed_maps_to_dataset_not_trashed() {
-        let error = ApiError::from_catalog_error(&CatalogError::NotTrashed);
+        let error = ApiError::from(CatalogError::NotTrashed);
         assert!(matches!(error.code, ApiErrorCode::DatasetNotTrashed));
     }
 
     #[test]
     fn empty_tag_maps_to_invalid_tag() {
-        let error = ApiError::from_catalog_error(&CatalogError::EmptyTag);
+        let error = ApiError::from(CatalogError::EmptyTag);
         assert!(matches!(error.code, ApiErrorCode::InvalidTag));
     }
 
     #[test]
     fn same_tag_name_maps_to_same_tag_name() {
-        let error = ApiError::from_catalog_error(&CatalogError::SameTagName);
+        let error = ApiError::from(CatalogError::SameTagName);
         assert!(matches!(error.code, ApiErrorCode::SameTagName));
     }
 
     #[test]
     fn same_source_target_maps_to_same_source_target() {
-        let error = ApiError::from_catalog_error(&CatalogError::SameSourceTarget);
+        let error = ApiError::from(CatalogError::SameSourceTarget);
         assert!(matches!(error.code, ApiErrorCode::SameSourceTarget));
     }
 
     #[test]
     fn read_deleted_maps_to_dataset_deleted() {
-        let error = ApiError::from_read_error(&ReadError::Deleted {
+        let error = ApiError::from(ReadError::Deleted {
             id: "42".to_string(),
         });
         assert!(matches!(error.code, ApiErrorCode::DatasetDeleted));
@@ -236,7 +244,7 @@ mod tests {
 
     #[test]
     fn read_not_found_maps_to_dataset_not_found() {
-        let error = ApiError::from_read_error(&ReadError::NotFound {
+        let error = ApiError::from(ReadError::NotFound {
             id: "42".to_string(),
         });
         assert!(matches!(error.code, ApiErrorCode::DatasetNotFound));
@@ -244,9 +252,7 @@ mod tests {
 
     #[test]
     fn internal_dataset_failures_map_to_internal() {
-        let error = ApiError::from_catalog_error(&CatalogError::Portability(
-            PortabilityError::MissingMetadata,
-        ));
+        let error = ApiError::from(CatalogError::Portability(PortabilityError::MissingMetadata));
         assert!(matches!(error.code, ApiErrorCode::Internal));
     }
 
@@ -255,29 +261,28 @@ mod tests {
         let error = UiDatasetError::Catalog(CatalogAppError::TaskCancelled {
             operation: "joining catalog task",
         });
-        let api_error = ApiError::from_dataset_error(&error);
+        let api_error = ApiError::from(error);
         assert!(matches!(api_error.code, ApiErrorCode::Internal));
     }
 
     #[test]
     fn catalog_app_error_maps_domain_variants() {
-        let error =
-            ApiError::from_catalog_app_error(&CatalogAppError::Domain(CatalogError::Deleted {
-                id: "42".to_string(),
-            }));
+        let error = ApiError::from(CatalogAppError::Domain(CatalogError::Deleted {
+            id: "42".to_string(),
+        }));
         assert!(matches!(error.code, ApiErrorCode::DatasetDeleted));
     }
 
     #[test]
     fn read_app_error_maps_runtime_variants_to_internal() {
-        let error = ApiError::from_read_app_error(&ReadAppError::StateDropped);
+        let error = ApiError::from(ReadAppError::StateDropped);
         assert!(matches!(error.code, ApiErrorCode::Internal));
     }
 
     #[test]
     fn validation_dataset_errors_map_to_validation() {
         let error = UiDatasetError::validation("limit must be non-negative");
-        let api_error = ApiError::from_dataset_error(&error);
+        let api_error = ApiError::from(error);
         assert!(matches!(api_error.code, ApiErrorCode::Validation));
     }
 

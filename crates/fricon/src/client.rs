@@ -210,7 +210,7 @@ impl Client {
             .into_inner()
             .dataset
             .ok_or(ClientError::MissingResponse)?;
-        let record: DatasetRecord = record.try_into().map_err(ClientError::ProtoConversion)?;
+        let record: DatasetRecord = record.try_into()?;
         Ok(Dataset {
             client: self.clone(),
             record,
@@ -382,7 +382,7 @@ impl DatasetWriter {
             .await
             .map_err(|_| ClientError::ConnectorPanic)??;
         let dataset = response.dataset.ok_or(ClientError::MissingResponse)?;
-        let record: DatasetRecord = dataset.try_into().map_err(ClientError::ProtoConversion)?;
+        let record: DatasetRecord = dataset.try_into()?;
         info!(dataset.id = record.id, "Dataset write finished");
         Ok(Dataset {
             client: self.client.clone(),

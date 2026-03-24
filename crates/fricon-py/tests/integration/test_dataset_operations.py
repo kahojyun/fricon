@@ -11,6 +11,7 @@ from pathlib import Path
 
 import fricon
 import fricon._core
+import pytest
 
 
 class TestDatasetOperations:
@@ -284,13 +285,12 @@ class TestDatasetOperations:
             workspace, server_handle = fricon._core.serve_workspace(workspace_path)
             dm = workspace.dataset_manager
 
-            try:
+            with pytest.raises(fricon.FriconDatasetError) as exc_info:
                 dm.open(999999)
-            except fricon.FriconDatasetError as exc:
-                assert exc.code == "dataset_not_found"
-                assert exc.message == "Dataset not found"
-            else:
-                raise AssertionError("Expected FriconDatasetError for missing dataset")
+
+            exc = exc_info.value
+            assert exc.code == "dataset_not_found"
+            assert exc.message == "Dataset not found"
 
             server_handle.shutdown()
             assert not server_handle.is_running

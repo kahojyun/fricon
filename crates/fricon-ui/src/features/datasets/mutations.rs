@@ -26,8 +26,8 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
     unique.into_iter().collect()
 }
 
-fn dataset_operation_error(error: &UiDatasetError) -> DatasetOperationError {
-    ApiError::from_dataset_error(error).into_dataset_operation_error()
+fn dataset_operation_error(error: UiDatasetError) -> DatasetOperationError {
+    ApiError::from(error).into_dataset_operation_error()
 }
 
 pub(crate) async fn update_dataset_favorite(
@@ -106,7 +106,7 @@ pub(crate) async fn delete_datasets(
                 results.push(DatasetDeleteResult {
                     id,
                     success: false,
-                    error: Some(dataset_operation_error(&error)),
+                    error: Some(dataset_operation_error(error)),
                 });
             }
         }
@@ -132,7 +132,7 @@ pub(crate) async fn trash_datasets(
                 results.push(DatasetDeleteResult {
                     id,
                     success: false,
-                    error: Some(dataset_operation_error(&error)),
+                    error: Some(dataset_operation_error(error)),
                 });
             }
         }
@@ -158,7 +158,7 @@ pub(crate) async fn restore_datasets(
                 results.push(DatasetDeleteResult {
                     id,
                     success: false,
-                    error: Some(dataset_operation_error(&error)),
+                    error: Some(dataset_operation_error(error)),
                 });
             }
         }
@@ -208,14 +208,14 @@ pub(crate) async fn batch_update_dataset_tags(
             Ok(()) => None,
             Err(error) => {
                 let error = UiDatasetError::from(error);
-                Some(dataset_operation_error(&error))
+                Some(dataset_operation_error(error))
             }
         };
         let remove_error = match remove_result {
             Ok(()) => None,
             Err(error) => {
                 let error = UiDatasetError::from(error);
-                Some(dataset_operation_error(&error))
+                Some(dataset_operation_error(error))
             }
         };
         results.push(DatasetTagBatchResult {
