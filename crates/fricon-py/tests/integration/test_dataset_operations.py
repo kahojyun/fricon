@@ -9,6 +9,7 @@ import tempfile
 import time
 from pathlib import Path
 
+import fricon
 import fricon._core
 
 
@@ -274,5 +275,22 @@ class TestDatasetOperations:
             # but they require async runtime context which needs additional setup
 
             # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_open_missing_dataset_raises_semantic_dataset_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            try:
+                dm.open(999999)
+            except fricon.FriconDatasetError as exc:
+                assert exc.code == "dataset_not_found"
+                assert exc.message == "Dataset not found"
+            else:
+                raise AssertionError("Expected FriconDatasetError for missing dataset")
+
             server_handle.shutdown()
             assert not server_handle.is_running
