@@ -34,3 +34,28 @@ pub enum DatasetEvent {
 pub(crate) trait DatasetEventPublisher {
     fn publish(&self, event: DatasetEvent);
 }
+
+#[cfg(test)]
+pub(crate) mod test_utils {
+    use std::sync::Mutex;
+
+    use super::{DatasetEvent, DatasetEventPublisher};
+
+    /// Test double that collects all published events.
+    #[derive(Default)]
+    pub(crate) struct CollectEvents {
+        events: Mutex<Vec<DatasetEvent>>,
+    }
+
+    impl CollectEvents {
+        pub(crate) fn snapshot(&self) -> Vec<DatasetEvent> {
+            self.events.lock().expect("events").clone()
+        }
+    }
+
+    impl DatasetEventPublisher for CollectEvents {
+        fn publish(&self, event: DatasetEvent) {
+            self.events.lock().expect("events").push(event);
+        }
+    }
+}

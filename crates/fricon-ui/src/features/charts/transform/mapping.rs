@@ -124,27 +124,16 @@ mod tests {
     use fricon::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind};
     use indexmap::IndexMap;
 
-    use super::build_chart_selected_columns;
+    use super::{
+        super::test_utils::numeric_schema as make_numeric_schema, build_chart_selected_columns,
+    };
     use crate::features::charts::types::{
         ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions, LineChartDataOptions,
         ScatterChartDataOptions, ScatterModeOptions,
     };
 
     fn numeric_schema() -> DatasetSchema {
-        let mut columns = IndexMap::new();
-        columns.insert(
-            "x".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "y".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        columns.insert(
-            "z".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        );
-        DatasetSchema::new(columns)
+        make_numeric_schema(&["x", "y", "z"])
     }
 
     fn mixed_scatter_schema() -> DatasetSchema {

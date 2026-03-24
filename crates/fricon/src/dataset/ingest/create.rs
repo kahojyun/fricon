@@ -137,7 +137,7 @@ mod tests {
     use super::*;
     use crate::{
         dataset::{
-            events::DatasetEvent,
+            events::{DatasetEvent, test_utils::CollectEvents},
             model::{DatasetMetadata, DatasetStatus},
         },
         workspace::WorkspaceRoot,
@@ -222,23 +222,6 @@ mod tests {
             let state = self.state.lock().expect("repo state");
             assert!(matches!(id, DatasetId::Id(7)));
             Ok(state.record.clone())
-        }
-    }
-
-    #[derive(Default)]
-    struct CollectEvents {
-        events: Mutex<Vec<DatasetEvent>>,
-    }
-
-    impl CollectEvents {
-        fn snapshot(&self) -> Vec<DatasetEvent> {
-            self.events.lock().expect("events").clone()
-        }
-    }
-
-    impl DatasetEventPublisher for CollectEvents {
-        fn publish(&self, event: DatasetEvent) {
-            self.events.lock().expect("events").push(event);
         }
     }
 

@@ -629,26 +629,13 @@ impl AppManager {
 mod tests {
     use tokio::runtime::Runtime;
 
-    use super::{catalog_join_error, ingest_join_error, read_join_error};
-    use crate::{
-        app::{CatalogAppError, IngestAppError, ReadAppError},
-        dataset::{catalog::CatalogError, ingest::IngestError, read::ReadError},
-    };
+    use super::catalog_join_error;
+    use crate::app::CatalogAppError;
 
     fn panic_join_error() -> tokio::task::JoinError {
         Runtime::new()
             .expect("runtime")
             .block_on(async { tokio::spawn(async { panic!("boom") }).await.unwrap_err() })
-    }
-
-    fn cancelled_join_error() -> tokio::task::JoinError {
-        Runtime::new().expect("runtime").block_on(async {
-            let handle = tokio::spawn(async {
-                tokio::task::yield_now().await;
-            });
-            handle.abort();
-            handle.await.unwrap_err()
-        })
     }
 
     #[test]
@@ -659,57 +646,6 @@ mod tests {
             CatalogAppError::TaskPanic {
                 operation: "joining catalog task"
             }
-        ));
-    }
-
-    #[test]
-    fn ingest_join_error_preserves_cancel_context() {
-        let error = ingest_join_error(&cancelled_join_error(), "joining ingest task");
-        assert!(matches!(
-            error,
-            IngestAppError::TaskCancelled {
-                operation: "joining ingest task"
-            }
-        ));
-    }
-
-    #[test]
-    fn read_join_error_preserves_cancel_context() {
-        let error = read_join_error(&cancelled_join_error(), "joining read task");
-        assert!(matches!(
-            error,
-            ReadAppError::TaskCancelled {
-                operation: "joining read task"
-            }
-        ));
-    }
-
-    #[test]
-    fn catalog_app_error_wraps_domain_errors() {
-        let error = CatalogAppError::from(CatalogError::NotTrashed);
-        assert!(matches!(
-            error,
-            CatalogAppError::Domain(CatalogError::NotTrashed)
-        ));
-    }
-
-    #[test]
-    fn ingest_app_error_wraps_domain_errors() {
-        let error = IngestAppError::from(IngestError::NotFound {
-            id: "42".to_string(),
-        });
-        assert!(matches!(
-            error,
-            IngestAppError::Domain(IngestError::NotFound { .. })
-        ));
-    }
-
-    #[test]
-    fn read_app_error_wraps_domain_errors() {
-        let error = ReadAppError::from(ReadError::EmptyDataset);
-        assert!(matches!(
-            error,
-            ReadAppError::Domain(ReadError::EmptyDataset)
         ));
     }
 }

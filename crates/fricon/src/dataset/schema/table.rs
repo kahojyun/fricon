@@ -136,8 +136,13 @@ mod tests {
             chunked_table.push_back(batch).unwrap();
         }
 
-        assert_eq!(chunked_table.batches.len(), lengths.len());
-        assert_eq!(chunked_table.offsets, [0, 1, 3, 6, 10]);
+        assert_eq!(chunked_table.first_offset(), 0);
+        assert_eq!(chunked_table.last_offset(), 10);
+
+        let all: Vec<_> = chunked_table.range(..).collect();
+        let merged = concat_batches(chunked_table.schema(), all.iter().map(AsRef::as_ref)).unwrap();
+        let arr = merged.column(0).as_primitive::<Int32Type>();
+        assert_eq!(arr.values(), &(0..10).collect::<Vec<_>>());
     }
 
     #[test]
@@ -150,28 +155,27 @@ mod tests {
         }
 
         chunked_table.release_front(0);
-        assert_eq!(chunked_table.batches.len(), 4);
-        assert_eq!(chunked_table.offsets.len(), 5);
+        assert_eq!(chunked_table.first_offset(), 0);
+        assert_eq!(chunked_table.last_offset(), 12);
 
         chunked_table.release_front(1);
-        assert_eq!(chunked_table.batches.len(), 4);
-        assert_eq!(chunked_table.offsets.len(), 5);
+        assert_eq!(chunked_table.first_offset(), 0);
 
         chunked_table.release_front(3);
-        assert_eq!(chunked_table.batches.len(), 3);
-        assert_eq!(chunked_table.offsets.len(), 4);
+        assert_eq!(chunked_table.first_offset(), 3);
+        // Data from row 3 onward is still accessible
+        check_slice(&chunked_table, &(0..12).collect::<Vec<_>>(), 3..12);
 
         chunked_table.release_front(7);
-        assert_eq!(chunked_table.batches.len(), 2);
-        assert_eq!(chunked_table.offsets.len(), 3);
+        assert_eq!(chunked_table.first_offset(), 6);
+        check_slice(&chunked_table, &(0..12).collect::<Vec<_>>(), 6..12);
 
         chunked_table.release_front(12);
-        assert_eq!(chunked_table.batches.len(), 0);
-        assert_eq!(chunked_table.offsets.len(), 1);
+        assert_eq!(chunked_table.first_offset(), 12);
+        assert_eq!(chunked_table.last_offset(), 12);
 
         chunked_table.release_front(15);
-        assert_eq!(chunked_table.batches.len(), 0);
-        assert_eq!(chunked_table.offsets.len(), 1);
+        assert_eq!(chunked_table.first_offset(), 12);
     }
 
     fn check_slice<R>(chunked_table: &ChunkedTable, reference: &[i32], r: R)

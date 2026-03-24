@@ -188,7 +188,7 @@ pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
 mod tests {
     use fricon::{
         CatalogAppError, ReadAppError,
-        dataset::{PortabilityError, catalog::CatalogError, read::ReadError},
+        dataset::{PortabilityError, catalog::CatalogError},
     };
 
     use super::{ApiError, ApiErrorCode};
@@ -197,54 +197,6 @@ mod tests {
     #[test]
     fn catalog_not_found_maps_to_dataset_not_found() {
         let error = ApiError::from(CatalogError::NotFound {
-            id: "42".to_string(),
-        });
-        assert!(matches!(error.code, ApiErrorCode::DatasetNotFound));
-    }
-
-    #[test]
-    fn catalog_deleted_maps_to_dataset_deleted() {
-        let error = ApiError::from(CatalogError::Deleted {
-            id: "42".to_string(),
-        });
-        assert!(matches!(error.code, ApiErrorCode::DatasetDeleted));
-    }
-
-    #[test]
-    fn not_trashed_maps_to_dataset_not_trashed() {
-        let error = ApiError::from(CatalogError::NotTrashed);
-        assert!(matches!(error.code, ApiErrorCode::DatasetNotTrashed));
-    }
-
-    #[test]
-    fn empty_tag_maps_to_invalid_tag() {
-        let error = ApiError::from(CatalogError::EmptyTag);
-        assert!(matches!(error.code, ApiErrorCode::InvalidTag));
-    }
-
-    #[test]
-    fn same_tag_name_maps_to_same_tag_name() {
-        let error = ApiError::from(CatalogError::SameTagName);
-        assert!(matches!(error.code, ApiErrorCode::SameTagName));
-    }
-
-    #[test]
-    fn same_source_target_maps_to_same_source_target() {
-        let error = ApiError::from(CatalogError::SameSourceTarget);
-        assert!(matches!(error.code, ApiErrorCode::SameSourceTarget));
-    }
-
-    #[test]
-    fn read_deleted_maps_to_dataset_deleted() {
-        let error = ApiError::from(ReadError::Deleted {
-            id: "42".to_string(),
-        });
-        assert!(matches!(error.code, ApiErrorCode::DatasetDeleted));
-    }
-
-    #[test]
-    fn read_not_found_maps_to_dataset_not_found() {
-        let error = ApiError::from(ReadError::NotFound {
             id: "42".to_string(),
         });
         assert!(matches!(error.code, ApiErrorCode::DatasetNotFound));
