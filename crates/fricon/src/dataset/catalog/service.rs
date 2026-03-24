@@ -64,7 +64,9 @@ impl DatasetCatalogService {
 
     #[instrument(skip(self, id), fields(dataset.id = ?id))]
     pub(crate) fn get_dataset(&self, id: DatasetId) -> Result<DatasetRecord, CatalogError> {
-        self.repository.get_dataset(id)
+        let record = self.repository.get_dataset(id)?;
+        Self::ensure_not_deleted_record(&record)?;
+        Ok(record)
     }
 
     #[instrument(skip(self, query_options))]
@@ -746,6 +748,31 @@ mod tests {
         assert!(
             events.events.lock().expect("events").is_empty(),
             "no events should be published on conflict"
+        );
+    }
+
+    #[test]
+    fn get_dataset_rejects_deleted_dataset() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let mut record = dataset_record(5, uid);
+        record.metadata.deleted_at = Some(Utc::now());
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_get_dataset()
+            .once()
+            .withf(|id| matches!(id, DatasetId::Id(5)))
+            .return_once(move |_| Ok(record));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+
+        let result = service.get_dataset(DatasetId::Id(5));
+
+        assert!(
+            matches!(result, Err(CatalogError::Deleted { .. })),
+            "deleted datasets should not be retrievable"
         );
     }
 

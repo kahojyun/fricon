@@ -32,7 +32,14 @@ use crate::{
         create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
         fricon_service_client::FriconServiceClient, get_request::IdEnum,
     },
-    transport::{grpc::codec::CodecError, ipc, ipc::error::ConnectError},
+    transport::{
+        grpc::{
+            codec::CodecError,
+            dataset_service::{DATASET_ERROR_CODE_METADATA_KEY, DatasetTransportErrorCode},
+        },
+        ipc,
+        ipc::error::ConnectError,
+    },
     workspace::{WorkspaceError, WorkspacePaths, WorkspaceRoot},
 };
 
@@ -51,6 +58,20 @@ pub enum ClientError {
     Transport(#[from] tonic::transport::Error),
     #[error("RPC error: {0}")]
     Status(#[from] Status),
+    #[error("Dataset not found")]
+    DatasetNotFound,
+    #[error("Dataset has been permanently deleted")]
+    DatasetDeleted,
+    #[error("Dataset must be moved to trash before permanent deletion")]
+    DatasetNotTrashed,
+    #[error("Tag name must not be empty")]
+    InvalidTag,
+    #[error("Old tag name and new tag name must differ")]
+    SameTagName,
+    #[error("Source tag and target tag must differ")]
+    SameSourceTarget,
+    #[error("Dataset operation failed")]
+    DatasetOperationFailed,
     #[error("Version parse error: {0}")]
     VersionParse(#[from] semver::Error),
     #[error("Server version {server} does not match client version {client}")]
@@ -166,7 +187,11 @@ impl Client {
             page_size,
             page_token,
         };
-        let response = self.dataset_service().search(request).await?;
+        let response = self
+            .dataset_service()
+            .search(request)
+            .await
+            .map_err(dataset_status_to_client_error)?;
         let records = response.into_inner().datasets;
         records
             .into_iter()
@@ -176,7 +201,11 @@ impl Client {
 
     async fn get_dataset_by_id_enum(&self, id: IdEnum) -> Result<Dataset, ClientError> {
         let request = GetRequest { id_enum: Some(id) };
-        let response = self.dataset_service().get(request).await?;
+        let response = self
+            .dataset_service()
+            .get(request)
+            .await
+            .map_err(dataset_status_to_client_error)?;
         let record = response
             .into_inner()
             .dataset
@@ -214,6 +243,37 @@ fn connect_target_missing(err: &tonic::transport::Error) -> bool {
     false
 }
 
+fn dataset_transport_error_code(status: &Status) -> Option<DatasetTransportErrorCode> {
+    let value = status
+        .metadata()
+        .get(DATASET_ERROR_CODE_METADATA_KEY)?
+        .to_str()
+        .ok()?;
+    match value {
+        "dataset_not_found" => Some(DatasetTransportErrorCode::DatasetNotFound),
+        "dataset_deleted" => Some(DatasetTransportErrorCode::DatasetDeleted),
+        "dataset_not_trashed" => Some(DatasetTransportErrorCode::DatasetNotTrashed),
+        "invalid_tag" => Some(DatasetTransportErrorCode::InvalidTag),
+        "same_tag_name" => Some(DatasetTransportErrorCode::SameTagName),
+        "same_source_target" => Some(DatasetTransportErrorCode::SameSourceTarget),
+        "internal" => Some(DatasetTransportErrorCode::Internal),
+        _ => None,
+    }
+}
+
+fn dataset_status_to_client_error(status: Status) -> ClientError {
+    match dataset_transport_error_code(&status) {
+        Some(DatasetTransportErrorCode::DatasetNotFound) => ClientError::DatasetNotFound,
+        Some(DatasetTransportErrorCode::DatasetDeleted) => ClientError::DatasetDeleted,
+        Some(DatasetTransportErrorCode::DatasetNotTrashed) => ClientError::DatasetNotTrashed,
+        Some(DatasetTransportErrorCode::InvalidTag) => ClientError::InvalidTag,
+        Some(DatasetTransportErrorCode::SameTagName) => ClientError::SameTagName,
+        Some(DatasetTransportErrorCode::SameSourceTarget) => ClientError::SameSourceTarget,
+        Some(DatasetTransportErrorCode::Internal) => ClientError::DatasetOperationFailed,
+        None => ClientError::Status(status),
+    }
+}
+
 #[derive(Debug)]
 enum StreamMessage {
     Batch(RecordBatch),
@@ -248,7 +308,11 @@ impl DatasetWriter {
                 build_request_stream(name, description, tags, arrow_schema.clone(), rx);
             async move {
                 let request = Request::new(request_stream);
-                let response = client.dataset_service().create(request).await?;
+                let response = client
+                    .dataset_service()
+                    .create(request)
+                    .await
+                    .map_err(dataset_status_to_client_error)?;
                 Ok(response.into_inner())
             }
         });
@@ -553,7 +617,12 @@ impl Dataset {
             id: self.record.id,
             tags,
         };
-        let _response = self.client.dataset_service().add_tags(request).await?;
+        let _response = self
+            .client
+            .dataset_service()
+            .add_tags(request)
+            .await
+            .map_err(dataset_status_to_client_error)?;
         Ok(())
     }
 
@@ -562,7 +631,12 @@ impl Dataset {
             id: self.record.id,
             tags,
         };
-        let _response = self.client.dataset_service().remove_tags(request).await?;
+        let _response = self
+            .client
+            .dataset_service()
+            .remove_tags(request)
+            .await
+            .map_err(dataset_status_to_client_error)?;
         Ok(())
     }
 
@@ -578,7 +652,12 @@ impl Dataset {
             description,
             favorite,
         };
-        let _response = self.client.dataset_service().update(request).await?;
+        let _response = self
+            .client
+            .dataset_service()
+            .update(request)
+            .await
+            .map_err(dataset_status_to_client_error)?;
         Ok(())
     }
 }
@@ -610,13 +689,104 @@ mod tests {
     use futures::StreamExt;
     use itertools::Itertools;
     use tokio::sync::mpsc;
+    use tonic::{Code, Status};
 
-    use super::{MAX_PAYLOAD_CHUNK_SIZE, StreamMessage, build_request_stream, split_payload_chunk};
-    use crate::proto::create_request::CreateMessage;
+    use super::{
+        ClientError, MAX_PAYLOAD_CHUNK_SIZE, StreamMessage, build_request_stream,
+        dataset_status_to_client_error, split_payload_chunk,
+    };
+    use crate::{
+        proto::create_request::CreateMessage,
+        transport::grpc::dataset_service::DATASET_ERROR_CODE_METADATA_KEY,
+    };
 
     fn one_col_batch() -> RecordBatch {
         let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
         RecordBatch::try_new(schema, vec![Arc::new(Int64Array::from(vec![1_i64]))]).expect("batch")
+    }
+
+    fn dataset_status(code: Code, semantic_code: &str, message: &str) -> Status {
+        let mut status = Status::new(code, message.to_string());
+        status.metadata_mut().insert(
+            DATASET_ERROR_CODE_METADATA_KEY,
+            semantic_code.parse().expect("valid metadata value"),
+        );
+        status
+    }
+
+    #[test]
+    fn dataset_status_metadata_maps_to_typed_client_error() {
+        assert!(matches!(
+            dataset_status_to_client_error(dataset_status(
+                Code::NotFound,
+                "dataset_not_found",
+                "dataset not found"
+            )),
+            ClientError::DatasetNotFound
+        ));
+        assert!(matches!(
+            dataset_status_to_client_error(dataset_status(
+                Code::FailedPrecondition,
+                "dataset_deleted",
+                "deleted"
+            )),
+            ClientError::DatasetDeleted
+        ));
+        assert!(matches!(
+            dataset_status_to_client_error(dataset_status(
+                Code::FailedPrecondition,
+                "dataset_not_trashed",
+                "not trashed"
+            )),
+            ClientError::DatasetNotTrashed
+        ));
+        assert!(matches!(
+            dataset_status_to_client_error(dataset_status(
+                Code::InvalidArgument,
+                "invalid_tag",
+                "empty tag"
+            )),
+            ClientError::InvalidTag
+        ));
+        assert!(matches!(
+            dataset_status_to_client_error(dataset_status(
+                Code::InvalidArgument,
+                "same_tag_name",
+                "same tag"
+            )),
+            ClientError::SameTagName
+        ));
+        assert!(matches!(
+            dataset_status_to_client_error(dataset_status(
+                Code::InvalidArgument,
+                "same_source_target",
+                "same source/target"
+            )),
+            ClientError::SameSourceTarget
+        ));
+        assert!(matches!(
+            dataset_status_to_client_error(dataset_status(Code::Internal, "internal", "boom")),
+            ClientError::DatasetOperationFailed
+        ));
+    }
+
+    #[test]
+    fn missing_or_invalid_metadata_falls_back_to_raw_status() {
+        let raw_status = Status::new(Code::NotFound, "dataset not found");
+        match dataset_status_to_client_error(raw_status.clone()) {
+            ClientError::Status(status) => assert_eq!(status.code(), raw_status.code()),
+            other => panic!("expected raw status fallback, got {other:?}"),
+        }
+
+        let malformed_status = dataset_status(
+            Code::NotFound,
+            "unexpected_dataset_code",
+            "dataset not found",
+        );
+        match dataset_status_to_client_error(malformed_status.clone()) {
+            ClientError::Status(status) => assert_eq!(status.code(), malformed_status.code()),
+            other => panic!("expected malformed metadata fallback, got {other:?}"),
+        }
     }
 
     #[tokio::test]

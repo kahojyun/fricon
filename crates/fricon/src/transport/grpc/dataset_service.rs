@@ -5,7 +5,10 @@
 //! stream assembly for create/search/get/update/delete endpoints.
 
 use tokio_util::sync::CancellationToken;
-use tonic::{Request, Response, Result, Status, Streaming};
+use tonic::{
+    Code, Request, Response, Result, Status, Streaming,
+    metadata::{AsciiMetadataKey, AsciiMetadataValue},
+};
 use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
@@ -33,6 +36,33 @@ pub(crate) struct Storage {
     shutdown_token: CancellationToken,
 }
 
+pub(crate) const DATASET_ERROR_CODE_METADATA_KEY: &str = "fricon-dataset-error-code";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DatasetTransportErrorCode {
+    DatasetNotFound,
+    DatasetDeleted,
+    DatasetNotTrashed,
+    InvalidTag,
+    SameTagName,
+    SameSourceTarget,
+    Internal,
+}
+
+impl DatasetTransportErrorCode {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::DatasetNotFound => "dataset_not_found",
+            Self::DatasetDeleted => "dataset_deleted",
+            Self::DatasetNotTrashed => "dataset_not_trashed",
+            Self::InvalidTag => "invalid_tag",
+            Self::SameTagName => "same_tag_name",
+            Self::SameSourceTarget => "same_source_target",
+            Self::Internal => "internal",
+        }
+    }
+}
+
 impl Storage {
     /// Build the dataset gRPC adapter around the shared application handle.
     pub(crate) fn new(app: AppHandle, shutdown_token: CancellationToken) -> Self {
@@ -43,21 +73,66 @@ impl Storage {
     }
 }
 
+fn dataset_status(
+    code: Code,
+    dataset_code: DatasetTransportErrorCode,
+    message: impl Into<String>,
+) -> Status {
+    let mut status = Status::new(code, message.into());
+    status.metadata_mut().insert(
+        AsciiMetadataKey::from_static(DATASET_ERROR_CODE_METADATA_KEY),
+        AsciiMetadataValue::from_static(dataset_code.as_str()),
+    );
+    status
+}
+
 impl From<CatalogError> for Status {
     fn from(error: CatalogError) -> Self {
         match error {
-            CatalogError::NotFound { .. } => Status::not_found("dataset not found"),
-            CatalogError::EmptyTag | CatalogError::SameTagName | CatalogError::SameSourceTarget => {
-                Status::invalid_argument(error.to_string())
-            }
-            CatalogError::Deleted { .. }
-            | CatalogError::NotTrashed
-            | CatalogError::StateDropped
+            CatalogError::NotFound { .. } => dataset_status(
+                Code::NotFound,
+                DatasetTransportErrorCode::DatasetNotFound,
+                "dataset not found",
+            ),
+            CatalogError::EmptyTag => dataset_status(
+                Code::InvalidArgument,
+                DatasetTransportErrorCode::InvalidTag,
+                error.to_string(),
+            ),
+            CatalogError::SameTagName => dataset_status(
+                Code::InvalidArgument,
+                DatasetTransportErrorCode::SameTagName,
+                error.to_string(),
+            ),
+            CatalogError::SameSourceTarget => dataset_status(
+                Code::InvalidArgument,
+                DatasetTransportErrorCode::SameSourceTarget,
+                error.to_string(),
+            ),
+            CatalogError::Deleted { .. } => dataset_status(
+                Code::FailedPrecondition,
+                DatasetTransportErrorCode::DatasetDeleted,
+                error.to_string(),
+            ),
+            CatalogError::NotTrashed => dataset_status(
+                Code::FailedPrecondition,
+                DatasetTransportErrorCode::DatasetNotTrashed,
+                error.to_string(),
+            ),
+            CatalogError::StateDropped
             | CatalogError::TaskPanic { .. }
-            | CatalogError::TaskCancelled { .. } => Status::failed_precondition(error.to_string()),
+            | CatalogError::TaskCancelled { .. } => dataset_status(
+                Code::Internal,
+                DatasetTransportErrorCode::Internal,
+                error.to_string(),
+            ),
             CatalogError::DatasetFs(_)
             | CatalogError::Database(_)
-            | CatalogError::Portability(_) => Status::internal("dataset operation failed"),
+            | CatalogError::Portability(_) => dataset_status(
+                Code::Internal,
+                DatasetTransportErrorCode::Internal,
+                "dataset operation failed",
+            ),
         }
     }
 }
@@ -65,12 +140,24 @@ impl From<CatalogError> for Status {
 impl From<IngestError> for Status {
     fn from(error: IngestError) -> Self {
         match error {
-            IngestError::NotFound { .. } => Status::not_found("dataset not found"),
+            IngestError::NotFound { .. } => dataset_status(
+                Code::NotFound,
+                DatasetTransportErrorCode::DatasetNotFound,
+                "dataset not found",
+            ),
             IngestError::StateDropped
             | IngestError::TaskPanic { .. }
-            | IngestError::TaskCancelled { .. } => Status::failed_precondition(error.to_string()),
+            | IngestError::TaskCancelled { .. } => dataset_status(
+                Code::Internal,
+                DatasetTransportErrorCode::Internal,
+                error.to_string(),
+            ),
             IngestError::Dataset(_) | IngestError::DatasetFs(_) | IngestError::Database(_) => {
-                Status::internal("dataset ingestion failed")
+                dataset_status(
+                    Code::Internal,
+                    DatasetTransportErrorCode::Internal,
+                    "dataset ingestion failed",
+                )
             }
         }
     }
@@ -79,14 +166,30 @@ impl From<IngestError> for Status {
 impl From<ReadError> for Status {
     fn from(error: ReadError) -> Self {
         match error {
-            ReadError::NotFound { .. } => Status::not_found("dataset not found"),
-            ReadError::Deleted { .. }
-            | ReadError::EmptyDataset
+            ReadError::NotFound { .. } => dataset_status(
+                Code::NotFound,
+                DatasetTransportErrorCode::DatasetNotFound,
+                "dataset not found",
+            ),
+            ReadError::Deleted { .. } => dataset_status(
+                Code::FailedPrecondition,
+                DatasetTransportErrorCode::DatasetDeleted,
+                error.to_string(),
+            ),
+            ReadError::EmptyDataset
             | ReadError::StateDropped
             | ReadError::TaskPanic { .. }
-            | ReadError::TaskCancelled { .. } => Status::failed_precondition(error.to_string()),
+            | ReadError::TaskCancelled { .. } => dataset_status(
+                Code::Internal,
+                DatasetTransportErrorCode::Internal,
+                error.to_string(),
+            ),
             ReadError::Dataset(_) | ReadError::DatasetFs(_) | ReadError::Database(_) => {
-                Status::internal("dataset read failed")
+                dataset_status(
+                    Code::Internal,
+                    DatasetTransportErrorCode::Internal,
+                    "dataset read failed",
+                )
             }
         }
     }
@@ -269,6 +372,7 @@ impl DatasetService for Storage {
 mod tests {
     use tonic::{Code, Status};
 
+    use super::{DATASET_ERROR_CODE_METADATA_KEY, DatasetTransportErrorCode};
     use crate::{
         database::core::DatabaseError,
         dataset::{
@@ -277,6 +381,13 @@ mod tests {
         transport::grpc::codec::CodecError,
     };
 
+    fn dataset_code(status: &Status) -> Option<&str> {
+        status
+            .metadata()
+            .get(DATASET_ERROR_CODE_METADATA_KEY)
+            .and_then(|value| value.to_str().ok())
+    }
+
     #[test]
     fn catalog_not_found_maps_to_not_found() {
         let status = Status::from(CatalogError::NotFound {
@@ -284,6 +395,10 @@ mod tests {
         });
         assert_eq!(status.code(), Code::NotFound);
         assert_eq!(status.message(), "dataset not found");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::DatasetNotFound.as_str())
+        );
     }
 
     #[test]
@@ -291,6 +406,10 @@ mod tests {
         let status = Status::from(CatalogError::EmptyTag);
         assert_eq!(status.code(), Code::InvalidArgument);
         assert_eq!(status.message(), "Tag name must not be empty");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::InvalidTag.as_str())
+        );
     }
 
     #[test]
@@ -301,6 +420,23 @@ mod tests {
             status.message(),
             "Dataset must be moved to trash before permanent deletion"
         );
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::DatasetNotTrashed.as_str())
+        );
+    }
+
+    #[test]
+    fn catalog_deleted_maps_to_failed_precondition_with_metadata() {
+        let status = Status::from(CatalogError::Deleted {
+            id: "9".to_string(),
+        });
+        assert_eq!(status.code(), Code::FailedPrecondition);
+        assert_eq!(status.message(), "Dataset has been permanently deleted: 9");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::DatasetDeleted.as_str())
+        );
     }
 
     #[test]
@@ -310,17 +446,25 @@ mod tests {
         )));
         assert_eq!(status.code(), Code::Internal);
         assert_eq!(status.message(), "dataset operation failed");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::Internal.as_str())
+        );
     }
 
     #[test]
-    fn ingest_precondition_maps_to_failed_precondition() {
+    fn ingest_internal_metadata_maps_to_internal() {
         let status = Status::from(IngestError::TaskCancelled {
             operation: "joining ingest task",
         });
-        assert_eq!(status.code(), Code::FailedPrecondition);
+        assert_eq!(status.code(), Code::Internal);
         assert_eq!(
             status.message(),
             "Background task was cancelled while joining ingest task"
+        );
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::Internal.as_str())
         );
     }
 
@@ -329,6 +473,10 @@ mod tests {
         let status = Status::from(IngestError::Dataset(DatasetError::SchemaMismatch));
         assert_eq!(status.code(), Code::Internal);
         assert_eq!(status.message(), "dataset ingestion failed");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::Internal.as_str())
+        );
     }
 
     #[test]
@@ -338,6 +486,10 @@ mod tests {
         });
         assert_eq!(status.code(), Code::NotFound);
         assert_eq!(status.message(), "dataset not found");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::DatasetNotFound.as_str())
+        );
     }
 
     #[test]
@@ -349,6 +501,21 @@ mod tests {
         assert_eq!(
             status.message(),
             "Dataset payload has been permanently deleted: 9"
+        );
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::DatasetDeleted.as_str())
+        );
+    }
+
+    #[test]
+    fn read_empty_dataset_maps_to_internal() {
+        let status = Status::from(ReadError::EmptyDataset);
+        assert_eq!(status.code(), Code::Internal);
+        assert_eq!(status.message(), "No dataset file found.");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::Internal.as_str())
         );
     }
 
