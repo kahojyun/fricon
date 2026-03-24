@@ -213,10 +213,11 @@ impl DatasetService for Storage {
             .app
             .create_dataset_from_receiver(create.request, create.events_rx)
             .await;
-        let producer_result = create.events_task.await.map_err(|e| {
-            error!(error = %e, "Create stream event producer task panicked");
-            Status::internal("create stream event producer failed unexpectedly")
-        })?;
+        let producer_result = create
+            .events_task
+            .await
+            .inspect_err(|e| error!(error = %e, "Create stream event producer task panicked"))
+            .map_err(|_| Status::internal("create stream event producer failed unexpectedly"))?;
         let record =
             record_result.inspect_err(|e| error!(error = %e, "Failed to write dataset"))?;
         if let Err(status) = producer_result {

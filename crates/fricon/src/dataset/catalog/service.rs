@@ -356,8 +356,11 @@ impl DatasetCatalogService {
         let record = self.repository.get_dataset(id)?;
         Self::ensure_not_deleted_record(&record)?;
         let dataset_dir = self.paths.dataset_path_from_uid(record.metadata.uid);
-        portability::export_dataset(&record.metadata, &dataset_dir, output_dir)
-            .map_err(CatalogError::from)
+        Ok(portability::export_dataset(
+            &record.metadata,
+            &dataset_dir,
+            output_dir,
+        )?)
     }
 
     /// Inspect an archive and return metadata + optional conflict info without
@@ -371,15 +374,13 @@ impl DatasetCatalogService {
         archive_path: &Path,
     ) -> Result<ImportPreview, CatalogError> {
         // Peek at metadata to find the uuid.
-        let preview =
-            portability::preview_import(archive_path, None).map_err(CatalogError::from)?;
+        let preview = portability::preview_import(archive_path, None)?;
         // Check whether that uuid is already in the DB.
         let existing_record = self.repository.find_dataset_by_uid(preview.metadata.uid)?;
         if let Some(record) = existing_record {
             // Re-run with existing metadata so the diff is populated.
             let preview_with_conflict =
-                portability::preview_import(archive_path, Some(&record.metadata))
-                    .map_err(CatalogError::from)?;
+                portability::preview_import(archive_path, Some(&record.metadata))?;
             return Ok(preview_with_conflict);
         }
         Ok(preview)
@@ -407,8 +408,7 @@ impl DatasetCatalogService {
         events: &P,
     ) -> Result<DatasetRecord, CatalogError> {
         // Peek metadata from archive to resolve dest dir and check conflict.
-        let preview =
-            portability::preview_import(archive_path, None).map_err(CatalogError::from)?;
+        let preview = portability::preview_import(archive_path, None)?;
         let uid = preview.metadata.uid;
         let dest_dir = self.paths.dataset_path_from_uid(uid);
 
@@ -420,8 +420,7 @@ impl DatasetCatalogService {
             ));
         }
 
-        let staged =
-            portability::stage_import(archive_path, &dest_dir).map_err(CatalogError::from)?;
+        let staged = portability::stage_import(archive_path, &dest_dir)?;
 
         let backup_dir =
             match portability::promote_staged_import(&staged.staging_dir, &dest_dir, force, uid) {

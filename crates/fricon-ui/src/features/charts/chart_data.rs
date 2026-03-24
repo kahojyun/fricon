@@ -58,14 +58,13 @@ pub(crate) async fn dataset_chart_data(
             index_filters,
             selected_columns: Some(selected_columns),
         })
-        .map_err(|err| {
+        .inspect_err(|err| {
             error!(
                 dataset_id = id,
                 chart_type,
                 error = %err,
                 "Failed to select chart source data"
             );
-            err
         })
         .context("Failed to select data.")?;
 
@@ -73,14 +72,13 @@ pub(crate) async fn dataset_chart_data(
         RecordBatch::new_empty(output_schema)
     } else {
         concat_batches(&output_schema, &batches)
-            .map_err(|err| {
+            .inspect_err(|err| {
                 error!(
                     dataset_id = id,
                     chart_type,
                     error = %err,
                     "Failed to concat chart batches"
                 );
-                err
             })
             .context("Failed to concat batches")?
     };

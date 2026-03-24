@@ -26,10 +26,10 @@ pub(crate) async fn parse_create_stream(
         .next()
         .await
         .ok_or_else(|| Status::invalid_argument("request stream is empty"))?
-        .map_err(|e| {
+        .inspect_err(|e| {
             error!(error = %e, "Failed to read first message");
-            Status::internal("failed to read first message")
-        })?;
+        })
+        .map_err(|_| Status::internal("failed to read first message"))?;
     let Some(CreateMessage::Metadata(CreateMetadata {
         name,
         description,
