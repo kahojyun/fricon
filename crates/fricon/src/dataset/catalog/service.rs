@@ -587,11 +587,7 @@ impl DatasetCatalogService {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        fs,
-        path::Path,
-        sync::{Arc, Mutex},
-    };
+    use std::{fs, path::Path, sync::Arc};
 
     use chrono::Utc;
     use tempfile::tempdir;
@@ -600,24 +596,10 @@ mod tests {
     use super::*;
     use crate::dataset::{
         catalog::MockDatasetCatalogRepository,
-        events::DatasetEvent,
+        events::{DatasetEvent, test_support::CollectEvents},
         model::{DatasetId, DatasetMetadata, DatasetStatus},
         portability,
     };
-
-    #[derive(Default)]
-    struct CollectEvents {
-        events: Mutex<Vec<DatasetEvent>>,
-    }
-
-    impl DatasetEventPublisher for CollectEvents {
-        fn publish(&self, event: DatasetEvent) {
-            self.events
-                .lock()
-                .expect("events mutex should lock")
-                .push(event);
-        }
-    }
 
     fn dataset_record(id: i32, uid: Uuid) -> DatasetRecord {
         DatasetRecord {
@@ -717,7 +699,7 @@ mod tests {
             .delete_dataset(1, &events)
             .expect("delete should succeed when live directory is already missing");
 
-        let published = events.events.lock().expect("events mutex should lock");
+        let published = events.snapshot();
         assert_eq!(published.len(), 1);
         match &published[0] {
             DatasetEvent::Updated(record) => assert_eq!(record.id, 1),
@@ -753,7 +735,7 @@ mod tests {
             "live dataset path should not be created on conflict"
         );
         assert!(
-            events.events.lock().expect("events").is_empty(),
+            events.snapshot().is_empty(),
             "no events should be published on conflict"
         );
     }
@@ -876,7 +858,7 @@ mod tests {
             !live_dir.join("metadata.json").exists(),
             "live payload should not retain archive metadata sidecar files"
         );
-        let published = events.events.lock().expect("events");
+        let published = events.snapshot();
         assert_eq!(published.len(), 1);
         match &published[0] {
             DatasetEvent::Updated(record) => assert_eq!(record.id, 7),
@@ -948,7 +930,7 @@ mod tests {
             !graveyard_dir.exists(),
             "revived dataset should clean up any stale graveyard payload"
         );
-        let published = events.events.lock().expect("events");
+        let published = events.snapshot();
         assert_eq!(published.len(), 1);
         match &published[0] {
             DatasetEvent::Updated(record) => assert_eq!(record.id, 9),
@@ -1002,7 +984,7 @@ mod tests {
             "promoted payload should be removed after rollback"
         );
         assert!(
-            events.events.lock().expect("events").is_empty(),
+            events.snapshot().is_empty(),
             "no events should be published on rollback"
         );
     }
@@ -1077,7 +1059,7 @@ mod tests {
             }),
             "forced import should clean up any temporary backup directory"
         );
-        let published = events.events.lock().expect("events");
+        let published = events.snapshot();
         assert_eq!(published.len(), 1);
         match &published[0] {
             DatasetEvent::Created(record) => assert_eq!(record.id, 13),
@@ -1120,7 +1102,7 @@ mod tests {
             "existing on-disk payload should remain untouched"
         );
         assert!(
-            events.events.lock().expect("events").is_empty(),
+            events.snapshot().is_empty(),
             "no events should be published on filesystem conflict"
         );
     }
@@ -1168,7 +1150,7 @@ mod tests {
             "promoted payload should be removed after rollback"
         );
         assert!(
-            events.events.lock().expect("events").is_empty(),
+            events.snapshot().is_empty(),
             "no events should be published on rollback"
         );
     }

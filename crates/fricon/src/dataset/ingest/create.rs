@@ -225,22 +225,7 @@ mod tests {
         }
     }
 
-    #[derive(Default)]
-    struct CollectEvents {
-        events: Mutex<Vec<DatasetEvent>>,
-    }
-
-    impl CollectEvents {
-        fn snapshot(&self) -> Vec<DatasetEvent> {
-            self.events.lock().expect("events").clone()
-        }
-    }
-
-    impl DatasetEventPublisher for CollectEvents {
-        fn publish(&self, event: DatasetEvent) {
-            self.events.lock().expect("events").push(event);
-        }
-    }
+    use crate::dataset::events::test_support::CollectEvents;
 
     fn create_request() -> CreateDatasetRequest {
         CreateDatasetRequest {
