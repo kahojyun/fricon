@@ -59,7 +59,7 @@ pub enum ClientError {
     Arrow(#[from] ArrowError),
     /// Proto message conversion failed.
     #[error("Proto conversion failed: {0}")]
-    ProtoConversion(#[source] anyhow::Error),
+    ProtoConversion(#[from] crate::transport::grpc::codec::CodecError),
     /// The dataset writer has been closed already (via finish or abort).
     #[error("Dataset writer is already closed")]
     WriterClosed,

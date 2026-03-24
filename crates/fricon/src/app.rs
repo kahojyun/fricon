@@ -6,7 +6,6 @@ use std::{
     time::Duration,
 };
 
-use anyhow::bail;
 use chrono::Local;
 use thiserror::Error;
 use tokio::{
@@ -18,7 +17,7 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tracing::{error, info, instrument};
 
 use crate::{
-    database::{core, dataset as database_dataset},
+    database::{core, core::DatabaseError, dataset as database_dataset},
     dataset::{
         CreateDatasetInput, CreateDatasetRequest, DatasetEvent, DatasetId, DatasetListQuery,
         DatasetReader, DatasetRecord, DatasetUpdate, ImportPreview,
@@ -27,7 +26,7 @@ use crate::{
         ingest::{DatasetIngestService, IngestError, WriteSessionRegistry},
         read::{DatasetReadService, ReadError},
     },
-    workspace::{WorkspacePaths, WorkspaceRoot},
+    workspace::{WorkspaceError, WorkspacePaths, WorkspaceRoot},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +40,14 @@ pub enum AppError {
     StateDropped,
     #[error("UI command was not delivered to any subscribers")]
     UiCommandUndelivered,
+    #[error("App server is already started")]
+    AlreadyStarted,
+    #[error(transparent)]
+    Workspace(#[from] WorkspaceError),
+    #[error(transparent)]
+    Database(#[from] DatabaseError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 #[derive(Debug, Error)]
@@ -101,7 +108,7 @@ pub struct AppState {
 
 impl AppState {
     #[instrument(skip(root), fields(workspace.path = ?root.paths().root()))]
-    fn new(root: WorkspaceRoot) -> anyhow::Result<Arc<Self>> {
+    fn new(root: WorkspaceRoot) -> Result<Arc<Self>, DatabaseError> {
         let database = init_database(&root)?;
         let shutdown_token = CancellationToken::new();
         let tracker = TaskTracker::new();
@@ -140,7 +147,7 @@ impl AppState {
     }
 }
 
-fn init_database(root: &WorkspaceRoot) -> anyhow::Result<core::Pool> {
+fn init_database(root: &WorkspaceRoot) -> Result<core::Pool, DatabaseError> {
     let db_path = root.paths().database_file();
     let backup_path = root
         .paths()
@@ -492,7 +499,7 @@ pub struct AppManager {
 
 impl AppManager {
     #[instrument(skip(root), fields(workspace.path = ?root.paths().root()))]
-    pub fn new(root: WorkspaceRoot) -> anyhow::Result<Self> {
+    pub fn new(root: WorkspaceRoot) -> Result<Self, AppError> {
         let state = AppState::new(root)?;
         let handle = AppHandle::new(Arc::downgrade(&state));
         Ok(Self {
@@ -502,15 +509,15 @@ impl AppManager {
         })
     }
 
-    pub fn new_with_path(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
+    pub fn new_with_path(path: impl Into<PathBuf>) -> Result<Self, AppError> {
         let root = WorkspaceRoot::create(path)?;
         Self::new(root)
     }
 
     #[instrument(skip(self, runtime), fields(workspace.path = ?self.handle.paths()?.root()))]
-    pub fn start(mut self, runtime: &Handle) -> anyhow::Result<Self> {
+    pub fn start(mut self, runtime: &Handle) -> Result<Self, AppError> {
         if self.started {
-            bail!("App server is already started");
+            return Err(AppError::AlreadyStarted);
         }
 
         let ipc_file = self.handle.paths()?.ipc_file();
