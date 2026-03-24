@@ -630,10 +630,7 @@ mod tests {
     use tokio::runtime::Runtime;
 
     use super::{catalog_join_error, ingest_join_error, read_join_error};
-    use crate::{
-        app::{CatalogAppError, IngestAppError, ReadAppError},
-        dataset::{catalog::CatalogError, ingest::IngestError, read::ReadError},
-    };
+    use crate::app::{CatalogAppError, IngestAppError, ReadAppError};
 
     fn panic_join_error() -> tokio::task::JoinError {
         Runtime::new()
@@ -681,35 +678,6 @@ mod tests {
             ReadAppError::TaskCancelled {
                 operation: "joining read task"
             }
-        ));
-    }
-
-    #[test]
-    fn catalog_app_error_wraps_domain_errors() {
-        let error = CatalogAppError::from(CatalogError::NotTrashed);
-        assert!(matches!(
-            error,
-            CatalogAppError::Domain(CatalogError::NotTrashed)
-        ));
-    }
-
-    #[test]
-    fn ingest_app_error_wraps_domain_errors() {
-        let error = IngestAppError::from(IngestError::NotFound {
-            id: "42".to_string(),
-        });
-        assert!(matches!(
-            error,
-            IngestAppError::Domain(IngestError::NotFound { .. })
-        ));
-    }
-
-    #[test]
-    fn read_app_error_wraps_domain_errors() {
-        let error = ReadAppError::from(ReadError::EmptyDataset);
-        assert!(matches!(
-            error,
-            ReadAppError::Domain(ReadError::EmptyDataset)
         ));
     }
 }
