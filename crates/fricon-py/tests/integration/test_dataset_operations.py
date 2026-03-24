@@ -286,7 +286,7 @@ class TestDatasetOperations:
             dm = workspace.dataset_manager
 
             with pytest.raises(fricon.FriconDatasetError) as exc_info:
-                dm.open(999999)
+                _ = dm.open(999999)
 
             exc = exc_info.value
             assert exc.code == "dataset_not_found"
