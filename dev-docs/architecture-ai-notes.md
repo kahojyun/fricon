@@ -186,8 +186,8 @@ For `fricon`, that means preserving feature-local layered slices with thin adapt
 Fricon treats workspace compatibility and IPC compatibility as separate concerns
 and they should be maintained separately.
 
-- Workspace compatibility is controlled by the workspace metadata version in
-  `.fricon_workspace.json` and the migration steps in
+- Workspace compatibility is controlled by the integer workspace metadata
+  version in `.fricon_workspace.json` and the migration steps in
   `crates/fricon/src/workspace.rs`.
 - IPC compatibility is controlled by the explicit protocol handshake exposed by
   the `Version` RPC. App version strings are useful for diagnostics, but the

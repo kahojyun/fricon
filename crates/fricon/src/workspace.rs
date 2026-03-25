@@ -7,7 +7,6 @@ use std::{
 };
 
 use chrono::NaiveDateTime;
-use semver::Version;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use tracing::{debug, info, instrument};
@@ -16,8 +15,8 @@ use uuid::Uuid;
 pub use self::error::WorkspaceError;
 use self::lock::FileLock;
 
-const WORKSPACE_VERSION: Version = Version::new(0, 1, 0);
-const MIN_MIGRATABLE_WORKSPACE_VERSION: Version = Version::new(0, 0, 0);
+const WORKSPACE_VERSION: u32 = 1;
+const MIN_MIGRATABLE_WORKSPACE_VERSION: u32 = 0;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum VersionCheckResult {
@@ -28,10 +27,7 @@ pub(crate) enum VersionCheckResult {
 #[derive(Debug, Clone, PartialEq)]
 pub enum WorkspaceValidation {
     Current(WorkspacePaths),
-    NeedsMigration {
-        paths: WorkspacePaths,
-        version: Version,
-    },
+    NeedsMigration { paths: WorkspacePaths, version: u32 },
 }
 
 impl WorkspaceValidation {
@@ -65,21 +61,17 @@ pub fn get_log_dir(workspace_path: impl Into<PathBuf>) -> Result<PathBuf, Worksp
         .log_dir())
 }
 
-fn check_version(version: &Version) -> Result<VersionCheckResult, WorkspaceError> {
-    use std::cmp::Ordering;
-
+fn check_version(version: u32) -> Result<VersionCheckResult, WorkspaceError> {
     match version.cmp(&WORKSPACE_VERSION) {
-        Ordering::Equal => Ok(VersionCheckResult::Current),
-        Ordering::Less => Ok(VersionCheckResult::NeedsMigration),
-        Ordering::Greater => Err(WorkspaceError::VersionTooNew {
-            version: version.clone(),
-        }),
+        std::cmp::Ordering::Equal => Ok(VersionCheckResult::Current),
+        std::cmp::Ordering::Less => Ok(VersionCheckResult::NeedsMigration),
+        std::cmp::Ordering::Greater => Err(WorkspaceError::VersionTooNew { version }),
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct WorkspaceMetadata {
-    pub version: Version,
+    pub version: u32,
 }
 
 impl WorkspaceMetadata {
@@ -289,13 +281,13 @@ impl WorkspaceRoot {
         let metadata = WorkspaceMetadata::read_json(paths.metadata_file())?;
         let mut root = Self { paths, _lock: lock };
 
-        match check_version(&metadata.version)? {
+        match check_version(metadata.version)? {
             VersionCheckResult::Current => {
                 debug!(path = ?root.paths.root(), version = %metadata.version, "Workspace opened");
             }
             VersionCheckResult::NeedsMigration => {
                 info!(path = ?root.paths.root(), from_version = %metadata.version, "Workspace requires migration");
-                root.migrate_to_current(metadata.version.clone())?;
+                root.migrate_to_current(metadata.version)?;
             }
         }
 
@@ -315,7 +307,7 @@ impl WorkspaceRoot {
         }
 
         let metadata = WorkspaceMetadata::read_json(paths.metadata_file())?;
-        match check_version(&metadata.version)? {
+        match check_version(metadata.version)? {
             VersionCheckResult::Current => Ok(WorkspaceValidation::Current(paths)),
             VersionCheckResult::NeedsMigration => Ok(WorkspaceValidation::NeedsMigration {
                 paths,
@@ -334,7 +326,7 @@ impl WorkspaceRoot {
         &self.paths
     }
 
-    fn migrate_to_current(&mut self, mut version: Version) -> Result<(), WorkspaceError> {
+    fn migrate_to_current(&mut self, mut version: u32) -> Result<(), WorkspaceError> {
         while version < WORKSPACE_VERSION {
             version = self.migrate_one_step(version)?;
         }
@@ -342,23 +334,23 @@ impl WorkspaceRoot {
         Ok(())
     }
 
-    fn migrate_one_step(&mut self, version: Version) -> Result<Version, WorkspaceError> {
-        match (version.major, version.minor, version.patch) {
-            (0, 0, 0) => self.migrate_v0_0_0_to_v0_1_0(),
+    fn migrate_one_step(&mut self, version: u32) -> Result<u32, WorkspaceError> {
+        match version {
+            0 => self.migrate_v0_to_v1(),
             _ => Err(WorkspaceError::UnsupportedMigrationVersion {
                 version,
-                supported_from: MIN_MIGRATABLE_WORKSPACE_VERSION.clone(),
+                supported_from: MIN_MIGRATABLE_WORKSPACE_VERSION,
             }),
         }
     }
 
-    fn migrate_v0_0_0_to_v0_1_0(&mut self) -> Result<Version, WorkspaceError> {
-        let from = Version::new(0, 0, 0);
-        let to = Version::new(0, 1, 0);
+    fn migrate_v0_to_v1(&mut self) -> Result<u32, WorkspaceError> {
+        let from = 0;
+        let to = 1;
 
         tracing::info!("Migrating workspace from version {} to {}", from, to);
         let mut metadata = WorkspaceMetadata::read_json(self.paths.metadata_file())?;
-        metadata.version = to.clone();
+        metadata.version = to;
         metadata.write_json(self.paths.metadata_file())?;
 
         Ok(to)
@@ -367,12 +359,11 @@ impl WorkspaceRoot {
 
 #[cfg(test)]
 mod tests {
-    use semver::Version;
     use tempfile::tempdir;
 
     use super::*;
 
-    fn write_workspace_version(path: &Path, version: Version) {
+    fn write_workspace_version(path: &Path, version: u32) {
         WorkspaceMetadata { version }
             .write_json(path.join(".fricon_workspace.json"))
             .unwrap();
@@ -446,13 +437,13 @@ mod tests {
         let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
         drop(root);
 
-        write_workspace_version(&workspace_path, Version::new(0, 0, 0));
+        write_workspace_version(&workspace_path, 0);
 
         let result = WorkspaceRoot::validate_current(&workspace_path)
             .expect_err("old workspace should require migration");
         assert!(matches!(
             result,
-            WorkspaceError::MigrationRequired { version } if version == Version::new(0, 0, 0)
+            WorkspaceError::MigrationRequired { version } if version == 0
         ));
     }
 
@@ -464,12 +455,12 @@ mod tests {
         let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
         drop(root);
 
-        write_workspace_version(&workspace_path, Version::new(0, 0, 0));
+        write_workspace_version(&workspace_path, 0);
 
         let result = WorkspaceRoot::validate(&workspace_path).unwrap();
         assert!(matches!(
             result,
-            WorkspaceValidation::NeedsMigration { version, .. } if version == Version::new(0, 0, 0)
+            WorkspaceValidation::NeedsMigration { version, .. } if version == 0
         ));
     }
 
@@ -507,14 +498,14 @@ mod tests {
     }
 
     #[test]
-    fn test_workspace_open_migrates_supported_legacy_version() {
+    fn test_workspace_open_migrates_supported_older_version() {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path().join("test_workspace");
 
         let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
         drop(root);
 
-        write_workspace_version(&workspace_path, Version::new(0, 0, 0));
+        write_workspace_version(&workspace_path, 0);
 
         let _root = WorkspaceRoot::open(workspace_path.clone()).unwrap();
         let metadata =
@@ -523,26 +514,20 @@ mod tests {
     }
 
     #[test]
-    fn test_workspace_open_rejects_unsupported_legacy_version() {
+    fn test_workspace_open_rejects_newer_workspace_version() {
         let temp_dir = tempdir().unwrap();
         let workspace_path = temp_dir.path().join("test_workspace");
 
         let root = WorkspaceRoot::create(workspace_path.clone()).unwrap();
         drop(root);
 
-        write_workspace_version(&workspace_path, Version::new(0, 0, 5));
+        write_workspace_version(&workspace_path, WORKSPACE_VERSION + 1);
 
         let result = WorkspaceRoot::open(workspace_path.clone())
-            .expect_err("unknown legacy version should not silently upgrade");
+            .expect_err("newer workspace version should be rejected");
         assert!(matches!(
             result,
-            WorkspaceError::UnsupportedMigrationVersion { version, supported_from }
-                if version == Version::new(0, 0, 5)
-                    && supported_from == Version::new(0, 0, 0)
+            WorkspaceError::VersionTooNew { version } if version == WORKSPACE_VERSION + 1
         ));
-
-        let metadata =
-            WorkspaceMetadata::read_json(workspace_path.join(".fricon_workspace.json")).unwrap();
-        assert_eq!(metadata.version, Version::new(0, 0, 5));
     }
 }

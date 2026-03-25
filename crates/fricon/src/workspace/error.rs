@@ -2,7 +2,6 @@
 
 use std::io;
 
-use semver::Version;
 use tempfile::PersistError;
 
 /// Errors that occur when acquiring the workspace file lock.
@@ -25,19 +24,16 @@ pub enum WorkspaceError {
         "Workspace version {version} requires migration before use. Open the workspace with a \
          newer fricon build that supports migrating it."
     )]
-    MigrationRequired { version: Version },
+    MigrationRequired { version: u32 },
     #[error(
         "Workspace version {version} is too old to migrate automatically. Supported migrations \
          start at version {supported_from}."
     )]
-    UnsupportedMigrationVersion {
-        version: Version,
-        supported_from: Version,
-    },
+    UnsupportedMigrationVersion { version: u32, supported_from: u32 },
     #[error(
         "Workspace version {version} is newer than the supported version. Please update fricon."
     )]
-    VersionTooNew { version: Version },
+    VersionTooNew { version: u32 },
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]

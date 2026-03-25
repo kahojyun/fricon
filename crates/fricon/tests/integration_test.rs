@@ -409,7 +409,7 @@ async fn test_probe_existing_ui_reports_not_running_for_migration_needed_workspa
     WorkspaceRoot::create_new(workspace_path)?;
     std::fs::write(
         workspace_path.join(".fricon_workspace.json"),
-        serde_json::json!({ "version": "0.0.0" }).to_string(),
+        serde_json::json!({ "version": 0 }).to_string(),
     )?;
 
     let probe_result = Client::probe_existing_ui(workspace_path).await?;
