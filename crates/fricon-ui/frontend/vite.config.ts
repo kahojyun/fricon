@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+
 import { fileURLToPath } from "node:url";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
@@ -29,6 +31,14 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/shared/test/setup.ts",
+    css: true,
+    watch: false,
+    globals: true,
+    execArgv: ["--no-experimental-webstorage"],
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
