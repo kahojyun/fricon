@@ -402,6 +402,25 @@ async fn test_probe_existing_ui_reports_not_running_without_server() -> anyhow::
 }
 
 #[tokio::test]
+async fn test_probe_existing_ui_reports_not_running_for_migration_needed_workspace()
+-> anyhow::Result<()> {
+    let temp_dir = TempDir::new()?;
+    let workspace_path = temp_dir.path();
+    WorkspaceRoot::create_new(workspace_path)?;
+    std::fs::write(
+        workspace_path.join(".fricon_workspace.json"),
+        serde_json::json!({ "version": "0.0.0" }).to_string(),
+    )?;
+
+    let probe_result = Client::probe_existing_ui(workspace_path).await?;
+
+    assert_eq!(probe_result, ExistingUiProbeResult::NotRunning);
+
+    temp_dir.close()?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_show_ui_requires_attached_ui_subscriber() -> anyhow::Result<()> {
     let temp_dir = TempDir::new()?;
     let workspace_path = temp_dir.path();

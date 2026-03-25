@@ -118,23 +118,29 @@ impl Client {
     pub async fn probe_existing_ui(
         path: impl AsRef<Path>,
     ) -> Result<ExistingUiProbeResult, ClientError> {
-        match Self::connect(path).await {
-            Ok(client) => match client.show_ui().await {
-                Ok(()) => Ok(ExistingUiProbeResult::UiShown),
-                Err(ClientError::Status(s)) if s.code() == Code::FailedPrecondition => {
-                    Ok(ExistingUiProbeResult::UiUnavailable)
-                }
-                Err(err) => Err(err),
-            },
-            Err(ClientError::NotRunning) => Ok(ExistingUiProbeResult::NotRunning),
-            Err(err) => Err(err),
+        let path = fs::canonicalize(path)?;
+        let workspace_paths = WorkspaceRoot::validate(path)?.into_paths();
+        let channel = match connect_ipc_channel(workspace_paths.ipc_file()).await {
+            Ok(channel) => channel,
+            Err(ClientError::NotRunning) => return Ok(ExistingUiProbeResult::NotRunning),
+            Err(err) => return Err(err),
+        };
+
+        let request = crate::proto::ShowUiRequest {};
+        let mut client = FriconServiceClient::new(channel);
+        match client.show_ui(request).await {
+            Ok(_) => Ok(ExistingUiProbeResult::UiShown),
+            Err(status) if status.code() == Code::FailedPrecondition => {
+                Ok(ExistingUiProbeResult::UiUnavailable)
+            }
+            Err(status) => Err(ClientError::Status(status)),
         }
     }
 
     #[instrument(skip(path), fields(workspace.path = ?path.as_ref()))]
     pub async fn connect(path: impl AsRef<Path>) -> Result<Self, ClientError> {
         let path = fs::canonicalize(path)?;
-        WorkspaceRoot::validate(path.clone())?;
+        WorkspaceRoot::validate_current(path.clone())?;
         let workspace_paths = WorkspacePaths::new(path);
         debug!(path = ?workspace_paths.root(), "Connecting to fricon server");
         let channel = connect_ipc_channel(workspace_paths.ipc_file()).await?;
