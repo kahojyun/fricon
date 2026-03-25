@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import {
   RouterProvider,
-  createRoute,
   createMemoryHistory,
   createRouter,
 } from "@tanstack/react-router";
@@ -9,9 +8,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Route as rootRoute } from "@/routes/__root";
-import { Button } from "@/shared/ui/button";
-import { DatasetExplorerScreen } from "./ui/DatasetExplorerScreen";
+import { routeTree } from "@/routeTree.gen";
 
 const { datasetCreatedListenMock, datasetUpdatedListenMock } = vi.hoisted(
   () => ({
@@ -70,41 +67,6 @@ vi.mock("react-resizable-panels", () => ({
     <div {...props} />
   ),
 }));
-
-function CreditsScreen() {
-  return (
-    <div className="p-4">
-      <Button
-        nativeButton={false}
-        variant="link"
-        render={(props) => (
-          <a
-            {...props}
-            href="https://www.flaticon.com/free-icons/computer"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Computer icons created by Freepik - Flaticon
-          </a>
-        )}
-      />
-    </div>
-  );
-}
-
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/",
-  component: DatasetExplorerScreen,
-});
-
-const creditsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/credits",
-  component: CreditsScreen,
-});
-
-const routeTree = rootRoute.addChildren([indexRoute, creditsRoute]);
 
 describe("router app shell", () => {
   beforeEach(() => {

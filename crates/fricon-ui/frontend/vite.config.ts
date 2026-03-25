@@ -8,11 +8,12 @@ import { createViteLicensePlugin } from "rollup-license-plugin";
 
 const host = process.env.TAURI_DEV_HOST;
 const isLicenseBundle = process.env.npm_lifecycle_event === "bundle-licenses";
+const isVitest = process.env.VITEST === "true";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    tanstackRouter({ target: "react", autoCodeSplitting: !isVitest }),
     react(),
     babel({
       presets: [reactCompilerPreset()],
