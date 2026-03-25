@@ -694,6 +694,7 @@ mod tests {
         let fixture = RepoFixture::new();
         let created_at = Utc::now() - Duration::days(5);
         let metadata = ExportedMetadata {
+            archive_version: 1,
             uid: Uuid::new_v4(),
             name: "imported".to_string(),
             description: "imported dataset".to_string(),
@@ -735,6 +736,7 @@ mod tests {
 
         let created_at = Utc::now() - Duration::days(2);
         let metadata = ExportedMetadata {
+            archive_version: 1,
             uid,
             name: "replacement".to_string(),
             description: "replacement dataset".to_string(),

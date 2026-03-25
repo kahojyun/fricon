@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { isApiError } from "@/shared/lib/tauri";
 import {
   importDataset,
   previewImportDialog,
@@ -30,6 +31,22 @@ function getDuplicateBatchConflicts(
   return Array.from(entriesByUid.entries())
     .filter(([, entries]) => entries.length > 1)
     .map(([uid, entries]) => ({ uid, entries }));
+}
+
+function getPreviewErrorMessage(error: unknown): string {
+  if (isApiError(error) && error.code === "archive_version_unsupported") {
+    return "One or more selected archives were created by a newer version of fricon. Update fricon and try again.";
+  }
+
+  return `Import error: ${error instanceof Error ? error.message : String(error)}`;
+}
+
+function getImportErrorMessage(datasetName: string, error: unknown): string {
+  if (isApiError(error) && error.code === "archive_version_unsupported") {
+    return `Can't import ${datasetName}: this archive was created by a newer version of fricon. Update fricon and try again.`;
+  }
+
+  return `Error importing ${datasetName}: ${error instanceof Error ? error.message : String(error)}`;
 }
 
 export function useDatasetImportFlow() {
@@ -79,9 +96,7 @@ export function useDatasetImportFlow() {
           return;
         }
 
-        toast.error(
-          `Import error: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        toast.error(getPreviewErrorMessage(e));
       });
   };
 
@@ -117,9 +132,7 @@ export function useDatasetImportFlow() {
           successCount = successCount + 1;
         } catch (e) {
           failCount = failCount + 1;
-          toast.error(
-            `Error importing ${p.preview.metadata.name}: ${e instanceof Error ? e.message : String(e)}`,
-          );
+          toast.error(getImportErrorMessage(p.preview.metadata.name, e));
         }
       }
     })().finally(() => {

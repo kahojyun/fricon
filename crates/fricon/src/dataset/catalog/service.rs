@@ -587,7 +587,7 @@ impl DatasetCatalogService {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path, sync::Arc};
+    use std::{fs, io::Read, path::Path, sync::Arc};
 
     use chrono::Utc;
     use tempfile::tempdir;
@@ -737,6 +737,81 @@ mod tests {
         assert!(
             events.snapshot().is_empty(),
             "no events should be published on conflict"
+        );
+    }
+
+    #[test]
+    fn import_dataset_rejects_archive_version_newer_than_supported() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let archive = create_import_archive(temp_dir.path(), uid, "future-version");
+
+        let archive_file = fs::File::open(&archive).expect("open archive");
+        let decoder = zstd::Decoder::new(std::io::BufReader::new(archive_file)).expect("decoder");
+        let mut tar = tar::Archive::new(decoder);
+        let mut metadata_json = None;
+        for entry in tar.entries().expect("entries") {
+            let mut entry = entry.expect("entry");
+            let path = entry.path().expect("path").into_owned();
+            if path.to_str() == Some("metadata.json") {
+                let mut buf = String::new();
+                entry.read_to_string(&mut buf).expect("read metadata");
+                metadata_json = Some(buf);
+                break;
+            }
+        }
+        let mut metadata: serde_json::Value =
+            serde_json::from_str(&metadata_json.expect("metadata present"))
+                .expect("parse metadata");
+        metadata["archive_version"] = serde_json::Value::from(99);
+
+        let future_archive = temp_dir.path().join("future.tar.zst");
+        let out_file = fs::File::create(&future_archive).expect("create future archive");
+        let zstd_encoder = zstd::Encoder::new(out_file, 0).expect("encoder");
+        let mut tar = tar::Builder::new(zstd_encoder);
+        let json_bytes = serde_json::to_vec_pretty(&metadata).expect("serialize metadata");
+        let mut metadata_header = tar::Header::new_gnu();
+        metadata_header.set_size(json_bytes.len() as u64);
+        metadata_header.set_mode(0o644);
+        metadata_header.set_cksum();
+        tar.append_data(&mut metadata_header, "metadata.json", json_bytes.as_slice())
+            .expect("metadata entry");
+        let mut chunk_header = tar::Header::new_gnu();
+        chunk_header.set_size(3);
+        chunk_header.set_mode(0o644);
+        chunk_header.set_cksum();
+        tar.append_data(
+            &mut chunk_header,
+            "data/data_chunk_0.arrow",
+            b"NEW".as_slice(),
+        )
+        .expect("chunk entry");
+        let zstd_encoder = tar.into_inner().expect("tar into inner");
+        zstd_encoder.finish().expect("finish archive");
+
+        let repository = MockDatasetCatalogRepository::new();
+        let service = DatasetCatalogService::new(Arc::new(repository), paths.clone());
+        let events = CollectEvents::default();
+
+        let error = service
+            .import_dataset(&future_archive, false, &events)
+            .expect_err("newer archive version should be rejected");
+
+        assert!(matches!(
+            error,
+            CatalogError::Portability(portability::PortabilityError::UnsupportedArchiveVersion {
+                found: 99,
+                ..
+            })
+        ));
+        assert!(
+            !paths.dataset_path_from_uid(uid).exists(),
+            "live dataset path should not be created when archive version is unsupported"
+        );
+        assert!(
+            events.snapshot().is_empty(),
+            "no events should be published on failure"
         );
     }
 

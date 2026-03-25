@@ -193,7 +193,7 @@ datasetUpdated: "dataset-updated"
 /** user-defined types **/
 
 export type ApiError = { code: ApiErrorCode; message: string }
-export type ApiErrorCode = "dataset_not_found" | "dataset_deleted" | "dataset_not_trashed" | "invalid_tag" | "same_tag_name" | "same_source_target" | "workspace" | "charts" | "dialog" | "validation" | "internal"
+export type ApiErrorCode = "dataset_not_found" | "dataset_deleted" | "dataset_not_trashed" | "archive_version_unsupported" | "invalid_tag" | "same_tag_name" | "same_source_target" | "workspace" | "charts" | "dialog" | "validation" | "internal"
 export type BatchTagUpdateOptions = { ids: number[]; add?: string[] | null; remove?: string[] | null }
 export type ChartDataResponse = { type: ChartType; xName: string; yName: string | null; xCategories: number[] | null; yCategories: number[] | null; series: Series[] }
 export type ChartType = "line" | "heatmap" | "scatter"

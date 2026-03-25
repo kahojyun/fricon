@@ -23,7 +23,7 @@
 //! # Archive format
 //!
 //! ```text
-//! metadata.json            <- ExportedMetadata (JSON)
+//! metadata.json            <- ExportedMetadata (JSON, includes archive version)
 //! data/data_chunk_0.arrow  <- Arrow IPC chunk files
 //! data/data_chunk_1.arrow
 //! …
@@ -55,6 +55,7 @@ use crate::dataset::model::{DatasetMetadata, DatasetStatus};
 const METADATA_ENTRY: &str = "metadata.json";
 /// Prefix used for data chunk files inside the archive.
 const DATA_PREFIX: &str = "data/";
+const CURRENT_ARCHIVE_VERSION: u32 = 1;
 const MAX_ARCHIVE_NAME_CHARS: usize = 64;
 const FALLBACK_ARCHIVE_NAME: &str = "dataset";
 
@@ -68,6 +69,11 @@ pub enum PortabilityError {
     Zstd(io::Error),
     #[error("Archive does not contain a metadata entry")]
     MissingMetadata,
+    #[error(
+        "Dataset archive format version {found} is newer than the supported version {supported}. \
+         Please update fricon to import this archive"
+    )]
+    UnsupportedArchiveVersion { found: u32, supported: u32 },
     #[error("Dataset already exists (uuid {uid}); use force=true to overwrite")]
     UuidConflict { uid: Uuid },
     #[error(
@@ -83,6 +89,7 @@ pub enum PortabilityError {
 /// replace records without trusting archive-local ids.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedMetadata {
+    pub archive_version: u32,
     pub uid: Uuid,
     pub name: String,
     pub description: String,
@@ -97,6 +104,7 @@ impl ExportedMetadata {
     #[must_use]
     pub fn from_metadata(m: &DatasetMetadata) -> Self {
         Self {
+            archive_version: CURRENT_ARCHIVE_VERSION,
             uid: m.uid,
             name: m.name.clone(),
             description: m.description.clone(),
@@ -106,6 +114,17 @@ impl ExportedMetadata {
             tags: m.tags.clone(),
         }
     }
+}
+
+fn validate_archive_version(metadata: &ExportedMetadata) -> Result<(), PortabilityError> {
+    if metadata.archive_version > CURRENT_ARCHIVE_VERSION {
+        return Err(PortabilityError::UnsupportedArchiveVersion {
+            found: metadata.archive_version,
+            supported: CURRENT_ARCHIVE_VERSION,
+        });
+    }
+
+    Ok(())
 }
 
 /// A single field difference between the existing dataset and the archive.
@@ -464,6 +483,7 @@ fn read_metadata_from_archive(archive_path: &Path) -> Result<ExportedMetadata, P
             let mut buf = String::new();
             entry.read_to_string(&mut buf)?;
             let m: ExportedMetadata = serde_json::from_str(&buf)?;
+            validate_archive_version(&m)?;
             return Ok(m);
         }
     }
@@ -673,6 +693,12 @@ mod tests {
                     val.get("id").is_none(),
                     "exported metadata must not contain 'id' field"
                 );
+                assert_eq!(
+                    val.get("archive_version")
+                        .and_then(serde_json::Value::as_u64),
+                    Some(CURRENT_ARCHIVE_VERSION.into()),
+                    "exported metadata should include the current archive version"
+                );
                 return;
             }
         }
@@ -694,9 +720,51 @@ mod tests {
 
         let preview = preview_import(&archive, None).expect("preview");
 
+        assert_eq!(preview.metadata.archive_version, CURRENT_ARCHIVE_VERSION);
         assert_eq!(preview.metadata.uid, uid);
         assert_eq!(preview.metadata.name, "preview-test");
         assert!(preview.conflict.is_none());
+    }
+
+    #[test]
+    fn preview_rejects_archive_newer_than_supported() {
+        let tmp = TempDir::new().expect("temp dir");
+        let archive = tmp.path().join("future.tar.zst");
+        let exported = ExportedMetadata {
+            archive_version: CURRENT_ARCHIVE_VERSION + 1,
+            uid: Uuid::new_v4(),
+            name: "future".to_string(),
+            description: "future archive".to_string(),
+            favorite: false,
+            status: DatasetStatus::Completed,
+            created_at: Utc::now(),
+            tags: Vec::new(),
+        };
+
+        let out_file = File::create(&archive).expect("archive file");
+        let zstd_encoder = zstd::Encoder::new(out_file, 0).expect("encoder");
+        let mut tar = tar::Builder::new(zstd_encoder);
+
+        let json_bytes = serde_json::to_vec_pretty(&exported).expect("metadata");
+        let mut metadata_header = tar::Header::new_gnu();
+        metadata_header.set_size(json_bytes.len() as u64);
+        metadata_header.set_mode(0o644);
+        metadata_header.set_cksum();
+        tar.append_data(&mut metadata_header, METADATA_ENTRY, json_bytes.as_slice())
+            .expect("metadata entry");
+
+        let zstd_encoder = tar.into_inner().expect("tar into inner");
+        zstd_encoder.finish().expect("finish archive");
+
+        let error = preview_import(&archive, None).expect_err("future archive should fail");
+
+        assert!(matches!(
+            error,
+            PortabilityError::UnsupportedArchiveVersion {
+                found,
+                supported
+            } if found == CURRENT_ARCHIVE_VERSION + 1 && supported == CURRENT_ARCHIVE_VERSION
+        ));
     }
 
     #[test]
@@ -758,6 +826,7 @@ mod tests {
         let tmp = TempDir::new().expect("temp dir");
         let archive = tmp.path().join("nested.tar.zst");
         let exported = ExportedMetadata {
+            archive_version: CURRENT_ARCHIVE_VERSION,
             uid: Uuid::new_v4(),
             name: "nested".to_string(),
             description: "nested".to_string(),

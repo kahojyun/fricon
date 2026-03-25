@@ -84,6 +84,7 @@ describe("ImportDatasetDialog", () => {
   it("keeps a non-duplicate batch confirmable", () => {
     renderDialog();
 
+    expect(screen.getByText("alpha.tar.zst")).toBeInTheDocument();
     expect(
       screen.queryByText("Duplicate Dataset UUIDs"),
     ).not.toBeInTheDocument();

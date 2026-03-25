@@ -92,6 +92,12 @@ export function ImportDatasetDialog({
               <div key={result.archivePath} className="space-y-2">
                 <div className="rounded-md bg-muted p-3">
                   <p>
+                    <strong>Archive:</strong>{" "}
+                    <span className="font-mono text-xs break-all">
+                      {fileNameFromPath(result.archivePath)}
+                    </span>
+                  </p>
+                  <p>
                     <strong>Name:</strong>{" "}
                     <span className="break-all">{metadata.name}</span>
                   </p>

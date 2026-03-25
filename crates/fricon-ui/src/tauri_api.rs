@@ -29,6 +29,7 @@ pub(crate) enum ApiErrorCode {
     DatasetNotFound,
     DatasetDeleted,
     DatasetNotTrashed,
+    ArchiveVersionUnsupported,
     InvalidTag,
     SameTagName,
     SameSourceTarget,
@@ -85,6 +86,9 @@ impl From<CatalogError> for ApiError {
             CatalogError::NotFound { .. } => ApiErrorCode::DatasetNotFound,
             CatalogError::Deleted { .. } => ApiErrorCode::DatasetDeleted,
             CatalogError::NotTrashed => ApiErrorCode::DatasetNotTrashed,
+            CatalogError::Portability(
+                fricon::dataset::PortabilityError::UnsupportedArchiveVersion { .. },
+            ) => ApiErrorCode::ArchiveVersionUnsupported,
             CatalogError::EmptyTag => ApiErrorCode::InvalidTag,
             CatalogError::SameTagName => ApiErrorCode::SameTagName,
             CatalogError::SameSourceTarget => ApiErrorCode::SameSourceTarget,
@@ -206,6 +210,20 @@ mod tests {
     fn internal_dataset_failures_map_to_internal() {
         let error = ApiError::from(CatalogError::Portability(PortabilityError::MissingMetadata));
         assert!(matches!(error.code, ApiErrorCode::Internal));
+    }
+
+    #[test]
+    fn unsupported_archive_version_maps_to_dedicated_code() {
+        let error = ApiError::from(CatalogError::Portability(
+            PortabilityError::UnsupportedArchiveVersion {
+                found: 2,
+                supported: 1,
+            },
+        ));
+        assert!(matches!(
+            error.code,
+            ApiErrorCode::ArchiveVersionUnsupported
+        ));
     }
 
     #[test]
