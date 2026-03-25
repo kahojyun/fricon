@@ -25,7 +25,7 @@ workspace/
   log/
 ```
 
-` .fricon_workspace.json` stores the workspace format version as an internal
+`.fricon_workspace.json` stores the workspace format version as an internal
 integer compatibility counter. Opening an older workspace may trigger a
 stepwise migration before the workspace is usable.
 
