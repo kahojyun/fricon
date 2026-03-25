@@ -30,3 +30,6 @@ const DEFAULT_DATASET_LIST_LIMIT: i64 = 200;
 
 /// Version of fricon crate.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Version of the IPC/gRPC protocol between clients and the workspace server.
+const IPC_PROTOCOL_VERSION: u32 = 1;

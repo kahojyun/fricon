@@ -2,7 +2,7 @@ use tonic::{Request, Response, Result, Status};
 use tracing::warn;
 
 use crate::{
-    VERSION,
+    IPC_PROTOCOL_VERSION, VERSION,
     app::{AppError, AppHandle},
     proto::{
         ShowUiRequest, ShowUiResponse, VersionRequest, VersionResponse,
@@ -20,8 +20,10 @@ impl FriconService for Fricon {
         &self,
         _request: Request<VersionRequest>,
     ) -> Result<Response<VersionResponse>> {
-        let version = VERSION.into();
-        Ok(Response::new(VersionResponse { version }))
+        Ok(Response::new(VersionResponse {
+            app_version: VERSION.into(),
+            protocol_version: IPC_PROTOCOL_VERSION,
+        }))
     }
 
     async fn show_ui(&self, _request: Request<ShowUiRequest>) -> Result<Response<ShowUiResponse>> {

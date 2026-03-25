@@ -13,8 +13,9 @@ Currently a workspace contains the following files:
 
 ```tree
 workspace/
-  .fricon_version
+  .fricon_workspace.json
   fricon.sqlite3
+  fricon.socket
   data/
     <uid[0:2]>/
       <uid>/
@@ -23,6 +24,9 @@ workspace/
   backup/
   log/
 ```
+
+` .fricon_workspace.json` stores the workspace format version. Opening an older
+workspace may trigger a stepwise migration before the workspace is usable.
 
 ## Fricon Server
 

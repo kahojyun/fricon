@@ -180,3 +180,32 @@ The main architectural lesson is not “use more layers”. It is:
 - optimize for local reasoning, especially for AI contributors
 
 For `fricon`, that means preserving feature-local layered slices with thin adapters and one-way dependency flow, while resisting both uncontrolled direct Diesel usage and unnecessary abstraction growth.
+
+## Workspace And IPC Compatibility Maintenance
+
+Fricon treats workspace compatibility and IPC compatibility as separate concerns
+and they should be maintained separately.
+
+- Workspace compatibility is controlled by the workspace metadata version in
+  `.fricon_workspace.json` and the migration steps in
+  `crates/fricon/src/workspace.rs`.
+- IPC compatibility is controlled by the explicit protocol handshake exposed by
+  the `Version` RPC. App version strings are useful for diagnostics, but the
+  IPC protocol version is the compatibility gate for client-server
+  communication.
+- Lightweight probes such as UI delegation checks should only verify that a
+  workspace is recognizable and that IPC is reachable. They should not take
+  over the job of workspace migration.
+
+When changing workspace structure or workspace metadata semantics:
+
+- update the stepwise migration logic
+- decide whether `WORKSPACE_VERSION` must change
+- update developer-facing maintenance docs and repo rules together
+
+When changing IPC/gRPC request or response contracts:
+
+- update the explicit IPC protocol compatibility logic in the client and server
+- decide whether `IPC_PROTOCOL_VERSION` must change
+- update generated bindings and the maintainer-facing docs/rules that describe
+  the protocol change workflow

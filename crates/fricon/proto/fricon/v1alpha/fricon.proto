@@ -17,7 +17,8 @@ service FriconService {
 message VersionRequest {}
 
 message VersionResponse {
-  string version = 1;
+  string app_version = 1;
+  uint32 protocol_version = 2;
 }
 
 message ShowUiRequest {}

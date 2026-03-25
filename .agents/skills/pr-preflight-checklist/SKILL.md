@@ -25,8 +25,14 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 5. If Rust IPC signatures changed, run:
    - `pnpm --filter fricon-ui run gen:bindings`
    - `git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts`
-6. Re-run failed checks after fixes, then run the selected profile once end-to-end.
-7. Report results with explicit pass/fail status and any remaining risk.
+6. If workspace structure or workspace metadata semantics changed, also:
+   - verify whether `WORKSPACE_VERSION` must change
+   - verify docs/rules that describe workspace structure and migration duties
+7. If Rust IPC/gRPC compatibility semantics changed, also:
+   - verify whether `IPC_PROTOCOL_VERSION` must change
+   - verify the explicit IPC protocol version/handshake logic changed with the protocol
+8. Re-run failed checks after fixes, then run the selected profile once end-to-end.
+9. Report results with explicit pass/fail status and any remaining risk.
 
 ## Repository Rules To Enforce
 
@@ -34,6 +40,8 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 - Run `uv run maturin develop` before `uv run pytest` for Python binding tests.
 - Never hand-edit `crates/fricon-ui/frontend/src/shared/lib/bindings.ts`; regenerate it.
 - Treat `pnpm run check` as the default frontend gate and ensure frontend slice-boundary validation is covered by it or by `pnpm run depcruise:frontend` when commands are split.
+- Workspace structure changes are not complete until migration logic, the `WORKSPACE_VERSION` decision, and docs/rules are updated together.
+- IPC/gRPC contract changes are not complete until the explicit IPC protocol compatibility rule, the `IPC_PROTOCOL_VERSION` decision, and generated bindings/docs are updated together.
 
 ## Optional Alternatives
 

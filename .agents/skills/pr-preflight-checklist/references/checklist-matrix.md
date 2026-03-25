@@ -16,6 +16,8 @@ Use the result to choose areas:
 - Python bindings (`crates/fricon-py`, Python tests, `pyproject.toml`)
 - Frontend (`crates/fricon-ui/frontend`, root JS/TS config)
 - Tauri IPC signatures (Rust command/event changes used by UI)
+- Workspace structure / migration compatibility (`crates/fricon/src/workspace.rs`, workspace metadata files, docs describing workspace layout)
+- Rust IPC/gRPC protocol compatibility (`crates/fricon/proto/**`, `crates/fricon/src/client.rs`, `crates/fricon/src/transport/**`)
 - Docs-only (`docs/**`, markdown files)
 
 ## Quick Profile (default)
@@ -63,6 +65,18 @@ pnpm run depcruise:frontend
 pnpm --filter fricon-ui run gen:bindings
 git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
 ```
+
+### Workspace structure / migration compatibility changed
+Use the normal Rust test gate for coverage, and also verify:
+
+- whether `WORKSPACE_VERSION` must change
+- the docs and repo rules that describe workspace structure and migration duties
+
+### Rust IPC/gRPC protocol compatibility changed
+Use the normal Rust test gate for coverage, and also verify:
+
+- whether `IPC_PROTOCOL_VERSION` must change
+- the explicit IPC protocol version/handshake logic changed with the protocol contract
 
 ### Route tree guard (when frontend router files changed)
 ```bash
@@ -125,6 +139,18 @@ pnpm run depcruise:frontend
 pnpm --filter fricon-ui run gen:bindings
 git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
 ```
+
+### Workspace structure / migration compatibility changed
+Use the normal Rust test gate for coverage, and also verify:
+
+- whether `WORKSPACE_VERSION` must change
+- the docs and repo rules that describe workspace structure and migration duties
+
+### Rust IPC/gRPC protocol compatibility changed
+Use the normal Rust test gate for coverage, and also verify:
+
+- whether `IPC_PROTOCOL_VERSION` must change
+- the explicit IPC protocol version/handshake logic changed with the protocol contract
 
 ### Docs
 ```bash

@@ -21,7 +21,7 @@ use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    DEFAULT_DATASET_LIST_LIMIT, VERSION,
+    DEFAULT_DATASET_LIST_LIMIT, IPC_PROTOCOL_VERSION, VERSION,
     dataset::{
         model::{DatasetRecord, DatasetStatus},
         schema::{DatasetArray, DatasetRow, DatasetSchema},
@@ -74,8 +74,16 @@ pub enum ClientError {
     DatasetOperationFailed,
     #[error("Version parse error: {0}")]
     VersionParse(#[from] semver::Error),
-    #[error("Server version {server} does not match client version {client}")]
-    VersionMismatch { server: Version, client: Version },
+    #[error(
+        "Server IPC protocol {server_protocol} is incompatible with client protocol \
+         {client_protocol} (server {server_version}, client {client_version})"
+    )]
+    ProtocolMismatch {
+        server_protocol: u32,
+        client_protocol: u32,
+        server_version: Version,
+        client_version: Version,
+    },
     #[error("Arrow error: {0}")]
     Arrow(#[from] ArrowError),
     /// Proto message conversion failed.
@@ -107,6 +115,12 @@ pub enum ExistingUiProbeResult {
     UiUnavailable,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ServerCompatibilityInfo {
+    app_version: Version,
+    protocol_version: u32,
+}
+
 #[derive(Debug, Clone)]
 pub struct Client {
     channel: Channel,
@@ -125,6 +139,7 @@ impl Client {
             Err(ClientError::NotRunning) => return Ok(ExistingUiProbeResult::NotRunning),
             Err(err) => return Err(err),
         };
+        check_server_compatibility(channel.clone()).await?;
 
         let request = crate::proto::ShowUiRequest {};
         let mut client = FriconServiceClient::new(channel);
@@ -144,7 +159,7 @@ impl Client {
         let workspace_paths = WorkspacePaths::new(path);
         debug!(path = ?workspace_paths.root(), "Connecting to fricon server");
         let channel = connect_ipc_channel(workspace_paths.ipc_file()).await?;
-        check_server_version(channel.clone()).await?;
+        check_server_compatibility(channel.clone()).await?;
         info!(path = ?workspace_paths.root(), "Connected to fricon server");
         Ok(Self {
             channel,
@@ -668,20 +683,37 @@ impl Dataset {
     }
 }
 
-#[instrument(skip(channel))]
-async fn check_server_version(channel: Channel) -> Result<(), ClientError> {
-    let request = VersionRequest {};
-    let response = FriconServiceClient::new(channel).version(request).await?;
-    let server_version = response.into_inner().version;
-    let server_version: Version = server_version.parse()?;
+fn ensure_ipc_protocol_compatible(server: &ServerCompatibilityInfo) -> Result<(), ClientError> {
     let client_version: Version = VERSION.parse()?;
-    if client_version != server_version {
-        return Err(ClientError::VersionMismatch {
-            server: server_version,
-            client: client_version,
+    if server.protocol_version != IPC_PROTOCOL_VERSION {
+        return Err(ClientError::ProtocolMismatch {
+            server_protocol: server.protocol_version,
+            client_protocol: IPC_PROTOCOL_VERSION,
+            server_version: server.app_version.clone(),
+            client_version,
         });
     }
-    debug!(server_version = %server_version, client_version = %client_version, "Server version check passed");
+
+    Ok(())
+}
+
+#[instrument(skip(channel))]
+async fn check_server_compatibility(channel: Channel) -> Result<(), ClientError> {
+    let request = VersionRequest {};
+    let response = FriconServiceClient::new(channel).version(request).await?;
+    let response = response.into_inner();
+    let server = ServerCompatibilityInfo {
+        app_version: response.app_version.parse()?,
+        protocol_version: response.protocol_version,
+    };
+    ensure_ipc_protocol_compatible(&server)?;
+    debug!(
+        server_version = %server.app_version,
+        client_version = VERSION,
+        server_protocol = server.protocol_version,
+        client_protocol = IPC_PROTOCOL_VERSION,
+        "Server IPC compatibility check passed"
+    );
     Ok(())
 }
 
@@ -698,11 +730,12 @@ mod tests {
     use tonic::{Code, Status};
 
     use super::{
-        ClientError, MAX_PAYLOAD_CHUNK_SIZE, StreamMessage, build_request_stream,
-        dataset_status_to_client_error, split_payload_chunk,
+        ClientError, MAX_PAYLOAD_CHUNK_SIZE, ServerCompatibilityInfo, StreamMessage,
+        build_request_stream, dataset_status_to_client_error, ensure_ipc_protocol_compatible,
+        split_payload_chunk,
     };
     use crate::{
-        proto::create_request::CreateMessage,
+        IPC_PROTOCOL_VERSION, VERSION, proto::create_request::CreateMessage,
         transport::grpc::dataset_service::DATASET_ERROR_CODE_METADATA_KEY,
     };
 
@@ -793,6 +826,34 @@ mod tests {
             ClientError::Status(status) => assert_eq!(status.code(), malformed_status.code()),
             other => panic!("expected malformed metadata fallback, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn ipc_protocol_check_accepts_matching_protocol() {
+        let server = ServerCompatibilityInfo {
+            app_version: VERSION.parse().expect("valid semver"),
+            protocol_version: IPC_PROTOCOL_VERSION,
+        };
+
+        ensure_ipc_protocol_compatible(&server).expect("matching protocol should be accepted");
+    }
+
+    #[test]
+    fn ipc_protocol_check_rejects_mismatched_protocol() {
+        let server = ServerCompatibilityInfo {
+            app_version: VERSION.parse().expect("valid semver"),
+            protocol_version: IPC_PROTOCOL_VERSION + 1,
+        };
+
+        assert!(matches!(
+            ensure_ipc_protocol_compatible(&server),
+            Err(ClientError::ProtocolMismatch {
+                server_protocol,
+                client_protocol,
+                ..
+            }) if server_protocol == IPC_PROTOCOL_VERSION + 1
+                && client_protocol == IPC_PROTOCOL_VERSION
+        ));
     }
 
     #[tokio::test]
