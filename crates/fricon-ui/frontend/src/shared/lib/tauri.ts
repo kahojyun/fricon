@@ -1,12 +1,29 @@
 import type { ApiError as WireError } from "@/shared/lib/bindings";
 
+export class ApiError extends Error {
+  readonly code: WireError["code"];
+  readonly apiMessage: string;
+
+  constructor(error: WireError) {
+    super(`[${error.code}] ${error.message}`);
+    this.name = "ApiError";
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.code = error.code;
+    this.apiMessage = error.message;
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
+}
+
 export function unwrapResult<T>(
   result: { status: "ok"; data: T } | { status: "error"; error: WireError },
 ): T {
   if (result.status === "ok") {
     return result.data;
   }
-  throw new Error(`[${result.error.code}] ${result.error.message}`);
+  throw new ApiError(result.error);
 }
 
 export async function invoke<T>(

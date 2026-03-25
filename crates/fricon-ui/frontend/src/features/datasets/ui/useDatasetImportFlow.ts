@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { isApiError } from "@/shared/lib/tauri";
 import {
   importDataset,
   previewImportDialog,
@@ -79,6 +80,13 @@ export function useDatasetImportFlow() {
           return;
         }
 
+        if (isApiError(e) && e.code === "archive_version_unsupported") {
+          toast.error(
+            "One or more selected archives were created by a newer version of fricon. Update fricon and try again.",
+          );
+          return;
+        }
+
         toast.error(
           `Import error: ${e instanceof Error ? e.message : String(e)}`,
         );
@@ -117,6 +125,13 @@ export function useDatasetImportFlow() {
           successCount = successCount + 1;
         } catch (e) {
           failCount = failCount + 1;
+          if (isApiError(e) && e.code === "archive_version_unsupported") {
+            toast.error(
+              `Can't import ${p.preview.metadata.name}: this archive was created by a newer version of fricon. Update fricon and try again.`,
+            );
+            continue;
+          }
+
           toast.error(
             `Error importing ${p.preview.metadata.name}: ${e instanceof Error ? e.message : String(e)}`,
           );

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetImportFlow } from "./useDatasetImportFlow";
 import type { UiPreviewImportResult } from "../api/types";
+import { ApiError } from "@/shared/lib/tauri";
 
 type PreviewImportFilesFn = (paths: string[]) => Promise<unknown>;
 type PreviewImportDialogFn = () => Promise<unknown>;
@@ -209,5 +210,56 @@ describe("useDatasetImportFlow", () => {
       expect(result.current.isDialogOpen).toBe(false);
       expect(result.current.previewResults).toEqual([]);
     });
+  });
+
+  it("shows a friendly message for unsupported archive versions during preview", async () => {
+    previewImportFilesMock.mockRejectedValue(
+      new ApiError({
+        code: "archive_version_unsupported",
+        message: "archive format version 2 is not supported",
+      }),
+    );
+
+    const { result } = renderHook(() => useDatasetImportFlow());
+
+    act(() => {
+      result.current.startImportFromFiles(["/tmp/future.tar.zst"]);
+    });
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith(
+        "One or more selected archives were created by a newer version of fricon. Update fricon and try again.",
+      );
+    });
+  });
+
+  it("shows a friendly message for unsupported archive versions during import", async () => {
+    previewImportFilesMock.mockResolvedValue([
+      makePreviewResult("/tmp/future.tar.zst", "uid-a", { name: "Future" }),
+    ]);
+    importDatasetMock.mockRejectedValue(
+      new ApiError({
+        code: "archive_version_unsupported",
+        message: "archive format version 2 is not supported",
+      }),
+    );
+
+    const { result } = renderHook(() => useDatasetImportFlow());
+
+    act(() => {
+      result.current.startImportFromFiles(["/tmp/future.tar.zst"]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.previewResults).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.confirmImport();
+    });
+
+    expect(toastError).toHaveBeenCalledWith(
+      "Can't import Future: this archive was created by a newer version of fricon. Update fricon and try again.",
+    );
   });
 });

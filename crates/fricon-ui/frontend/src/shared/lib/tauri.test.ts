@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  ApiError,
+  isApiError,
   normalizeCreatedAtDate,
   normalizeDatasetDates,
   toDate,
@@ -18,6 +20,24 @@ describe("tauri helpers", () => {
         error: { code: "internal", message: "backend exploded" },
       }),
     ).toThrow("[internal] backend exploded");
+  });
+
+  it("throws a structured ApiError for error results", () => {
+    try {
+      unwrapResult({
+        status: "error",
+        error: {
+          code: "archive_version_unsupported",
+          message: "archive is too new",
+        },
+      });
+      throw new Error("expected unwrapResult to throw");
+    } catch (error) {
+      expect(isApiError(error)).toBe(true);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).code).toBe("archive_version_unsupported");
+      expect((error as ApiError).apiMessage).toBe("archive is too new");
+    }
   });
 
   it("rejects invalid date values", () => {
