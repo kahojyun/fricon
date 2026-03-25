@@ -22,6 +22,19 @@ pub enum WorkspaceError {
     #[error("Not a Fricon workspace: missing metadata file")]
     NotWorkspace,
     #[error(
+        "Workspace version {version} requires migration before use. Open the workspace with a \
+         newer fricon build that supports migrating it."
+    )]
+    MigrationRequired { version: Version },
+    #[error(
+        "Workspace version {version} is too old to migrate automatically. Supported migrations \
+         start at version {supported_from}."
+    )]
+    UnsupportedMigrationVersion {
+        version: Version,
+        supported_from: Version,
+    },
+    #[error(
         "Workspace version {version} is newer than the supported version. Please update fricon."
     )]
     VersionTooNew { version: Version },

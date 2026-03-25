@@ -102,6 +102,29 @@ mod tests {
     }
 
     #[test]
+    fn validate_workspace_path_accepts_migration_needed_workspace() {
+        let temp_dir = tempdir().expect("tempdir should be created");
+        let workspace_path = temp_dir.path().join("workspace");
+        let workspace =
+            WorkspaceRoot::create_new(workspace_path.clone()).expect("workspace should be created");
+        drop(workspace);
+
+        fs::write(
+            workspace_path.join(".fricon_workspace.json"),
+            serde_json::json!({ "version": "0.0.0" }).to_string(),
+        )
+        .expect("workspace metadata should be rewritable");
+
+        let result = validate_workspace_path(&workspace_path);
+        let expected =
+            fs::canonicalize(workspace_path).expect("workspace path should canonicalize");
+        assert_eq!(
+            result.expect("migration-needed workspace should validate"),
+            expected
+        );
+    }
+
+    #[test]
     fn validate_workspace_path_rejects_non_workspace_directory() {
         let temp_dir = tempdir().expect("tempdir should be created");
         let non_workspace_dir = temp_dir.path().join("not-workspace");
