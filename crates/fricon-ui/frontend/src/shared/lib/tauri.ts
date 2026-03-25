@@ -7,6 +7,7 @@ export class ApiError extends Error {
   constructor(error: WireError) {
     super(`[${error.code}] ${error.message}`);
     this.name = "ApiError";
+    Object.setPrototypeOf(this, new.target.prototype);
     this.code = error.code;
     this.apiMessage = error.message;
   }

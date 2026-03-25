@@ -33,22 +33,6 @@ function getDuplicateBatchConflicts(
     .map(([uid, entries]) => ({ uid, entries }));
 }
 
-function getPreviewErrorMessage(error: unknown): string {
-  if (isApiError(error) && error.code === "archive_version_unsupported") {
-    return "One or more selected archives were created by a newer version of fricon. Update fricon and try again.";
-  }
-
-  return `Import error: ${error instanceof Error ? error.message : String(error)}`;
-}
-
-function getImportErrorMessage(datasetName: string, error: unknown): string {
-  if (isApiError(error) && error.code === "archive_version_unsupported") {
-    return `Can't import ${datasetName}: this archive was created by a newer version of fricon. Update fricon and try again.`;
-  }
-
-  return `Error importing ${datasetName}: ${error instanceof Error ? error.message : String(error)}`;
-}
-
 export function useDatasetImportFlow() {
   const [previewResults, setPreviewResults] = useState<UiPreviewImportResult[]>(
     [],
@@ -96,7 +80,16 @@ export function useDatasetImportFlow() {
           return;
         }
 
-        toast.error(getPreviewErrorMessage(e));
+        if (isApiError(e) && e.code === "archive_version_unsupported") {
+          toast.error(
+            "One or more selected archives were created by a newer version of fricon. Update fricon and try again.",
+          );
+          return;
+        }
+
+        toast.error(
+          `Import error: ${e instanceof Error ? e.message : String(e)}`,
+        );
       });
   };
 
@@ -132,7 +125,16 @@ export function useDatasetImportFlow() {
           successCount = successCount + 1;
         } catch (e) {
           failCount = failCount + 1;
-          toast.error(getImportErrorMessage(p.preview.metadata.name, e));
+          if (isApiError(e) && e.code === "archive_version_unsupported") {
+            toast.error(
+              `Can't import ${p.preview.metadata.name}: this archive was created by a newer version of fricon. Update fricon and try again.`,
+            );
+            continue;
+          }
+
+          toast.error(
+            `Error importing ${p.preview.metadata.name}: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     })().finally(() => {
