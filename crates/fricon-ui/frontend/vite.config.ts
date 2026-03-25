@@ -14,7 +14,6 @@ export default defineConfig({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
-    // @ts-expect-error The published types currently reject the documented presets-only shape.
     babel({
       presets: [reactCompilerPreset()],
     }),
