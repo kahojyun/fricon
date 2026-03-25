@@ -19,6 +19,15 @@
   use `pnpm run check` as the default frontend quality gate; run
   `pnpm run [type-check|lint|format:check|depcruise:frontend|test --run]`
   individually when needed.
+- When changing workspace on-disk structure or `.fricon_workspace.json`, update
+  `crates/fricon/src/workspace.rs` migration steps, decide whether
+  `WORKSPACE_VERSION` must change, and update developer-facing documentation
+  describing the format and maintenance duties.
+- When changing Rust IPC/gRPC request or response contracts under
+  `crates/fricon/proto` or `crates/fricon/src/transport`, update the explicit
+  IPC protocol compatibility logic, decide whether `IPC_PROTOCOL_VERSION` must
+  change, regenerate affected bindings, and document any new maintenance steps
+  or constraints.
 - Follow the existing vertical slice boundaries and add code within the owning domain/feature. Keep boundaries and data ownership clear, and avoid cross-feature or cross-layer shortcuts.
 - Keep internal structure lightweight: prefer straightforward local implementations, feature-local duplication, and explicit types over premature shared abstractions or generic extension points.
 - Add traits only for real boundaries or capabilities with multiple plausible implementations, not as a default pattern for mocking.

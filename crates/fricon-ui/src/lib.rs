@@ -111,7 +111,7 @@ mod tests {
 
         fs::write(
             workspace_path.join(".fricon_workspace.json"),
-            serde_json::json!({ "version": "0.0.0" }).to_string(),
+            serde_json::json!({ "version": 0 }).to_string(),
         )
         .expect("workspace metadata should be rewritable");
 

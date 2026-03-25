@@ -1550,7 +1550,6 @@ dependencies = [
  "num",
  "prost",
  "prost-types",
- "semver",
  "serde",
  "serde_json",
  "tar",
