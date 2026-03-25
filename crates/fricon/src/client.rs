@@ -12,7 +12,6 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use hyper_util::rt::TokioIo;
-use semver::Version;
 use thiserror::Error;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tonic::{Code, Request, Status, transport::Channel};
@@ -21,7 +20,7 @@ use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    DEFAULT_DATASET_LIST_LIMIT, IPC_PROTOCOL_VERSION, VERSION,
+    APP_VERSION, DEFAULT_DATASET_LIST_LIMIT, IPC_PROTOCOL_VERSION,
     dataset::{
         model::{DatasetRecord, DatasetStatus},
         schema::{DatasetArray, DatasetRow, DatasetSchema},
@@ -72,8 +71,6 @@ pub enum ClientError {
     SameSourceTarget,
     #[error("Dataset operation failed")]
     DatasetOperationFailed,
-    #[error("Version parse error: {0}")]
-    VersionParse(#[from] semver::Error),
     #[error(
         "Server IPC protocol {server_protocol} is incompatible with client protocol \
          {client_protocol} (server {server_version}, client {client_version})"
@@ -81,8 +78,8 @@ pub enum ClientError {
     ProtocolMismatch {
         server_protocol: u32,
         client_protocol: u32,
-        server_version: Version,
-        client_version: Version,
+        server_version: String,
+        client_version: String,
     },
     #[error("Arrow error: {0}")]
     Arrow(#[from] ArrowError),
@@ -117,7 +114,7 @@ pub enum ExistingUiProbeResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ServerCompatibilityInfo {
-    app_version: Version,
+    app_version: String,
     protocol_version: u32,
 }
 
@@ -684,13 +681,12 @@ impl Dataset {
 }
 
 fn ensure_ipc_protocol_compatible(server: &ServerCompatibilityInfo) -> Result<(), ClientError> {
-    let client_version: Version = VERSION.parse()?;
     if server.protocol_version != IPC_PROTOCOL_VERSION {
         return Err(ClientError::ProtocolMismatch {
             server_protocol: server.protocol_version,
             client_protocol: IPC_PROTOCOL_VERSION,
             server_version: server.app_version.clone(),
-            client_version,
+            client_version: APP_VERSION.to_owned(),
         });
     }
 
@@ -703,13 +699,13 @@ async fn check_server_compatibility(channel: Channel) -> Result<(), ClientError>
     let response = FriconServiceClient::new(channel).version(request).await?;
     let response = response.into_inner();
     let server = ServerCompatibilityInfo {
-        app_version: response.app_version.parse()?,
+        app_version: response.app_version,
         protocol_version: response.protocol_version,
     };
     ensure_ipc_protocol_compatible(&server)?;
     debug!(
         server_version = %server.app_version,
-        client_version = VERSION,
+        client_version = APP_VERSION,
         server_protocol = server.protocol_version,
         client_protocol = IPC_PROTOCOL_VERSION,
         "Server IPC compatibility check passed"
@@ -735,7 +731,7 @@ mod tests {
         split_payload_chunk,
     };
     use crate::{
-        IPC_PROTOCOL_VERSION, VERSION, proto::create_request::CreateMessage,
+        APP_VERSION, IPC_PROTOCOL_VERSION, proto::create_request::CreateMessage,
         transport::grpc::dataset_service::DATASET_ERROR_CODE_METADATA_KEY,
     };
 
@@ -831,7 +827,7 @@ mod tests {
     #[test]
     fn ipc_protocol_check_accepts_matching_protocol() {
         let server = ServerCompatibilityInfo {
-            app_version: VERSION.parse().expect("valid semver"),
+            app_version: APP_VERSION.to_owned(),
             protocol_version: IPC_PROTOCOL_VERSION,
         };
 
@@ -841,7 +837,7 @@ mod tests {
     #[test]
     fn ipc_protocol_check_rejects_mismatched_protocol() {
         let server = ServerCompatibilityInfo {
-            app_version: VERSION.parse().expect("valid semver"),
+            app_version: APP_VERSION.to_owned(),
             protocol_version: IPC_PROTOCOL_VERSION + 1,
         };
 

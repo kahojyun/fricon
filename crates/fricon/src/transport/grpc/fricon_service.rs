@@ -2,7 +2,7 @@ use tonic::{Request, Response, Result, Status};
 use tracing::warn;
 
 use crate::{
-    IPC_PROTOCOL_VERSION, VERSION,
+    APP_VERSION, IPC_PROTOCOL_VERSION,
     app::{AppError, AppHandle},
     proto::{
         ShowUiRequest, ShowUiResponse, VersionRequest, VersionResponse,
@@ -21,7 +21,7 @@ impl FriconService for Fricon {
         _request: Request<VersionRequest>,
     ) -> Result<Response<VersionResponse>> {
         Ok(Response::new(VersionResponse {
-            app_version: VERSION.into(),
+            app_version: APP_VERSION.into(),
             protocol_version: IPC_PROTOCOL_VERSION,
         }))
     }
