@@ -1,7 +1,7 @@
 {
   "name": "fricon",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.1.0-alpha.1",
   "scripts": {
     "gen:bindings": "pnpm --filter fricon-ui run gen:bindings",
     "lint": "eslint .",
