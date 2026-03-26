@@ -41,6 +41,7 @@ for file in crates/fricon-ui/frontend/package.json crates/fricon-ui/tauri.conf.j
 done
 git add crates/fricon-ui/frontend/package.json crates/fricon-ui/tauri.conf.json
 """
+shell = true
 
 [[workflows.steps]]
 type = "Command"
