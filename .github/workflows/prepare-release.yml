@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    environment: release-plz
+    environment: release
     concurrency:
       group: prepare-release-${{ github.ref }}
       cancel-in-progress: false
