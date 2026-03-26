@@ -6,7 +6,9 @@ CREATE TABLE datasets (
     favorite BOOLEAN NOT NULL DEFAULT FALSE,
     -- 'pending', 'writing', 'completed', 'aborted'
     status TEXT NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    trashed_at TIMESTAMP NULL,
+    deleted_at TIMESTAMP NULL
 );
 
 CREATE TABLE tags (
