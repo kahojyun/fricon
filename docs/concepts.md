@@ -31,21 +31,22 @@ stepwise migration before the workspace is usable.
 
 ## Fricon Server
 
-Fricon needs a _server process_ to manage the workspace. You can start the server
-using the CLI:
+Fricon needs a _server process_ to manage the workspace. The desktop app can
+launch it for you:
 
 ```shell
-fricon serve path/to/workspace
+fricon gui path/to/workspace
 ```
 
-The server process will listen to an IPC socket based on the workspace path. The
-client connects to the server with the workspace path.
+Python scripts can connect to an already running workspace server:
 
 ```python
 from fricon import Workspace
 
 ws = Workspace.connect("path/to/workspace")
 ```
+
+Python scripts connect to the server with the workspace path.
 
 ## Dataset
 
@@ -63,30 +64,3 @@ Each dataset will be given two unique identifiers:
   workspace.
 
 Users can open a dataset by either `uid` or `id`.
-
-## Desktop UI Architecture
-
-`fricon-ui` is organized as vertical feature slices across the Rust and React boundary.
-
-Rust dependency flow:
-
-```text
-desktop_runtime -> tauri_api -> features/<feature>/tauri -> features/<feature>/workflow -> fricon
-```
-
-Frontend dependency flow:
-
-```text
-app/routes -> features/<feature> -> feature-local api -> shared/lib/tauri.ts -> generated bindings
-```
-
-The important boundary rules are:
-
-- Rust `src/tauri_api.rs` owns global Tauri/Specta binding export and command/event aggregation.
-- Rust `src/features/<feature>/tauri.rs` files are Tauri adapters only. They own commands, events, exported DTOs, and native dialogs.
-- Rust `src/features/<feature>/workflow.rs` files own feature orchestration and should not depend on Tauri types.
-- Pure Rust data shaping helpers stay inside the owning feature slice, for example `src/features/charts/transform.rs`.
-- Frontend features own their own `api/`, `ui/`, `model/`, and `hooks/` modules.
-- Files under `frontend/src/features/**` use relative imports only.
-- `frontend/src/app/**` and `frontend/src/routes/**` import features only through public barrels such as `@/features/<feature>`.
-- `frontend/src/shared/lib/tauri.ts` stays generic; feature-specific normalization and query/event wiring belong in each feature's `api/` folder.
