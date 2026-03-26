@@ -1,0 +1,64 @@
+[package]
+versioned_files = [
+  "Cargo.toml",
+  { path = "Cargo.lock", dependency = "fricon" },
+  "crates/fricon-ui/frontend/package.json",
+  "crates/fricon-ui/tauri.conf.json",
+]
+changelog = "CHANGELOG.md"
+
+[changes]
+ignore_conventional_commits = true
+
+[github]
+owner = "kahojyun"
+repo = "fricon"
+
+[[workflows]]
+name = "plan-release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+allow_empty = true
+prerelease_label = "alpha"
+
+[[workflows]]
+name = "prepare-release"
+
+[[workflows.steps]]
+type = "Command"
+command = "git switch --force-create release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+prerelease_label = "alpha"
+
+[[workflows.steps]]
+type = "Command"
+command = "git commit -m 'chore: prepare release $version'"
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --force --set-upstream origin release"
+
+[[workflows.steps]]
+type = "CreatePullRequest"
+base = "main"
+title.template = "chore: prepare release $version"
+body.template = """
+This PR was created by Knope. Merging it will create a new release.
+
+$changelog
+"""
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "Release"
+
+[[workflows]]
+name = "document-change"
+
+[[workflows.steps]]
+type = "CreateChangeFile"
