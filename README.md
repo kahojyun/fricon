@@ -37,22 +37,35 @@ python3 scripts/setup-dev.py
 
 ### Basic Usage
 
+Create a workspace:
+
+```bash
+fricon init path/to/workspace
+```
+
+Launch the desktop UI:
+
+```bash
+fricon gui path/to/workspace
+```
+
+Or connect from Python to a workspace with a running server:
+
 ```python
+from pathlib import Path
+
 from fricon import Workspace
 
-# Initialize a new workspace from CLI
-# fricon workspace init path/to/workspace
+workspace_path = Path("path/to/workspace")
+ws = Workspace.connect(workspace_path)
 
-# Connect to existing workspace
-ws = Workspace.connect("path/to/workspace")
-
-# Create a new dataset (schema is automatically inferred)
+# Initialize a new dataset (schema is automatically inferred)
 writer = ws.dataset_manager.create("my_dataset", description="My test dataset")
 
 # Write data - schema is inferred from the first row
 # MVP currently supports float and complex types only
-writer.write(id=1, value=42.0, measurement=3.14+2j)
-writer.write(id=2, value=84.0, measurement=1.618-1j)
+writer.write(id=1, value=42.0, measurement=3.14 + 2j)
+writer.write(id=2, value=84.0, measurement=1.618 - 1j)
 writer.close()
 
 # List all datasets

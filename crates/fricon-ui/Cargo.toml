@@ -13,7 +13,6 @@ default-run = "fricon-ui"
 anyhow = { workspace = true }
 arrow-array = { workspace = true }
 arrow-buffer = { workspace = true }
-arrow-json = { workspace = true }
 arrow-schema = { workspace = true }
 arrow-select = { workspace = true }
 base64 = { workspace = true }

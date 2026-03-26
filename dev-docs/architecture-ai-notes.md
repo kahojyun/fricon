@@ -181,6 +181,34 @@ The main architectural lesson is not “use more layers”. It is:
 
 For `fricon`, that means preserving feature-local layered slices with thin adapters and one-way dependency flow, while resisting both uncontrolled direct Diesel usage and unnecessary abstraction growth.
 
+## Desktop UI Slice Rules
+
+`fricon-ui` is organized as vertical feature slices across the Rust and React
+boundary.
+
+Rust dependency flow:
+
+```text
+desktop_runtime -> tauri_api -> features/<feature>/tauri -> features/<feature>/workflow -> fricon
+```
+
+Frontend dependency flow:
+
+```text
+app/routes -> features/<feature> -> feature-local api -> shared/lib/tauri.ts -> generated bindings
+```
+
+Important boundary rules:
+
+- Rust `src/tauri_api.rs` owns global Tauri/Specta binding export and command/event aggregation.
+- Rust `src/features/<feature>/tauri.rs` files are Tauri adapters only. They own commands, events, exported DTOs, and native dialogs.
+- Rust `src/features/<feature>/workflow.rs` files own feature orchestration and should not depend on Tauri types.
+- Pure Rust data shaping helpers stay inside the owning feature slice, for example `src/features/charts/transform.rs`.
+- Frontend features own their own `api/`, `ui/`, `model/`, and `hooks/` modules.
+- Files under `frontend/src/features/**` use relative imports only.
+- `frontend/src/app/**` and `frontend/src/routes/**` import features only through public barrels such as `@/features/<feature>`.
+- `frontend/src/shared/lib/tauri.ts` stays generic; feature-specific normalization and query/event wiring belong in each feature's `api/` folder.
+
 ## Workspace And IPC Compatibility Maintenance
 
 Fricon treats workspace compatibility and IPC compatibility as separate concerns

@@ -5,7 +5,7 @@ Fricon is a framework for data collection automation.
 ## Current features
 
 - Data storage.
-- Desktop UI built as Rust + React feature slices.
+- Desktop UI for browsing and managing datasets.
 
 ## Usage
 
@@ -21,20 +21,28 @@ Initialize workspace via CLI:
 fricon init path/to/workspace
 ```
 
-Start the server:
+Launch the desktop UI for a workspace:
 
 ```shell
-fricon serve path/to/workspace
+fricon gui path/to/workspace
 ```
 
-Create a dataset:
+Connect from Python to a workspace with a running server:
+
+```python
+from fricon import Workspace
+
+ws = Workspace.connect("path/to/workspace")
+```
+
+Create and populate a dataset from Python:
 
 ```python title="examples/simple/create.py"
---8<-- "examples/simple/create.py"
+--8<-- "examples/simple/create.py:create-example"
 ```
 
-Query and open a dataset:
+Query and open a dataset from Python:
 
 ```python title="examples/simple/open.py"
---8<-- "examples/simple/open.py"
+--8<-- "examples/simple/open.py:open-example"
 ```

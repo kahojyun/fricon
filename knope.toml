@@ -1,6 +1,7 @@
 [package]
 versioned_files = [
   "Cargo.toml",
+  "package.json",
   { path = "Cargo.lock", dependency = "fricon" },
   { path = "Cargo.lock", dependency = "fricon-cli" },
   { path = "Cargo.lock", dependency = "fricon-py" },
@@ -34,12 +35,12 @@ type = "PrepareRelease"
 [[workflows.steps]]
 type = "Command"
 command = """
-for file in crates/fricon-ui/frontend/package.json crates/fricon-ui/tauri.conf.json; do
+for file in package.json crates/fricon-ui/frontend/package.json crates/fricon-ui/tauri.conf.json; do
   if [ -n "$(tail -c 1 "$file")" ]; then
     printf '\n' >> "$file"
   fi
 done
-git add crates/fricon-ui/frontend/package.json crates/fricon-ui/tauri.conf.json
+git add package.json crates/fricon-ui/frontend/package.json crates/fricon-ui/tauri.conf.json
 """
 shell = true
 

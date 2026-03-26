@@ -861,11 +861,10 @@ pub fn main_gui(py: Python<'_>) -> i32 {
     }
 }
 
-/// Create a workspace for integration testing.
+/// Create a workspace and start a server for it.
 ///
 /// This function creates a new workspace at the given path and starts a server.
 /// The server will run in the background and the workspace client is returned.
-/// It's not exported to the public API and should only be used for testing.
 ///
 /// Note: The server runs in the background. When the workspace client is
 /// dropped, the connection is closed but the server continues running. For
@@ -875,10 +874,7 @@ pub fn main_gui(py: Python<'_>) -> i32 {
 ///     path: The path where to create the workspace.
 ///
 /// Returns:
-///     A tuple containing (workspace_client, server_handle) where:
-///     - workspace_client: A workspace client connected to the newly created
-///       workspace
-///     - server_handle: A handle to manage the server lifecycle
+///     A tuple of `(workspace_client, server_handle)`.
 #[pyfunction]
 pub fn serve_workspace(py: Python<'_>, path: PathBuf) -> Result<(Workspace, ServerHandle)> {
     let runtime = get_runtime();

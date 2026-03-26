@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 from ._core import (
     Dataset,
     DatasetManager,
@@ -11,6 +13,11 @@ from ._core import (
     Workspace,
 )
 
+try:
+    __version__ = version("fricon")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
+
 __all__ = [
     "Dataset",
     "DatasetManager",
@@ -18,4 +25,5 @@ __all__ = [
     "FriconDatasetError",
     "Trace",
     "Workspace",
+    "__version__",
 ]
