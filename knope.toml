@@ -7,9 +7,6 @@ versioned_files = [
 ]
 changelog = "CHANGELOG.md"
 
-[changes]
-ignore_conventional_commits = true
-
 [github]
 owner = "kahojyun"
 repo = "fricon"
@@ -20,7 +17,6 @@ name = "plan-release"
 [[workflows.steps]]
 type = "PrepareRelease"
 allow_empty = true
-prerelease_label = "alpha"
 
 [[workflows]]
 name = "prepare-release"
@@ -31,7 +27,6 @@ command = "git switch --force-create release"
 
 [[workflows.steps]]
 type = "PrepareRelease"
-prerelease_label = "alpha"
 
 [[workflows.steps]]
 type = "Command"

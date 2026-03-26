@@ -131,7 +131,7 @@ Docs:
 
 - Branch from `main`: feature/bugfix branches named clearly.
 - Use conventional commits: `type(scope): description` (feat, fix, docs, style, refactor, test, chore).
-- For release notes and version bumps, run `knope document-change` and commit the generated file under `.changeset/`.
+- For release notes and version bumps, prefer `knope document-change` and commit the generated file under `.changeset/`.
 - Add tests for new features when possible.
 - Run relevant linters and tests before opening a PR.
 - For frontend work, start with `pnpm run check`, then run narrower commands only if you need to investigate a specific failure.
@@ -148,7 +148,7 @@ PR checklist (recommended):
 - The repository ships one unified release version and one canonical Git tag: `v<version>`.
 - A push to `main` refreshes a rolling release preview PR from the `release` branch.
 - Merging that PR creates the GitHub release and tag; publishing remains PyPI-only.
-- Release notes and version bumps come from Knope change files. Conventional commits are still the repository commit style, but they do not drive releases in the current alpha workflow.
+- Release notes and version bumps can come from either Knope change files or conventional commits. Use change files when you want explicit release notes or a release rule that should not rely on commit parsing.
 
 ## Reporting issues & getting help
 
