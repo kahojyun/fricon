@@ -17,6 +17,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  KNOPE_VERSION: 0.22.4
 
 jobs:
   fmt:
@@ -38,6 +39,10 @@ jobs:
           python-version-file: ".python-version"
       - name: Install uv
         uses: astral-sh/setup-uv@v7
+      - name: Install Knope
+        uses: knope-dev/action@v2.1.2
+        with:
+          version: ${{ env.KNOPE_VERSION }}
       - name: Ruff format
         run: uv run --only-group fmt ruff format --check
       - name: Ruff lint
@@ -50,6 +55,8 @@ jobs:
         run: pnpm run check
       - name: Frontend format check
         run: pnpm run format:check
+      - name: Validate Knope release config
+        run: knope --validate
       - name: Check route tree is up-to-date
         run: |
           git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
