@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.0 (2026-03-26)
+
+### Features
+
+- basic dataset api (#3)
+- add a draft GUI viewer (#66)
+- implement async chunked writes and zero-copy dataset reads (#80)
+- dataset viewer (#108)
+- filter table with individual column (#113)
+- heatmap (#133)
+- scatter plot (#135)
+- edit and filter favorite dataset (#136)
+- search by name (#137)
+- filter by tags (#138)
+- dataset write status display (#153)
+- dataset paging limit (#155)
+- dataset detail page (#158)
+- migrate frontend to React and refresh tooling/docs (#159)
+- integrate tauri-specta bindings and typed events (#164)
+- add dataset test case generators and realtime scan case (#168)
+- prefer trailing index columns for chart defaults (#171)
+- improve workspace launch flow for cli and dialog modes (#173)
+- add structured logging with tracing instrumentation (#180)
+- refactor dataset creation streaming with robust termination handling (#189)
+- improve dataset table column visibility UX (#201)
+- align UI with shadcn patterns (#210)
+- add multi-select delete workflow (#227)
+- add keyboard navigation for selectable tables (#230)
+- add dataset tag management (#231)
+- bring up running GUI for opened workspace (#236)
+- implement dataset trashing and restoration functionality (#266)
+- add tombstone graveyard deletion (#268)
+- add dataset portability import and export flows (#271)
+- add dataset import and export flows (#272)
+- improve dataset import archive version handling (#288)
+- enhance workspace migration error handling and validation logic (#289)
+
+### Fixes
+
+- Windows named pipe and application lifecycle issues (#83)
+- focused dataset MVP API (#86)
+- dev env setup on windows (#93)
+- cargo config.toml generation on windows (#96)
+- rename uuid field to uid (#99)
+- add license-files field to pyproject.toml (#112)
+- minor improvement of chart viewer UI (#121)
+- correct gitignore (#122)
+- page overflow behavior (#126)
+- keep filter selection after toggling split mode (#130)
+- meta-key occupied when focusing tables (#131)
+- heatmap realtime update (#134)
+- update stale dataset status on startup (#154)
+- stabilize trace chart rendering and semantics (#169)
+- release GIL when doing blocking rust operations (#178)
+- improve logging registration (#179)
+- store and use `tokio::runtime::Handle` in `DatasetWriter` drop (#192)
+- clean up dataset detail and viewer flows (#213)
+- enhance ChartViewer with loading and tombstone states (#275)
+
 ## 0.1.0-alpha.1 (2025-12-16)
 
 ### Features
