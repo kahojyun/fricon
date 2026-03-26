@@ -439,17 +439,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#desktop-ui-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Desktop UI Architecture
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -561,17 +550,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#desktop-ui-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Desktop UI Architecture
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -615,16 +593,16 @@ the data files and metadata. You can create a workspace using the CLI:</p>
 integer compatibility counter. Opening an older workspace may trigger a
 stepwise migration before the workspace is usable.</p>
 <h2 id="fricon-server">Fricon Server</h2>
-<p>Fricon needs a <em>server process</em> to manage the workspace. You can start the server
-using the CLI:</p>
-<div class="language-shell highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>fricon<span class="w"> </span>serve<span class="w"> </span>path/to/workspace
+<p>Fricon needs a <em>server process</em> to manage the workspace. The desktop app can
+launch it for you:</p>
+<div class="language-shell highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>fricon<span class="w"> </span>gui<span class="w"> </span>path/to/workspace
 </span></code></pre></div>
-<p>The server process will listen to an IPC socket based on the workspace path. The
-client connects to the server with the workspace path.</p>
+<p>Python scripts can connect to an already running workspace server:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">fricon</span><span class="w"> </span><span class="kn">import</span> <span class="n">Workspace</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">ws</span> <span class="o">=</span> <span class="n">Workspace</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;path/to/workspace&quot;</span><span class="p">)</span>
 </span></code></pre></div>
+<p>Python scripts connect to the server with the workspace path.</p>
 <h2 id="dataset">Dataset</h2>
 <p>Fricon allows users to store data in datasets. A dataset stores one and only
 one data table based on the Arrow format with additional metadata.</p>
@@ -638,25 +616,6 @@ one data table based on the Arrow format with additional metadata.</p>
   workspace.</li>
 </ul>
 <p>Users can open a dataset by either <code>uid</code> or <code>id</code>.</p>
-<h2 id="desktop-ui-architecture">Desktop UI Architecture</h2>
-<p><code>fricon-ui</code> is organized as vertical feature slices across the Rust and React boundary.</p>
-<p>Rust dependency flow:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>desktop_runtime -&gt; tauri_api -&gt; features/&lt;feature&gt;/tauri -&gt; features/&lt;feature&gt;/workflow -&gt; fricon
-</span></code></pre></div>
-<p>Frontend dependency flow:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>app/routes -&gt; features/&lt;feature&gt; -&gt; feature-local api -&gt; shared/lib/tauri.ts -&gt; generated bindings
-</span></code></pre></div>
-<p>The important boundary rules are:</p>
-<ul>
-<li>Rust <code>src/tauri_api.rs</code> owns global Tauri/Specta binding export and command/event aggregation.</li>
-<li>Rust <code>src/features/&lt;feature&gt;/tauri.rs</code> files are Tauri adapters only. They own commands, events, exported DTOs, and native dialogs.</li>
-<li>Rust <code>src/features/&lt;feature&gt;/workflow.rs</code> files own feature orchestration and should not depend on Tauri types.</li>
-<li>Pure Rust data shaping helpers stay inside the owning feature slice, for example <code>src/features/charts/transform.rs</code>.</li>
-<li>Frontend features own their own <code>api/</code>, <code>ui/</code>, <code>model/</code>, and <code>hooks/</code> modules.</li>
-<li>Files under <code>frontend/src/features/**</code> use relative imports only.</li>
-<li><code>frontend/src/app/**</code> and <code>frontend/src/routes/**</code> import features only through public barrels such as <code>@/features/&lt;feature&gt;</code>.</li>
-<li><code>frontend/src/shared/lib/tauri.ts</code> stays generic; feature-specific normalization and query/event wiring belong in each feature's <code>api/</code> folder.</li>
-</ul>
 
 
 
