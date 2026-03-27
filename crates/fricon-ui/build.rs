@@ -5,6 +5,16 @@ use tauri_utils::{
     platform::Target,
 };
 
+fn run_checked(command: &mut Command, description: &str) {
+    let status = command.status().unwrap_or_else(|error| {
+        panic!("Failed to run {description}: {error}");
+    });
+    assert!(
+        status.success(),
+        "{description} failed with status {status}"
+    );
+}
+
 /// Find the pnpm executable by trying multiple possible names in order
 fn find_pnpm_executable() -> &'static str {
     if cfg!(windows) {
@@ -66,16 +76,15 @@ fn main() {
             );
         }
         let pnpm = find_pnpm_executable();
-        Command::new(pnpm)
-            .current_dir(frontend_root)
-            .arg("install")
-            .status()
-            .expect("Failed to run pnpm install");
-        Command::new(pnpm)
+        let mut pnpm_install = Command::new(pnpm);
+        pnpm_install.current_dir(frontend_root).arg("install");
+        run_checked(&mut pnpm_install, "pnpm install");
+
+        let mut pnpm_build = Command::new(pnpm);
+        pnpm_build
             .current_dir(frontend_root)
             .arg("run")
-            .arg("build")
-            .status()
-            .expect("Failed to run pnpm build");
+            .arg("build");
+        run_checked(&mut pnpm_build, "pnpm run build");
     }
 }

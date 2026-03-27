@@ -69,6 +69,8 @@ include = [
   { format = "sdist", path = "package.json" },
   { format = "sdist", path = "pnpm-workspace.yaml" },
   { format = "sdist", path = "pnpm-lock.yaml" },
+  { format = "sdist", path = "tsconfig.node.json" },
+  { format = "sdist", path = "eslint.config.ts" },
 ]
 manifest-path = "crates/fricon-py/Cargo.toml"
 module-name = "fricon._core"
