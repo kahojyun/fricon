@@ -19,11 +19,29 @@ use crate::dataset::model::DatasetRecord;
 /// A dataset lifecycle event carrying the resulting record state.
 #[derive(Clone, Debug)]
 pub enum DatasetEvent {
-    /// A new dataset was created (ingest or import).
+    /// A new dataset was created by ingest (Writing status).
     Created(DatasetRecord),
-    /// An existing dataset was modified (metadata update, trash, restore,
-    /// delete, re-import).
-    Updated(DatasetRecord),
+    /// A write session transitioned a dataset from Writing to Completed or
+    /// Aborted.
+    StatusChanged(DatasetRecord),
+    /// Dataset name, description, or favorite flag changed.
+    MetadataUpdated(DatasetRecord),
+    /// Dataset tags were added or removed.
+    TagsChanged(DatasetRecord),
+    /// Dataset was moved to trash.
+    Trashed(DatasetRecord),
+    /// Dataset was restored from trash.
+    Restored(DatasetRecord),
+    /// Dataset was permanently deleted.
+    Deleted(DatasetRecord),
+    /// An existing dataset was replaced by a force-import.
+    Imported(DatasetRecord),
+    /// A global tag was deleted, renamed, or merged across all datasets.
+    ///
+    /// This event carries no `DatasetRecord` because the operation affects
+    /// all datasets that held the tag. Consumers should invalidate the
+    /// full tag list and any dataset lists or details that may display tags.
+    GlobalTagsChanged,
 }
 
 /// Port for publishing dataset events.

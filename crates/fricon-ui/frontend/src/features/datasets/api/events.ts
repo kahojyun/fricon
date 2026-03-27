@@ -1,16 +1,30 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { events } from "@/shared/lib/bindings";
+import {
+  events,
+  type DatasetChanged as WireDatasetChanged,
+} from "@/shared/lib/bindings";
 import { normalizeDataset, type DatasetInfo } from "./types";
 
-export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
-  return events.datasetCreated.listen((event) => {
-    callback(normalizeDataset(event.payload));
-  });
-}
+type WireDatasetChangedWithInfo = Extract<
+  WireDatasetChanged,
+  { info: unknown }
+>;
 
-export function onDatasetUpdated(callback: (event: DatasetInfo) => void) {
-  return events.datasetUpdated.listen((event) => {
-    callback(normalizeDataset(event.payload));
+/** Normalized dataset change event (info.createdAt etc. are Date objects). */
+export type DatasetChangedEvent =
+  | { kind: WireDatasetChangedWithInfo["kind"]; info: DatasetInfo }
+  | { kind: "globalTagsChanged" };
+
+export function onDatasetChanged(
+  callback: (event: DatasetChangedEvent) => void,
+) {
+  return events.datasetChanged.listen((event) => {
+    const p = event.payload;
+    if (p.kind === "globalTagsChanged") {
+      callback(p);
+    } else {
+      callback({ kind: p.kind, info: normalizeDataset(p.info) });
+    }
   });
 }
 

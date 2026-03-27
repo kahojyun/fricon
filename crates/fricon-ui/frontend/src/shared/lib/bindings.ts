@@ -179,11 +179,9 @@ async importDataset(archivePath: string, force: boolean) : Promise<Result<Datase
 
 
 export const events = __makeEvents__<{
-datasetCreated: DatasetCreated,
-datasetUpdated: DatasetUpdated
+datasetChanged: DatasetChanged
 }>({
-datasetCreated: "dataset-created",
-datasetUpdated: "dataset-updated"
+datasetChanged: "dataset-changed"
 })
 
 /** user-defined constants **/
@@ -200,8 +198,51 @@ export type ChartType = "line" | "heatmap" | "scatter"
 export type ColumnInfo = { name: string; isComplex: boolean; isTrace: boolean; isIndex: boolean }
 export type ColumnUniqueValue = { index: number; displayValue: string }
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg"
+/**
+ * Payload for the `dataset-changed` Tauri event.
+ * 
+ * Serialised as an internally-tagged JSON object (discriminant field: `kind`).
+ * Variants that concern a specific dataset carry an `info` field; the
+ * `globalTagsChanged` variant has no `info`.
+ */
+export type DatasetChanged = 
+/**
+ * New dataset was created by ingest (Writing status).
+ */
+{ kind: "created"; info: DatasetInfo } | 
+/**
+ * Write session transitioned the dataset to Completed or Aborted.
+ */
+{ kind: "statusChanged"; info: DatasetInfo } | 
+/**
+ * Name, description, or favorite flag changed.
+ */
+{ kind: "metadataUpdated"; info: DatasetInfo } | 
+/**
+ * Tags were added or removed on a specific dataset.
+ */
+{ kind: "tagsChanged"; info: DatasetInfo } | 
+/**
+ * Dataset was moved to trash.
+ */
+{ kind: "trashed"; info: DatasetInfo } | 
+/**
+ * Dataset was restored from trash.
+ */
+{ kind: "restored"; info: DatasetInfo } | 
+/**
+ * Dataset was permanently deleted.
+ */
+{ kind: "deleted"; info: DatasetInfo } | 
+/**
+ * An existing dataset was replaced by a force-import.
+ */
+{ kind: "imported"; info: DatasetInfo } | 
+/**
+ * A global tag was deleted, renamed, or merged across all datasets.
+ */
+{ kind: "globalTagsChanged" }
 export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
-export type DatasetCreated = DatasetInfo
 export type DatasetDeleteResult = { id: number; success: boolean; error: DatasetOperationError | null }
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; trashedAt: string | null; deletedAt: string | null; payloadAvailable: boolean; columns: ColumnInfo[] }
 export type DatasetFavoriteUpdate = { favorite: boolean }
@@ -210,7 +251,6 @@ export type DatasetInfoUpdate = { name?: string | null; description?: string | n
 export type DatasetListOptions = { search?: string | null; tags?: string[] | null; favoriteOnly?: boolean | null; statuses?: UiDatasetStatus[] | null; trashed?: boolean | null; sortBy?: UiDatasetSortBy | null; sortDir?: UiSortDirection | null; limit?: number | null; offset?: number | null }
 export type DatasetOperationError = { code: ApiErrorCode; message: string }
 export type DatasetTagBatchResult = { id: number; success: boolean; addError: DatasetOperationError | null; removeError: DatasetOperationError | null }
-export type DatasetUpdated = DatasetInfo
 export type DatasetWriteStatus = { rowCount: number; isComplete: boolean }
 export type FilterTableOptions = { excludeColumns?: string[] | null }
 export type HeatmapChartDataOptions = ({ start: number | null; end: number | null; indexFilters: number[] | null; excludeColumns: string[] | null }) & { series: string; xColumn: string | null; yColumn: string; complexViewSingle: ComplexViewOption | null }

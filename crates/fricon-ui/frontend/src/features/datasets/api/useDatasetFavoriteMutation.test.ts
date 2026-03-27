@@ -56,22 +56,17 @@ describe("useDatasetFavoriteMutation", () => {
     updateDatasetFavoriteMock.mockReset();
   });
 
-  it("optimistically updates the cached favorite state and keeps it after refresh", async () => {
+  it("optimistically updates the cached favorite state", async () => {
     const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
+      defaultOptions: { queries: { retry: false } },
     });
-    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
     const first = makeDataset({ id: 1, favorite: false });
     const second = makeDataset({ id: 2, favorite: true, name: "Pinned" });
     queryClient.setQueryData(datasetQueryKey, [first, second]);
     updateDatasetFavoriteMock.mockResolvedValue(undefined);
 
     const { result } = renderHook(
-      () => useDatasetFavoriteMutation(datasetQueryKey, refreshDatasets),
+      () => useDatasetFavoriteMutation(datasetQueryKey),
       { wrapper: createWrapper(queryClient) },
     );
 
@@ -80,7 +75,6 @@ describe("useDatasetFavoriteMutation", () => {
     });
 
     expect(updateDatasetFavoriteMock).toHaveBeenCalledWith(1, true);
-    expect(refreshDatasets).toHaveBeenCalledTimes(1);
     expect(queryClient.getQueryData(datasetQueryKey)).toEqual([
       expect.objectContaining({ id: 1, favorite: true }),
       expect.objectContaining({ id: 2, favorite: true }),
@@ -89,19 +83,14 @@ describe("useDatasetFavoriteMutation", () => {
 
   it("rolls back the optimistic cache update when the backend write fails", async () => {
     const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
+      defaultOptions: { queries: { retry: false } },
     });
-    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
     const dataset = makeDataset({ id: 1, favorite: false });
     queryClient.setQueryData(datasetQueryKey, [dataset]);
     updateDatasetFavoriteMock.mockRejectedValue(new Error("write failed"));
 
     const { result } = renderHook(
-      () => useDatasetFavoriteMutation(datasetQueryKey, refreshDatasets),
+      () => useDatasetFavoriteMutation(datasetQueryKey),
       { wrapper: createWrapper(queryClient) },
     );
 
@@ -109,40 +98,8 @@ describe("useDatasetFavoriteMutation", () => {
       await result.current.toggleFavorite(dataset);
     });
 
-    expect(refreshDatasets).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(datasetQueryKey)).toEqual([
       expect.objectContaining({ id: 1, favorite: false }),
-    ]);
-  });
-
-  it("keeps the optimistic cache state when refresh fails after a successful write", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-    const refreshDatasets = vi
-      .fn()
-      .mockRejectedValue(new Error("refresh failed"));
-    const dataset = makeDataset({ id: 1, favorite: false });
-    queryClient.setQueryData(datasetQueryKey, [dataset]);
-    updateDatasetFavoriteMock.mockResolvedValue(undefined);
-
-    const { result } = renderHook(
-      () => useDatasetFavoriteMutation(datasetQueryKey, refreshDatasets),
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    await act(async () => {
-      await result.current.toggleFavorite(dataset);
-    });
-
-    expect(updateDatasetFavoriteMock).toHaveBeenCalledWith(1, true);
-    expect(refreshDatasets).toHaveBeenCalledTimes(1);
-    expect(queryClient.getQueryData(datasetQueryKey)).toEqual([
-      expect.objectContaining({ id: 1, favorite: true }),
     ]);
   });
 });

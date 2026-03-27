@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   batchUpdateDatasetTags as batchUpdateDatasetTagsApi,
   deleteTag as deleteTagApi,
   renameTag as renameTagApi,
   mergeTag as mergeTagApi,
 } from "./client";
-import { datasetKeys } from "./queryKeys";
 import type { DatasetTagBatchResult } from "./types";
 
 async function runTagMutation<T>({
@@ -24,82 +22,43 @@ async function runTagMutation<T>({
   }
 }
 
-export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
-  const queryClient = useQueryClient();
+export function useDatasetTagMutation() {
   const [isUpdatingTags, setIsUpdatingTags] = useState(false);
 
-  const invalidateAfterTagChange = async (invalidateAllDetails = false) => {
-    if (invalidateAllDetails) {
-      await queryClient.invalidateQueries({
-        queryKey: ["datasets", "detail"],
-      });
-    }
-    await queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-    await refreshDatasets();
-  };
-
-  const batchAddTags = async (
+  const batchAddTags = (
     ids: number[],
     tags: string[],
   ): Promise<DatasetTagBatchResult[]> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        const results = await batchUpdateDatasetTagsApi(ids, tags, []);
-        // Invalidate detail queries for affected datasets
-        ids.forEach((id) => {
-          void queryClient.invalidateQueries({
-            queryKey: datasetKeys.detail(id),
-          });
-        });
-        await invalidateAfterTagChange();
-        return results;
-      },
+      work: () => batchUpdateDatasetTagsApi(ids, tags, []),
     });
 
-  const batchRemoveTags = async (
+  const batchRemoveTags = (
     ids: number[],
     tags: string[],
   ): Promise<DatasetTagBatchResult[]> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        const results = await batchUpdateDatasetTagsApi(ids, [], tags);
-        ids.forEach((id) => {
-          void queryClient.invalidateQueries({
-            queryKey: datasetKeys.detail(id),
-          });
-        });
-        await invalidateAfterTagChange();
-        return results;
-      },
+      work: () => batchUpdateDatasetTagsApi(ids, [], tags),
     });
 
   const deleteTag = (tag: string): Promise<void> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        await deleteTagApi(tag);
-        await invalidateAfterTagChange(true);
-      },
+      work: () => deleteTagApi(tag),
     });
 
   const renameTag = (oldName: string, newName: string): Promise<void> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        await renameTagApi(oldName, newName);
-        await invalidateAfterTagChange(true);
-      },
+      work: () => renameTagApi(oldName, newName),
     });
 
   const mergeTag = (source: string, target: string): Promise<void> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        await mergeTagApi(source, target);
-        await invalidateAfterTagChange(true);
-      },
+      work: () => mergeTagApi(source, target),
     });
 
   return {

@@ -16,9 +16,6 @@ type BatchUpdateDatasetTagsFn = (
   addTags: string[],
   removeTags: string[],
 ) => Promise<unknown[]>;
-type DatasetEventListenerFn = (
-  callback: (event: DatasetInfo) => void,
-) => Promise<() => void>;
 
 const listDatasetsMock = vi.fn<ListDatasetsFn>();
 const listDatasetTagsMock = vi.fn<ListDatasetTagsFn>();
@@ -27,8 +24,6 @@ const deleteTagMock = vi.fn<DeleteTagFn>();
 const renameTagMock = vi.fn<RenameTagFn>();
 const mergeTagMock = vi.fn<MergeTagFn>();
 const batchUpdateDatasetTagsMock = vi.fn<BatchUpdateDatasetTagsFn>();
-const onDatasetCreatedMock = vi.fn<DatasetEventListenerFn>();
-const onDatasetUpdatedMock = vi.fn<DatasetEventListenerFn>();
 
 vi.mock("./client", () => ({
   listDatasets: (options?: ListDatasetsOptions) => listDatasetsMock(options),
@@ -48,13 +43,6 @@ vi.mock("./client", () => ({
     addTags: string[],
     removeTags: string[],
   ) => batchUpdateDatasetTagsMock(ids, addTags, removeTags),
-}));
-
-vi.mock("./events", () => ({
-  onDatasetCreated: (callback: (event: DatasetInfo) => void) =>
-    onDatasetCreatedMock(callback),
-  onDatasetUpdated: (callback: (event: DatasetInfo) => void) =>
-    onDatasetUpdatedMock(callback),
 }));
 
 vi.mock("./types", async (importOriginal) => {
@@ -125,8 +113,6 @@ describe("useDatasetTableData", () => {
     renameTagMock.mockReset();
     mergeTagMock.mockReset();
     batchUpdateDatasetTagsMock.mockReset();
-    onDatasetCreatedMock.mockReset();
-    onDatasetUpdatedMock.mockReset();
 
     listDatasetsMock.mockResolvedValue([]);
     listDatasetTagsMock.mockResolvedValue([]);
@@ -135,8 +121,6 @@ describe("useDatasetTableData", () => {
     renameTagMock.mockResolvedValue(undefined);
     mergeTagMock.mockResolvedValue(undefined);
     batchUpdateDatasetTagsMock.mockResolvedValue([]);
-    onDatasetCreatedMock.mockResolvedValue(() => undefined);
-    onDatasetUpdatedMock.mockResolvedValue(() => undefined);
   });
 
   afterEach(() => {
@@ -720,108 +704,5 @@ describe("useDatasetTableData", () => {
     });
 
     expect(result.current.searchInput).toBe("");
-  });
-
-  it("refreshes datasets on create event instead of prepending locally", async () => {
-    let createdCallback: ((event: DatasetInfo) => void) | undefined;
-    onDatasetCreatedMock.mockImplementation((callback) => {
-      createdCallback = callback;
-      return Promise.resolve(() => undefined);
-    });
-    listDatasetsMock
-      .mockResolvedValueOnce([makeDataset({ id: 1 })])
-      .mockResolvedValueOnce([makeDataset({ id: 2 })]);
-
-    renderHook(() => useDatasetTableData(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenCalledTimes(1);
-    });
-
-    act(() => {
-      createdCallback?.(makeDataset({ id: 99 }));
-    });
-
-    await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  it("does not enqueue an extra refetch when invalidating an in-flight request", async () => {
-    let createdCallback: ((event: DatasetInfo) => void) | undefined;
-    onDatasetCreatedMock.mockImplementation((callback) => {
-      createdCallback = callback;
-      return Promise.resolve(() => undefined);
-    });
-
-    let resolveInitial: ((value: DatasetInfo[]) => void) | undefined;
-    listDatasetsMock
-      .mockImplementationOnce(
-        () =>
-          new Promise<DatasetInfo[]>((resolve) => {
-            resolveInitial = resolve;
-          }),
-      )
-      .mockResolvedValueOnce([makeDataset({ id: 2 })]);
-
-    const { result } = renderHook(() => useDatasetTableData(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(listDatasetsMock).toHaveBeenCalledTimes(1);
-    });
-
-    act(() => {
-      createdCallback?.(makeDataset({ id: 99 }));
-    });
-
-    expect(listDatasetsMock).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      resolveInitial?.([makeDataset({ id: 1 })]);
-    });
-
-    await waitFor(() => {
-      expect(result.current.datasets).toHaveLength(1);
-    });
-
-    expect(listDatasetsMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("cleans up late-resolving listeners after unmount", async () => {
-    let resolveCreated: ((unlisten: () => void) => void) | undefined;
-    let resolveUpdated: ((unlisten: () => void) => void) | undefined;
-
-    const unlistenCreated = vi.fn();
-    const unlistenUpdated = vi.fn();
-
-    onDatasetCreatedMock.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveCreated = resolve;
-        }),
-    );
-    onDatasetUpdatedMock.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveUpdated = resolve;
-        }),
-    );
-
-    const { unmount } = renderHook(() => useDatasetTableData(), {
-      wrapper: createWrapper(),
-    });
-    unmount();
-
-    resolveCreated?.(unlistenCreated);
-    resolveUpdated?.(unlistenUpdated);
-
-    await waitFor(() => {
-      expect(unlistenCreated).toHaveBeenCalledTimes(1);
-      expect(unlistenUpdated).toHaveBeenCalledTimes(1);
-    });
   });
 });

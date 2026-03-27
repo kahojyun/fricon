@@ -3,10 +3,7 @@ import { updateDatasetFavorite } from "./client";
 import { type DatasetInfo } from "./types";
 import type { DatasetQueryKey } from "./datasetTableShared";
 
-export function useDatasetFavoriteMutation(
-  datasetQueryKey: DatasetQueryKey,
-  refreshDatasets: () => Promise<void>,
-) {
+export function useDatasetFavoriteMutation(datasetQueryKey: DatasetQueryKey) {
   const queryClient = useQueryClient();
   const favoriteMutation = useMutation({
     mutationFn: ({ id, favorite }: { id: number; favorite: boolean }) =>
@@ -32,13 +29,6 @@ export function useDatasetFavoriteMutation(
       });
     } catch {
       queryClient.setQueryData(datasetQueryKey, previousData);
-      return;
-    }
-
-    try {
-      await refreshDatasets();
-    } catch {
-      // Keep optimistic state if backend write succeeded but refresh failed.
     }
   };
 

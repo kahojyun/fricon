@@ -17,7 +17,7 @@ use crate::features::{
     datasets::{
         error::UiDatasetError,
         tauri as datasets,
-        tauri::{DatasetCreated, DatasetUpdated},
+        tauri::DatasetChanged,
         types::{DatasetInfo, DatasetOperationError},
     },
     workspace::tauri as workspace,
@@ -175,7 +175,7 @@ pub(crate) fn specta_builder() -> Builder {
             datasets::preview_import_files,
             datasets::import_dataset
         ])
-        .events(collect_events![DatasetCreated, DatasetUpdated])
+        .events(collect_events![DatasetChanged])
         .typ::<DatasetInfo>()
 }
 
