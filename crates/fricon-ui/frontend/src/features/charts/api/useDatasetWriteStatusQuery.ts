@@ -10,5 +10,6 @@ export function useDatasetWriteStatusQuery(
     queryKey: chartKeys.writeStatus(datasetId),
     queryFn: () => getDatasetWriteStatus(datasetId),
     enabled,
+    refetchInterval: 2000,
   });
 }

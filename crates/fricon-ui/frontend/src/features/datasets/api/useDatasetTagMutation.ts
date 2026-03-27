@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   batchUpdateDatasetTags as batchUpdateDatasetTagsApi,
   deleteTag as deleteTagApi,
   renameTag as renameTagApi,
   mergeTag as mergeTagApi,
 } from "./client";
-import { datasetKeys } from "./queryKeys";
 import type { DatasetTagBatchResult } from "./types";
 
 async function runTagMutation<T>({
@@ -25,16 +23,7 @@ async function runTagMutation<T>({
 }
 
 export function useDatasetTagMutation() {
-  const queryClient = useQueryClient();
   const [isUpdatingTags, setIsUpdatingTags] = useState(false);
-
-  // Global tag operations (delete/rename/merge) are not covered by per-dataset
-  // events; invalidate all affected queries manually.
-  const invalidateGlobalTagChange = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["datasets", "list"] });
-    await queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-    await queryClient.invalidateQueries({ queryKey: ["datasets", "detail"] });
-  };
 
   const batchAddTags = (
     ids: number[],
@@ -57,28 +46,19 @@ export function useDatasetTagMutation() {
   const deleteTag = (tag: string): Promise<void> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        await deleteTagApi(tag);
-        await invalidateGlobalTagChange();
-      },
+      work: () => deleteTagApi(tag),
     });
 
   const renameTag = (oldName: string, newName: string): Promise<void> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        await renameTagApi(oldName, newName);
-        await invalidateGlobalTagChange();
-      },
+      work: () => renameTagApi(oldName, newName),
     });
 
   const mergeTag = (source: string, target: string): Promise<void> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        await mergeTagApi(source, target);
-        await invalidateGlobalTagChange();
-      },
+      work: () => mergeTagApi(source, target),
     });
 
   return {

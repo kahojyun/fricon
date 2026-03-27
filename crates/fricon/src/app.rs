@@ -439,9 +439,10 @@ impl AppHandle {
     }
 
     pub async fn delete_tag(&self, tag: String) -> Result<(), CatalogAppError> {
-        self.run_catalog_task("failed to join tag delete task", move |catalog| {
-            catalog.delete_tag(tag)
-        })
+        self.run_catalog_task_with_events(
+            "failed to join tag delete task",
+            move |catalog, events| catalog.delete_tag(tag, &events),
+        )
         .await
     }
 
@@ -450,16 +451,18 @@ impl AppHandle {
         old_name: String,
         new_name: String,
     ) -> Result<(), CatalogAppError> {
-        self.run_catalog_task("failed to join tag rename task", move |catalog| {
-            catalog.rename_tag(old_name, new_name)
-        })
+        self.run_catalog_task_with_events(
+            "failed to join tag rename task",
+            move |catalog, events| catalog.rename_tag(old_name, new_name, &events),
+        )
         .await
     }
 
     pub async fn merge_tag(&self, source: String, target: String) -> Result<(), CatalogAppError> {
-        self.run_catalog_task("failed to join tag merge task", move |catalog| {
-            catalog.merge_tag(source, target)
-        })
+        self.run_catalog_task_with_events(
+            "failed to join tag merge task",
+            move |catalog, events| catalog.merge_tag(source, target, &events),
+        )
         .await
     }
 

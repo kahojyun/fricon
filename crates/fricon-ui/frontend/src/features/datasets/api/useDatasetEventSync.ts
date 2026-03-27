@@ -16,7 +16,7 @@ export function useDatasetEventSync() {
   const queryClient = useQueryClient();
 
   const handleEvent = useEffectEvent(({ info, kind }: DatasetChangedEvent) => {
-    const id = info.id;
+    const id = info?.id;
     switch (kind) {
       case "created":
         void queryClient.invalidateQueries({
@@ -30,7 +30,7 @@ export function useDatasetEventSync() {
           queryKey: ["datasets", "list"],
         });
         void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
+          queryKey: datasetKeys.detail(id!),
         });
         break;
 
@@ -39,7 +39,7 @@ export function useDatasetEventSync() {
           queryKey: ["datasets", "list"],
         });
         void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
+          queryKey: datasetKeys.detail(id!),
         });
         break;
 
@@ -49,7 +49,7 @@ export function useDatasetEventSync() {
         });
         void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
         void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
+          queryKey: datasetKeys.detail(id!),
         });
         break;
 
@@ -59,7 +59,7 @@ export function useDatasetEventSync() {
           queryKey: ["datasets", "list"],
         });
         void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-        queryClient.removeQueries({ queryKey: datasetKeys.detail(id) });
+        queryClient.removeQueries({ queryKey: datasetKeys.detail(id!) });
         break;
 
       case "restored":
@@ -72,8 +72,19 @@ export function useDatasetEventSync() {
         void queryClient.invalidateQueries({
           queryKey: ["datasets", "list"],
         });
+        void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
         void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
+          queryKey: datasetKeys.detail(id!),
+        });
+        break;
+
+      case "globalTagsChanged":
+        void queryClient.invalidateQueries({
+          queryKey: ["datasets", "list"],
+        });
+        void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
+        void queryClient.invalidateQueries({
+          queryKey: ["datasets", "detail"],
         });
         break;
     }

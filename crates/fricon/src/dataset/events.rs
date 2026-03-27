@@ -36,6 +36,12 @@ pub enum DatasetEvent {
     Deleted(DatasetRecord),
     /// An existing dataset was replaced by a force-import.
     Imported(DatasetRecord),
+    /// A global tag was deleted, renamed, or merged across all datasets.
+    ///
+    /// This event carries no `DatasetRecord` because the operation affects
+    /// all datasets that held the tag. Consumers should invalidate the
+    /// full tag list and any dataset lists or details that may display tags.
+    GlobalTagsChanged,
 }
 
 /// Port for publishing dataset events.

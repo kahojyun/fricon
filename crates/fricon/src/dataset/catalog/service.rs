@@ -299,34 +299,56 @@ impl DatasetCatalogService {
         Ok(deleted_count)
     }
 
-    #[instrument(skip(self, tag), fields(tag.name = %tag))]
-    pub(crate) fn delete_tag(&self, tag: String) -> Result<(), CatalogError> {
+    #[instrument(skip(self, events, tag), fields(tag.name = %tag))]
+    pub(crate) fn delete_tag<P: DatasetEventPublisher>(
+        &self,
+        tag: String,
+        events: &P,
+    ) -> Result<(), CatalogError> {
         let tag = NormalizedTag::parse(tag).map_err(|_| CatalogError::EmptyTag)?;
-        self.repository.delete_tag(&tag)
+        self.repository.delete_tag(&tag)?;
+        events.publish(DatasetEvent::GlobalTagsChanged);
+        Ok(())
     }
 
-    #[instrument(skip(self, old_name, new_name), fields(tag.old = %old_name, tag.new = %new_name))]
-    pub(crate) fn rename_tag(
+    #[instrument(
+        skip(self, events, old_name, new_name),
+        fields(tag.old = %old_name, tag.new = %new_name)
+    )]
+    pub(crate) fn rename_tag<P: DatasetEventPublisher>(
         &self,
         old_name: String,
         new_name: String,
+        events: &P,
     ) -> Result<(), CatalogError> {
         let old_name = NormalizedTag::parse(old_name).map_err(|_| CatalogError::EmptyTag)?;
         let new_name = NormalizedTag::parse(new_name).map_err(|_| CatalogError::EmptyTag)?;
         if old_name == new_name {
             return Err(CatalogError::SameTagName);
         }
-        self.repository.rename_tag(&old_name, &new_name)
+        self.repository.rename_tag(&old_name, &new_name)?;
+        events.publish(DatasetEvent::GlobalTagsChanged);
+        Ok(())
     }
 
-    #[instrument(skip(self, source, target), fields(tag.source = %source, tag.target = %target))]
-    pub(crate) fn merge_tag(&self, source: String, target: String) -> Result<(), CatalogError> {
+    #[instrument(
+        skip(self, events, source, target),
+        fields(tag.source = %source, tag.target = %target)
+    )]
+    pub(crate) fn merge_tag<P: DatasetEventPublisher>(
+        &self,
+        source: String,
+        target: String,
+        events: &P,
+    ) -> Result<(), CatalogError> {
         let source = NormalizedTag::parse(source).map_err(|_| CatalogError::EmptyTag)?;
         let target = NormalizedTag::parse(target).map_err(|_| CatalogError::EmptyTag)?;
         if source == target {
             return Err(CatalogError::SameSourceTarget);
         }
-        self.repository.merge_tag(&source, &target)
+        self.repository.merge_tag(&source, &target)?;
+        events.publish(DatasetEvent::GlobalTagsChanged);
+        Ok(())
     }
 
     fn ensure_not_deleted(&self, id: i32) -> Result<(), CatalogError> {
@@ -1219,6 +1241,87 @@ mod tests {
         assert!(
             events.snapshot().is_empty(),
             "no events should be published on rollback"
+        );
+    }
+
+    #[test]
+    fn delete_tag_publishes_global_tags_changed() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_delete_tag()
+            .once()
+            .withf(|t| t.as_str() == "alpha")
+            .return_once(|_| Ok(()));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+        let events = CollectEvents::default();
+
+        service
+            .delete_tag("alpha".to_string(), &events)
+            .expect("delete_tag should succeed");
+
+        let published = events.snapshot();
+        assert_eq!(published.len(), 1);
+        assert!(
+            matches!(&published[0], DatasetEvent::GlobalTagsChanged),
+            "delete_tag should publish GlobalTagsChanged"
+        );
+    }
+
+    #[test]
+    fn rename_tag_publishes_global_tags_changed() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_rename_tag()
+            .once()
+            .withf(|old, new| old.as_str() == "alpha" && new.as_str() == "beta")
+            .return_once(|_, _| Ok(()));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+        let events = CollectEvents::default();
+
+        service
+            .rename_tag("alpha".to_string(), "beta".to_string(), &events)
+            .expect("rename_tag should succeed");
+
+        let published = events.snapshot();
+        assert_eq!(published.len(), 1);
+        assert!(
+            matches!(&published[0], DatasetEvent::GlobalTagsChanged),
+            "rename_tag should publish GlobalTagsChanged"
+        );
+    }
+
+    #[test]
+    fn merge_tag_publishes_global_tags_changed() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_merge_tag()
+            .once()
+            .withf(|src, tgt| src.as_str() == "alpha" && tgt.as_str() == "beta")
+            .return_once(|_, _| Ok(()));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+        let events = CollectEvents::default();
+
+        service
+            .merge_tag("alpha".to_string(), "beta".to_string(), &events)
+            .expect("merge_tag should succeed");
+
+        let published = events.snapshot();
+        assert_eq!(published.len(), 1);
+        assert!(
+            matches!(&published[0], DatasetEvent::GlobalTagsChanged),
+            "merge_tag should publish GlobalTagsChanged"
         );
     }
 }

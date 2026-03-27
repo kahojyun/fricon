@@ -233,8 +233,13 @@ export type DatasetChangeKind =
 /**
  * An existing dataset was replaced by a force-import.
  */
-"imported"
-export type DatasetChanged = { info: DatasetInfo; kind: DatasetChangeKind }
+"imported" | 
+/**
+ * A global tag was deleted, renamed, or merged across all datasets.
+ * The `info` field on [`DatasetChanged`] is `None` for this kind.
+ */
+"globalTagsChanged"
+export type DatasetChanged = { info: DatasetInfo | null; kind: DatasetChangeKind }
 export type DatasetChartDataOptions = ({ chartType: "line" } & LineChartDataOptions) | ({ chartType: "heatmap" } & HeatmapChartDataOptions) | ({ chartType: "scatter" } & ScatterChartDataOptions)
 export type DatasetDeleteResult = { id: number; success: boolean; error: DatasetOperationError | null }
 export type DatasetDetail = { id: number; name: string; description: string; favorite: boolean; tags: string[]; status: UiDatasetStatus; createdAt: string; trashedAt: string | null; deletedAt: string | null; payloadAvailable: boolean; columns: ColumnInfo[] }

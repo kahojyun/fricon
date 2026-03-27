@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetTagMutation } from "./useDatasetTagMutation";
-import { datasetKeys } from "./queryKeys";
 import type { DatasetTagBatchResult } from "./types";
 
 type BatchUpdateDatasetTagsFn = (
@@ -47,11 +46,10 @@ describe("useDatasetTagMutation", () => {
     mergeTagMock.mockReset();
   });
 
-  it("invalidates list, tags, and detail queries after deleting a tag", async () => {
+  it("calls deleteTag API", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
 
     deleteTagMock.mockResolvedValue(undefined);
 
@@ -64,15 +62,6 @@ describe("useDatasetTagMutation", () => {
     });
 
     expect(deleteTagMock).toHaveBeenCalledWith("vision");
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: ["datasets", "list"],
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.tags(),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: ["datasets", "detail"],
-    });
   });
 
   it("batch-adds tags and returns results", async () => {
@@ -127,11 +116,10 @@ describe("useDatasetTagMutation", () => {
     expect(actualResults).toEqual(results);
   });
 
-  it("invalidates list, tags, and detail queries after renaming a tag", async () => {
+  it("calls renameTag API", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
     renameTagMock.mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useDatasetTagMutation(), {
@@ -143,22 +131,12 @@ describe("useDatasetTagMutation", () => {
     });
 
     expect(renameTagMock).toHaveBeenCalledWith("vision", "images");
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: ["datasets", "list"],
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.tags(),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: ["datasets", "detail"],
-    });
   });
 
-  it("invalidates list, tags, and detail queries after merging tags", async () => {
+  it("calls mergeTag API", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
     mergeTagMock.mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useDatasetTagMutation(), {
@@ -170,15 +148,6 @@ describe("useDatasetTagMutation", () => {
     });
 
     expect(mergeTagMock).toHaveBeenCalledWith("vision", "archive");
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: ["datasets", "list"],
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.tags(),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: ["datasets", "detail"],
-    });
   });
 
   it("clears isUpdatingTags after a failed tag mutation", async () => {

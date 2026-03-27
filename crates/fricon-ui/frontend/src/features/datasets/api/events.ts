@@ -3,7 +3,7 @@ import { type DatasetChangeKind, events } from "@/shared/lib/bindings";
 import { normalizeDataset, type DatasetInfo } from "./types";
 
 export interface DatasetChangedEvent {
-  info: DatasetInfo;
+  info: DatasetInfo | null;
   kind: DatasetChangeKind;
 }
 
@@ -12,7 +12,10 @@ export function onDatasetChanged(
 ) {
   return events.datasetChanged.listen((event) => {
     callback({
-      info: normalizeDataset(event.payload.info),
+      info:
+        event.payload.info !== null
+          ? normalizeDataset(event.payload.info)
+          : null,
       kind: event.payload.kind,
     });
   });

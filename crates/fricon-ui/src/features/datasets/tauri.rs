@@ -98,12 +98,15 @@ pub(crate) enum DatasetChangeKind {
     Deleted,
     /// An existing dataset was replaced by a force-import.
     Imported,
+    /// A global tag was deleted, renamed, or merged across all datasets.
+    /// The `info` field on [`DatasetChanged`] is `None` for this kind.
+    GlobalTagsChanged,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DatasetChanged {
-    pub(crate) info: DatasetInfo,
+    pub(crate) info: Option<DatasetInfo>,
     pub(crate) kind: DatasetChangeKind,
 }
 
