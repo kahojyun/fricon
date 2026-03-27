@@ -24,55 +24,34 @@ async function runTagMutation<T>({
   }
 }
 
-export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
+export function useDatasetTagMutation() {
   const queryClient = useQueryClient();
   const [isUpdatingTags, setIsUpdatingTags] = useState(false);
 
-  const invalidateAfterTagChange = async (invalidateAllDetails = false) => {
-    if (invalidateAllDetails) {
-      await queryClient.invalidateQueries({
-        queryKey: ["datasets", "detail"],
-      });
-    }
+  // Global tag operations (delete/rename/merge) are not covered by per-dataset
+  // events; invalidate all affected queries manually.
+  const invalidateGlobalTagChange = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["datasets", "list"] });
     await queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-    await refreshDatasets();
+    await queryClient.invalidateQueries({ queryKey: ["datasets", "detail"] });
   };
 
-  const batchAddTags = async (
+  const batchAddTags = (
     ids: number[],
     tags: string[],
   ): Promise<DatasetTagBatchResult[]> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        const results = await batchUpdateDatasetTagsApi(ids, tags, []);
-        // Invalidate detail queries for affected datasets
-        ids.forEach((id) => {
-          void queryClient.invalidateQueries({
-            queryKey: datasetKeys.detail(id),
-          });
-        });
-        await invalidateAfterTagChange();
-        return results;
-      },
+      work: () => batchUpdateDatasetTagsApi(ids, tags, []),
     });
 
-  const batchRemoveTags = async (
+  const batchRemoveTags = (
     ids: number[],
     tags: string[],
   ): Promise<DatasetTagBatchResult[]> =>
     runTagMutation({
       setIsUpdatingTags,
-      work: async () => {
-        const results = await batchUpdateDatasetTagsApi(ids, [], tags);
-        ids.forEach((id) => {
-          void queryClient.invalidateQueries({
-            queryKey: datasetKeys.detail(id),
-          });
-        });
-        await invalidateAfterTagChange();
-        return results;
-      },
+      work: () => batchUpdateDatasetTagsApi(ids, [], tags),
     });
 
   const deleteTag = (tag: string): Promise<void> =>
@@ -80,7 +59,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
       setIsUpdatingTags,
       work: async () => {
         await deleteTagApi(tag);
-        await invalidateAfterTagChange(true);
+        await invalidateGlobalTagChange();
       },
     });
 
@@ -89,7 +68,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
       setIsUpdatingTags,
       work: async () => {
         await renameTagApi(oldName, newName);
-        await invalidateAfterTagChange(true);
+        await invalidateGlobalTagChange();
       },
     });
 
@@ -98,7 +77,7 @@ export function useDatasetTagMutation(refreshDatasets: () => Promise<void>) {
       setIsUpdatingTags,
       work: async () => {
         await mergeTagApi(source, target);
-        await invalidateAfterTagChange(true);
+        await invalidateGlobalTagChange();
       },
     });
 

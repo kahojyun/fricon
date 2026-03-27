@@ -7,7 +7,6 @@ import {
   useDatasetRestoreMutation,
   useDatasetTrashMutation,
 } from "./useDatasetDeleteMutation";
-import { datasetKeys } from "./queryKeys";
 import type { DatasetDeleteResult } from "./types";
 
 type DatasetMutationFn = (ids: number[]) => Promise<DatasetDeleteResult[]>;
@@ -49,16 +48,10 @@ describe("useDatasetDeleteMutation", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it("returns per-id results and refreshes affected dataset queries", async () => {
+  it("returns per-id results from the delete API", async () => {
     const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
+      defaultOptions: { queries: { retry: false } },
     });
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
-    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
     const results: DatasetDeleteResult[] = [
       { id: 1, success: true, error: null },
       {
@@ -70,10 +63,9 @@ describe("useDatasetDeleteMutation", () => {
 
     deleteDatasetsMock.mockResolvedValue(results);
 
-    const { result } = renderHook(
-      () => useDatasetDeleteMutation(refreshDatasets),
-      { wrapper: createWrapper(queryClient) },
-    );
+    const { result } = renderHook(() => useDatasetDeleteMutation(), {
+      wrapper: createWrapper(queryClient),
+    });
 
     let actualResults: DatasetDeleteResult[] | undefined;
     await act(async () => {
@@ -82,139 +74,47 @@ describe("useDatasetDeleteMutation", () => {
 
     expect(actualResults).toEqual(results);
     expect(deleteDatasetsMock).toHaveBeenCalledWith([1, 2]);
-    expect(refreshDatasets).toHaveBeenCalledTimes(1);
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.tags(),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.detail(1),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.detail(2),
-    });
   });
 
   it("rethrows API failures and clears deleting state", async () => {
     const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
+      defaultOptions: { queries: { retry: false } },
     });
-    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
-    deleteDatasetsMock.mockRejectedValueOnce(new Error("delete failed"));
-
-    const { result } = renderHook(
-      () => useDatasetDeleteMutation(refreshDatasets),
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    let deletePromise!: Promise<DatasetDeleteResult[]>;
-    act(() => {
-      deletePromise = result.current.deleteDatasets([1]);
-    });
-    void deletePromise.catch(() => undefined);
-
-    await waitFor(() => {
-      expect(result.current.isDeleting).toBe(true);
-    });
-    await expect(deletePromise).rejects.toThrow("delete failed");
-    await waitFor(() => {
-      expect(result.current.isDeleting).toBe(false);
-    });
-
-    expect(refreshDatasets).not.toHaveBeenCalled();
-  });
-
-  it("rethrows refresh failures and clears deleting state", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-    const refreshDatasets = vi
-      .fn()
-      .mockRejectedValue(new Error("refresh failed"));
-    deleteDatasetsMock.mockResolvedValue([
-      { id: 1, success: true, error: null },
-    ]);
-
-    const { result } = renderHook(
-      () => useDatasetDeleteMutation(refreshDatasets),
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    let deletePromise!: Promise<DatasetDeleteResult[]>;
-    act(() => {
-      deletePromise = result.current.deleteDatasets([1]);
-    });
-    void deletePromise.catch(() => undefined);
-
-    await waitFor(() => {
-      expect(result.current.isDeleting).toBe(true);
-    });
-    await expect(deletePromise).rejects.toThrow("refresh failed");
-    await waitFor(() => {
-      expect(result.current.isDeleting).toBe(false);
-    });
-  });
-
-  it("keeps isDeleting true while refresh is still pending after a successful delete", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-    let resolveRefresh: (() => void) | undefined;
-    const refreshDatasets = vi.fn().mockImplementation(
+    let rejectDelete: ((reason?: unknown) => void) | undefined;
+    deleteDatasetsMock.mockImplementation(
       () =>
-        new Promise<void>((resolve) => {
-          resolveRefresh = resolve;
+        new Promise<DatasetDeleteResult[]>((_, reject) => {
+          rejectDelete = reject;
         }),
     );
-    deleteDatasetsMock.mockResolvedValue([
-      { id: 1, success: true, error: null },
-    ]);
 
-    const { result } = renderHook(
-      () => useDatasetDeleteMutation(refreshDatasets),
-      { wrapper: createWrapper(queryClient) },
-    );
+    const { result } = renderHook(() => useDatasetDeleteMutation(), {
+      wrapper: createWrapper(queryClient),
+    });
 
     let deletePromise!: Promise<DatasetDeleteResult[]>;
     act(() => {
       deletePromise = result.current.deleteDatasets([1]);
     });
+    void deletePromise.catch(() => undefined);
 
     await waitFor(() => {
-      expect(refreshDatasets).toHaveBeenCalledTimes(1);
       expect(result.current.isDeleting).toBe(true);
     });
 
-    resolveRefresh?.();
-    await expect(deletePromise).resolves.toEqual([
-      { id: 1, success: true, error: null },
-    ]);
+    await act(async () => {
+      rejectDelete?.(new Error("delete failed"));
+      await expect(deletePromise).rejects.toThrow("delete failed");
+    });
     await waitFor(() => {
       expect(result.current.isDeleting).toBe(false);
     });
   });
 
-  it("invalidates tags and detail queries after trashing datasets", async () => {
+  it("returns per-id results from the trash API", async () => {
     const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
+      defaultOptions: { queries: { retry: false } },
     });
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
-    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
     const results: DatasetDeleteResult[] = [
       { id: 3, success: true, error: null },
       { id: 4, success: true, error: null },
@@ -222,56 +122,39 @@ describe("useDatasetDeleteMutation", () => {
 
     trashDatasetsMock.mockResolvedValue(results);
 
-    const { result } = renderHook(
-      () => useDatasetTrashMutation(refreshDatasets),
-      { wrapper: createWrapper(queryClient) },
-    );
+    const { result } = renderHook(() => useDatasetTrashMutation(), {
+      wrapper: createWrapper(queryClient),
+    });
 
+    let actualResults: DatasetDeleteResult[] | undefined;
     await act(async () => {
-      await result.current.trashDatasets([3, 4]);
+      actualResults = await result.current.trashDatasets([3, 4]);
     });
 
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.tags(),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.detail(3),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.detail(4),
-    });
+    expect(actualResults).toEqual(results);
+    expect(trashDatasetsMock).toHaveBeenCalledWith([3, 4]);
   });
 
-  it("invalidates tags and detail queries after restoring datasets", async () => {
+  it("returns per-id results from the restore API", async () => {
     const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
+      defaultOptions: { queries: { retry: false } },
     });
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
-    const refreshDatasets = vi.fn().mockResolvedValue(undefined);
     const results: DatasetDeleteResult[] = [
       { id: 5, success: true, error: null },
     ];
 
     restoreDatasetsMock.mockResolvedValue(results);
 
-    const { result } = renderHook(
-      () => useDatasetRestoreMutation(refreshDatasets),
-      { wrapper: createWrapper(queryClient) },
-    );
+    const { result } = renderHook(() => useDatasetRestoreMutation(), {
+      wrapper: createWrapper(queryClient),
+    });
 
+    let actualResults: DatasetDeleteResult[] | undefined;
     await act(async () => {
-      await result.current.restoreDatasets([5]);
+      actualResults = await result.current.restoreDatasets([5]);
     });
 
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.tags(),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: datasetKeys.detail(5),
-    });
+    expect(actualResults).toEqual(results);
+    expect(restoreDatasetsMock).toHaveBeenCalledWith([5]);
   });
 });

@@ -78,11 +78,34 @@ pub(crate) struct DatasetFavoriteUpdate {
     favorite: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
-pub(crate) struct DatasetCreated(pub(crate) DatasetInfo);
+/// Discriminates the kind of change that triggered a [`DatasetChanged`] event.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DatasetChangeKind {
+    /// New dataset was created by ingest (Writing status).
+    Created,
+    /// Write session transitioned the dataset to Completed or Aborted.
+    StatusChanged,
+    /// Name, description, or favorite flag changed.
+    MetadataUpdated,
+    /// Tags were added or removed.
+    TagsChanged,
+    /// Dataset was moved to trash.
+    Trashed,
+    /// Dataset was restored from trash.
+    Restored,
+    /// Dataset was permanently deleted.
+    Deleted,
+    /// An existing dataset was replaced by a force-import.
+    Imported,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
-pub(crate) struct DatasetUpdated(pub(crate) DatasetInfo);
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DatasetChanged {
+    pub(crate) info: DatasetInfo,
+    pub(crate) kind: DatasetChangeKind,
+}
 
 #[tauri::command]
 #[specta::specta]

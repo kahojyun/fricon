@@ -99,7 +99,7 @@ impl DatasetCatalogService {
     ) -> Result<(), CatalogError> {
         self.repository.update_dataset(id, update_payload)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(DatasetEvent::Updated(record));
+        events.publish(DatasetEvent::MetadataUpdated(record));
         Ok(())
     }
 
@@ -116,7 +116,7 @@ impl DatasetCatalogService {
         }
         self.repository.add_tags(id, &tags)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(DatasetEvent::Updated(record));
+        events.publish(DatasetEvent::TagsChanged(record));
         Ok(())
     }
 
@@ -133,7 +133,7 @@ impl DatasetCatalogService {
         }
         self.repository.remove_tags(id, &tags)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(DatasetEvent::Updated(record));
+        events.publish(DatasetEvent::TagsChanged(record));
         Ok(())
     }
 
@@ -173,7 +173,7 @@ impl DatasetCatalogService {
         }
 
         let deleted_record = self.repository.mark_dataset_deleted(id)?;
-        events.publish(DatasetEvent::Updated(deleted_record));
+        events.publish(DatasetEvent::Deleted(deleted_record));
 
         if let Err(error) = storage::delete_dataset(&graveyard_path) {
             error!(
@@ -194,7 +194,7 @@ impl DatasetCatalogService {
         self.ensure_not_deleted(id)?;
         self.repository.trash_dataset(id)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(DatasetEvent::Updated(record));
+        events.publish(DatasetEvent::Trashed(record));
         Ok(())
     }
 
@@ -211,7 +211,7 @@ impl DatasetCatalogService {
         }
         self.repository.restore_dataset(id)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
-        events.publish(DatasetEvent::Updated(record));
+        events.publish(DatasetEvent::Restored(record));
         Ok(())
     }
 
@@ -494,7 +494,7 @@ impl DatasetCatalogService {
                     uid = %uid,
                     "Dataset force-imported from archive"
                 );
-                events.publish(DatasetEvent::Updated(record.clone()));
+                events.publish(DatasetEvent::Imported(record.clone()));
                 Ok(record)
             }
             Err(error) => {
@@ -702,10 +702,8 @@ mod tests {
         let published = events.snapshot();
         assert_eq!(published.len(), 1);
         match &published[0] {
-            DatasetEvent::Updated(record) => assert_eq!(record.id, 1),
-            DatasetEvent::Created(record) => {
-                panic!("unexpected created event for dataset {}", record.id)
-            }
+            DatasetEvent::Deleted(record) => assert_eq!(record.id, 1),
+            unexpected => panic!("unexpected event {unexpected:?}"),
         }
     }
 
@@ -936,10 +934,8 @@ mod tests {
         let published = events.snapshot();
         assert_eq!(published.len(), 1);
         match &published[0] {
-            DatasetEvent::Updated(record) => assert_eq!(record.id, 7),
-            DatasetEvent::Created(record) => {
-                panic!("unexpected created event for dataset {}", record.id)
-            }
+            DatasetEvent::Imported(record) => assert_eq!(record.id, 7),
+            unexpected => panic!("unexpected event {unexpected:?}"),
         }
     }
 
@@ -1008,10 +1004,8 @@ mod tests {
         let published = events.snapshot();
         assert_eq!(published.len(), 1);
         match &published[0] {
-            DatasetEvent::Updated(record) => assert_eq!(record.id, 9),
-            DatasetEvent::Created(record) => {
-                panic!("unexpected created event for dataset {}", record.id)
-            }
+            DatasetEvent::Imported(record) => assert_eq!(record.id, 9),
+            unexpected => panic!("unexpected event {unexpected:?}"),
         }
     }
 
@@ -1138,9 +1132,7 @@ mod tests {
         assert_eq!(published.len(), 1);
         match &published[0] {
             DatasetEvent::Created(record) => assert_eq!(record.id, 13),
-            DatasetEvent::Updated(record) => {
-                panic!("unexpected updated event for dataset {}", record.id)
-            }
+            unexpected => panic!("unexpected event {unexpected:?}"),
         }
     }
 

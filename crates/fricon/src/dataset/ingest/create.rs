@@ -33,7 +33,7 @@ use crate::{
 /// 4. Consume streamed inputs into a write session until `Finish`, `Abort`, or
 ///    end-of-stream.
 /// 5. Commit to `Completed` or abort to `Aborted`, then re-read the final
-///    stored record.
+///    stored record, and publish `DatasetEvent::StatusChanged`.
 ///
 /// End-of-stream is treated as `Abort`. If session commit fails after the
 /// record exists, the workflow best-effort marks the dataset `Aborted`
@@ -98,7 +98,9 @@ where
             }
             repo.update_status(dataset_record.id, DatasetStatus::Completed)?;
             info!(dataset.id = dataset_record.id, %uid, "Dataset write completed");
-            repo.get_dataset(DatasetId::Id(dataset_record.id))
+            let record = repo.get_dataset(DatasetId::Id(dataset_record.id))?;
+            events.publish(DatasetEvent::StatusChanged(record.clone()));
+            Ok(record)
         }
         CreateDatasetInput::Abort => {
             if let Some(session) = session.take()
@@ -108,7 +110,9 @@ where
             }
             repo.update_status(dataset_record.id, DatasetStatus::Aborted)?;
             info!(dataset.id = dataset_record.id, "Dataset write aborted");
-            repo.get_dataset(DatasetId::Id(dataset_record.id))
+            let record = repo.get_dataset(DatasetId::Id(dataset_record.id))?;
+            events.publish(DatasetEvent::StatusChanged(record.clone()));
+            Ok(record)
         }
         CreateDatasetInput::Batch(_) => unreachable!("batch cannot terminate dataset creation"),
     }
@@ -264,7 +268,8 @@ mod tests {
         assert_eq!(repo.updated_statuses(), vec![DatasetStatus::Completed]);
         assert!(matches!(
             events.snapshot().as_slice(),
-            [DatasetEvent::Created(created)] if created.id == record.id
+            [DatasetEvent::Created(created), DatasetEvent::StatusChanged(status)]
+            if created.id == record.id && status.id == record.id
         ));
     }
 
@@ -292,7 +297,8 @@ mod tests {
         assert_eq!(repo.updated_statuses(), vec![DatasetStatus::Aborted]);
         assert!(matches!(
             events.snapshot().as_slice(),
-            [DatasetEvent::Created(created)] if created.id == record.id
+            [DatasetEvent::Created(created), DatasetEvent::StatusChanged(status)]
+            if created.id == record.id && status.id == record.id
         ));
     }
 

@@ -9,7 +9,7 @@ use tracing::{error, warn};
 use crate::{
     desktop_runtime::{runtime::show_main_window, session::WorkspaceSession},
     features::datasets::{
-        tauri::{DatasetCreated, DatasetUpdated},
+        tauri::{DatasetChanged, DatasetChangeKind},
         types::DatasetInfo,
     },
 };
@@ -58,10 +58,17 @@ async fn forward_dataset_events(
 fn emit_dataset_event(event: &DatasetEvent, app_handle: &tauri::AppHandle) {
     let info = dataset_info_from_event(event);
     let dataset_id = info.id;
-    let result = match event {
-        DatasetEvent::Created(_) => DatasetCreated(info).emit(app_handle),
-        DatasetEvent::Updated(_) => DatasetUpdated(info).emit(app_handle),
+    let kind = match event {
+        DatasetEvent::Created(_) => DatasetChangeKind::Created,
+        DatasetEvent::StatusChanged(_) => DatasetChangeKind::StatusChanged,
+        DatasetEvent::MetadataUpdated(_) => DatasetChangeKind::MetadataUpdated,
+        DatasetEvent::TagsChanged(_) => DatasetChangeKind::TagsChanged,
+        DatasetEvent::Trashed(_) => DatasetChangeKind::Trashed,
+        DatasetEvent::Restored(_) => DatasetChangeKind::Restored,
+        DatasetEvent::Deleted(_) => DatasetChangeKind::Deleted,
+        DatasetEvent::Imported(_) => DatasetChangeKind::Imported,
     };
+    let result = DatasetChanged { info, kind }.emit(app_handle);
 
     if let Err(err) = result {
         warn!(
@@ -74,7 +81,14 @@ fn emit_dataset_event(event: &DatasetEvent, app_handle: &tauri::AppHandle) {
 
 fn dataset_info_from_event(event: &DatasetEvent) -> DatasetInfo {
     let record = match event {
-        DatasetEvent::Created(record) | DatasetEvent::Updated(record) => record,
+        DatasetEvent::Created(record)
+        | DatasetEvent::StatusChanged(record)
+        | DatasetEvent::MetadataUpdated(record)
+        | DatasetEvent::TagsChanged(record)
+        | DatasetEvent::Trashed(record)
+        | DatasetEvent::Restored(record)
+        | DatasetEvent::Deleted(record)
+        | DatasetEvent::Imported(record) => record,
     };
     DatasetInfo::from(record)
 }

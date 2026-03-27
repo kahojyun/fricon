@@ -7,6 +7,8 @@ import { ThemeProvider } from "next-themes";
 import { Button } from "@/shared/ui/button";
 import { Toaster } from "@/shared/ui/sonner";
 import { useWorkspaceInfoQuery } from "@/features/workspace";
+import { useDatasetEventSync } from "@/features/datasets";
+import { useChartEventSync } from "@/features/charts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +42,8 @@ function RootComponent() {
 
 function RootLayout() {
   const workspaceInfoQuery = useWorkspaceInfoQuery();
+  useDatasetEventSync();
+  useChartEventSync();
   const workspacePath = workspaceInfoQuery.data?.path ?? "(no workspace)";
 
   return (

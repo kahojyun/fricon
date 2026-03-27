@@ -1,16 +1,20 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { events } from "@/shared/lib/bindings";
+import { type DatasetChangeKind, events } from "@/shared/lib/bindings";
 import { normalizeDataset, type DatasetInfo } from "./types";
 
-export function onDatasetCreated(callback: (event: DatasetInfo) => void) {
-  return events.datasetCreated.listen((event) => {
-    callback(normalizeDataset(event.payload));
-  });
+export interface DatasetChangedEvent {
+  info: DatasetInfo;
+  kind: DatasetChangeKind;
 }
 
-export function onDatasetUpdated(callback: (event: DatasetInfo) => void) {
-  return events.datasetUpdated.listen((event) => {
-    callback(normalizeDataset(event.payload));
+export function onDatasetChanged(
+  callback: (event: DatasetChangedEvent) => void,
+) {
+  return events.datasetChanged.listen((event) => {
+    callback({
+      info: normalizeDataset(event.payload.info),
+      kind: event.payload.kind,
+    });
   });
 }
 

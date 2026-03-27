@@ -1,9 +1,5 @@
 import { useEffect, useReducer } from "react";
-import {
-  keepPreviousData,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { listDatasets, listDatasetTags } from "./client";
 import { datasetKeys } from "./queryKeys";
@@ -14,7 +10,6 @@ import {
   type DatasetQueryParams,
   type UseDatasetTableDataResult,
 } from "./datasetTableShared";
-import { useDatasetTableRefreshSync } from "./useDatasetTableRefreshSync";
 import { useDatasetTableActions } from "./useDatasetTableActions";
 import type { DatasetStatus } from "./types";
 import {
@@ -37,7 +32,6 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     }
   }, [debouncedSearchInput, state.appliedSearchQuery]);
 
-  const queryClient = useQueryClient();
   const datasetQueryParams: DatasetQueryParams = {
     search: state.appliedSearchQuery,
     tags: state.activeTags,
@@ -62,9 +56,6 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     placeholderData: keepPreviousData,
   });
   const datasets = datasetsQuery.data ?? [];
-  const refreshDatasets = async () => {
-    await queryClient.invalidateQueries({ queryKey: datasetQueryKey });
-  };
   const hasMore = datasetsQuery.isPlaceholderData
     ? true
     : deriveHasMore(datasets.length, state.queryLimit);
@@ -125,10 +116,8 @@ export function useDatasetTableData(): UseDatasetTableDataResult {
     queryFn: listDatasetTags,
   });
 
-  useDatasetTableRefreshSync(datasets, refreshDatasets);
   const actions = useDatasetTableActions({
     datasetQueryKey,
-    refreshDatasets,
     removeActiveTag,
     replaceActiveTag,
   });

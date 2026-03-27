@@ -10,23 +10,17 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "@/routeTree.gen";
 
-const { datasetCreatedListenMock, datasetUpdatedListenMock } = vi.hoisted(
-  () => ({
-    datasetCreatedListenMock: vi.fn(),
-    datasetUpdatedListenMock: vi.fn(),
-  }),
-);
+const { datasetChangedListenMock } = vi.hoisted(() => ({
+  datasetChangedListenMock: vi.fn(),
+}));
 
 vi.mock("@/shared/lib/bindings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/lib/bindings")>();
   return {
     ...actual,
     events: {
-      datasetCreated: {
-        listen: datasetCreatedListenMock,
-      },
-      datasetUpdated: {
-        listen: datasetUpdatedListenMock,
+      datasetChanged: {
+        listen: datasetChangedListenMock,
       },
     },
   };
@@ -71,10 +65,8 @@ vi.mock("react-resizable-panels", () => ({
 describe("router app shell", () => {
   beforeEach(() => {
     clearMocks();
-    datasetCreatedListenMock.mockReset();
-    datasetUpdatedListenMock.mockReset();
-    datasetCreatedListenMock.mockResolvedValue(() => undefined);
-    datasetUpdatedListenMock.mockResolvedValue(() => undefined);
+    datasetChangedListenMock.mockReset();
+    datasetChangedListenMock.mockResolvedValue(() => undefined);
     window.localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
 

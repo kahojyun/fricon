@@ -1,165 +1,48 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   deleteDatasets as deleteDatasetsApi,
   emptyTrash as emptyTrashApi,
   restoreDatasets as restoreDatasetsApi,
   trashDatasets as trashDatasetsApi,
 } from "./client";
-import { datasetKeys } from "./queryKeys";
 import type { DatasetDeleteResult } from "./types";
 
-async function executeDeleteMutation<T>({
-  ids,
-  mutateAsync,
-  refreshDatasets,
-  setIsRefreshingAfterDelete,
-}: {
-  ids: number[];
-  mutateAsync: (ids: number[]) => Promise<T>;
-  refreshDatasets: () => Promise<void>;
-  setIsRefreshingAfterDelete: (next: boolean) => void;
-}): Promise<T> {
-  setIsRefreshingAfterDelete(true);
-  try {
-    const results = await mutateAsync(ids);
-    await refreshDatasets();
-    return results;
-  } catch (error) {
-    console.error("Failed to delete datasets:", error);
-    throw error;
-  } finally {
-    setIsRefreshingAfterDelete(false);
-  }
-}
-
-export function useDatasetDeleteMutation(refreshDatasets: () => Promise<void>) {
-  const queryClient = useQueryClient();
-  const [isRefreshingAfterDelete, setIsRefreshingAfterDelete] = useState(false);
-  const deleteMutation = useMutation({
+export function useDatasetDeleteMutation() {
+  const mutation = useMutation({
     mutationFn: (ids: number[]) => deleteDatasetsApi(ids),
-    onSuccess: (_, ids) => {
-      // Invalidate tags query as well since deleting datasets might remove tags
-      void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-
-      // Invalidate detail queries for deleted datasets to prevent stale data in the inspector
-      ids.forEach((id) => {
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
-        });
-      });
-    },
   });
-
-  const deleteDatasets = (ids: number[]) =>
-    executeDeleteMutation({
-      ids,
-      mutateAsync: deleteMutation.mutateAsync,
-      refreshDatasets,
-      setIsRefreshingAfterDelete,
-    });
-
   return {
-    deleteDatasets,
-    isDeleting: deleteMutation.isPending || isRefreshingAfterDelete,
+    deleteDatasets: (ids: number[]) => mutation.mutateAsync(ids),
+    isDeleting: mutation.isPending,
   };
 }
 
-export function useDatasetTrashMutation(refreshDatasets: () => Promise<void>) {
-  const queryClient = useQueryClient();
-  const [isRefreshingAfterTrash, setIsRefreshingAfterTrash] = useState(false);
-  const trashMutation = useMutation({
+export function useDatasetTrashMutation() {
+  const mutation = useMutation({
     mutationFn: (ids: number[]) => trashDatasetsApi(ids),
-    onSuccess: (_, ids) => {
-      void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-
-      ids.forEach((id) => {
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
-        });
-      });
-    },
   });
-
-  const trashDatasets = (ids: number[]) =>
-    executeDeleteMutation({
-      ids,
-      mutateAsync: trashMutation.mutateAsync,
-      refreshDatasets,
-      setIsRefreshingAfterDelete: setIsRefreshingAfterTrash,
-    });
-
   return {
-    trashDatasets,
-    isTrashing: trashMutation.isPending || isRefreshingAfterTrash,
+    trashDatasets: (ids: number[]) => mutation.mutateAsync(ids),
+    isTrashing: mutation.isPending,
   };
 }
 
-export function useDatasetRestoreMutation(
-  refreshDatasets: () => Promise<void>,
-) {
-  const queryClient = useQueryClient();
-  const [isRefreshingAfterRestore, setIsRefreshingAfterRestore] =
-    useState(false);
-  const restoreMutation = useMutation({
+export function useDatasetRestoreMutation() {
+  const mutation = useMutation({
     mutationFn: (ids: number[]) => restoreDatasetsApi(ids),
-    onSuccess: (_, ids) => {
-      void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-
-      ids.forEach((id) => {
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id),
-        });
-      });
-    },
   });
-
-  const restoreDatasets = (ids: number[]) =>
-    executeDeleteMutation({
-      ids,
-      mutateAsync: restoreMutation.mutateAsync,
-      refreshDatasets,
-      setIsRefreshingAfterDelete: setIsRefreshingAfterRestore,
-    });
-
   return {
-    restoreDatasets,
-    isRestoring: restoreMutation.isPending || isRefreshingAfterRestore,
+    restoreDatasets: (ids: number[]) => mutation.mutateAsync(ids),
+    isRestoring: mutation.isPending,
   };
 }
 
-export function useEmptyTrashMutation(refreshDatasets: () => Promise<void>) {
-  const queryClient = useQueryClient();
-  const [isRefreshingAfterEmptyTrash, setIsRefreshingAfterEmptyTrash] =
-    useState(false);
-  const emptyTrashMutation = useMutation({
-    mutationFn: () => emptyTrashApi(),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-    },
+export function useEmptyTrashMutation() {
+  const mutation = useMutation({
+    mutationFn: (): Promise<DatasetDeleteResult[]> => emptyTrashApi(),
   });
-
-  const emptyTrash = async (): Promise<DatasetDeleteResult[]> => {
-    setIsRefreshingAfterEmptyTrash(true);
-
-    return emptyTrashMutation
-      .mutateAsync()
-      .then(async (result) => {
-        await refreshDatasets();
-        return result;
-      })
-      .catch((error: unknown) => {
-        console.error("Failed to empty trash:", error);
-        throw error;
-      })
-      .finally(() => {
-        setIsRefreshingAfterEmptyTrash(false);
-      });
-  };
-
   return {
-    emptyTrash,
-    isEmptyingTrash:
-      emptyTrashMutation.isPending || isRefreshingAfterEmptyTrash,
+    emptyTrash: () => mutation.mutateAsync(),
+    isEmptyingTrash: mutation.isPending,
   };
 }

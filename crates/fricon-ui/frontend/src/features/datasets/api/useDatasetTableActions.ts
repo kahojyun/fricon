@@ -15,7 +15,6 @@ import { useDatasetTagMutation } from "./useDatasetTagMutation";
 
 interface UseDatasetTableActionsArgs {
   datasetQueryKey: DatasetQueryKey;
-  refreshDatasets: () => Promise<void>;
   removeActiveTag: (tag: string) => void;
   replaceActiveTag: (oldName: string, newName: string) => void;
 }
@@ -43,22 +42,14 @@ export interface UseDatasetTableActionsResult {
 
 export function useDatasetTableActions({
   datasetQueryKey,
-  refreshDatasets,
   removeActiveTag,
   replaceActiveTag,
 }: UseDatasetTableActionsArgs): UseDatasetTableActionsResult {
-  const { toggleFavorite } = useDatasetFavoriteMutation(
-    datasetQueryKey,
-    refreshDatasets,
-  );
-  const { trashDatasets, isTrashing } =
-    useDatasetTrashMutation(refreshDatasets);
-  const { restoreDatasets, isRestoring } =
-    useDatasetRestoreMutation(refreshDatasets);
-  const { deleteDatasets, isDeleting } =
-    useDatasetDeleteMutation(refreshDatasets);
-  const { emptyTrash, isEmptyingTrash } =
-    useEmptyTrashMutation(refreshDatasets);
+  const { toggleFavorite } = useDatasetFavoriteMutation(datasetQueryKey);
+  const { trashDatasets, isTrashing } = useDatasetTrashMutation();
+  const { restoreDatasets, isRestoring } = useDatasetRestoreMutation();
+  const { deleteDatasets, isDeleting } = useDatasetDeleteMutation();
+  const { emptyTrash, isEmptyingTrash } = useEmptyTrashMutation();
   const {
     batchAddTags,
     batchRemoveTags,
@@ -66,7 +57,7 @@ export function useDatasetTableActions({
     renameTag: renameTagMutation,
     mergeTag: mergeTagMutation,
     isUpdatingTags,
-  } = useDatasetTagMutation(refreshDatasets);
+  } = useDatasetTagMutation();
 
   const deleteTag = async (tag: string) => {
     await deleteTagMutation(tag);
