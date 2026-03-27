@@ -78,36 +78,32 @@ pub(crate) struct DatasetFavoriteUpdate {
     favorite: bool,
 }
 
-/// Discriminates the kind of change that triggered a [`DatasetChanged`] event.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub(crate) enum DatasetChangeKind {
-    /// New dataset was created by ingest (Writing status).
-    Created,
-    /// Write session transitioned the dataset to Completed or Aborted.
-    StatusChanged,
-    /// Name, description, or favorite flag changed.
-    MetadataUpdated,
-    /// Tags were added or removed.
-    TagsChanged,
-    /// Dataset was moved to trash.
-    Trashed,
-    /// Dataset was restored from trash.
-    Restored,
-    /// Dataset was permanently deleted.
-    Deleted,
-    /// An existing dataset was replaced by a force-import.
-    Imported,
-    /// A global tag was deleted, renamed, or merged across all datasets.
-    /// The `info` field on [`DatasetChanged`] is `None` for this kind.
-    GlobalTagsChanged,
-}
-
+/// Payload for the `dataset-changed` Tauri event.
+///
+/// Serialised as an internally-tagged JSON object (discriminant field: `kind`).
+/// Variants that concern a specific dataset carry an `info` field; the
+/// `globalTagsChanged` variant has no `info`.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct DatasetChanged {
-    pub(crate) info: Option<DatasetInfo>,
-    pub(crate) kind: DatasetChangeKind,
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum DatasetChanged {
+    /// New dataset was created by ingest (Writing status).
+    Created { info: DatasetInfo },
+    /// Write session transitioned the dataset to Completed or Aborted.
+    StatusChanged { info: DatasetInfo },
+    /// Name, description, or favorite flag changed.
+    MetadataUpdated { info: DatasetInfo },
+    /// Tags were added or removed on a specific dataset.
+    TagsChanged { info: DatasetInfo },
+    /// Dataset was moved to trash.
+    Trashed { info: DatasetInfo },
+    /// Dataset was restored from trash.
+    Restored { info: DatasetInfo },
+    /// Dataset was permanently deleted.
+    Deleted { info: DatasetInfo },
+    /// An existing dataset was replaced by a force-import.
+    Imported { info: DatasetInfo },
+    /// A global tag was deleted, renamed, or merged across all datasets.
+    GlobalTagsChanged,
 }
 
 #[tauri::command]

@@ -15,21 +15,14 @@ import { chartKeys } from "./queryKeys";
 export function useChartEventSync() {
   const queryClient = useQueryClient();
 
-  const handleEvent = useEffectEvent(
-    (kind: string, datasetId: number | undefined) => {
-      if (
-        datasetId !== undefined &&
-        (kind === "statusChanged" || kind === "imported")
-      ) {
-        void queryClient.invalidateQueries({
-          queryKey: chartKeys.chartData(datasetId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: chartKeys.filterTableData(datasetId),
-        });
-      }
-    },
-  );
+  const handleEvent = useEffectEvent((datasetId: number) => {
+    void queryClient.invalidateQueries({
+      queryKey: chartKeys.chartData(datasetId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: chartKeys.filterTableData(datasetId),
+    });
+  });
 
   useEffect(() => {
     let active = true;
@@ -38,7 +31,10 @@ export function useChartEventSync() {
     void events.datasetChanged
       .listen((event) => {
         if (!active) return;
-        handleEvent(event.payload.kind, event.payload.info?.id);
+        const p = event.payload;
+        if (p.kind === "statusChanged" || p.kind === "imported") {
+          handleEvent(p.info.id);
+        }
       })
       .then((fn) => {
         if (!active) {

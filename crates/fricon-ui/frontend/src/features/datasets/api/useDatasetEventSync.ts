@@ -15,74 +15,51 @@ import { datasetKeys } from "./queryKeys";
 export function useDatasetEventSync() {
   const queryClient = useQueryClient();
 
-  const handleEvent = useEffectEvent(({ info, kind }: DatasetChangedEvent) => {
-    const id = info?.id;
-    switch (kind) {
+  const handleEvent = useEffectEvent((event: DatasetChangedEvent) => {
+    const invalidateList = () =>
+      void queryClient.invalidateQueries({ queryKey: ["datasets", "list"] });
+    const invalidateTags = () =>
+      void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
+
+    switch (event.kind) {
       case "created":
-        void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
-        });
-        void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
+        invalidateList();
+        invalidateTags();
         break;
 
       case "statusChanged":
-        void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
-        });
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id!),
-        });
-        break;
-
       case "metadataUpdated":
+        invalidateList();
         void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
-        });
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id!),
+          queryKey: datasetKeys.detail(event.info.id),
         });
         break;
 
       case "tagsChanged":
+      case "imported":
+        invalidateList();
+        invalidateTags();
         void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
-        });
-        void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id!),
+          queryKey: datasetKeys.detail(event.info.id),
         });
         break;
 
       case "trashed":
       case "deleted":
-        void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
+        invalidateList();
+        invalidateTags();
+        queryClient.removeQueries({
+          queryKey: datasetKeys.detail(event.info.id),
         });
-        void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-        queryClient.removeQueries({ queryKey: datasetKeys.detail(id!) });
         break;
 
       case "restored":
-        void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
-        });
-        break;
-
-      case "imported":
-        void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
-        });
-        void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
-        void queryClient.invalidateQueries({
-          queryKey: datasetKeys.detail(id!),
-        });
+        invalidateList();
         break;
 
       case "globalTagsChanged":
-        void queryClient.invalidateQueries({
-          queryKey: ["datasets", "list"],
-        });
-        void queryClient.invalidateQueries({ queryKey: datasetKeys.tags() });
+        invalidateList();
+        invalidateTags();
         void queryClient.invalidateQueries({
           queryKey: ["datasets", "detail"],
         });

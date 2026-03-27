@@ -8,10 +8,7 @@ use tracing::{error, warn};
 
 use crate::{
     desktop_runtime::{runtime::show_main_window, session::WorkspaceSession},
-    features::datasets::{
-        tauri::{DatasetChangeKind, DatasetChanged},
-        types::DatasetInfo,
-    },
+    features::datasets::{tauri::DatasetChanged, types::DatasetInfo},
 };
 
 pub(crate) fn start_event_forwarder(session: &WorkspaceSession, app_handle: tauri::AppHandle) {
@@ -56,43 +53,36 @@ async fn forward_dataset_events(
 }
 
 fn emit_dataset_event(event: &DatasetEvent, app_handle: &tauri::AppHandle) {
-    let info = dataset_info_from_event(event);
-    let kind = match event {
-        DatasetEvent::Created(_) => DatasetChangeKind::Created,
-        DatasetEvent::StatusChanged(_) => DatasetChangeKind::StatusChanged,
-        DatasetEvent::MetadataUpdated(_) => DatasetChangeKind::MetadataUpdated,
-        DatasetEvent::TagsChanged(_) => DatasetChangeKind::TagsChanged,
-        DatasetEvent::Trashed(_) => DatasetChangeKind::Trashed,
-        DatasetEvent::Restored(_) => DatasetChangeKind::Restored,
-        DatasetEvent::Deleted(_) => DatasetChangeKind::Deleted,
-        DatasetEvent::Imported(_) => DatasetChangeKind::Imported,
-        DatasetEvent::GlobalTagsChanged => DatasetChangeKind::GlobalTagsChanged,
+    let changed = match event {
+        DatasetEvent::Created(r) => DatasetChanged::Created {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::StatusChanged(r) => DatasetChanged::StatusChanged {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::MetadataUpdated(r) => DatasetChanged::MetadataUpdated {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::TagsChanged(r) => DatasetChanged::TagsChanged {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::Trashed(r) => DatasetChanged::Trashed {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::Restored(r) => DatasetChanged::Restored {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::Deleted(r) => DatasetChanged::Deleted {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::Imported(r) => DatasetChanged::Imported {
+            info: DatasetInfo::from(r),
+        },
+        DatasetEvent::GlobalTagsChanged => DatasetChanged::GlobalTagsChanged,
     };
-    let dataset_id = info.as_ref().map(|i| i.id);
-    let result = DatasetChanged { info, kind }.emit(app_handle);
-
-    if let Err(err) = result {
-        warn!(
-            dataset_id = ?dataset_id,
-            error = %err,
-            "Failed to emit dataset event"
-        );
+    if let Err(err) = changed.emit(app_handle) {
+        warn!(error = %err, "Failed to emit dataset event");
     }
-}
-
-fn dataset_info_from_event(event: &DatasetEvent) -> Option<DatasetInfo> {
-    let record = match event {
-        DatasetEvent::Created(record)
-        | DatasetEvent::StatusChanged(record)
-        | DatasetEvent::MetadataUpdated(record)
-        | DatasetEvent::TagsChanged(record)
-        | DatasetEvent::Trashed(record)
-        | DatasetEvent::Restored(record)
-        | DatasetEvent::Deleted(record)
-        | DatasetEvent::Imported(record) => record,
-        DatasetEvent::GlobalTagsChanged => return None,
-    };
-    Some(DatasetInfo::from(record))
 }
 
 async fn forward_ui_commands(
