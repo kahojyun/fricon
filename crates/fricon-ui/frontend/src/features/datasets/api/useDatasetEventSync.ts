@@ -55,6 +55,9 @@ export function useDatasetEventSync() {
 
       case "restored":
         invalidateList();
+        void queryClient.invalidateQueries({
+          queryKey: datasetKeys.detail(event.info.id),
+        });
         break;
 
       case "globalTagsChanged":
