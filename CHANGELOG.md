@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.1 (2026-03-27)
+
+### Fixes
+
+- make uv sdist builds self-contained (#299)
+
+#### Targeted dataset event system for UI cache invalidation
+
+Replace the single `Updated` backend event with fine-grained dataset lifecycle events
+(Created, StatusChanged, MetadataUpdated, TagsChanged, Trashed, Restored, Deleted,
+Imported, GlobalTagsChanged). The frontend now performs targeted React Query cache
+invalidation per-event instead of blanket refetches, and chart data refreshes
+correctly during active write sessions.
+
 ## 0.1.0 (2026-03-26)
 
 ### Features
