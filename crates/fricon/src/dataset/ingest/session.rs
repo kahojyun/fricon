@@ -47,7 +47,7 @@ impl WriteSession {
         Ok(())
     }
 
-    pub(super) fn abort(self) -> Result<(), IngestError> {
+    pub(super) fn finalize_writer(self) -> Result<(), IngestError> {
         self.writer.finish()?;
         Ok(())
     }
