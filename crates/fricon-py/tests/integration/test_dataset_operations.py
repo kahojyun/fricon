@@ -104,6 +104,27 @@ class TestDatasetOperations:
             server_handle.shutdown()
             assert not server_handle.is_running
 
+    def test_dataset_writer_idle_gap_still_finishes_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            writer = dm.create("idle_gap_dataset", description="idle gap flow")
+            writer.write(id=1, value=7.0, measurement=7.0 + 0.5j)
+            time.sleep(1.1)
+            writer.write(id=2, value=8.0, measurement=8.0 + 0.25j)
+
+            dataset = writer.finish()
+            assert dataset.status == "completed"
+
+            reopened = dm.open(dataset.id)
+            expected_rows = 2
+            assert reopened.to_arrow().num_rows == expected_rows
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_dataset_writer_abort_returns_aborted_dataset(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"

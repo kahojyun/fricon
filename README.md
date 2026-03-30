@@ -63,6 +63,7 @@ ws = Workspace.connect(workspace_path)
 writer = ws.dataset_manager.create("my_dataset", description="My test dataset")
 
 # Write data - schema is inferred from the first row
+# Writes are micro-batched automatically every second or when 16 rows accumulate
 # MVP currently supports float and complex types only
 writer.write(id=1, value=42.0, measurement=3.14 + 2j)
 writer.write(id=2, value=84.0, measurement=1.618 - 1j)

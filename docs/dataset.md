@@ -30,6 +30,14 @@ is created, the schema of the table is automatically inferred from the first row
 of data written. This allows for flexible data collection without requiring
 manual schema definition.
 
+## Write batching
+
+Dataset writes are buffered on the client and flushed automatically when either
+16 rows have accumulated or 1 second has elapsed since the first buffered row.
+This keeps the write API row-oriented while reducing transport overhead for
+larger ingests. Calling `finish()`, `abort()`, or dropping the writer will flush
+any pending rows before the dataset stream is finalized.
+
 ## Type inference
 
 `fricon` MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
