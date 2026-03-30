@@ -32,11 +32,13 @@ use crate::{
 /// 3. Publish `DatasetEvent::Created` for the new record.
 /// 4. Consume streamed inputs into a write session until `Finish`, `Abort`, or
 ///    end-of-stream.
-/// 5. Commit to `Completed` or abort to `Aborted`, then re-read the final
-///    stored record, and publish `DatasetEvent::StatusChanged`.
+/// 5. Finalize any persisted rows, transition to `Completed` or `Aborted`, then
+///    re-read the final stored record and publish
+///    `DatasetEvent::StatusChanged`.
 ///
-/// End-of-stream is treated as `Abort`. If session commit fails after the
-/// record exists, the workflow best-effort marks the dataset `Aborted`
+/// End-of-stream is treated as `Abort`. Aborted datasets retain rows that were
+/// successfully written before termination. If session finalization fails after
+/// the record exists, the workflow best-effort marks the dataset `Aborted`
 /// before returning the error.
 #[instrument(
     skip(repo, paths, events, write_sessions, next_input, request),
@@ -90,9 +92,9 @@ where
     match terminal {
         CreateDatasetInput::Finish => {
             if let Some(session) = session.take()
-                && let Err(error) = session.commit_session()
+                && let Err(error) = session.finalize_session()
             {
-                debug!(error = %error, "Failed to commit dataset session, switching to aborted");
+                debug!(error = %error, "Failed to finalize dataset session, switching to aborted");
                 let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
                 return Err(error);
             }
@@ -104,9 +106,9 @@ where
         }
         CreateDatasetInput::Abort => {
             if let Some(session) = session.take()
-                && let Err(error) = session.abort_session()
+                && let Err(error) = session.finalize_session()
             {
-                debug!(error = %error, "Failed to abort dataset session, keeping aborted status");
+                debug!(error = %error, "Failed to finalize dataset session, keeping aborted status");
             }
             repo.update_status(dataset_record.id, DatasetStatus::Aborted)?;
             info!(dataset.id = dataset_record.id, "Dataset write aborted");
@@ -303,7 +305,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_failure_marks_dataset_aborted_and_returns_error() {
+    fn finalize_failure_marks_dataset_aborted_and_returns_error() {
         let temp_dir = TempDir::new().expect("temp dir");
         let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
         let paths = workspace.paths().clone();
@@ -333,7 +335,7 @@ mod tests {
                 }
             },
         )
-        .expect_err("commit should fail");
+        .expect_err("finalize should fail");
 
         assert_eq!(repo.updated_statuses(), vec![DatasetStatus::Aborted]);
         assert!(matches!(

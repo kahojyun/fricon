@@ -108,7 +108,7 @@ describe("ChartViewer", () => {
         throw new Error("Internal Server Error");
       }
       if (cmd === "get_dataset_write_status") {
-        return { rowCount: 0, isComplete: true };
+        return { rowCount: 0 };
       }
       return null;
     });
@@ -172,7 +172,7 @@ describe("ChartViewer", () => {
         };
       }
       if (cmd === "get_dataset_write_status") {
-        return { rowCount: 0, isComplete: true };
+        return { rowCount: 0 };
       }
       return null;
     });
@@ -261,7 +261,7 @@ describe("ChartViewer", () => {
         };
       }
       if (cmd === "get_dataset_write_status") {
-        return { rowCount: 0, isComplete: true };
+        return { rowCount: 0 };
       }
       return null;
     });
@@ -338,7 +338,7 @@ describe("ChartViewer", () => {
         };
       }
       if (cmd === "get_dataset_write_status") {
-        return { rowCount: 0, isComplete: true };
+        return { rowCount: 0 };
       }
       return null;
     });

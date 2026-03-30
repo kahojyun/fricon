@@ -390,6 +390,19 @@ impl AppHandle {
         .await
     }
 
+    pub async fn update_dataset_details(
+        &self,
+        id: i32,
+        update: DatasetUpdate,
+        tags: Option<Vec<String>>,
+    ) -> Result<(), CatalogAppError> {
+        self.run_catalog_task_with_events(
+            "failed to join dataset detail update task",
+            move |catalog, events| catalog.update_dataset_details(id, update, tags, &events),
+        )
+        .await
+    }
+
     pub async fn add_dataset_tags(
         &self,
         id: i32,

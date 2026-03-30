@@ -20,17 +20,10 @@ enum DatasetSource {
 }
 
 impl DatasetSource {
-    fn is_complete(&self) -> bool {
+    fn write_status(&self) -> usize {
         match self {
-            Self::WriteSession(handle) => handle.is_complete(),
-            Self::File(_) => true,
-        }
-    }
-
-    fn write_status(&self) -> (usize, bool) {
-        match self {
-            Self::WriteSession(handle) => handle.snapshot_status(),
-            Self::File(reader) => (reader.num_rows(), true),
+            Self::WriteSession(handle) => handle.num_rows(),
+            Self::File(reader) => reader.num_rows(),
         }
     }
 
@@ -236,12 +229,7 @@ impl DatasetReader {
     }
 
     #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.source.is_complete()
-    }
-
-    #[must_use]
-    pub fn write_status(&self) -> (usize, bool) {
+    pub fn write_status(&self) -> usize {
         self.source.write_status()
     }
 

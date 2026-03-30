@@ -26,7 +26,7 @@
 //! - New event variants should be published only after the primary state change
 //!   has succeeded.
 
-use std::{path::Path, sync::Arc};
+use std::{collections::BTreeSet, path::Path, sync::Arc};
 
 use tracing::{error, info, instrument, warn};
 
@@ -100,6 +100,52 @@ impl DatasetCatalogService {
         self.repository.update_dataset(id, update_payload)?;
         let record = self.repository.get_dataset(DatasetId::Id(id))?;
         events.publish(DatasetEvent::MetadataUpdated(record));
+        Ok(())
+    }
+
+    #[instrument(skip(self, events, update_payload, tags), fields(dataset.id = id))]
+    pub(crate) fn update_dataset_details<P: DatasetEventPublisher>(
+        &self,
+        id: i32,
+        update_payload: DatasetUpdate,
+        tags: Option<Vec<String>>,
+        events: &P,
+    ) -> Result<(), CatalogError> {
+        let current_tags = if tags.is_some() {
+            Some(
+                self.repository
+                    .get_dataset(DatasetId::Id(id))?
+                    .metadata
+                    .tags
+                    .into_iter()
+                    .collect::<BTreeSet<_>>(),
+            )
+        } else {
+            None
+        };
+
+        self.update_dataset(id, update_payload, events)?;
+
+        if let Some(next_tags) = tags {
+            let next_tags = NormalizedTag::parse_many(next_tags)
+                .into_iter()
+                .map(|tag| tag.as_str().to_string())
+                .collect::<BTreeSet<_>>();
+            let current_tags =
+                current_tags.expect("current tags should be loaded when replacing tags");
+
+            let to_add: Vec<String> = next_tags.difference(&current_tags).cloned().collect();
+            let to_remove: Vec<String> = current_tags.difference(&next_tags).cloned().collect();
+
+            if !to_add.is_empty() {
+                self.add_tags(id, to_add, events)?;
+            }
+
+            if !to_remove.is_empty() {
+                self.remove_tags(id, to_remove, events)?;
+            }
+        }
+
         Ok(())
     }
 

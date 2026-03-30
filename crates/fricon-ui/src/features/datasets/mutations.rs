@@ -1,6 +1,4 @@
-use std::collections::BTreeSet;
-
-use fricon::{DatasetListQuery, DatasetUpdate, dataset::model::DatasetId};
+use fricon::{DatasetListQuery, DatasetUpdate};
 
 use super::{
     error::UiDatasetError,
@@ -16,7 +14,7 @@ pub(crate) struct BatchTagUpdate {
 }
 
 fn normalize_tags(tags: Vec<String>) -> Vec<String> {
-    let mut unique = BTreeSet::new();
+    let mut unique = std::collections::BTreeSet::new();
     for tag in tags {
         let trimmed = tag.trim();
         if !trimmed.is_empty() {
@@ -54,37 +52,18 @@ pub(crate) async fn update_dataset_info(
     id: i32,
     update: DatasetInfoUpdate,
 ) -> Result<(), UiDatasetError> {
-    let app = session.app();
-
-    let current = app.get_dataset_including_deleted(DatasetId::Id(id)).await?;
-
-    app.update_dataset(
-        id,
-        DatasetUpdate {
-            name: update.name,
-            description: update.description,
-            favorite: update.favorite,
-        },
-    )
-    .await?;
-
-    if let Some(next_tags_raw) = update.tags {
-        let next_tags = normalize_tags(next_tags_raw);
-        let current_tags: BTreeSet<_> = current.metadata.tags.into_iter().collect();
-        let next_tags_set: BTreeSet<_> = next_tags.into_iter().collect();
-
-        let to_add: Vec<String> = next_tags_set.difference(&current_tags).cloned().collect();
-        let to_remove: Vec<String> = current_tags.difference(&next_tags_set).cloned().collect();
-
-        if !to_add.is_empty() {
-            app.add_dataset_tags(id, to_add).await?;
-        }
-
-        if !to_remove.is_empty() {
-            app.remove_dataset_tags(id, to_remove).await?;
-        }
-    }
-
+    session
+        .app()
+        .update_dataset_details(
+            id,
+            DatasetUpdate {
+                name: update.name,
+                description: update.description,
+                favorite: update.favorite,
+            },
+            update.tags,
+        )
+        .await?;
     Ok(())
 }
 
@@ -597,6 +576,43 @@ mod tests {
                 .as_ref()
                 .is_some_and(|error| error.code == ApiErrorCode::Internal)
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn update_dataset_info_replaces_tags_and_metadata() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let dataset_id = create_completed_dataset(&session, "before").await?;
+
+        update_dataset_info(
+            &session,
+            dataset_id,
+            DatasetInfoUpdate {
+                name: Some("after".to_string()),
+                description: Some("updated description".to_string()),
+                favorite: Some(true),
+                tags: Some(vec![
+                    " science ".to_string(),
+                    "science".to_string(),
+                    String::new(),
+                ]),
+            },
+        )
+        .await?;
+
+        let updated = session
+            .app()
+            .get_dataset_including_deleted(DatasetId::Id(dataset_id))
+            .await?;
+        assert_eq!(updated.metadata.name, "after");
+        assert_eq!(updated.metadata.description, "updated description");
+        assert!(updated.metadata.favorite);
+        assert_eq!(updated.metadata.tags, vec!["science".to_string()]);
 
         Ok(())
     }

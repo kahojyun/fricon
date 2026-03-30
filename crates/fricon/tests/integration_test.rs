@@ -334,6 +334,15 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
     assert_eq!(datasets.len(), 1);
     assert_eq!(datasets[0].metadata.status, DatasetStatus::Aborted);
 
+    let reopened = client.get_dataset_by_id(dataset.id()).await?;
+    assert_eq!(reopened.status(), DatasetStatus::Aborted);
+
+    let reader = app_manager
+        .handle()
+        .get_dataset_reader(DatasetId::Id(reopened.id()))
+        .await?;
+    assert_eq!(reader.num_rows(), 1);
+
     app_manager.shutdown().await;
     temp_dir.close()?;
 
@@ -379,6 +388,24 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
     drop(writer);
 
     wait_for_dataset_status(&app_manager, "aborted_dataset", DatasetStatus::Aborted).await?;
+
+    let datasets = app_manager
+        .handle()
+        .list_datasets(DatasetListQuery {
+            search: Some("aborted_dataset".to_string()),
+            ..DatasetListQuery::default()
+        })
+        .await?;
+    assert_eq!(datasets.len(), 1);
+
+    let reopened = client.get_dataset_by_id(datasets[0].id).await?;
+    assert_eq!(reopened.status(), DatasetStatus::Aborted);
+
+    let reader = app_manager
+        .handle()
+        .get_dataset_reader(DatasetId::Id(reopened.id()))
+        .await?;
+    assert_eq!(reader.num_rows(), 1);
 
     // Shutdown the server
     app_manager.shutdown().await;

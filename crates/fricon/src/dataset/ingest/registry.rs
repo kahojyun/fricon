@@ -32,19 +32,11 @@ impl WriteSessionGuard {
         self.session_mut().write(batch)
     }
 
-    pub(crate) fn commit_session(mut self) -> Result<(), IngestError> {
+    pub(crate) fn finalize_session(mut self) -> Result<(), IngestError> {
         if let Some(session) = self.session.take() {
             session.finish()?;
         }
-        debug!(dataset.id = self.id, "Write session committed");
-        Ok(())
-    }
-
-    pub(crate) fn abort_session(mut self) -> Result<(), IngestError> {
-        if let Some(session) = self.session.take() {
-            session.abort()?;
-        }
-        debug!(dataset.id = self.id, "Write session aborted");
+        debug!(dataset.id = self.id, "Write session finalized");
         Ok(())
     }
 }
@@ -54,9 +46,9 @@ impl Drop for WriteSessionGuard {
         if let Some(session) = self.session.take() {
             debug!(
                 dataset.id = self.id,
-                "Write session dropped without commit, aborting"
+                "Write session dropped without commit, finalizing persisted partial data"
             );
-            let _ = session.abort();
+            let _ = session.finish();
         }
         self.registry.remove(self.id);
     }
@@ -92,5 +84,76 @@ impl WriteSessionRegistry {
         if let Ok(mut m) = self.inner.write() {
             m.remove(&id);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_array::{Int32Array, RecordBatch};
+    use arrow_schema::{DataType, Field, Schema};
+    use tempfile::TempDir;
+
+    use super::WriteSessionRegistry;
+    use crate::dataset::storage::ChunkReader;
+
+    fn test_schema() -> Arc<Schema> {
+        Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]))
+    }
+
+    fn test_batch(values: Vec<i32>) -> RecordBatch {
+        RecordBatch::try_new(test_schema(), vec![Arc::new(Int32Array::from(values))]).unwrap()
+    }
+
+    fn setup_session_dir() -> TempDir {
+        TempDir::new().expect("temp dir")
+    }
+
+    #[test]
+    fn finalized_session_persists_data() {
+        let dir = setup_session_dir();
+        let registry = WriteSessionRegistry::new();
+        let mut guard = registry.start_session(1, dir.path().to_owned(), test_schema());
+
+        guard.write_batch(test_batch(vec![1, 2, 3])).unwrap();
+        let handle = registry.get(1).expect("handle exists during session");
+        assert_eq!(handle.num_rows(), 3);
+
+        guard.finalize_session().unwrap();
+
+        let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
+        reader.read_all().unwrap();
+        assert_eq!(reader.num_rows(), 3);
+    }
+
+    #[test]
+    fn dropped_session_finalizes_and_cleans_up_registry() {
+        let dir = setup_session_dir();
+        let registry = WriteSessionRegistry::new();
+        let mut guard = registry.start_session(1, dir.path().to_owned(), test_schema());
+
+        guard.write_batch(test_batch(vec![7])).unwrap();
+        assert!(registry.get(1).is_some());
+        drop(guard);
+
+        assert!(registry.get(1).is_none());
+
+        let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
+        reader.read_all().unwrap();
+        assert_eq!(reader.num_rows(), 1);
+    }
+
+    #[test]
+    fn empty_finalize_succeeds_with_no_persisted_data() {
+        let dir = setup_session_dir();
+        let registry = WriteSessionRegistry::new();
+        let guard = registry.start_session(1, dir.path().to_owned(), test_schema());
+
+        guard.finalize_session().unwrap();
+
+        let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
+        reader.read_all().unwrap();
+        assert_eq!(reader.num_rows(), 0);
     }
 }

@@ -9,7 +9,6 @@ use crate::dataset::{ingest::IngestError, schema::ChunkedTable, storage::ChunkRe
 pub(super) struct InProgressTable {
     in_memory: ChunkedTable,
     reader: ChunkReader,
-    is_complete: bool,
 }
 
 impl InProgressTable {
@@ -17,7 +16,6 @@ impl InProgressTable {
         Self {
             in_memory: ChunkedTable::new(schema.clone()),
             reader: ChunkReader::new(dir_path, Some(schema)),
-            is_complete: false,
         }
     }
 
@@ -38,14 +36,6 @@ impl InProgressTable {
 
     pub(super) fn num_rows(&self) -> usize {
         self.in_memory.last_offset()
-    }
-
-    pub(super) fn is_complete(&self) -> bool {
-        self.is_complete
-    }
-
-    pub(super) fn mark_complete(&mut self) {
-        self.is_complete = true;
     }
 
     pub(super) fn range<R>(&self, range: R) -> impl Iterator<Item = Cow<'_, RecordBatch>>

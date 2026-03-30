@@ -5,9 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDatasetWriteStatusQuery } from "./useDatasetWriteStatusQuery";
 import { chartKeys } from "./queryKeys";
 
-type GetWriteStatusFn = (
-  id: number,
-) => Promise<{ rowCount: number; isComplete: boolean }>;
+type GetWriteStatusFn = (id: number) => Promise<{ rowCount: number }>;
 
 const getDatasetWriteStatusMock = vi.fn<GetWriteStatusFn>();
 
@@ -34,7 +32,7 @@ describe("useDatasetWriteStatusQuery", () => {
   });
 
   it("fetches write status when enabled", async () => {
-    const status = { rowCount: 5, isComplete: false };
+    const status = { rowCount: 5 };
     getDatasetWriteStatusMock.mockResolvedValue(status);
 
     const { result } = renderHook(() => useDatasetWriteStatusQuery(1, true), {
@@ -63,7 +61,6 @@ describe("useDatasetWriteStatusQuery", () => {
   it("has refetchInterval set for live-write polling", () => {
     getDatasetWriteStatusMock.mockResolvedValue({
       rowCount: 0,
-      isComplete: false,
     });
 
     const { result } = renderHook(() => useDatasetWriteStatusQuery(1, true), {

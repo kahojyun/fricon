@@ -42,12 +42,6 @@ impl WriteSession {
     }
 
     pub(super) fn finish(self) -> Result<(), IngestError> {
-        self.in_progress_table_mut().mark_complete();
-        self.writer.finish()?;
-        Ok(())
-    }
-
-    pub(super) fn abort(self) -> Result<(), IngestError> {
         self.writer.finish()?;
         Ok(())
     }
@@ -68,21 +62,12 @@ impl WriteSessionHandle {
         self.0.lock().expect("Should be poisoned")
     }
 
-    pub(crate) fn is_complete(&self) -> bool {
-        self.0.lock().expect("Should not be poisoned").is_complete()
-    }
-
     pub(crate) fn schema(&self) -> SchemaRef {
         self.inner().schema().clone()
     }
 
     pub(crate) fn num_rows(&self) -> usize {
         self.inner().num_rows()
-    }
-
-    pub(crate) fn snapshot_status(&self) -> (usize, bool) {
-        let inner = self.inner();
-        (inner.num_rows(), inner.is_complete())
     }
 
     pub(crate) fn snapshot_range<R>(&self, range: R) -> Vec<RecordBatch>
