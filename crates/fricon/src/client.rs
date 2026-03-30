@@ -1,6 +1,7 @@
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    pin::pin,
     sync::Arc,
     time::Duration,
 };
@@ -16,6 +17,7 @@ use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use thiserror::Error;
 use tokio::{sync::mpsc, task::JoinHandle};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Code, Request, Status, transport::Channel};
 use tower::service_fn;
 use tracing::{debug, error, info, instrument, warn};
@@ -452,15 +454,12 @@ impl Drop for DatasetWriter {
     }
 }
 
-fn flush_row_buffer(
+fn flush_batches(
     writer: &mut StreamWriter<bytes::buf::Writer<BytesMut>>,
-    row_buffer: &mut Vec<RecordBatch>,
-    flush_deadline: &mut Option<tokio::time::Instant>,
+    batches: &[RecordBatch],
     arrow_schema: &SchemaRef,
 ) -> Result<Bytes, ArrowError> {
-    let combined = concat_batches(arrow_schema, row_buffer.as_slice())?;
-    row_buffer.clear();
-    *flush_deadline = None;
+    let combined = concat_batches(arrow_schema, batches)?;
     writer.write(&combined)?;
     Ok(writer.get_mut().get_mut().split().freeze())
 }
@@ -488,7 +487,7 @@ fn build_request_stream(
     description: String,
     tags: Vec<String>,
     arrow_schema: SchemaRef,
-    mut message_rx: mpsc::Receiver<StreamMessage>,
+    message_rx: mpsc::Receiver<StreamMessage>,
 ) -> impl Stream<Item = CreateRequest> {
     stream! {
         yield CreateRequest {
@@ -514,55 +513,28 @@ fn build_request_stream(
             yield payload_request(chunk);
         }
 
-        let mut row_buffer: Vec<RecordBatch> = Vec::new();
-        let mut flush_deadline: Option<tokio::time::Instant> = None;
+        let mut chunked = pin!(tokio_stream::StreamExt::chunks_timeout(
+            ReceiverStream::new(message_rx),
+            MAX_BATCH_ROWS,
+            BATCH_FLUSH_INTERVAL,
+        ));
 
-        loop {
-            // Receive the next message, breaking on channel close.
-            // When a flush deadline is active, a timeout returns None.
-            let (received, is_timeout) = match flush_deadline {
-                Some(deadline) => {
-                    match tokio::time::timeout_at(deadline, message_rx.recv()).await {
-                        Ok(Some(msg)) => (Some(msg), false),
-                        Ok(None) => break,  // channel closed
-                        Err(_) => (None, true),
+        while let Some(messages) = chunked.next().await {
+            let mut batches = Vec::new();
+            let mut terminal = None;
+            for msg in messages {
+                match msg {
+                    StreamMessage::Batch(batch) => batches.push(batch),
+                    other => {
+                        terminal = Some(other);
+                        break;
                     }
                 }
-                None => match message_rx.recv().await {
-                    Some(msg) => (Some(msg), false),
-                    None => break, // channel closed
-                },
-            };
+            }
 
-            // Classify: buffer new batches, or identify a terminal message.
-            let terminal = match received {
-                Some(StreamMessage::Batch(batch)) => {
-                    row_buffer.push(batch);
-                    if flush_deadline.is_none() {
-                        flush_deadline =
-                            Some(tokio::time::Instant::now() + BATCH_FLUSH_INTERVAL);
-                    }
-                    None
-                }
-                Some(terminal) => Some(terminal),
-                None => None, // flush timeout
-            };
-
-            // Flush when the buffer is full, a terminal message arrived with
-            // buffered rows, or the flush timeout fired.
-            let should_flush = !row_buffer.is_empty()
-                && (terminal.is_some()
-                    || row_buffer.len() >= MAX_BATCH_ROWS
-                    || is_timeout);
-
-            if should_flush {
+            if !batches.is_empty() {
                 let best_effort = matches!(&terminal, Some(StreamMessage::Abort));
-                match flush_row_buffer(
-                    &mut writer,
-                    &mut row_buffer,
-                    &mut flush_deadline,
-                    &arrow_schema,
-                ) {
+                match flush_batches(&mut writer, &batches, &arrow_schema) {
                     Ok(chunk) => {
                         for payload_chunk in split_payload_chunk(chunk) {
                             yield payload_request(payload_chunk);
@@ -577,7 +549,6 @@ fn build_request_stream(
                 }
             }
 
-            // Handle terminal messages.
             match terminal {
                 Some(StreamMessage::Finish) => {
                     if let Err(e) = writer.finish() {
