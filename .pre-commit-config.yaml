@@ -20,7 +20,7 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
   - repo: https://github.com/tombi-toml/tombi-pre-commit
-    rev: d22bfb61c88eb765ec84ed19d501d623809e162f  # frozen: v0.9.9
+    rev: 55b23abfe59da6785ac1f60201efc4a21f1014b0  # frozen: v0.9.12
     hooks:
       - id: tombi-format
         exclude: Cargo\.lock
@@ -30,17 +30,17 @@ repos:
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: e3daa3b1abb0f966fc89f674fdf01eebd84c2eec  # frozen: 0.10.12
+    rev: 20d6e6698b00aed95d4f269a6309b11c2c57b202  # frozen: 0.11.2
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e05c5c0818279e5ac248ac9e954431ba58865e61  # frozen: v0.15.7
+    rev: aca6d4c8045a504e2812ea4bedff1d0a09e437bc  # frozen: v0.15.8
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: ca2e228d873e15bca82cd588f1964f0ec0aa9762  # frozen: 4.0.4
+    rev: ec5ed61d83ae336c65c4c15396a23772ce9d2fcc  # frozen: 4.1.0
     hooks:
       - id: sqlfluff-lint
       - id: sqlfluff-fix
