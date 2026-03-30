@@ -119,6 +119,7 @@ class TestDatasetOperations:
 
             reopened = dm.open(dataset.id)
             assert reopened.status == "aborted"
+            assert reopened.to_arrow().num_rows == 1
 
             server_handle.shutdown()
             assert not server_handle.is_running
@@ -135,6 +136,12 @@ class TestDatasetOperations:
             _ = gc.collect()
 
             self._wait_dataset_status(dm, "drop_abort_dataset", "aborted")
+
+            reopened = dm.open(
+                dm.list_all()[dm.list_all()["name"] == "drop_abort_dataset"].index[0]  # pyright: ignore[reportAny]
+            )
+            assert reopened.status == "aborted"
+            assert reopened.to_arrow().num_rows == 1
 
             server_handle.shutdown()
             assert not server_handle.is_running

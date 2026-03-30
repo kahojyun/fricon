@@ -32,11 +32,13 @@ use crate::{
 /// 3. Publish `DatasetEvent::Created` for the new record.
 /// 4. Consume streamed inputs into a write session until `Finish`, `Abort`, or
 ///    end-of-stream.
-/// 5. Commit to `Completed` or abort to `Aborted`, then re-read the final
-///    stored record, and publish `DatasetEvent::StatusChanged`.
+/// 5. Finalize any persisted rows, transition to `Completed` or `Aborted`, then
+///    re-read the final stored record and publish
+///    `DatasetEvent::StatusChanged`.
 ///
-/// End-of-stream is treated as `Abort`. If session finalization fails after the
-/// record exists, the workflow best-effort marks the dataset `Aborted`
+/// End-of-stream is treated as `Abort`. Aborted datasets retain rows that were
+/// successfully written before termination. If session finalization fails after
+/// the record exists, the workflow best-effort marks the dataset `Aborted`
 /// before returning the error.
 #[instrument(
     skip(repo, paths, events, write_sessions, next_input, request),

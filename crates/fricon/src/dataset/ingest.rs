@@ -57,8 +57,8 @@ pub(crate) struct CreateDatasetRequest {
 /// Stream input driving a dataset ingest session.
 ///
 /// `Batch` appends rows, `Finish` commits the accumulated session, and
-/// `Abort` discards any buffered data and leaves the dataset in `Aborted`
-/// status.
+/// `Abort` stops ingest while preserving any rows already written, then leaves
+/// the dataset in `Aborted` status.
 #[derive(Debug)]
 pub(crate) enum CreateDatasetInput {
     Batch(RecordBatch),
