@@ -41,30 +41,25 @@ impl WriteSessionGuard {
     }
 
     pub(crate) fn abort_session(mut self) -> Result<(), IngestError> {
-        self.finalize_writer()?;
+        if let Some(session) = self.session.take() {
+            session.finish()?;
+        }
         debug!(
             dataset.id = self.id,
             "Write session finalized for aborted dataset"
         );
         Ok(())
     }
-
-    fn finalize_writer(&mut self) -> Result<(), IngestError> {
-        if let Some(session) = self.session.take() {
-            session.finalize_writer()?;
-        }
-        Ok(())
-    }
 }
 
 impl Drop for WriteSessionGuard {
     fn drop(&mut self) {
-        if self.session.is_some() {
+        if let Some(session) = self.session.take() {
             debug!(
                 dataset.id = self.id,
                 "Write session dropped without commit, finalizing persisted partial data"
             );
-            let _ = self.finalize_writer();
+            let _ = session.finish();
         }
         self.registry.remove(self.id);
     }
@@ -134,7 +129,6 @@ mod tests {
 
         guard.write_batch(test_batch(vec![1, 2, 3])).unwrap();
         let handle = registry.get(1).expect("handle exists during session");
-        assert!(!handle.is_complete());
         assert_eq!(handle.num_rows(), 3);
 
         guard.commit_session().unwrap();
@@ -145,7 +139,7 @@ mod tests {
     }
 
     #[test]
-    fn aborted_session_persists_data_without_marking_complete() {
+    fn aborted_session_persists_data() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
         let mut guard = registry.start_session(1, dir.path().to_owned(), test_schema());

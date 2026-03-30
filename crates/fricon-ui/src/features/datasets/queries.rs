@@ -85,11 +85,8 @@ pub(crate) async fn get_dataset_write_status(
     id: i32,
 ) -> Result<DatasetWriteStatus, UiDatasetError> {
     let dataset = session.dataset(id).await?;
-    let (row_count, is_complete) = dataset.write_status();
-    Ok(DatasetWriteStatus {
-        row_count,
-        is_complete,
-    })
+    let row_count = dataset.write_status();
+    Ok(DatasetWriteStatus { row_count })
 }
 
 #[cfg(test)]

@@ -111,7 +111,6 @@ pub(crate) struct DatasetDetail {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DatasetWriteStatus {
     pub(crate) row_count: usize,
-    pub(crate) is_complete: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]

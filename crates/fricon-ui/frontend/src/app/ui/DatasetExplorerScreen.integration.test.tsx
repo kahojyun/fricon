@@ -164,7 +164,7 @@ describe("DatasetExplorerScreen integration", () => {
             ],
           };
         case "get_dataset_write_status":
-          return { rowCount: 0, isComplete: true };
+          return { rowCount: 0 };
         default:
           return null;
       }
