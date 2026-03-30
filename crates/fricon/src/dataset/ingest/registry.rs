@@ -32,22 +32,11 @@ impl WriteSessionGuard {
         self.session_mut().write(batch)
     }
 
-    pub(crate) fn commit_session(mut self) -> Result<(), IngestError> {
+    pub(crate) fn finalize_session(mut self) -> Result<(), IngestError> {
         if let Some(session) = self.session.take() {
             session.finish()?;
         }
-        debug!(dataset.id = self.id, "Write session committed");
-        Ok(())
-    }
-
-    pub(crate) fn abort_session(mut self) -> Result<(), IngestError> {
-        if let Some(session) = self.session.take() {
-            session.finish()?;
-        }
-        debug!(
-            dataset.id = self.id,
-            "Write session finalized for aborted dataset"
-        );
+        debug!(dataset.id = self.id, "Write session finalized");
         Ok(())
     }
 }
@@ -122,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn committed_session_marks_complete_and_persists_data() {
+    fn finalized_session_persists_data() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
         let mut guard = registry.start_session(1, dir.path().to_owned(), test_schema());
@@ -131,25 +120,11 @@ mod tests {
         let handle = registry.get(1).expect("handle exists during session");
         assert_eq!(handle.num_rows(), 3);
 
-        guard.commit_session().unwrap();
+        guard.finalize_session().unwrap();
 
         let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
         reader.read_all().unwrap();
         assert_eq!(reader.num_rows(), 3);
-    }
-
-    #[test]
-    fn aborted_session_persists_data() {
-        let dir = setup_session_dir();
-        let registry = WriteSessionRegistry::new();
-        let mut guard = registry.start_session(1, dir.path().to_owned(), test_schema());
-
-        guard.write_batch(test_batch(vec![10, 20])).unwrap();
-        guard.abort_session().unwrap();
-
-        let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
-        reader.read_all().unwrap();
-        assert_eq!(reader.num_rows(), 2);
     }
 
     #[test]
@@ -170,12 +145,12 @@ mod tests {
     }
 
     #[test]
-    fn empty_commit_succeeds_with_no_persisted_data() {
+    fn empty_finalize_succeeds_with_no_persisted_data() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
         let guard = registry.start_session(1, dir.path().to_owned(), test_schema());
 
-        guard.commit_session().unwrap();
+        guard.finalize_session().unwrap();
 
         let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
         reader.read_all().unwrap();
