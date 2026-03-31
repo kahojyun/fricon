@@ -11,7 +11,8 @@ use crate::{
     desktop_runtime::session::WorkspaceSession,
     features::charts::{
         transform::{
-            build_heatmap_series, build_line_series, build_live_line_series, build_scatter_series,
+            build_heatmap_series, build_line_series, build_live_heatmap_series,
+            build_live_line_series, build_live_scatter_series, build_scatter_series,
             mapping::build_chart_selected_columns,
         },
         types::{ChartDataResponse, LiveChartDataOptions},
@@ -138,11 +139,20 @@ pub(crate) async fn dataset_live_chart_data(
         dataset_id = id,
         rows = batch.num_rows(),
         cols = batch.num_columns(),
-        tail_count = options.tail_count,
         "Building live chart data"
     );
 
-    let result = build_live_line_series(&batch, schema, index_columns.as_deref(), options);
+    let result = match options {
+        LiveChartDataOptions::Line(opts) => {
+            build_live_line_series(&batch, schema, index_columns.as_deref(), opts)
+        }
+        LiveChartDataOptions::Heatmap(opts) => {
+            build_live_heatmap_series(&batch, schema, index_columns.as_deref(), opts)
+        }
+        LiveChartDataOptions::Scatter(opts) => {
+            build_live_scatter_series(&batch, schema, index_columns.as_deref(), opts)
+        }
+    };
     if let Err(err) = &result {
         error!(
             dataset_id = id,

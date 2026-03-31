@@ -4,7 +4,7 @@ use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
 use crate::features::charts::types::{
-    ChartDataResponse, ChartType, ComplexViewOption, LiveChartDataOptions, Series,
+    ChartDataResponse, ChartType, ComplexViewOption, LiveLineOptions, Series,
     transform_complex_values,
 };
 
@@ -240,7 +240,7 @@ pub(crate) fn build_live_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
-    options: &LiveChartDataOptions,
+    options: &LiveLineOptions,
 ) -> Result<ChartDataResponse> {
     let series_name = &options.series;
     let data_type = *schema

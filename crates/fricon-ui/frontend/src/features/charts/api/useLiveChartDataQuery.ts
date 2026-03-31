@@ -8,11 +8,7 @@ export function useLiveChartDataQuery(
   options: LiveChartDataOptions | null,
 ) {
   return useQuery({
-    queryKey: [
-      ...chartKeys.liveChartData(datasetId),
-      options?.series ?? null,
-      options?.complexView ?? null,
-    ],
+    queryKey: [...chartKeys.liveChartData(datasetId), options],
     queryFn: () => fetchLiveChartData(datasetId, options!),
     enabled: Boolean(options),
     refetchInterval: 1000,

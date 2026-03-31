@@ -108,7 +108,6 @@ export function ChartViewerControls({
         <div className="min-w-40">
           <Label className="mb-1 block">Chart Type</Label>
           <Select
-            disabled={isLiveMode}
             value={effectiveChartType}
             onValueChange={(value) => {
               if (value) {

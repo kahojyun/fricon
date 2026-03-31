@@ -98,27 +98,42 @@ function buildOption(data?: ChartOptions, liveMode?: boolean): EChartsOption {
         },
       },
       grid: { right: "18%" },
-      tooltip: { trigger: "item" },
+      tooltip: liveMode ? { show: false } : { trigger: "item" },
       series: seriesOption,
     };
   }
 
   if (data.type === "scatter") {
     const { xName, yName, series } = data;
-    const seriesOption = series.map(
-      (s): ScatterSeriesOption => ({
+    const seriesOption = series.map((s, index): ScatterSeriesOption => {
+      if (liveMode && series.length > 1) {
+        const total = series.length;
+        const isNewest = index === total - 1;
+        const opacity = isNewest
+          ? 1.0
+          : 0.12 + (0.5 * index) / Math.max(total - 2, 1);
+        return {
+          name: s.name,
+          type: "scatter",
+          data: s.data,
+          symbolSize: isNewest ? 6 : 4,
+          color: isNewest ? "#2563eb" : "#94a3b8",
+          itemStyle: { opacity },
+        };
+      }
+      return {
         name: s.name,
         type: "scatter",
         data: s.data,
         symbolSize: 6,
-      }),
-    );
+      };
+    });
     return {
       animation: false,
       xAxis: { type: "value", name: xName },
       yAxis: { type: "value", name: yName },
-      legend: {},
-      tooltip: { trigger: "item" },
+      legend: liveMode ? { show: false } : {},
+      tooltip: liveMode ? { show: false } : { trigger: "item" },
       series: seriesOption,
     };
   }
@@ -128,7 +143,6 @@ function buildOption(data?: ChartOptions, liveMode?: boolean): EChartsOption {
     if (liveMode && series.length > 1) {
       const total = series.length;
       const isNewest = index === total - 1;
-      // Opacity: oldest ~0.12, newest 1.0
       const opacity = isNewest
         ? 1.0
         : 0.12 + (0.5 * index) / Math.max(total - 2, 1);
@@ -136,6 +150,7 @@ function buildOption(data?: ChartOptions, liveMode?: boolean): EChartsOption {
         name: s.name,
         type: "line",
         data: s.data,
+        color: isNewest ? "#2563eb" : "#94a3b8",
         lineStyle: {
           width: isNewest ? 2.5 : 1.5,
           opacity,

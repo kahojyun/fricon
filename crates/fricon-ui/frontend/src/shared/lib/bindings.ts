@@ -208,9 +208,21 @@ export type LineChartDataOptions = {
 	complexViews: ComplexViewOption[] | null,
 } & (ChartCommonOptions);
 
-export type LiveChartDataOptions = {
+export type LiveChartDataOptions = { chartType: "line" } & (LiveLineOptions) | { chartType: "heatmap" } & (LiveHeatmapOptions) | { chartType: "scatter" } & (LiveScatterOptions);
+
+export type LiveHeatmapOptions = {
+	series: string,
+	complexViewSingle: ComplexViewOption | null,
+};
+
+export type LiveLineOptions = {
 	series: string,
 	complexView: ComplexViewOption | null,
+	tailCount: number,
+};
+
+export type LiveScatterOptions = {
+	scatter: ScatterModeOptions,
 	tailCount: number,
 };
 
