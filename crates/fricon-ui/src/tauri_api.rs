@@ -180,9 +180,7 @@ pub(crate) fn specta_builder() -> Builder {
 }
 
 pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
-    let language = specta_typescript::Typescript::default()
-        .header("// @ts-nocheck")
-        .bigint(specta_typescript::BigIntExportBehavior::Number);
+    let language = specta_typescript::Typescript::default().header("// @ts-nocheck");
     specta_builder()
         .export(language, path)
         .map_err(|err| anyhow::anyhow!("Failed to export TypeScript bindings: {err}"))
