@@ -623,6 +623,9 @@ impl DatasetWriter {
 impl DatasetWriter {
     /// Write a row of values to the dataset.
     ///
+    /// Rows are buffered client-side and flushed automatically every second or
+    /// once 16 rows have accumulated.
+    ///
     /// Parameters:
     ///     kwargs: Names and values in the row.
     #[pyo3(signature = (**kwargs))]
@@ -638,6 +641,9 @@ impl DatasetWriter {
     }
 
     /// Write a row of values to the dataset.
+    ///
+    /// Rows are buffered client-side and flushed automatically every second or
+    /// once 16 rows have accumulated.
     ///
     /// Parameters:
     ///     values: A dictionary of names and values in the row.

@@ -1,12 +1,15 @@
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    pin::pin,
     sync::Arc,
+    time::Duration,
 };
 
 use arrow_array::RecordBatch;
 use arrow_ipc::writer::StreamWriter;
 use arrow_schema::{ArrowError, SchemaRef};
+use arrow_select::concat::concat_batches;
 use async_stream::stream;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
@@ -14,6 +17,7 @@ use futures::prelude::*;
 use hyper_util::rt::TokioIo;
 use thiserror::Error;
 use tokio::{sync::mpsc, task::JoinHandle};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Code, Request, Status, transport::Channel};
 use tower::service_fn;
 use tracing::{debug, error, info, instrument, warn};
@@ -104,6 +108,8 @@ pub enum ClientError {
 }
 
 const MAX_PAYLOAD_CHUNK_SIZE: usize = 1024 * 1024;
+const MAX_BATCH_ROWS: usize = 16;
+const BATCH_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExistingUiProbeResult {
@@ -448,12 +454,40 @@ impl Drop for DatasetWriter {
     }
 }
 
+fn flush_batches(
+    writer: &mut StreamWriter<bytes::buf::Writer<BytesMut>>,
+    batches: &[RecordBatch],
+    arrow_schema: &SchemaRef,
+) -> Result<Bytes, ArrowError> {
+    let combined = concat_batches(arrow_schema, batches)?;
+    writer.write(&combined)?;
+    Ok(writer.get_mut().get_mut().split().freeze())
+}
+
+fn payload_request(chunk: Bytes) -> CreateRequest {
+    CreateRequest {
+        create_message: Some(CreateMessage::Payload(chunk)),
+    }
+}
+
+fn abort_request() -> CreateRequest {
+    CreateRequest {
+        create_message: Some(CreateMessage::Abort(CreateAbort {})),
+    }
+}
+
+fn finish_request() -> CreateRequest {
+    CreateRequest {
+        create_message: Some(CreateMessage::Finish(CreateFinish {})),
+    }
+}
+
 fn build_request_stream(
     name: String,
     description: String,
     tags: Vec<String>,
     arrow_schema: SchemaRef,
-    mut message_rx: mpsc::Receiver<StreamMessage>,
+    message_rx: mpsc::Receiver<StreamMessage>,
 ) -> impl Stream<Item = CreateRequest> {
     stream! {
         yield CreateRequest {
@@ -469,69 +503,77 @@ fn build_request_stream(
             Ok(writer) => writer,
             Err(e) => {
                 error!(error = %e, "Failed to initialize dataset stream writer");
-                yield CreateRequest {
-                    create_message: Some(CreateMessage::Abort(CreateAbort {})),
-                };
+                yield abort_request();
                 return;
             }
         };
 
         let schema_chunk = writer.get_mut().get_mut().split().freeze();
-        for payload_chunk in split_payload_chunk(schema_chunk) {
-            yield CreateRequest {
-                create_message: Some(CreateMessage::Payload(payload_chunk)),
-            };
+        for chunk in split_payload_chunk(schema_chunk) {
+            yield payload_request(chunk);
         }
 
-        while let Some(message) = message_rx.recv().await {
-            match message {
-                StreamMessage::Batch(batch) => {
-                    if let Err(e) = writer.write(&batch) {
-                        error!(error = %e, "Failed to write batch to dataset stream");
-                        yield CreateRequest {
-                            create_message: Some(CreateMessage::Abort(CreateAbort {})),
-                        };
-                        return;
-                    }
-                    let chunk = writer.get_mut().get_mut().split().freeze();
-                    for payload_chunk in split_payload_chunk(chunk) {
-                        yield CreateRequest {
-                            create_message: Some(CreateMessage::Payload(payload_chunk)),
-                        };
+        let mut chunked = pin!(tokio_stream::StreamExt::chunks_timeout(
+            ReceiverStream::new(message_rx),
+            MAX_BATCH_ROWS,
+            BATCH_FLUSH_INTERVAL,
+        ));
+
+        while let Some(messages) = chunked.next().await {
+            let mut batches = Vec::new();
+            let mut terminal = None;
+            for msg in messages {
+                match msg {
+                    StreamMessage::Batch(batch) => batches.push(batch),
+                    other => {
+                        terminal = Some(other);
+                        break;
                     }
                 }
-                StreamMessage::Finish => {
+            }
+
+            if !batches.is_empty() {
+                let best_effort = matches!(&terminal, Some(StreamMessage::Abort));
+                match flush_batches(&mut writer, &batches, &arrow_schema) {
+                    Ok(chunk) => {
+                        for payload_chunk in split_payload_chunk(chunk) {
+                            yield payload_request(payload_chunk);
+                        }
+                    }
+                    Err(e) if !best_effort => {
+                        error!(error = %e, "Failed to write batch to dataset stream");
+                        yield abort_request();
+                        return;
+                    }
+                    Err(_) => {}
+                }
+            }
+
+            match terminal {
+                Some(StreamMessage::Finish) => {
                     if let Err(e) = writer.finish() {
                         error!(error = %e, "Failed to finish dataset stream writer");
-                        yield CreateRequest {
-                            create_message: Some(CreateMessage::Abort(CreateAbort {})),
-                        };
+                        yield abort_request();
                         return;
                     }
                     let eos_chunk = writer.get_mut().get_mut().split().freeze();
-                    for payload_chunk in split_payload_chunk(eos_chunk) {
-                        yield CreateRequest {
-                            create_message: Some(CreateMessage::Payload(payload_chunk)),
-                        };
+                    for chunk in split_payload_chunk(eos_chunk) {
+                        yield payload_request(chunk);
                     }
-                    yield CreateRequest {
-                        create_message: Some(CreateMessage::Finish(CreateFinish {})),
-                    };
+                    yield finish_request();
                     return;
                 }
-                StreamMessage::Abort => {
-                    yield CreateRequest {
-                        create_message: Some(CreateMessage::Abort(CreateAbort {})),
-                    };
+                Some(StreamMessage::Abort) => {
+                    yield abort_request();
                     return;
                 }
+                _ => {}
             }
         }
 
+        // Channel closed without finish/abort.
         warn!("Dataset stream closed without finish/abort; sending abort");
-        yield CreateRequest {
-            create_message: Some(CreateMessage::Abort(CreateAbort {})),
-        };
+        yield abort_request();
     }
 }
 
