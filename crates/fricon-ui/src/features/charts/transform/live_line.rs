@@ -3,26 +3,17 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
+use super::{compute_sweep_groups, sweep_name};
 use crate::features::charts::types::{
     ChartDataResponse, ChartType, ComplexViewOption, LiveLineOptions, Series,
     transform_complex_values,
 };
-
-fn sweep_name(age: usize, total: usize) -> String {
-    if age == total - 1 {
-        "current".to_string()
-    } else {
-        let offset = total - 1 - age;
-        format!("-{offset}")
-    }
-}
 
 /// Build live line series for **trace** columns.
 ///
 /// Each row in the batch is one sweep. We take the last `tail_count` rows,
 /// expand each row's trace, and produce one `Series` per row.
 fn build_trace_live_series(
-    _batch: &RecordBatch,
     series_name: &str,
     series_array: &DatasetArray,
     is_complex: bool,
@@ -86,14 +77,11 @@ fn build_scalar_live_series(
     complex_view: Option<ComplexViewOption>,
     tail_count: usize,
 ) -> Result<(String, Vec<Series>)> {
-    let column_names: Vec<&str> = schema.columns().keys().map(|k| k.as_str()).collect();
+    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
 
     // Most-frequent index = last index column
     let mfi_idx = *index_columns.last().context("No index columns")?;
     let mfi_name = column_names[mfi_idx];
-
-    // The outer indices are everything except the most-frequent
-    let outer_indices = &index_columns[..index_columns.len() - 1];
 
     // Extract x-axis values (most-frequent index)
     let x_array = batch
@@ -111,35 +99,15 @@ fn build_scalar_live_series(
         .context("Series column not found")?;
     let ds_y: DatasetArray = series_column.clone().try_into()?;
 
-    // Extract outer index values for grouping
-    let outer_columns: Vec<Vec<f64>> = outer_indices
-        .iter()
-        .map(|&idx| {
-            let name = column_names[idx];
-            let arr = batch.column_by_name(name).unwrap();
-            let ds: DatasetArray = arr.clone().try_into().unwrap();
-            ds.as_numeric().unwrap().values().to_vec()
-        })
-        .collect();
-
-    // Group rows by outer index key transitions.
-    // A new group starts when any outer index value changes from the previous row.
     let num_rows = batch.num_rows();
     if num_rows == 0 {
         return Ok((mfi_name.to_string(), vec![]));
     }
 
-    let mut group_starts: Vec<usize> = vec![0];
-    for row in 1..num_rows {
-        let changed = outer_columns.iter().any(|col| col[row] != col[row - 1]);
-        if changed {
-            group_starts.push(row);
-        }
-    }
-
-    // Take the last `tail_count` groups
-    let start_group = group_starts.len().saturating_sub(tail_count);
-    let selected_groups = &group_starts[start_group..];
+    // Compute sweep groups and take the last `tail_count`
+    let groups = compute_sweep_groups(batch, schema, Some(index_columns));
+    let start_group = groups.len().saturating_sub(tail_count);
+    let selected_groups = &groups[start_group..];
     let total = selected_groups.len();
 
     let mut series_list = Vec::new();
@@ -267,7 +235,6 @@ pub(crate) fn build_live_line_series(
             .context("Column not found")?;
         let series_array: DatasetArray = series_column.try_into()?;
         build_trace_live_series(
-            batch,
             series_name,
             &series_array,
             is_complex,
@@ -304,4 +271,101 @@ pub(crate) fn build_live_line_series(
         y_categories: None,
         series,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::charts::transform::test_utils::{numeric_batch, numeric_schema};
+
+    /// 9 rows, 2 index columns (sweep, freq), series "val".
+    /// sweep transitions at rows 0, 3, 6 → 3 groups of 3.
+    fn sample_indexed_batch() -> (RecordBatch, DatasetSchema) {
+        let batch = numeric_batch(&[
+            ("sweep", &[1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0]),
+            (
+                "freq",
+                &[10.0, 20.0, 30.0, 10.0, 20.0, 30.0, 10.0, 20.0, 30.0],
+            ),
+            ("val", &[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
+        ]);
+        let schema = numeric_schema(&["sweep", "freq", "val"]);
+        (batch, schema)
+    }
+
+    #[test]
+    fn scalar_with_index_groups_by_sweep() {
+        let (batch, schema) = sample_indexed_batch();
+        let options = LiveLineOptions {
+            series: "val".to_string(),
+            complex_view: None,
+            tail_count: 10,
+        };
+        let res = build_live_line_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
+
+        assert_eq!(res.r#type, ChartType::Line);
+        assert_eq!(res.x_name, "freq"); // MFI = last index column
+        assert_eq!(res.series.len(), 3);
+        assert_eq!(res.series[0].name, "-2");
+        assert_eq!(res.series[1].name, "-1");
+        assert_eq!(res.series[2].name, "current");
+        // First sweep: freq=[10,20,30], val=[0.1,0.2,0.3]
+        assert_eq!(
+            res.series[0].data,
+            vec![vec![10.0, 0.1], vec![20.0, 0.2], vec![30.0, 0.3]]
+        );
+    }
+
+    #[test]
+    fn scalar_with_index_respects_tail_count() {
+        let (batch, schema) = sample_indexed_batch();
+        let options = LiveLineOptions {
+            series: "val".to_string(),
+            complex_view: None,
+            tail_count: 2,
+        };
+        let res = build_live_line_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
+
+        assert_eq!(res.series.len(), 2);
+        assert_eq!(res.series[0].name, "-1");
+        assert_eq!(res.series[1].name, "current");
+        // Only last 2 sweeps: sweep=2 and sweep=3
+        assert_eq!(
+            res.series[1].data,
+            vec![vec![10.0, 0.7], vec![20.0, 0.8], vec![30.0, 0.9]]
+        );
+    }
+
+    #[test]
+    fn scalar_no_index_shows_last_n_points() {
+        let batch = numeric_batch(&[("val", &[1.0, 2.0, 3.0, 4.0, 5.0])]);
+        let schema = numeric_schema(&["val"]);
+        let options = LiveLineOptions {
+            series: "val".to_string(),
+            complex_view: None,
+            tail_count: 3,
+        };
+        let res = build_live_line_series(&batch, &schema, None, &options).unwrap();
+
+        assert_eq!(res.x_name, "row");
+        assert_eq!(res.series.len(), 1);
+        assert_eq!(res.series[0].name, "val");
+        assert_eq!(
+            res.series[0].data,
+            vec![vec![2.0, 3.0], vec![3.0, 4.0], vec![4.0, 5.0]]
+        );
+    }
+
+    #[test]
+    fn empty_batch_returns_no_series() {
+        let batch = numeric_batch(&[("val", &[])]);
+        let schema = numeric_schema(&["val"]);
+        let options = LiveLineOptions {
+            series: "val".to_string(),
+            complex_view: None,
+            tail_count: 5,
+        };
+        let res = build_live_line_series(&batch, &schema, None, &options).unwrap();
+        assert!(res.series.is_empty() || res.series[0].data.is_empty());
+    }
 }

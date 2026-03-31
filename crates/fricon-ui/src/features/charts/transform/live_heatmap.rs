@@ -3,9 +3,9 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
-use super::heatmap::build_heatmap_series;
+use super::{heatmap::build_heatmap_series, last_outer_group_start};
 use crate::features::charts::types::{
-    ChartCommonOptions, ChartDataResponse, ComplexViewOption, HeatmapChartDataOptions,
+    ChartCommonOptions, ChartDataResponse, ChartType, ComplexViewOption, HeatmapChartDataOptions,
     LiveHeatmapOptions, Series, complex_view_label, transform_complex_values,
 };
 
@@ -48,7 +48,7 @@ pub(crate) fn build_live_heatmap_series(
         .filter(|c| c.len() >= 2)
         .context("Live heatmap requires at least two index columns")?;
 
-    let column_names: Vec<&str> = schema.columns().keys().map(|k| k.as_str()).collect();
+    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
     let mfi_idx = *idx_cols.last().context("No index columns")?;
     let second_mfi_idx = idx_cols[idx_cols.len() - 2];
     let mfi_name = column_names[mfi_idx];
@@ -56,27 +56,9 @@ pub(crate) fn build_live_heatmap_series(
 
     // Crop to the last outer-index group (outermost indices, excluding the two
     // most-frequent ones).
-    let outer_indices = &idx_cols[..idx_cols.len().saturating_sub(2)];
+    let outer_count = idx_cols.len().saturating_sub(2);
     let num_rows = batch.num_rows();
-    let start = if !outer_indices.is_empty() && num_rows > 0 {
-        let outer_columns: Vec<Vec<f64>> = outer_indices
-            .iter()
-            .map(|&idx| {
-                let arr = batch.column_by_name(column_names[idx]).unwrap();
-                let ds: DatasetArray = arr.clone().try_into().unwrap();
-                ds.as_numeric().unwrap().values().to_vec()
-            })
-            .collect();
-        let mut last_group_start = 0;
-        for row in 1..num_rows {
-            if outer_columns.iter().any(|col| col[row] != col[row - 1]) {
-                last_group_start = row;
-            }
-        }
-        last_group_start
-    } else {
-        0
-    };
+    let start = last_outer_group_start(batch, schema, idx_cols, outer_count);
 
     let cropped = batch.slice(start, num_rows - start);
 
@@ -111,11 +93,11 @@ fn build_trace_live_heatmap(
         .unwrap_or(ComplexViewOption::Mag);
 
     // For traces, fall back to showing just the last row (or last sweep group)
-    let column_names: Vec<&str> = schema.columns().keys().map(|k| k.as_str()).collect();
+    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
     let num_rows = batch.num_rows();
     if num_rows == 0 {
         return Ok(ChartDataResponse {
-            r#type: crate::features::charts::types::ChartType::Heatmap,
+            r#type: ChartType::Heatmap,
             x_name: format!("{series_name} - X"),
             y_name: None,
             x_categories: None,
@@ -133,22 +115,8 @@ fn build_trace_live_heatmap(
     let start = if let Some(idx_cols) = index_columns
         && idx_cols.len() >= 2
     {
-        let outer_indices = &idx_cols[..idx_cols.len() - 1];
-        let outer_columns: Vec<Vec<f64>> = outer_indices
-            .iter()
-            .map(|&idx| {
-                let arr = batch.column_by_name(column_names[idx]).unwrap();
-                let ds: DatasetArray = arr.clone().try_into().unwrap();
-                ds.as_numeric().unwrap().values().to_vec()
-            })
-            .collect();
-        let mut last_group_start = 0;
-        for row in 1..num_rows {
-            if outer_columns.iter().any(|col| col[row] != col[row - 1]) {
-                last_group_start = row;
-            }
-        }
-        last_group_start
+        let outer_count = idx_cols.len() - 1;
+        last_outer_group_start(batch, schema, idx_cols, outer_count)
     } else {
         0
     };
@@ -160,9 +128,9 @@ fn build_trace_live_heatmap(
         .try_into()?;
 
     let y_values: Option<Vec<f64>> = y_column_name.map(|name| {
-        let arr = batch.column_by_name(name).unwrap();
-        let ds: DatasetArray = arr.clone().try_into().unwrap();
-        ds.as_numeric().unwrap().values().to_vec()
+        let arr = batch.column_by_name(name).expect("y column present");
+        let ds: DatasetArray = arr.clone().try_into().expect("valid array");
+        ds.as_numeric().expect("numeric column").values().to_vec()
     });
 
     let mut data = Vec::new();
@@ -170,6 +138,10 @@ fn build_trace_live_heatmap(
         let Some((x_values, trace_values)) = series_array.expand_trace(row)? else {
             continue;
         };
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Row index is unlikely to exceed 2^53"
+        )]
         let y_val = y_values
             .as_ref()
             .and_then(|v| v.get(row).copied())
@@ -201,18 +173,70 @@ fn build_trace_live_heatmap(
     let name = if is_complex {
         format!("{series_name} ({})", complex_view_label(view_option))
     } else {
-        series_name.to_string()
+        series_name.clone()
     };
 
     let mut series = vec![Series { name, data }];
     let (x_categories, y_categories) = super::heatmap::normalize_heatmap_series(&mut series);
 
     Ok(ChartDataResponse {
-        r#type: crate::features::charts::types::ChartType::Heatmap,
+        r#type: ChartType::Heatmap,
         x_name: format!("{series_name} - X"),
-        y_name: y_column_name.map(|s| s.to_string()),
+        y_name: y_column_name.map(str::to_string),
         x_categories: Some(x_categories),
         y_categories: Some(y_categories),
         series,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::charts::{
+        transform::test_utils::{numeric_batch, numeric_schema},
+        types::ChartType,
+    };
+
+    /// 9 rows: 3 outer sweeps × 3 inner points.
+    /// Index columns: sweep (outer), freq (MFI-2), point (MFI).
+    /// Only the last outer sweep should appear.
+    #[test]
+    fn scalar_shows_only_last_sweep() {
+        let batch = numeric_batch(&[
+            ("sweep", &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0]),
+            (
+                "freq",
+                &[10.0, 10.0, 20.0, 20.0, 10.0, 10.0, 10.0, 10.0, 20.0],
+            ),
+            ("point", &[1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0]),
+            ("val", &[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]),
+        ]);
+        let schema = numeric_schema(&["sweep", "freq", "point", "val"]);
+        let options = LiveHeatmapOptions {
+            series: "val".to_string(),
+            complex_view_single: None,
+        };
+        // index_columns = [0 (sweep), 1 (freq), 2 (point)]
+        // MFI = point (last), second-MFI = freq, outer = sweep
+        let res = build_live_heatmap_series(&batch, &schema, Some(&[0, 1, 2]), &options).unwrap();
+
+        assert_eq!(res.r#type, ChartType::Heatmap);
+        // Only rows from the last outer-sweep (sweep=2, rows 6-8) should be included
+        assert_eq!(res.series.len(), 1);
+        // The heatmap should contain data from the last 3 rows only
+        assert_eq!(res.series[0].data.len(), 3);
+    }
+
+    #[test]
+    fn requires_two_index_columns() {
+        let batch = numeric_batch(&[("idx", &[1.0, 2.0, 3.0]), ("val", &[10.0, 20.0, 30.0])]);
+        let schema = numeric_schema(&["idx", "val"]);
+        let options = LiveHeatmapOptions {
+            series: "val".to_string(),
+            complex_view_single: None,
+        };
+        // Only one index column → should error
+        let res = build_live_heatmap_series(&batch, &schema, Some(&[0]), &options);
+        assert!(res.is_err());
+    }
 }

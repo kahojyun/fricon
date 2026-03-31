@@ -3,18 +3,10 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
+use super::{compute_sweep_groups, sweep_name};
 use crate::features::charts::types::{
     ChartDataResponse, ChartType, LiveScatterOptions, ScatterModeOptions, Series,
 };
-
-fn sweep_name(age: usize, total: usize) -> String {
-    if age == total - 1 {
-        "current".to_string()
-    } else {
-        let offset = total - 1 - age;
-        format!("-{offset}")
-    }
-}
 
 /// Build live scatter series split into per-sweep groups so the frontend can
 /// apply color/opacity differentiation between old and current sweeps.
@@ -226,41 +218,80 @@ fn build_xy_live(
     Ok((x_column.to_string(), y_column.to_string(), result))
 }
 
-/// Compute sweep group start indices based on outer index column transitions.
-/// Falls back to one-row-per-group when there are fewer than two index columns.
-fn compute_sweep_groups(
-    batch: &RecordBatch,
-    schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
-) -> Vec<usize> {
-    let num_rows = batch.num_rows();
-    if num_rows == 0 {
-        return vec![];
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::charts::transform::test_utils::{numeric_batch, numeric_schema};
+
+    /// 9 rows: 3 sweeps of 3 points each.
+    fn sample_xy_batch() -> (RecordBatch, DatasetSchema) {
+        let batch = numeric_batch(&[
+            ("sweep", &[1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0]),
+            ("x", &[0.1, 0.2, 0.3, 0.1, 0.2, 0.3, 0.1, 0.2, 0.3]),
+            ("y", &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]),
+        ]);
+        let schema = numeric_schema(&["sweep", "x", "y"]);
+        (batch, schema)
     }
 
-    if let Some(idx_cols) = index_columns
-        && idx_cols.len() >= 2
-    {
-        let column_names: Vec<&str> = schema.columns().keys().map(|k| k.as_str()).collect();
-        let outer_indices = &idx_cols[..idx_cols.len() - 1];
-        let outer_columns: Vec<Vec<f64>> = outer_indices
-            .iter()
-            .map(|&idx| {
-                let arr = batch.column_by_name(column_names[idx]).unwrap();
-                let ds: DatasetArray = arr.clone().try_into().unwrap();
-                ds.as_numeric().unwrap().values().to_vec()
-            })
-            .collect();
+    #[test]
+    fn xy_splits_per_sweep() {
+        let (batch, schema) = sample_xy_batch();
+        let options = LiveScatterOptions {
+            scatter: ScatterModeOptions::Xy {
+                x_column: "x".to_string(),
+                y_column: "y".to_string(),
+                bin_column: None,
+            },
+            tail_count: 10,
+        };
+        let res = build_live_scatter_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
 
-        let mut group_starts = vec![0_usize];
-        for row in 1..num_rows {
-            if outer_columns.iter().any(|col| col[row] != col[row - 1]) {
-                group_starts.push(row);
-            }
-        }
-        group_starts
-    } else {
-        // No meaningful grouping: each row is its own "sweep"
-        (0..num_rows).collect()
+        assert_eq!(res.r#type, ChartType::Scatter);
+        assert_eq!(res.series.len(), 3);
+        assert_eq!(res.series[0].name, "-2");
+        assert_eq!(res.series[2].name, "current");
+        assert_eq!(
+            res.series[2].data,
+            vec![vec![0.1, 7.0], vec![0.2, 8.0], vec![0.3, 9.0]]
+        );
+    }
+
+    #[test]
+    fn xy_respects_tail_count() {
+        let (batch, schema) = sample_xy_batch();
+        let options = LiveScatterOptions {
+            scatter: ScatterModeOptions::Xy {
+                x_column: "x".to_string(),
+                y_column: "y".to_string(),
+                bin_column: None,
+            },
+            tail_count: 2,
+        };
+        let res = build_live_scatter_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
+
+        assert_eq!(res.series.len(), 2);
+        assert_eq!(res.series[0].name, "-1");
+        assert_eq!(res.series[1].name, "current");
+    }
+
+    #[test]
+    fn xy_no_index_each_row_is_sweep() {
+        let batch = numeric_batch(&[("x", &[1.0, 2.0, 3.0]), ("y", &[10.0, 20.0, 30.0])]);
+        let schema = numeric_schema(&["x", "y"]);
+        let options = LiveScatterOptions {
+            scatter: ScatterModeOptions::Xy {
+                x_column: "x".to_string(),
+                y_column: "y".to_string(),
+                bin_column: None,
+            },
+            tail_count: 2,
+        };
+        let res = build_live_scatter_series(&batch, &schema, None, &options).unwrap();
+
+        // Without 2+ index columns, each row is its own "sweep"
+        assert_eq!(res.series.len(), 2);
+        assert_eq!(res.series[1].name, "current");
+        assert_eq!(res.series[1].data, vec![vec![3.0, 30.0]]);
     }
 }
