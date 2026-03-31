@@ -49,9 +49,10 @@ type EChartsOption = echarts.ComposeOption<
 
 interface ChartWrapperProps {
   data?: ChartOptions;
+  liveMode?: boolean;
 }
 
-function buildOption(data?: ChartOptions): EChartsOption {
+function buildOption(data?: ChartOptions, liveMode?: boolean): EChartsOption {
   if (!data) return {};
 
   if (data.type === "heatmap") {
@@ -123,24 +124,43 @@ function buildOption(data?: ChartOptions): EChartsOption {
   }
 
   const { xName, series } = data;
-  const seriesOption = series.map(
-    (s): LineSeriesOption => ({
+  const seriesOption = series.map((s, index): LineSeriesOption => {
+    if (liveMode && series.length > 1) {
+      const total = series.length;
+      const isNewest = index === total - 1;
+      // Opacity: oldest ~0.12, newest 1.0
+      const opacity = isNewest
+        ? 1.0
+        : 0.12 + (0.5 * index) / Math.max(total - 2, 1);
+      return {
+        name: s.name,
+        type: "line",
+        data: s.data,
+        lineStyle: {
+          width: isNewest ? 2.5 : 1.5,
+          opacity,
+        },
+        itemStyle: { opacity: 0 },
+        showSymbol: false,
+      };
+    }
+    return {
       name: s.name,
       type: "line",
       data: s.data,
-    }),
-  );
+    };
+  });
   return {
     animation: false,
     xAxis: { type: "value", name: xName },
     yAxis: { type: "value" },
-    legend: {},
-    tooltip: { trigger: "axis" },
+    legend: liveMode ? { show: false } : {},
+    tooltip: liveMode ? { show: false } : { trigger: "axis" },
     series: seriesOption,
   };
 }
 
-export function ChartWrapper({ data }: ChartWrapperProps) {
+export function ChartWrapper({ data, liveMode }: ChartWrapperProps) {
   const { resolvedTheme } = useTheme();
   const theme = resolvedTheme === "dark" ? "dark" : "default";
 
@@ -149,7 +169,7 @@ export function ChartWrapper({ data }: ChartWrapperProps) {
       <ReactEChartsCore
         echarts={echarts}
         style={{ width: "100%", height: "100%" }}
-        option={buildOption(data)}
+        option={buildOption(data, liveMode)}
         notMerge
         lazyUpdate
         theme={theme}

@@ -11,10 +11,10 @@ use crate::{
     desktop_runtime::session::WorkspaceSession,
     features::charts::{
         transform::{
-            build_heatmap_series, build_line_series, build_scatter_series,
+            build_heatmap_series, build_line_series, build_live_line_series, build_scatter_series,
             mapping::build_chart_selected_columns,
         },
-        types::ChartDataResponse,
+        types::{ChartDataResponse, LiveChartDataOptions},
     },
 };
 
@@ -103,6 +103,52 @@ pub(crate) async fn dataset_chart_data(
             cols = batch.num_columns(),
             error = %err,
             "Failed to build dataset chart data"
+        );
+    }
+    result
+}
+
+#[instrument(level = "debug", skip(session, options), fields(dataset_id = id))]
+pub(crate) async fn dataset_live_chart_data(
+    session: &WorkspaceSession,
+    id: i32,
+    options: &LiveChartDataOptions,
+) -> anyhow::Result<ChartDataResponse> {
+    let dataset = session.dataset(id).await?;
+    let schema = dataset.schema();
+    let index_columns = dataset.index_columns();
+
+    // For live mode, read all data (the backend already keeps recent data efficient
+    // via in-memory write session buffers)
+    let (output_schema, batches) = dataset
+        .select_data(&SelectOptions {
+            start: Bound::Unbounded,
+            end: Bound::Unbounded,
+            index_filters: None,
+            selected_columns: None,
+        })
+        .context("Failed to select data")?;
+
+    let batch = if batches.is_empty() {
+        RecordBatch::new_empty(output_schema)
+    } else {
+        concat_batches(&output_schema, &batches).context("Failed to concat batches")?
+    };
+    debug!(
+        dataset_id = id,
+        rows = batch.num_rows(),
+        cols = batch.num_columns(),
+        tail_count = options.tail_count,
+        "Building live chart data"
+    );
+
+    let result = build_live_line_series(&batch, schema, index_columns.as_deref(), options);
+    if let Err(err) = &result {
+        error!(
+            dataset_id = id,
+            rows = batch.num_rows(),
+            error = %err,
+            "Failed to build live chart data"
         );
     }
     result

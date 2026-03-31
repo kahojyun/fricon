@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ColumnInfo } from "../api/types";
+import type { ColumnInfo, DatasetStatus } from "../api/types";
 import type {
   ChartType,
   ComplexViewOption,
@@ -10,6 +10,7 @@ import { deriveChartViewerState } from "../model/chartViewerLogic";
 export interface ChartViewerControlState {
   selectedComplexView: ComplexViewOption[];
   selectedComplexViewSingle: ComplexViewOption;
+  isLiveMode: boolean;
 }
 
 export interface ChartViewerControlActions {
@@ -26,9 +27,13 @@ export interface ChartViewerControlActions {
   setScatterBinName: (next: string | null) => void;
   setSelectedComplexView: (next: ComplexViewOption[]) => void;
   setSelectedComplexViewSingle: (next: ComplexViewOption) => void;
+  setLiveMode: (next: boolean) => void;
 }
 
-export function useChartViewerSelection(columns: ColumnInfo[]) {
+export function useChartViewerSelection(
+  columns: ColumnInfo[],
+  datasetStatus?: DatasetStatus,
+) {
   const [chartType, setChartType] = useState<ChartType>("line");
   const [selectedComplexView, setSelectedComplexView] = useState<
     ComplexViewOption[]
@@ -54,6 +59,21 @@ export function useChartViewerSelection(columns: ColumnInfo[]) {
   const [scatterYName, setScatterYName] = useState<string | null>(null);
   const [scatterBinName, setScatterBinName] = useState<string | null>(null);
 
+  const [isLiveMode, setIsLiveMode] = useState(datasetStatus === "Writing");
+
+  // Auto-toggle live mode on dataset status transitions.
+  // Uses the "adjusting state during rendering" pattern (stores previous
+  // status in state instead of using an effect) so the React compiler is happy.
+  const [prevDatasetStatus, setPrevDatasetStatus] = useState(datasetStatus);
+  if (prevDatasetStatus !== datasetStatus) {
+    setPrevDatasetStatus(datasetStatus);
+    if (datasetStatus === "Writing") {
+      setIsLiveMode(true);
+    } else if (prevDatasetStatus === "Writing") {
+      setIsLiveMode(false);
+    }
+  }
+
   const derived = deriveChartViewerState(columns, {
     chartType,
     seriesName,
@@ -71,6 +91,7 @@ export function useChartViewerSelection(columns: ColumnInfo[]) {
   const controlState: ChartViewerControlState = {
     selectedComplexView,
     selectedComplexViewSingle,
+    isLiveMode,
   };
 
   const actions: ChartViewerControlActions = {
@@ -87,6 +108,7 @@ export function useChartViewerSelection(columns: ColumnInfo[]) {
     setScatterBinName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
+    setLiveMode: setIsLiveMode,
   };
 
   return {

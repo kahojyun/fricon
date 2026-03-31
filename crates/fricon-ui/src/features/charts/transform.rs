@@ -1,10 +1,12 @@
 pub(crate) mod heatmap;
 pub(crate) mod line;
+pub(crate) mod live_line;
 pub(crate) mod mapping;
 pub(crate) mod scatter;
 
 pub(crate) use self::{
-    heatmap::build_heatmap_series, line::build_line_series, scatter::build_scatter_series,
+    heatmap::build_heatmap_series, line::build_line_series, live_line::build_live_line_series,
+    scatter::build_scatter_series,
 };
 
 #[cfg(test)]

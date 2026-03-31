@@ -1,0 +1,307 @@
+use anyhow::{Context, Result};
+use arrow_array::RecordBatch;
+use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
+use tracing::debug;
+
+use crate::features::charts::types::{
+    ChartDataResponse, ChartType, ComplexViewOption, LiveChartDataOptions, Series,
+    transform_complex_values,
+};
+
+fn sweep_name(age: usize, total: usize) -> String {
+    if age == total - 1 {
+        "current".to_string()
+    } else {
+        let offset = total - 1 - age;
+        format!("-{offset}")
+    }
+}
+
+/// Build live line series for **trace** columns.
+///
+/// Each row in the batch is one sweep. We take the last `tail_count` rows,
+/// expand each row's trace, and produce one `Series` per row.
+fn build_trace_live_series(
+    _batch: &RecordBatch,
+    series_name: &str,
+    series_array: &DatasetArray,
+    is_complex: bool,
+    complex_view: Option<ComplexViewOption>,
+    tail_count: usize,
+) -> Result<(String, Vec<Series>)> {
+    let num_rows = series_array.num_rows();
+    let start = num_rows.saturating_sub(tail_count);
+    let x_name = format!("{series_name} - X");
+
+    let mut series = Vec::new();
+    let total = num_rows - start;
+    for (age, row) in (start..num_rows).enumerate() {
+        let Some((x_values, y_values_array)) = series_array
+            .expand_trace(row)
+            .with_context(|| format!("Failed to expand trace row {row}"))?
+        else {
+            continue;
+        };
+        if x_values.is_empty() {
+            continue;
+        }
+
+        let ds_y: DatasetArray = y_values_array.try_into()?;
+        let name = sweep_name(age, total);
+
+        if is_complex {
+            let complex_array = ds_y.as_complex().context("Expected complex array")?;
+            let reals = complex_array.real().values();
+            let imags = complex_array.imag().values();
+            let view = complex_view.unwrap_or(ComplexViewOption::Mag);
+            let y_values = transform_complex_values(reals, imags, view);
+            let len = x_values.len().min(y_values.len());
+            let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
+            series.push(Series { name, data });
+        } else {
+            let y_values = ds_y
+                .as_numeric()
+                .context("Expected numeric array")?
+                .values();
+            let len = x_values.len().min(y_values.len());
+            let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
+            series.push(Series { name, data });
+        }
+    }
+
+    Ok((x_name, series))
+}
+
+/// Build live line series for **scalar** columns with index grouping.
+///
+/// Rows are grouped by outer index columns (all index columns except the
+/// most-frequent / last one). The most-frequent index becomes the x-axis.
+/// We take the last `tail_count` complete groups.
+fn build_scalar_live_series(
+    batch: &RecordBatch,
+    series_name: &str,
+    index_columns: &[usize],
+    schema: &DatasetSchema,
+    is_complex: bool,
+    complex_view: Option<ComplexViewOption>,
+    tail_count: usize,
+) -> Result<(String, Vec<Series>)> {
+    let column_names: Vec<&str> = schema.columns().keys().map(|k| k.as_str()).collect();
+
+    // Most-frequent index = last index column
+    let mfi_idx = *index_columns.last().context("No index columns")?;
+    let mfi_name = column_names[mfi_idx];
+
+    // The outer indices are everything except the most-frequent
+    let outer_indices = &index_columns[..index_columns.len() - 1];
+
+    // Extract x-axis values (most-frequent index)
+    let x_array = batch
+        .column_by_name(mfi_name)
+        .context("MFI column not found")?;
+    let ds_x: DatasetArray = x_array.clone().try_into()?;
+    let x_values = ds_x
+        .as_numeric()
+        .context("MFI column must be numeric")?
+        .values();
+
+    // Extract series y-values
+    let series_column = batch
+        .column_by_name(series_name)
+        .context("Series column not found")?;
+    let ds_y: DatasetArray = series_column.clone().try_into()?;
+
+    // Extract outer index values for grouping
+    let outer_columns: Vec<Vec<f64>> = outer_indices
+        .iter()
+        .map(|&idx| {
+            let name = column_names[idx];
+            let arr = batch.column_by_name(name).unwrap();
+            let ds: DatasetArray = arr.clone().try_into().unwrap();
+            ds.as_numeric().unwrap().values().to_vec()
+        })
+        .collect();
+
+    // Group rows by outer index key transitions.
+    // A new group starts when any outer index value changes from the previous row.
+    let num_rows = batch.num_rows();
+    if num_rows == 0 {
+        return Ok((mfi_name.to_string(), vec![]));
+    }
+
+    let mut group_starts: Vec<usize> = vec![0];
+    for row in 1..num_rows {
+        let changed = outer_columns.iter().any(|col| col[row] != col[row - 1]);
+        if changed {
+            group_starts.push(row);
+        }
+    }
+
+    // Take the last `tail_count` groups
+    let start_group = group_starts.len().saturating_sub(tail_count);
+    let selected_groups = &group_starts[start_group..];
+    let total = selected_groups.len();
+
+    let mut series_list = Vec::new();
+
+    for (age, &group_start) in selected_groups.iter().enumerate() {
+        let group_end = selected_groups.get(age + 1).copied().unwrap_or(num_rows);
+        let name = sweep_name(age, total);
+
+        if is_complex {
+            let complex_array = ds_y.as_complex().context("Expected complex array")?;
+            let reals = complex_array.real().values();
+            let imags = complex_array.imag().values();
+            let view = complex_view.unwrap_or(ComplexViewOption::Mag);
+            let y_values = transform_complex_values(
+                &reals[group_start..group_end],
+                &imags[group_start..group_end],
+                view,
+            );
+            let data = (group_start..group_end)
+                .enumerate()
+                .map(|(i, row)| vec![x_values[row], y_values[i]])
+                .collect();
+            series_list.push(Series { name, data });
+        } else {
+            let y_values = ds_y
+                .as_numeric()
+                .context("Expected numeric array")?
+                .values();
+            let data = (group_start..group_end)
+                .map(|row| vec![x_values[row], y_values[row]])
+                .collect();
+            series_list.push(Series { name, data });
+        }
+    }
+
+    Ok((mfi_name.to_string(), series_list))
+}
+
+/// Build live line series for scalar data **without** index columns.
+///
+/// Simply shows the last `tail_count` data points as a single series.
+fn build_scalar_no_index_live_series(
+    batch: &RecordBatch,
+    series_name: &str,
+    is_complex: bool,
+    complex_view: Option<ComplexViewOption>,
+    tail_count: usize,
+) -> Result<(String, Vec<Series>)> {
+    let series_column = batch
+        .column_by_name(series_name)
+        .context("Series column not found")?;
+    let ds_y: DatasetArray = series_column.clone().try_into()?;
+    let num_rows = batch.num_rows();
+    let start = num_rows.saturating_sub(tail_count);
+    let x_name = "row".to_string();
+
+    let series = if is_complex {
+        let complex_array = ds_y.as_complex().context("Expected complex array")?;
+        let reals = complex_array.real().values();
+        let imags = complex_array.imag().values();
+        let view = complex_view.unwrap_or(ComplexViewOption::Mag);
+        let y_values =
+            transform_complex_values(&reals[start..num_rows], &imags[start..num_rows], view);
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Row index is unlikely to exceed 2^53"
+        )]
+        let data = (start..num_rows)
+            .enumerate()
+            .map(|(i, row)| vec![row as f64, y_values[i]])
+            .collect();
+        vec![Series {
+            name: series_name.to_string(),
+            data,
+        }]
+    } else {
+        let y_values = ds_y
+            .as_numeric()
+            .context("Expected numeric array")?
+            .values();
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "Row index is unlikely to exceed 2^53"
+        )]
+        let data = (start..num_rows)
+            .map(|row| vec![row as f64, y_values[row]])
+            .collect();
+        vec![Series {
+            name: series_name.to_string(),
+            data,
+        }]
+    };
+
+    Ok((x_name, series))
+}
+
+pub(crate) fn build_live_line_series(
+    batch: &RecordBatch,
+    schema: &DatasetSchema,
+    index_columns: Option<&[usize]>,
+    options: &LiveChartDataOptions,
+) -> Result<ChartDataResponse> {
+    let series_name = &options.series;
+    let data_type = *schema
+        .columns()
+        .get(series_name)
+        .context("Column not found")?;
+    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let is_complex = data_type.is_complex();
+    let tail_count = options.tail_count.max(1);
+
+    debug!(
+        chart_type = "live_line",
+        series = %series_name,
+        ?data_type,
+        rows = batch.num_rows(),
+        tail_count,
+        "Building live line chart series"
+    );
+
+    let (x_name, series) = if is_trace {
+        let series_column = batch
+            .column_by_name(series_name)
+            .cloned()
+            .context("Column not found")?;
+        let series_array: DatasetArray = series_column.try_into()?;
+        build_trace_live_series(
+            batch,
+            series_name,
+            &series_array,
+            is_complex,
+            options.complex_view,
+            tail_count,
+        )?
+    } else if let Some(idx_cols) = index_columns
+        && !idx_cols.is_empty()
+    {
+        build_scalar_live_series(
+            batch,
+            series_name,
+            idx_cols,
+            schema,
+            is_complex,
+            options.complex_view,
+            tail_count,
+        )?
+    } else {
+        build_scalar_no_index_live_series(
+            batch,
+            series_name,
+            is_complex,
+            options.complex_view,
+            tail_count,
+        )?
+    };
+
+    Ok(ChartDataResponse {
+        r#type: ChartType::Line,
+        x_name,
+        y_name: None,
+        x_categories: None,
+        y_categories: None,
+        series,
+    })
+}

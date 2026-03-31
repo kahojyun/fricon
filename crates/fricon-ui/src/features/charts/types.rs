@@ -182,3 +182,11 @@ pub(crate) fn complex_view_label(option: ComplexViewOption) -> &'static str {
         ComplexViewOption::Arg => "arg",
     }
 }
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LiveChartDataOptions {
+    pub(crate) series: String,
+    pub(crate) complex_view: Option<ComplexViewOption>,
+    pub(crate) tail_count: usize,
+}

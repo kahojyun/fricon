@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ChartViewerAvailability, DatasetDetail } from "../api/types";
 import type { ComplexViewOption } from "@/shared/lib/chartTypes";
 import { useChartDataQuery } from "../api/useChartDataQuery";
+import { useLiveChartDataQuery } from "../api/useLiveChartDataQuery";
 import { useDatasetWriteStatusQuery } from "../api/useDatasetWriteStatusQuery";
 import { useFilterTableDataQuery } from "../api/useFilterTableDataQuery";
 import { chartKeys } from "../api/queryKeys";
@@ -19,6 +20,7 @@ interface UseChartViewerDataArgs {
   derived: ReturnType<typeof deriveChartViewerState>;
   selectedComplexView: ComplexViewOption[];
   selectedComplexViewSingle: ComplexViewOption;
+  isLiveMode: boolean;
 }
 
 export function useChartViewerData({
@@ -28,13 +30,14 @@ export function useChartViewerData({
   derived,
   selectedComplexView,
   selectedComplexViewSingle,
+  isLiveMode,
 }: UseChartViewerDataArgs) {
   const queryClient = useQueryClient();
   const queriesEnabled = availability === "available";
   const filterTableQuery = useFilterTableDataQuery(
     datasetId,
     derived.excludeColumns,
-    queriesEnabled,
+    queriesEnabled && !isLiveMode,
   );
   const filterTableData = filterTableQuery.data ?? null;
 
@@ -59,6 +62,23 @@ export function useChartViewerData({
     }
   }, [queryClient, datasetId, writeStatus.data?.rowCount]);
 
+  // Build live chart request when in live mode
+  const liveChartRequest =
+    isLiveMode && queriesEnabled && derived.series
+      ? {
+          series: derived.series.name,
+          complexView: derived.series.isComplex
+            ? (selectedComplexViewSingle ?? "mag")
+            : null,
+          tailCount: 5,
+        }
+      : null;
+
+  const liveChartQuery = useLiveChartDataQuery(
+    datasetId,
+    isLiveMode ? liveChartRequest : null,
+  );
+
   const chartRequest = buildChartRequest({
     datasetDetail,
     filterTableData,
@@ -72,14 +92,18 @@ export function useChartViewerData({
 
   const chartQuery = useChartDataQuery(
     datasetId,
-    queriesEnabled ? chartRequest : null,
+    queriesEnabled && !isLiveMode ? chartRequest : null,
   );
-  const chartData = chartQuery.data;
+
+  const activeChartData = isLiveMode ? liveChartQuery.data : chartQuery.data;
+  const activeChartError = isLiveMode ? liveChartQuery.error : chartQuery.error;
+
+  const chartData = activeChartData;
   const chartError = !queriesEnabled
     ? null
-    : chartQuery.error
-      ? chartQuery.error instanceof Error
-        ? chartQuery.error.message
+    : activeChartError
+      ? activeChartError instanceof Error
+        ? activeChartError.message
         : "Failed to load chart data."
       : null;
 
