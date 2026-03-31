@@ -63,6 +63,10 @@ build-backend = "maturin"
 [tool.basedpyright]
 include = ["crates/fricon-py/python", "examples", "crates/fricon-py/tests"]
 
+[[tool.basedpyright.executionEnvironments]]
+root = "crates/fricon-py/python"
+pythonVersion = "3.10"
+
 [tool.maturin]
 features = ["pyo3/extension-module", "prod"]
 include = [
