@@ -64,7 +64,6 @@ jobs:
 
   test:
     name: Test Python
-    needs: [fmt]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -134,7 +133,6 @@ jobs:
 
   build:
     runs-on: ${{ matrix.runner }}
-    needs: [fmt]
     strategy:
       matrix:
         include:
@@ -192,7 +190,6 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
-    needs: [fmt]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: taiki-e/install-action@6ef672efc2b5aabc787a9e94baf4989aa02a97df # v2
@@ -223,7 +220,7 @@ jobs:
   # For branch protection rules
   check:
     if: always()
-    needs: [test, cargo-deny, build, sdist]
+    needs: [fmt, test, cargo-deny, build, sdist]
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed
