@@ -6,5 +6,11 @@
     ":automergeStableNonMajor",
     ":approveMajorUpdates",
     "customManagers:githubActionsVersions"
+  ],
+  "packageRules": [
+    {
+      "extends": [":pinAllExceptPeerDependencies"],
+      "matchManagers": ["npm"]
+    }
   ]
 }
