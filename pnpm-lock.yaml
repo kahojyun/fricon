@@ -4,15 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-catalogs:
-  default:
-    '@types/node':
-      specifier: ^24.12.0
-      version: 24.12.0
-    typescript:
-      specifier: ~6.0.2
-      version: 6.0.2
-
 importers:
 
   .:
@@ -30,7 +21,7 @@ importers:
         specifier: ^2.10.1
         version: 2.10.1
       '@types/node':
-        specifier: 'catalog:'
+        specifier: ^24.12.0
         version: 24.12.0
       dependency-cruiser:
         specifier: ^17.3.9
@@ -154,7 +145,7 @@ importers:
         specifier: ^14.6.1
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/node':
-        specifier: 'catalog:'
+        specifier: ^24.12.0
         version: 24.12.0
       '@types/react':
         specifier: ^19.2.14
@@ -184,7 +175,7 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       typescript:
-        specifier: 'catalog:'
+        specifier: ~6.0.2
         version: 6.0.2
       vite:
         specifier: ^8.0.2
