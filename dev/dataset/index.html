@@ -437,6 +437,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#write-batching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write batching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#type-inference" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -532,6 +543,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#write-batching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write batching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#type-inference" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -617,6 +639,12 @@ classes in the python binding of Arrow:</p>
 is created, the schema of the table is automatically inferred from the first row
 of data written. This allows for flexible data collection without requiring
 manual schema definition.</p>
+<h2 id="write-batching">Write batching</h2>
+<p>Dataset writes are buffered on the client and flushed automatically when either
+16 rows have accumulated or 1 second has elapsed since the first buffered row.
+This keeps the write API row-oriented while reducing transport overhead for
+larger ingests. Calling <code>finish()</code>, <code>abort()</code>, or dropping the writer will flush
+any pending rows before the dataset stream is finalized.</p>
 <h2 id="type-inference">Type inference</h2>
 <p><code>fricon</code> MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:</p>
 <table>
