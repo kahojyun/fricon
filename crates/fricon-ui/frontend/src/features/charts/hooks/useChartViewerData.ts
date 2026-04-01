@@ -101,9 +101,7 @@ export function useChartViewerData({
       return {
         chartType: "line" as const,
         series: derived.series.name,
-        complexView: derived.series.isComplex
-          ? (selectedComplexViewSingle ?? "mag")
-          : null,
+        complexViews: derived.series.isComplex ? selectedComplexView : null,
         tailCount,
       };
     }

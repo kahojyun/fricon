@@ -217,7 +217,7 @@ export type LiveHeatmapOptions = {
 
 export type LiveLineOptions = {
 	series: string,
-	complexView: ComplexViewOption | null,
+	complexViews: ComplexViewOption[] | null,
 	tailCount: number,
 };
 

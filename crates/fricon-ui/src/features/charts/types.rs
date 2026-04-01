@@ -187,7 +187,7 @@ pub(crate) fn complex_view_label(option: ComplexViewOption) -> &'static str {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LiveLineOptions {
     pub(crate) series: String,
-    pub(crate) complex_view: Option<ComplexViewOption>,
+    pub(crate) complex_views: Option<Vec<ComplexViewOption>>,
     pub(crate) tail_count: usize,
 }
 

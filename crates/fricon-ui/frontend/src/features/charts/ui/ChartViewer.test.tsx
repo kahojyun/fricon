@@ -389,4 +389,70 @@ describe("ChartViewer", () => {
 
     clearMocks();
   });
+
+  it("sends the selected complex views to live line queries", async () => {
+    const livePayloads: Record<string, unknown>[] = [];
+    mockIPC((cmd, payload) => {
+      if (cmd === "dataset_live_chart_data") {
+        if (payload && typeof payload === "object") {
+          livePayloads.push(payload as Record<string, unknown>);
+        }
+        return {
+          type: "line",
+          xName: "t",
+          series: [{ name: "sig (real)", data: [[0, 1]] }],
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 1 };
+      }
+      return null;
+    });
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            status: "Writing",
+            columns: [
+              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              { name: "sig", isComplex: true, isTrace: false, isIndex: false },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+
+    await waitFor(() => {
+      const lastPayload = livePayloads.at(-1);
+      const options = lastPayload?.options as {
+        chartType: string;
+        complexViews?: string[] | null;
+      };
+      expect(options.chartType).toBe("line");
+      expect(options.complexViews).toEqual(["real", "imag"]);
+    });
+
+    const magLabel = await screen.findByText("mag");
+    const magToggle =
+      magLabel.parentElement?.querySelector('[role="checkbox"]');
+    if (!(magToggle instanceof HTMLElement)) {
+      throw new Error("Complex view checkbox not found");
+    }
+    await user.click(magToggle);
+
+    await waitFor(() => {
+      const lastPayload = livePayloads.at(-1);
+      const options = lastPayload?.options as {
+        complexViews?: string[] | null;
+      };
+      expect(options.complexViews).toEqual(["real", "imag", "mag"]);
+    });
+
+    clearMocks();
+  });
 });

@@ -52,6 +52,40 @@ interface ChartWrapperProps {
   liveMode?: boolean;
 }
 
+function parseLiveAge(name: string): number | null {
+  const marker = /\[(current|-\d+)\]$/.exec(name)?.[1] ?? null;
+  if (!marker) return null;
+  if (marker === "current") return 0;
+  return Number.parseInt(marker.slice(1), 10);
+}
+
+function liveSeriesStyle(
+  name: string,
+  allNames: string[],
+  fallbackIndex: number,
+  total: number,
+) {
+  const age = parseLiveAge(name);
+  if (age == null) {
+    const isNewest = fallbackIndex === total - 1;
+    const opacity = isNewest
+      ? 1.0
+      : 0.12 + (0.5 * fallbackIndex) / Math.max(total - 2, 1);
+    return { isNewest, opacity };
+  }
+
+  if (age === 0) {
+    return { isNewest: true, opacity: 1.0 };
+  }
+
+  const maxAge = Math.max(
+    ...allNames.map((candidate) => parseLiveAge(candidate) ?? 0),
+    age,
+  );
+  const opacity = 0.12 + (0.5 * (maxAge - age)) / Math.max(maxAge, 1);
+  return { isNewest: false, opacity };
+}
+
 function buildOption(data?: ChartOptions, liveMode?: boolean): EChartsOption {
   if (!data) return {};
 
@@ -139,13 +173,15 @@ function buildOption(data?: ChartOptions, liveMode?: boolean): EChartsOption {
   }
 
   const { xName, series } = data;
+  const liveSeriesNames = liveMode ? series.map((item) => item.name) : [];
   const seriesOption = series.map((s, index): LineSeriesOption => {
     if (liveMode && series.length > 1) {
-      const total = series.length;
-      const isNewest = index === total - 1;
-      const opacity = isNewest
-        ? 1.0
-        : 0.12 + (0.5 * index) / Math.max(total - 2, 1);
+      const { isNewest, opacity } = liveSeriesStyle(
+        s.name,
+        liveSeriesNames,
+        index,
+        series.length,
+      );
       return {
         name: s.name,
         type: "line",
