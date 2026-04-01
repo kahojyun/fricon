@@ -33,7 +33,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install build dependencies
-        uses: taiki-e/install-action@bfadeaba214680fb4ab63e710bcb2a6a17019fdc # v2
+        uses: taiki-e/install-action@a1df9120380005ebdc788c62449b841b205541dd # v2
         with:
           tool: protoc
       - name: Install pnpm
