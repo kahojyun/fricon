@@ -25,7 +25,8 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
         : "tombstone";
 
   const columns = datasetDetail?.columns ?? [];
-  const selection = useChartViewerSelection(columns);
+  const selection = useChartViewerSelection(columns, datasetDetail?.status);
+  const isLiveMode = selection.controlState.isLiveMode;
   const { chartData, chartError, filterTableProps } = useChartViewerData({
     datasetId,
     availability,
@@ -33,6 +34,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
     derived: selection.derived,
     selectedComplexView: selection.controlState.selectedComplexView,
     selectedComplexViewSingle: selection.controlState.selectedComplexViewSingle,
+    isLiveMode,
   });
 
   if (availability === "tombstone") {
@@ -63,6 +65,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
         derived={selection.derived}
         controlState={selection.controlState}
         actions={selection.actions}
+        datasetStatus={datasetDetail?.status}
       />
 
       {chartError ? (
@@ -75,19 +78,28 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-hidden p-1.5">
-        <ResizablePanelGroup orientation="vertical" className="h-full min-h-0">
-          <ResizablePanel defaultSize={70} minSize={35} className="min-h-0">
-            <div className="h-full min-h-0">
-              <ChartWrapper data={chartData} />
-            </div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={30} minSize={20} className="min-h-0">
-            <div className="h-full min-h-0">
-              <FilterTable {...filterTableProps} />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+        {isLiveMode ? (
+          <div className="h-full min-h-0">
+            <ChartWrapper data={chartData} liveMode />
+          </div>
+        ) : (
+          <ResizablePanelGroup
+            orientation="vertical"
+            className="h-full min-h-0"
+          >
+            <ResizablePanel defaultSize={70} minSize={35} className="min-h-0">
+              <div className="h-full min-h-0">
+                <ChartWrapper data={chartData} />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={20} className="min-h-0">
+              <div className="h-full min-h-0">
+                <FilterTable {...filterTableProps} />
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </div>
     </div>
   );

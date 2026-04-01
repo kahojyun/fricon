@@ -6,6 +6,7 @@ import type {
   DatasetWriteStatus,
   FilterTableOptions,
   Row as FilterTableRow,
+  ScatterModeOptions as WireScatterModeOptions,
   TableData as WireFilterTableData,
   UiDatasetStatus as DatasetStatus,
 } from "@/shared/lib/bindings";
@@ -60,22 +61,7 @@ export type ChartDataOptions =
       scatter: ScatterModeOptions;
     });
 
-export type ScatterModeOptions =
-  | {
-      mode: "complex";
-      series: string;
-    }
-  | {
-      mode: "trace_xy";
-      traceXColumn: string;
-      traceYColumn: string;
-    }
-  | {
-      mode: "xy";
-      xColumn: string;
-      yColumn: string;
-      binColumn?: string;
-    };
+export type ScatterModeOptions = WireScatterModeOptions;
 
 export function toWireChartOptions(
   options: ChartDataOptions,

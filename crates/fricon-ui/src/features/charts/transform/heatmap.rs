@@ -74,7 +74,7 @@ pub(crate) fn build_heatmap_series(
     })
 }
 
-fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<f64>) {
+pub(crate) fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<f64>) {
     fn f64_key(value: f64) -> u64 {
         if value == 0.0 { 0_u64 } else { value.to_bits() }
     }

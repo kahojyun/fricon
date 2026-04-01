@@ -22,6 +22,7 @@ export const commands = {
 	datasetDetail: (id: number) => typedError<DatasetDetail, ApiError>(__TAURI_INVOKE("dataset_detail", { id })),
 	datasetChartData: (id: number, options: DatasetChartDataOptions) => typedError<ChartDataResponse, ApiError>(__TAURI_INVOKE("dataset_chart_data", { id, options })),
 	getFilterTableData: (id: number, options: FilterTableOptions) => typedError<TableData, ApiError>(__TAURI_INVOKE("get_filter_table_data", { id, options })),
+	datasetLiveChartData: (id: number, options: LiveChartDataOptions) => typedError<ChartDataResponse, ApiError>(__TAURI_INVOKE("dataset_live_chart_data", { id, options })),
 	updateDatasetFavorite: (id: number, update: DatasetFavoriteUpdate) => typedError<null, ApiError>(__TAURI_INVOKE("update_dataset_favorite", { id, update })),
 	updateDatasetInfo: (id: number, update: DatasetInfoUpdate) => typedError<null, ApiError>(__TAURI_INVOKE("update_dataset_info", { id, update })),
 	getDatasetWriteStatus: (id: number) => typedError<DatasetWriteStatus, ApiError>(__TAURI_INVOKE("get_dataset_write_status", { id })),
@@ -206,6 +207,24 @@ export type LineChartDataOptions = {
 	xColumn: string | null,
 	complexViews: ComplexViewOption[] | null,
 } & (ChartCommonOptions);
+
+export type LiveChartDataOptions = { chartType: "line" } & (LiveLineOptions) | { chartType: "heatmap" } & (LiveHeatmapOptions) | { chartType: "scatter" } & (LiveScatterOptions);
+
+export type LiveHeatmapOptions = {
+	series: string,
+	complexViewSingle: ComplexViewOption | null,
+};
+
+export type LiveLineOptions = {
+	series: string,
+	complexViews: ComplexViewOption[] | null,
+	tailCount: number,
+};
+
+export type LiveScatterOptions = {
+	scatter: ScatterModeOptions,
+	tailCount: number,
+};
 
 export type Row = {
 	displayValues: string[],

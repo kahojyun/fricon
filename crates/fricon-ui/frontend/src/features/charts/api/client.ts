@@ -2,6 +2,7 @@ import {
   commands,
   type ChartDataResponse as WireChartResponse,
   type DatasetWriteStatus,
+  type LiveChartDataOptions,
   type TableData as WireFilterTableData,
 } from "@/shared/lib/bindings";
 import { invoke } from "@/shared/lib/tauri";
@@ -17,6 +18,16 @@ import {
 export async function fetchChartData(id: number, options: ChartDataOptions) {
   const result: WireChartResponse = await invoke(
     commands.datasetChartData(id, toWireChartOptions(options)),
+  );
+  return normalizeChartOptions(result);
+}
+
+export async function fetchLiveChartData(
+  id: number,
+  options: LiveChartDataOptions,
+) {
+  const result: WireChartResponse = await invoke(
+    commands.datasetLiveChartData(id, options),
   );
   return normalizeChartOptions(result);
 }

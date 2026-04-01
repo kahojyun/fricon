@@ -159,6 +159,7 @@ pub(crate) fn specta_builder() -> Builder {
             datasets::dataset_detail,
             charts::dataset_chart_data,
             charts::get_filter_table_data,
+            charts::dataset_live_chart_data,
             datasets::update_dataset_favorite,
             datasets::update_dataset_info,
             datasets::get_dataset_write_status,

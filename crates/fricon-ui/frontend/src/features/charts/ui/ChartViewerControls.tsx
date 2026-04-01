@@ -1,4 +1,4 @@
-import type { ColumnInfo } from "../api/types";
+import type { ColumnInfo, DatasetStatus } from "../api/types";
 import {
   complexSeriesOptions,
   deriveChartViewerState,
@@ -18,20 +18,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
+import { Toggle } from "@/shared/ui/toggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { Activity } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
 interface ChartViewerControlsProps {
   derived: ReturnType<typeof deriveChartViewerState>;
   controlState: ChartViewerControlState;
   actions: ChartViewerControlActions;
+  datasetStatus?: DatasetStatus;
 }
 
 export function ChartViewerControls({
   derived,
   controlState,
   actions,
+  datasetStatus,
 }: ChartViewerControlsProps) {
-  const { selectedComplexView, selectedComplexViewSingle } = controlState;
+  const { selectedComplexView, selectedComplexViewSingle, isLiveMode } =
+    controlState;
   const {
     setChartType,
     setSeriesName,
@@ -77,7 +83,28 @@ export function ChartViewerControls({
 
   return (
     <>
-      <div className="flex flex-wrap gap-1.5 p-1.5">
+      <div className="flex flex-wrap items-end gap-1.5 p-1.5">
+        {datasetStatus === "Writing" ? (
+          <div className="flex flex-col">
+            <Label className="mb-1 block">Live</Label>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Toggle
+                    pressed={isLiveMode}
+                    onPressedChange={actions.setLiveMode}
+                    variant="outline"
+                    aria-label="Toggle live monitor"
+                  />
+                }
+              >
+                <Activity />
+              </TooltipTrigger>
+              <TooltipContent>Live Monitor</TooltipContent>
+            </Tooltip>
+          </div>
+        ) : null}
+
         <div className="min-w-40">
           <Label className="mb-1 block">Chart Type</Label>
           <Select

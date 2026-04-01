@@ -182,3 +182,33 @@ pub(crate) fn complex_view_label(option: ComplexViewOption) -> &'static str {
         ComplexViewOption::Arg => "arg",
     }
 }
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LiveLineOptions {
+    pub(crate) series: String,
+    pub(crate) complex_views: Option<Vec<ComplexViewOption>>,
+    pub(crate) tail_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LiveHeatmapOptions {
+    pub(crate) series: String,
+    pub(crate) complex_view_single: Option<ComplexViewOption>,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LiveScatterOptions {
+    pub(crate) scatter: ScatterModeOptions,
+    pub(crate) tail_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(tag = "chartType", rename_all = "snake_case")]
+pub(crate) enum LiveChartDataOptions {
+    Line(LiveLineOptions),
+    Heatmap(LiveHeatmapOptions),
+    Scatter(LiveScatterOptions),
+}
