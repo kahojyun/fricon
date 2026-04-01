@@ -94,22 +94,21 @@ fn build_trace_live_heatmap(
 
     // For traces, fall back to showing just the last row (or last sweep group)
     let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
+    let y_column_name = index_columns
+        .and_then(|cols| cols.last())
+        .map(|&idx| column_names[idx]);
+    let y_name = y_column_name.unwrap_or("row").to_string();
     let num_rows = batch.num_rows();
     if num_rows == 0 {
         return Ok(ChartDataResponse {
             r#type: ChartType::Heatmap,
             x_name: format!("{series_name} - X"),
-            y_name: None,
-            x_categories: None,
-            y_categories: None,
+            y_name: Some(y_name),
+            x_categories: Some(vec![]),
+            y_categories: Some(vec![]),
             series: vec![],
         });
     }
-
-    // Determine Y column: use the last index column if available
-    let y_column_name = index_columns
-        .and_then(|cols| cols.last())
-        .map(|&idx| column_names[idx]);
 
     // Crop to last group if we have outer indices (more than 1 index col)
     let start = if let Some(idx_cols) = index_columns
@@ -182,7 +181,7 @@ fn build_trace_live_heatmap(
     Ok(ChartDataResponse {
         r#type: ChartType::Heatmap,
         x_name: format!("{series_name} - X"),
-        y_name: y_column_name.map(str::to_string),
+        y_name: Some(y_name),
         x_categories: Some(x_categories),
         y_categories: Some(y_categories),
         series,
@@ -191,11 +190,60 @@ fn build_trace_live_heatmap(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use arrow_array::{ArrayRef, Float64Array};
+    use arrow_schema::{DataType, Field};
+    use arrow_select::concat::concat;
+    use fricon::{DatasetScalar, ScalarArray, ScalarKind, TraceKind};
+    use indexmap::IndexMap;
+
     use super::*;
     use crate::features::charts::{
         transform::test_utils::{numeric_batch, numeric_schema},
         types::ChartType,
     };
+
+    fn trace_batch(
+        trace_rows: Vec<Vec<f64>>,
+        index_values: &[f64],
+    ) -> (RecordBatch, DatasetSchema) {
+        let trace_array: ArrayRef = if trace_rows.is_empty() {
+            let sample: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
+                ScalarArray::from_iter(Vec::<f64>::new()),
+            ))
+            .into();
+            sample.slice(0, 0)
+        } else {
+            let row_arrays: Vec<ArrayRef> = trace_rows
+                .into_iter()
+                .map(|row| {
+                    DatasetArray::from(DatasetScalar::SimpleTrace(ScalarArray::from_iter(row)))
+                        .into()
+                })
+                .collect();
+            let row_refs: Vec<&dyn arrow_array::Array> =
+                row_arrays.iter().map(|array| &**array).collect();
+            concat(&row_refs).unwrap()
+        };
+        let index_array: ArrayRef = Arc::new(Float64Array::from(index_values.to_vec()));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("idx", DataType::Float64, false),
+            Field::new("trace", trace_array.data_type().clone(), false),
+        ]));
+        let batch = RecordBatch::try_new(arrow_schema, vec![index_array, trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "idx".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        (batch, DatasetSchema::new(columns))
+    }
 
     /// 9 rows: 3 outer sweeps × 3 inner points.
     /// Index columns: sweep (outer), freq (MFI-2), point (MFI).
@@ -238,5 +286,42 @@ mod tests {
         // Only one index column → should error
         let res = build_live_heatmap_series(&batch, &schema, Some(&[0]), &options);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn trace_empty_batch_uses_heatmap_contract_defaults() {
+        let (batch, schema) = trace_batch(vec![], &[]);
+        let options = LiveHeatmapOptions {
+            series: "trace".to_string(),
+            complex_view_single: None,
+        };
+
+        let res = build_live_heatmap_series(&batch, &schema, Some(&[0]), &options).unwrap();
+
+        assert_eq!(res.r#type, ChartType::Heatmap);
+        assert_eq!(res.y_name.as_deref(), Some("idx"));
+        assert_eq!(res.x_categories, Some(vec![]));
+        assert_eq!(res.y_categories, Some(vec![]));
+        assert!(res.series.is_empty());
+    }
+
+    #[test]
+    fn trace_without_index_columns_falls_back_to_row_y_axis() {
+        let (batch, schema) = trace_batch(vec![vec![1.0, 2.0]], &[0.0]);
+        let options = LiveHeatmapOptions {
+            series: "trace".to_string(),
+            complex_view_single: None,
+        };
+
+        let res = build_live_heatmap_series(&batch, &schema, None, &options).unwrap();
+
+        assert_eq!(res.r#type, ChartType::Heatmap);
+        assert_eq!(res.y_name.as_deref(), Some("row"));
+        assert_eq!(res.x_categories, Some(vec![0.0, 1.0]));
+        assert_eq!(res.y_categories, Some(vec![0.0]));
+        assert_eq!(
+            res.series[0].data,
+            vec![vec![0.0, 0.0, 1.0], vec![1.0, 0.0, 2.0]]
+        );
     }
 }

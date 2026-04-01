@@ -1,8 +1,11 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ChartViewerAvailability, DatasetDetail } from "../api/types";
+import type {
+  ChartViewerAvailability,
+  DatasetDetail,
+  ScatterModeOptions,
+} from "../api/types";
 import type { ComplexViewOption } from "@/shared/lib/chartTypes";
-import type { ScatterModeOptions } from "@/shared/lib/bindings";
 import { useChartDataQuery } from "../api/useChartDataQuery";
 import { useLiveChartDataQuery } from "../api/useLiveChartDataQuery";
 import { useDatasetWriteStatusQuery } from "../api/useDatasetWriteStatusQuery";

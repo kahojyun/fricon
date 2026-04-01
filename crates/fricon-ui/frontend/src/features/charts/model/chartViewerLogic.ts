@@ -403,7 +403,7 @@ export function buildChartRequest(
         mode: "xy",
         xColumn: derived.scatterXColumn.name,
         yColumn: derived.scatterYColumn.name,
-        binColumn: derived.scatterBinColumn?.name,
+        binColumn: derived.scatterBinColumn?.name ?? null,
       },
       indexFilters,
       excludeColumns: derived.excludeColumns,
