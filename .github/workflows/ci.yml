@@ -242,6 +242,9 @@ jobs:
   release:
     name: Release After CI
     needs: [check]
+    # This relies on squash-and-merge preserving Knope's `chore: prepare release <version>`
+    # subject on the resulting `main` commit so only prepared release merges call the reusable
+    # release workflow.
     if: >
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&

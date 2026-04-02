@@ -2,6 +2,9 @@ name: Publish PyPI
 
 on:
   push:
+    # This workflow intentionally trusts only repository tags. Safety depends on the repository
+    # tag ruleset restricting who can create release tags, while the release workflow is guarded
+    # upstream by the squash-and-merge-based release preparation flow on `main`.
     tags:
       - "**"
 

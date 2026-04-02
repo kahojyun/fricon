@@ -46,6 +46,8 @@ shell = true
 
 [[workflows.steps]]
 type = "Command"
+# Keep this commit subject in sync with the release/prepare-release workflow guards in
+# `.github/workflows/ci.yml` and `.github/workflows/prepare-release.yml`.
 command = "git commit -m 'chore: prepare release $version'"
 
 [[workflows.steps]]

@@ -15,6 +15,8 @@ env:
 jobs:
   prepare-release:
     name: Plan And Open Release Pull Request
+    # This must stay in sync with the release gate in `ci.yml`. The release flow depends on
+    # squash-and-merge preserving Knope's `chore: prepare release <version>` subject on `main`.
     if: "!startsWith(github.event.head_commit.message, 'chore: prepare release ')"
     runs-on: ubuntu-latest
     permissions:
