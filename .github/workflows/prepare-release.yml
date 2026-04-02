@@ -5,6 +5,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 env:
   CARGO_TERM_COLOR: always
   # renovate: datasource=github-releases depName=knope-dev/knope
@@ -12,11 +14,12 @@ env:
 
 jobs:
   prepare-release:
+    name: Plan And Open Release Pull Request
     if: "!contains(github.event.head_commit.message, 'chore: prepare release')"
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write # Required for knope to create and update the release branch.
+      pull-requests: write # Required for knope to open and update the release pull request.
     environment: release
     concurrency:
       group: prepare-release-${{ github.ref }}

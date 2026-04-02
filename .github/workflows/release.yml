@@ -7,6 +7,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 env:
   CARGO_TERM_COLOR: always
   # renovate: datasource=github-releases depName=knope-dev/knope
@@ -14,10 +16,14 @@ env:
 
 jobs:
   release:
+    name: Create GitHub Release
     if: ${{ github.head_ref == 'release' && github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
-      contents: write
+      contents: write # Required for knope to create the GitHub release and push release metadata.
     environment: release
     steps:
       - name: Generate GitHub token

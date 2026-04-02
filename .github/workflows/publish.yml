@@ -17,6 +17,7 @@ env:
 
 jobs:
   build:
+    name: Build Release Wheel Artifacts
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -71,6 +72,7 @@ jobs:
           path: dist
 
   sdist:
+    name: Build Release Source Distribution
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -102,7 +104,7 @@ jobs:
           path: dist
 
   publish:
-    name: Publish to PyPI
+    name: Publish Release Artifacts To PyPI
     needs:
       - build
       - sdist
@@ -111,8 +113,8 @@ jobs:
       name: pypi
       url: https://pypi.org/p/fricon
     permissions:
-      id-token: write
-      attestations: write
+      id-token: write # Required for PyPI trusted publishing via OIDC.
+      attestations: write # Required to generate provenance attestations for uploaded artifacts.
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
