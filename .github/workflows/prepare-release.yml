@@ -5,6 +5,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 env:
   CARGO_TERM_COLOR: always
   # renovate: datasource=github-releases depName=knope-dev/knope
@@ -12,11 +14,14 @@ env:
 
 jobs:
   prepare-release:
-    if: "!contains(github.event.head_commit.message, 'chore: prepare release')"
+    name: Plan And Open Release Pull Request
+    # This must stay in sync with the release gate in `ci.yml`. The release flow depends on
+    # squash-and-merge preserving Knope's `chore: prepare release <version>` subject on `main`.
+    if: "!startsWith(github.event.head_commit.message, 'chore: prepare release ')"
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write # Required for knope to create and update the release branch.
+      pull-requests: write # Required for knope to open and update the release pull request.
     environment: release
     concurrency:
       group: prepare-release-${{ github.ref }}
@@ -32,6 +37,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          persist-credentials: true
           token: ${{ steps.generate-token.outputs.token }}
       - name: Install Knope
         uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2

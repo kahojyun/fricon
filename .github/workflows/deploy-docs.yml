@@ -1,8 +1,5 @@
 name: Deploy Docs
 
-permissions:
-  contents: write
-
 on:
   push:
     branches:
@@ -14,12 +11,18 @@ concurrency:
   group: deploy-docs
   cancel-in-progress: false
 
+permissions: {}
+
 jobs:
   mike-deploy:
-    name: Mike Deploy
+    name: Build And Publish Documentation
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for mike to push the built site to the gh-pages branch.
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: true
       - name: Install dependencies
         run: |
           sudo apt-get update

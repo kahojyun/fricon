@@ -1,11 +1,9 @@
 name: Release
 
 on:
-  pull_request:
-    types:
-      - closed
-    branches:
-      - main
+  workflow_call:
+
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,10 +12,11 @@ env:
 
 jobs:
   release:
-    if: ${{ github.head_ref == 'release' && github.event.pull_request.merged == true }}
+    name: Create GitHub Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    concurrency:
+      group: release-${{ github.sha }}
+      cancel-in-progress: false
     environment: release
     steps:
       - name: Generate GitHub token
@@ -30,6 +29,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          persist-credentials: true
           token: ${{ steps.generate-token.outputs.token }}
       - name: Install Knope
         uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2

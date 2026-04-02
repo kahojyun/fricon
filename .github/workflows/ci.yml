@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "**"
   pull_request:
 
 concurrency:
@@ -22,9 +20,12 @@ env:
 
 jobs:
   fmt:
+    name: Verify Formatting And Generated Files
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Install pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
       - name: Setup Node.js
@@ -63,10 +64,12 @@ jobs:
           git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 
   test:
-    name: Test Python
+    name: Build And Test Workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -121,10 +124,12 @@ jobs:
         run: uv run --group docs mkdocs build -s -v
 
   cargo-deny:
-    name: Check cargo dependencies
+    name: Audit Cargo Dependencies
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - uses: taiki-e/install-action@0cccd59f03b32c54f0db097c518c320bfc8c73b3 # v2
         with:
           tool: cargo-deny
@@ -132,6 +137,7 @@ jobs:
         run: cargo deny --workspace --all-features check
 
   build:
+    name: Build Wheel Artifacts
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -145,6 +151,8 @@ jobs:
             rustflags: ""
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - name: Install dependencies (Linux)
         if: matrix.os == 'linux'
         run: |
@@ -155,7 +163,6 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
       - name: Rust cache
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -189,9 +196,12 @@ jobs:
           path: dist
 
   sdist:
+    name: Build Source Distribution Artifact
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - uses: taiki-e/install-action@0cccd59f03b32c54f0db097c518c320bfc8c73b3 # v2
         with:
           tool: cargo-bundle-licenses
@@ -219,6 +229,7 @@ jobs:
 
   # For branch protection rules
   check:
+    name: Report Required CI Status
     if: always()
     needs: [fmt, test, cargo-deny, build, sdist]
     runs-on: ubuntu-latest
@@ -228,26 +239,14 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
-  publish:
-    name: Publish to PyPI
-    needs:
-      - check
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/fricon
-    permissions:
-      id-token: write
-      attestations: write
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4
-        with:
-          subject-path: "dist/*"
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+  release:
+    name: Release After CI
+    needs: [check]
+    # This relies on squash-and-merge preserving Knope's `chore: prepare release <version>`
+    # subject on the resulting `main` commit so only prepared release merges call the reusable
+    # release workflow.
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      startsWith(github.event.head_commit.message, 'chore: prepare release ')
+    uses: ./.github/workflows/release.yml
