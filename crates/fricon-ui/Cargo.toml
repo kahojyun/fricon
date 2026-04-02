@@ -44,7 +44,7 @@ tauri-build = { workspace = true }
 tauri-utils = { workspace = true }
 
 [features]
-prod = ["tauri/custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 
 [lints]
 workspace = true
