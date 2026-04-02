@@ -238,3 +238,12 @@ jobs:
         uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # release/v1
         with:
           jobs: ${{ toJSON(needs) }}
+
+  release:
+    name: Release After CI
+    needs: [check]
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      startsWith(github.event.head_commit.message, 'chore: prepare release ')
+    uses: ./.github/workflows/release.yml
