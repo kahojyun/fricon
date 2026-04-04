@@ -45,7 +45,7 @@ jobs:
             libxdo-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-      - uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2
+      - uses: taiki-e/install-action@1ed3272338f573e042a2e6bca3893aa19f43b47a # v2
         with:
           tool: protoc,cargo-bundle-licenses
       - name: Install pnpm
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@d858f8113943481093e02986a7586a4819a3bfd6 # v2
+      - uses: taiki-e/install-action@1ed3272338f573e042a2e6bca3893aa19f43b47a # v2
         with:
           tool: cargo-bundle-licenses
       - name: Install pnpm
