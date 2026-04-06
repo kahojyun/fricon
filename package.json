@@ -22,7 +22,7 @@
   "type": "module",
   "devDependencies": {
     "@eslint-react/eslint-plugin": "3.0.0",
-    "@eslint/compat": "2.0.3",
+    "@eslint/compat": "2.0.4",
     "@eslint/js": "10.0.1",
     "@tauri-apps/cli": "2.10.1",
     "@types/node": "24.12.2",
