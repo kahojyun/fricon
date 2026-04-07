@@ -17,7 +17,7 @@ arrow-array = { workspace = true }
 arrow-pyarrow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 fricon = { path = "../fricon" }
-fricon-cli = { path = "../fricon-cli" }
+fricon-cli = { path = "../fricon-cli", optional = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 num = { workspace = true }
@@ -33,7 +33,19 @@ pyo3 = { workspace = true, features = [
 pyo3-async-runtimes = { workspace = true, features = ["tokio-runtime"] }
 
 [features]
-prod = ["fricon-cli/prod"]
+default = ["dev"]
+
+desktop-custom-protocol = ["fricon-cli/custom-protocol"]
+python-cli-entrypoints = ["dep:fricon-cli"]
+python-extension-module = ["pyo3/extension-module"]
+
+dev = ["python-cli-entrypoints"]
+dist = [
+  "desktop-custom-protocol",
+  "python-cli-entrypoints",
+  "python-extension-module",
+]
+docs = ["python-extension-module"]
 
 [lints]
 workspace = true

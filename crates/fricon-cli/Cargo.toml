@@ -21,7 +21,7 @@ fricon-ui = { path = "../fricon-ui" }
 tracing-subscriber = { workspace = true }
 
 [features]
-prod = ["fricon-ui/prod"]
+custom-protocol = ["fricon-ui/custom-protocol"]
 
 [lints]
 workspace = true
