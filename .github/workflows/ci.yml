@@ -250,3 +250,6 @@ jobs:
       github.ref == 'refs/heads/main' &&
       startsWith(github.event.head_commit.message, 'chore: prepare release ')
     uses: ./.github/workflows/release.yml
+    secrets:
+      APP_ID: ${{ secrets.APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
