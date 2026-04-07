@@ -2,6 +2,8 @@ packages:
   - crates/fricon-ui/frontend
 
 minimumReleaseAge: 4320
+minimumReleaseAgeExclude:
+  - "vite@8.0.5"
 
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"
