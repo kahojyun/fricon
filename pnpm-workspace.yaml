@@ -1,6 +1,8 @@
 packages:
   - crates/fricon-ui/frontend
 
+minimumReleaseAge: 4320
+
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild
