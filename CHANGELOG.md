@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.2 (2026-04-07)
+
+### Features
+
+- micro-batch client dataset writes (#303)
+- add live monitor mode for chart viewer (#329)
+
+### Fixes
+
+- make uv sdist builds self-contained (#299)
+- pin dependencies (#322)
+- update tanstack-router monorepo (patch) (#327)
+- update dependency lucide-react to v1.7.0 (#332)
+- update dependency react-resizable-panels to v4.8.0 (#333)
+- update tanstack-router monorepo (patch) (#346)
+- update tanstack-query monorepo to v5.96.0 (minor) (#348)
+- update tanstack-query monorepo to v5.96.1 (patch) (#351)
+- update dependency react-resizable-panels to v4.9.0 (#354)
+- update tanstack-query monorepo to v5.96.2 (patch) (#357)
+- add required secrets for release workflow (#364)
+
 ## 0.1.1 (2026-04-07)
 
 ### Features
