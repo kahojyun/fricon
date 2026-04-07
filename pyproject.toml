@@ -88,3 +88,4 @@ testpaths = ["crates/fricon-py/tests"]
 [tool.uv]
 config-settings = { build-args = "--profile=dev" }
 default-groups = ["dev", "fmt", "ci", "docs"]
+exclude-newer = "3 days"
