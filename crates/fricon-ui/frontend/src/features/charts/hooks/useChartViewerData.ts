@@ -155,6 +155,10 @@ export function useChartViewerData({
 
   const activeChartData = isLiveMode ? liveChartQuery.data : chartQuery.data;
   const activeChartError = isLiveMode ? liveChartQuery.error : chartQuery.error;
+  const chartInteractionKey = JSON.stringify([
+    datasetId,
+    isLiveMode ? liveChartRequest : chartRequest,
+  ]);
 
   const chartData = activeChartData;
   const chartError = !queriesEnabled
@@ -167,6 +171,7 @@ export function useChartViewerData({
 
   return {
     chartData,
+    chartInteractionKey,
     chartError,
     filterTableProps: {
       data: filterTableData ?? undefined,

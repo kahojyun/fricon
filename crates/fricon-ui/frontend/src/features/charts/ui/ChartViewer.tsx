@@ -27,15 +27,17 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
   const columns = datasetDetail?.columns ?? [];
   const selection = useChartViewerSelection(columns, datasetDetail?.status);
   const isLiveMode = selection.controlState.isLiveMode;
-  const { chartData, chartError, filterTableProps } = useChartViewerData({
-    datasetId,
-    availability,
-    datasetDetail,
-    derived: selection.derived,
-    selectedComplexView: selection.controlState.selectedComplexView,
-    selectedComplexViewSingle: selection.controlState.selectedComplexViewSingle,
-    isLiveMode,
-  });
+  const { chartData, chartError, chartInteractionKey, filterTableProps } =
+    useChartViewerData({
+      datasetId,
+      availability,
+      datasetDetail,
+      derived: selection.derived,
+      selectedComplexView: selection.controlState.selectedComplexView,
+      selectedComplexViewSingle:
+        selection.controlState.selectedComplexViewSingle,
+      isLiveMode,
+    });
 
   if (availability === "tombstone") {
     return (
@@ -80,7 +82,11 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
       <div className="min-h-0 flex-1 overflow-hidden p-1.5">
         {isLiveMode ? (
           <div className="h-full min-h-0">
-            <ChartWrapper data={chartData} liveMode />
+            <ChartWrapper
+              data={chartData}
+              interactionKey={chartInteractionKey}
+              liveMode
+            />
           </div>
         ) : (
           <ResizablePanelGroup
@@ -89,7 +95,10 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
           >
             <ResizablePanel defaultSize={70} minSize={35} className="min-h-0">
               <div className="h-full min-h-0">
-                <ChartWrapper data={chartData} />
+                <ChartWrapper
+                  data={chartData}
+                  interactionKey={chartInteractionKey}
+                />
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />

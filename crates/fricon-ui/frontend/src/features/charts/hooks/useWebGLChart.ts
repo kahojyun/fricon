@@ -1,0 +1,797 @@
+/**
+ * React hook that manages the full WebGL2 + d3 chart lifecycle.
+ *
+ * - Creates and tears down the WebGL2 context
+ * - Delegates to the correct renderer based on ChartOptions.type
+ * - Manages d3 SVG overlay for axes
+ * - Handles zoom/pan via d3-zoom
+ * - Handles resize via ResizeObserver
+ */
+
+import { useEffect, useRef, useCallback } from "react";
+import { scaleLinear, scaleBand } from "d3-scale";
+import { select } from "d3-selection";
+import type { ChartOptions } from "@/shared/lib/chartTypes";
+import {
+  resizeCanvas,
+  dataToClipMatrix,
+  mul3x3,
+  zoomToClipMatrix,
+  chartAreaToViewport,
+  DEFAULT_MARGIN,
+  HEATMAP_MARGIN,
+  type ChartMargin,
+} from "../rendering/webgl";
+import {
+  renderAxes,
+  renderCategoryAxes,
+  getOverlayTheme,
+} from "../rendering/d3Overlay";
+import {
+  attachZoom,
+  IDENTITY_ZOOM,
+  type BrushRect,
+  type ZoomController,
+  type ZoomState,
+} from "../rendering/zoomController";
+import {
+  attachCrosshair,
+  type CrosshairController,
+} from "../rendering/crosshairOverlay";
+import {
+  createLineRenderState,
+  drawLines,
+  destroyLineRenderState,
+  lineDataBounds,
+  type LineRenderState,
+} from "../rendering/lineRenderer";
+import {
+  createScatterRenderState,
+  drawScatter,
+  destroyScatterRenderState,
+  scatterDataBounds,
+  type ScatterRenderState,
+} from "../rendering/scatterRenderer";
+import {
+  createHeatmapRenderState,
+  drawHeatmap,
+  destroyHeatmapRenderState,
+  type HeatmapRenderState,
+} from "../rendering/heatmapRenderer";
+
+type RenderState =
+  | { type: "line"; state: LineRenderState }
+  | { type: "scatter"; state: ScatterRenderState }
+  | { type: "heatmap"; state: HeatmapRenderState };
+
+interface WebGLChartRefs {
+  gl: WebGL2RenderingContext | null;
+  renderState: RenderState | null;
+  zoomController: ZoomController | null;
+  crosshairController: CrosshairController | null;
+  zoomState: ZoomState;
+  defaultZoomState: ZoomState;
+  followsDefaultView: boolean;
+  viewBounds: NumericBounds | null;
+  data: ChartOptions | undefined;
+  interactionKey: string | null;
+  lastResolvedInteractionKey: string | null;
+  liveMode: boolean;
+  theme: string | undefined;
+  animFrameId: number;
+  needsRender: boolean;
+  contextLost: boolean;
+}
+
+export interface UseWebGLChartOptions {
+  data?: ChartOptions;
+  interactionKey?: string | null;
+  liveMode?: boolean;
+  theme?: string;
+}
+
+export interface UseWebGLChartReturn {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  svgRef: React.RefObject<SVGSVGElement | null>;
+  /** For tooltip: get current chart interaction state. */
+  getInteractionState: () => ChartInteractionState | null;
+}
+
+export type ChartInteractionState =
+  | {
+      type: "line";
+      xMin: number;
+      xMax: number;
+      yMin: number;
+      yMax: number;
+      margin: ChartMargin;
+      zoomState: ZoomState;
+    }
+  | {
+      type: "scatter";
+      xMin: number;
+      xMax: number;
+      yMin: number;
+      yMax: number;
+      margin: ChartMargin;
+      zoomState: ZoomState;
+    }
+  | {
+      type: "heatmap";
+      xCategories: number[];
+      yCategories: number[];
+      margin: ChartMargin;
+    };
+
+export function useWebGLChart({
+  data,
+  interactionKey,
+  liveMode = false,
+  theme,
+}: UseWebGLChartOptions): UseWebGLChartReturn {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const chartRef = useRef<WebGLChartRefs>({
+    gl: null,
+    renderState: null,
+    zoomController: null,
+    crosshairController: null,
+    zoomState: IDENTITY_ZOOM,
+    defaultZoomState: IDENTITY_ZOOM,
+    followsDefaultView: true,
+    viewBounds: null,
+    data: undefined,
+    interactionKey: null,
+    lastResolvedInteractionKey: null,
+    liveMode: false,
+    theme: undefined,
+    animFrameId: 0,
+    needsRender: true,
+    contextLost: false,
+  });
+
+  // Keep mutable refs in sync with props (via effects for React Compiler compat)
+  useEffect(() => {
+    chartRef.current.data = data;
+  }, [data]);
+
+  useEffect(() => {
+    chartRef.current.liveMode = liveMode;
+  }, [liveMode]);
+
+  useEffect(() => {
+    chartRef.current.interactionKey = interactionKey ?? null;
+  }, [interactionKey]);
+
+  useEffect(() => {
+    chartRef.current.theme = theme;
+  }, [theme]);
+
+  // Main render function
+  const render = useCallback(() => {
+    const r = chartRef.current;
+    const gl = r.gl;
+    const canvas = canvasRef.current;
+    const svgEl = svgRef.current;
+    if (!gl || !canvas || !svgEl || r.contextLost) return;
+
+    resizeCanvas(canvas);
+
+    const currentData = r.data;
+    const currentLive = r.liveMode;
+    const margin =
+      currentData?.type === "heatmap" ? HEATMAP_MARGIN : DEFAULT_MARGIN;
+
+    // Clear entire canvas with theme background first
+    const isDark = r.theme === "dark";
+    if (isDark) {
+      gl.clearColor(0.09, 0.09, 0.11, 1);
+    } else {
+      gl.clearColor(1, 1, 1, 1);
+    }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // Set viewport and scissor to chart area
+    const viewport = chartAreaToViewport(canvas, margin);
+    gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(viewport.x, viewport.y, viewport.width, viewport.height);
+
+    if (!currentData || !r.renderState) {
+      // Clear stale SVG axes when there is no data
+      select(svgEl).selectAll("*").remove();
+      gl.disable(gl.SCISSOR_TEST);
+      return;
+    }
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    const rs = r.renderState;
+
+    if (rs.type === "line" && currentData.type === "line") {
+      const bounds = r.viewBounds ?? lineDataBounds(currentData.series);
+      const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
+        buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
+
+      drawLines(gl, rs.state, finalMatrix, currentData, currentLive);
+
+      renderAxes(
+        svgEl,
+        zoomedXScale,
+        zoomedYScale,
+        currentData.xName,
+        "",
+        margin,
+        overlayTheme,
+      );
+    } else if (rs.type === "scatter" && currentData.type === "scatter") {
+      const bounds = r.viewBounds ?? scatterDataBounds(currentData.series);
+      const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
+        buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
+
+      drawScatter(gl, rs.state, finalMatrix, currentData, currentLive);
+
+      renderAxes(
+        svgEl,
+        zoomedXScale,
+        zoomedYScale,
+        currentData.xName,
+        currentData.yName,
+        margin,
+        overlayTheme,
+      );
+    } else if (rs.type === "heatmap" && currentData.type === "heatmap") {
+      const numCols = currentData.xCategories.length;
+      const numRows = currentData.yCategories.length;
+
+      // For heatmap, we render fullscreen in the viewport (no zoom for now)
+      drawHeatmap(gl, rs.state, numCols, numRows);
+
+      const overlayTheme = getOverlayTheme(r.theme);
+      const chartW = canvas.clientWidth - margin.left - margin.right;
+      const chartH = canvas.clientHeight - margin.top - margin.bottom;
+      const xScale = scaleBand<string | number>()
+        .domain(currentData.xCategories)
+        .range([0, chartW])
+        .padding(0);
+      const yScale = scaleBand<string | number>()
+        .domain(currentData.yCategories)
+        .range([chartH, 0])
+        .padding(0);
+      renderCategoryAxes(
+        svgEl,
+        xScale,
+        yScale,
+        currentData.xName,
+        currentData.yName,
+        margin,
+        overlayTheme,
+      );
+    }
+
+    gl.disable(gl.SCISSOR_TEST);
+    gl.disable(gl.BLEND);
+  }, []);
+
+  const scheduleRender = useCallback(() => {
+    const currentRefs = chartRef.current;
+    currentRefs.needsRender = true;
+
+    function flushRender() {
+      currentRefs.animFrameId = 0;
+      if (!currentRefs.needsRender) return;
+
+      currentRefs.needsRender = false;
+      render();
+
+      if (currentRefs.needsRender) {
+        currentRefs.animFrameId = requestAnimationFrame(flushRender);
+      }
+    }
+
+    if (currentRefs.animFrameId !== 0) return;
+
+    currentRefs.animFrameId = requestAnimationFrame(flushRender);
+  }, [render]);
+
+  // Initialize WebGL2 context
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    function initContext() {
+      const gl = canvas!.getContext("webgl2", {
+        antialias: true,
+        alpha: false,
+        premultipliedAlpha: false,
+      });
+      if (!gl) {
+        console.error("WebGL2 not supported");
+        return;
+      }
+      const currentRefs = chartRef.current;
+      currentRefs.gl = gl;
+      currentRefs.contextLost = false;
+      scheduleRender();
+    }
+
+    initContext();
+
+    // Handle context loss: prevent default to allow restore, pause rendering
+    function handleContextLost(e: Event) {
+      e.preventDefault();
+      const currentRefs = chartRef.current;
+      currentRefs.contextLost = true;
+      if (currentRefs.renderState && currentRefs.gl) {
+        // GPU resources are implicitly destroyed on context loss;
+        // null out so we don't try to use stale handles.
+        currentRefs.renderState = null;
+      }
+      currentRefs.gl = null;
+    }
+
+    // Handle context restore: re-acquire GL and rebuild render state
+    function handleContextRestored() {
+      initContext();
+      // Re-create render state for current data
+      const currentRefs = chartRef.current;
+      const gl = currentRefs.gl;
+      const currentData = currentRefs.data;
+      if (!gl || !currentData) return;
+
+      if (currentData.type === "line") {
+        currentRefs.renderState = {
+          type: "line",
+          state: createLineRenderState(gl, currentData.series),
+        };
+      } else if (currentData.type === "scatter") {
+        currentRefs.renderState = {
+          type: "scatter",
+          state: createScatterRenderState(gl, currentData.series),
+        };
+      } else if (currentData.type === "heatmap") {
+        currentRefs.renderState = {
+          type: "heatmap",
+          state: createHeatmapRenderState(gl, currentData.series),
+        };
+      }
+      scheduleRender();
+    }
+
+    const effectRefs = chartRef.current;
+
+    canvas.addEventListener("webglcontextlost", handleContextLost);
+    canvas.addEventListener("webglcontextrestored", handleContextRestored);
+
+    return () => {
+      canvas.removeEventListener("webglcontextlost", handleContextLost);
+      canvas.removeEventListener("webglcontextrestored", handleContextRestored);
+      cancelAnimationFrame(effectRefs.animFrameId);
+      effectRefs.animFrameId = 0;
+      if (effectRefs.renderState && effectRefs.gl) {
+        destroyRenderState(effectRefs.gl, effectRefs.renderState);
+        effectRefs.renderState = null;
+      }
+      effectRefs.gl = null;
+    };
+  }, [scheduleRender]);
+
+  // Recreate render state when data changes
+  useEffect(() => {
+    const r = chartRef.current;
+    const gl = r.gl;
+    if (!gl) return;
+
+    const interactionChanged =
+      r.lastResolvedInteractionKey !== r.interactionKey;
+
+    // Destroy old state
+    if (r.renderState) {
+      destroyRenderState(gl, r.renderState);
+      r.renderState = null;
+    }
+
+    const nextDefaultZoom = getDefaultZoomState();
+    const nextZoomState = resolveNextZoomState({
+      liveMode,
+      data,
+      previousZoomState: r.zoomState,
+      followsDefaultView: r.followsDefaultView,
+      interactionChanged,
+    });
+    const nextFollowsDefaultView = isSameZoomState(
+      nextZoomState,
+      nextDefaultZoom,
+    );
+    const nextViewBounds = resolveNextViewBounds({
+      data,
+      followsDefaultView: nextFollowsDefaultView,
+      previousViewBounds: r.viewBounds,
+    });
+
+    if (!data) {
+      r.defaultZoomState = nextDefaultZoom;
+      r.zoomState = nextZoomState;
+      r.followsDefaultView = true;
+      r.viewBounds = nextViewBounds;
+      r.lastResolvedInteractionKey = r.interactionKey;
+      r.zoomController?.setDefaultState(nextDefaultZoom);
+      r.zoomController?.syncState(nextZoomState);
+      scheduleRender();
+      return;
+    }
+
+    if (data.type === "line") {
+      r.renderState = {
+        type: "line",
+        state: createLineRenderState(gl, data.series),
+      };
+    } else if (data.type === "scatter") {
+      r.renderState = {
+        type: "scatter",
+        state: createScatterRenderState(gl, data.series),
+      };
+    } else if (data.type === "heatmap") {
+      r.renderState = {
+        type: "heatmap",
+        state: createHeatmapRenderState(gl, data.series),
+      };
+    }
+
+    r.defaultZoomState = nextDefaultZoom;
+    r.zoomState = nextZoomState;
+    r.followsDefaultView = nextFollowsDefaultView;
+    r.viewBounds = nextViewBounds;
+    r.lastResolvedInteractionKey = r.interactionKey;
+    r.zoomController?.setDefaultState(nextDefaultZoom);
+    r.zoomController?.syncState(nextZoomState);
+
+    scheduleRender();
+  }, [data, interactionKey, liveMode, scheduleRender]);
+
+  // Re-render on theme change
+  useEffect(() => {
+    scheduleRender();
+  }, [theme, scheduleRender]);
+
+  // Re-render on liveMode change
+  useEffect(() => {
+    scheduleRender();
+  }, [liveMode, scheduleRender]);
+
+  // Zoom controller, crosshair, and brush overlay
+  useEffect(() => {
+    const currentRefs = chartRef.current;
+    const svgEl = svgRef.current;
+    const canvas = canvasRef.current;
+    if (!svgEl || !canvas || !data || data.type === "heatmap") {
+      // No zoom for heatmap
+      currentRefs.crosshairController?.destroy();
+      currentRefs.crosshairController = null;
+      currentRefs.zoomController?.destroy();
+      currentRefs.zoomController = null;
+      return;
+    }
+
+    const margin = DEFAULT_MARGIN;
+    const chartW = canvas.clientWidth - margin.left - margin.right;
+    const chartH = canvas.clientHeight - margin.top - margin.bottom;
+
+    // Brush overlay SVG group (managed by React hook, driven by zoom controller callback)
+    const brushGroup = select(svgEl)
+      .append("g")
+      .attr("class", "brush-rect")
+      .style("display", "none");
+    const brushRect = brushGroup
+      .append("rect")
+      .attr("fill", "rgba(37, 99, 235, 0.15)")
+      .attr("stroke", "rgba(37, 99, 235, 0.6)")
+      .attr("stroke-width", 1);
+
+    function handleBrushChange(rect: BrushRect | null) {
+      if (!rect) {
+        brushGroup.style("display", "none");
+        return;
+      }
+      brushGroup.style("display", null);
+      brushRect
+        .attr("x", rect.x + margin.left)
+        .attr("y", rect.y + margin.top)
+        .attr("width", rect.width)
+        .attr("height", rect.height);
+    }
+
+    const controller = attachZoom(
+      svgEl,
+      chartW,
+      chartH,
+      margin,
+      (state, reason) => {
+        currentRefs.zoomState = state;
+        const followsDefault =
+          reason === "reset"
+            ? true
+            : isSameZoomState(state, currentRefs.defaultZoomState);
+        currentRefs.followsDefaultView = followsDefault;
+        currentRefs.viewBounds = followsDefault
+          ? getNumericBounds(currentRefs.data)
+          : currentRefs.viewBounds;
+        scheduleRender();
+      },
+      handleBrushChange,
+      () => {
+        currentRefs.followsDefaultView = true;
+        currentRefs.viewBounds = getNumericBounds(currentRefs.data);
+      },
+    );
+    controller.setDefaultState(currentRefs.defaultZoomState);
+    controller.syncState(currentRefs.zoomState);
+    currentRefs.zoomController = controller;
+
+    // Crosshair overlay
+    const crosshair = attachCrosshair(svgEl, () => {
+      const d = currentRefs.data;
+      if (!d || d.type === "heatmap") return null;
+
+      const bounds =
+        currentRefs.viewBounds ??
+        (d.type === "line"
+          ? lineDataBounds(d.series)
+          : scatterDataBounds(d.series));
+
+      return {
+        margin,
+        zoomState: currentRefs.zoomState,
+        ...bounds,
+        theme: getOverlayTheme(currentRefs.theme),
+      };
+    });
+    currentRefs.crosshairController = crosshair;
+
+    return () => {
+      crosshair.destroy();
+      currentRefs.crosshairController = null;
+      controller.destroy();
+      currentRefs.zoomController = null;
+      brushGroup.remove();
+    };
+  }, [data, liveMode, scheduleRender]);
+
+  // Resize observer — use devicePixelContentBoxSize when available for accurate DPR sizing
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.devicePixelContentBoxSize?.[0]) {
+          const dpSize = entry.devicePixelContentBoxSize[0];
+          const w = dpSize.inlineSize;
+          const h = dpSize.blockSize;
+          if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+          }
+        }
+        // If devicePixelContentBoxSize is unavailable, resizeCanvas()
+        // inside render() handles it via DPR multiplication.
+      }
+      // Update zoom translate extents so pan/zoom clamps match the new size
+      const currentRefs = chartRef.current;
+      if (currentRefs.zoomController) {
+        const margin = DEFAULT_MARGIN;
+        const chartW = canvas.clientWidth - margin.left - margin.right;
+        const chartH = canvas.clientHeight - margin.top - margin.bottom;
+        currentRefs.zoomController.updateExtents(chartW, chartH, margin);
+      }
+      scheduleRender();
+    });
+
+    // Request device-pixel-level notifications when supported
+    try {
+      observer.observe(canvas, { box: "device-pixel-content-box" });
+    } catch {
+      observer.observe(canvas);
+    }
+
+    return () => observer.disconnect();
+  }, [scheduleRender]);
+
+  const getInteractionState = useCallback(() => {
+    const currentData = chartRef.current.data;
+    if (!currentData) return null;
+
+    const margin =
+      currentData.type === "heatmap" ? HEATMAP_MARGIN : DEFAULT_MARGIN;
+
+    if (currentData.type === "line") {
+      return {
+        type: "line" as const,
+        ...(chartRef.current.viewBounds ?? lineDataBounds(currentData.series)),
+        margin,
+        zoomState: chartRef.current.zoomState,
+      };
+    }
+    if (currentData.type === "scatter") {
+      return {
+        type: "scatter" as const,
+        ...(chartRef.current.viewBounds ??
+          scatterDataBounds(currentData.series)),
+        margin,
+        zoomState: chartRef.current.zoomState,
+      };
+    }
+    if (currentData.type === "heatmap") {
+      return {
+        type: "heatmap" as const,
+        xCategories: currentData.xCategories,
+        yCategories: currentData.yCategories,
+        margin,
+      };
+    }
+
+    return null;
+  }, []);
+
+  return { canvasRef, svgRef, getInteractionState };
+}
+
+interface ResolveNextZoomStateArgs {
+  liveMode: boolean;
+  data?: ChartOptions;
+  previousZoomState: ZoomState;
+  followsDefaultView: boolean;
+  interactionChanged: boolean;
+}
+
+interface ResolveNextViewBoundsArgs {
+  data?: ChartOptions;
+  followsDefaultView: boolean;
+  previousViewBounds: NumericBounds | null;
+}
+
+interface NumericBounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
+function getDefaultZoomState(): ZoomState {
+  return IDENTITY_ZOOM;
+}
+
+function isSameZoomState(
+  left: ZoomState,
+  right: ZoomState,
+  epsilon = 1e-4,
+): boolean {
+  return (
+    Math.abs(left.scaleX - right.scaleX) <= epsilon &&
+    Math.abs(left.scaleY - right.scaleY) <= epsilon &&
+    Math.abs(left.translateX - right.translateX) <= epsilon &&
+    Math.abs(left.translateY - right.translateY) <= epsilon
+  );
+}
+
+function resolveNextZoomState({
+  liveMode,
+  data,
+  previousZoomState,
+  followsDefaultView,
+  interactionChanged,
+}: ResolveNextZoomStateArgs): ZoomState {
+  const nextDefaultZoom = getDefaultZoomState();
+
+  if (!data || data.type === "heatmap") {
+    return nextDefaultZoom;
+  }
+
+  if (!liveMode || interactionChanged || followsDefaultView) {
+    return nextDefaultZoom;
+  }
+
+  return previousZoomState;
+}
+
+function resolveNextViewBounds({
+  data,
+  followsDefaultView,
+  previousViewBounds,
+}: ResolveNextViewBoundsArgs): NumericBounds | null {
+  if (!data || data.type === "heatmap") {
+    return null;
+  }
+
+  if (followsDefaultView || !previousViewBounds) {
+    return getNumericBounds(data);
+  }
+
+  return previousViewBounds;
+}
+
+function getNumericBounds(
+  data: ChartOptions | undefined,
+): NumericBounds | null {
+  if (!data || data.type === "heatmap") return null;
+  return data.type === "line"
+    ? lineDataBounds(data.series)
+    : scatterDataBounds(data.series);
+}
+
+function destroyRenderState(gl: WebGL2RenderingContext, rs: RenderState): void {
+  switch (rs.type) {
+    case "line":
+      destroyLineRenderState(gl, rs.state);
+      break;
+    case "scatter":
+      destroyScatterRenderState(gl, rs.state);
+      break;
+    case "heatmap":
+      destroyHeatmapRenderState(gl, rs.state);
+      break;
+  }
+}
+
+function buildZoomedAxes(
+  canvas: HTMLCanvasElement,
+  margin: ChartMargin,
+  bounds: NumericBounds,
+  zoomState: ZoomState,
+  theme: string | undefined,
+) {
+  const chartW = canvas.clientWidth - margin.left - margin.right;
+  const chartH = canvas.clientHeight - margin.top - margin.bottom;
+  const dataMatrix = dataToClipMatrix(
+    bounds.xMin,
+    bounds.xMax,
+    bounds.yMin,
+    bounds.yMax,
+  );
+  const zoomMatrix = zoomToClipMatrix(
+    zoomState.scaleX,
+    zoomState.translateX,
+    zoomState.scaleY,
+    zoomState.translateY,
+    chartW,
+    chartH,
+  );
+  const finalMatrix = mul3x3(zoomMatrix, dataMatrix);
+
+  const overlayTheme = getOverlayTheme(theme);
+  const xScale = scaleLinear()
+    .domain([bounds.xMin, bounds.xMax])
+    .range([0, chartW]);
+  const yScale = scaleLinear()
+    .domain([bounds.yMin, bounds.yMax])
+    .range([chartH, 0]);
+
+  const zoomedXScale =
+    zoomState.scaleX !== 1 || zoomState.translateX !== 0
+      ? xScale
+          .copy()
+          .domain(
+            xScale
+              .range()
+              .map((px) =>
+                xScale.invert((px - zoomState.translateX) / zoomState.scaleX),
+              ),
+          )
+      : xScale;
+  const zoomedYScale =
+    zoomState.scaleY !== 1 || zoomState.translateY !== 0
+      ? yScale
+          .copy()
+          .domain(
+            yScale
+              .range()
+              .map((px) =>
+                yScale.invert((px - zoomState.translateY) / zoomState.scaleY),
+              ),
+          )
+      : yScale;
+
+  return { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme };
+}
