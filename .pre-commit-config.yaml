@@ -9,7 +9,9 @@ exclude: |
     crates/fricon-ui/icons/.*|
     crates/fricon-ui/frontend/src/shared/lib/bindings\.ts|
     crates/fricon-ui/frontend/src/routeTree\.gen\.ts|
-    crates/fricon/src/database/schema\.rs
+    crates/fricon/src/database/schema\.rs|
+    Cargo\.lock|
+    uv\.lock
   )$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -23,7 +25,6 @@ repos:
     rev: 278e5cffad3af72e94baa7f447ee9d4752ef43c7  # frozen: v0.9.15
     hooks:
       - id: tombi-format
-        exclude: Cargo\.lock
         args: ["--offline"]
   - repo: https://github.com/crate-ci/typos
     rev: f06b85043a5ab470afbb0a5592456e733243983a  # frozen: v1
