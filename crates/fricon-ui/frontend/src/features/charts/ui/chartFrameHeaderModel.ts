@@ -44,7 +44,7 @@ export function buildChartFrameHeader({
     meta.push(`grouped by ${groupBy.join(", ")}`);
   }
   if (isLiveMode) {
-    meta.push(`last ${liveWindowCount} ${liveWindowUnit(derived)}`);
+    meta.push(`recent ${liveWindowCount} ${liveWindowUnit(derived)}`);
   }
 
   return {
@@ -57,7 +57,7 @@ function liveWindowUnit(derived: ReturnType<typeof deriveChartViewerState>) {
   return derived.xyUsesTraceSource ||
     derived.liveMonitorGroupByIndexColumnNames.length > 0
     ? "sweeps"
-    : "updates";
+    : "points";
 }
 
 function headerStatusText(
@@ -65,7 +65,7 @@ function headerStatusText(
   isLiveMode: boolean,
 ) {
   if (isLiveMode) {
-    return datasetStatus === "Writing" ? "Live" : "Live monitor";
+    return datasetStatus === "Writing" ? "Live Acquisition" : "Live View";
   }
   if (datasetStatus === "Aborted") {
     return "Aborted run";

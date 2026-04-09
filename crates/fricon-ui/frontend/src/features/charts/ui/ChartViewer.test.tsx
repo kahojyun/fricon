@@ -362,7 +362,7 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const projectionTrigger = await getSelectTrigger("Projection");
+    const projectionTrigger = await getSelectTrigger("Plot Mode");
     await user.click(projectionTrigger);
     await user.click(
       await screen.findByRole("option", { name: "Complex Plane" }),
@@ -381,6 +381,77 @@ describe("ChartViewer", () => {
       expect(options.orderByIndexColumn).toBe("idxB");
       expect(options.excludeColumns).toEqual(["idxB"]);
     });
+
+    clearMocks();
+  });
+
+  it("does not offer a None sweep axis for quantity-vs-sweep plots", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "get_filter_table_data") {
+        return {
+          fields: ["idxA", "idxB"],
+          rows: [
+            { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
+          ],
+          columnUniqueValues: {
+            idxA: [{ index: 1, displayValue: "1" }],
+            idxB: [{ index: 1, displayValue: "10" }],
+          },
+        };
+      }
+      if (cmd === "dataset_chart_data") {
+        return {
+          type: "xy",
+          projection: "trend",
+          drawStyle: "line",
+          xName: "idxB",
+          yName: null,
+          series: [
+            { id: "signal", label: "signal", pointCount: 1, values: [0, 1] },
+          ],
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 0 };
+      }
+      return null;
+    });
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
+              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "signal",
+                isComplex: false,
+                isTrace: false,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+
+    const sweepAxisTrigger = await getSelectTrigger("Sweep Axis");
+    await user.click(sweepAxisTrigger);
+
+    expect(
+      screen.queryByRole("option", { name: "None" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: "idxA" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: "idxB" }),
+    ).toBeInTheDocument();
 
     clearMocks();
   });
@@ -547,16 +618,16 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const projectionTrigger = await getSelectTrigger("Projection");
+    const projectionTrigger = await getSelectTrigger("Plot Mode");
     await user.click(projectionTrigger);
     await user.click(
       await screen.findByRole("option", { name: "Complex Plane" }),
     );
 
-    expect(screen.queryByText("Order By")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sweep Axis")).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: /advanced/i }));
-    expect(screen.queryByText("Split Into Series")).not.toBeInTheDocument();
-    expect(await screen.findByText("Last sweeps")).toBeInTheDocument();
+    expect(screen.queryByText("Group By")).not.toBeInTheDocument();
+    expect(await screen.findByText("Recent Sweeps")).toBeInTheDocument();
 
     await waitFor(() => {
       const lastPayload = livePayloads.at(-1);
@@ -572,7 +643,7 @@ describe("ChartViewer", () => {
       expect(options.groupByIndexColumns).toEqual(["idx_cycle", "idx_y"]);
     });
 
-    const liveWindowTrigger = await getSelectTrigger("Last sweeps");
+    const liveWindowTrigger = await getSelectTrigger("Recent Sweeps");
     await user.click(liveWindowTrigger);
     await user.click(await screen.findByRole("option", { name: "10 sweeps" }));
 

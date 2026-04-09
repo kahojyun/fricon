@@ -50,7 +50,7 @@ describe("buildChartFrameHeader", () => {
       }),
     ).toEqual({
       title: "Dataset #42",
-      meta: ["Live", "grouped by idx_cycle", "last 5 sweeps"],
+      meta: ["Live Acquisition", "grouped by idx_cycle", "recent 5 sweeps"],
     });
   });
 

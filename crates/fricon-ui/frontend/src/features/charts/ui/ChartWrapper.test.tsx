@@ -166,14 +166,14 @@ describe("ChartWrapper", () => {
     };
     const header: ChartFrameHeaderData = {
       title: "Dataset #17",
-      meta: ["Live", "last 5 sweeps"],
+      meta: ["Live Acquisition", "recent 5 sweeps"],
     };
 
     render(<ChartWrapper data={data} header={header} />);
 
     expect(screen.getByText("Dataset #17")).toBeInTheDocument();
-    expect(screen.getByText("Live")).toBeInTheDocument();
-    expect(screen.getByText("last 5 sweeps")).toBeInTheDocument();
+    expect(screen.getByText("Live Acquisition")).toBeInTheDocument();
+    expect(screen.getByText("recent 5 sweeps")).toBeInTheDocument();
   });
 
   it("renders a canvas for scatter chart data", () => {
