@@ -57,8 +57,9 @@ vi.mock("react-resizable-panels", () => ({
   ),
 }));
 
-vi.mock("echarts-for-react/esm/core", () => ({
-  default: () => <div data-testid="echarts-instance" />,
+// next-themes stub for ChartWrapper
+vi.mock("next-themes", () => ({
+  useTheme: () => ({ resolvedTheme: "light" }),
 }));
 
 function createWrapper() {
@@ -178,7 +179,7 @@ describe("DatasetExplorerScreen integration", () => {
   it("loads datasets, selects one, and renders the real inspector query flow", async () => {
     const user = userEvent.setup();
 
-    render(<DatasetExplorerScreen />, {
+    const { container } = render(<DatasetExplorerScreen />, {
       wrapper: createWrapper(),
     });
 
@@ -275,7 +276,8 @@ describe("DatasetExplorerScreen integration", () => {
       ).toBe(true);
     });
 
-    expect(await screen.findByTestId("echarts-instance")).toBeInTheDocument();
+    // Chart viewer renders a canvas for WebGL2 rendering
+    expect(container.querySelector("canvas")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Properties" }));
 
