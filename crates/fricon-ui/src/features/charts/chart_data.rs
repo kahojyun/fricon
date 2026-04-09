@@ -319,7 +319,7 @@ pub(crate) async fn dataset_live_chart_data(
         "Building live chart data"
     );
 
-    let snapshot = build_live_snapshot(&batch, schema, index_columns.as_deref(), options);
+    let snapshot = build_live_snapshot(&batch, schema, index_columns.as_deref(), start, options);
     if let Err(err) = &snapshot {
         error!(
             dataset_id = id,
@@ -367,8 +367,13 @@ pub(crate) async fn dataset_live_chart_data(
 
     let previous_batch =
         select_live_range(&dataset, previous_start, known_row_count, selected_columns)?;
-    let previous_snapshot =
-        build_live_snapshot(&previous_batch, schema, index_columns.as_deref(), options)?;
+    let previous_snapshot = build_live_snapshot(
+        &previous_batch,
+        schema,
+        index_columns.as_deref(),
+        previous_start,
+        options,
+    )?;
 
     let Some(ops) = diff_live_snapshots(&previous_snapshot, &snapshot) else {
         return Ok(LiveChartDataResponse::Reset {
@@ -387,10 +392,13 @@ fn build_live_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    row_start: usize,
     options: &LiveChartDataOptions,
 ) -> anyhow::Result<ChartSnapshot> {
     match options {
-        LiveChartDataOptions::Xy(opts) => build_live_xy_series(batch, schema, index_columns, opts),
+        LiveChartDataOptions::Xy(opts) => {
+            build_live_xy_series(batch, schema, index_columns, row_start, opts)
+        }
         LiveChartDataOptions::Heatmap(opts) => {
             build_live_heatmap_series(batch, schema, index_columns, opts)
         }

@@ -219,4 +219,53 @@ describe("chartViewerLogic", () => {
       excludeColumns: ["idxA", "idxB"],
     });
   });
+
+  it("preserves trace XY selections when scalar XY columns are also available", () => {
+    const columns = [
+      makeColumn({ name: "idxA", isIndex: true }),
+      makeColumn({ name: "scalarX" }),
+      makeColumn({ name: "scalarY" }),
+      makeColumn({ name: "traceX", isTrace: true }),
+      makeColumn({ name: "traceY", isTrace: true }),
+    ];
+    const derived = deriveChartViewerState(
+      columns,
+      makeState({
+        plotMode: "xy",
+        drawStyle: "points",
+        xyXName: "traceX",
+        xyYName: "traceY",
+      }),
+    );
+
+    expect(derived.xyXOptions.map((column) => column.name)).toEqual([
+      "scalarX",
+      "scalarY",
+      "traceX",
+      "traceY",
+    ]);
+    expect(derived.effectiveXYXName).toBe("traceX");
+    expect(derived.effectiveXYYName).toBe("traceY");
+
+    const request = buildChartRequest({
+      datasetDetail: makeDatasetDetail(columns),
+      filterTableData: makeFilterTableData(),
+      hasFilters: false,
+      filterRow: null,
+      selectedComplexView: ["real", "imag"],
+      selectedComplexViewSingle: "mag",
+      indexFilters: undefined,
+      derived,
+    });
+
+    expect(request).toEqual({
+      view: "xy",
+      plotMode: "xy",
+      drawStyle: "points",
+      xColumn: "traceX",
+      yColumn: "traceY",
+      indexFilters: undefined,
+      excludeColumns: [],
+    });
+  });
 });

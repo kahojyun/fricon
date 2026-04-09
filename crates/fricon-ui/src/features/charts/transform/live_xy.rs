@@ -16,6 +16,7 @@ pub(crate) fn build_live_xy_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    row_start: usize,
     options: &LiveXYOptions,
 ) -> Result<ChartSnapshot> {
     debug!(
@@ -34,6 +35,7 @@ pub(crate) fn build_live_xy_series(
             batch,
             schema,
             index_columns,
+            row_start,
             options,
             quantity,
             complex_views.as_deref().unwrap_or(&[]),
@@ -53,6 +55,7 @@ fn build_live_quantity_vs_sweep_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    row_start: usize,
     options: &LiveXYOptions,
     series_name: &str,
     complex_views: &[ComplexViewOption],
@@ -87,6 +90,7 @@ fn build_live_quantity_vs_sweep_snapshot(
             is_complex,
             complex_views,
             tail_count,
+            row_start,
             &roles,
         )?
     };
@@ -356,6 +360,7 @@ fn build_live_scalar_quantity_vs_sweep(
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
+    row_start: usize,
     roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
     let series_column = batch
@@ -382,10 +387,17 @@ fn build_live_scalar_quantity_vs_sweep(
             is_complex,
             complex_views,
             tail_count,
+            row_start,
         );
     }
 
-    build_live_scalar_quantity_vs_sweep_groups(&ctx, is_complex, complex_views, tail_count)
+    build_live_scalar_quantity_vs_sweep_groups(
+        &ctx,
+        is_complex,
+        complex_views,
+        tail_count,
+        row_start,
+    )
 }
 
 fn build_live_scalar_xy(
@@ -544,12 +556,12 @@ fn row_axis_value(row: usize) -> Result<f64> {
 
 fn resolve_quantity_vs_sweep_x(
     x_values: Option<&[f64]>,
-    position: usize,
+    row_start: usize,
     row: usize,
 ) -> Result<f64> {
     Ok(x_values
         .and_then(|values| values.get(row).copied())
-        .unwrap_or(row_axis_value(position)?))
+        .unwrap_or(row_axis_value(row_start + row)?))
 }
 
 fn make_live_trace_series(
@@ -602,6 +614,7 @@ fn build_live_scalar_quantity_vs_sweep_rows(
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
+    row_start: usize,
 ) -> Result<Vec<FlatXYSeries>> {
     let num_rows = ctx.batch.num_rows();
     let start = num_rows.saturating_sub(tail_count);
@@ -616,8 +629,8 @@ fn build_live_scalar_quantity_vs_sweep_rows(
             .map(|view| {
                 let transformed = transform_complex_values(reals, imags, view);
                 let mut values = Vec::with_capacity(rows.len() * 2);
-                for (position, row) in rows.iter().copied().enumerate() {
-                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
+                for row in rows.iter().copied() {
+                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
                     values.push(transformed[row]);
                 }
                 Ok(FlatXYSeries::new(
@@ -636,8 +649,8 @@ fn build_live_scalar_quantity_vs_sweep_rows(
         .context("Expected numeric array")?
         .values();
     let mut values = Vec::with_capacity(rows.len() * 2);
-    for (position, row) in rows.iter().copied().enumerate() {
-        values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
+    for row in rows.iter().copied() {
+        values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
         values.push(y_values[row]);
     }
     Ok(vec![FlatXYSeries::new(
@@ -653,6 +666,7 @@ fn build_live_scalar_quantity_vs_sweep_groups(
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
+    row_start: usize,
 ) -> Result<Vec<FlatXYSeries>> {
     let groups = compute_group_starts(ctx.batch, ctx.schema, &ctx.roles.trace_group);
     let ranges = group_ranges(&groups, ctx.batch.num_rows());
@@ -680,8 +694,8 @@ fn build_live_scalar_quantity_vs_sweep_groups(
             for &view in &views {
                 let transformed = transform_complex_values(reals, imags, view);
                 let mut values = Vec::with_capacity(rows.len() * 2);
-                for (position, row) in rows.iter().copied().enumerate() {
-                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
+                for row in rows.iter().copied() {
+                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
                     values.push(transformed[row]);
                 }
                 result.push(FlatXYSeries::new(
@@ -721,8 +735,8 @@ fn build_live_scalar_quantity_vs_sweep_groups(
         let group_label =
             make_group_label(ctx.batch, ctx.schema, &ctx.roles.trace_group, group_start);
         let mut values = Vec::with_capacity(rows.len() * 2);
-        for (position, row) in rows.iter().copied().enumerate() {
-            values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
+        for row in rows.iter().copied() {
+            values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
             values.push(y_values[row]);
         }
         result.push(FlatXYSeries::new(
@@ -767,6 +781,7 @@ mod tests {
                 &batch,
                 &schema,
                 Some(&[0]),
+                0,
                 match &LiveChartDataOptions::Xy(LiveXYOptions {
                     draw_style: XYDrawStyle::Line,
                     tail_count: 2,
@@ -786,5 +801,40 @@ mod tests {
 
         assert_eq!(snapshot.series.len(), 1);
         assert_eq!(snapshot.series[0].point_count, 2);
+    }
+
+    #[test]
+    fn live_quantity_vs_sweep_without_sweep_column_keeps_absolute_row_axis() {
+        let batch = numeric_batch(&[("value", &[10.0, 11.0, 12.0])]);
+        let schema = numeric_schema(&["value"]);
+
+        let snapshot = xy_snapshot(
+            build_live_xy_series(
+                &batch,
+                &schema,
+                None,
+                5,
+                match &LiveChartDataOptions::Xy(LiveXYOptions {
+                    draw_style: XYDrawStyle::Line,
+                    tail_count: 3,
+                    known_row_count: None,
+                    plot_mode: XYPlotModeOptions::QuantityVsSweep {
+                        quantity: "value".to_string(),
+                        complex_views: None,
+                    },
+                    trace_roles: XYTraceRoleOptions::default(),
+                }) {
+                    LiveChartDataOptions::Xy(options) => options,
+                    LiveChartDataOptions::Heatmap(_) => unreachable!(),
+                },
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(snapshot.x_name, "row");
+        assert_eq!(
+            snapshot.series[0].values,
+            vec![5.0, 10.0, 6.0, 11.0, 7.0, 12.0]
+        );
     }
 }

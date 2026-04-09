@@ -146,11 +146,13 @@ export function deriveChartViewerState(
     (column) => column.name === effectiveComplexPlaneQuantityName,
   );
 
-  const defaultXYXOptions =
-    scalarXYColumnOptions.length >= 2
-      ? scalarXYColumnOptions
-      : traceXYColumnOptions;
-  const effectiveXYXName = pickSelection(defaultXYXOptions, state.xyXName);
+  const xyXOptions =
+    scalarXYColumnOptions.length >= 2 && traceXYColumnOptions.length >= 2
+      ? [...scalarXYColumnOptions, ...traceXYColumnOptions]
+      : scalarXYColumnOptions.length >= 2
+        ? scalarXYColumnOptions
+        : traceXYColumnOptions;
+  const effectiveXYXName = pickSelection(xyXOptions, state.xyXName);
   const xyXColumn = columns.find((column) => column.name === effectiveXYXName);
   const xyYOptions = xyXColumn?.isTrace
     ? traceXYColumnOptions
@@ -289,7 +291,7 @@ export function deriveChartViewerState(
     complexPlaneQuantityOptions,
     scalarXYColumnOptions,
     traceXYColumnOptions,
-    xyXOptions: defaultXYXOptions,
+    xyXOptions,
     xyYOptions: xyYOptions.filter((column) => column.name !== effectiveXYXName),
     heatmapXOptions,
     heatmapYOptions: heatmapYSelectionOptions,
