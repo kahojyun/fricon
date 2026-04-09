@@ -96,16 +96,9 @@ fn build_scatter_selected_columns(
             push_column(&mut selected, column_index(schema, trace_x_column)?);
             push_column(&mut selected, column_index(schema, trace_y_column)?);
         }
-        ScatterModeOptions::Xy {
-            x_column,
-            y_column,
-            bin_column,
-        } => {
+        ScatterModeOptions::Xy { x_column, y_column } => {
             push_column(&mut selected, column_index(schema, x_column)?);
             push_column(&mut selected, column_index(schema, y_column)?);
-            if let Some(bin_name) = bin_column.as_ref() {
-                push_column(&mut selected, column_index(schema, bin_name)?);
-            }
         }
     }
     Ok(selected)
@@ -278,13 +271,12 @@ mod tests {
             scatter: ScatterModeOptions::Xy {
                 x_column: "x".to_string(),
                 y_column: "y".to_string(),
-                bin_column: Some("z".to_string()),
             },
             common: ChartCommonOptions::default(),
         });
 
         let selected = build_chart_selected_columns(&schema, &options).unwrap();
-        assert_eq!(selected, vec![0, 1, 2]);
+        assert_eq!(selected, vec![0, 1]);
     }
 
     #[test]
@@ -337,6 +329,7 @@ mod tests {
             series: "y".to_string(),
             complex_views: None,
             tail_count: 5,
+            known_row_count: None,
         });
 
         let selected = build_live_chart_selected_columns(&schema, Some(&[0]), &options).unwrap();
@@ -352,6 +345,7 @@ mod tests {
                 trace_y_column: "trace_y".to_string(),
             },
             tail_count: 5,
+            known_row_count: None,
         });
 
         let selected = build_live_chart_selected_columns(&schema, Some(&[0, 1]), &options).unwrap();

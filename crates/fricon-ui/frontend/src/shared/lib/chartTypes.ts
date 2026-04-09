@@ -4,14 +4,21 @@ export type ScatterMode = "complex" | "trace_xy" | "xy";
 
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg";
 
-export type ChartSeriesData = number[][];
-
 export interface ChartSeries {
-  name: string;
-  data: ChartSeriesData;
+  id: string;
+  label: string;
+  values: Float32Array;
+  pointCount: number;
 }
 
-export type ChartOptions =
+export interface HeatmapSeries {
+  id: string;
+  label: string;
+  values: Float32Array;
+  pointCount: number;
+}
+
+export type ChartModel =
   | {
       type: "line";
       xName: string;
@@ -23,7 +30,7 @@ export type ChartOptions =
       yName: string;
       xCategories: number[];
       yCategories: number[];
-      series: ChartSeries[];
+      series: HeatmapSeries[];
     }
   | {
       type: "scatter";
@@ -31,3 +38,22 @@ export type ChartOptions =
       yName: string;
       series: ChartSeries[];
     };
+
+export type ChartOptions = ChartModel;
+
+export function getXYPoint(series: ChartSeries, index: number) {
+  const offset = index * 2;
+  return {
+    x: series.values[offset] ?? 0,
+    y: series.values[offset + 1] ?? 0,
+  };
+}
+
+export function getXYZPoint(series: HeatmapSeries, index: number) {
+  const offset = index * 3;
+  return {
+    x: series.values[offset] ?? 0,
+    y: series.values[offset + 1] ?? 0,
+    z: series.values[offset + 2] ?? 0,
+  };
+}

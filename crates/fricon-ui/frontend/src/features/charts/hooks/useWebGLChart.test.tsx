@@ -22,6 +22,7 @@ const glStub = {
   createBuffer: () => ({}),
   bindBuffer: noop,
   bufferData: noop,
+  bufferSubData: noop,
   useProgram: noop,
   getUniformLocation: () => ({}),
   getAttribLocation: () => 0,
@@ -165,7 +166,7 @@ function makeLineData(
   return {
     type: "line",
     xName: "x",
-    series: [{ name: "sig", data: points }],
+    series: [xySeries("sig", "sig", points)],
   };
 }
 
@@ -177,14 +178,33 @@ function makeHeatmapData(): Extract<ChartOptions, { type: "heatmap" }> {
     xCategories: [0, 1],
     yCategories: [0, 1],
     series: [
-      {
-        name: "z",
-        data: [
-          [0, 0, 1],
-          [1, 1, 2],
-        ],
-      },
+      xyzSeries("z", "z", [
+        [0, 0, 1],
+        [1, 1, 2],
+      ]),
     ],
+  };
+}
+
+function xySeries(id: string, label: string, points: [number, number][]) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
+  };
+}
+
+function xyzSeries(
+  id: string,
+  label: string,
+  points: [number, number, number][],
+) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
   };
 }
 

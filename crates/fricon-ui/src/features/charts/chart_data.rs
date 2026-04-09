@@ -16,7 +16,11 @@ use crate::{
             compute_sweep_groups,
             mapping::{build_chart_selected_columns, build_live_chart_selected_columns},
         },
-        types::{ChartDataResponse, LiveChartDataOptions, ScatterModeOptions},
+        types::{
+            ChartSnapshot, FlatSeries, FlatXYSeries, HeatmapChartSnapshot,
+            LiveChartAppendOperation, LiveChartDataOptions, LiveChartDataResponse,
+            ScatterModeOptions,
+        },
     },
 };
 
@@ -115,9 +119,9 @@ fn resolve_live_row_start(
     dataset: &DatasetReader,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    total_rows: usize,
     options: &LiveChartDataOptions,
 ) -> anyhow::Result<usize> {
-    let total_rows = dataset.num_rows();
     if total_rows == 0 {
         return Ok(0);
     }
@@ -211,7 +215,7 @@ pub(crate) async fn dataset_chart_data(
     session: &WorkspaceSession,
     id: i32,
     options: &DatasetChartDataOptions,
-) -> anyhow::Result<ChartDataResponse> {
+) -> anyhow::Result<ChartSnapshot> {
     let dataset = session.dataset(id).await?;
     let schema = dataset.schema();
     let common = options.common();
@@ -295,16 +299,22 @@ pub(crate) async fn dataset_live_chart_data(
     session: &WorkspaceSession,
     id: i32,
     options: &LiveChartDataOptions,
-) -> anyhow::Result<ChartDataResponse> {
+) -> anyhow::Result<LiveChartDataResponse> {
     let dataset = session.dataset(id).await?;
     let schema = dataset.schema();
     let index_columns = dataset.index_columns();
     let total_rows = dataset.num_rows();
-    let start = resolve_live_row_start(&dataset, schema, index_columns.as_deref(), options)?;
     let selected_columns =
         build_live_chart_selected_columns(schema, index_columns.as_deref(), options)?;
+    let start = resolve_live_row_start(
+        &dataset,
+        schema,
+        index_columns.as_deref(),
+        total_rows,
+        options,
+    )?;
 
-    let batch = select_live_range(&dataset, start, total_rows, selected_columns)?;
+    let batch = select_live_range(&dataset, start, total_rows, selected_columns.clone())?;
     debug!(
         dataset_id = id,
         start,
@@ -314,18 +324,8 @@ pub(crate) async fn dataset_live_chart_data(
         "Building live chart data"
     );
 
-    let result = match options {
-        LiveChartDataOptions::Line(opts) => {
-            build_live_line_series(&batch, schema, index_columns.as_deref(), opts)
-        }
-        LiveChartDataOptions::Heatmap(opts) => {
-            build_live_heatmap_series(&batch, schema, index_columns.as_deref(), opts)
-        }
-        LiveChartDataOptions::Scatter(opts) => {
-            build_live_scatter_series(&batch, schema, index_columns.as_deref(), opts)
-        }
-    };
-    if let Err(err) = &result {
+    let snapshot = build_live_snapshot(&batch, schema, index_columns.as_deref(), options);
+    if let Err(err) = &snapshot {
         error!(
             dataset_id = id,
             rows = batch.num_rows(),
@@ -333,7 +333,190 @@ pub(crate) async fn dataset_live_chart_data(
             "Failed to build live chart data"
         );
     }
-    result
+    let snapshot = snapshot?;
+
+    let Some(known_row_count) = options.known_row_count() else {
+        return Ok(LiveChartDataResponse::Reset {
+            row_count: total_rows,
+            snapshot,
+        });
+    };
+
+    if known_row_count == 0 || known_row_count > total_rows {
+        return Ok(LiveChartDataResponse::Reset {
+            row_count: total_rows,
+            snapshot,
+        });
+    }
+
+    if known_row_count == total_rows {
+        return Ok(LiveChartDataResponse::Append {
+            row_count: total_rows,
+            ops: vec![],
+        });
+    }
+
+    let previous_start = resolve_live_row_start(
+        &dataset,
+        schema,
+        index_columns.as_deref(),
+        known_row_count,
+        options,
+    )?;
+    if previous_start != start {
+        return Ok(LiveChartDataResponse::Reset {
+            row_count: total_rows,
+            snapshot,
+        });
+    }
+
+    let previous_batch =
+        select_live_range(&dataset, previous_start, known_row_count, selected_columns)?;
+    let previous_snapshot =
+        build_live_snapshot(&previous_batch, schema, index_columns.as_deref(), options)?;
+
+    let Some(ops) = diff_live_snapshots(&previous_snapshot, &snapshot) else {
+        return Ok(LiveChartDataResponse::Reset {
+            row_count: total_rows,
+            snapshot,
+        });
+    };
+
+    Ok(LiveChartDataResponse::Append {
+        row_count: total_rows,
+        ops,
+    })
+}
+
+fn build_live_snapshot(
+    batch: &RecordBatch,
+    schema: &DatasetSchema,
+    index_columns: Option<&[usize]>,
+    options: &LiveChartDataOptions,
+) -> anyhow::Result<ChartSnapshot> {
+    match options {
+        LiveChartDataOptions::Line(opts) => {
+            build_live_line_series(batch, schema, index_columns, opts)
+        }
+        LiveChartDataOptions::Heatmap(opts) => {
+            build_live_heatmap_series(batch, schema, index_columns, opts)
+        }
+        LiveChartDataOptions::Scatter(opts) => {
+            build_live_scatter_series(batch, schema, index_columns, opts)
+        }
+    }
+}
+
+fn diff_live_snapshots(
+    previous: &ChartSnapshot,
+    current: &ChartSnapshot,
+) -> Option<Vec<LiveChartAppendOperation>> {
+    match (previous, current) {
+        (ChartSnapshot::Line(previous), ChartSnapshot::Line(current)) => {
+            diff_xy_series(&previous.series, &current.series)
+        }
+        (ChartSnapshot::Scatter(previous), ChartSnapshot::Scatter(current)) => {
+            diff_xy_series(&previous.series, &current.series)
+        }
+        (ChartSnapshot::Heatmap(previous), ChartSnapshot::Heatmap(current)) => {
+            diff_heatmap(previous, current)
+        }
+        _ => None,
+    }
+}
+
+fn diff_xy_series(
+    previous: &[FlatXYSeries],
+    current: &[FlatXYSeries],
+) -> Option<Vec<LiveChartAppendOperation>> {
+    if previous.len() > current.len() {
+        return None;
+    }
+
+    let mut ops = Vec::new();
+    for (previous_series, current_series) in previous.iter().zip(current) {
+        if previous_series.id != current_series.id || previous_series.label != current_series.label
+        {
+            return None;
+        }
+        if !current_series.values.starts_with(&previous_series.values) {
+            return None;
+        }
+        if previous_series.point_count > current_series.point_count {
+            return None;
+        }
+        let appended_values = current_series.values[previous_series.values.len()..].to_vec();
+        let appended_points = current_series.point_count - previous_series.point_count;
+        if appended_points > 0 {
+            ops.push(LiveChartAppendOperation::AppendPoints {
+                series_id: current_series.id.clone(),
+                values: appended_values,
+                point_count: appended_points,
+            });
+        }
+    }
+
+    for series in &current[previous.len()..] {
+        ops.push(LiveChartAppendOperation::AppendSeries {
+            series: FlatSeries::Xy(series.clone()),
+        });
+    }
+
+    Some(ops)
+}
+
+fn diff_heatmap(
+    previous: &HeatmapChartSnapshot,
+    current: &HeatmapChartSnapshot,
+) -> Option<Vec<LiveChartAppendOperation>> {
+    if previous.series.len() > current.series.len() {
+        return None;
+    }
+    if !current.x_categories.starts_with(&previous.x_categories)
+        || !current.y_categories.starts_with(&previous.y_categories)
+    {
+        return None;
+    }
+
+    let mut ops = Vec::new();
+    let appended_x = current.x_categories[previous.x_categories.len()..].to_vec();
+    let appended_y = current.y_categories[previous.y_categories.len()..].to_vec();
+    if !appended_x.is_empty() || !appended_y.is_empty() {
+        ops.push(LiveChartAppendOperation::AppendHeatmapCategories {
+            x_categories: (!appended_x.is_empty()).then_some(appended_x),
+            y_categories: (!appended_y.is_empty()).then_some(appended_y),
+        });
+    }
+
+    for (previous_series, current_series) in previous.series.iter().zip(&current.series) {
+        if previous_series.id != current_series.id || previous_series.label != current_series.label
+        {
+            return None;
+        }
+        if !current_series.values.starts_with(&previous_series.values) {
+            return None;
+        }
+        if previous_series.point_count > current_series.point_count {
+            return None;
+        }
+        let appended_values = current_series.values[previous_series.values.len()..].to_vec();
+        let appended_points = current_series.point_count - previous_series.point_count;
+        if appended_points > 0 {
+            ops.push(LiveChartAppendOperation::AppendPoints {
+                series_id: current_series.id.clone(),
+                values: appended_values,
+                point_count: appended_points,
+            });
+        }
+    }
+
+    for series in &current.series[previous.series.len()..] {
+        ops.push(LiveChartAppendOperation::AppendSeries {
+            series: FlatSeries::Xyz(series.clone()),
+        });
+    }
+
+    Some(ops)
 }
 
 #[cfg(test)]

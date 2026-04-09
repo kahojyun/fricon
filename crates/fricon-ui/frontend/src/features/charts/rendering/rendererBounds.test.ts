@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ChartSeries } from "@/shared/lib/chartTypes";
+import type { ChartSeries, HeatmapSeries } from "@/shared/lib/chartTypes";
 import {
   syncHeatmapRenderState,
   type HeatmapRenderState,
@@ -10,15 +10,12 @@ import { scatterDataBounds } from "./scatterRenderer";
 describe("lineDataBounds", () => {
   it("ignores non-finite points when computing chart bounds", () => {
     const series: ChartSeries[] = [
-      {
-        name: "signal",
-        data: [
-          [0, 1],
-          [2, Infinity],
-          [Infinity, 3],
-          [4, 5],
-        ],
-      },
+      xySeries("signal", "signal", [
+        [0, 1],
+        [2, Infinity],
+        [Infinity, 3],
+        [4, 5],
+      ]),
     ];
 
     expect(lineDataBounds(series)).toEqual({
@@ -33,15 +30,12 @@ describe("lineDataBounds", () => {
 describe("scatterDataBounds", () => {
   it("ignores non-finite points when computing chart bounds", () => {
     const series: ChartSeries[] = [
-      {
-        name: "points",
-        data: [
-          [0, 1],
-          [2, NaN],
-          [Infinity, 3],
-          [4, 5],
-        ],
-      },
+      xySeries("points", "points", [
+        [0, 1],
+        [2, Number.NaN],
+        [Infinity, 3],
+        [4, 5],
+      ]),
     ];
 
     expect(scatterDataBounds(series)).toEqual({
@@ -56,29 +50,30 @@ describe("scatterDataBounds", () => {
 describe("syncHeatmapRenderState", () => {
   it("uses only finite cell values for min/max normalization", () => {
     const bufferData = vi.fn();
+    const bufferSubData = vi.fn();
     const gl = {
       ARRAY_BUFFER: 0x8892,
       DYNAMIC_DRAW: 0x88e8,
       bindBuffer: vi.fn(),
       bufferData,
+      bufferSubData,
     } as unknown as WebGL2RenderingContext;
 
     const state = {
       cellBuffer: {} as WebGLBuffer,
       instanceCount: 0,
+      capacity: 0,
+      instanceData: new Float32Array(0),
       valueMin: 0,
       valueMax: 0,
     } as HeatmapRenderState;
 
-    const series: ChartSeries[] = [
-      {
-        name: "heat",
-        data: [
-          [0, 0, 1],
-          [1, 0, Infinity],
-          [0, 1, 5],
-        ],
-      },
+    const series: HeatmapSeries[] = [
+      xyzSeries("heat", "heat", [
+        [0, 0, 1],
+        [1, 0, Infinity],
+        [0, 1, 5],
+      ]),
     ];
 
     syncHeatmapRenderState(gl, state, series);
@@ -88,8 +83,39 @@ describe("syncHeatmapRenderState", () => {
     expect(state.instanceCount).toBe(2);
     expect(bufferData).toHaveBeenCalledWith(
       gl.ARRAY_BUFFER,
-      new Float32Array([0, 0, 0, 0, 1, 1]),
+      new Float32Array(6),
       gl.DYNAMIC_DRAW,
+    );
+    expect(bufferSubData).toHaveBeenCalledWith(
+      gl.ARRAY_BUFFER,
+      0,
+      new Float32Array([0, 0, 0, 0, 1, 1]),
     );
   });
 });
+
+function xySeries(
+  id: string,
+  label: string,
+  points: [number, number][],
+): ChartSeries {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
+  };
+}
+
+function xyzSeries(
+  id: string,
+  label: string,
+  points: [number, number, number][],
+): HeatmapSeries {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
+  };
+}

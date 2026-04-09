@@ -49,7 +49,6 @@ export function ChartViewerControls({
     setScatterTraceYName,
     setScatterXName,
     setScatterYName,
-    setScatterBinName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
   } = actions;
@@ -58,7 +57,6 @@ export function ChartViewerControls({
     availableChartTypes,
     complexControlsDisabled,
     effectiveChartType,
-    effectiveScatterBinName,
     effectiveScatterMode,
     effectiveScatterSeriesName,
     effectiveScatterTraceXName,
@@ -69,9 +67,7 @@ export function ChartViewerControls({
     effectiveXColumnName,
     effectiveYColumnName,
     isTraceSeries,
-    scatterBinColumnOptions,
     scatterComplexOptions,
-    scatterIsTraceBased,
     scatterModeOptions,
     scatterTraceXYOptions,
     scatterXYOptions,
@@ -345,31 +341,6 @@ export function ChartViewerControls({
               </Select>
             </div>
           </>
-        ) : null}
-
-        {effectiveChartType === "scatter" &&
-        (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
-        !scatterIsTraceBased ? (
-          <div className="min-w-50">
-            <Label className="mb-1 block">Index Column (excluded)</Label>
-            <Select
-              value={effectiveScatterBinName ?? ""}
-              onValueChange={(value) =>
-                setScatterBinName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select index column" />
-              </SelectTrigger>
-              <SelectContent>
-                {scatterBinColumnOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         ) : null}
       </div>
 

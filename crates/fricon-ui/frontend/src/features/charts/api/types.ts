@@ -1,16 +1,22 @@
 import type {
-  ChartDataResponse as WireChartResponse,
+  ChartSnapshot as WireChartSnapshot,
   ColumnUniqueValue,
   ColumnInfo,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
+  FlatSeries as WireFlatSeries,
+  FlatXYSeries as WireFlatXYSeries,
+  FlatXYZSeries as WireFlatXYZSeries,
+  LiveChartAppendOperation as WireLiveChartAppendOperation,
+  LiveChartDataResponse as WireLiveChartResponse,
+  LiveChartDataOptions as WireLiveChartDataOptions,
   Row as FilterTableRow,
   ScatterModeOptions as WireScatterModeOptions,
   TableData as WireFilterTableData,
   UiDatasetStatus as DatasetStatus,
 } from "@/shared/lib/bindings";
-import type { ChartOptions, ComplexViewOption } from "@/shared/lib/chartTypes";
+import type { ChartModel, ComplexViewOption } from "@/shared/lib/chartTypes";
 
 export type {
   ColumnInfo,
@@ -19,6 +25,7 @@ export type {
   DatasetWriteStatus,
   FilterTableOptions,
   FilterTableRow,
+  WireLiveChartDataOptions as LiveChartDataOptions,
 };
 
 export interface DatasetDetail {
@@ -62,6 +69,43 @@ export type ChartDataOptions =
     });
 
 export type ScatterModeOptions = WireScatterModeOptions;
+
+export type LiveChartAppendOperation =
+  | {
+      kind: "append_points";
+      seriesId: string;
+      values: Float32Array;
+      pointCount: number;
+    }
+  | {
+      kind: "append_series";
+      series:
+        | {
+            shape: "xy";
+            series: import("@/shared/lib/chartTypes").ChartSeries;
+          }
+        | {
+            shape: "xyz";
+            series: import("@/shared/lib/chartTypes").HeatmapSeries;
+          };
+    }
+  | {
+      kind: "append_heatmap_categories";
+      xCategories?: number[];
+      yCategories?: number[];
+    };
+
+export type LiveChartUpdate =
+  | {
+      mode: "reset";
+      rowCount: number;
+      snapshot: ChartModel;
+    }
+  | {
+      mode: "append";
+      rowCount: number;
+      ops: LiveChartAppendOperation[];
+    };
 
 export function toWireChartOptions(
   options: ChartDataOptions,
@@ -111,7 +155,6 @@ export function toWireChartOptions(
       mode: "xy" as const,
       xColumn: options.scatter.xColumn,
       yColumn: options.scatter.yColumn,
-      binColumn: options.scatter.binColumn ?? null,
     };
   })();
 
@@ -125,40 +168,49 @@ export function toWireChartOptions(
   };
 }
 
-export function normalizeChartOptions(result: WireChartResponse): ChartOptions {
+export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
   if (result.type === "line") {
     return {
       type: "line",
       xName: result.xName,
-      series: result.series,
+      series: result.series.map(normalizeXYSeries),
     };
   }
 
-  if (result.yName == null) {
-    throw new Error(
-      `Missing yName for chart type '${result.type}' in backend response`,
-    );
-  }
-
   if (result.type === "heatmap") {
-    if (result.xCategories == null || result.yCategories == null) {
-      throw new Error("Missing heatmap categories in backend response");
-    }
     return {
       type: "heatmap",
       xName: result.xName,
       yName: result.yName,
       xCategories: result.xCategories,
       yCategories: result.yCategories,
-      series: result.series,
+      series: result.series.map(normalizeXYZSeries),
     };
   }
 
   return {
-    type: result.type,
+    type: "scatter",
     xName: result.xName,
     yName: result.yName,
-    series: result.series,
+    series: result.series.map(normalizeXYSeries),
+  };
+}
+
+export function normalizeLiveChartUpdate(
+  result: WireLiveChartResponse,
+): LiveChartUpdate {
+  if (result.mode === "reset") {
+    return {
+      mode: "reset",
+      rowCount: result.row_count,
+      snapshot: normalizeChartSnapshot(result.snapshot),
+    };
+  }
+
+  return {
+    mode: "append",
+    rowCount: result.row_count,
+    ops: result.ops.map(normalizeLiveChartAppendOperation),
   };
 }
 
@@ -175,5 +227,63 @@ export function normalizeFilterTableData(
     fields: result.fields,
     rows: result.rows,
     columnUniqueValues,
+  };
+}
+
+function normalizeXYSeries(series: WireFlatXYSeries) {
+  return {
+    id: series.id,
+    label: series.label,
+    values: Float32Array.from(series.values),
+    pointCount: series.pointCount,
+  };
+}
+
+function normalizeXYZSeries(series: WireFlatXYZSeries) {
+  return {
+    id: series.id,
+    label: series.label,
+    values: Float32Array.from(series.values),
+    pointCount: series.pointCount,
+  };
+}
+
+function normalizeFlatSeries(series: WireFlatSeries) {
+  if (series.shape === "xy") {
+    return {
+      shape: "xy" as const,
+      series: normalizeXYSeries(series),
+    };
+  }
+
+  return {
+    shape: "xyz" as const,
+    series: normalizeXYZSeries(series),
+  };
+}
+
+function normalizeLiveChartAppendOperation(
+  operation: WireLiveChartAppendOperation,
+): LiveChartAppendOperation {
+  if (operation.kind === "append_points") {
+    return {
+      kind: "append_points",
+      seriesId: operation.series_id,
+      values: Float32Array.from(operation.values),
+      pointCount: operation.point_count,
+    };
+  }
+
+  if (operation.kind === "append_series") {
+    return {
+      kind: "append_series",
+      series: normalizeFlatSeries(operation.series),
+    };
+  }
+
+  return {
+    kind: "append_heatmap_categories",
+    xCategories: operation.x_categories ?? undefined,
+    yCategories: operation.y_categories ?? undefined,
   };
 }

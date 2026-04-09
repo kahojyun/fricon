@@ -3,9 +3,9 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
-use super::{compute_sweep_groups, sweep_name};
+use super::{compute_sweep_groups, group_series_id, row_series_id};
 use crate::features::charts::types::{
-    ChartDataResponse, ChartType, LiveScatterOptions, ScatterModeOptions, Series,
+    ChartSnapshot, FlatXYSeries, LiveScatterOptions, ScatterChartSnapshot, ScatterModeOptions,
 };
 
 /// Build live scatter series split into per-sweep groups so the frontend can
@@ -15,7 +15,7 @@ pub(crate) fn build_live_scatter_series(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     options: &LiveScatterOptions,
-) -> Result<ChartDataResponse> {
+) -> Result<ChartSnapshot> {
     let tail_count = options.tail_count.max(1);
     debug!(
         chart_type = "live_scatter",
@@ -37,14 +37,11 @@ pub(crate) fn build_live_scatter_series(
         } => build_xy_live(batch, index_columns, schema, x_column, y_column, tail_count)?,
     };
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Scatter,
+    Ok(ChartSnapshot::Scatter(ScatterChartSnapshot {
         x_name,
-        y_name: Some(y_name),
-        x_categories: None,
-        y_categories: None,
+        y_name,
         series,
-    })
+    }))
 }
 
 /// Complex scatter: real vs imag, split per sweep.
@@ -54,7 +51,7 @@ fn build_complex_live(
     index_columns: Option<&[usize]>,
     series_name: &str,
     tail_count: usize,
-) -> Result<(String, String, Vec<Series>)> {
+) -> Result<(String, String, Vec<FlatXYSeries>)> {
     let data_type = *schema
         .columns()
         .get(series_name)
@@ -70,9 +67,8 @@ fn build_complex_live(
             .try_into()?;
         let num_rows = series_array.num_rows();
         let start = num_rows.saturating_sub(tail_count);
-        let total = num_rows - start;
         let mut result = Vec::new();
-        for (age, row) in (start..num_rows).enumerate() {
+        for row in start..num_rows {
             let Some((_x_values, trace_values)) = series_array.expand_trace(row)? else {
                 continue;
             };
@@ -81,11 +77,17 @@ fn build_complex_live(
             let reals = complex_array.real().values();
             let imags = complex_array.imag().values();
             let len = reals.len().min(imags.len());
-            let data = (0..len).map(|i| vec![reals[i], imags[i]]).collect();
-            result.push(Series {
-                name: sweep_name(age, total),
-                data,
-            });
+            let mut values = Vec::with_capacity(len * 2);
+            for i in 0..len {
+                values.push(reals[i]);
+                values.push(imags[i]);
+            }
+            result.push(FlatXYSeries::new(
+                row_series_id(row),
+                series_name.to_string(),
+                values,
+                len,
+            ));
         }
         Ok((
             format!("{series_name} (real)"),
@@ -108,19 +110,23 @@ fn build_complex_live(
         let groups = compute_sweep_groups(batch, schema, index_columns);
         let start_group = groups.len().saturating_sub(tail_count);
         let selected = &groups[start_group..];
-        let total = selected.len();
         let num_rows = batch.num_rows();
 
         let mut result = Vec::new();
-        for (age, &group_start) in selected.iter().enumerate() {
-            let group_end = selected.get(age + 1).copied().unwrap_or(num_rows);
-            let data = (group_start..group_end)
-                .map(|i| vec![reals[i], imags[i]])
-                .collect();
-            result.push(Series {
-                name: sweep_name(age, total),
-                data,
-            });
+        for (group_index, &group_start) in selected.iter().enumerate() {
+            let group_end = selected.get(group_index + 1).copied().unwrap_or(num_rows);
+            let len = group_end - group_start;
+            let mut values = Vec::with_capacity(len * 2);
+            for i in group_start..group_end {
+                values.push(reals[i]);
+                values.push(imags[i]);
+            }
+            result.push(FlatXYSeries::new(
+                group_series_id(group_start),
+                series_name.to_string(),
+                values,
+                len,
+            ));
         }
         Ok((
             format!("{series_name} (real)"),
@@ -136,7 +142,7 @@ fn build_trace_xy_live(
     trace_x: &str,
     trace_y: &str,
     tail_count: usize,
-) -> Result<(String, String, Vec<Series>)> {
+) -> Result<(String, String, Vec<FlatXYSeries>)> {
     let x_array: DatasetArray = batch
         .column_by_name(trace_x)
         .cloned()
@@ -150,10 +156,9 @@ fn build_trace_xy_live(
 
     let num_rows = batch.num_rows();
     let start = num_rows.saturating_sub(tail_count);
-    let total = num_rows - start;
     let mut result = Vec::new();
 
-    for (age, row) in (start..num_rows).enumerate() {
+    for row in start..num_rows {
         let Some((_x_axis, x_values_array)) = x_array.expand_trace(row)? else {
             continue;
         };
@@ -165,11 +170,17 @@ fn build_trace_xy_live(
         let x_values = ds_x.as_numeric().context("X must be numeric")?.values();
         let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
         let len = x_values.len().min(y_values.len());
-        let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
-        result.push(Series {
-            name: sweep_name(age, total),
-            data,
-        });
+        let mut values = Vec::with_capacity(len * 2);
+        for i in 0..len {
+            values.push(x_values[i]);
+            values.push(y_values[i]);
+        }
+        result.push(FlatXYSeries::new(
+            row_series_id(row),
+            format!("{trace_x} vs {trace_y}"),
+            values,
+            len,
+        ));
     }
 
     Ok((trace_x.to_string(), trace_y.to_string(), result))
@@ -183,7 +194,7 @@ fn build_xy_live(
     x_column: &str,
     y_column: &str,
     tail_count: usize,
-) -> Result<(String, String, Vec<Series>)> {
+) -> Result<(String, String, Vec<FlatXYSeries>)> {
     let x_array: DatasetArray = batch
         .column_by_name(x_column)
         .cloned()
@@ -201,18 +212,22 @@ fn build_xy_live(
     let groups = compute_sweep_groups(batch, schema, index_columns);
     let start_group = groups.len().saturating_sub(tail_count);
     let selected = &groups[start_group..];
-    let total = selected.len();
 
     let mut result = Vec::new();
-    for (age, &group_start) in selected.iter().enumerate() {
-        let group_end = selected.get(age + 1).copied().unwrap_or(num_rows);
-        let data = (group_start..group_end)
-            .map(|i| vec![x_values[i], y_values[i]])
-            .collect();
-        result.push(Series {
-            name: sweep_name(age, total),
-            data,
-        });
+    for (group_index, &group_start) in selected.iter().enumerate() {
+        let group_end = selected.get(group_index + 1).copied().unwrap_or(num_rows);
+        let len = group_end - group_start;
+        let mut values = Vec::with_capacity(len * 2);
+        for i in group_start..group_end {
+            values.push(x_values[i]);
+            values.push(y_values[i]);
+        }
+        result.push(FlatXYSeries::new(
+            group_series_id(group_start),
+            format!("{x_column} vs {y_column}"),
+            values,
+            len,
+        ));
     }
 
     Ok((x_column.to_string(), y_column.to_string(), result))
@@ -222,6 +237,21 @@ fn build_xy_live(
 mod tests {
     use super::*;
     use crate::features::charts::transform::test_utils::{numeric_batch, numeric_schema};
+
+    fn scatter_snapshot(snapshot: ChartSnapshot) -> ScatterChartSnapshot {
+        match snapshot {
+            ChartSnapshot::Scatter(snapshot) => snapshot,
+            other => panic!("expected scatter snapshot, got {other:?}"),
+        }
+    }
+
+    fn xy_points(series: &FlatXYSeries) -> Vec<Vec<f64>> {
+        series
+            .values
+            .chunks_exact(2)
+            .map(|point| vec![point[0], point[1]])
+            .collect()
+    }
 
     /// 9 rows: 3 sweeps of 3 points each.
     fn sample_xy_batch() -> (RecordBatch, DatasetSchema) {
@@ -241,18 +271,19 @@ mod tests {
             scatter: ScatterModeOptions::Xy {
                 x_column: "x".to_string(),
                 y_column: "y".to_string(),
-                bin_column: None,
             },
             tail_count: 10,
+            known_row_count: None,
         };
-        let res = build_live_scatter_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
+        let res = scatter_snapshot(
+            build_live_scatter_series(&batch, &schema, Some(&[0, 1]), &options).unwrap(),
+        );
 
-        assert_eq!(res.r#type, ChartType::Scatter);
         assert_eq!(res.series.len(), 3);
-        assert_eq!(res.series[0].name, "-2");
-        assert_eq!(res.series[2].name, "current");
+        assert_eq!(res.series[0].id, "group:0");
+        assert_eq!(res.series[2].id, "group:6");
         assert_eq!(
-            res.series[2].data,
+            xy_points(&res.series[2]),
             vec![vec![0.1, 7.0], vec![0.2, 8.0], vec![0.3, 9.0]]
         );
     }
@@ -264,15 +295,17 @@ mod tests {
             scatter: ScatterModeOptions::Xy {
                 x_column: "x".to_string(),
                 y_column: "y".to_string(),
-                bin_column: None,
             },
             tail_count: 2,
+            known_row_count: None,
         };
-        let res = build_live_scatter_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
+        let res = scatter_snapshot(
+            build_live_scatter_series(&batch, &schema, Some(&[0, 1]), &options).unwrap(),
+        );
 
         assert_eq!(res.series.len(), 2);
-        assert_eq!(res.series[0].name, "-1");
-        assert_eq!(res.series[1].name, "current");
+        assert_eq!(res.series[0].id, "group:3");
+        assert_eq!(res.series[1].id, "group:6");
     }
 
     #[test]
@@ -283,15 +316,16 @@ mod tests {
             scatter: ScatterModeOptions::Xy {
                 x_column: "x".to_string(),
                 y_column: "y".to_string(),
-                bin_column: None,
             },
             tail_count: 2,
+            known_row_count: None,
         };
-        let res = build_live_scatter_series(&batch, &schema, None, &options).unwrap();
+        let res =
+            scatter_snapshot(build_live_scatter_series(&batch, &schema, None, &options).unwrap());
 
         // Without 2+ index columns, each row is its own "sweep"
         assert_eq!(res.series.len(), 2);
-        assert_eq!(res.series[1].name, "current");
-        assert_eq!(res.series[1].data, vec![vec![3.0, 30.0]]);
+        assert_eq!(res.series[1].id, "group:2");
+        assert_eq!(xy_points(&res.series[1]), vec![vec![3.0, 30.0]]);
     }
 }

@@ -3,14 +3,14 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 
 use crate::features::charts::types::{
-    ChartDataResponse, ChartType, ScatterChartDataOptions, ScatterModeOptions, Series,
+    ChartSnapshot, FlatXYSeries, ScatterChartDataOptions, ScatterChartSnapshot, ScatterModeOptions,
 };
 
 pub(crate) fn build_scatter_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &ScatterChartDataOptions,
-) -> Result<ChartDataResponse> {
+) -> Result<ChartSnapshot> {
     let (x_name, y_name, series) = match &options.scatter {
         ScatterModeOptions::Complex { series } => process_complex_scatter(batch, schema, series)?,
         ScatterModeOptions::TraceXy {
@@ -22,21 +22,18 @@ pub(crate) fn build_scatter_series(
         } => process_xy_scatter(batch, x_column, y_column)?,
     };
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Scatter,
+    Ok(ChartSnapshot::Scatter(ScatterChartSnapshot {
         x_name,
-        y_name: Some(y_name),
-        x_categories: None,
-        y_categories: None,
+        y_name,
         series,
-    })
+    }))
 }
 
 fn process_complex_scatter(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     series_name: &str,
-) -> Result<(String, String, Vec<Series>)> {
+) -> Result<(String, String, Vec<FlatXYSeries>)> {
     let data_type = *schema
         .columns()
         .get(series_name)
@@ -47,7 +44,8 @@ fn process_complex_scatter(
         .cloned()
         .context("Column not found")?
         .try_into()?;
-    let mut data = Vec::new();
+    let mut values = Vec::new();
+    let mut point_count = 0;
     if is_trace {
         for row in 0..batch.num_rows() {
             let Some((_x_values, trace_values)) = series_array.expand_trace(row)? else {
@@ -59,8 +57,10 @@ fn process_complex_scatter(
             let imags = complex_array.imag().values();
             let len = reals.len().min(imags.len());
             for i in 0..len {
-                data.push(vec![reals[i], imags[i]]);
+                values.push(reals[i]);
+                values.push(imags[i]);
             }
+            point_count += len;
         }
     } else {
         let complex_array = series_array
@@ -70,16 +70,20 @@ fn process_complex_scatter(
         let imags = complex_array.imag().values();
         let len = reals.len().min(imags.len());
         for i in 0..len {
-            data.push(vec![reals[i], imags[i]]);
+            values.push(reals[i]);
+            values.push(imags[i]);
         }
+        point_count = len;
     }
     Ok((
         format!("{series_name} (real)"),
         format!("{series_name} (imag)"),
-        vec![Series {
-            name: series_name.to_string(),
-            data,
-        }],
+        vec![FlatXYSeries::new(
+            series_name.to_string(),
+            series_name.to_string(),
+            values,
+            point_count,
+        )],
     ))
 }
 
@@ -87,7 +91,7 @@ fn process_trace_xy_scatter(
     batch: &RecordBatch,
     trace_x: &str,
     trace_y: &str,
-) -> Result<(String, String, Vec<Series>)> {
+) -> Result<(String, String, Vec<FlatXYSeries>)> {
     let x_array: DatasetArray = batch
         .column_by_name(trace_x)
         .cloned()
@@ -99,7 +103,8 @@ fn process_trace_xy_scatter(
         .context("Y not found")?
         .try_into()?;
 
-    let mut data = Vec::new();
+    let mut values = Vec::new();
+    let mut point_count = 0;
     for row in 0..batch.num_rows() {
         let Some((_x_axis, x_values_array)) = x_array.expand_trace(row)? else {
             continue;
@@ -113,17 +118,21 @@ fn process_trace_xy_scatter(
         let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
         let len = x_values.len().min(y_values.len());
         for i in 0..len {
-            data.push(vec![x_values[i], y_values[i]]);
+            values.push(x_values[i]);
+            values.push(y_values[i]);
         }
+        point_count += len;
     }
     let series_name = format!("{trace_x} vs {trace_y}");
     Ok((
         trace_x.to_string(),
         trace_y.to_string(),
-        vec![Series {
-            name: series_name,
-            data,
-        }],
+        vec![FlatXYSeries::new(
+            series_name.clone(),
+            series_name,
+            values,
+            point_count,
+        )],
     ))
 }
 
@@ -131,7 +140,7 @@ fn process_xy_scatter(
     batch: &RecordBatch,
     x_column: &str,
     y_column: &str,
-) -> Result<(String, String, Vec<Series>)> {
+) -> Result<(String, String, Vec<FlatXYSeries>)> {
     let x_array: DatasetArray = batch
         .column_by_name(x_column)
         .cloned()
@@ -145,17 +154,21 @@ fn process_xy_scatter(
     let x_values = x_array.as_numeric().context("X must be numeric")?.values();
     let y_values = y_array.as_numeric().context("Y must be numeric")?.values();
     let len = x_values.len().min(y_values.len());
-    let data = (0..len)
-        .map(|i| vec![x_values[i], y_values[i]])
-        .collect::<Vec<_>>();
+    let mut values = Vec::with_capacity(len * 2);
+    for i in 0..len {
+        values.push(x_values[i]);
+        values.push(y_values[i]);
+    }
     let series_name = format!("{x_column} vs {y_column}");
     Ok((
         x_column.to_string(),
         y_column.to_string(),
-        vec![Series {
-            name: series_name,
-            data,
-        }],
+        vec![FlatXYSeries::new(
+            series_name.clone(),
+            series_name,
+            values,
+            len,
+        )],
     ))
 }
 
@@ -177,6 +190,21 @@ mod tests {
         transform::test_utils::{numeric_batch, numeric_schema},
         types::{ChartCommonOptions, DatasetChartDataOptions},
     };
+
+    fn scatter_snapshot(snapshot: ChartSnapshot) -> ScatterChartSnapshot {
+        match snapshot {
+            ChartSnapshot::Scatter(snapshot) => snapshot,
+            other => panic!("expected scatter snapshot, got {other:?}"),
+        }
+    }
+
+    fn xy_points(series: &FlatXYSeries) -> Vec<Vec<f64>> {
+        series
+            .values
+            .chunks_exact(2)
+            .map(|point| vec![point[0], point[1]])
+            .collect()
+    }
 
     #[test]
     fn test_build_scatter_series_complex_scalar_and_trace() {
@@ -215,10 +243,11 @@ mod tests {
             },
             common: ChartCommonOptions::default(),
         };
-        let scalar_res =
-            build_scatter_series(&scalar_batch, &scalar_dataset_schema, &scalar_options).unwrap();
+        let scalar_res = scatter_snapshot(
+            build_scatter_series(&scalar_batch, &scalar_dataset_schema, &scalar_options).unwrap(),
+        );
         assert_eq!(
-            scalar_res.series[0].data,
+            xy_points(&scalar_res.series[0]),
             vec![vec![1.0, -1.0], vec![2.0, -2.0]]
         );
 
@@ -247,10 +276,11 @@ mod tests {
             },
             common: ChartCommonOptions::default(),
         };
-        let trace_res =
-            build_scatter_series(&trace_batch, &trace_dataset_schema, &trace_options).unwrap();
+        let trace_res = scatter_snapshot(
+            build_scatter_series(&trace_batch, &trace_dataset_schema, &trace_options).unwrap(),
+        );
         assert_eq!(
-            trace_res.series[0].data,
+            xy_points(&trace_res.series[0]),
             vec![vec![3.0, 4.0], vec![5.0, 6.0]]
         );
     }
@@ -292,8 +322,11 @@ mod tests {
         );
         let schema = DatasetSchema::new(columns);
 
-        let res = build_scatter_series(&batch, &schema, &options).unwrap();
-        assert_eq!(res.series[0].data, vec![vec![1.0, 10.0], vec![2.0, 20.0]]);
+        let res = scatter_snapshot(build_scatter_series(&batch, &schema, &options).unwrap());
+        assert_eq!(
+            xy_points(&res.series[0]),
+            vec![vec![1.0, 10.0], vec![2.0, 20.0]]
+        );
     }
 
     #[test]
@@ -305,14 +338,16 @@ mod tests {
             scatter: ScatterModeOptions::Xy {
                 x_column: "x".to_string(),
                 y_column: "y".to_string(),
-                bin_column: None,
             },
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_scatter_series(&batch, &schema, &options).unwrap();
+        let res = scatter_snapshot(build_scatter_series(&batch, &schema, &options).unwrap());
         assert_eq!(res.series.len(), 1);
-        assert_eq!(res.series[0].data, vec![vec![1.0, 10.0], vec![2.0, 20.0]]);
+        assert_eq!(
+            xy_points(&res.series[0]),
+            vec![vec![1.0, 10.0], vec![2.0, 20.0]]
+        );
     }
 
     #[test]

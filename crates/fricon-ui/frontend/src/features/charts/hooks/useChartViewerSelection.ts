@@ -24,7 +24,6 @@ export interface ChartViewerControlActions {
   setScatterTraceYName: (next: string | null) => void;
   setScatterXName: (next: string | null) => void;
   setScatterYName: (next: string | null) => void;
-  setScatterBinName: (next: string | null) => void;
   setSelectedComplexView: (next: ComplexViewOption[]) => void;
   setSelectedComplexViewSingle: (next: ComplexViewOption) => void;
   setLiveMode: (next: boolean) => void;
@@ -57,7 +56,6 @@ export function useChartViewerSelection(
   );
   const [scatterXName, setScatterXName] = useState<string | null>(null);
   const [scatterYName, setScatterYName] = useState<string | null>(null);
-  const [scatterBinName, setScatterBinName] = useState<string | null>(null);
 
   const [isLiveMode, setIsLiveMode] = useState(datasetStatus === "Writing");
 
@@ -85,7 +83,6 @@ export function useChartViewerSelection(
     scatterTraceYName,
     scatterXName,
     scatterYName,
-    scatterBinName,
   });
 
   const controlState: ChartViewerControlState = {
@@ -105,7 +102,6 @@ export function useChartViewerSelection(
     setScatterTraceYName,
     setScatterXName,
     setScatterYName,
-    setScatterBinName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
     setLiveMode: setIsLiveMode,

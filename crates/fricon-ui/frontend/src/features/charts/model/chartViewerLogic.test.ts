@@ -38,7 +38,6 @@ function makeState(
     scatterTraceYName: null,
     scatterXName: null,
     scatterYName: null,
-    scatterBinName: null,
     ...overrides,
   };
 }
@@ -89,7 +88,7 @@ describe("chartViewerLogic", () => {
     ]);
   });
 
-  it("computes scatter exclusion from selected bin column", () => {
+  it("does not add scatter exclusion columns for xy mode", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -102,8 +101,7 @@ describe("chartViewerLogic", () => {
       makeState({ chartType: "scatter", scatterMode: "xy" }),
     );
 
-    expect(derived.effectiveScatterBinName).toBe("idxB");
-    expect(derived.excludeColumns).toEqual(["idxB"]);
+    expect(derived.excludeColumns).toEqual([]);
   });
 
   it("returns null request when filters exist but no resolved row", () => {
@@ -127,7 +125,7 @@ describe("chartViewerLogic", () => {
     expect(request).toBeNull();
   });
 
-  it("builds scatter xy request with derived bin exclusion", () => {
+  it("builds scatter xy request without legacy bin exclusion", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -161,10 +159,9 @@ describe("chartViewerLogic", () => {
         mode: "xy",
         xColumn: "xVal",
         yColumn: "yVal",
-        binColumn: "idxB",
       },
       indexFilters: [1],
-      excludeColumns: ["idxB"],
+      excludeColumns: [],
     });
   });
 });

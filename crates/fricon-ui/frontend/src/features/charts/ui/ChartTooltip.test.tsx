@@ -16,14 +16,11 @@ describe("getTooltipLines", () => {
       type: "line",
       xName: "x",
       series: [
-        {
-          name: "series",
-          data: [
-            [0, 0],
-            [5, 5],
-            [10, 10],
-          ],
-        },
+        xySeries("series", "series", [
+          [0, 0],
+          [5, 5],
+          [10, 10],
+        ]),
       ],
     };
 
@@ -52,12 +49,7 @@ describe("getTooltipLines", () => {
       type: "scatter",
       xName: "x",
       yName: "y",
-      series: [
-        {
-          name: "series",
-          data: [[5, 5]],
-        },
-      ],
+      series: [xySeries("series", "series", [[5, 5]])],
     };
 
     const interactionState: ChartInteractionState = {
@@ -87,12 +79,7 @@ describe("getTooltipLines", () => {
       yName: "y",
       xCategories: [1, 2],
       yCategories: [10, 20],
-      series: [
-        {
-          name: "z",
-          data: [[1, 1, 200]],
-        },
-      ],
+      series: [xyzSeries("z", "z", [[1, 1, 200]])],
     };
 
     const interactionState: ChartInteractionState = {
@@ -108,3 +95,25 @@ describe("getTooltipLines", () => {
     ]);
   });
 });
+
+function xySeries(id: string, label: string, points: [number, number][]) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
+  };
+}
+
+function xyzSeries(
+  id: string,
+  label: string,
+  points: [number, number, number][],
+) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
+  };
+}

@@ -4,14 +4,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ChartType {
-    Line,
-    Heatmap,
-    Scatter,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
-#[serde(rename_all = "snake_case")]
 pub(crate) enum ComplexViewOption {
     Real,
     Imag,
@@ -66,8 +58,6 @@ pub(crate) enum ScatterModeOptions {
         x_column: String,
         #[serde(rename = "yColumn")]
         y_column: String,
-        #[serde(rename = "binColumn")]
-        bin_column: Option<String>,
     },
 }
 
@@ -105,22 +95,96 @@ impl DatasetChartDataOptions {
     }
 }
 
-#[derive(Serialize, Clone, Debug, specta::Type)]
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Series {
-    pub(crate) name: String,
-    pub(crate) data: Vec<Vec<f64>>,
+pub(crate) struct FlatXYSeries {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) values: Vec<f64>,
+    pub(crate) point_count: usize,
 }
 
-#[derive(Serialize, Debug, specta::Type)]
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ChartDataResponse {
-    pub(crate) r#type: ChartType,
+pub(crate) struct FlatXYZSeries {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) values: Vec<f64>,
+    pub(crate) point_count: usize,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LineChartSnapshot {
     pub(crate) x_name: String,
-    pub(crate) y_name: Option<String>,
-    pub(crate) x_categories: Option<Vec<f64>>,
-    pub(crate) y_categories: Option<Vec<f64>>,
-    pub(crate) series: Vec<Series>,
+    pub(crate) series: Vec<FlatXYSeries>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ScatterChartSnapshot {
+    pub(crate) x_name: String,
+    pub(crate) y_name: String,
+    pub(crate) series: Vec<FlatXYSeries>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct HeatmapChartSnapshot {
+    pub(crate) x_name: String,
+    pub(crate) y_name: String,
+    pub(crate) x_categories: Vec<f64>,
+    pub(crate) y_categories: Vec<f64>,
+    pub(crate) series: Vec<FlatXYZSeries>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum ChartSnapshot {
+    Line(LineChartSnapshot),
+    Heatmap(HeatmapChartSnapshot),
+    Scatter(ScatterChartSnapshot),
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(tag = "shape", rename_all = "snake_case")]
+pub(crate) enum FlatSeries {
+    Xy(FlatXYSeries),
+    Xyz(FlatXYZSeries),
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[expect(
+    clippy::enum_variant_names,
+    reason = "Wire format uses append-prefixed operation names"
+)]
+pub(crate) enum LiveChartAppendOperation {
+    AppendPoints {
+        series_id: String,
+        values: Vec<f64>,
+        point_count: usize,
+    },
+    AppendSeries {
+        series: FlatSeries,
+    },
+    AppendHeatmapCategories {
+        x_categories: Option<Vec<f64>>,
+        y_categories: Option<Vec<f64>>,
+    },
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub(crate) enum LiveChartDataResponse {
+    Reset {
+        row_count: usize,
+        snapshot: ChartSnapshot,
+    },
+    Append {
+        row_count: usize,
+        ops: Vec<LiveChartAppendOperation>,
+    },
 }
 
 #[derive(Serialize, Clone, PartialEq, Debug, specta::Type)]
@@ -189,6 +253,8 @@ pub(crate) struct LiveLineOptions {
     pub(crate) series: String,
     pub(crate) complex_views: Option<Vec<ComplexViewOption>>,
     pub(crate) tail_count: usize,
+    #[specta(optional)]
+    pub(crate) known_row_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -196,6 +262,8 @@ pub(crate) struct LiveLineOptions {
 pub(crate) struct LiveHeatmapOptions {
     pub(crate) series: String,
     pub(crate) complex_view_single: Option<ComplexViewOption>,
+    #[specta(optional)]
+    pub(crate) known_row_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -203,6 +271,8 @@ pub(crate) struct LiveHeatmapOptions {
 pub(crate) struct LiveScatterOptions {
     pub(crate) scatter: ScatterModeOptions,
     pub(crate) tail_count: usize,
+    #[specta(optional)]
+    pub(crate) known_row_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -211,4 +281,46 @@ pub(crate) enum LiveChartDataOptions {
     Line(LiveLineOptions),
     Heatmap(LiveHeatmapOptions),
     Scatter(LiveScatterOptions),
+}
+
+impl LiveChartDataOptions {
+    pub(crate) const fn known_row_count(&self) -> Option<usize> {
+        match self {
+            Self::Line(options) => options.known_row_count,
+            Self::Heatmap(options) => options.known_row_count,
+            Self::Scatter(options) => options.known_row_count,
+        }
+    }
+}
+
+impl FlatXYSeries {
+    pub(crate) fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        values: Vec<f64>,
+        point_count: usize,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            values,
+            point_count,
+        }
+    }
+}
+
+impl FlatXYZSeries {
+    pub(crate) fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        values: Vec<f64>,
+        point_count: usize,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            values,
+            point_count,
+        }
+    }
 }

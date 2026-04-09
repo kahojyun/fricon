@@ -39,7 +39,6 @@ function buildScatterModeOptions(
       mode: "xy",
       xColumn: derived.scatterXColumn.name,
       yColumn: derived.scatterYColumn.name,
-      binColumn: derived.scatterBinColumn?.name ?? null,
     };
   }
   return null;

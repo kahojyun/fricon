@@ -4,19 +4,15 @@ use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::{debug, warn};
 
 use crate::features::charts::types::{
-    ChartDataResponse, ChartType, ComplexViewOption, LineChartDataOptions, Series,
+    ChartSnapshot, ComplexViewOption, FlatXYSeries, LineChartDataOptions, LineChartSnapshot,
     complex_view_label, transform_complex_values,
 };
 
-fn empty_line_response(x_name: String) -> ChartDataResponse {
-    ChartDataResponse {
-        r#type: ChartType::Line,
+fn empty_line_response(x_name: String) -> ChartSnapshot {
+    ChartSnapshot::Line(LineChartSnapshot {
         x_name,
-        y_name: None,
-        x_categories: None,
-        y_categories: None,
         series: vec![],
-    }
+    })
 }
 
 fn resolve_trace_line_values(
@@ -82,7 +78,7 @@ pub(crate) fn build_line_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &LineChartDataOptions,
-) -> Result<ChartDataResponse> {
+) -> Result<ChartSnapshot> {
     let series_name = &options.series;
     let data_type = *schema
         .columns()
@@ -153,11 +149,17 @@ pub(crate) fn build_line_series(
             .map(|option| {
                 let y_values = transform_complex_values(reals, imags, option);
                 let len = x_values.len().min(y_values.len());
-                let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
-                Series {
-                    name: format!("{series_name} ({})", complex_view_label(option)),
-                    data,
+                let mut values = Vec::with_capacity(len * 2);
+                for i in 0..len {
+                    values.push(x_values[i]);
+                    values.push(y_values[i]);
                 }
+                FlatXYSeries::new(
+                    format!("{series_name}:{}", complex_view_label(option)),
+                    format!("{series_name} ({})", complex_view_label(option)),
+                    values,
+                    len,
+                )
             })
             .collect()
     } else {
@@ -166,20 +168,20 @@ pub(crate) fn build_line_series(
             .context("Expected numeric array")?
             .values();
         let len = x_values.len().min(y_values.len());
-        vec![Series {
-            name: series_name.clone(),
-            data: (0..len).map(|i| vec![x_values[i], y_values[i]]).collect(),
-        }]
+        let mut values = Vec::with_capacity(len * 2);
+        for i in 0..len {
+            values.push(x_values[i]);
+            values.push(y_values[i]);
+        }
+        vec![FlatXYSeries::new(
+            series_name.clone(),
+            series_name.clone(),
+            values,
+            len,
+        )]
     };
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Line,
-        x_name,
-        y_name: None,
-        x_categories: None,
-        y_categories: None,
-        series,
-    })
+    Ok(ChartSnapshot::Line(LineChartSnapshot { x_name, series }))
 }
 
 #[cfg(test)]
@@ -201,6 +203,21 @@ mod tests {
         types::ChartCommonOptions,
     };
 
+    fn line_snapshot(snapshot: ChartSnapshot) -> LineChartSnapshot {
+        match snapshot {
+            ChartSnapshot::Line(snapshot) => snapshot,
+            other => panic!("expected line snapshot, got {other:?}"),
+        }
+    }
+
+    fn xy_points(series: &FlatXYSeries) -> Vec<Vec<f64>> {
+        series
+            .values
+            .chunks_exact(2)
+            .map(|point| vec![point[0], point[1]])
+            .collect()
+    }
+
     #[test]
     fn test_build_line_series_numeric() {
         let batch = numeric_batch(&[("x", &[1.0, 2.0, 3.0]), ("y", &[10.0, 20.0, 30.0])]);
@@ -213,11 +230,11 @@ mod tests {
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_line_series(&batch, &schema, &options).unwrap();
+        let res = line_snapshot(build_line_series(&batch, &schema, &options).unwrap());
         assert_eq!(res.series.len(), 1);
-        assert_eq!(res.series[0].name, "y");
+        assert_eq!(res.series[0].label, "y");
         assert_eq!(
-            res.series[0].data,
+            xy_points(&res.series[0]),
             vec![vec![1.0, 10.0], vec![2.0, 20.0], vec![3.0, 30.0]]
         );
     }
@@ -264,10 +281,10 @@ mod tests {
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_line_series(&batch, &schema, &options).unwrap();
+        let res = line_snapshot(build_line_series(&batch, &schema, &options).unwrap());
         assert_eq!(res.series.len(), 1);
-        assert!(res.series[0].name.contains("mag"));
-        assert!((res.series[0].data[0][1] - 3.1622).abs() < 1e-4);
+        assert!(res.series[0].label.contains("mag"));
+        assert!((xy_points(&res.series[0])[0][1] - 3.1622).abs() < 1e-4);
     }
 
     #[test]
@@ -296,7 +313,7 @@ mod tests {
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_line_series(&batch, &schema, &options).unwrap();
+        let res = line_snapshot(build_line_series(&batch, &schema, &options).unwrap());
         assert!(res.series.is_empty());
     }
 
@@ -327,7 +344,7 @@ mod tests {
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_line_series(&batch, &schema, &options).unwrap();
+        let res = line_snapshot(build_line_series(&batch, &schema, &options).unwrap());
         assert!(res.series.is_empty());
     }
 
@@ -364,7 +381,7 @@ mod tests {
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_line_series(&batch, &schema, &options).unwrap();
+        let res = line_snapshot(build_line_series(&batch, &schema, &options).unwrap());
         assert!(res.series.is_empty());
     }
 }

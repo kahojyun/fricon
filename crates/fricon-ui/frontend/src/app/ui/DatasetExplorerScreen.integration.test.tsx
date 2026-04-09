@@ -151,16 +151,12 @@ describe("DatasetExplorerScreen integration", () => {
           return {
             type: "line",
             xName: "t",
-            yName: null,
-            xCategories: null,
-            yCategories: null,
             series: [
               {
-                name: "signal",
-                data: [
-                  [0, 1],
-                  [1, 2],
-                ],
+                id: "signal",
+                label: "signal",
+                pointCount: 2,
+                values: [0, 1, 1, 2],
               },
             ],
           };

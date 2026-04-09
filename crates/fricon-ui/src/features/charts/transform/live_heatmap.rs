@@ -5,8 +5,8 @@ use tracing::debug;
 
 use super::{heatmap::build_heatmap_series, last_outer_group_start};
 use crate::features::charts::types::{
-    ChartCommonOptions, ChartDataResponse, ChartType, ComplexViewOption, HeatmapChartDataOptions,
-    LiveHeatmapOptions, Series, complex_view_label, transform_complex_values,
+    ChartCommonOptions, ChartSnapshot, ComplexViewOption, FlatXYZSeries, HeatmapChartDataOptions,
+    HeatmapChartSnapshot, LiveHeatmapOptions, complex_view_label, transform_complex_values,
 };
 
 /// Build a live heatmap showing only the latest sweep of data.
@@ -23,7 +23,7 @@ pub(crate) fn build_live_heatmap_series(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     options: &LiveHeatmapOptions,
-) -> Result<ChartDataResponse> {
+) -> Result<ChartSnapshot> {
     let series_name = &options.series;
     let data_type = *schema
         .columns()
@@ -81,7 +81,7 @@ fn build_trace_live_heatmap(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     options: &LiveHeatmapOptions,
-) -> Result<ChartDataResponse> {
+) -> Result<ChartSnapshot> {
     let series_name = &options.series;
     let data_type = *schema
         .columns()
@@ -100,14 +100,13 @@ fn build_trace_live_heatmap(
     let y_name = y_column_name.unwrap_or("row").to_string();
     let num_rows = batch.num_rows();
     if num_rows == 0 {
-        return Ok(ChartDataResponse {
-            r#type: ChartType::Heatmap,
+        return Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
             x_name: format!("{series_name} - X"),
-            y_name: Some(y_name),
-            x_categories: Some(vec![]),
-            y_categories: Some(vec![]),
+            y_name,
+            x_categories: vec![],
+            y_categories: vec![],
             series: vec![],
-        });
+        }));
     }
 
     // Crop to last group if we have outer indices (more than 1 index col)
@@ -132,7 +131,8 @@ fn build_trace_live_heatmap(
         ds.as_numeric().expect("numeric column").values().to_vec()
     });
 
-    let mut data = Vec::new();
+    let mut values = Vec::new();
+    let mut point_count = 0;
     for row in start..num_rows {
         let Some((x_values, trace_values)) = series_array.expand_trace(row)? else {
             continue;
@@ -155,8 +155,11 @@ fn build_trace_live_heatmap(
             );
             let len = x_values.len().min(z_values.len());
             for i in 0..len {
-                data.push(vec![x_values[i], y_val, z_values[i]]);
+                values.push(x_values[i]);
+                values.push(y_val);
+                values.push(z_values[i]);
             }
+            point_count += len;
         } else {
             let z_values = ds_trace
                 .as_numeric()
@@ -164,8 +167,11 @@ fn build_trace_live_heatmap(
                 .values();
             let len = x_values.len().min(z_values.len());
             for i in 0..len {
-                data.push(vec![x_values[i], y_val, z_values[i]]);
+                values.push(x_values[i]);
+                values.push(y_val);
+                values.push(z_values[i]);
             }
+            point_count += len;
         }
     }
 
@@ -175,17 +181,16 @@ fn build_trace_live_heatmap(
         series_name.clone()
     };
 
-    let mut series = vec![Series { name, data }];
+    let mut series = vec![FlatXYZSeries::new(name.clone(), name, values, point_count)];
     let (x_categories, y_categories) = super::heatmap::normalize_heatmap_series(&mut series);
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Heatmap,
+    Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
         x_name: format!("{series_name} - X"),
-        y_name: Some(y_name),
-        x_categories: Some(x_categories),
-        y_categories: Some(y_categories),
+        y_name,
+        x_categories,
+        y_categories,
         series,
-    })
+    }))
 }
 
 #[cfg(test)]
@@ -199,10 +204,22 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::*;
-    use crate::features::charts::{
-        transform::test_utils::{numeric_batch, numeric_schema},
-        types::ChartType,
-    };
+    use crate::features::charts::transform::test_utils::{numeric_batch, numeric_schema};
+
+    fn heatmap_snapshot(snapshot: ChartSnapshot) -> HeatmapChartSnapshot {
+        match snapshot {
+            ChartSnapshot::Heatmap(snapshot) => snapshot,
+            other => panic!("expected heatmap snapshot, got {other:?}"),
+        }
+    }
+
+    fn xyz_points(series: &FlatXYZSeries) -> Vec<Vec<f64>> {
+        series
+            .values
+            .chunks_exact(3)
+            .map(|point| vec![point[0], point[1], point[2]])
+            .collect()
+    }
 
     fn trace_batch(
         trace_rows: Vec<Vec<f64>>,
@@ -263,16 +280,17 @@ mod tests {
         let options = LiveHeatmapOptions {
             series: "val".to_string(),
             complex_view_single: None,
+            known_row_count: None,
         };
         // index_columns = [0 (sweep), 1 (freq), 2 (point)]
         // MFI = point (last), second-MFI = freq, outer = sweep
-        let res = build_live_heatmap_series(&batch, &schema, Some(&[0, 1, 2]), &options).unwrap();
-
-        assert_eq!(res.r#type, ChartType::Heatmap);
+        let res = heatmap_snapshot(
+            build_live_heatmap_series(&batch, &schema, Some(&[0, 1, 2]), &options).unwrap(),
+        );
         // Only rows from the last outer-sweep (sweep=2, rows 6-8) should be included
         assert_eq!(res.series.len(), 1);
         // The heatmap should contain data from the last 3 rows only
-        assert_eq!(res.series[0].data.len(), 3);
+        assert_eq!(res.series[0].point_count, 3);
     }
 
     #[test]
@@ -282,6 +300,7 @@ mod tests {
         let options = LiveHeatmapOptions {
             series: "val".to_string(),
             complex_view_single: None,
+            known_row_count: None,
         };
         // Only one index column → should error
         let res = build_live_heatmap_series(&batch, &schema, Some(&[0]), &options);
@@ -294,14 +313,16 @@ mod tests {
         let options = LiveHeatmapOptions {
             series: "trace".to_string(),
             complex_view_single: None,
+            known_row_count: None,
         };
 
-        let res = build_live_heatmap_series(&batch, &schema, Some(&[0]), &options).unwrap();
+        let res = heatmap_snapshot(
+            build_live_heatmap_series(&batch, &schema, Some(&[0]), &options).unwrap(),
+        );
 
-        assert_eq!(res.r#type, ChartType::Heatmap);
-        assert_eq!(res.y_name.as_deref(), Some("idx"));
-        assert_eq!(res.x_categories, Some(vec![]));
-        assert_eq!(res.y_categories, Some(vec![]));
+        assert_eq!(res.y_name, "idx");
+        assert_eq!(res.x_categories, Vec::<f64>::new());
+        assert_eq!(res.y_categories, Vec::<f64>::new());
         assert!(res.series.is_empty());
     }
 
@@ -311,16 +332,17 @@ mod tests {
         let options = LiveHeatmapOptions {
             series: "trace".to_string(),
             complex_view_single: None,
+            known_row_count: None,
         };
 
-        let res = build_live_heatmap_series(&batch, &schema, None, &options).unwrap();
+        let res =
+            heatmap_snapshot(build_live_heatmap_series(&batch, &schema, None, &options).unwrap());
 
-        assert_eq!(res.r#type, ChartType::Heatmap);
-        assert_eq!(res.y_name.as_deref(), Some("row"));
-        assert_eq!(res.x_categories, Some(vec![0.0, 1.0]));
-        assert_eq!(res.y_categories, Some(vec![0.0]));
+        assert_eq!(res.y_name, "row");
+        assert_eq!(res.x_categories, vec![0.0, 1.0]);
+        assert_eq!(res.y_categories, vec![0.0]);
         assert_eq!(
-            res.series[0].data,
+            xyz_points(&res.series[0]),
             vec![vec![0.0, 0.0, 1.0], vec![1.0, 0.0, 2.0]]
         );
     }

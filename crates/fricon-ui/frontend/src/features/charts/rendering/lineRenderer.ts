@@ -19,41 +19,23 @@ export interface LineRenderState {
   uMatrix: WebGLUniformLocation | null;
   uColor: WebGLUniformLocation | null;
   aPosition: number;
-  seriesBuffers: { buffer: WebGLBuffer; count: number }[];
-}
-
-function parseLiveAge(name: string): number | null {
-  const marker = /\[(current|-\d+)\]$/.exec(name)?.[1] ?? null;
-  if (!marker) return null;
-  if (marker === "current") return 0;
-  return Number.parseInt(marker.slice(1), 10);
+  seriesBuffers: {
+    buffer: WebGLBuffer;
+    count: number;
+    capacity: number;
+    values: Float32Array;
+  }[];
 }
 
 function liveSeriesStyle(
-  name: string,
-  allNames: string[],
-  fallbackIndex: number,
+  index: number,
   total: number,
 ): { isNewest: boolean; opacity: number } {
-  const age = parseLiveAge(name);
-  if (age == null) {
-    const isNewest = fallbackIndex === total - 1;
-    const opacity = isNewest
-      ? 1.0
-      : 0.12 + (0.5 * fallbackIndex) / Math.max(total - 2, 1);
-    return { isNewest, opacity };
-  }
-
-  if (age === 0) {
-    return { isNewest: true, opacity: 1.0 };
-  }
-
-  const maxAge = Math.max(
-    ...allNames.map((candidate) => parseLiveAge(candidate) ?? 0),
-    age,
-  );
-  const opacity = 0.12 + (0.5 * (maxAge - age)) / Math.max(maxAge, 1);
-  return { isNewest: false, opacity };
+  const isNewest = index === total - 1;
+  const opacity = isNewest
+    ? 1.0
+    : 0.12 + (0.5 * index) / Math.max(total - 2, 1);
+  return { isNewest, opacity };
 }
 
 export function createLineRenderState(
@@ -75,18 +57,50 @@ export function syncLineRenderState(
   series: ChartSeries[],
 ): void {
   for (let i = 0; i < series.length; i++) {
-    const flat = flattenSeriesPoints(series[i]);
+    const flat = series[i].values;
     const existing = state.seriesBuffers[i];
     if (existing) {
       gl.bindBuffer(gl.ARRAY_BUFFER, existing.buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, flat, gl.DYNAMIC_DRAW);
-      existing.count = series[i].data.length;
+      if (
+        flat.length >= existing.values.length &&
+        hasPrefix(flat, existing.values)
+      ) {
+        if (flat.length > existing.capacity) {
+          existing.capacity = Math.max(flat.length, existing.capacity * 2, 2);
+          gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array(existing.capacity),
+            gl.DYNAMIC_DRAW,
+          );
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, flat);
+        } else if (flat.length > existing.values.length) {
+          gl.bufferSubData(
+            gl.ARRAY_BUFFER,
+            existing.values.length * 4,
+            flat.subarray(existing.values.length),
+          );
+        }
+      } else {
+        if (flat.length > existing.capacity) {
+          existing.capacity = flat.length;
+          gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array(existing.capacity),
+            gl.DYNAMIC_DRAW,
+          );
+        }
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, flat);
+      }
+      existing.count = series[i].pointCount;
+      existing.values = flat;
       continue;
     }
 
     state.seriesBuffers.push({
       buffer: createBuffer(gl, flat, gl.DYNAMIC_DRAW),
-      count: series[i].data.length,
+      count: series[i].pointCount,
+      capacity: flat.length,
+      values: flat,
     });
   }
 
@@ -108,8 +122,6 @@ export function drawLines(
 
   gl.uniformMatrix3fv(uMatrix, false, matrix);
 
-  const liveNames = liveMode ? data.series.map((s) => s.name) : [];
-
   for (let i = 0; i < seriesBuffers.length; i++) {
     const { buffer, count } = seriesBuffers[i];
     if (count === 0) continue;
@@ -118,12 +130,7 @@ export function drawLines(
     let opacity: number;
 
     if (liveMode && data.series.length > 1) {
-      const style = liveSeriesStyle(
-        data.series[i].name,
-        liveNames,
-        i,
-        data.series.length,
-      );
+      const style = liveSeriesStyle(i, data.series.length);
       const hex = style.isNewest ? LIVE_NEWEST_COLOR : LIVE_OLD_COLOR;
       color = hexToRgb(hex);
       opacity = style.opacity;
@@ -140,15 +147,6 @@ export function drawLines(
 
     gl.drawArrays(gl.LINE_STRIP, 0, count);
   }
-}
-
-function flattenSeriesPoints(series: ChartSeries): Float32Array {
-  const flat = new Float32Array(series.data.length * 2);
-  for (let i = 0; i < series.data.length; i++) {
-    flat[i * 2] = series.data[i][0]!;
-    flat[i * 2 + 1] = series.data[i][1]!;
-  }
-  return flat;
 }
 
 export function destroyLineRenderState(
@@ -173,9 +171,9 @@ export function lineDataBounds(series: ChartSeries[]): {
     yMin = Infinity,
     yMax = -Infinity;
   for (const s of series) {
-    for (const d of s.data) {
-      const x = d[0];
-      const y = d[1];
+    for (let i = 0; i < s.values.length; i += 2) {
+      const x = s.values[i]!;
+      const y = s.values[i + 1]!;
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       if (x < xMin) xMin = x;
       if (x > xMax) xMax = x;
@@ -200,4 +198,12 @@ export function lineDataBounds(series: ChartSeries[]): {
     yMin: yMin - yPad,
     yMax: yMax + yPad,
   };
+}
+
+function hasPrefix(values: Float32Array, prefix: Float32Array) {
+  if (prefix.length > values.length) return false;
+  for (let i = 0; i < prefix.length; i++) {
+    if (values[i] !== prefix[i]) return false;
+  }
+  return true;
 }

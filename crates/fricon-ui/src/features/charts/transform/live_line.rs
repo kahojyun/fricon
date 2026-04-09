@@ -3,11 +3,16 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
-use super::{compute_sweep_groups, sweep_name};
+use super::{compute_sweep_groups, group_series_id, row_series_id};
 use crate::features::charts::types::{
-    ChartDataResponse, ChartType, ComplexViewOption, LiveLineOptions, Series, complex_view_label,
-    transform_complex_values,
+    ChartSnapshot, ComplexViewOption, FlatXYSeries, LineChartSnapshot, LiveLineOptions,
+    complex_view_label, transform_complex_values,
 };
+
+fn row_axis_value(row: usize) -> Result<f64> {
+    let row = u32::try_from(row).context("Row index exceeds supported chart range")?;
+    Ok(f64::from(row))
+}
 
 /// Build live line series for **trace** columns.
 ///
@@ -19,14 +24,13 @@ fn build_trace_live_series(
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
-) -> Result<(String, Vec<Series>)> {
+) -> Result<(String, Vec<FlatXYSeries>)> {
     let num_rows = series_array.num_rows();
     let start = num_rows.saturating_sub(tail_count);
     let x_name = format!("{series_name} - X");
 
     let mut series = Vec::new();
-    let total = num_rows - start;
-    for (age, row) in (start..num_rows).enumerate() {
+    for row in start..num_rows {
         let Some((x_values, y_values_array)) = series_array
             .expand_trace(row)
             .with_context(|| format!("Failed to expand trace row {row}"))?
@@ -42,15 +46,20 @@ fn build_trace_live_series(
             let complex_array = ds_y.as_complex().context("Expected complex array")?;
             let reals = complex_array.real().values();
             let imags = complex_array.imag().values();
-            let sweep = sweep_name(age, total);
             for &view in complex_views {
                 let y_values = transform_complex_values(reals, imags, view);
                 let len = x_values.len().min(y_values.len());
-                let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
-                series.push(Series {
-                    name: format!("{series_name} ({}) [{sweep}]", complex_view_label(view)),
-                    data,
-                });
+                let mut values = Vec::with_capacity(len * 2);
+                for i in 0..len {
+                    values.push(x_values[i]);
+                    values.push(y_values[i]);
+                }
+                series.push(FlatXYSeries::new(
+                    format!("{}:{}", row_series_id(row), complex_view_label(view)),
+                    format!("{series_name} ({})", complex_view_label(view)),
+                    values,
+                    len,
+                ));
             }
         } else {
             let y_values = ds_y
@@ -58,11 +67,17 @@ fn build_trace_live_series(
                 .context("Expected numeric array")?
                 .values();
             let len = x_values.len().min(y_values.len());
-            let data = (0..len).map(|i| vec![x_values[i], y_values[i]]).collect();
-            series.push(Series {
-                name: sweep_name(age, total),
-                data,
-            });
+            let mut values = Vec::with_capacity(len * 2);
+            for i in 0..len {
+                values.push(x_values[i]);
+                values.push(y_values[i]);
+            }
+            series.push(FlatXYSeries::new(
+                row_series_id(row),
+                series_name.to_string(),
+                values,
+                len,
+            ));
         }
     }
 
@@ -82,7 +97,7 @@ fn build_scalar_live_series(
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
-) -> Result<(String, Vec<Series>)> {
+) -> Result<(String, Vec<FlatXYSeries>)> {
     let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
 
     // Most-frequent index = last index column
@@ -114,44 +129,58 @@ fn build_scalar_live_series(
     let groups = compute_sweep_groups(batch, schema, Some(index_columns));
     let start_group = groups.len().saturating_sub(tail_count);
     let selected_groups = &groups[start_group..];
-    let total = selected_groups.len();
 
     let mut series_list = Vec::new();
 
-    for (age, &group_start) in selected_groups.iter().enumerate() {
-        let group_end = selected_groups.get(age + 1).copied().unwrap_or(num_rows);
+    for (group_index, &group_start) in selected_groups.iter().enumerate() {
+        let group_end = selected_groups
+            .get(group_index + 1)
+            .copied()
+            .unwrap_or(num_rows);
         if is_complex {
             let complex_array = ds_y.as_complex().context("Expected complex array")?;
             let reals = complex_array.real().values();
             let imags = complex_array.imag().values();
-            let sweep = sweep_name(age, total);
             for &view in complex_views {
                 let y_values = transform_complex_values(
                     &reals[group_start..group_end],
                     &imags[group_start..group_end],
                     view,
                 );
-                let data = (group_start..group_end)
-                    .enumerate()
-                    .map(|(i, row)| vec![x_values[row], y_values[i]])
-                    .collect();
-                series_list.push(Series {
-                    name: format!("{series_name} ({}) [{sweep}]", complex_view_label(view)),
-                    data,
-                });
+                let len = group_end - group_start;
+                let mut values = Vec::with_capacity(len * 2);
+                for (i, row) in (group_start..group_end).enumerate() {
+                    values.push(x_values[row]);
+                    values.push(y_values[i]);
+                }
+                series_list.push(FlatXYSeries::new(
+                    format!(
+                        "{}:{}",
+                        group_series_id(group_start),
+                        complex_view_label(view)
+                    ),
+                    format!("{series_name} ({})", complex_view_label(view)),
+                    values,
+                    len,
+                ));
             }
         } else {
             let y_values = ds_y
                 .as_numeric()
                 .context("Expected numeric array")?
                 .values();
-            let data = (group_start..group_end)
-                .map(|row| vec![x_values[row], y_values[row]])
-                .collect();
-            series_list.push(Series {
-                name: sweep_name(age, total),
-                data,
-            });
+            let len = group_end - group_start;
+            let mut values = Vec::with_capacity(len * 2);
+            for row in group_start..group_end {
+                values.push(x_values[row]);
+                values.push(y_values[row]);
+            }
+            series_list.push(FlatXYSeries::new(
+                group_series_id(group_start),
+                series_name.to_string(),
+                values,
+                len,
+            ));
         }
     }
 
@@ -170,7 +199,7 @@ fn build_scalar_single_index_live_series(
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
-) -> Result<(String, Vec<Series>)> {
+) -> Result<(String, Vec<FlatXYSeries>)> {
     let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
     let x_name = column_names[index_column];
     let x_array = batch
@@ -201,14 +230,18 @@ fn build_scalar_single_index_live_series(
                     &imags[start..num_rows],
                     view,
                 );
-                let data = (start..num_rows)
-                    .enumerate()
-                    .map(|(i, row)| vec![x_values[row], y_values[i]])
-                    .collect();
-                Series {
-                    name: format!("{series_name} ({})", complex_view_label(view)),
-                    data,
+                let len = num_rows - start;
+                let mut values = Vec::with_capacity(len * 2);
+                for (i, row) in (start..num_rows).enumerate() {
+                    values.push(x_values[row]);
+                    values.push(y_values[i]);
                 }
+                FlatXYSeries::new(
+                    format!("{series_name}:{}", complex_view_label(view)),
+                    format!("{series_name} ({})", complex_view_label(view)),
+                    values,
+                    len,
+                )
             })
             .collect()
     } else {
@@ -216,12 +249,18 @@ fn build_scalar_single_index_live_series(
             .as_numeric()
             .context("Expected numeric array")?
             .values();
-        vec![Series {
-            name: series_name.to_string(),
-            data: (start..num_rows)
-                .map(|row| vec![x_values[row], y_values[row]])
-                .collect(),
-        }]
+        let len = num_rows - start;
+        let mut values = Vec::with_capacity(len * 2);
+        for row in start..num_rows {
+            values.push(x_values[row]);
+            values.push(y_values[row]);
+        }
+        vec![FlatXYSeries::new(
+            series_name.to_string(),
+            series_name.to_string(),
+            values,
+            len,
+        )]
     };
 
     Ok((x_name.to_string(), series))
@@ -236,7 +275,7 @@ fn build_scalar_no_index_live_series(
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
-) -> Result<(String, Vec<Series>)> {
+) -> Result<(String, Vec<FlatXYSeries>)> {
     let series_column = batch
         .column_by_name(series_name)
         .context("Series column not found")?;
@@ -257,37 +296,38 @@ fn build_scalar_no_index_live_series(
                     &imags[start..num_rows],
                     view,
                 );
-                #[expect(
-                    clippy::cast_precision_loss,
-                    reason = "Row index is unlikely to exceed 2^53"
-                )]
-                let data = (start..num_rows)
-                    .enumerate()
-                    .map(|(i, row)| vec![row as f64, y_values[i]])
-                    .collect();
-                Series {
-                    name: format!("{series_name} ({})", complex_view_label(view)),
-                    data,
+                let len = num_rows - start;
+                let mut values = Vec::with_capacity(len * 2);
+                for (i, row) in (start..num_rows).enumerate() {
+                    values.push(row_axis_value(row)?);
+                    values.push(y_values[i]);
                 }
+                Ok(FlatXYSeries::new(
+                    format!("{series_name}:{}", complex_view_label(view)),
+                    format!("{series_name} ({})", complex_view_label(view)),
+                    values,
+                    len,
+                ))
             })
-            .collect()
+            .collect::<Result<Vec<_>>>()
     } else {
         let y_values = ds_y
             .as_numeric()
             .context("Expected numeric array")?
             .values();
-        #[expect(
-            clippy::cast_precision_loss,
-            reason = "Row index is unlikely to exceed 2^53"
-        )]
-        let data = (start..num_rows)
-            .map(|row| vec![row as f64, y_values[row]])
-            .collect();
-        vec![Series {
-            name: series_name.to_string(),
-            data,
-        }]
-    };
+        let len = num_rows - start;
+        let mut values = Vec::with_capacity(len * 2);
+        for row in start..num_rows {
+            values.push(row_axis_value(row)?);
+            values.push(y_values[row]);
+        }
+        Ok(vec![FlatXYSeries::new(
+            series_name.to_string(),
+            series_name.to_string(),
+            values,
+            len,
+        )])
+    }?;
 
     Ok((x_name, series))
 }
@@ -297,7 +337,7 @@ pub(crate) fn build_live_line_series(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     options: &LiveLineOptions,
-) -> Result<ChartDataResponse> {
+) -> Result<ChartSnapshot> {
     let series_name = &options.series;
     let data_type = *schema
         .columns()
@@ -369,20 +409,28 @@ pub(crate) fn build_live_line_series(
         )?
     };
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Line,
-        x_name,
-        y_name: None,
-        x_categories: None,
-        y_categories: None,
-        series,
-    })
+    Ok(ChartSnapshot::Line(LineChartSnapshot { x_name, series }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::features::charts::transform::test_utils::{numeric_batch, numeric_schema};
+
+    fn line_snapshot(snapshot: ChartSnapshot) -> LineChartSnapshot {
+        match snapshot {
+            ChartSnapshot::Line(snapshot) => snapshot,
+            other => panic!("expected line snapshot, got {other:?}"),
+        }
+    }
+
+    fn xy_points(series: &FlatXYSeries) -> Vec<Vec<f64>> {
+        series
+            .values
+            .chunks_exact(2)
+            .map(|point| vec![point[0], point[1]])
+            .collect()
+    }
 
     /// 9 rows, 2 index columns (sweep, freq), series "val".
     /// sweep transitions at rows 0, 3, 6 → 3 groups of 3.
@@ -406,18 +454,20 @@ mod tests {
             series: "val".to_string(),
             complex_views: None,
             tail_count: 10,
+            known_row_count: None,
         };
-        let res = build_live_line_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
+        let res = line_snapshot(
+            build_live_line_series(&batch, &schema, Some(&[0, 1]), &options).unwrap(),
+        );
 
-        assert_eq!(res.r#type, ChartType::Line);
         assert_eq!(res.x_name, "freq"); // MFI = last index column
         assert_eq!(res.series.len(), 3);
-        assert_eq!(res.series[0].name, "-2");
-        assert_eq!(res.series[1].name, "-1");
-        assert_eq!(res.series[2].name, "current");
+        assert_eq!(res.series[0].id, "group:0");
+        assert_eq!(res.series[1].id, "group:3");
+        assert_eq!(res.series[2].id, "group:6");
         // First sweep: freq=[10,20,30], val=[0.1,0.2,0.3]
         assert_eq!(
-            res.series[0].data,
+            xy_points(&res.series[0]),
             vec![vec![10.0, 0.1], vec![20.0, 0.2], vec![30.0, 0.3]]
         );
     }
@@ -429,15 +479,18 @@ mod tests {
             series: "val".to_string(),
             complex_views: None,
             tail_count: 2,
+            known_row_count: None,
         };
-        let res = build_live_line_series(&batch, &schema, Some(&[0, 1]), &options).unwrap();
+        let res = line_snapshot(
+            build_live_line_series(&batch, &schema, Some(&[0, 1]), &options).unwrap(),
+        );
 
         assert_eq!(res.series.len(), 2);
-        assert_eq!(res.series[0].name, "-1");
-        assert_eq!(res.series[1].name, "current");
+        assert_eq!(res.series[0].id, "group:3");
+        assert_eq!(res.series[1].id, "group:6");
         // Only last 2 sweeps: sweep=2 and sweep=3
         assert_eq!(
-            res.series[1].data,
+            xy_points(&res.series[1]),
             vec![vec![10.0, 0.7], vec![20.0, 0.8], vec![30.0, 0.9]]
         );
     }
@@ -450,14 +503,15 @@ mod tests {
             series: "val".to_string(),
             complex_views: None,
             tail_count: 3,
+            known_row_count: None,
         };
-        let res = build_live_line_series(&batch, &schema, None, &options).unwrap();
+        let res = line_snapshot(build_live_line_series(&batch, &schema, None, &options).unwrap());
 
         assert_eq!(res.x_name, "row");
         assert_eq!(res.series.len(), 1);
-        assert_eq!(res.series[0].name, "val");
+        assert_eq!(res.series[0].label, "val");
         assert_eq!(
-            res.series[0].data,
+            xy_points(&res.series[0]),
             vec![vec![2.0, 3.0], vec![3.0, 4.0], vec![4.0, 5.0]]
         );
     }
@@ -470,9 +524,10 @@ mod tests {
             series: "val".to_string(),
             complex_views: None,
             tail_count: 5,
+            known_row_count: None,
         };
-        let res = build_live_line_series(&batch, &schema, None, &options).unwrap();
-        assert!(res.series.is_empty() || res.series[0].data.is_empty());
+        let res = line_snapshot(build_live_line_series(&batch, &schema, None, &options).unwrap());
+        assert!(res.series.is_empty() || res.series[0].values.is_empty());
     }
 
     #[test]
@@ -486,13 +541,15 @@ mod tests {
             series: "val".to_string(),
             complex_views: None,
             tail_count: 3,
+            known_row_count: None,
         };
-        let res = build_live_line_series(&batch, &schema, Some(&[0]), &options).unwrap();
+        let res =
+            line_snapshot(build_live_line_series(&batch, &schema, Some(&[0]), &options).unwrap());
 
         assert_eq!(res.x_name, "t");
         assert_eq!(res.series.len(), 1);
         assert_eq!(
-            res.series[0].data,
+            xy_points(&res.series[0]),
             vec![vec![1.0, 11.0], vec![2.0, 12.0], vec![3.0, 13.0]]
         );
     }
@@ -540,11 +597,13 @@ mod tests {
             series: "sig".to_string(),
             complex_views: Some(vec![ComplexViewOption::Real, ComplexViewOption::Mag]),
             tail_count: 3,
+            known_row_count: None,
         };
-        let res = build_live_line_series(&batch, &schema, Some(&[0]), &options).unwrap();
+        let res =
+            line_snapshot(build_live_line_series(&batch, &schema, Some(&[0]), &options).unwrap());
 
         assert_eq!(res.series.len(), 2);
-        assert_eq!(res.series[0].name, "sig (real)");
-        assert_eq!(res.series[1].name, "sig (mag)");
+        assert_eq!(res.series[0].label, "sig (real)");
+        assert_eq!(res.series[1].label, "sig (mag)");
     }
 }

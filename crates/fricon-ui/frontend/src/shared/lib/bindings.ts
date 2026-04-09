@@ -20,9 +20,9 @@ export const commands = {
 } | null) => typedError<DatasetInfo[], ApiError>(__TAURI_INVOKE("list_datasets", { options })),
 	listDatasetTags: () => typedError<string[], ApiError>(__TAURI_INVOKE("list_dataset_tags")),
 	datasetDetail: (id: number) => typedError<DatasetDetail, ApiError>(__TAURI_INVOKE("dataset_detail", { id })),
-	datasetChartData: (id: number, options: DatasetChartDataOptions) => typedError<ChartDataResponse, ApiError>(__TAURI_INVOKE("dataset_chart_data", { id, options })),
+	datasetChartData: (id: number, options: DatasetChartDataOptions) => typedError<ChartSnapshot, ApiError>(__TAURI_INVOKE("dataset_chart_data", { id, options })),
 	getFilterTableData: (id: number, options: FilterTableOptions) => typedError<TableData, ApiError>(__TAURI_INVOKE("get_filter_table_data", { id, options })),
-	datasetLiveChartData: (id: number, options: LiveChartDataOptions) => typedError<ChartDataResponse, ApiError>(__TAURI_INVOKE("dataset_live_chart_data", { id, options })),
+	datasetLiveChartData: (id: number, options: LiveChartDataOptions) => typedError<LiveChartDataResponse, ApiError>(__TAURI_INVOKE("dataset_live_chart_data", { id, options })),
 	updateDatasetFavorite: (id: number, update: DatasetFavoriteUpdate) => typedError<null, ApiError>(__TAURI_INVOKE("update_dataset_favorite", { id, update })),
 	updateDatasetInfo: (id: number, update: DatasetInfoUpdate) => typedError<null, ApiError>(__TAURI_INVOKE("update_dataset_info", { id, update })),
 	getDatasetWriteStatus: (id: number) => typedError<DatasetWriteStatus, ApiError>(__TAURI_INVOKE("get_dataset_write_status", { id })),
@@ -66,16 +66,7 @@ export type ChartCommonOptions = {
 	excludeColumns: string[] | null,
 };
 
-export type ChartDataResponse = {
-	type: ChartType,
-	xName: string,
-	yName: string | null,
-	xCategories: number[] | null,
-	yCategories: number[] | null,
-	series: Series[],
-};
-
-export type ChartType = "line" | "heatmap" | "scatter";
+export type ChartSnapshot = { type: "line" } & (LineChartSnapshot) | { type: "heatmap" } & (HeatmapChartSnapshot) | { type: "scatter" } & (ScatterChartSnapshot);
 
 export type ColumnInfo = {
 	name: string,
@@ -195,6 +186,22 @@ export type FilterTableOptions = {
 	excludeColumns?: string[] | null,
 };
 
+export type FlatSeries = { shape: "xy" } & (FlatXYSeries) | { shape: "xyz" } & (FlatXYZSeries);
+
+export type FlatXYSeries = {
+	id: string,
+	label: string,
+	values: number[],
+	pointCount: number,
+};
+
+export type FlatXYZSeries = {
+	id: string,
+	label: string,
+	values: number[],
+	pointCount: number,
+};
+
 export type HeatmapChartDataOptions = {
 	series: string,
 	xColumn: string | null,
@@ -202,28 +209,48 @@ export type HeatmapChartDataOptions = {
 	complexViewSingle: ComplexViewOption | null,
 } & (ChartCommonOptions);
 
+export type HeatmapChartSnapshot = {
+	xName: string,
+	yName: string,
+	xCategories: number[],
+	yCategories: number[],
+	series: FlatXYZSeries[],
+};
+
 export type LineChartDataOptions = {
 	series: string,
 	xColumn: string | null,
 	complexViews: ComplexViewOption[] | null,
 } & (ChartCommonOptions);
 
+export type LineChartSnapshot = {
+	xName: string,
+	series: FlatXYSeries[],
+};
+
+export type LiveChartAppendOperation = { kind: "append_points"; series_id: string; values: number[]; point_count: number } | { kind: "append_series"; series: FlatSeries } | { kind: "append_heatmap_categories"; x_categories: number[] | null; y_categories: number[] | null };
+
 export type LiveChartDataOptions = { chartType: "line" } & (LiveLineOptions) | { chartType: "heatmap" } & (LiveHeatmapOptions) | { chartType: "scatter" } & (LiveScatterOptions);
+
+export type LiveChartDataResponse = { mode: "reset"; row_count: number; snapshot: ChartSnapshot } | { mode: "append"; row_count: number; ops: LiveChartAppendOperation[] };
 
 export type LiveHeatmapOptions = {
 	series: string,
 	complexViewSingle: ComplexViewOption | null,
+	knownRowCount?: number | null,
 };
 
 export type LiveLineOptions = {
 	series: string,
 	complexViews: ComplexViewOption[] | null,
 	tailCount: number,
+	knownRowCount?: number | null,
 };
 
 export type LiveScatterOptions = {
 	scatter: ScatterModeOptions,
 	tailCount: number,
+	knownRowCount?: number | null,
 };
 
 export type Row = {
@@ -236,12 +263,13 @@ export type ScatterChartDataOptions = {
 	scatter: ScatterModeOptions,
 } & (ChartCommonOptions);
 
-export type ScatterModeOptions = { mode: "complex"; series: string } | { mode: "trace_xy"; traceXColumn: string; traceYColumn: string } | { mode: "xy"; xColumn: string; yColumn: string; binColumn: string | null };
-
-export type Series = {
-	name: string,
-	data: number[][],
+export type ScatterChartSnapshot = {
+	xName: string,
+	yName: string,
+	series: FlatXYSeries[],
 };
+
+export type ScatterModeOptions = { mode: "complex"; series: string } | { mode: "trace_xy"; traceXColumn: string; traceYColumn: string } | { mode: "xy"; xColumn: string; yColumn: string };
 
 export type TableData = {
 	fields: string[],

@@ -15,15 +15,12 @@ pub(crate) use self::{
     live_scatter::build_live_scatter_series, scatter::build_scatter_series,
 };
 
-/// Format a sweep-age label: the newest sweep is `"current"`, older ones are
-/// `"-1"`, `"-2"`, etc.
-pub(super) fn sweep_name(age: usize, total: usize) -> String {
-    if age == total - 1 {
-        "current".to_string()
-    } else {
-        let offset = total - 1 - age;
-        format!("-{offset}")
-    }
+pub(super) fn row_series_id(row: usize) -> String {
+    format!("row:{row}")
+}
+
+pub(super) fn group_series_id(group_start: usize) -> String {
+    format!("group:{group_start}")
 }
 
 /// Compute sweep group start indices based on outer index column transitions.
@@ -157,14 +154,6 @@ mod tests {
         test_utils::{numeric_batch, numeric_schema},
         *,
     };
-
-    #[test]
-    fn sweep_name_labels() {
-        assert_eq!(sweep_name(0, 3), "-2");
-        assert_eq!(sweep_name(1, 3), "-1");
-        assert_eq!(sweep_name(2, 3), "current");
-        assert_eq!(sweep_name(0, 1), "current");
-    }
 
     #[test]
     fn compute_sweep_groups_with_two_indices() {

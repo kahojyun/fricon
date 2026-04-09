@@ -22,6 +22,7 @@ const glStub = {
   createBuffer: () => ({}),
   bindBuffer: () => undefined,
   bufferData: () => undefined,
+  bufferSubData: () => undefined,
   useProgram: noop,
   getUniformLocation: () => ({}),
   getAttribLocation: () => 0,
@@ -80,13 +81,10 @@ describe("ChartWrapper", () => {
       type: "line",
       xName: "x",
       series: [
-        {
-          name: "s1",
-          data: [
-            [0, 1],
-            [1, 2],
-          ],
-        },
+        xySeries("s1", "s1", [
+          [0, 1],
+          [1, 2],
+        ]),
       ],
     };
 
@@ -101,13 +99,10 @@ describe("ChartWrapper", () => {
       type: "line",
       xName: "x",
       series: [
-        {
-          name: "s1",
-          data: [
-            [0, 1],
-            [1, 2],
-          ],
-        },
+        xySeries("s1", "s1", [
+          [0, 1],
+          [1, 2],
+        ]),
       ],
     };
 
@@ -123,13 +118,10 @@ describe("ChartWrapper", () => {
       xName: "x",
       yName: "y",
       series: [
-        {
-          name: "s1",
-          data: [
-            [0, 1],
-            [1, 2],
-          ],
-        },
+        xySeries("s1", "s1", [
+          [0, 1],
+          [1, 2],
+        ]),
       ],
     };
 
@@ -146,13 +138,10 @@ describe("ChartWrapper", () => {
       xCategories: [1, 2],
       yCategories: [10],
       series: [
-        {
-          name: "z",
-          data: [
-            [0, 0, 100],
-            [1, 0, 200],
-          ],
-        },
+        xyzSeries("z", "z", [
+          [0, 0, 100],
+          [1, 0, 200],
+        ]),
       ],
     };
 
@@ -169,13 +158,10 @@ describe("ChartWrapper", () => {
       xCategories: [1, 2],
       yCategories: [10],
       series: [
-        {
-          name: "z",
-          data: [
-            [0, 0, 100],
-            [1, 0, 200],
-          ],
-        },
+        xyzSeries("z", "z", [
+          [0, 0, 100],
+          [1, 0, 200],
+        ]),
       ],
     };
 
@@ -203,3 +189,25 @@ describe("ChartWrapper", () => {
     expect(screen.getByText("z: 200")).toBeInTheDocument();
   });
 });
+
+function xySeries(id: string, label: string, points: [number, number][]) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
+  };
+}
+
+function xyzSeries(
+  id: string,
+  label: string,
+  points: [number, number, number][],
+) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float32Array.from(points.flat()),
+  };
+}

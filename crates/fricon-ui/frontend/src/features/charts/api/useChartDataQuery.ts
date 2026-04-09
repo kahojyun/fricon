@@ -64,10 +64,6 @@ function buildChartDataKey(
           options.scatter.mode === "trace_xy"
             ? options.scatter.traceYColumn
             : null,
-        binColumn:
-          options.scatter.mode === "xy"
-            ? (options.scatter.binColumn ?? null)
-            : null,
       },
     },
   ] as const;

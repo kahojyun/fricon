@@ -32,7 +32,6 @@ export interface ChartViewerSelectionState {
   scatterTraceYName: string | null;
   scatterXName: string | null;
   scatterYName: string | null;
-  scatterBinName: string | null;
 }
 
 function pickSelection(
@@ -148,41 +147,6 @@ export function deriveChartViewerState(
     (column) => column.name === effectiveScatterYName,
   );
 
-  const scatterIsTraceBased = (() => {
-    if (effectiveScatterMode === "trace_xy") return true;
-    return effectiveScatterMode === "complex" && scatterSeries?.isTrace;
-  })();
-
-  const scatterBinColumnOptions = (() => {
-    const excludedNames = new Set(
-      [
-        scatterSeries?.name,
-        scatterXColumn?.name,
-        scatterYColumn?.name,
-        scatterTraceXColumn?.name,
-        scatterTraceYColumn?.name,
-      ].filter((name): name is string => Boolean(name)),
-    );
-    return columns.filter(
-      (column) => column.isIndex && !excludedNames.has(column.name),
-    );
-  })();
-
-  const effectiveScatterBinName = (() => {
-    if (scatterIsTraceBased) return null;
-    if (effectiveScatterMode !== "xy" && effectiveScatterMode !== "complex") {
-      return null;
-    }
-    return pickSelection(
-      scatterBinColumnOptions,
-      state.scatterBinName,
-      scatterBinColumnOptions.length - 1,
-    );
-  })();
-  const scatterBinColumn = columns.find(
-    (column) => column.name === effectiveScatterBinName,
-  );
-
   const scatterModeOptions = (() => {
     const options: { label: string; value: ScatterMode }[] = [];
     if (canUseScatterComplex) {
@@ -238,13 +202,7 @@ export function deriveChartViewerState(
         if (yColumn) excludes.push(yColumn.name);
       }
     } else if (effectiveChartType === "scatter") {
-      if (
-        (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
-        !scatterIsTraceBased &&
-        scatterBinColumn?.isIndex
-      ) {
-        excludes.push(scatterBinColumn.name);
-      }
+      // No extra scatter bin/exclusion column in the flat WebGL payload.
     }
     return excludes;
   })();
@@ -276,10 +234,6 @@ export function deriveChartViewerState(
     scatterTraceYColumn,
     scatterXColumn,
     scatterYColumn,
-    scatterIsTraceBased,
-    scatterBinColumnOptions,
-    effectiveScatterBinName,
-    scatterBinColumn,
     scatterModeOptions,
     availableChartTypes,
     effectiveChartType,
@@ -403,7 +357,6 @@ export function buildChartRequest(
         mode: "xy",
         xColumn: derived.scatterXColumn.name,
         yColumn: derived.scatterYColumn.name,
-        binColumn: derived.scatterBinColumn?.name ?? null,
       },
       indexFilters,
       excludeColumns: derived.excludeColumns,

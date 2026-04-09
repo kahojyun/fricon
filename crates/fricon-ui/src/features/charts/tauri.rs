@@ -6,8 +6,8 @@ use crate::{
     features::charts::{
         chart_data, filter_table,
         types::{
-            ChartDataResponse, DatasetChartDataOptions, FilterTableOptions, LiveChartDataOptions,
-            TableData,
+            ChartSnapshot, DatasetChartDataOptions, FilterTableOptions, LiveChartDataOptions,
+            LiveChartDataResponse, TableData,
         },
     },
     tauri_api::ApiError,
@@ -20,7 +20,7 @@ pub(crate) async fn dataset_chart_data(
     state: State<'_, AppState>,
     id: i32,
     options: DatasetChartDataOptions,
-) -> Result<ChartDataResponse, ApiError> {
+) -> Result<ChartSnapshot, ApiError> {
     chart_data::dataset_chart_data(state.session(), id, &options)
         .await
         .map_err(ApiError::charts)
@@ -45,7 +45,7 @@ pub(crate) async fn dataset_live_chart_data(
     state: State<'_, AppState>,
     id: i32,
     options: LiveChartDataOptions,
-) -> Result<ChartDataResponse, ApiError> {
+) -> Result<LiveChartDataResponse, ApiError> {
     chart_data::dataset_live_chart_data(state.session(), id, &options)
         .await
         .map_err(ApiError::charts)

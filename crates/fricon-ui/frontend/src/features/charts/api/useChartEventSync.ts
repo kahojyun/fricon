@@ -20,6 +20,9 @@ export function useChartEventSync() {
       queryKey: chartKeys.chartData(datasetId),
     });
     void queryClient.invalidateQueries({
+      queryKey: chartKeys.liveChartData(datasetId),
+    });
+    void queryClient.invalidateQueries({
       queryKey: chartKeys.filterTableData(datasetId),
     });
   });

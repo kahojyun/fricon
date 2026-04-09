@@ -162,11 +162,10 @@ describe("ChartViewer", () => {
           yCategories: [10],
           series: [
             {
-              name: "trace_signal",
-              data: [
-                [0, 0, 1],
-                [1, 0, 2],
-              ],
+              id: "trace_signal",
+              label: "trace_signal",
+              pointCount: 2,
+              values: [0, 0, 1, 1, 0, 2],
             },
           ],
         };
@@ -251,11 +250,10 @@ describe("ChartViewer", () => {
           xName: "t",
           series: [
             {
-              name: "signal",
-              data: [
-                [0, 1],
-                [1, 2],
-              ],
+              id: "signal",
+              label: "signal",
+              pointCount: 2,
+              values: [0, 1, 1, 2],
             },
           ],
         };
@@ -311,7 +309,7 @@ describe("ChartViewer", () => {
     clearMocks();
   });
 
-  it("allows index exclusion for scalar complex scatter mode", async () => {
+  it("does not send legacy scatter exclusion columns", async () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
       if (cmd === "get_filter_table_data") {
@@ -334,7 +332,7 @@ describe("ChartViewer", () => {
           type: "scatter",
           xName: "c (real)",
           yName: "c (imag)",
-          series: [{ name: "c", data: [[1, 2]] }],
+          series: [{ id: "c", label: "c", pointCount: 1, values: [1, 2] }],
         };
       }
       if (cmd === "get_dataset_write_status") {
@@ -374,17 +372,7 @@ describe("ChartViewer", () => {
       };
       expect(options.chartType).toBe("scatter");
       expect(options.scatter.mode).toBe("complex");
-      expect(options.excludeColumns).toEqual(["idxB"]);
-    });
-
-    const excludeTrigger = await getSelectTrigger("Index Column (excluded)");
-    await user.click(excludeTrigger);
-    await user.click(await screen.findByRole("option", { name: "idxA" }));
-
-    await waitFor(() => {
-      const lastPayload = chartPayloads.at(-1);
-      const options = lastPayload?.options as { excludeColumns?: string[] };
-      expect(options.excludeColumns).toEqual(["idxA"]);
+      expect(options.excludeColumns).toEqual([]);
     });
 
     clearMocks();
@@ -398,9 +386,20 @@ describe("ChartViewer", () => {
           livePayloads.push(payload as Record<string, unknown>);
         }
         return {
-          type: "line",
-          xName: "t",
-          series: [{ name: "sig (real)", data: [[0, 1]] }],
+          mode: "reset",
+          row_count: 1,
+          snapshot: {
+            type: "line",
+            xName: "t",
+            series: [
+              {
+                id: "sig:real",
+                label: "sig (real)",
+                pointCount: 1,
+                values: [0, 1],
+              },
+            ],
+          },
         };
       }
       if (cmd === "get_dataset_write_status") {
