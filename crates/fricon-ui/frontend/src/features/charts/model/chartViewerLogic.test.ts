@@ -75,6 +75,44 @@ describe("chartViewerLogic", () => {
     expect(derived.effectiveOrderByIndexColumnName).toBe("idxB");
   });
 
+  it("keeps the same default order-by when style changes", () => {
+    const columns = [
+      makeColumn({ name: "idxA", isIndex: true }),
+      makeColumn({ name: "idxB", isIndex: true }),
+      makeColumn({ name: "signal" }),
+    ];
+
+    const lineDerived = deriveChartViewerState(
+      columns,
+      makeState({ projection: "complex_xy", drawStyle: "line" }),
+    );
+    const pointsDerived = deriveChartViewerState(
+      columns,
+      makeState({ projection: "complex_xy", drawStyle: "points" }),
+    );
+
+    expect(lineDerived.effectiveOrderByIndexColumnName).toBe("idxB");
+    expect(pointsDerived.effectiveOrderByIndexColumnName).toBe("idxB");
+  });
+
+  it("defaults scalar heatmap axes to the two trailing index columns", () => {
+    const columns = [
+      makeColumn({ name: "idxSlow", isIndex: true }),
+      makeColumn({ name: "idxMid", isIndex: true }),
+      makeColumn({ name: "idxFast", isIndex: true }),
+      makeColumn({ name: "signal" }),
+    ];
+
+    const derived = deriveChartViewerState(
+      columns,
+      makeState({ view: "heatmap" }),
+    );
+
+    expect(derived.effectiveHeatmapXName).toBe("idxFast");
+    expect(derived.effectiveHeatmapYName).toBe("idxMid");
+    expect(derived.excludeColumns).toEqual(["idxFast", "idxMid"]);
+  });
+
   it("falls back projection to available option", () => {
     const columns = [makeColumn({ name: "c", isComplex: true })];
 

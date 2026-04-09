@@ -310,7 +310,7 @@ describe("ChartViewer", () => {
     clearMocks();
   });
 
-  it("does not send legacy scatter exclusion columns", async () => {
+  it("keeps order-by stable for complex plane points", async () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
       if (cmd === "get_filter_table_data") {
@@ -373,11 +373,13 @@ describe("ChartViewer", () => {
       const options = lastPayload?.options as {
         view: string;
         projection: string;
+        orderByIndexColumn?: string;
         excludeColumns?: string[];
       };
       expect(options.view).toBe("xy");
       expect(options.projection).toBe("complex_xy");
-      expect(options.excludeColumns).toEqual([]);
+      expect(options.orderByIndexColumn).toBe("idxB");
+      expect(options.excludeColumns).toEqual(["idxB"]);
     });
 
     clearMocks();
@@ -448,6 +450,7 @@ describe("ChartViewer", () => {
       expect(options.complex_views).toEqual(["real", "imag"]);
     });
 
+    await user.click(await screen.findByRole("button", { name: /advanced/i }));
     const magLabel = await screen.findByText("Magnitude");
     const magToggle =
       magLabel.parentElement?.querySelector('[role="checkbox"]');

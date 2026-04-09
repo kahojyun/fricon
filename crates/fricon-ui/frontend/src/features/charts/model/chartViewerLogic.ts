@@ -10,7 +10,6 @@ import type {
   XYDrawStyle,
   XYProjection,
 } from "@/shared/lib/chartTypes";
-import { xyDrawStyleIncludesLine } from "@/shared/lib/chartTypes";
 
 export const complexSeriesOptions: ComplexViewOption[] = [
   "real",
@@ -169,9 +168,7 @@ export function deriveChartViewerState(
   const heatmapYSelectionOptions = heatmapSeries?.isTrace
     ? heatmapYOptions
     : heatmapYOptions.filter((column) => column.name !== effectiveHeatmapXName);
-  const heatmapYDefaultIndex = heatmapSeries?.isTrace
-    ? Math.max(heatmapYSelectionOptions.length - 1, 0)
-    : 0;
+  const heatmapYDefaultIndex = Math.max(heatmapYSelectionOptions.length - 1, 0);
   const effectiveHeatmapYName = pickSelection(
     heatmapYSelectionOptions,
     state.heatmapYName,
@@ -209,10 +206,7 @@ export function deriveChartViewerState(
       )
     : [];
 
-  const orderByFallback =
-    effectiveProjection === "trend" || xyDrawStyleIncludesLine(state.drawStyle)
-      ? "last"
-      : null;
+  const orderByFallback = "last";
   const effectiveOrderByIndexColumnName = xyRoleControlsVisible
     ? pickOptionalSelection(
         orderByOptions,
