@@ -39,20 +39,13 @@ export interface ChartViewerControlActions {
   setLiveWindowCount: (next: number) => void;
 }
 
-function defaultDrawStyle(projection: XYProjection): XYDrawStyle {
-  if (projection === "trend") return "line";
-  return "points";
-}
-
 export function useChartViewerSelection(
   columns: ColumnInfo[],
   datasetStatus?: DatasetStatus,
 ) {
   const [view, setView] = useState<ChartView>("xy");
   const [projection, setProjection] = useState<XYProjection>("trend");
-  const [drawStyle, setDrawStyle] = useState<XYDrawStyle>(() =>
-    defaultDrawStyle("trend"),
-  );
+  const [drawStyle, setDrawStyle] = useState<XYDrawStyle>("line");
 
   const [selectedComplexView, setSelectedComplexView] = useState<
     ComplexViewOption[]

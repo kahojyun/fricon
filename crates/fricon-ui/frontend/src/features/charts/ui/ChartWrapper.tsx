@@ -1,21 +1,34 @@
 import { useTheme } from "next-themes";
-import type { ChartOptions } from "@/shared/lib/chartTypes";
+import type { ChartOptions, ChartSeries } from "@/shared/lib/chartTypes";
 import { useWebGLChart } from "../hooks/useWebGLChart";
+import { ChartFrameHeader } from "./ChartFrameHeader";
 import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
+import type { ChartFrameHeaderData } from "./chartFrameHeaderModel";
+import { deriveLegendPresentation } from "./chartLegendPresentation";
 
 interface ChartWrapperProps {
   data?: ChartOptions;
   interactionKey?: string | null;
   liveMode?: boolean;
+  header?: ChartFrameHeaderData | null;
 }
 
 export function ChartWrapper({
   data,
   interactionKey,
   liveMode,
+  header,
 }: ChartWrapperProps) {
   const { resolvedTheme } = useTheme();
+  const visibleLegendSeries =
+    data && data.type !== "heatmap"
+      ? liveMode
+        ? currentLiveLegendSeries(data.series)
+        : data.series
+      : [];
+  const legendPresentation = deriveLegendPresentation(visibleLegendSeries);
+  const showLegend = legendPresentation.items.length > 1;
   const { canvasRef, svgRef, getInteractionState } = useWebGLChart({
     data,
     interactionKey,
@@ -42,8 +55,15 @@ export function ChartWrapper({
           getInteractionState={getInteractionState}
         />
       ) : null}
-      {!liveMode && data && data.type !== "heatmap" ? (
-        <ChartLegend series={data.series} />
+      {header ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center p-2">
+          <ChartFrameHeader header={header} />
+        </div>
+      ) : null}
+      {showLegend ? (
+        <div className="pointer-events-none absolute top-2 right-2 z-10 max-w-[40%]">
+          <ChartLegend items={legendPresentation.items} />
+        </div>
       ) : null}
       {!data ? (
         <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
@@ -52,4 +72,19 @@ export function ChartWrapper({
       ) : null}
     </div>
   );
+}
+
+function currentLiveLegendSeries(series: ChartSeries[]): ChartSeries[] {
+  const currentGroup = liveSeriesGroupId(series.at(-1)?.id);
+  if (!currentGroup) {
+    return series;
+  }
+
+  return series.filter((item) => liveSeriesGroupId(item.id) === currentGroup);
+}
+
+function liveSeriesGroupId(id: string | undefined): string | null {
+  if (!id) return null;
+  const match = /^(row:\d+|group:\d+)(?::|$)/.exec(id);
+  return match?.[1] ?? null;
 }

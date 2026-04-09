@@ -7,10 +7,8 @@ import type { ChartOptions, ChartSeries } from "@/shared/lib/chartTypes";
 import {
   createBuffer,
   createProgram,
-  hexToRgb,
-  LIVE_NEWEST_COLOR,
-  LIVE_OLD_COLOR,
-  SERIES_COLORS,
+  getLiveSeriesAppearance,
+  getSeriesColor,
 } from "./webgl";
 import { lineFragmentSource, lineVertexSource } from "./shaders/line";
 
@@ -25,17 +23,6 @@ export interface LineRenderState {
     capacity: number;
     values: Float64Array;
   }[];
-}
-
-function liveSeriesStyle(
-  index: number,
-  total: number,
-): { isNewest: boolean; opacity: number } {
-  const isNewest = index === total - 1;
-  const opacity = isNewest
-    ? 1.0
-    : 0.12 + (0.5 * index) / Math.max(total - 2, 1);
-  return { isNewest, opacity };
 }
 
 export function createLineRenderState(
@@ -130,12 +117,11 @@ export function drawLines(
     let opacity: number;
 
     if (liveMode && data.series.length > 1) {
-      const style = liveSeriesStyle(i, data.series.length);
-      const hex = style.isNewest ? LIVE_NEWEST_COLOR : LIVE_OLD_COLOR;
-      color = hexToRgb(hex);
+      const style = getLiveSeriesAppearance(data.series[i], data.series, i);
+      color = style.color;
       opacity = style.opacity;
     } else {
-      color = hexToRgb(SERIES_COLORS[i % SERIES_COLORS.length]);
+      color = getSeriesColor(i);
       opacity = 1.0;
     }
 

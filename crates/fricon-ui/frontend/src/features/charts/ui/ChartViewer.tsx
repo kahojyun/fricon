@@ -4,6 +4,7 @@ import { useChartViewerSelection } from "../hooks/useChartViewerSelection";
 import { ChartViewerControls } from "./ChartViewerControls";
 import { ChartWrapper } from "./ChartWrapper";
 import { FilterTable } from "./FilterTable";
+import { buildChartFrameHeader } from "./chartFrameHeaderModel";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import {
   ResizableHandle,
@@ -39,6 +40,14 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
       isLiveMode,
       liveWindowCount: selection.controlState.liveWindowCount,
     });
+  const chartHeader = buildChartFrameHeader({
+    datasetId,
+    datasetStatus: datasetDetail?.status,
+    data: chartData ?? undefined,
+    derived: selection.derived,
+    isLiveMode,
+    liveWindowCount: selection.controlState.liveWindowCount,
+  });
 
   if (availability === "tombstone") {
     return (
@@ -87,6 +96,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
               data={chartData}
               interactionKey={chartInteractionKey}
               liveMode
+              header={chartHeader}
             />
           </div>
         ) : (
@@ -99,6 +109,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
                 <ChartWrapper
                   data={chartData}
                   interactionKey={chartInteractionKey}
+                  header={chartHeader}
                 />
               </div>
             </ResizablePanel>

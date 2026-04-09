@@ -2,6 +2,7 @@ import { useLayoutEffect, useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
+import { resolveXYYAxisLabel } from "../model/seriesLabeling";
 import { useWebGLChart, type ChartInteractionState } from "./useWebGLChart";
 
 const noop = () => undefined;
@@ -313,6 +314,25 @@ describe("useWebGLChart", () => {
     expect(autoFollow?.zoomState?.translateY).toBeCloseTo(0);
     expect(autoFollow?.xMax).toBeGreaterThan(reset?.xMax ?? 0);
     expect(autoFollow?.yMax).toBeGreaterThan(reset?.yMax ?? 0);
+  });
+
+  it("uses the shared trend series label for the y axis when available", () => {
+    expect(
+      resolveXYYAxisLabel({
+        projection: "trend",
+        yName: null,
+        series: [
+          xySeries("sig-real", "signal (real)", [
+            [0, 1],
+            [1, 2],
+          ]),
+          xySeries("sig-imag", "signal (imag)", [
+            [0, 2],
+            [1, 3],
+          ]),
+        ],
+      }),
+    ).toBe("signal");
   });
 
   it("resets non-live charts back to the default view on data changes", () => {

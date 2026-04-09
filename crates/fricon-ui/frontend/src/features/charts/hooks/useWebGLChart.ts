@@ -16,6 +16,7 @@ import {
   xyDrawStyleIncludesPoints,
   type ChartOptions,
 } from "@/shared/lib/chartTypes";
+import { resolveXYYAxisLabel } from "../model/seriesLabeling";
 import {
   resizeCanvas,
   dataToClipMatrix,
@@ -237,7 +238,7 @@ export function useWebGLChart({
         zoomedXScale,
         zoomedYScale,
         currentData.xName,
-        currentData.yName ?? "",
+        resolveXYYAxisLabel(currentData),
         margin,
         overlayTheme,
       );
@@ -595,7 +596,6 @@ export function useWebGLChart({
 
   return { canvasRef, svgRef, getInteractionState };
 }
-
 interface ResolveNextZoomStateArgs {
   liveMode: boolean;
   data?: ChartOptions;

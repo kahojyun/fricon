@@ -7,10 +7,8 @@ import type { ChartOptions, ChartSeries } from "@/shared/lib/chartTypes";
 import {
   createBuffer,
   createProgram,
-  hexToRgb,
-  LIVE_NEWEST_COLOR,
-  LIVE_OLD_COLOR,
-  SERIES_COLORS,
+  getLiveSeriesAppearance,
+  getSeriesColor,
 } from "./webgl";
 import { scatterFragmentSource, scatterVertexSource } from "./shaders/scatter";
 
@@ -125,14 +123,12 @@ export function drawScatter(
     let pointSize: number;
 
     if (liveMode && data.series.length > 1) {
-      const total = data.series.length;
-      const isNewest = i === total - 1;
-      opacity = isNewest ? 1.0 : 0.12 + (0.5 * i) / Math.max(total - 2, 1);
-      const hex = isNewest ? LIVE_NEWEST_COLOR : LIVE_OLD_COLOR;
-      color = hexToRgb(hex);
-      pointSize = (isNewest ? 6 : 4) * dpr;
+      const style = getLiveSeriesAppearance(data.series[i], data.series, i);
+      opacity = style.opacity;
+      color = style.color;
+      pointSize = (style.isCurrent ? 6 : 4) * dpr;
     } else {
-      color = hexToRgb(SERIES_COLORS[i % SERIES_COLORS.length]);
+      color = getSeriesColor(i);
       opacity = 1.0;
       pointSize = 6 * dpr;
     }

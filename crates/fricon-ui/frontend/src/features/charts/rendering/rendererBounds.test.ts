@@ -1,11 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ChartSeries, HeatmapSeries } from "@/shared/lib/chartTypes";
 import {
+  drawLines,
+  lineDataBounds,
+  type LineRenderState,
+} from "./lineRenderer";
+import {
   syncHeatmapRenderState,
   type HeatmapRenderState,
 } from "./heatmapRenderer";
-import { lineDataBounds } from "./lineRenderer";
-import { scatterDataBounds } from "./scatterRenderer";
+import {
+  drawScatter,
+  scatterDataBounds,
+  type ScatterRenderState,
+} from "./scatterRenderer";
+import { getSeriesColor } from "./webgl";
 
 describe("lineDataBounds", () => {
   it("ignores non-finite points when computing chart bounds", () => {
@@ -24,6 +33,80 @@ describe("lineDataBounds", () => {
       yMin: 0.8,
       yMax: 5.2,
     });
+  });
+
+  it("keeps all current live-series variants highlighted together", () => {
+    const uniform4f = vi.fn();
+    const gl = {
+      useProgram: vi.fn(),
+      uniformMatrix3fv: vi.fn(),
+      uniform4f,
+      bindBuffer: vi.fn(),
+      enableVertexAttribArray: vi.fn(),
+      vertexAttribPointer: vi.fn(),
+      drawArrays: vi.fn(),
+      ARRAY_BUFFER: 0x8892,
+      FLOAT: 0x1406,
+      LINE_STRIP: 0x0003,
+    } as unknown as WebGL2RenderingContext;
+
+    const state = {
+      program: {} as WebGLProgram,
+      uMatrix: {} as WebGLUniformLocation,
+      uColor: {} as WebGLUniformLocation,
+      aPosition: 0,
+      seriesBuffers: [
+        {
+          buffer: {} as WebGLBuffer,
+          count: 1,
+          capacity: 2,
+          values: new Float64Array([0, 0]),
+        },
+        {
+          buffer: {} as WebGLBuffer,
+          count: 1,
+          capacity: 2,
+          values: new Float64Array([1, 1]),
+        },
+        {
+          buffer: {} as WebGLBuffer,
+          count: 1,
+          capacity: 2,
+          values: new Float64Array([2, 2]),
+        },
+      ],
+    } satisfies LineRenderState;
+
+    drawLines(
+      gl,
+      state,
+      new Float32Array(9),
+      {
+        type: "xy",
+        projection: "trend",
+        drawStyle: "line",
+        xName: "x",
+        yName: null,
+        series: [
+          xySeries("row:4:signal:real", "signal (real)", [[0, 0]]),
+          xySeries("row:5:signal:real", "signal (real)", [[1, 1]]),
+          xySeries("row:5:signal:imag", "signal (imag)", [[2, 2]]),
+        ],
+      },
+      true,
+    );
+
+    expect(uniform4f.mock.calls).toEqual([
+      [
+        state.uColor,
+        getSeriesColor(0)[0] * 0.55,
+        getSeriesColor(0)[1] * 0.55,
+        getSeriesColor(0)[2] * 0.55,
+        0.16,
+      ],
+      [state.uColor, ...getSeriesColor(0), 1],
+      [state.uColor, ...getSeriesColor(1), 1],
+    ]);
   });
 });
 
@@ -44,6 +127,87 @@ describe("scatterDataBounds", () => {
       yMin: 0.8,
       yMax: 5.2,
     });
+  });
+
+  it("keeps all current live point variants highlighted together", () => {
+    const uniform4f = vi.fn();
+    const uniform1f = vi.fn();
+    const gl = {
+      useProgram: vi.fn(),
+      uniformMatrix3fv: vi.fn(),
+      uniform4f,
+      uniform1f,
+      bindBuffer: vi.fn(),
+      enableVertexAttribArray: vi.fn(),
+      vertexAttribPointer: vi.fn(),
+      drawArrays: vi.fn(),
+      ARRAY_BUFFER: 0x8892,
+      FLOAT: 0x1406,
+      POINTS: 0x0000,
+    } as unknown as WebGL2RenderingContext;
+
+    const state = {
+      program: {} as WebGLProgram,
+      uMatrix: {} as WebGLUniformLocation,
+      uColor: {} as WebGLUniformLocation,
+      uPointSize: {} as WebGLUniformLocation,
+      aPosition: 0,
+      seriesBuffers: [
+        {
+          buffer: {} as WebGLBuffer,
+          count: 1,
+          capacity: 2,
+          values: new Float64Array([0, 0]),
+        },
+        {
+          buffer: {} as WebGLBuffer,
+          count: 1,
+          capacity: 2,
+          values: new Float64Array([1, 1]),
+        },
+        {
+          buffer: {} as WebGLBuffer,
+          count: 1,
+          capacity: 2,
+          values: new Float64Array([2, 2]),
+        },
+      ],
+    } satisfies ScatterRenderState;
+
+    drawScatter(
+      gl,
+      state,
+      new Float32Array(9),
+      {
+        type: "xy",
+        projection: "trend",
+        drawStyle: "line_points",
+        xName: "x",
+        yName: null,
+        series: [
+          xySeries("group:4:signal:real", "signal (real)", [[0, 0]]),
+          xySeries("group:5:signal:real", "signal (real)", [[1, 1]]),
+          xySeries("group:5:signal:imag", "signal (imag)", [[2, 2]]),
+        ],
+      },
+      true,
+    );
+
+    expect(uniform4f.mock.calls).toEqual([
+      [
+        state.uColor,
+        getSeriesColor(0)[0] * 0.55,
+        getSeriesColor(0)[1] * 0.55,
+        getSeriesColor(0)[2] * 0.55,
+        0.16,
+      ],
+      [state.uColor, ...getSeriesColor(0), 1],
+      [state.uColor, ...getSeriesColor(1), 1],
+    ]);
+    const pointSizes = (uniform1f.mock.calls as [unknown, number][]).map(
+      ([, size]) => size,
+    );
+    expect(pointSizes).toEqual([4, 6, 6]);
   });
 });
 

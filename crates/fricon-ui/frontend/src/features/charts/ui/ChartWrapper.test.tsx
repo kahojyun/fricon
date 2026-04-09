@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
 import { ChartWrapper } from "./ChartWrapper";
+import type { ChartFrameHeaderData } from "./chartFrameHeaderModel";
 
 // Stub WebGL2 context so the hook can initialize without a real GPU
 const noop = () => undefined;
@@ -116,6 +117,63 @@ describe("ChartWrapper", () => {
     expect(container.querySelector("svg")).toHaveStyle({
       pointerEvents: "auto",
     });
+  });
+
+  it("shows the legend for multi-series live xy charts", () => {
+    const data: ChartOptions = {
+      type: "xy",
+      projection: "trend",
+      drawStyle: "line",
+      xName: "x",
+      yName: null,
+      series: [
+        xySeries("row:4:signal:real", "signal (real)", [
+          [0, 1],
+          [1, 2],
+        ]),
+        xySeries("row:5:signal:real", "signal (real)", [
+          [0, 2],
+          [1, 3],
+        ]),
+        xySeries("row:5:signal:imag", "signal (imag)", [
+          [0, 3],
+          [1, 4],
+        ]),
+      ],
+    };
+
+    render(<ChartWrapper data={data} liveMode />);
+
+    expect(screen.getByText("real")).toBeInTheDocument();
+    expect(screen.getByText("imag")).toBeInTheDocument();
+    expect(screen.queryByText("signal (real)")).not.toBeInTheDocument();
+    expect(screen.queryByText("signal (imag)")).not.toBeInTheDocument();
+  });
+
+  it("renders a chart frame header inside the plot area", () => {
+    const data: ChartOptions = {
+      type: "xy",
+      projection: "trend",
+      drawStyle: "line",
+      xName: "step",
+      yName: null,
+      series: [
+        xySeries("s1", "signal", [
+          [0, 1],
+          [1, 2],
+        ]),
+      ],
+    };
+    const header: ChartFrameHeaderData = {
+      title: "Dataset #17",
+      meta: ["Live", "last 5 sweeps"],
+    };
+
+    render(<ChartWrapper data={data} header={header} />);
+
+    expect(screen.getByText("Dataset #17")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
+    expect(screen.getByText("last 5 sweeps")).toBeInTheDocument();
   });
 
   it("renders a canvas for scatter chart data", () => {
