@@ -56,6 +56,8 @@ const complexViewLabels = {
   arg: "Phase",
 } as const;
 
+const liveWindowOptions = [1, 3, 5, 10, 20] as const;
+
 export function ChartViewerControls({
   derived,
   controlState,
@@ -63,8 +65,12 @@ export function ChartViewerControls({
   datasetStatus,
 }: ChartViewerControlsProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const { selectedComplexView, selectedComplexViewSingle, isLiveMode } =
-    controlState;
+  const {
+    selectedComplexView,
+    selectedComplexViewSingle,
+    isLiveMode,
+    liveWindowCount,
+  } = controlState;
   const {
     setView,
     setProjection,
@@ -80,12 +86,15 @@ export function ChartViewerControls({
     setOrderByIndexColumnName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
+    setLiveWindowCount,
   } = actions;
   const showPrimaryProjection = derived.effectiveView === "xy";
-  const showPrimaryOrderBy = derived.xyRoleControlsVisible;
+  const showPrimaryLiveWindow = isLiveMode && derived.effectiveView === "xy";
+  const showPrimaryOrderBy = derived.xyRoleControlsVisible && !isLiveMode;
   const showAdvancedStyle = derived.effectiveView === "xy";
-  const showAdvancedHeatmapAxes = derived.effectiveView === "heatmap";
-  const showAdvancedGrouping = derived.xyRoleControlsVisible;
+  const showAdvancedHeatmapAxes =
+    derived.effectiveView === "heatmap" && !isLiveMode;
+  const showAdvancedGrouping = derived.xyRoleControlsVisible && !isLiveMode;
   const showAdvancedComplexControls =
     derived.effectiveView === "heatmap" ||
     (derived.effectiveView === "xy" && derived.effectiveProjection === "trend");
@@ -332,6 +341,29 @@ export function ChartViewerControls({
           </div>
         ) : null}
 
+        {showPrimaryLiveWindow ? (
+          <div className="min-w-32">
+            <Label className="mb-1 block">Live Window</Label>
+            <Select
+              value={String(liveWindowCount)}
+              onValueChange={(value) => setLiveWindowCount(Number(value))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select window">
+                  {String(liveWindowCount)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {liveWindowOptions.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
         {showAdvancedControls ? (
           <div className="flex flex-col">
             <Label className="mb-1 block opacity-0">Advanced</Label>
@@ -533,6 +565,27 @@ export function ChartViewerControls({
               )}
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {isLiveMode && derived.effectiveView === "xy" ? (
+        <div className="px-1.5 pb-1.5 text-xs text-muted-foreground">
+          {derived.xyUsesTraceSource ? (
+            <span>Live mode shows the last {liveWindowCount} sweeps.</span>
+          ) : derived.liveMonitorGroupByIndexColumnNames.length > 0 ? (
+            <span>
+              Live mode shows the last {liveWindowCount} sweeps, grouped by{" "}
+              {derived.liveMonitorGroupByIndexColumnNames.join(", ")} and
+              ordered by {derived.liveMonitorOrderByIndexColumnName}.
+            </span>
+          ) : derived.liveMonitorUsesForcedRoles ? (
+            <span>
+              Live mode shows the last {liveWindowCount} updates, ordered by{" "}
+              {derived.liveMonitorOrderByIndexColumnName}.
+            </span>
+          ) : (
+            <span>Live mode shows the last {liveWindowCount} updates.</span>
+          )}
         </div>
       ) : null}
     </>

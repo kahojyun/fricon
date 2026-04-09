@@ -12,6 +12,7 @@ export interface ChartViewerControlState {
   selectedComplexView: ComplexViewOption[];
   selectedComplexViewSingle: ComplexViewOption;
   isLiveMode: boolean;
+  liveWindowCount: number;
 }
 
 interface LiveModeSelection {
@@ -35,6 +36,7 @@ export interface ChartViewerControlActions {
   setSelectedComplexView: (next: ComplexViewOption[]) => void;
   setSelectedComplexViewSingle: (next: ComplexViewOption) => void;
   setLiveMode: (next: boolean) => void;
+  setLiveWindowCount: (next: number) => void;
 }
 
 function defaultDrawStyle(projection: XYProjection): XYDrawStyle {
@@ -78,6 +80,7 @@ export function useChartViewerSelection(
 
   const [liveModeSelection, setLiveModeSelection] =
     useState<LiveModeSelection | null>(null);
+  const [liveWindowCount, setLiveWindowCount] = useState(5);
   const currentLiveModeSelection =
     liveModeSelection?.datasetStatus === datasetStatus
       ? liveModeSelection
@@ -104,6 +107,7 @@ export function useChartViewerSelection(
     selectedComplexView,
     selectedComplexViewSingle,
     isLiveMode,
+    liveWindowCount,
   };
 
   const actions: ChartViewerControlActions = {
@@ -139,6 +143,7 @@ export function useChartViewerSelection(
         datasetStatus,
         value: next,
       }),
+    setLiveWindowCount,
   };
 
   return {

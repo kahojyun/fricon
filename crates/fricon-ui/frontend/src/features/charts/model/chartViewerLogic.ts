@@ -193,6 +193,18 @@ export function deriveChartViewerState(
       (effectiveProjection === "complex_xy" &&
         Boolean(complexXYSeries?.isTrace)) ||
       (effectiveProjection === "xy" && Boolean(xyXColumn?.isTrace)));
+  const liveMonitorUsesForcedRoles =
+    effectiveView === "xy" &&
+    !xyUsesTraceSource &&
+    activeXYSource !== undefined &&
+    indexColumns.length > 0;
+  const liveMonitorOrderByIndexColumnName = liveMonitorUsesForcedRoles
+    ? (indexColumns[indexColumns.length - 1]?.name ?? null)
+    : null;
+  const liveMonitorGroupByIndexColumnNames =
+    liveMonitorUsesForcedRoles && indexColumns.length > 1
+      ? indexColumns.slice(0, -1).map((column) => column.name)
+      : [];
 
   const xyRoleControlsVisible =
     effectiveView === "xy" &&
@@ -293,6 +305,9 @@ export function deriveChartViewerState(
     heatmapXColumn,
     heatmapYColumn,
     xyUsesTraceSource,
+    liveMonitorUsesForcedRoles,
+    liveMonitorOrderByIndexColumnName,
+    liveMonitorGroupByIndexColumnNames,
     xyRoleControlsVisible,
     orderByOptions,
     effectiveOrderByIndexColumnName,

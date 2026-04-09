@@ -37,6 +37,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
       selectedComplexViewSingle:
         selection.controlState.selectedComplexViewSingle,
       isLiveMode,
+      liveWindowCount: selection.controlState.liveWindowCount,
     });
 
   if (availability === "tombstone") {

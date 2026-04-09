@@ -21,8 +21,9 @@ function buildLiveChartRequest(
   derived: ReturnType<typeof deriveChartViewerState>,
   selectedComplexView: ComplexViewOption[],
   selectedComplexViewSingle: ComplexViewOption,
+  liveWindowCount: number,
 ): LiveChartDataOptions | null {
-  const tailCount = 5;
+  const tailCount = liveWindowCount;
 
   if (derived.effectiveView === "heatmap" && derived.heatmapSeries) {
     return {
@@ -38,14 +39,14 @@ function buildLiveChartRequest(
     return null;
   }
 
-  const roleOptions = derived.xyRoleControlsVisible
+  const roleOptions = derived.liveMonitorUsesForcedRoles
     ? {
         groupByIndexColumns:
-          derived.effectiveGroupByIndexColumnNames.length > 0
-            ? derived.effectiveGroupByIndexColumnNames
+          derived.liveMonitorGroupByIndexColumnNames.length > 0
+            ? derived.liveMonitorGroupByIndexColumnNames
             : undefined,
         orderByIndexColumn:
-          derived.effectiveOrderByIndexColumnName ?? undefined,
+          derived.liveMonitorOrderByIndexColumnName ?? undefined,
       }
     : {};
 
@@ -101,6 +102,7 @@ interface UseChartViewerDataArgs {
   selectedComplexView: ComplexViewOption[];
   selectedComplexViewSingle: ComplexViewOption;
   isLiveMode: boolean;
+  liveWindowCount: number;
 }
 
 export function useChartViewerData({
@@ -111,6 +113,7 @@ export function useChartViewerData({
   selectedComplexView,
   selectedComplexViewSingle,
   isLiveMode,
+  liveWindowCount,
 }: UseChartViewerDataArgs) {
   const queryClient = useQueryClient();
   const queriesEnabled = availability === "available";
@@ -148,6 +151,7 @@ export function useChartViewerData({
           derived,
           selectedComplexView,
           selectedComplexViewSingle,
+          liveWindowCount,
         )
       : null;
 

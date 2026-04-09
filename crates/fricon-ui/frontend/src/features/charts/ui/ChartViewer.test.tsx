@@ -442,11 +442,15 @@ describe("ChartViewer", () => {
         view: string;
         projection: string;
         drawStyle?: string;
+        orderByIndexColumn?: string;
         complex_views?: string[] | null;
+        tailCount?: number;
       };
       expect(options.view).toBe("xy");
       expect(options.projection).toBe("trend");
       expect(options.drawStyle).toBe("line");
+      expect(options.orderByIndexColumn).toBe("t");
+      expect(options.tailCount).toBe(5);
       expect(options.complex_views).toEqual(["real", "imag"]);
     });
 
@@ -465,6 +469,102 @@ describe("ChartViewer", () => {
         complex_views?: string[] | null;
       };
       expect(options.complex_views).toEqual(["real", "imag", "mag"]);
+    });
+
+    clearMocks();
+  });
+
+  it("forces live scalar complex-plane requests to use sweep grouping", async () => {
+    const livePayloads: Record<string, unknown>[] = [];
+    mockIPC((cmd, payload) => {
+      if (cmd === "dataset_live_chart_data") {
+        if (payload && typeof payload === "object") {
+          livePayloads.push(payload as Record<string, unknown>);
+        }
+        return {
+          mode: "reset",
+          row_count: 6,
+          snapshot: {
+            type: "xy",
+            projection: "complex_xy",
+            drawStyle: "points",
+            xName: "impedance (real)",
+            yName: "impedance (imag)",
+            series: [
+              {
+                id: "group:4",
+                label: "impedance [idx_cycle=2, idx_y=1]",
+                pointCount: 2,
+                values: [1, 2, 3, 4],
+              },
+            ],
+          },
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 6 };
+      }
+      return null;
+    });
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            status: "Writing",
+            columns: [
+              {
+                name: "idx_cycle",
+                isComplex: false,
+                isTrace: false,
+                isIndex: true,
+              },
+              {
+                name: "idx_y",
+                isComplex: false,
+                isTrace: false,
+                isIndex: true,
+              },
+              {
+                name: "idx_x",
+                isComplex: false,
+                isTrace: false,
+                isIndex: true,
+              },
+              {
+                name: "complex_impedance_ohm",
+                isComplex: true,
+                isTrace: false,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+
+    const projectionTrigger = await getSelectTrigger("Projection");
+    await user.click(projectionTrigger);
+    await user.click(
+      await screen.findByRole("option", { name: "Complex Plane" }),
+    );
+
+    await waitFor(() => {
+      const lastPayload = livePayloads.at(-1);
+      const options = lastPayload?.options as {
+        projection: string;
+        tailCount?: number;
+        orderByIndexColumn?: string;
+        groupByIndexColumns?: string[];
+      };
+      expect(options.projection).toBe("complex_xy");
+      expect(options.tailCount).toBe(5);
+      expect(options.orderByIndexColumn).toBe("idx_x");
+      expect(options.groupByIndexColumns).toEqual(["idx_cycle", "idx_y"]);
     });
 
     clearMocks();
