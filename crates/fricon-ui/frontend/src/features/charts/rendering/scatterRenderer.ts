@@ -24,7 +24,7 @@ export interface ScatterRenderState {
     buffer: WebGLBuffer;
     count: number;
     capacity: number;
-    values: Float32Array;
+    values: Float64Array;
   }[];
 }
 
@@ -63,12 +63,12 @@ export function syncScatterRenderState(
             new Float32Array(existing.capacity),
             gl.DYNAMIC_DRAW,
           );
-          gl.bufferSubData(gl.ARRAY_BUFFER, 0, flat);
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, toFloat32Array(flat));
         } else if (flat.length > existing.values.length) {
           gl.bufferSubData(
             gl.ARRAY_BUFFER,
             existing.values.length * 4,
-            flat.subarray(existing.values.length),
+            toFloat32Array(flat.subarray(existing.values.length)),
           );
         }
       } else {
@@ -80,7 +80,7 @@ export function syncScatterRenderState(
             gl.DYNAMIC_DRAW,
           );
         }
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, flat);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, toFloat32Array(flat));
       }
       existing.count = series[i].pointCount;
       existing.values = flat;
@@ -88,7 +88,7 @@ export function syncScatterRenderState(
     }
 
     state.seriesBuffers.push({
-      buffer: createBuffer(gl, flat, gl.DYNAMIC_DRAW),
+      buffer: createBuffer(gl, toFloat32Array(flat), gl.DYNAMIC_DRAW),
       count: series[i].pointCount,
       capacity: flat.length,
       values: flat,
@@ -198,10 +198,14 @@ export function scatterDataBounds(series: ChartSeries[]): {
   };
 }
 
-function hasPrefix(values: Float32Array, prefix: Float32Array) {
+function hasPrefix(values: Float64Array, prefix: Float64Array) {
   if (prefix.length > values.length) return false;
   for (let i = 0; i < prefix.length; i++) {
     if (values[i] !== prefix[i]) return false;
   }
   return true;
+}
+
+function toFloat32Array(values: Float64Array) {
+  return Float32Array.from(values);
 }

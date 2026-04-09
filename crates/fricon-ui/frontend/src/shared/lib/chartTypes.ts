@@ -9,14 +9,14 @@ export type ComplexViewOption = "real" | "imag" | "mag" | "arg";
 export interface ChartSeries {
   id: string;
   label: string;
-  values: Float32Array;
+  values: Float64Array;
   pointCount: number;
 }
 
 export interface HeatmapSeries {
   id: string;
   label: string;
-  values: Float32Array;
+  values: Float64Array;
   pointCount: number;
 }
 

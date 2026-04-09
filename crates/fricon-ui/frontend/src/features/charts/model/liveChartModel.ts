@@ -63,7 +63,7 @@ function appendToChart(
     if (operation.kind === "append_points") {
       const target = series.find((item) => item.id === operation.seriesId);
       if (!target) return null;
-      target.values = concatFloat32(target.values, operation.values);
+      target.values = concatFloat64(target.values, operation.values);
       target.pointCount += operation.pointCount;
       continue;
     }
@@ -100,7 +100,7 @@ function appendToHeatmap(
     if (operation.kind === "append_points") {
       const target = series.find((item) => item.id === operation.seriesId);
       if (!target) return null;
-      target.values = concatFloat32(target.values, operation.values);
+      target.values = concatFloat64(target.values, operation.values);
       target.pointCount += operation.pointCount;
       continue;
     }
@@ -120,8 +120,8 @@ function appendToHeatmap(
   };
 }
 
-function concatFloat32(current: Float32Array, appended: Float32Array) {
-  const next = new Float32Array(current.length + appended.length);
+function concatFloat64(current: Float64Array, appended: Float64Array) {
+  const next = new Float64Array(current.length + appended.length);
   next.set(current, 0);
   next.set(appended, current.length);
   return next;
@@ -130,13 +130,13 @@ function concatFloat32(current: Float32Array, appended: Float32Array) {
 export function cloneChartSeries(series: ChartSeries): ChartSeries {
   return {
     ...series,
-    values: new Float32Array(series.values),
+    values: new Float64Array(series.values),
   };
 }
 
 export function cloneHeatmapSeries(series: HeatmapSeries): HeatmapSeries {
   return {
     ...series,
-    values: new Float32Array(series.values),
+    values: new Float64Array(series.values),
   };
 }

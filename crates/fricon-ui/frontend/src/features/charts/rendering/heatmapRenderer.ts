@@ -22,7 +22,7 @@ export interface HeatmapRenderState {
   cellBuffer: WebGLBuffer;
   instanceCount: number;
   capacity: number;
-  instanceData: Float32Array;
+  instanceData: Float64Array;
   vao: WebGLVertexArrayObject;
   valueMin: number;
   valueMax: number;
@@ -71,7 +71,7 @@ export function createHeatmapRenderState(
     cellBuffer,
     instanceCount: 0,
     capacity: 0,
-    instanceData: new Float32Array(0),
+    instanceData: new Float64Array(0),
     vao,
     valueMin: 0,
     valueMax: 1,
@@ -98,12 +98,12 @@ export function syncHeatmapRenderState(
         new Float32Array(state.capacity),
         gl.DYNAMIC_DRAW,
       );
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, instanceData);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, toFloat32Array(instanceData));
     } else if (instanceData.length > state.instanceData.length) {
       gl.bufferSubData(
         gl.ARRAY_BUFFER,
         state.instanceData.length * 4,
-        instanceData.subarray(state.instanceData.length),
+        toFloat32Array(instanceData.subarray(state.instanceData.length)),
       );
     }
   } else {
@@ -115,7 +115,7 @@ export function syncHeatmapRenderState(
         gl.DYNAMIC_DRAW,
       );
     }
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, instanceData);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, toFloat32Array(instanceData));
   }
   state.instanceCount = instanceData.length / 3;
   state.instanceData = instanceData;
@@ -172,7 +172,7 @@ export function destroyHeatmapRenderState(
 function buildHeatmapInstances(series: HeatmapSeries[]): {
   valueMin: number;
   valueMax: number;
-  instanceData: Float32Array;
+  instanceData: Float64Array;
 } {
   let min = Infinity;
   let max = -Infinity;
@@ -200,14 +200,18 @@ function buildHeatmapInstances(series: HeatmapSeries[]): {
   return {
     valueMin: min,
     valueMax: max,
-    instanceData: new Float32Array(instances),
+    instanceData: Float64Array.from(instances),
   };
 }
 
-function hasPrefix(values: Float32Array, prefix: Float32Array) {
+function hasPrefix(values: Float64Array, prefix: Float64Array) {
   if (prefix.length > values.length) return false;
   for (let i = 0; i < prefix.length; i++) {
     if (values[i] !== prefix[i]) return false;
   }
   return true;
+}
+
+function toFloat32Array(values: Float64Array) {
+  return Float32Array.from(values);
 }

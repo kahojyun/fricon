@@ -106,7 +106,7 @@ function xySeries(id: string, label: string, points: [number, number][]) {
     id,
     label,
     pointCount: points.length,
-    values: Float32Array.from(points.flat()),
+    values: Float64Array.from(points.flat()),
   };
 }
 
@@ -119,6 +119,6 @@ function xyzSeries(
     id,
     label,
     pointCount: points.length,
-    values: Float32Array.from(points.flat()),
+    values: Float64Array.from(points.flat()),
   };
 }

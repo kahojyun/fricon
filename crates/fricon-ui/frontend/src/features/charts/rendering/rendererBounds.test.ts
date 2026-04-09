@@ -63,10 +63,10 @@ describe("syncHeatmapRenderState", () => {
       cellBuffer: {} as WebGLBuffer,
       instanceCount: 0,
       capacity: 0,
-      instanceData: new Float32Array(0),
+      instanceData: new Float64Array(0),
       valueMin: 0,
       valueMax: 0,
-    } as HeatmapRenderState;
+    } as unknown as HeatmapRenderState;
 
     const series: HeatmapSeries[] = [
       xyzSeries("heat", "heat", [
@@ -103,7 +103,7 @@ function xySeries(
     id,
     label,
     pointCount: points.length,
-    values: Float32Array.from(points.flat()),
+    values: Float64Array.from(points.flat()),
   };
 }
 
@@ -116,6 +116,6 @@ function xyzSeries(
     id,
     label,
     pointCount: points.length,
-    values: Float32Array.from(points.flat()),
+    values: Float64Array.from(points.flat()),
   };
 }

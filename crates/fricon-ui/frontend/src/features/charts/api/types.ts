@@ -107,7 +107,7 @@ export type LiveChartAppendOperation =
   | {
       kind: "append_points";
       seriesId: string;
-      values: Float32Array;
+      values: Float64Array;
       pointCount: number;
     }
   | {
@@ -289,7 +289,7 @@ function normalizeXYSeries(series: WireFlatXYSeries) {
   return {
     id: series.id,
     label: series.label,
-    values: Float32Array.from(series.values),
+    values: Float64Array.from(series.values),
     pointCount: series.pointCount,
   };
 }
@@ -298,7 +298,7 @@ function normalizeXYZSeries(series: WireFlatXYZSeries) {
   return {
     id: series.id,
     label: series.label,
-    values: Float32Array.from(series.values),
+    values: Float64Array.from(series.values),
     pointCount: series.pointCount,
   };
 }
@@ -324,7 +324,7 @@ function normalizeLiveChartAppendOperation(
     return {
       kind: "append_points",
       seriesId: operation.series_id,
-      values: Float32Array.from(operation.values),
+      values: Float64Array.from(operation.values),
       pointCount: operation.point_count,
     };
   }
