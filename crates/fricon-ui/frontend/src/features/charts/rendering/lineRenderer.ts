@@ -1,6 +1,6 @@
 /**
- * Line chart renderer — draws multi-series line charts via GL_LINE_STRIP.
- * Consumes ChartOptions (type="line") and renders into a WebGL2 context.
+ * XY line renderer — draws multi-series line charts via GL_LINE_STRIP.
+ * Consumes ChartOptions (type="xy") and renders into a WebGL2 context.
  */
 
 import type { ChartOptions, ChartSeries } from "@/shared/lib/chartTypes";
@@ -114,7 +114,7 @@ export function drawLines(
   gl: WebGL2RenderingContext,
   state: LineRenderState,
   matrix: Float32Array,
-  data: Extract<ChartOptions, { type: "line" }>,
+  data: Extract<ChartOptions, { type: "xy" }>,
   liveMode: boolean,
 ): void {
   const { program, seriesBuffers, uMatrix, uColor, aPosition } = state;
@@ -172,8 +172,8 @@ export function lineDataBounds(series: ChartSeries[]): {
     yMax = -Infinity;
   for (const s of series) {
     for (let i = 0; i < s.values.length; i += 2) {
-      const x = s.values[i]!;
-      const y = s.values[i + 1]!;
+      const x = s.values[i];
+      const y = s.values[i + 1];
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       if (x < xMin) xMin = x;
       if (x > xMax) xMax = x;

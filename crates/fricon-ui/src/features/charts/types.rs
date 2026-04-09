@@ -2,13 +2,35 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ComplexViewOption {
     Real,
     Imag,
     Mag,
     Arg,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum XYProjection {
+    Trend,
+    Xy,
+    ComplexXy,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum XYDrawStyle {
+    Line,
+    Points,
+    LinePoints,
+}
+
+impl XYDrawStyle {
+    pub(crate) const fn includes_lines(self) -> bool {
+        matches!(self, Self::Line | Self::LinePoints)
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize, specta::Type)]
@@ -20,12 +42,51 @@ pub(crate) struct ChartCommonOptions {
     pub(crate) exclude_columns: Option<Vec<String>>,
 }
 
+#[derive(Debug, Clone, Default, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct XYIndexRoleOptions {
+    #[specta(optional)]
+    pub(crate) group_by_index_columns: Option<Vec<String>>,
+    #[specta(optional)]
+    pub(crate) order_by_index_column: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(tag = "projection", rename_all = "snake_case")]
+pub(crate) enum XYProjectionOptions {
+    Trend {
+        series: String,
+        complex_views: Option<Vec<ComplexViewOption>>,
+    },
+    Xy {
+        #[serde(rename = "xColumn")]
+        x_column: String,
+        #[serde(rename = "yColumn")]
+        y_column: String,
+    },
+    ComplexXy {
+        series: String,
+    },
+}
+
+impl XYProjectionOptions {
+    pub(crate) const fn projection(&self) -> XYProjection {
+        match self {
+            Self::Trend { .. } => XYProjection::Trend,
+            Self::Xy { .. } => XYProjection::Xy,
+            Self::ComplexXy { .. } => XYProjection::ComplexXy,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct LineChartDataOptions {
-    pub(crate) series: String,
-    pub(crate) x_column: Option<String>,
-    pub(crate) complex_views: Option<Vec<ComplexViewOption>>,
+pub(crate) struct XYChartDataOptions {
+    pub(crate) draw_style: XYDrawStyle,
+    #[serde(flatten)]
+    pub(crate) projection: XYProjectionOptions,
+    #[serde(flatten)]
+    pub(crate) index_roles: XYIndexRoleOptions,
     #[serde(flatten)]
     pub(crate) common: ChartCommonOptions,
 }
@@ -42,55 +103,24 @@ pub(crate) struct HeatmapChartDataOptions {
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
-#[serde(tag = "mode", rename_all = "snake_case")]
-pub(crate) enum ScatterModeOptions {
-    Complex {
-        series: String,
-    },
-    TraceXy {
-        #[serde(rename = "traceXColumn")]
-        trace_x_column: String,
-        #[serde(rename = "traceYColumn")]
-        trace_y_column: String,
-    },
-    Xy {
-        #[serde(rename = "xColumn")]
-        x_column: String,
-        #[serde(rename = "yColumn")]
-        y_column: String,
-    },
-}
-
-#[derive(Debug, Clone, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ScatterChartDataOptions {
-    pub(crate) scatter: ScatterModeOptions,
-    #[serde(flatten)]
-    pub(crate) common: ChartCommonOptions,
-}
-
-#[derive(Debug, Clone, Deserialize, specta::Type)]
-#[serde(tag = "chartType", rename_all = "snake_case")]
+#[serde(tag = "view", rename_all = "snake_case")]
 pub(crate) enum DatasetChartDataOptions {
-    Line(LineChartDataOptions),
+    Xy(XYChartDataOptions),
     Heatmap(HeatmapChartDataOptions),
-    Scatter(ScatterChartDataOptions),
 }
 
 impl DatasetChartDataOptions {
     pub(crate) fn common(&self) -> &ChartCommonOptions {
         match self {
-            Self::Line(options) => &options.common,
+            Self::Xy(options) => &options.common,
             Self::Heatmap(options) => &options.common,
-            Self::Scatter(options) => &options.common,
         }
     }
 
-    pub(crate) const fn chart_type_name(&self) -> &'static str {
+    pub(crate) const fn view_name(&self) -> &'static str {
         match self {
-            Self::Line(_) => "line",
+            Self::Xy(_) => "xy",
             Self::Heatmap(_) => "heatmap",
-            Self::Scatter(_) => "scatter",
         }
     }
 }
@@ -115,16 +145,11 @@ pub(crate) struct FlatXYZSeries {
 
 #[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct LineChartSnapshot {
+pub(crate) struct XYChartSnapshot {
+    pub(crate) projection: XYProjection,
+    pub(crate) draw_style: XYDrawStyle,
     pub(crate) x_name: String,
-    pub(crate) series: Vec<FlatXYSeries>,
-}
-
-#[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ScatterChartSnapshot {
-    pub(crate) x_name: String,
-    pub(crate) y_name: String,
+    pub(crate) y_name: Option<String>,
     pub(crate) series: Vec<FlatXYSeries>,
 }
 
@@ -141,9 +166,8 @@ pub(crate) struct HeatmapChartSnapshot {
 #[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub(crate) enum ChartSnapshot {
-    Line(LineChartSnapshot),
+    Xy(XYChartSnapshot),
     Heatmap(HeatmapChartSnapshot),
-    Scatter(ScatterChartSnapshot),
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
@@ -249,12 +273,15 @@ pub(crate) fn complex_view_label(option: ComplexViewOption) -> &'static str {
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct LiveLineOptions {
-    pub(crate) series: String,
-    pub(crate) complex_views: Option<Vec<ComplexViewOption>>,
+pub(crate) struct LiveXYOptions {
+    pub(crate) draw_style: XYDrawStyle,
     pub(crate) tail_count: usize,
     #[specta(optional)]
     pub(crate) known_row_count: Option<usize>,
+    #[serde(flatten)]
+    pub(crate) projection: XYProjectionOptions,
+    #[serde(flatten)]
+    pub(crate) index_roles: XYIndexRoleOptions,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -267,28 +294,17 @@ pub(crate) struct LiveHeatmapOptions {
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct LiveScatterOptions {
-    pub(crate) scatter: ScatterModeOptions,
-    pub(crate) tail_count: usize,
-    #[specta(optional)]
-    pub(crate) known_row_count: Option<usize>,
-}
-
-#[derive(Debug, Clone, Deserialize, specta::Type)]
-#[serde(tag = "chartType", rename_all = "snake_case")]
+#[serde(tag = "view", rename_all = "snake_case")]
 pub(crate) enum LiveChartDataOptions {
-    Line(LiveLineOptions),
+    Xy(LiveXYOptions),
     Heatmap(LiveHeatmapOptions),
-    Scatter(LiveScatterOptions),
 }
 
 impl LiveChartDataOptions {
     pub(crate) const fn known_row_count(&self) -> Option<usize> {
         match self {
-            Self::Line(options) => options.known_row_count,
+            Self::Xy(options) => options.known_row_count,
             Self::Heatmap(options) => options.known_row_count,
-            Self::Scatter(options) => options.known_row_count,
         }
     }
 }

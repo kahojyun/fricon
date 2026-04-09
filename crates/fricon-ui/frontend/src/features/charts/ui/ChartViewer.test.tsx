@@ -199,18 +199,19 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const chartTypeTrigger = await getSelectTrigger("Chart Type");
-    await user.click(chartTypeTrigger);
-    await user.click(await screen.findByRole("option", { name: "heatmap" }));
+    const viewTrigger = await getSelectTrigger("View");
+    expect(viewTrigger).toHaveTextContent("XY");
+    await user.click(viewTrigger);
+    await user.click(await screen.findByRole("option", { name: "Heatmap" }));
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);
       const options = lastPayload?.options as {
-        chartType: string;
+        view: string;
         xColumn?: string | null;
         yColumn?: string;
       };
-      expect(options.chartType).toBe("heatmap");
+      expect(options.view).toBe("heatmap");
       expect(options.xColumn).toBeNull();
       expect(options.yColumn).toBe("idxB");
     });
@@ -329,7 +330,9 @@ describe("ChartViewer", () => {
           chartPayloads.push(payload as Record<string, unknown>);
         }
         return {
-          type: "scatter",
+          type: "xy",
+          projection: "complex_xy",
+          drawStyle: "points",
           xName: "c (real)",
           yName: "c (imag)",
           series: [{ id: "c", label: "c", pointCount: 1, values: [1, 2] }],
@@ -359,19 +362,21 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const chartTypeTrigger = await getSelectTrigger("Chart Type");
-    await user.click(chartTypeTrigger);
-    await user.click(await screen.findByRole("option", { name: "scatter" }));
+    const projectionTrigger = await getSelectTrigger("Projection");
+    await user.click(projectionTrigger);
+    await user.click(
+      await screen.findByRole("option", { name: "Complex Plane" }),
+    );
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);
       const options = lastPayload?.options as {
-        chartType: string;
-        scatter: { mode: string };
+        view: string;
+        projection: string;
         excludeColumns?: string[];
       };
-      expect(options.chartType).toBe("scatter");
-      expect(options.scatter.mode).toBe("complex");
+      expect(options.view).toBe("xy");
+      expect(options.projection).toBe("complex_xy");
       expect(options.excludeColumns).toEqual([]);
     });
 
@@ -389,8 +394,11 @@ describe("ChartViewer", () => {
           mode: "reset",
           row_count: 1,
           snapshot: {
-            type: "line",
+            type: "xy",
+            projection: "trend",
+            drawStyle: "line",
             xName: "t",
+            yName: null,
             series: [
               {
                 id: "sig:real",
@@ -429,14 +437,18 @@ describe("ChartViewer", () => {
     await waitFor(() => {
       const lastPayload = livePayloads.at(-1);
       const options = lastPayload?.options as {
-        chartType: string;
-        complexViews?: string[] | null;
+        view: string;
+        projection: string;
+        drawStyle?: string;
+        complex_views?: string[] | null;
       };
-      expect(options.chartType).toBe("line");
-      expect(options.complexViews).toEqual(["real", "imag"]);
+      expect(options.view).toBe("xy");
+      expect(options.projection).toBe("trend");
+      expect(options.drawStyle).toBe("line");
+      expect(options.complex_views).toEqual(["real", "imag"]);
     });
 
-    const magLabel = await screen.findByText("mag");
+    const magLabel = await screen.findByText("Magnitude");
     const magToggle =
       magLabel.parentElement?.querySelector('[role="checkbox"]');
     if (!(magToggle instanceof HTMLElement)) {
@@ -447,9 +459,9 @@ describe("ChartViewer", () => {
     await waitFor(() => {
       const lastPayload = livePayloads.at(-1);
       const options = lastPayload?.options as {
-        complexViews?: string[] | null;
+        complex_views?: string[] | null;
       };
-      expect(options.complexViews).toEqual(["real", "imag", "mag"]);
+      expect(options.complex_views).toEqual(["real", "imag", "mag"]);
     });
 
     clearMocks();

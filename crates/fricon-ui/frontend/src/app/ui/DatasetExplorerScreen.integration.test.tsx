@@ -235,39 +235,53 @@ describe("DatasetExplorerScreen integration", () => {
               payload as {
                 id?: number;
                 options?: {
-                  chartType?: string;
+                  view?: string;
+                  projection?: string;
                   series?: string;
-                  xColumn?: string;
+                  orderByIndexColumn?: string;
                 };
               } | null
             )?.id === 1 &&
             (
               payload as {
                 options?: {
-                  chartType?: string;
+                  view?: string;
+                  projection?: string;
                   series?: string;
-                  xColumn?: string;
+                  orderByIndexColumn?: string;
                 };
               } | null
-            )?.options?.chartType === "line" &&
+            )?.options?.view === "xy" &&
             (
               payload as {
                 options?: {
-                  chartType?: string;
+                  view?: string;
+                  projection?: string;
                   series?: string;
-                  xColumn?: string;
+                  orderByIndexColumn?: string;
+                };
+              } | null
+            )?.options?.projection === "trend" &&
+            (
+              payload as {
+                options?: {
+                  view?: string;
+                  projection?: string;
+                  series?: string;
+                  orderByIndexColumn?: string;
                 };
               } | null
             )?.options?.series === "signal" &&
             (
               payload as {
                 options?: {
-                  chartType?: string;
+                  view?: string;
+                  projection?: string;
                   series?: string;
-                  xColumn?: string;
+                  orderByIndexColumn?: string;
                 };
               } | null
-            )?.options?.xColumn === "t",
+            )?.options?.orderByIndexColumn === "t",
         ),
       ).toBe(true);
     });

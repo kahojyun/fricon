@@ -193,7 +193,7 @@ function buildHeatmapInstances(series: HeatmapSeries[]): {
     for (let i = 0; i < s.values.length; i += 3) {
       const value = s.values[i + 2];
       if (value === undefined || !Number.isFinite(value)) continue;
-      instances.push(s.values[i]!, s.values[i + 1]!, (value - min) / range);
+      instances.push(s.values[i], s.values[i + 1], (value - min) / range);
     }
   }
 

@@ -162,10 +162,13 @@ function HookHarness({
 
 function makeLineData(
   points: [number, number][],
-): Extract<ChartOptions, { type: "line" }> {
+): Extract<ChartOptions, { type: "xy" }> {
   return {
-    type: "line",
+    type: "xy",
+    projection: "trend",
+    drawStyle: "line",
     xName: "x",
+    yName: null,
     series: [xySeries("sig", "sig", points)],
   };
 }

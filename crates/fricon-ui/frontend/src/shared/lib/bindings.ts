@@ -66,7 +66,7 @@ export type ChartCommonOptions = {
 	excludeColumns: string[] | null,
 };
 
-export type ChartSnapshot = { type: "line" } & (LineChartSnapshot) | { type: "heatmap" } & (HeatmapChartSnapshot) | { type: "scatter" } & (ScatterChartSnapshot);
+export type ChartSnapshot = { type: "xy" } & (XYChartSnapshot) | { type: "heatmap" } & (HeatmapChartSnapshot);
 
 export type ColumnInfo = {
 	name: string,
@@ -109,7 +109,7 @@ export type DatasetChanged =
 // A global tag was deleted, renamed, or merged across all datasets.
 { kind: "globalTagsChanged" };
 
-export type DatasetChartDataOptions = { chartType: "line" } & (LineChartDataOptions) | { chartType: "heatmap" } & (HeatmapChartDataOptions) | { chartType: "scatter" } & (ScatterChartDataOptions);
+export type DatasetChartDataOptions = { view: "xy" } & (XYChartDataOptions) | { view: "heatmap" } & (HeatmapChartDataOptions);
 
 export type DatasetDeleteResult = {
 	id: number,
@@ -217,20 +217,9 @@ export type HeatmapChartSnapshot = {
 	series: FlatXYZSeries[],
 };
 
-export type LineChartDataOptions = {
-	series: string,
-	xColumn: string | null,
-	complexViews: ComplexViewOption[] | null,
-} & (ChartCommonOptions);
-
-export type LineChartSnapshot = {
-	xName: string,
-	series: FlatXYSeries[],
-};
-
 export type LiveChartAppendOperation = { kind: "append_points"; series_id: string; values: number[]; point_count: number } | { kind: "append_series"; series: FlatSeries } | { kind: "append_heatmap_categories"; x_categories: number[] | null; y_categories: number[] | null };
 
-export type LiveChartDataOptions = { chartType: "line" } & (LiveLineOptions) | { chartType: "heatmap" } & (LiveHeatmapOptions) | { chartType: "scatter" } & (LiveScatterOptions);
+export type LiveChartDataOptions = { view: "xy" } & (LiveXYOptions) | { view: "heatmap" } & (LiveHeatmapOptions);
 
 export type LiveChartDataResponse = { mode: "reset"; row_count: number; snapshot: ChartSnapshot } | { mode: "append"; row_count: number; ops: LiveChartAppendOperation[] };
 
@@ -240,36 +229,17 @@ export type LiveHeatmapOptions = {
 	knownRowCount?: number | null,
 };
 
-export type LiveLineOptions = {
-	series: string,
-	complexViews: ComplexViewOption[] | null,
+export type LiveXYOptions = {
+	drawStyle: XYDrawStyle,
 	tailCount: number,
 	knownRowCount?: number | null,
-};
-
-export type LiveScatterOptions = {
-	scatter: ScatterModeOptions,
-	tailCount: number,
-	knownRowCount?: number | null,
-};
+} & (XYProjectionOptions) & (XYIndexRoleOptions);
 
 export type Row = {
 	displayValues: string[],
 	valueIndices: number[],
 	index: number,
 };
-
-export type ScatterChartDataOptions = {
-	scatter: ScatterModeOptions,
-} & (ChartCommonOptions);
-
-export type ScatterChartSnapshot = {
-	xName: string,
-	yName: string,
-	series: FlatXYSeries[],
-};
-
-export type ScatterModeOptions = { mode: "complex"; series: string } | { mode: "trace_xy"; traceXColumn: string; traceYColumn: string } | { mode: "xy"; xColumn: string; yColumn: string };
 
 export type TableData = {
 	fields: string[],
@@ -317,6 +287,29 @@ export type UiSortDirection = "asc" | "desc";
 export type WorkspaceInfo = {
 	path: string,
 };
+
+export type XYChartDataOptions = {
+	drawStyle: XYDrawStyle,
+} & (XYProjectionOptions) & (XYIndexRoleOptions) & (ChartCommonOptions);
+
+export type XYChartSnapshot = {
+	projection: XYProjection,
+	drawStyle: XYDrawStyle,
+	xName: string,
+	yName: string | null,
+	series: FlatXYSeries[],
+};
+
+export type XYDrawStyle = "line" | "points" | "line_points";
+
+export type XYIndexRoleOptions = {
+	groupByIndexColumns?: string[] | null,
+	orderByIndexColumn?: string | null,
+};
+
+export type XYProjection = "trend" | "xy" | "complex_xy";
+
+export type XYProjectionOptions = { projection: "trend"; series: string; complex_views: ComplexViewOption[] | null } | { projection: "xy"; xColumn: string; yColumn: string } | { projection: "complex_xy"; series: string };
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

@@ -1,6 +1,6 @@
 /**
- * Scatter chart renderer — draws multi-series scatter plots via GL_POINTS.
- * Consumes ChartOptions (type="scatter") and renders into a WebGL2 context.
+ * XY point renderer — draws multi-series scatter plots via GL_POINTS.
+ * Consumes ChartOptions (type="xy") and renders into a WebGL2 context.
  */
 
 import type { ChartOptions, ChartSeries } from "@/shared/lib/chartTypes";
@@ -105,7 +105,7 @@ export function drawScatter(
   gl: WebGL2RenderingContext,
   state: ScatterRenderState,
   matrix: Float32Array,
-  data: Extract<ChartOptions, { type: "scatter" }>,
+  data: Extract<ChartOptions, { type: "xy" }>,
   liveMode: boolean,
 ): void {
   const { program, seriesBuffers, uMatrix, uColor, uPointSize, aPosition } =
@@ -171,8 +171,8 @@ export function scatterDataBounds(series: ChartSeries[]): {
     yMax = -Infinity;
   for (const s of series) {
     for (let i = 0; i < s.values.length; i += 2) {
-      const x = s.values[i]!;
-      const y = s.values[i + 1]!;
+      const x = s.values[i];
+      const y = s.values[i + 1];
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       if (x < xMin) xMin = x;
       if (x > xMax) xMax = x;

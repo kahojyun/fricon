@@ -209,7 +209,9 @@ mod tests {
     fn heatmap_snapshot(snapshot: ChartSnapshot) -> HeatmapChartSnapshot {
         match snapshot {
             ChartSnapshot::Heatmap(snapshot) => snapshot,
-            other => panic!("expected heatmap snapshot, got {other:?}"),
+            other @ ChartSnapshot::Xy(_) => {
+                panic!("expected heatmap snapshot, got {other:?}")
+            }
         }
     }
 

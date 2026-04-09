@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { LiveChartDataOptions } from "@/shared/lib/bindings";
-import type { ChartModel } from "@/shared/lib/chartTypes";
 import { fetchLiveChartData } from "./client";
 import { chartKeys } from "./queryKeys";
+import type { LiveChartDataOptions } from "./types";
 import {
   applyLiveChartUpdate,
   type LiveChartState,
@@ -13,37 +12,32 @@ export function useLiveChartDataQuery(
   datasetId: number,
   options: LiveChartDataOptions | null,
 ) {
-  const liveStateRef = useRef<LiveChartState | null>(null);
-  const [chartData, setChartData] = useState<ChartModel | undefined>(undefined);
+  const liveStateRef = useRef<{
+    requestKey: string;
+    state: LiveChartState | null;
+  } | null>(null);
   const optionsKey = JSON.stringify(options);
-
-  useEffect(() => {
-    liveStateRef.current = null;
-    setChartData(undefined);
-  }, [datasetId, optionsKey]);
+  const requestKey = `${datasetId}:${optionsKey}`;
 
   const query = useQuery({
     queryKey: [...chartKeys.liveChartData(datasetId), options],
-    queryFn: () =>
-      fetchLiveChartData(
+    queryFn: async () => {
+      const previousState =
+        liveStateRef.current?.requestKey === requestKey
+          ? liveStateRef.current.state
+          : null;
+      const update = await fetchLiveChartData(
         datasetId,
         options!,
-        liveStateRef.current?.rowCount ?? null,
-      ),
+        previousState?.rowCount ?? null,
+      );
+      const nextState = applyLiveChartUpdate(previousState, update);
+      liveStateRef.current = { requestKey, state: nextState };
+      return nextState?.chart;
+    },
     enabled: Boolean(options),
     refetchInterval: 1000,
   });
 
-  useEffect(() => {
-    if (!query.data) return;
-    const nextState = applyLiveChartUpdate(liveStateRef.current, query.data);
-    if (!nextState) return;
-    liveStateRef.current = nextState;
-    setChartData(nextState.chart);
-  }, [query.data]);
-
-  return {
-    ...query,
-    data: chartData,
-  };
+  return query;
 }

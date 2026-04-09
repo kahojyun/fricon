@@ -9,14 +9,17 @@ import type {
   FlatXYSeries as WireFlatXYSeries,
   FlatXYZSeries as WireFlatXYZSeries,
   LiveChartAppendOperation as WireLiveChartAppendOperation,
-  LiveChartDataResponse as WireLiveChartResponse,
   LiveChartDataOptions as WireLiveChartDataOptions,
+  LiveChartDataResponse as WireLiveChartResponse,
   Row as FilterTableRow,
-  ScatterModeOptions as WireScatterModeOptions,
   TableData as WireFilterTableData,
   UiDatasetStatus as DatasetStatus,
 } from "@/shared/lib/bindings";
-import type { ChartModel, ComplexViewOption } from "@/shared/lib/chartTypes";
+import type {
+  ChartModel,
+  ComplexViewOption,
+  XYDrawStyle,
+} from "@/shared/lib/chartTypes";
 
 export type {
   ColumnInfo,
@@ -25,7 +28,6 @@ export type {
   DatasetWriteStatus,
   FilterTableOptions,
   FilterTableRow,
-  WireLiveChartDataOptions as LiveChartDataOptions,
 };
 
 export interface DatasetDetail {
@@ -49,26 +51,57 @@ interface BaseChartDataOptions {
   excludeColumns?: string[];
 }
 
+interface XYRoleOptions {
+  groupByIndexColumns?: string[];
+  orderByIndexColumn?: string | null;
+}
+
+interface TrendProjectionOptions {
+  projection: "trend";
+  series: string;
+  complexViews?: ComplexViewOption[];
+}
+
+type XYProjectionOptions =
+  | TrendProjectionOptions
+  | {
+      projection: "xy";
+      xColumn: string;
+      yColumn: string;
+    }
+  | {
+      projection: "complex_xy";
+      series: string;
+    };
+
 export type ChartDataOptions =
   | (BaseChartDataOptions & {
-      chartType: "line";
-      series: string;
-      xColumn?: string;
-      complexViews?: ComplexViewOption[];
-    })
+      view: "xy";
+      drawStyle: XYDrawStyle;
+    } & XYRoleOptions &
+      XYProjectionOptions)
   | (BaseChartDataOptions & {
-      chartType: "heatmap";
+      view: "heatmap";
       series: string;
       xColumn?: string;
       yColumn: string;
       complexViewSingle?: ComplexViewOption;
-    })
-  | (BaseChartDataOptions & {
-      chartType: "scatter";
-      scatter: ScatterModeOptions;
     });
 
-export type ScatterModeOptions = WireScatterModeOptions;
+export type LiveChartDataOptions =
+  | ({
+      view: "xy";
+      drawStyle: XYDrawStyle;
+      tailCount: number;
+      knownRowCount?: number | null;
+    } & XYRoleOptions &
+      XYProjectionOptions)
+  | {
+      view: "heatmap";
+      series: string;
+      complexViewSingle?: ComplexViewOption;
+      knownRowCount?: number | null;
+    };
 
 export type LiveChartAppendOperation =
   | {
@@ -110,22 +143,9 @@ export type LiveChartUpdate =
 export function toWireChartOptions(
   options: ChartDataOptions,
 ): WireChartDataOptions {
-  if (options.chartType === "line") {
+  if (options.view === "heatmap") {
     return {
-      chartType: "line",
-      series: options.series,
-      xColumn: options.xColumn ?? null,
-      complexViews: options.complexViews ?? null,
-      start: options.start ?? null,
-      end: options.end ?? null,
-      indexFilters: options.indexFilters ?? null,
-      excludeColumns: options.excludeColumns ?? null,
-    };
-  }
-
-  if (options.chartType === "heatmap") {
-    return {
-      chartType: "heatmap",
+      view: "heatmap",
       series: options.series,
       xColumn: options.xColumn ?? null,
       yColumn: options.yColumn,
@@ -137,30 +157,12 @@ export function toWireChartOptions(
     };
   }
 
-  const scatter = (() => {
-    if (options.scatter.mode === "complex") {
-      return {
-        mode: "complex" as const,
-        series: options.scatter.series,
-      };
-    }
-    if (options.scatter.mode === "trace_xy") {
-      return {
-        mode: "trace_xy" as const,
-        traceXColumn: options.scatter.traceXColumn,
-        traceYColumn: options.scatter.traceYColumn,
-      };
-    }
-    return {
-      mode: "xy" as const,
-      xColumn: options.scatter.xColumn,
-      yColumn: options.scatter.yColumn,
-    };
-  })();
-
   return {
-    chartType: "scatter",
-    scatter,
+    view: "xy",
+    drawStyle: options.drawStyle,
+    ...toWireXYProjection(options),
+    groupByIndexColumns: options.groupByIndexColumns ?? null,
+    orderByIndexColumn: options.orderByIndexColumn ?? null,
     start: options.start ?? null,
     end: options.end ?? null,
     indexFilters: options.indexFilters ?? null,
@@ -168,15 +170,30 @@ export function toWireChartOptions(
   };
 }
 
-export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
-  if (result.type === "line") {
+export function toWireLiveChartOptions(
+  options: LiveChartDataOptions,
+): WireLiveChartDataOptions {
+  if (options.view === "heatmap") {
     return {
-      type: "line",
-      xName: result.xName,
-      series: result.series.map(normalizeXYSeries),
+      view: "heatmap",
+      series: options.series,
+      complexViewSingle: options.complexViewSingle ?? null,
+      knownRowCount: options.knownRowCount ?? null,
     };
   }
 
+  return {
+    view: "xy",
+    drawStyle: options.drawStyle,
+    tailCount: options.tailCount,
+    knownRowCount: options.knownRowCount ?? null,
+    groupByIndexColumns: options.groupByIndexColumns ?? null,
+    orderByIndexColumn: options.orderByIndexColumn ?? null,
+    ...toWireXYProjection(options),
+  };
+}
+
+export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
   if (result.type === "heatmap") {
     return {
       type: "heatmap",
@@ -189,7 +206,9 @@ export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
   }
 
   return {
-    type: "scatter",
+    type: "xy",
+    projection: result.projection,
+    drawStyle: result.drawStyle,
     xName: result.xName,
     yName: result.yName,
     series: result.series.map(normalizeXYSeries),
@@ -228,6 +247,42 @@ export function normalizeFilterTableData(
     rows: result.rows,
     columnUniqueValues,
   };
+}
+
+function toWireXYProjection(options: XYProjectionOptions):
+  | {
+      projection: "trend";
+      series: string;
+      complex_views: ComplexViewOption[] | null;
+    }
+  | {
+      projection: "xy";
+      xColumn: string;
+      yColumn: string;
+    }
+  | {
+      projection: "complex_xy";
+      series: string;
+    } {
+  switch (options.projection) {
+    case "trend":
+      return {
+        projection: "trend",
+        series: options.series,
+        complex_views: options.complexViews ?? null,
+      };
+    case "xy":
+      return {
+        projection: "xy",
+        xColumn: options.xColumn,
+        yColumn: options.yColumn,
+      };
+    case "complex_xy":
+      return {
+        projection: "complex_xy",
+        series: options.series,
+      };
+  }
 }
 
 function normalizeXYSeries(series: WireFlatXYSeries) {

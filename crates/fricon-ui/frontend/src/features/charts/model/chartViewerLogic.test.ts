@@ -28,16 +28,18 @@ function makeState(
   overrides: Partial<ChartViewerSelectionState> = {},
 ): ChartViewerSelectionState {
   return {
-    chartType: "line",
-    seriesName: null,
-    xColumnName: null,
-    yColumnName: null,
-    scatterMode: "complex",
-    scatterSeriesName: null,
-    scatterTraceXName: null,
-    scatterTraceYName: null,
-    scatterXName: null,
-    scatterYName: null,
+    view: "xy",
+    projection: "trend",
+    drawStyle: "line",
+    trendSeriesName: null,
+    heatmapSeriesName: null,
+    complexXYSeriesName: null,
+    xyXName: null,
+    xyYName: null,
+    heatmapXName: null,
+    heatmapYName: null,
+    groupByIndexColumnNames: [],
+    orderByIndexColumnName: null,
     ...overrides,
   };
 }
@@ -61,7 +63,7 @@ function makeFilterTableData(): FilterTableData {
 }
 
 describe("chartViewerLogic", () => {
-  it("selects trailing index columns as default X/Y", () => {
+  it("defaults trend ordering to the trailing index column", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -70,25 +72,25 @@ describe("chartViewerLogic", () => {
 
     const derived = deriveChartViewerState(columns, makeState());
 
-    expect(derived.effectiveXColumnName).toBe("idxB");
-    expect(derived.effectiveYColumnName).toBe("idxA");
+    expect(derived.effectiveOrderByIndexColumnName).toBe("idxB");
   });
 
-  it("falls back scatter mode to available option", () => {
+  it("falls back projection to available option", () => {
     const columns = [makeColumn({ name: "c", isComplex: true })];
 
     const derived = deriveChartViewerState(
       columns,
-      makeState({ chartType: "scatter", scatterMode: "trace_xy" }),
+      makeState({ projection: "xy" }),
     );
 
-    expect(derived.effectiveScatterMode).toBe("complex");
-    expect(derived.scatterModeOptions.map((item) => item.value)).toEqual([
-      "complex",
+    expect(derived.effectiveProjection).toBe("trend");
+    expect(derived.availableProjections.map((item) => item.value)).toEqual([
+      "trend",
+      "complex_xy",
     ]);
   });
 
-  it("does not add scatter exclusion columns for xy mode", () => {
+  it("excludes explicit index roles from filter-table columns", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -98,10 +100,17 @@ describe("chartViewerLogic", () => {
 
     const derived = deriveChartViewerState(
       columns,
-      makeState({ chartType: "scatter", scatterMode: "xy" }),
+      makeState({
+        projection: "xy",
+        drawStyle: "line_points",
+        xyXName: "xVal",
+        xyYName: "yVal",
+        groupByIndexColumnNames: ["idxA"],
+        orderByIndexColumnName: "idxB",
+      }),
     );
 
-    expect(derived.excludeColumns).toEqual([]);
+    expect(derived.excludeColumns).toEqual(["idxA", "idxB"]);
   });
 
   it("returns null request when filters exist but no resolved row", () => {
@@ -125,7 +134,7 @@ describe("chartViewerLogic", () => {
     expect(request).toBeNull();
   });
 
-  it("builds scatter xy request without legacy bin exclusion", () => {
+  it("builds scalar XY requests with explicit group/order roles", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -134,7 +143,14 @@ describe("chartViewerLogic", () => {
     ];
     const derived = deriveChartViewerState(
       columns,
-      makeState({ chartType: "scatter", scatterMode: "xy" }),
+      makeState({
+        projection: "xy",
+        drawStyle: "line_points",
+        xyXName: "xVal",
+        xyYName: "yVal",
+        groupByIndexColumnNames: ["idxA"],
+        orderByIndexColumnName: "idxB",
+      }),
     );
     const filterRow: FilterTableRow = {
       index: 1,
@@ -154,14 +170,15 @@ describe("chartViewerLogic", () => {
     });
 
     expect(request).toEqual({
-      chartType: "scatter",
-      scatter: {
-        mode: "xy",
-        xColumn: "xVal",
-        yColumn: "yVal",
-      },
+      view: "xy",
+      projection: "xy",
+      drawStyle: "line_points",
+      xColumn: "xVal",
+      yColumn: "yVal",
+      groupByIndexColumns: ["idxA"],
+      orderByIndexColumn: "idxB",
       indexFilters: [1],
-      excludeColumns: [],
+      excludeColumns: ["idxA", "idxB"],
     });
   });
 });

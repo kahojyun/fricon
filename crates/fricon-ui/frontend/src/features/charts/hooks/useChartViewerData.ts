@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type {
   ChartViewerAvailability,
   DatasetDetail,
-  ScatterModeOptions,
+  LiveChartDataOptions,
 } from "../api/types";
 import type { ComplexViewOption } from "@/shared/lib/chartTypes";
 import { useChartDataQuery } from "../api/useChartDataQuery";
@@ -17,30 +17,79 @@ import {
   deriveChartViewerState,
 } from "../model/chartViewerLogic";
 
-function buildScatterModeOptions(
+function buildLiveChartRequest(
   derived: ReturnType<typeof deriveChartViewerState>,
-): ScatterModeOptions | null {
-  if (derived.effectiveScatterMode === "complex" && derived.scatterSeries) {
-    return { mode: "complex", series: derived.scatterSeries.name };
+  selectedComplexView: ComplexViewOption[],
+  selectedComplexViewSingle: ComplexViewOption,
+): LiveChartDataOptions | null {
+  const tailCount = 5;
+
+  if (derived.effectiveView === "heatmap" && derived.heatmapSeries) {
+    return {
+      view: "heatmap",
+      series: derived.heatmapSeries.name,
+      complexViewSingle: derived.heatmapSeries.isComplex
+        ? selectedComplexViewSingle
+        : undefined,
+    };
   }
+
+  if (derived.effectiveView !== "xy" || !derived.effectiveDrawStyle) {
+    return null;
+  }
+
+  const roleOptions = derived.xyRoleControlsVisible
+    ? {
+        groupByIndexColumns:
+          derived.effectiveGroupByIndexColumnNames.length > 0
+            ? derived.effectiveGroupByIndexColumnNames
+            : undefined,
+        orderByIndexColumn:
+          derived.effectiveOrderByIndexColumnName ?? undefined,
+      }
+    : {};
+
+  if (derived.effectiveProjection === "trend" && derived.trendSeries) {
+    return {
+      view: "xy",
+      projection: "trend",
+      drawStyle: derived.effectiveDrawStyle,
+      series: derived.trendSeries.name,
+      complexViews: derived.trendSeries.isComplex
+        ? selectedComplexView
+        : undefined,
+      tailCount,
+      ...roleOptions,
+    };
+  }
+
   if (
-    derived.effectiveScatterMode === "trace_xy" &&
-    derived.scatterTraceXColumn &&
-    derived.scatterTraceYColumn
+    derived.effectiveProjection === "xy" &&
+    derived.xyXColumn &&
+    derived.xyYColumn
   ) {
     return {
-      mode: "trace_xy",
-      traceXColumn: derived.scatterTraceXColumn.name,
-      traceYColumn: derived.scatterTraceYColumn.name,
+      view: "xy",
+      projection: "xy",
+      drawStyle: derived.effectiveDrawStyle,
+      xColumn: derived.xyXColumn.name,
+      yColumn: derived.xyYColumn.name,
+      tailCount,
+      ...roleOptions,
     };
   }
-  if (derived.scatterXColumn && derived.scatterYColumn) {
+
+  if (derived.effectiveProjection === "complex_xy" && derived.complexXYSeries) {
     return {
-      mode: "xy",
-      xColumn: derived.scatterXColumn.name,
-      yColumn: derived.scatterYColumn.name,
+      view: "xy",
+      projection: "complex_xy",
+      drawStyle: derived.effectiveDrawStyle,
+      series: derived.complexXYSeries.name,
+      tailCount,
+      ...roleOptions,
     };
   }
+
   return null;
 }
 
@@ -93,43 +142,14 @@ export function useChartViewerData({
     }
   }, [queryClient, datasetId, writeStatus.data?.rowCount]);
 
-  // Build live chart request when in live mode
-  const liveChartRequest = (() => {
-    if (!isLiveMode || !queriesEnabled) return null;
-
-    const tailCount = 5;
-
-    if (derived.effectiveChartType === "line" && derived.series) {
-      return {
-        chartType: "line" as const,
-        series: derived.series.name,
-        complexViews: derived.series.isComplex ? selectedComplexView : null,
-        tailCount,
-      };
-    }
-
-    if (derived.effectiveChartType === "heatmap" && derived.series) {
-      return {
-        chartType: "heatmap" as const,
-        series: derived.series.name,
-        complexViewSingle: derived.series.isComplex
-          ? (selectedComplexViewSingle ?? "mag")
-          : null,
-      };
-    }
-
-    if (derived.effectiveChartType === "scatter") {
-      const scatter = buildScatterModeOptions(derived);
-      if (!scatter) return null;
-      return {
-        chartType: "scatter" as const,
-        scatter,
-        tailCount,
-      };
-    }
-
-    return null;
-  })();
+  const liveChartRequest =
+    isLiveMode && queriesEnabled
+      ? buildLiveChartRequest(
+          derived,
+          selectedComplexView,
+          selectedComplexViewSingle,
+        )
+      : null;
 
   const liveChartQuery = useLiveChartDataQuery(
     datasetId,

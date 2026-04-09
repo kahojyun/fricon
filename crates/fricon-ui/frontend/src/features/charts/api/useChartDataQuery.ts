@@ -12,28 +12,14 @@ function buildChartDataKey(
   }
 
   const common = {
-    chartType: options.chartType,
+    view: options.view,
     indexFilters: options.indexFilters ?? null,
     excludeColumns: options.excludeColumns
       ? [...options.excludeColumns].sort()
       : null,
   };
 
-  if (options.chartType === "line") {
-    return [
-      ...chartKeys.chartData(datasetId),
-      {
-        ...common,
-        series: options.series,
-        xColumn: options.xColumn ?? null,
-        complexViews: options.complexViews
-          ? [...options.complexViews].sort()
-          : null,
-      },
-    ] as const;
-  }
-
-  if (options.chartType === "heatmap") {
+  if (options.view === "heatmap") {
     return [
       ...chartKeys.chartData(datasetId),
       {
@@ -46,27 +32,52 @@ function buildChartDataKey(
     ] as const;
   }
 
-  return [
-    ...chartKeys.chartData(datasetId),
-    {
-      ...common,
-      scatter: {
-        mode: options.scatter.mode,
-        series:
-          options.scatter.mode === "complex" ? options.scatter.series : null,
-        xColumn: options.scatter.mode === "xy" ? options.scatter.xColumn : null,
-        yColumn: options.scatter.mode === "xy" ? options.scatter.yColumn : null,
-        traceXColumn:
-          options.scatter.mode === "trace_xy"
-            ? options.scatter.traceXColumn
+  const roleOptions = {
+    groupByIndexColumns: options.groupByIndexColumns
+      ? [...options.groupByIndexColumns].sort()
+      : null,
+    orderByIndexColumn: options.orderByIndexColumn ?? null,
+  };
+
+  switch (options.projection) {
+    case "trend":
+      return [
+        ...chartKeys.chartData(datasetId),
+        {
+          ...common,
+          ...roleOptions,
+          drawStyle: options.drawStyle,
+          projection: "trend",
+          series: options.series,
+          complexViews: options.complexViews
+            ? [...options.complexViews].sort()
             : null,
-        traceYColumn:
-          options.scatter.mode === "trace_xy"
-            ? options.scatter.traceYColumn
-            : null,
-      },
-    },
-  ] as const;
+        },
+      ] as const;
+    case "xy":
+      return [
+        ...chartKeys.chartData(datasetId),
+        {
+          ...common,
+          ...roleOptions,
+          drawStyle: options.drawStyle,
+          projection: "xy",
+          xColumn: options.xColumn,
+          yColumn: options.yColumn,
+        },
+      ] as const;
+    case "complex_xy":
+      return [
+        ...chartKeys.chartData(datasetId),
+        {
+          ...common,
+          ...roleOptions,
+          drawStyle: options.drawStyle,
+          projection: "complex_xy",
+          series: options.series,
+        },
+      ] as const;
+  }
 }
 
 export function useChartDataQuery(

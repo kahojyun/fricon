@@ -1,6 +1,8 @@
-export type ChartType = "line" | "heatmap" | "scatter";
+export type ChartView = "xy" | "heatmap";
 
-export type ScatterMode = "complex" | "trace_xy" | "xy";
+export type XYProjection = "trend" | "xy" | "complex_xy";
+
+export type XYDrawStyle = "line" | "points" | "line_points";
 
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg";
 
@@ -18,28 +20,35 @@ export interface HeatmapSeries {
   pointCount: number;
 }
 
-export type ChartModel =
-  | {
-      type: "line";
-      xName: string;
-      series: ChartSeries[];
-    }
-  | {
-      type: "heatmap";
-      xName: string;
-      yName: string;
-      xCategories: number[];
-      yCategories: number[];
-      series: HeatmapSeries[];
-    }
-  | {
-      type: "scatter";
-      xName: string;
-      yName: string;
-      series: ChartSeries[];
-    };
+export interface XYChartModel {
+  type: "xy";
+  projection: XYProjection;
+  drawStyle: XYDrawStyle;
+  xName: string;
+  yName: string | null;
+  series: ChartSeries[];
+}
+
+export interface HeatmapChartModel {
+  type: "heatmap";
+  xName: string;
+  yName: string;
+  xCategories: number[];
+  yCategories: number[];
+  series: HeatmapSeries[];
+}
+
+export type ChartModel = XYChartModel | HeatmapChartModel;
 
 export type ChartOptions = ChartModel;
+
+export function xyDrawStyleIncludesLine(style: XYDrawStyle) {
+  return style === "line" || style === "line_points";
+}
+
+export function xyDrawStyleIncludesPoints(style: XYDrawStyle) {
+  return style === "points" || style === "line_points";
+}
 
 export function getXYPoint(series: ChartSeries, index: number) {
   const offset = index * 2;

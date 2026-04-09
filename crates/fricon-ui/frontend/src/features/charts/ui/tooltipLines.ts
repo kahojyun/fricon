@@ -17,7 +17,7 @@ export function getTooltipLines(
   chartWidth: number,
   chartHeight: number,
 ): string[] {
-  if (data.type === "line" && interactionState.type === "line") {
+  if (data.type === "xy" && interactionState.type === "xy") {
     const dataX = invertZoomedLinearRange(
       chartX,
       interactionState.zoomState.translateX,
@@ -29,55 +29,21 @@ export function getTooltipLines(
     );
 
     return data.series.flatMap((series) => {
-      const nearest = findNearestX(series, dataX);
+      const nearest =
+        data.projection === "trend"
+          ? findNearestX(series, dataX)
+          : findNearestPoint(
+              series,
+              interactionState,
+              chartX,
+              chartY,
+              chartWidth,
+              chartHeight,
+            );
       return nearest
         ? [`${series.label}: (${fmt(nearest.x)}, ${fmt(nearest.y)})`]
         : [];
     });
-  }
-
-  if (data.type === "scatter" && interactionState.type === "scatter") {
-    let bestDist = Infinity;
-    let bestSeries = "";
-    let bestPoint: { x: number; y: number } | null = null;
-
-    for (const series of data.series) {
-      for (let i = 0; i < series.pointCount; i++) {
-        const pt = getXYPoint(series, i);
-        const px =
-          interactionState.zoomState.translateX +
-          projectLinearRange(
-            pt.x,
-            interactionState.xMin,
-            interactionState.xMax,
-            0,
-            chartWidth,
-          ) *
-            interactionState.zoomState.scaleX;
-        const py =
-          interactionState.zoomState.translateY +
-          projectLinearRange(
-            pt.y,
-            interactionState.yMin,
-            interactionState.yMax,
-            chartHeight,
-            0,
-          ) *
-            interactionState.zoomState.scaleY;
-        const dx = px - chartX;
-        const dy = py - chartY;
-        const dist = dx * dx + dy * dy;
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestSeries = series.label;
-          bestPoint = pt;
-        }
-      }
-    }
-
-    return bestPoint && Math.sqrt(bestDist) < 20
-      ? [`${bestSeries}: (${fmt(bestPoint.x)}, ${fmt(bestPoint.y)})`]
-      : [];
   }
 
   if (data.type === "heatmap" && interactionState.type === "heatmap") {
@@ -130,6 +96,51 @@ function findNearestX(
     }
   }
   return getXYPoint(series, best);
+}
+
+function findNearestPoint(
+  series: import("@/shared/lib/chartTypes").ChartSeries,
+  interactionState: Extract<ChartInteractionState, { type: "xy" }>,
+  chartX: number,
+  chartY: number,
+  chartWidth: number,
+  chartHeight: number,
+) {
+  let bestDist = Infinity;
+  let bestPoint: { x: number; y: number } | null = null;
+
+  for (let i = 0; i < series.pointCount; i++) {
+    const pt = getXYPoint(series, i);
+    const px =
+      interactionState.zoomState.translateX +
+      projectLinearRange(
+        pt.x,
+        interactionState.xMin,
+        interactionState.xMax,
+        0,
+        chartWidth,
+      ) *
+        interactionState.zoomState.scaleX;
+    const py =
+      interactionState.zoomState.translateY +
+      projectLinearRange(
+        pt.y,
+        interactionState.yMin,
+        interactionState.yMax,
+        chartHeight,
+        0,
+      ) *
+        interactionState.zoomState.scaleY;
+    const dx = px - chartX;
+    const dy = py - chartY;
+    const dist = dx * dx + dy * dy;
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestPoint = pt;
+    }
+  }
+
+  return bestPoint && Math.sqrt(bestDist) < 20 ? bestPoint : null;
 }
 
 function findHeatmapCellValue(

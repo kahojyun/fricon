@@ -30,6 +30,30 @@ interface ChartViewerControlsProps {
   datasetStatus?: DatasetStatus;
 }
 
+const viewLabels = {
+  xy: "XY",
+  heatmap: "Heatmap",
+} as const;
+
+const projectionLabels = {
+  trend: "Trend",
+  xy: "X-Y",
+  complex_xy: "Complex Plane",
+} as const;
+
+const drawStyleLabels = {
+  line: "Line",
+  points: "Points",
+  line_points: "Line + Points",
+} as const;
+
+const complexViewLabels = {
+  real: "Real",
+  imag: "Imaginary",
+  mag: "Magnitude",
+  arg: "Phase",
+} as const;
+
 export function ChartViewerControls({
   derived,
   controlState,
@@ -39,43 +63,21 @@ export function ChartViewerControls({
   const { selectedComplexView, selectedComplexViewSingle, isLiveMode } =
     controlState;
   const {
-    setChartType,
-    setSeriesName,
-    setXColumnName,
-    setYColumnName,
-    setScatterMode,
-    setScatterSeriesName,
-    setScatterTraceXName,
-    setScatterTraceYName,
-    setScatterXName,
-    setScatterYName,
+    setView,
+    setProjection,
+    setDrawStyle,
+    setTrendSeriesName,
+    setHeatmapSeriesName,
+    setComplexXYSeriesName,
+    setXYXName,
+    setXYYName,
+    setHeatmapXName,
+    setHeatmapYName,
+    toggleGroupByIndexColumnName,
+    setOrderByIndexColumnName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
   } = actions;
-
-  const {
-    availableChartTypes,
-    complexControlsDisabled,
-    effectiveChartType,
-    effectiveScatterMode,
-    effectiveScatterSeriesName,
-    effectiveScatterTraceXName,
-    effectiveScatterTraceYName,
-    effectiveScatterXName,
-    effectiveScatterYName,
-    effectiveSeriesName,
-    effectiveXColumnName,
-    effectiveYColumnName,
-    isTraceSeries,
-    scatterComplexOptions,
-    scatterModeOptions,
-    scatterTraceXYOptions,
-    scatterXYOptions,
-    series,
-    seriesOptions,
-    xColumnOptions,
-    yColumnOptions,
-  } = derived;
 
   return (
     <>
@@ -102,42 +104,111 @@ export function ChartViewerControls({
         ) : null}
 
         <div className="min-w-40">
-          <Label className="mb-1 block">Chart Type</Label>
+          <Label className="mb-1 block">View</Label>
           <Select
-            value={effectiveChartType}
+            value={derived.effectiveView}
             onValueChange={(value) => {
-              if (value) {
-                setChartType(value);
+              if (value === "xy" || value === "heatmap") {
+                setView(value);
               }
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select chart type" />
+              <SelectValue placeholder="Select view">
+                {viewLabels[derived.effectiveView]}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {availableChartTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
+              {derived.availableViews.map((view) => (
+                <SelectItem key={view} value={view}>
+                  {viewLabels[view]}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {effectiveChartType !== "scatter" ? (
-          <div className="min-w-45">
+        {derived.effectiveView === "xy" ? (
+          <>
+            <div className="min-w-40">
+              <Label className="mb-1 block">Projection</Label>
+              <Select
+                value={derived.effectiveProjection}
+                onValueChange={(value) => {
+                  if (
+                    value === "trend" ||
+                    value === "xy" ||
+                    value === "complex_xy"
+                  ) {
+                    setProjection(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select projection">
+                    {projectionLabels[derived.effectiveProjection]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {derived.availableProjections.map((projection) => (
+                    <SelectItem key={projection.value} value={projection.value}>
+                      {projection.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="min-w-40">
+              <Label className="mb-1 block">Style</Label>
+              <Select
+                value={derived.effectiveDrawStyle ?? "line"}
+                onValueChange={(value) => {
+                  if (
+                    value === "line" ||
+                    value === "points" ||
+                    value === "line_points"
+                  ) {
+                    setDrawStyle(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select style">
+                    {derived.effectiveDrawStyle
+                      ? drawStyleLabels[derived.effectiveDrawStyle]
+                      : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {derived.drawStyleOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        ) : null}
+
+        {derived.effectiveView === "xy" &&
+        derived.effectiveProjection === "trend" ? (
+          <div className="min-w-50">
             <Label className="mb-1 block">Series</Label>
             <Select
-              value={effectiveSeriesName ?? ""}
+              value={derived.effectiveTrendSeriesName ?? ""}
               onValueChange={(value) =>
-                setSeriesName(value === "" ? null : value)
+                setTrendSeriesName(value === "" ? null : value)
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select series" />
+                <SelectValue placeholder="Select series">
+                  {derived.effectiveTrendSeriesName ?? undefined}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {seriesOptions.map((option: ColumnInfo) => (
+                {derived.trendSeriesOptions.map((option: ColumnInfo) => (
                   <SelectItem key={option.name} value={option.name}>
                     {option.name}
                   </SelectItem>
@@ -147,126 +218,24 @@ export function ChartViewerControls({
           </div>
         ) : null}
 
-        {effectiveChartType !== "scatter" &&
-        (effectiveChartType === "line" ||
-          (effectiveChartType === "heatmap" && !series?.isTrace)) ? (
-          <div className="min-w-40">
-            <Label className="mb-1 block">X</Label>
-            <Select
-              disabled={effectiveChartType === "line" && isTraceSeries}
-              value={effectiveXColumnName ?? ""}
-              onValueChange={(value) =>
-                setXColumnName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger
-                className="w-full"
-                disabled={effectiveChartType === "line" && isTraceSeries}
-              >
-                <SelectValue placeholder="Select X" />
-              </SelectTrigger>
-              <SelectContent>
-                {xColumnOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "heatmap" ? (
-          <div className="min-w-40">
-            <Label className="mb-1 block">Y</Label>
-            <Select
-              value={effectiveYColumnName ?? ""}
-              onValueChange={(value) =>
-                setYColumnName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Y" />
-              </SelectTrigger>
-              <SelectContent>
-                {yColumnOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "scatter" ? (
-          <div className="min-w-50">
-            <Label className="mb-1 block">Point Cloud Source</Label>
-            <Select
-              value={effectiveScatterMode}
-              onValueChange={(value) => {
-                if (
-                  value === "complex" ||
-                  value === "trace_xy" ||
-                  value === "xy"
-                ) {
-                  setScatterMode(value);
-                }
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select mode" />
-              </SelectTrigger>
-              <SelectContent>
-                {scatterModeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "scatter" &&
-        effectiveScatterMode === "complex" ? (
-          <div className="min-w-50">
-            <Label className="mb-1 block">Complex Series</Label>
-            <Select
-              value={effectiveScatterSeriesName ?? ""}
-              onValueChange={(value) =>
-                setScatterSeriesName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select series" />
-              </SelectTrigger>
-              <SelectContent>
-                {scatterComplexOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "scatter" && effectiveScatterMode === "xy" ? (
+        {derived.effectiveView === "xy" &&
+        derived.effectiveProjection === "xy" ? (
           <>
             <div className="min-w-40">
               <Label className="mb-1 block">X Column</Label>
               <Select
-                value={effectiveScatterXName ?? ""}
+                value={derived.effectiveXYXName ?? ""}
                 onValueChange={(value) =>
-                  setScatterXName(value === "" ? null : value)
+                  setXYXName(value === "" ? null : value)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select X" />
+                  <SelectValue placeholder="Select X">
+                    {derived.effectiveXYXName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {scatterXYOptions.map((option: ColumnInfo) => (
+                  {derived.xyXOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
@@ -277,16 +246,18 @@ export function ChartViewerControls({
             <div className="min-w-40">
               <Label className="mb-1 block">Y Column</Label>
               <Select
-                value={effectiveScatterYName ?? ""}
+                value={derived.effectiveXYYName ?? ""}
                 onValueChange={(value) =>
-                  setScatterYName(value === "" ? null : value)
+                  setXYYName(value === "" ? null : value)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Y" />
+                  <SelectValue placeholder="Select Y">
+                    {derived.effectiveXYYName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {scatterXYOptions.map((option: ColumnInfo) => (
+                  {derived.xyYOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
@@ -297,22 +268,49 @@ export function ChartViewerControls({
           </>
         ) : null}
 
-        {effectiveChartType === "scatter" &&
-        effectiveScatterMode === "trace_xy" ? (
+        {derived.effectiveView === "xy" &&
+        derived.effectiveProjection === "complex_xy" ? (
+          <div className="min-w-50">
+            <Label className="mb-1 block">Complex Series</Label>
+            <Select
+              value={derived.effectiveComplexXYSeriesName ?? ""}
+              onValueChange={(value) =>
+                setComplexXYSeriesName(value === "" ? null : value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select series">
+                  {derived.effectiveComplexXYSeriesName ?? undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {derived.complexXYSeriesOptions.map((option: ColumnInfo) => (
+                  <SelectItem key={option.name} value={option.name}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {derived.effectiveView === "heatmap" ? (
           <>
-            <div className="min-w-40">
-              <Label className="mb-1 block">Trace X</Label>
+            <div className="min-w-50">
+              <Label className="mb-1 block">Series</Label>
               <Select
-                value={effectiveScatterTraceXName ?? ""}
+                value={derived.effectiveHeatmapSeriesName ?? ""}
                 onValueChange={(value) =>
-                  setScatterTraceXName(value === "" ? null : value)
+                  setHeatmapSeriesName(value === "" ? null : value)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select trace X" />
+                  <SelectValue placeholder="Select series">
+                    {derived.effectiveHeatmapSeriesName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {scatterTraceXYOptions.map((option: ColumnInfo) => (
+                  {derived.heatmapSeriesOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
@@ -321,38 +319,124 @@ export function ChartViewerControls({
               </Select>
             </div>
             <div className="min-w-40">
-              <Label className="mb-1 block">Trace Y</Label>
+              <Label className="mb-1 block">X Index</Label>
               <Select
-                value={effectiveScatterTraceYName ?? ""}
+                value={derived.effectiveHeatmapXName ?? ""}
                 onValueChange={(value) =>
-                  setScatterTraceYName(value === "" ? null : value)
+                  setHeatmapXName(value === "" ? null : value)
                 }
+                disabled={Boolean(derived.heatmapSeries?.isTrace)}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select trace Y" />
+                  <SelectValue placeholder="Select X index">
+                    {derived.effectiveHeatmapXName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {scatterTraceXYOptions.map((option: ColumnInfo) => (
+                  {derived.heatmapXOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="min-w-40">
+              <Label className="mb-1 block">Y Index</Label>
+              <Select
+                value={derived.effectiveHeatmapYName ?? ""}
+                onValueChange={(value) =>
+                  setHeatmapYName(value === "" ? null : value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Y index">
+                    {derived.effectiveHeatmapYName ?? undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {derived.heatmapYOptions.map((option: ColumnInfo) => (
+                    <SelectItem key={option.name} value={option.name}>
+                      {option.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        ) : null}
+
+        {derived.xyRoleControlsVisible ? (
+          <>
+            <div className="min-w-40">
+              <Label className="mb-1 block">Order By</Label>
+              <Select
+                value={derived.effectiveOrderByIndexColumnName ?? "__none__"}
+                onValueChange={(value) =>
+                  setOrderByIndexColumnName(value === "__none__" ? null : value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No explicit order">
+                    {derived.effectiveOrderByIndexColumnName ?? "None"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {derived.orderByOptions.map((option: ColumnInfo) => (
+                    <SelectItem key={option.name} value={option.name}>
+                      {option.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex min-w-60 flex-col">
+              <Label className="mb-1 block">Split Into Series</Label>
+              <div className="flex flex-wrap gap-2 rounded border border-border/60 px-2 py-1.5">
+                {derived.groupByOptions.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    No remaining index columns
+                  </span>
+                ) : (
+                  derived.groupByOptions.map((option: ColumnInfo) => {
+                    const checked =
+                      derived.effectiveGroupByIndexColumnNames.includes(
+                        option.name,
+                      );
+                    return (
+                      <label
+                        key={option.name}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() =>
+                            toggleGroupByIndexColumnName(option.name)
+                          }
+                        />
+                        <span>{option.name}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </>
         ) : null}
       </div>
 
-      {effectiveChartType !== "scatter" ? (
+      {derived.effectiveView === "heatmap" ||
+      (derived.effectiveView === "xy" &&
+        derived.effectiveProjection === "trend") ? (
         <div className="flex flex-wrap items-center gap-2 px-1.5 pb-1.5 text-xs">
           <span className="font-medium">Complex:</span>
-          {effectiveChartType === "heatmap" ? (
+          {derived.effectiveView === "heatmap" ? (
             <RadioGroup
               className="flex flex-wrap gap-2"
               value={selectedComplexViewSingle}
               onValueChange={(value: string) => {
-                if (complexControlsDisabled) return;
+                if (derived.complexControlsDisabled) return;
                 if (isComplexViewOption(value)) {
                   setSelectedComplexViewSingle(value);
                 }
@@ -362,15 +446,15 @@ export function ChartViewerControls({
                 <label key={option} className="flex items-center gap-2">
                   <RadioGroupItem
                     value={option}
-                    disabled={complexControlsDisabled}
+                    disabled={derived.complexControlsDisabled}
                   />
                   <span
                     className={cn(
                       "text-xs",
-                      complexControlsDisabled && "opacity-50",
+                      derived.complexControlsDisabled && "opacity-50",
                     )}
                   >
-                    {option}
+                    {complexViewLabels[option]}
                   </span>
                 </label>
               ))}
@@ -383,9 +467,9 @@ export function ChartViewerControls({
                   <label key={option} className="flex items-center gap-2">
                     <Checkbox
                       checked={isChecked}
-                      disabled={complexControlsDisabled}
+                      disabled={derived.complexControlsDisabled}
                       onCheckedChange={(checked) => {
-                        if (complexControlsDisabled) return;
+                        if (derived.complexControlsDisabled) return;
                         const next = checked
                           ? [...selectedComplexView, option]
                           : selectedComplexView.filter(
@@ -397,10 +481,10 @@ export function ChartViewerControls({
                     <span
                       className={cn(
                         "text-xs",
-                        complexControlsDisabled && "opacity-50",
+                        derived.complexControlsDisabled && "opacity-50",
                       )}
                     >
-                      {option}
+                      {complexViewLabels[option]}
                     </span>
                   </label>
                 );

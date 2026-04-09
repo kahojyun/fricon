@@ -11,15 +11,15 @@ use crate::{
     desktop_runtime::session::WorkspaceSession,
     features::charts::{
         transform::{
-            build_heatmap_series, build_line_series, build_live_heatmap_series,
-            build_live_line_series, build_live_scatter_series, build_scatter_series,
-            compute_sweep_groups,
+            build_heatmap_series, build_live_heatmap_series, build_live_xy_series, build_xy_series,
+            compute_group_starts,
             mapping::{build_chart_selected_columns, build_live_chart_selected_columns},
+            resolve_xy_index_roles,
         },
         types::{
             ChartSnapshot, FlatSeries, FlatXYSeries, HeatmapChartSnapshot,
             LiveChartAppendOperation, LiveChartDataOptions, LiveChartDataResponse,
-            ScatterModeOptions,
+            XYProjectionOptions,
         },
     },
 };
@@ -49,7 +49,7 @@ fn recent_group_starts_in_scan_batch(
     scan_start: usize,
     range_start: usize,
 ) -> Vec<usize> {
-    compute_sweep_groups(batch, schema, Some(grouping_index_columns))
+    compute_group_starts(batch, schema, grouping_index_columns)
         .into_iter()
         .map(|offset| scan_start + offset)
         .filter(|&row| row >= range_start)
@@ -115,6 +115,32 @@ fn resolve_group_tail_start(
     }
 }
 
+fn projection_is_trace(
+    schema: &DatasetSchema,
+    projection: &XYProjectionOptions,
+) -> anyhow::Result<bool> {
+    match projection {
+        XYProjectionOptions::Trend { series, .. } | XYProjectionOptions::ComplexXy { series } => {
+            Ok(matches!(
+                schema.columns().get(series).context("Column not found")?,
+                DatasetDataType::Trace(_, _)
+            ))
+        }
+        XYProjectionOptions::Xy { x_column, y_column } => {
+            let x_type = *schema
+                .columns()
+                .get(x_column)
+                .context("X column not found")?;
+            let y_type = *schema
+                .columns()
+                .get(y_column)
+                .context("Y column not found")?;
+            Ok(matches!(x_type, DatasetDataType::Trace(_, _))
+                && matches!(y_type, DatasetDataType::Trace(_, _)))
+        }
+    }
+}
+
 fn resolve_live_row_start(
     dataset: &DatasetReader,
     schema: &DatasetSchema,
@@ -127,21 +153,18 @@ fn resolve_live_row_start(
     }
 
     match options {
-        LiveChartDataOptions::Line(opts) => {
-            let data_type = *schema
-                .columns()
-                .get(&opts.series)
-                .context("Column not found")?;
+        LiveChartDataOptions::Xy(opts) => {
             let tail_count = opts.tail_count.max(1);
-            if matches!(data_type, DatasetDataType::Trace(_, _)) {
+            if projection_is_trace(schema, &opts.projection)? {
                 return Ok(total_rows.saturating_sub(tail_count));
             }
 
-            match index_columns {
-                Some(idx_cols) if idx_cols.len() >= 2 => {
-                    resolve_group_tail_start(dataset, schema, idx_cols, total_rows, tail_count)
-                }
-                _ => Ok(total_rows.saturating_sub(tail_count)),
+            let roles =
+                resolve_xy_index_roles(schema, index_columns, &opts.index_roles, opts.draw_style)?;
+            if roles.group_by.is_empty() {
+                Ok(total_rows.saturating_sub(tail_count))
+            } else {
+                resolve_group_tail_start(dataset, schema, &roles.group_by, total_rows, tail_count)
             }
         }
         LiveChartDataOptions::Heatmap(opts) => {
@@ -172,41 +195,6 @@ fn resolve_live_row_start(
                 Ok(0)
             }
         }
-        LiveChartDataOptions::Scatter(opts) => {
-            let tail_count = opts.tail_count.max(1);
-            match &opts.scatter {
-                ScatterModeOptions::Complex { series } => {
-                    let data_type = *schema.columns().get(series).context("Column not found")?;
-                    if matches!(data_type, DatasetDataType::Trace(_, _)) {
-                        Ok(total_rows.saturating_sub(tail_count))
-                    } else if let Some(idx_cols) = index_columns {
-                        if idx_cols.len() >= 2 {
-                            resolve_group_tail_start(
-                                dataset, schema, idx_cols, total_rows, tail_count,
-                            )
-                        } else {
-                            Ok(total_rows.saturating_sub(tail_count))
-                        }
-                    } else {
-                        Ok(total_rows.saturating_sub(tail_count))
-                    }
-                }
-                ScatterModeOptions::TraceXy { .. } => Ok(total_rows.saturating_sub(tail_count)),
-                ScatterModeOptions::Xy { .. } => {
-                    if let Some(idx_cols) = index_columns {
-                        if idx_cols.len() >= 2 {
-                            resolve_group_tail_start(
-                                dataset, schema, idx_cols, total_rows, tail_count,
-                            )
-                        } else {
-                            Ok(total_rows.saturating_sub(tail_count))
-                        }
-                    } else {
-                        Ok(total_rows.saturating_sub(tail_count))
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -218,6 +206,7 @@ pub(crate) async fn dataset_chart_data(
 ) -> anyhow::Result<ChartSnapshot> {
     let dataset = session.dataset(id).await?;
     let schema = dataset.schema();
+    let index_columns = dataset.index_columns();
     let common = options.common();
     let start = common.start.map_or(Bound::Unbounded, Bound::Included);
     let end = common.end.map_or(Bound::Unbounded, Bound::Excluded);
@@ -235,8 +224,8 @@ pub(crate) async fn dataset_chart_data(
         None
     };
 
-    let selected_columns = build_chart_selected_columns(schema, options)?;
-    let chart_type = options.chart_type_name();
+    let selected_columns = build_chart_selected_columns(schema, index_columns.as_deref(), options)?;
+    let chart_type = options.view_name();
     debug!(
         dataset_id = id,
         chart_type,
@@ -277,9 +266,10 @@ pub(crate) async fn dataset_chart_data(
     );
 
     let result = match options {
-        DatasetChartDataOptions::Line(options) => build_line_series(&batch, schema, options),
+        DatasetChartDataOptions::Xy(options) => {
+            build_xy_series(&batch, schema, index_columns.as_deref(), options)
+        }
         DatasetChartDataOptions::Heatmap(options) => build_heatmap_series(&batch, schema, options),
-        DatasetChartDataOptions::Scatter(options) => build_scatter_series(&batch, schema, options),
     };
     if let Err(err) = &result {
         error!(
@@ -395,14 +385,9 @@ fn build_live_snapshot(
     options: &LiveChartDataOptions,
 ) -> anyhow::Result<ChartSnapshot> {
     match options {
-        LiveChartDataOptions::Line(opts) => {
-            build_live_line_series(batch, schema, index_columns, opts)
-        }
+        LiveChartDataOptions::Xy(opts) => build_live_xy_series(batch, schema, index_columns, opts),
         LiveChartDataOptions::Heatmap(opts) => {
             build_live_heatmap_series(batch, schema, index_columns, opts)
-        }
-        LiveChartDataOptions::Scatter(opts) => {
-            build_live_scatter_series(batch, schema, index_columns, opts)
         }
     }
 }
@@ -412,10 +397,12 @@ fn diff_live_snapshots(
     current: &ChartSnapshot,
 ) -> Option<Vec<LiveChartAppendOperation>> {
     match (previous, current) {
-        (ChartSnapshot::Line(previous), ChartSnapshot::Line(current)) => {
-            diff_xy_series(&previous.series, &current.series)
-        }
-        (ChartSnapshot::Scatter(previous), ChartSnapshot::Scatter(current)) => {
+        (ChartSnapshot::Xy(previous), ChartSnapshot::Xy(current))
+            if previous.projection == current.projection
+                && previous.draw_style == current.draw_style
+                && previous.x_name == current.x_name
+                && previous.y_name == current.y_name =>
+        {
             diff_xy_series(&previous.series, &current.series)
         }
         (ChartSnapshot::Heatmap(previous), ChartSnapshot::Heatmap(current)) => {
@@ -532,10 +519,10 @@ mod tests {
         ]);
         let schema = numeric_schema(&["sweep", "freq"]);
 
-        let starts = recent_group_starts_in_scan_batch(&batch, &schema, &[0, 1], 4, 5);
+        let starts = recent_group_starts_in_scan_batch(&batch, &schema, &[0], 4, 5);
         assert_eq!(starts, vec![6, 8]);
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], 4, 5, 2),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 4, 5, 2),
             Some(6)
         );
     }
@@ -549,7 +536,7 @@ mod tests {
         let schema = numeric_schema(&["sweep", "freq"]);
 
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], 5, 6, 2),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 5, 6, 2),
             None
         );
     }

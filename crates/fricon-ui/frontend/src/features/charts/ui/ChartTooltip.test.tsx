@@ -13,8 +13,11 @@ const margin = {
 describe("getTooltipLines", () => {
   it("maps line hover positions through the zoom transform", () => {
     const data: ChartOptions = {
-      type: "line",
+      type: "xy",
+      projection: "trend",
+      drawStyle: "line",
       xName: "x",
+      yName: null,
       series: [
         xySeries("series", "series", [
           [0, 0],
@@ -25,7 +28,7 @@ describe("getTooltipLines", () => {
     };
 
     const interactionState: ChartInteractionState = {
-      type: "line",
+      type: "xy",
       xMin: 0,
       xMax: 10,
       yMin: 0,
@@ -46,14 +49,16 @@ describe("getTooltipLines", () => {
 
   it("matches scatter points in zoomed screen space", () => {
     const data: ChartOptions = {
-      type: "scatter",
+      type: "xy",
+      projection: "xy",
+      drawStyle: "points",
       xName: "x",
       yName: "y",
       series: [xySeries("series", "series", [[5, 5]])],
     };
 
     const interactionState: ChartInteractionState = {
-      type: "scatter",
+      type: "xy",
       xMin: 0,
       xMax: 10,
       yMin: 0,

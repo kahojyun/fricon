@@ -78,8 +78,11 @@ describe("ChartWrapper", () => {
 
   it("renders a canvas and svg for line chart data", () => {
     const data: ChartOptions = {
-      type: "line",
+      type: "xy",
+      projection: "trend",
+      drawStyle: "line",
       xName: "x",
+      yName: null,
       series: [
         xySeries("s1", "s1", [
           [0, 1],
@@ -96,8 +99,11 @@ describe("ChartWrapper", () => {
 
   it("keeps svg interactions enabled in live mode for zoomable charts", () => {
     const data: ChartOptions = {
-      type: "line",
+      type: "xy",
+      projection: "trend",
+      drawStyle: "line",
       xName: "x",
+      yName: null,
       series: [
         xySeries("s1", "s1", [
           [0, 1],
@@ -114,7 +120,9 @@ describe("ChartWrapper", () => {
 
   it("renders a canvas for scatter chart data", () => {
     const data: ChartOptions = {
-      type: "scatter",
+      type: "xy",
+      projection: "xy",
+      drawStyle: "points",
       xName: "x",
       yName: "y",
       series: [

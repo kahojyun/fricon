@@ -75,10 +75,7 @@ function appendToChart(
     series.push(operation.series.series);
   }
 
-  return {
-    ...chart,
-    series,
-  };
+  return { ...chart, series };
 }
 
 function appendToHeatmap(
