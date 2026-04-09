@@ -8,7 +8,13 @@ import type { ChartSeries } from "@/shared/lib/chartTypes";
 import { createProgram, hexToRgb } from "./webgl";
 import { heatmapFragmentSource, heatmapVertexSource } from "./shaders/heatmap";
 
-const COLOR_RAMP = ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"];
+export const COLOR_RAMP = [
+  "#2c7bb6",
+  "#abd9e9",
+  "#ffffbf",
+  "#fdae61",
+  "#d7191c",
+];
 
 export interface HeatmapRenderState {
   program: WebGLProgram;
@@ -16,6 +22,8 @@ export interface HeatmapRenderState {
   cellBuffer: WebGLBuffer;
   instanceCount: number;
   vao: WebGLVertexArrayObject;
+  valueMin: number;
+  valueMax: number;
 }
 
 export function createHeatmapRenderState(
@@ -85,7 +93,15 @@ export function createHeatmapRenderState(
 
   gl.bindVertexArray(null);
 
-  return { program, cornerBuffer, cellBuffer, instanceCount, vao };
+  return {
+    program,
+    cornerBuffer,
+    cellBuffer,
+    instanceCount,
+    vao,
+    valueMin: min,
+    valueMax: max,
+  };
 }
 
 export function drawHeatmap(

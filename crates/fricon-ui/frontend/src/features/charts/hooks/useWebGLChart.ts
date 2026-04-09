@@ -25,6 +25,7 @@ import {
 import {
   renderAxes,
   renderCategoryAxes,
+  renderColorScale,
   getOverlayTheme,
 } from "../rendering/d3Overlay";
 import {
@@ -56,6 +57,7 @@ import {
   createHeatmapRenderState,
   drawHeatmap,
   destroyHeatmapRenderState,
+  COLOR_RAMP,
   type HeatmapRenderState,
 } from "../rendering/heatmapRenderer";
 
@@ -266,6 +268,14 @@ export function useWebGLChart({
         yScale,
         currentData.xName,
         currentData.yName,
+        margin,
+        overlayTheme,
+      );
+      renderColorScale(
+        svgEl,
+        COLOR_RAMP,
+        rs.state.valueMin,
+        rs.state.valueMax,
         margin,
         overlayTheme,
       );

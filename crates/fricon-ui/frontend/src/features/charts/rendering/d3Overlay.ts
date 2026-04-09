@@ -229,3 +229,91 @@ export function renderCategoryAxes(
       .text(yName);
   }
 }
+
+/**
+ * Render a vertical color-scale legend in the right margin of a heatmap chart.
+ * Uses a linearGradient with 5 color stops matching the heatmap shader ramp.
+ */
+export function renderColorScale(
+  svgEl: SVGSVGElement,
+  colorRamp: string[],
+  valueMin: number,
+  valueMax: number,
+  margin: ChartMargin,
+  theme: OverlayTheme,
+): void {
+  const svg = select(svgEl);
+  const height = svgEl.clientHeight;
+  const chartHeight = height - margin.top - margin.bottom;
+  const chartRight = svgEl.clientWidth - margin.right;
+
+  svg.selectAll(".color-scale").remove();
+
+  const barWidth = 12;
+  const barX = chartRight + 10;
+  const barHeight = chartHeight;
+
+  const g = svg
+    .append("g")
+    .attr("class", "color-scale")
+    .attr("transform", `translate(${barX},${margin.top})`);
+
+  // Define gradient (top = max, bottom = min)
+  const gradientId =
+    svgEl.dataset.colorScaleGradientId ??
+    `heatmap-color-scale-grad-${Math.random().toString(36).slice(2, 10)}`;
+  svgEl.dataset.colorScaleGradientId = gradientId;
+  const defs = svg.append("defs").attr("class", "color-scale");
+  const gradient = defs
+    .append("linearGradient")
+    .attr("id", gradientId)
+    .attr("x1", "0")
+    .attr("x2", "0")
+    .attr("y1", "0")
+    .attr("y2", "1");
+
+  for (let i = 0; i < colorRamp.length; i++) {
+    gradient
+      .append("stop")
+      .attr("offset", `${(i / Math.max(colorRamp.length - 1, 1)) * 100}%`)
+      .attr("stop-color", colorRamp[colorRamp.length - 1 - i]);
+  }
+
+  // Gradient bar
+  g.append("rect")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("width", barWidth)
+    .attr("height", barHeight)
+    .attr("fill", `url(#${gradientId})`)
+    .attr("stroke", theme.gridColor)
+    .attr("stroke-width", 0.5);
+
+  // Format labels
+  const fmt = (v: number) => {
+    if (Math.abs(v) >= 1000 || (Math.abs(v) < 0.01 && v !== 0)) {
+      return v.toExponential(1);
+    }
+    return Number.isInteger(v) ? String(v) : v.toPrecision(3);
+  };
+
+  // Max label (top)
+  g.append("text")
+    .attr("x", barWidth + 4)
+    .attr("y", 4)
+    .attr("text-anchor", "start")
+    .attr("dominant-baseline", "hanging")
+    .attr("fill", theme.textColor)
+    .style("font-size", "10px")
+    .text(fmt(valueMax));
+
+  // Min label (bottom)
+  g.append("text")
+    .attr("x", barWidth + 4)
+    .attr("y", barHeight - 2)
+    .attr("text-anchor", "start")
+    .attr("dominant-baseline", "auto")
+    .attr("fill", theme.textColor)
+    .style("font-size", "10px")
+    .text(fmt(valueMin));
+}

@@ -1,6 +1,7 @@
 import { useTheme } from "next-themes";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
 import { useWebGLChart } from "../hooks/useWebGLChart";
+import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
 
 interface ChartWrapperProps {
@@ -40,6 +41,9 @@ export function ChartWrapper({
           svgRef={svgRef}
           getInteractionState={getInteractionState}
         />
+      ) : null}
+      {!liveMode && data && data.type !== "heatmap" ? (
+        <ChartLegend series={data.series} />
       ) : null}
       {!data ? (
         <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
