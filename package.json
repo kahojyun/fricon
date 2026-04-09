@@ -16,7 +16,7 @@
     "depcruise:frontend": "pnpm --dir crates/fricon-ui/frontend exec depcruise --config .dependency-cruiser.cjs src",
     "bundle-licenses": "run-p -c bundle-licenses:rust bundle-licenses:npm",
     "bundle-licenses:rust": "cd crates/fricon-py && cargo bundle-licenses --format toml --output ../../THIRD_PARTY_RUST.toml",
-    "bundle-licenses:npm": "pnpm --filter fricon-ui run bundle-licenses && node -e \"const fs=require('node:fs');const path=require('node:path');const src=path.resolve('crates','fricon-ui','frontend','dist','THIRD_PARTY_NPM.json');const dst=path.resolve('THIRD_PARTY_NPM.json');fs.renameSync(src,dst);\""
+    "bundle-licenses:npm": "pnpm --filter fricon-ui run bundle-licenses && node -e \"const fs=require('node:fs');const path=require('node:path');const src=path.resolve('crates','fricon-ui','frontend','dist','THIRD_PARTY_NPM.md');const dst=path.resolve('THIRD_PARTY_NPM.md');fs.renameSync(src,dst);\""
   },
   "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
   "type": "module",

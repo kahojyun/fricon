@@ -5,7 +5,7 @@ requires-python = ">=3.10"
 license-files = [
   "LICENSE-APACHE",
   "LICENSE-MIT",
-  "THIRD_PARTY_NPM.json",
+  "THIRD_PARTY_NPM.md",
   "THIRD_PARTY_RUST.toml",
 ]
 authors = [{ name = "Jiahao Yuan", email = "kahojyun@icloud.com" }]
