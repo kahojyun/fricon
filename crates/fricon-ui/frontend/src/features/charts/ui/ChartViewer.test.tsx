@@ -553,6 +553,11 @@ describe("ChartViewer", () => {
       await screen.findByRole("option", { name: "Complex Plane" }),
     );
 
+    expect(screen.queryByText("Order By")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /advanced/i }));
+    expect(screen.queryByText("Split Into Series")).not.toBeInTheDocument();
+    expect(await screen.findByText("Last sweeps")).toBeInTheDocument();
+
     await waitFor(() => {
       const lastPayload = livePayloads.at(-1);
       const options = lastPayload?.options as {
@@ -565,6 +570,18 @@ describe("ChartViewer", () => {
       expect(options.tailCount).toBe(5);
       expect(options.orderByIndexColumn).toBe("idx_x");
       expect(options.groupByIndexColumns).toEqual(["idx_cycle", "idx_y"]);
+    });
+
+    const liveWindowTrigger = await getSelectTrigger("Last sweeps");
+    await user.click(liveWindowTrigger);
+    await user.click(await screen.findByRole("option", { name: "10 sweeps" }));
+
+    await waitFor(() => {
+      const lastPayload = livePayloads.at(-1);
+      const options = lastPayload?.options as {
+        tailCount?: number;
+      };
+      expect(options.tailCount).toBe(10);
     });
 
     clearMocks();

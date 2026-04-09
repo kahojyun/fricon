@@ -103,6 +103,12 @@ export function ChartViewerControls({
     showAdvancedHeatmapAxes ||
     showAdvancedGrouping ||
     showAdvancedComplexControls;
+  const liveWindowUnit =
+    derived.xyUsesTraceSource ||
+    derived.liveMonitorGroupByIndexColumnNames.length > 0
+      ? "sweeps"
+      : "updates";
+  const liveWindowLabel = `Last ${liveWindowUnit}`;
 
   return (
     <>
@@ -343,20 +349,20 @@ export function ChartViewerControls({
 
         {showPrimaryLiveWindow ? (
           <div className="min-w-32">
-            <Label className="mb-1 block">Live Window</Label>
+            <Label className="mb-1 block">{liveWindowLabel}</Label>
             <Select
               value={String(liveWindowCount)}
               onValueChange={(value) => setLiveWindowCount(Number(value))}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select window">
-                  {String(liveWindowCount)}
+                  {`${liveWindowCount} ${liveWindowUnit}`}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {liveWindowOptions.map((option) => (
                   <SelectItem key={option} value={String(option)}>
-                    {option}
+                    {`${option} ${liveWindowUnit}`}
                   </SelectItem>
                 ))}
               </SelectContent>

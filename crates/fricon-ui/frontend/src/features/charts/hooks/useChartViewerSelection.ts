@@ -112,14 +112,7 @@ export function useChartViewerSelection(
 
   const actions: ChartViewerControlActions = {
     setView,
-    setProjection: (next) => {
-      setProjection(next);
-      setDrawStyle((current) =>
-        current === defaultDrawStyle(projection)
-          ? defaultDrawStyle(next)
-          : current,
-      );
-    },
+    setProjection,
     setDrawStyle,
     setTrendSeriesName,
     setHeatmapSeriesName,
