@@ -1,10 +1,10 @@
 use anyhow::Context;
 use fricon::{DatasetDataType, DatasetSchema};
 
-use super::resolve_xy_index_roles;
+use super::resolve_xy_trace_roles;
 use crate::features::charts::types::{
     ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions, LiveChartDataOptions,
-    LiveHeatmapOptions, LiveXYOptions, XYChartDataOptions, XYProjectionOptions,
+    LiveHeatmapOptions, LiveXYOptions, XYChartDataOptions, XYPlotModeOptions,
 };
 
 fn column_index(schema: &DatasetSchema, name: &str) -> anyhow::Result<usize> {
@@ -32,12 +32,12 @@ fn build_heatmap_selected_columns(
     options: &HeatmapChartDataOptions,
 ) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
-    let series_index = column_index(schema, &options.series)?;
+    let quantity_index = column_index(schema, &options.quantity)?;
     let data_type = *schema
         .columns()
-        .get(&options.series)
+        .get(&options.quantity)
         .context("Column not found")?;
-    push_column(&mut selected, series_index);
+    push_column(&mut selected, quantity_index);
 
     let y_index = column_index(schema, &options.y_column)?;
     push_column(&mut selected, y_index);
@@ -59,25 +59,25 @@ fn build_xy_selected_columns(
     options: &XYChartDataOptions,
 ) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
-    match &options.projection {
-        XYProjectionOptions::Trend { series, .. } => {
-            let series_index = column_index(schema, series)?;
-            let data_type = *schema.columns().get(series).context("Column not found")?;
-            push_column(&mut selected, series_index);
+    match &options.plot_mode {
+        XYPlotModeOptions::QuantityVsSweep { quantity, .. } => {
+            let quantity_index = column_index(schema, quantity)?;
+            let data_type = *schema.columns().get(quantity).context("Column not found")?;
+            push_column(&mut selected, quantity_index);
             if !matches!(data_type, DatasetDataType::Trace(_, _)) {
-                let roles = resolve_xy_index_roles(
+                let roles = resolve_xy_trace_roles(
                     schema,
                     index_columns,
-                    &options.index_roles,
+                    &options.trace_roles,
                     options.draw_style,
                 )?;
-                push_columns(&mut selected, &roles.group_by);
-                if let Some(order_by) = roles.order_by {
-                    push_column(&mut selected, order_by);
+                push_columns(&mut selected, &roles.trace_group);
+                if let Some(sweep) = roles.sweep {
+                    push_column(&mut selected, sweep);
                 }
             }
         }
-        XYProjectionOptions::Xy { x_column, y_column } => {
+        XYPlotModeOptions::Xy { x_column, y_column } => {
             push_column(&mut selected, column_index(schema, x_column)?);
             push_column(&mut selected, column_index(schema, y_column)?);
             let x_type = *schema
@@ -91,31 +91,31 @@ fn build_xy_selected_columns(
             if !matches!(x_type, DatasetDataType::Trace(_, _))
                 && !matches!(y_type, DatasetDataType::Trace(_, _))
             {
-                let roles = resolve_xy_index_roles(
+                let roles = resolve_xy_trace_roles(
                     schema,
                     index_columns,
-                    &options.index_roles,
+                    &options.trace_roles,
                     options.draw_style,
                 )?;
-                push_columns(&mut selected, &roles.group_by);
-                if let Some(order_by) = roles.order_by {
-                    push_column(&mut selected, order_by);
+                push_columns(&mut selected, &roles.trace_group);
+                if let Some(sweep) = roles.sweep {
+                    push_column(&mut selected, sweep);
                 }
             }
         }
-        XYProjectionOptions::ComplexXy { series } => {
-            push_column(&mut selected, column_index(schema, series)?);
-            let data_type = *schema.columns().get(series).context("Column not found")?;
+        XYPlotModeOptions::ComplexPlane { quantity } => {
+            push_column(&mut selected, column_index(schema, quantity)?);
+            let data_type = *schema.columns().get(quantity).context("Column not found")?;
             if !matches!(data_type, DatasetDataType::Trace(_, _)) {
-                let roles = resolve_xy_index_roles(
+                let roles = resolve_xy_trace_roles(
                     schema,
                     index_columns,
-                    &options.index_roles,
+                    &options.trace_roles,
                     options.draw_style,
                 )?;
-                push_columns(&mut selected, &roles.group_by);
-                if let Some(order_by) = roles.order_by {
-                    push_column(&mut selected, order_by);
+                push_columns(&mut selected, &roles.trace_group);
+                if let Some(sweep) = roles.sweep {
+                    push_column(&mut selected, sweep);
                 }
             }
         }
@@ -144,7 +144,7 @@ fn build_live_heatmap_selected_columns(
     options: &LiveHeatmapOptions,
 ) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
-    push_column(&mut selected, column_index(schema, &options.series)?);
+    push_column(&mut selected, column_index(schema, &options.quantity)?);
     if let Some(idx_cols) = index_columns {
         push_columns(&mut selected, idx_cols);
     }
@@ -161,8 +161,8 @@ fn build_live_xy_selected_columns(
         index_columns,
         &XYChartDataOptions {
             draw_style: options.draw_style,
-            projection: options.projection.clone(),
-            index_roles: options.index_roles.clone(),
+            plot_mode: options.plot_mode.clone(),
+            trace_roles: options.trace_roles.clone(),
             common: ChartCommonOptions::default(),
         },
     )
@@ -194,8 +194,8 @@ mod tests {
     };
     use crate::features::charts::types::{
         ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions, LiveChartDataOptions,
-        LiveHeatmapOptions, LiveXYOptions, XYChartDataOptions, XYDrawStyle, XYIndexRoleOptions,
-        XYProjectionOptions,
+        LiveHeatmapOptions, LiveXYOptions, XYChartDataOptions, XYDrawStyle, XYPlotModeOptions,
+        XYTraceRoleOptions,
     };
 
     fn numeric_schema() -> DatasetSchema {
@@ -228,13 +228,13 @@ mod tests {
         let schema = numeric_schema();
         let options = DatasetChartDataOptions::Xy(XYChartDataOptions {
             draw_style: XYDrawStyle::Line,
-            projection: XYProjectionOptions::Xy {
+            plot_mode: XYPlotModeOptions::Xy {
                 x_column: "x".to_string(),
                 y_column: "y".to_string(),
             },
-            index_roles: XYIndexRoleOptions {
-                group_by_index_columns: Some(vec!["outer".to_string()]),
-                order_by_index_column: Some("inner".to_string()),
+            trace_roles: XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["outer".to_string()]),
+                sweep_index_column: Some("inner".to_string()),
             },
             common: ChartCommonOptions::default(),
         });
@@ -244,16 +244,16 @@ mod tests {
     }
 
     #[test]
-    fn build_chart_selected_columns_for_complex_xy_trace_skips_index_roles() {
+    fn build_chart_selected_columns_for_complex_plane_trace_skips_trace_roles() {
         let schema = mixed_schema();
         let options = DatasetChartDataOptions::Xy(XYChartDataOptions {
             draw_style: XYDrawStyle::Points,
-            projection: XYProjectionOptions::ComplexXy {
-                series: "complex_trace".to_string(),
+            plot_mode: XYPlotModeOptions::ComplexPlane {
+                quantity: "complex_trace".to_string(),
             },
-            index_roles: XYIndexRoleOptions {
-                group_by_index_columns: Some(vec!["outer".to_string()]),
-                order_by_index_column: Some("inner".to_string()),
+            trace_roles: XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["outer".to_string()]),
+                sweep_index_column: Some("inner".to_string()),
             },
             common: ChartCommonOptions::default(),
         });
@@ -266,7 +266,7 @@ mod tests {
     fn build_live_chart_selected_columns_for_heatmap_includes_indices() {
         let schema = numeric_schema();
         let options = LiveChartDataOptions::Heatmap(LiveHeatmapOptions {
-            series: "y".to_string(),
+            quantity: "y".to_string(),
             complex_view_single: None,
             known_row_count: None,
         });
@@ -282,11 +282,11 @@ mod tests {
             draw_style: XYDrawStyle::Line,
             tail_count: 5,
             known_row_count: None,
-            projection: XYProjectionOptions::Trend {
-                series: "y".to_string(),
+            plot_mode: XYPlotModeOptions::QuantityVsSweep {
+                quantity: "y".to_string(),
                 complex_views: None,
             },
-            index_roles: XYIndexRoleOptions::default(),
+            trace_roles: XYTraceRoleOptions::default(),
         });
 
         let selected = build_live_chart_selected_columns(&schema, Some(&[0, 1]), &options).unwrap();
@@ -297,7 +297,7 @@ mod tests {
     fn build_chart_selected_columns_heatmap() {
         let schema = numeric_schema();
         let options = DatasetChartDataOptions::Heatmap(HeatmapChartDataOptions {
-            series: "y".to_string(),
+            quantity: "y".to_string(),
             x_column: Some("outer".to_string()),
             y_column: "inner".to_string(),
             complex_view_single: None,

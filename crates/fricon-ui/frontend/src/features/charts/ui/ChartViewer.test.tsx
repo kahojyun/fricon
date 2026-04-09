@@ -331,7 +331,7 @@ describe("ChartViewer", () => {
         }
         return {
           type: "xy",
-          projection: "complex_xy",
+          plotMode: "complex_plane",
           drawStyle: "points",
           xName: "c (real)",
           yName: "c (imag)",
@@ -372,13 +372,13 @@ describe("ChartViewer", () => {
       const lastPayload = chartPayloads.at(-1);
       const options = lastPayload?.options as {
         view: string;
-        projection: string;
-        orderByIndexColumn?: string;
+        plotMode: string;
+        sweepIndexColumn?: string;
         excludeColumns?: string[];
       };
       expect(options.view).toBe("xy");
-      expect(options.projection).toBe("complex_xy");
-      expect(options.orderByIndexColumn).toBe("idxB");
+      expect(options.plotMode).toBe("complex_plane");
+      expect(options.sweepIndexColumn).toBe("idxB");
       expect(options.excludeColumns).toEqual(["idxB"]);
     });
 
@@ -402,7 +402,7 @@ describe("ChartViewer", () => {
       if (cmd === "dataset_chart_data") {
         return {
           type: "xy",
-          projection: "trend",
+          plotMode: "quantity_vs_sweep",
           drawStyle: "line",
           xName: "idxB",
           yName: null,
@@ -468,7 +468,7 @@ describe("ChartViewer", () => {
           row_count: 1,
           snapshot: {
             type: "xy",
-            projection: "trend",
+            plotMode: "quantity_vs_sweep",
             drawStyle: "line",
             xName: "t",
             yName: null,
@@ -511,16 +511,16 @@ describe("ChartViewer", () => {
       const lastPayload = livePayloads.at(-1);
       const options = lastPayload?.options as {
         view: string;
-        projection: string;
+        plotMode: string;
         drawStyle?: string;
-        orderByIndexColumn?: string;
+        sweepIndexColumn?: string;
         complex_views?: string[] | null;
         tailCount?: number;
       };
       expect(options.view).toBe("xy");
-      expect(options.projection).toBe("trend");
+      expect(options.plotMode).toBe("quantity_vs_sweep");
       expect(options.drawStyle).toBe("line");
-      expect(options.orderByIndexColumn).toBe("t");
+      expect(options.sweepIndexColumn).toBe("t");
       expect(options.tailCount).toBe(5);
       expect(options.complex_views).toEqual(["real", "imag"]);
     });
@@ -557,7 +557,7 @@ describe("ChartViewer", () => {
           row_count: 6,
           snapshot: {
             type: "xy",
-            projection: "complex_xy",
+            plotMode: "complex_plane",
             drawStyle: "points",
             xName: "impedance (real)",
             yName: "impedance (imag)",
@@ -632,15 +632,15 @@ describe("ChartViewer", () => {
     await waitFor(() => {
       const lastPayload = livePayloads.at(-1);
       const options = lastPayload?.options as {
-        projection: string;
+        plotMode: string;
         tailCount?: number;
-        orderByIndexColumn?: string;
-        groupByIndexColumns?: string[];
+        sweepIndexColumn?: string;
+        traceGroupIndexColumns?: string[];
       };
-      expect(options.projection).toBe("complex_xy");
+      expect(options.plotMode).toBe("complex_plane");
       expect(options.tailCount).toBe(5);
-      expect(options.orderByIndexColumn).toBe("idx_x");
-      expect(options.groupByIndexColumns).toEqual(["idx_cycle", "idx_y"]);
+      expect(options.sweepIndexColumn).toBe("idx_x");
+      expect(options.traceGroupIndexColumns).toEqual(["idx_cycle", "idx_y"]);
     });
 
     const liveWindowTrigger = await getSelectTrigger("Recent Sweeps");

@@ -83,7 +83,7 @@ describe("lineDataBounds", () => {
       new Float32Array(9),
       {
         type: "xy",
-        projection: "trend",
+        plotMode: "quantity_vs_sweep",
         drawStyle: "line",
         xName: "x",
         yName: null,
@@ -180,7 +180,7 @@ describe("scatterDataBounds", () => {
       new Float32Array(9),
       {
         type: "xy",
-        projection: "trend",
+        plotMode: "quantity_vs_sweep",
         drawStyle: "line_points",
         xName: "x",
         yName: null,

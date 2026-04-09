@@ -14,12 +14,12 @@ use crate::{
             build_heatmap_series, build_live_heatmap_series, build_live_xy_series, build_xy_series,
             compute_group_starts,
             mapping::{build_chart_selected_columns, build_live_chart_selected_columns},
-            resolve_xy_index_roles,
+            resolve_xy_trace_roles,
         },
         types::{
             ChartSnapshot, FlatSeries, FlatXYSeries, HeatmapChartSnapshot,
             LiveChartAppendOperation, LiveChartDataOptions, LiveChartDataResponse,
-            XYProjectionOptions,
+            XYPlotModeOptions,
         },
     },
 };
@@ -115,18 +115,17 @@ fn resolve_group_tail_start(
     }
 }
 
-fn projection_is_trace(
+fn plot_mode_is_trace(
     schema: &DatasetSchema,
-    projection: &XYProjectionOptions,
+    plot_mode: &XYPlotModeOptions,
 ) -> anyhow::Result<bool> {
-    match projection {
-        XYProjectionOptions::Trend { series, .. } | XYProjectionOptions::ComplexXy { series } => {
-            Ok(matches!(
-                schema.columns().get(series).context("Column not found")?,
-                DatasetDataType::Trace(_, _)
-            ))
-        }
-        XYProjectionOptions::Xy { x_column, y_column } => {
+    match plot_mode {
+        XYPlotModeOptions::QuantityVsSweep { quantity, .. }
+        | XYPlotModeOptions::ComplexPlane { quantity } => Ok(matches!(
+            schema.columns().get(quantity).context("Column not found")?,
+            DatasetDataType::Trace(_, _)
+        )),
+        XYPlotModeOptions::Xy { x_column, y_column } => {
             let x_type = *schema
                 .columns()
                 .get(x_column)
@@ -155,22 +154,28 @@ fn resolve_live_row_start(
     match options {
         LiveChartDataOptions::Xy(opts) => {
             let tail_count = opts.tail_count.max(1);
-            if projection_is_trace(schema, &opts.projection)? {
+            if plot_mode_is_trace(schema, &opts.plot_mode)? {
                 return Ok(total_rows.saturating_sub(tail_count));
             }
 
             let roles =
-                resolve_xy_index_roles(schema, index_columns, &opts.index_roles, opts.draw_style)?;
-            if roles.group_by.is_empty() {
+                resolve_xy_trace_roles(schema, index_columns, &opts.trace_roles, opts.draw_style)?;
+            if roles.trace_group.is_empty() {
                 Ok(total_rows.saturating_sub(tail_count))
             } else {
-                resolve_group_tail_start(dataset, schema, &roles.group_by, total_rows, tail_count)
+                resolve_group_tail_start(
+                    dataset,
+                    schema,
+                    &roles.trace_group,
+                    total_rows,
+                    tail_count,
+                )
             }
         }
         LiveChartDataOptions::Heatmap(opts) => {
             let data_type = *schema
                 .columns()
-                .get(&opts.series)
+                .get(&opts.quantity)
                 .context("Column not found")?;
             if matches!(data_type, DatasetDataType::Trace(_, _)) {
                 match index_columns {
@@ -398,7 +403,7 @@ fn diff_live_snapshots(
 ) -> Option<Vec<LiveChartAppendOperation>> {
     match (previous, current) {
         (ChartSnapshot::Xy(previous), ChartSnapshot::Xy(current))
-            if previous.projection == current.projection
+            if previous.plot_mode == current.plot_mode
                 && previous.draw_style == current.draw_style
                 && previous.x_name == current.x_name
                 && previous.y_name == current.y_name =>

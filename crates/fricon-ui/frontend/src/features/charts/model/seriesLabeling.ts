@@ -49,13 +49,13 @@ export function deriveSharedSeriesLabel(
 export function resolveXYYAxisLabel(
   data: Pick<
     Extract<ChartOptions, { type: "xy" }>,
-    "projection" | "yName" | "series"
+    "plotMode" | "yName" | "series"
   >,
 ) {
   if (data.yName) {
     return data.yName;
   }
-  if (data.projection === "trend") {
+  if (data.plotMode === "quantity_vs_sweep") {
     return deriveSharedSeriesLabel(data.series) ?? "";
   }
   return "";

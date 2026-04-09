@@ -14,7 +14,7 @@ describe("getTooltipLines", () => {
   it("maps line hover positions through the zoom transform", () => {
     const data: ChartOptions = {
       type: "xy",
-      projection: "trend",
+      plotMode: "quantity_vs_sweep",
       drawStyle: "line",
       xName: "x",
       yName: null,
@@ -50,7 +50,7 @@ describe("getTooltipLines", () => {
   it("matches scatter points in zoomed screen space", () => {
     const data: ChartOptions = {
       type: "xy",
-      projection: "xy",
+      plotMode: "xy",
       drawStyle: "points",
       xName: "x",
       yName: "y",

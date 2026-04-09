@@ -14,22 +14,22 @@ pub(crate) fn build_heatmap_series(
     schema: &DatasetSchema,
     options: &HeatmapChartDataOptions,
 ) -> Result<ChartSnapshot> {
-    let series_name = &options.series;
+    let quantity_name = &options.quantity;
     let y_column = &options.y_column;
     let data_type = *schema
         .columns()
-        .get(series_name)
+        .get(quantity_name)
         .context("Column not found")?;
     let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
     let is_complex = data_type.is_complex();
     let x_name = if is_trace {
-        format!("{series_name} - X")
+        format!("{quantity_name} - X")
     } else {
         options.x_column.clone().unwrap_or_else(|| "X".to_string())
     };
 
     let series_array: DatasetArray = batch
-        .column_by_name(series_name)
+        .column_by_name(quantity_name)
         .cloned()
         .context("Column not found")?
         .try_into()?;
@@ -40,7 +40,7 @@ pub(crate) fn build_heatmap_series(
     let mut series = if is_trace {
         process_trace_heatmap(
             batch,
-            series_name,
+            quantity_name,
             y_column,
             &series_array,
             is_complex,
@@ -53,7 +53,7 @@ pub(crate) fn build_heatmap_series(
             .context("Heatmap chart requires x column")?;
         process_scalar_heatmap(
             batch,
-            series_name,
+            quantity_name,
             x_column,
             y_column,
             &series_array,
@@ -295,7 +295,7 @@ mod tests {
         let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
-            series: "z".to_string(),
+            quantity: "z".to_string(),
             x_column: Some("x".to_string()),
             y_column: "y".to_string(),
             complex_view_single: None,
@@ -322,7 +322,7 @@ mod tests {
         let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
-            series: "z".to_string(),
+            quantity: "z".to_string(),
             x_column: Some("x".to_string()),
             y_column: "y".to_string(),
             complex_view_single: None,
@@ -352,7 +352,7 @@ mod tests {
         let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
-            series: "z".to_string(),
+            quantity: "z".to_string(),
             x_column: Some("x".to_string()),
             y_column: "y".to_string(),
             complex_view_single: None,
@@ -396,7 +396,7 @@ mod tests {
         let schema = DatasetSchema::new(columns);
 
         let options = HeatmapChartDataOptions {
-            series: "trace".to_string(),
+            quantity: "trace".to_string(),
             x_column: None,
             y_column: "y".to_string(),
             complex_view_single: None,

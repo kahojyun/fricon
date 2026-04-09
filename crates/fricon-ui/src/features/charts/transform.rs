@@ -12,11 +12,11 @@ pub(crate) use self::{
     heatmap::build_heatmap_series, live_heatmap::build_live_heatmap_series,
     live_xy::build_live_xy_series, xy::build_xy_series,
 };
-use crate::features::charts::types::{XYDrawStyle, XYIndexRoleOptions};
+use crate::features::charts::types::{XYDrawStyle, XYTraceRoleOptions};
 
-pub(super) struct XYIndexRoles {
-    pub(super) group_by: Vec<usize>,
-    pub(super) order_by: Option<usize>,
+pub(super) struct XYTraceRoles {
+    pub(super) trace_group: Vec<usize>,
+    pub(super) sweep: Option<usize>,
 }
 
 pub(super) fn row_series_id(row: usize) -> String {
@@ -27,56 +27,56 @@ pub(super) fn group_series_id(group_start: usize) -> String {
     format!("group:{group_start}")
 }
 
-pub(super) fn resolve_xy_index_roles(
+pub(super) fn resolve_xy_trace_roles(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
-    options: &XYIndexRoleOptions,
+    options: &XYTraceRoleOptions,
     draw_style: XYDrawStyle,
-) -> Result<XYIndexRoles> {
+) -> Result<XYTraceRoles> {
     let Some(index_columns) = index_columns else {
-        if options.order_by_index_column.is_some()
+        if options.sweep_index_column.is_some()
             || options
-                .group_by_index_columns
+                .trace_group_index_columns
                 .as_ref()
                 .is_some_and(|columns| !columns.is_empty())
         {
-            bail!("Index roles require dataset index columns");
+            bail!("Trace roles require dataset index columns");
         }
-        return Ok(XYIndexRoles {
-            group_by: vec![],
-            order_by: None,
+        return Ok(XYTraceRoles {
+            trace_group: vec![],
+            sweep: None,
         });
     };
 
-    let group_by = resolve_named_index_columns(
+    let trace_group = resolve_named_index_columns(
         schema,
         index_columns,
-        options.group_by_index_columns.as_deref().unwrap_or(&[]),
+        options.trace_group_index_columns.as_deref().unwrap_or(&[]),
     )?;
 
-    let explicit_order_by = options
-        .order_by_index_column
+    let explicit_sweep = options
+        .sweep_index_column
         .as_deref()
         .map(|name| resolve_named_index_column(schema, index_columns, name))
         .transpose()?;
 
-    if explicit_order_by.is_some_and(|order_by| group_by.contains(&order_by)) {
-        bail!("orderByIndexColumn must not also be used in groupByIndexColumns");
+    if explicit_sweep.is_some_and(|sweep| trace_group.contains(&sweep)) {
+        bail!("sweepIndexColumn must not also be used in traceGroupIndexColumns");
     }
 
-    let default_order_by = if draw_style.includes_lines() {
+    let default_sweep = if draw_style.includes_lines() {
         index_columns
             .iter()
             .rev()
-            .find(|&&index| !group_by.contains(&index))
+            .find(|&&index| !trace_group.contains(&index))
             .copied()
     } else {
         None
     };
 
-    Ok(XYIndexRoles {
-        group_by,
-        order_by: explicit_order_by.or(default_order_by),
+    Ok(XYTraceRoles {
+        trace_group,
+        sweep: explicit_sweep.or(default_sweep),
     })
 }
 
@@ -153,16 +153,16 @@ pub(super) fn row_order_for_group(
     schema: &DatasetSchema,
     start: usize,
     end: usize,
-    order_by: Option<usize>,
+    sweep: Option<usize>,
 ) -> Vec<usize> {
     let mut rows: Vec<usize> = (start..end).collect();
-    let Some(order_by) = order_by else {
+    let Some(sweep) = sweep else {
         return rows;
     };
 
     let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
     let arr = batch
-        .column_by_name(column_names[order_by])
+        .column_by_name(column_names[sweep])
         .expect("order column present");
     let ds: DatasetArray = arr.clone().try_into().expect("valid order column");
     let values = ds.as_numeric().expect("numeric order column").values();
@@ -295,10 +295,10 @@ pub(super) mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::{
-        compute_group_starts, group_ranges, last_outer_group_start, resolve_xy_index_roles,
+        compute_group_starts, group_ranges, last_outer_group_start, resolve_xy_trace_roles,
         test_utils::{numeric_batch, numeric_schema},
     };
-    use crate::features::charts::types::{XYDrawStyle, XYIndexRoleOptions};
+    use crate::features::charts::types::{XYDrawStyle, XYTraceRoleOptions};
 
     #[test]
     fn compute_group_starts_for_named_groups() {
@@ -333,32 +333,32 @@ mod tests {
     }
 
     #[test]
-    fn resolve_xy_index_roles_uses_explicit_group_and_default_order() {
+    fn resolve_xy_trace_roles_uses_explicit_group_and_default_sweep() {
         let schema = numeric_schema(&["outer", "middle", "inner"]);
-        let roles = resolve_xy_index_roles(
+        let roles = resolve_xy_trace_roles(
             &schema,
             Some(&[0, 1, 2]),
-            &XYIndexRoleOptions {
-                group_by_index_columns: Some(vec!["outer".to_string()]),
-                order_by_index_column: None,
+            &XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["outer".to_string()]),
+                sweep_index_column: None,
             },
             XYDrawStyle::Line,
         )
         .unwrap();
 
-        assert_eq!(roles.group_by, vec![0]);
-        assert_eq!(roles.order_by, Some(2));
+        assert_eq!(roles.trace_group, vec![0]);
+        assert_eq!(roles.sweep, Some(2));
     }
 
     #[test]
-    fn resolve_xy_index_roles_rejects_overlap() {
+    fn resolve_xy_trace_roles_rejects_overlap() {
         let schema = numeric_schema(&["outer", "inner"]);
-        let result = resolve_xy_index_roles(
+        let result = resolve_xy_trace_roles(
             &schema,
             Some(&[0, 1]),
-            &XYIndexRoleOptions {
-                group_by_index_columns: Some(vec!["inner".to_string()]),
-                order_by_index_column: Some("inner".to_string()),
+            &XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["inner".to_string()]),
+                sweep_index_column: Some("inner".to_string()),
             },
             XYDrawStyle::Line,
         );

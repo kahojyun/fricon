@@ -52,26 +52,26 @@ interface BaseChartDataOptions {
 }
 
 interface XYRoleOptions {
-  groupByIndexColumns?: string[];
-  orderByIndexColumn?: string | null;
+  traceGroupIndexColumns?: string[];
+  sweepIndexColumn?: string | null;
 }
 
-interface TrendProjectionOptions {
-  projection: "trend";
-  series: string;
+interface QuantityVsSweepPlotModeOptions {
+  plotMode: "quantity_vs_sweep";
+  quantity: string;
   complexViews?: ComplexViewOption[];
 }
 
-type XYProjectionOptions =
-  | TrendProjectionOptions
+type XYPlotModeOptions =
+  | QuantityVsSweepPlotModeOptions
   | {
-      projection: "xy";
+      plotMode: "xy";
       xColumn: string;
       yColumn: string;
     }
   | {
-      projection: "complex_xy";
-      series: string;
+      plotMode: "complex_plane";
+      quantity: string;
     };
 
 export type ChartDataOptions =
@@ -79,10 +79,10 @@ export type ChartDataOptions =
       view: "xy";
       drawStyle: XYDrawStyle;
     } & XYRoleOptions &
-      XYProjectionOptions)
+      XYPlotModeOptions)
   | (BaseChartDataOptions & {
       view: "heatmap";
-      series: string;
+      quantity: string;
       xColumn?: string;
       yColumn: string;
       complexViewSingle?: ComplexViewOption;
@@ -95,10 +95,10 @@ export type LiveChartDataOptions =
       tailCount: number;
       knownRowCount?: number | null;
     } & XYRoleOptions &
-      XYProjectionOptions)
+      XYPlotModeOptions)
   | {
       view: "heatmap";
-      series: string;
+      quantity: string;
       complexViewSingle?: ComplexViewOption;
       knownRowCount?: number | null;
     };
@@ -146,7 +146,7 @@ export function toWireChartOptions(
   if (options.view === "heatmap") {
     return {
       view: "heatmap",
-      series: options.series,
+      quantity: options.quantity,
       xColumn: options.xColumn ?? null,
       yColumn: options.yColumn,
       complexViewSingle: options.complexViewSingle ?? null,
@@ -160,9 +160,9 @@ export function toWireChartOptions(
   return {
     view: "xy",
     drawStyle: options.drawStyle,
-    ...toWireXYProjection(options),
-    groupByIndexColumns: options.groupByIndexColumns ?? null,
-    orderByIndexColumn: options.orderByIndexColumn ?? null,
+    ...toWireXYPlotMode(options),
+    traceGroupIndexColumns: options.traceGroupIndexColumns ?? null,
+    sweepIndexColumn: options.sweepIndexColumn ?? null,
     start: options.start ?? null,
     end: options.end ?? null,
     indexFilters: options.indexFilters ?? null,
@@ -176,7 +176,7 @@ export function toWireLiveChartOptions(
   if (options.view === "heatmap") {
     return {
       view: "heatmap",
-      series: options.series,
+      quantity: options.quantity,
       complexViewSingle: options.complexViewSingle ?? null,
       knownRowCount: options.knownRowCount ?? null,
     };
@@ -187,9 +187,9 @@ export function toWireLiveChartOptions(
     drawStyle: options.drawStyle,
     tailCount: options.tailCount,
     knownRowCount: options.knownRowCount ?? null,
-    groupByIndexColumns: options.groupByIndexColumns ?? null,
-    orderByIndexColumn: options.orderByIndexColumn ?? null,
-    ...toWireXYProjection(options),
+    traceGroupIndexColumns: options.traceGroupIndexColumns ?? null,
+    sweepIndexColumn: options.sweepIndexColumn ?? null,
+    ...toWireXYPlotMode(options),
   };
 }
 
@@ -207,7 +207,7 @@ export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
 
   return {
     type: "xy",
-    projection: result.projection,
+    plotMode: result.plotMode,
     drawStyle: result.drawStyle,
     xName: result.xName,
     yName: result.yName,
@@ -249,38 +249,38 @@ export function normalizeFilterTableData(
   };
 }
 
-function toWireXYProjection(options: XYProjectionOptions):
+function toWireXYPlotMode(options: XYPlotModeOptions):
   | {
-      projection: "trend";
-      series: string;
+      plotMode: "quantity_vs_sweep";
+      quantity: string;
       complex_views: ComplexViewOption[] | null;
     }
   | {
-      projection: "xy";
+      plotMode: "xy";
       xColumn: string;
       yColumn: string;
     }
   | {
-      projection: "complex_xy";
-      series: string;
+      plotMode: "complex_plane";
+      quantity: string;
     } {
-  switch (options.projection) {
-    case "trend":
+  switch (options.plotMode) {
+    case "quantity_vs_sweep":
       return {
-        projection: "trend",
-        series: options.series,
+        plotMode: "quantity_vs_sweep",
+        quantity: options.quantity,
         complex_views: options.complexViews ?? null,
       };
     case "xy":
       return {
-        projection: "xy",
+        plotMode: "xy",
         xColumn: options.xColumn,
         yColumn: options.yColumn,
       };
-    case "complex_xy":
+    case "complex_plane":
       return {
-        projection: "complex_xy",
-        series: options.series,
+        plotMode: "complex_plane",
+        quantity: options.quantity,
       };
   }
 }

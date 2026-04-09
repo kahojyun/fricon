@@ -36,9 +36,9 @@ export function buildChartFrameHeader({
 
   const groupBy =
     isLiveMode && derived.liveMonitorUsesForcedRoles
-      ? derived.liveMonitorGroupByIndexColumnNames
+      ? derived.liveMonitorTraceGroupIndexColumnNames
       : !isLiveMode && derived.xyRoleControlsVisible
-        ? derived.effectiveGroupByIndexColumnNames
+        ? derived.effectiveTraceGroupIndexColumnNames
         : [];
   if (groupBy.length > 0) {
     meta.push(`grouped by ${groupBy.join(", ")}`);
@@ -55,7 +55,7 @@ export function buildChartFrameHeader({
 
 function liveWindowUnit(derived: ReturnType<typeof deriveChartViewerState>) {
   return derived.xyUsesTraceSource ||
-    derived.liveMonitorGroupByIndexColumnNames.length > 0
+    derived.liveMonitorTraceGroupIndexColumnNames.length > 0
     ? "sweeps"
     : "points";
 }

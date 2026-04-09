@@ -1,6 +1,6 @@
 export type ChartView = "xy" | "heatmap";
 
-export type XYProjection = "trend" | "xy" | "complex_xy";
+export type XYPlotMode = "quantity_vs_sweep" | "xy" | "complex_plane";
 
 export type XYDrawStyle = "line" | "points" | "line_points";
 
@@ -22,7 +22,7 @@ export interface HeatmapSeries {
 
 export interface XYChartModel {
   type: "xy";
-  projection: XYProjection;
+  plotMode: XYPlotMode;
   drawStyle: XYDrawStyle;
   xName: string;
   yName: string | null;

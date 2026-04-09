@@ -4,12 +4,12 @@ use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
 use super::{
-    XYIndexRoles, compute_group_starts, group_ranges, make_group_id_suffix, make_group_label,
-    resolve_xy_index_roles, row_order_for_group, row_series_id,
+    XYTraceRoles, compute_group_starts, group_ranges, make_group_id_suffix, make_group_label,
+    resolve_xy_trace_roles, row_order_for_group, row_series_id,
 };
 use crate::features::charts::types::{
-    ChartSnapshot, ComplexViewOption, FlatXYSeries, LiveXYOptions, XYChartSnapshot, XYProjection,
-    XYProjectionOptions, complex_view_label, transform_complex_values,
+    ChartSnapshot, ComplexViewOption, FlatXYSeries, LiveXYOptions, XYChartSnapshot, XYPlotMode,
+    XYPlotModeOptions, complex_view_label, transform_complex_values,
 };
 
 pub(crate) fn build_live_xy_series(
@@ -20,41 +20,36 @@ pub(crate) fn build_live_xy_series(
 ) -> Result<ChartSnapshot> {
     debug!(
         chart_type = "live_xy",
-        projection = ?options.projection.projection(),
+        plot_mode = ?options.plot_mode.plot_mode(),
         rows = batch.num_rows(),
         tail_count = options.tail_count,
         "Building live XY chart series"
     );
 
-    let snapshot = match &options.projection {
-        XYProjectionOptions::Trend {
-            series,
+    let snapshot = match &options.plot_mode {
+        XYPlotModeOptions::QuantityVsSweep {
+            quantity,
             complex_views,
-        } => build_live_trend_snapshot(
+        } => build_live_quantity_vs_sweep_snapshot(
             batch,
             schema,
             index_columns,
             options,
-            series,
+            quantity,
             complex_views.as_deref().unwrap_or(&[]),
         )?,
-        XYProjectionOptions::Xy { x_column, y_column } => build_live_xy_projection_snapshot(
-            batch,
-            schema,
-            index_columns,
-            options,
-            x_column,
-            y_column,
-        )?,
-        XYProjectionOptions::ComplexXy { series } => {
-            build_live_complex_xy_snapshot(batch, schema, index_columns, options, series)?
+        XYPlotModeOptions::Xy { x_column, y_column } => {
+            build_live_xy_snapshot(batch, schema, index_columns, options, x_column, y_column)?
+        }
+        XYPlotModeOptions::ComplexPlane { quantity } => {
+            build_live_complex_plane_snapshot(batch, schema, index_columns, options, quantity)?
         }
     };
 
     Ok(ChartSnapshot::Xy(snapshot))
 }
 
-fn build_live_trend_snapshot(
+fn build_live_quantity_vs_sweep_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
@@ -71,15 +66,21 @@ fn build_live_trend_snapshot(
     let tail_count = options.tail_count.max(1);
 
     let series = if is_trace {
-        build_live_trace_trend(batch, series_name, is_complex, complex_views, tail_count)?
+        build_live_trace_quantity_vs_sweep(
+            batch,
+            series_name,
+            is_complex,
+            complex_views,
+            tail_count,
+        )?
     } else {
-        let roles = resolve_xy_index_roles(
+        let roles = resolve_xy_trace_roles(
             schema,
             index_columns,
-            &options.index_roles,
+            &options.trace_roles,
             options.draw_style,
         )?;
-        build_live_scalar_trend(
+        build_live_scalar_quantity_vs_sweep(
             batch,
             schema,
             series_name,
@@ -93,11 +94,11 @@ fn build_live_trend_snapshot(
     let x_name = if is_trace {
         format!("{series_name} - X")
     } else {
-        resolve_live_trend_x_name(schema, index_columns, options)?
+        resolve_live_quantity_vs_sweep_x_name(schema, index_columns, options)?
     };
 
     Ok(XYChartSnapshot {
-        projection: XYProjection::Trend,
+        plot_mode: XYPlotMode::QuantityVsSweep,
         draw_style: options.draw_style,
         x_name,
         y_name: None,
@@ -105,7 +106,7 @@ fn build_live_trend_snapshot(
     })
 }
 
-fn build_live_xy_projection_snapshot(
+fn build_live_xy_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
@@ -128,19 +129,19 @@ fn build_live_xy_projection_snapshot(
     let series = match (x_is_trace, y_is_trace) {
         (true, true) => build_live_trace_xy(batch, x_column, y_column, tail_count)?,
         (false, false) => {
-            let roles = resolve_xy_index_roles(
+            let roles = resolve_xy_trace_roles(
                 schema,
                 index_columns,
-                &options.index_roles,
+                &options.trace_roles,
                 options.draw_style,
             )?;
             build_live_scalar_xy(batch, schema, x_column, y_column, tail_count, &roles)?
         }
-        _ => bail!("X/Y projection requires both columns to be trace or both to be scalar"),
+        _ => bail!("X/Y plot mode requires both columns to be trace or both to be scalar"),
     };
 
     Ok(XYChartSnapshot {
-        projection: XYProjection::Xy,
+        plot_mode: XYPlotMode::Xy,
         draw_style: options.draw_style,
         x_name: x_column.to_string(),
         y_name: Some(y_column.to_string()),
@@ -148,7 +149,7 @@ fn build_live_xy_projection_snapshot(
     })
 }
 
-fn build_live_complex_xy_snapshot(
+fn build_live_complex_plane_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
@@ -163,19 +164,19 @@ fn build_live_complex_xy_snapshot(
     let tail_count = options.tail_count.max(1);
 
     let series = if is_trace {
-        build_live_trace_complex_xy(batch, schema, series_name, tail_count)?
+        build_live_trace_complex_plane(batch, schema, series_name, tail_count)?
     } else {
-        let roles = resolve_xy_index_roles(
+        let roles = resolve_xy_trace_roles(
             schema,
             index_columns,
-            &options.index_roles,
+            &options.trace_roles,
             options.draw_style,
         )?;
-        build_live_scalar_complex_xy(batch, schema, series_name, tail_count, &roles)?
+        build_live_scalar_complex_plane(batch, schema, series_name, tail_count, &roles)?
     };
 
     Ok(XYChartSnapshot {
-        projection: XYProjection::ComplexXy,
+        plot_mode: XYPlotMode::ComplexPlane,
         draw_style: options.draw_style,
         x_name: format!("{series_name} (real)"),
         y_name: Some(format!("{series_name} (imag)")),
@@ -183,7 +184,7 @@ fn build_live_complex_xy_snapshot(
     })
 }
 
-fn build_live_trace_trend(
+fn build_live_trace_quantity_vs_sweep(
     batch: &RecordBatch,
     series_name: &str,
     is_complex: bool,
@@ -300,7 +301,7 @@ fn build_live_trace_xy(
     Ok(result)
 }
 
-fn build_live_trace_complex_xy(
+fn build_live_trace_complex_plane(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     series_name: &str,
@@ -311,7 +312,7 @@ fn build_live_trace_complex_xy(
         .get(series_name)
         .context("Column not found")?;
     if !matches!(data_type, DatasetDataType::Trace(_, _)) {
-        bail!("Complex XY live trace projection requires a trace series");
+        bail!("Complex plane live trace plot mode requires a trace quantity");
     }
 
     let series_array: DatasetArray = batch
@@ -348,14 +349,14 @@ fn build_live_trace_complex_xy(
     Ok(result)
 }
 
-fn build_live_scalar_trend(
+fn build_live_scalar_quantity_vs_sweep(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     series_name: &str,
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
     let series_column = batch
         .column_by_name(series_name)
@@ -363,10 +364,10 @@ fn build_live_scalar_trend(
         .context("Series column not found")?;
     let ds_y: DatasetArray = series_column.try_into()?;
     let x_values = roles
-        .order_by
+        .sweep
         .map(|index| numeric_values(batch, schema, index))
         .transpose()?;
-    let ctx = LiveScalarTrendContext {
+    let ctx = LiveScalarQuantityVsSweepContext {
         batch,
         schema,
         series_name,
@@ -375,11 +376,16 @@ fn build_live_scalar_trend(
         x_values: x_values.as_deref(),
     };
 
-    if roles.group_by.is_empty() {
-        return build_live_scalar_trend_rows(&ctx, is_complex, complex_views, tail_count);
+    if roles.trace_group.is_empty() {
+        return build_live_scalar_quantity_vs_sweep_rows(
+            &ctx,
+            is_complex,
+            complex_views,
+            tail_count,
+        );
     }
 
-    build_live_scalar_trend_groups(&ctx, is_complex, complex_views, tail_count)
+    build_live_scalar_quantity_vs_sweep_groups(&ctx, is_complex, complex_views, tail_count)
 }
 
 fn build_live_scalar_xy(
@@ -388,7 +394,7 @@ fn build_live_scalar_xy(
     x_column: &str,
     y_column: &str,
     tail_count: usize,
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
     let x_array: DatasetArray = batch
         .column_by_name(x_column)
@@ -413,12 +419,12 @@ fn build_live_scalar_xy(
     ))
 }
 
-fn build_live_scalar_complex_xy(
+fn build_live_scalar_complex_plane(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     series_name: &str,
     tail_count: usize,
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
     let series_column: DatasetArray = batch
         .column_by_name(series_name)
@@ -445,14 +451,14 @@ fn build_live_grouped_xy(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     tail_count: usize,
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
     base_label: &str,
     point_at: impl Fn(usize) -> (f64, f64),
 ) -> Vec<FlatXYSeries> {
-    if roles.group_by.is_empty() {
+    if roles.trace_group.is_empty() {
         let num_rows = batch.num_rows();
         let start = num_rows.saturating_sub(tail_count);
-        let rows = row_order_for_group(batch, schema, start, num_rows, roles.order_by);
+        let rows = row_order_for_group(batch, schema, start, num_rows, roles.sweep);
         let mut values = Vec::with_capacity(rows.len() * 2);
         for row in rows.iter().copied() {
             let (x, y) = point_at(row);
@@ -467,14 +473,14 @@ fn build_live_grouped_xy(
         )];
     }
 
-    let groups = compute_group_starts(batch, schema, &roles.group_by);
+    let groups = compute_group_starts(batch, schema, &roles.trace_group);
     let ranges = group_ranges(&groups, batch.num_rows());
     let selected = &ranges[ranges.len().saturating_sub(tail_count)..];
     let mut result = Vec::new();
 
     for &(group_start, group_end) in selected {
-        let rows = row_order_for_group(batch, schema, group_start, group_end, roles.order_by);
-        let group_label = make_group_label(batch, schema, &roles.group_by, group_start);
+        let rows = row_order_for_group(batch, schema, group_start, group_end, roles.sweep);
+        let group_label = make_group_label(batch, schema, &roles.trace_group, group_start);
         let mut values = Vec::with_capacity(rows.len() * 2);
         for row in rows.iter().copied() {
             let (x, y) = point_at(row);
@@ -492,18 +498,18 @@ fn build_live_grouped_xy(
     result
 }
 
-fn resolve_live_trend_x_name(
+fn resolve_live_quantity_vs_sweep_x_name(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     options: &LiveXYOptions,
 ) -> Result<String> {
-    let roles = resolve_xy_index_roles(
+    let roles = resolve_xy_trace_roles(
         schema,
         index_columns,
-        &options.index_roles,
+        &options.trace_roles,
         options.draw_style,
     )?;
-    Ok(match roles.order_by {
+    Ok(match roles.sweep {
         Some(index) => schema
             .columns()
             .get_index(index)
@@ -536,7 +542,11 @@ fn row_axis_value(row: usize) -> Result<f64> {
     Ok(f64::from(row))
 }
 
-fn resolve_trend_x(x_values: Option<&[f64]>, position: usize, row: usize) -> Result<f64> {
+fn resolve_quantity_vs_sweep_x(
+    x_values: Option<&[f64]>,
+    position: usize,
+    row: usize,
+) -> Result<f64> {
     Ok(x_values
         .and_then(|values| values.get(row).copied())
         .unwrap_or(row_axis_value(position)?))
@@ -578,24 +588,24 @@ fn resolved_complex_views(complex_views: &[ComplexViewOption]) -> Vec<ComplexVie
     }
 }
 
-struct LiveScalarTrendContext<'a> {
+struct LiveScalarQuantityVsSweepContext<'a> {
     batch: &'a RecordBatch,
     schema: &'a DatasetSchema,
     series_name: &'a str,
     ds_y: &'a DatasetArray,
-    roles: &'a XYIndexRoles,
+    roles: &'a XYTraceRoles,
     x_values: Option<&'a [f64]>,
 }
 
-fn build_live_scalar_trend_rows(
-    ctx: &LiveScalarTrendContext<'_>,
+fn build_live_scalar_quantity_vs_sweep_rows(
+    ctx: &LiveScalarQuantityVsSweepContext<'_>,
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
 ) -> Result<Vec<FlatXYSeries>> {
     let num_rows = ctx.batch.num_rows();
     let start = num_rows.saturating_sub(tail_count);
-    let rows = row_order_for_group(ctx.batch, ctx.schema, start, num_rows, ctx.roles.order_by);
+    let rows = row_order_for_group(ctx.batch, ctx.schema, start, num_rows, ctx.roles.sweep);
 
     if is_complex {
         let complex_array = ctx.ds_y.as_complex().context("Expected complex array")?;
@@ -607,7 +617,7 @@ fn build_live_scalar_trend_rows(
                 let transformed = transform_complex_values(reals, imags, view);
                 let mut values = Vec::with_capacity(rows.len() * 2);
                 for (position, row) in rows.iter().copied().enumerate() {
-                    values.push(resolve_trend_x(ctx.x_values, position, row)?);
+                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
                     values.push(transformed[row]);
                 }
                 Ok(FlatXYSeries::new(
@@ -627,7 +637,7 @@ fn build_live_scalar_trend_rows(
         .values();
     let mut values = Vec::with_capacity(rows.len() * 2);
     for (position, row) in rows.iter().copied().enumerate() {
-        values.push(resolve_trend_x(ctx.x_values, position, row)?);
+        values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
         values.push(y_values[row]);
     }
     Ok(vec![FlatXYSeries::new(
@@ -638,13 +648,13 @@ fn build_live_scalar_trend_rows(
     )])
 }
 
-fn build_live_scalar_trend_groups(
-    ctx: &LiveScalarTrendContext<'_>,
+fn build_live_scalar_quantity_vs_sweep_groups(
+    ctx: &LiveScalarQuantityVsSweepContext<'_>,
     is_complex: bool,
     complex_views: &[ComplexViewOption],
     tail_count: usize,
 ) -> Result<Vec<FlatXYSeries>> {
-    let groups = compute_group_starts(ctx.batch, ctx.schema, &ctx.roles.group_by);
+    let groups = compute_group_starts(ctx.batch, ctx.schema, &ctx.roles.trace_group);
     let ranges = group_ranges(&groups, ctx.batch.num_rows());
     let selected = &ranges[ranges.len().saturating_sub(tail_count)..];
 
@@ -661,17 +671,17 @@ fn build_live_scalar_trend_groups(
                 ctx.schema,
                 group_start,
                 group_end,
-                ctx.roles.order_by,
+                ctx.roles.sweep,
             );
             let group_label =
-                make_group_label(ctx.batch, ctx.schema, &ctx.roles.group_by, group_start);
+                make_group_label(ctx.batch, ctx.schema, &ctx.roles.trace_group, group_start);
             let group_id =
-                make_group_id_suffix(ctx.batch, ctx.schema, &ctx.roles.group_by, group_start);
+                make_group_id_suffix(ctx.batch, ctx.schema, &ctx.roles.trace_group, group_start);
             for &view in &views {
                 let transformed = transform_complex_values(reals, imags, view);
                 let mut values = Vec::with_capacity(rows.len() * 2);
                 for (position, row) in rows.iter().copied().enumerate() {
-                    values.push(resolve_trend_x(ctx.x_values, position, row)?);
+                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
                     values.push(transformed[row]);
                 }
                 result.push(FlatXYSeries::new(
@@ -706,12 +716,13 @@ fn build_live_scalar_trend_groups(
             ctx.schema,
             group_start,
             group_end,
-            ctx.roles.order_by,
+            ctx.roles.sweep,
         );
-        let group_label = make_group_label(ctx.batch, ctx.schema, &ctx.roles.group_by, group_start);
+        let group_label =
+            make_group_label(ctx.batch, ctx.schema, &ctx.roles.trace_group, group_start);
         let mut values = Vec::with_capacity(rows.len() * 2);
         for (position, row) in rows.iter().copied().enumerate() {
-            values.push(resolve_trend_x(ctx.x_values, position, row)?);
+            values.push(resolve_quantity_vs_sweep_x(ctx.x_values, position, row)?);
             values.push(y_values[row]);
         }
         result.push(FlatXYSeries::new(
@@ -730,7 +741,7 @@ mod tests {
     use super::*;
     use crate::features::charts::{
         transform::test_utils::{numeric_batch, numeric_schema},
-        types::{LiveChartDataOptions, XYDrawStyle, XYIndexRoleOptions},
+        types::{LiveChartDataOptions, XYDrawStyle, XYPlotModeOptions, XYTraceRoleOptions},
     };
 
     fn xy_snapshot(snapshot: ChartSnapshot) -> XYChartSnapshot {
@@ -760,11 +771,11 @@ mod tests {
                     draw_style: XYDrawStyle::Line,
                     tail_count: 2,
                     known_row_count: None,
-                    projection: XYProjectionOptions::Xy {
+                    plot_mode: XYPlotModeOptions::Xy {
                         x_column: "x".to_string(),
                         y_column: "y".to_string(),
                     },
-                    index_roles: XYIndexRoleOptions::default(),
+                    trace_roles: XYTraceRoleOptions::default(),
                 }) {
                     LiveChartDataOptions::Xy(options) => options,
                     LiveChartDataOptions::Heatmap(_) => unreachable!(),

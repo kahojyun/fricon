@@ -30,7 +30,7 @@ export function getTooltipLines(
 
     return data.series.flatMap((series) => {
       const nearest =
-        data.projection === "trend"
+        data.plotMode === "quantity_vs_sweep"
           ? findNearestX(series, dataX)
           : findNearestPoint(
               series,

@@ -203,7 +203,7 @@ export type FlatXYZSeries = {
 };
 
 export type HeatmapChartDataOptions = {
-	series: string,
+	quantity: string,
 	xColumn: string | null,
 	yColumn: string,
 	complexViewSingle: ComplexViewOption | null,
@@ -224,7 +224,7 @@ export type LiveChartDataOptions = { view: "xy" } & (LiveXYOptions) | { view: "h
 export type LiveChartDataResponse = { mode: "reset"; row_count: number; snapshot: ChartSnapshot } | { mode: "append"; row_count: number; ops: LiveChartAppendOperation[] };
 
 export type LiveHeatmapOptions = {
-	series: string,
+	quantity: string,
 	complexViewSingle: ComplexViewOption | null,
 	knownRowCount?: number | null,
 };
@@ -233,7 +233,7 @@ export type LiveXYOptions = {
 	drawStyle: XYDrawStyle,
 	tailCount: number,
 	knownRowCount?: number | null,
-} & (XYProjectionOptions) & (XYIndexRoleOptions);
+} & (XYPlotModeOptions) & (XYTraceRoleOptions);
 
 export type Row = {
 	displayValues: string[],
@@ -290,10 +290,10 @@ export type WorkspaceInfo = {
 
 export type XYChartDataOptions = {
 	drawStyle: XYDrawStyle,
-} & (XYProjectionOptions) & (XYIndexRoleOptions) & (ChartCommonOptions);
+} & (XYPlotModeOptions) & (XYTraceRoleOptions) & (ChartCommonOptions);
 
 export type XYChartSnapshot = {
-	projection: XYProjection,
+	plotMode: XYPlotMode,
 	drawStyle: XYDrawStyle,
 	xName: string,
 	yName: string | null,
@@ -302,14 +302,14 @@ export type XYChartSnapshot = {
 
 export type XYDrawStyle = "line" | "points" | "line_points";
 
-export type XYIndexRoleOptions = {
-	groupByIndexColumns?: string[] | null,
-	orderByIndexColumn?: string | null,
+export type XYPlotMode = "quantity_vs_sweep" | "xy" | "complex_plane";
+
+export type XYPlotModeOptions = { plotMode: "quantity_vs_sweep"; quantity: string; complex_views: ComplexViewOption[] | null } | { plotMode: "xy"; xColumn: string; yColumn: string } | { plotMode: "complex_plane"; quantity: string };
+
+export type XYTraceRoleOptions = {
+	traceGroupIndexColumns?: string[] | null,
+	sweepIndexColumn?: string | null,
 };
-
-export type XYProjection = "trend" | "xy" | "complex_xy";
-
-export type XYProjectionOptions = { projection: "trend"; series: string; complex_views: ComplexViewOption[] | null } | { projection: "xy"; xColumn: string; yColumn: string } | { projection: "complex_xy"; series: string };
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

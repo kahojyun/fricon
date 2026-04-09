@@ -25,11 +25,11 @@ function buildLiveChartRequest(
 ): LiveChartDataOptions | null {
   const tailCount = liveWindowCount;
 
-  if (derived.effectiveView === "heatmap" && derived.heatmapSeries) {
+  if (derived.effectiveView === "heatmap" && derived.heatmapQuantity) {
     return {
       view: "heatmap",
-      series: derived.heatmapSeries.name,
-      complexViewSingle: derived.heatmapSeries.isComplex
+      quantity: derived.heatmapQuantity.name,
+      complexViewSingle: derived.heatmapQuantity.isComplex
         ? selectedComplexViewSingle
         : undefined,
     };
@@ -41,22 +41,24 @@ function buildLiveChartRequest(
 
   const roleOptions = derived.liveMonitorUsesForcedRoles
     ? {
-        groupByIndexColumns:
-          derived.liveMonitorGroupByIndexColumnNames.length > 0
-            ? derived.liveMonitorGroupByIndexColumnNames
+        traceGroupIndexColumns:
+          derived.liveMonitorTraceGroupIndexColumnNames.length > 0
+            ? derived.liveMonitorTraceGroupIndexColumnNames
             : undefined,
-        orderByIndexColumn:
-          derived.liveMonitorOrderByIndexColumnName ?? undefined,
+        sweepIndexColumn: derived.liveMonitorSweepIndexColumnName ?? undefined,
       }
     : {};
 
-  if (derived.effectiveProjection === "trend" && derived.trendSeries) {
+  if (
+    derived.effectivePlotMode === "quantity_vs_sweep" &&
+    derived.sweepQuantity
+  ) {
     return {
       view: "xy",
-      projection: "trend",
+      plotMode: "quantity_vs_sweep",
       drawStyle: derived.effectiveDrawStyle,
-      series: derived.trendSeries.name,
-      complexViews: derived.trendSeries.isComplex
+      quantity: derived.sweepQuantity.name,
+      complexViews: derived.sweepQuantity.isComplex
         ? selectedComplexView
         : undefined,
       tailCount,
@@ -65,13 +67,13 @@ function buildLiveChartRequest(
   }
 
   if (
-    derived.effectiveProjection === "xy" &&
+    derived.effectivePlotMode === "xy" &&
     derived.xyXColumn &&
     derived.xyYColumn
   ) {
     return {
       view: "xy",
-      projection: "xy",
+      plotMode: "xy",
       drawStyle: derived.effectiveDrawStyle,
       xColumn: derived.xyXColumn.name,
       yColumn: derived.xyYColumn.name,
@@ -80,12 +82,15 @@ function buildLiveChartRequest(
     };
   }
 
-  if (derived.effectiveProjection === "complex_xy" && derived.complexXYSeries) {
+  if (
+    derived.effectivePlotMode === "complex_plane" &&
+    derived.complexPlaneQuantity
+  ) {
     return {
       view: "xy",
-      projection: "complex_xy",
+      plotMode: "complex_plane",
       drawStyle: derived.effectiveDrawStyle,
-      series: derived.complexXYSeries.name,
+      quantity: derived.complexPlaneQuantity.name,
       tailCount,
       ...roleOptions,
     };

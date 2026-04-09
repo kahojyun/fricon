@@ -37,10 +37,10 @@ const viewLabels = {
   heatmap: "Heatmap",
 } as const;
 
-const projectionLabels = {
-  trend: "Quantity vs Sweep",
+const plotModeLabels = {
+  quantity_vs_sweep: "Quantity vs Sweep",
   xy: "X-Y Plot",
-  complex_xy: "Complex Plane",
+  complex_plane: "Complex Plane",
 } as const;
 
 const drawStyleLabels = {
@@ -73,40 +73,41 @@ export function ChartViewerControls({
   } = controlState;
   const {
     setView,
-    setProjection,
+    setPlotMode,
     setDrawStyle,
-    setTrendSeriesName,
-    setHeatmapSeriesName,
-    setComplexXYSeriesName,
+    setSweepQuantityName,
+    setHeatmapQuantityName,
+    setComplexPlaneQuantityName,
     setXYXName,
     setXYYName,
     setHeatmapXName,
     setHeatmapYName,
-    toggleGroupByIndexColumnName,
-    setOrderByIndexColumnName,
+    toggleTraceGroupIndexColumnName,
+    setSweepIndexColumnName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
     setLiveWindowCount,
   } = actions;
-  const showPrimaryProjection = derived.effectiveView === "xy";
+  const showPrimaryPlotMode = derived.effectiveView === "xy";
   const showPrimaryLiveWindow = isLiveMode && derived.effectiveView === "xy";
-  const showPrimaryOrderBy = derived.xyRoleControlsVisible && !isLiveMode;
+  const showPrimarySweepAxis = derived.xyRoleControlsVisible && !isLiveMode;
   const showAdvancedStyle = derived.effectiveView === "xy";
   const showAdvancedHeatmapAxes =
     derived.effectiveView === "heatmap" && !isLiveMode;
   const showAdvancedGrouping = derived.xyRoleControlsVisible && !isLiveMode;
   const showAdvancedComplexControls =
     derived.effectiveView === "heatmap" ||
-    (derived.effectiveView === "xy" && derived.effectiveProjection === "trend");
+    (derived.effectiveView === "xy" &&
+      derived.effectivePlotMode === "quantity_vs_sweep");
   const showAdvancedControls =
     showAdvancedStyle ||
     showAdvancedHeatmapAxes ||
     showAdvancedGrouping ||
     showAdvancedComplexControls;
-  const allowEmptySweepAxis = derived.effectiveProjection !== "trend";
+  const allowEmptySweepAxis = derived.effectivePlotMode !== "quantity_vs_sweep";
   const liveWindowUnit =
     derived.xyUsesTraceSource ||
-    derived.liveMonitorGroupByIndexColumnNames.length > 0
+    derived.liveMonitorTraceGroupIndexColumnNames.length > 0
       ? "sweeps"
       : "points";
   const liveWindowLabel = `Recent ${capitalize(liveWindowUnit)}`;
@@ -160,31 +161,31 @@ export function ChartViewerControls({
           </Select>
         </div>
 
-        {showPrimaryProjection ? (
+        {showPrimaryPlotMode ? (
           <>
             <div className="min-w-40">
               <Label className="mb-1 block">Plot Mode</Label>
               <Select
-                value={derived.effectiveProjection}
+                value={derived.effectivePlotMode}
                 onValueChange={(value) => {
                   if (
-                    value === "trend" ||
+                    value === "quantity_vs_sweep" ||
                     value === "xy" ||
-                    value === "complex_xy"
+                    value === "complex_plane"
                   ) {
-                    setProjection(value);
+                    setPlotMode(value);
                   }
                 }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select plot mode">
-                    {projectionLabels[derived.effectiveProjection]}
+                    {plotModeLabels[derived.effectivePlotMode]}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {derived.availableProjections.map((projection) => (
-                    <SelectItem key={projection.value} value={projection.value}>
-                      {projection.label}
+                  {derived.availablePlotModes.map((plotMode) => (
+                    <SelectItem key={plotMode.value} value={plotMode.value}>
+                      {plotMode.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -194,22 +195,22 @@ export function ChartViewerControls({
         ) : null}
 
         {derived.effectiveView === "xy" &&
-        derived.effectiveProjection === "trend" ? (
+        derived.effectivePlotMode === "quantity_vs_sweep" ? (
           <div className="min-w-50">
             <Label className="mb-1 block">Quantity</Label>
             <Select
-              value={derived.effectiveTrendSeriesName ?? ""}
+              value={derived.effectiveSweepQuantityName ?? ""}
               onValueChange={(value) =>
-                setTrendSeriesName(value === "" ? null : value)
+                setSweepQuantityName(value === "" ? null : value)
               }
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select quantity">
-                  {derived.effectiveTrendSeriesName ?? undefined}
+                  {derived.effectiveSweepQuantityName ?? undefined}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {derived.trendSeriesOptions.map((option: ColumnInfo) => (
+                {derived.sweepQuantityOptions.map((option: ColumnInfo) => (
                   <SelectItem key={option.name} value={option.name}>
                     {option.name}
                   </SelectItem>
@@ -220,7 +221,7 @@ export function ChartViewerControls({
         ) : null}
 
         {derived.effectiveView === "xy" &&
-        derived.effectiveProjection === "xy" ? (
+        derived.effectivePlotMode === "xy" ? (
           <>
             <div className="min-w-40">
               <Label className="mb-1 block">X Axis</Label>
@@ -270,26 +271,28 @@ export function ChartViewerControls({
         ) : null}
 
         {derived.effectiveView === "xy" &&
-        derived.effectiveProjection === "complex_xy" ? (
+        derived.effectivePlotMode === "complex_plane" ? (
           <div className="min-w-50">
             <Label className="mb-1 block">Complex Quantity</Label>
             <Select
-              value={derived.effectiveComplexXYSeriesName ?? ""}
+              value={derived.effectiveComplexPlaneQuantityName ?? ""}
               onValueChange={(value) =>
-                setComplexXYSeriesName(value === "" ? null : value)
+                setComplexPlaneQuantityName(value === "" ? null : value)
               }
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select quantity">
-                  {derived.effectiveComplexXYSeriesName ?? undefined}
+                  {derived.effectiveComplexPlaneQuantityName ?? undefined}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {derived.complexXYSeriesOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
+                {derived.complexPlaneQuantityOptions.map(
+                  (option: ColumnInfo) => (
+                    <SelectItem key={option.name} value={option.name}>
+                      {option.name}
+                    </SelectItem>
+                  ),
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -300,18 +303,18 @@ export function ChartViewerControls({
             <div className="min-w-50">
               <Label className="mb-1 block">Quantity</Label>
               <Select
-                value={derived.effectiveHeatmapSeriesName ?? ""}
+                value={derived.effectiveHeatmapQuantityName ?? ""}
                 onValueChange={(value) =>
-                  setHeatmapSeriesName(value === "" ? null : value)
+                  setHeatmapQuantityName(value === "" ? null : value)
                 }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select quantity">
-                    {derived.effectiveHeatmapSeriesName ?? undefined}
+                    {derived.effectiveHeatmapQuantityName ?? undefined}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {derived.heatmapSeriesOptions.map((option: ColumnInfo) => (
+                  {derived.heatmapQuantityOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
@@ -322,17 +325,17 @@ export function ChartViewerControls({
           </>
         ) : null}
 
-        {showPrimaryOrderBy ? (
+        {showPrimarySweepAxis ? (
           <div className="min-w-40">
             <Label className="mb-1 block">Sweep Axis</Label>
             <Select
               value={
                 allowEmptySweepAxis
-                  ? (derived.effectiveOrderByIndexColumnName ?? "__none__")
-                  : (derived.effectiveOrderByIndexColumnName ?? "")
+                  ? (derived.effectiveSweepIndexColumnName ?? "__none__")
+                  : (derived.effectiveSweepIndexColumnName ?? "")
               }
               onValueChange={(value) =>
-                setOrderByIndexColumnName(value === "__none__" ? null : value)
+                setSweepIndexColumnName(value === "__none__" ? null : value)
               }
             >
               <SelectTrigger className="w-full">
@@ -341,7 +344,7 @@ export function ChartViewerControls({
                     allowEmptySweepAxis ? "No sweep axis" : "Select sweep axis"
                   }
                 >
-                  {derived.effectiveOrderByIndexColumnName ??
+                  {derived.effectiveSweepIndexColumnName ??
                     (allowEmptySweepAxis ? "None" : undefined)}
                 </SelectValue>
               </SelectTrigger>
@@ -349,7 +352,7 @@ export function ChartViewerControls({
                 {allowEmptySweepAxis ? (
                   <SelectItem value="__none__">None</SelectItem>
                 ) : null}
-                {derived.orderByOptions.map((option: ColumnInfo) => (
+                {derived.sweepAxisOptions.map((option: ColumnInfo) => (
                   <SelectItem key={option.name} value={option.name}>
                     {option.name}
                   </SelectItem>
@@ -443,7 +446,7 @@ export function ChartViewerControls({
                   onValueChange={(value) =>
                     setHeatmapXName(value === "" ? null : value)
                   }
-                  disabled={Boolean(derived.heatmapSeries?.isTrace)}
+                  disabled={Boolean(derived.heatmapQuantity?.isTrace)}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select X index">
@@ -488,14 +491,14 @@ export function ChartViewerControls({
             <div className="flex min-w-60 flex-col">
               <Label className="mb-1 block">Group By</Label>
               <div className="flex flex-wrap gap-2 rounded border border-border/60 px-2 py-1.5">
-                {derived.groupByOptions.length === 0 ? (
+                {derived.traceGroupOptions.length === 0 ? (
                   <span className="text-xs text-muted-foreground">
                     No remaining grouping axes
                   </span>
                 ) : (
-                  derived.groupByOptions.map((option: ColumnInfo) => {
+                  derived.traceGroupOptions.map((option: ColumnInfo) => {
                     const checked =
-                      derived.effectiveGroupByIndexColumnNames.includes(
+                      derived.effectiveTraceGroupIndexColumnNames.includes(
                         option.name,
                       );
                     return (
@@ -506,7 +509,7 @@ export function ChartViewerControls({
                         <Checkbox
                           checked={checked}
                           onCheckedChange={() =>
-                            toggleGroupByIndexColumnName(option.name)
+                            toggleTraceGroupIndexColumnName(option.name)
                           }
                         />
                         <span>{option.name}</span>
@@ -592,17 +595,17 @@ export function ChartViewerControls({
             <span>
               Live Acquisition shows the most recent {liveWindowCount} sweeps.
             </span>
-          ) : derived.liveMonitorGroupByIndexColumnNames.length > 0 ? (
+          ) : derived.liveMonitorTraceGroupIndexColumnNames.length > 0 ? (
             <span>
               Live Acquisition shows the most recent {liveWindowCount} sweeps,
-              grouped by {derived.liveMonitorGroupByIndexColumnNames.join(", ")}{" "}
-              and swept along {derived.liveMonitorOrderByIndexColumnName}.
+              grouped by{" "}
+              {derived.liveMonitorTraceGroupIndexColumnNames.join(", ")} and
+              swept along {derived.liveMonitorSweepIndexColumnName}.
             </span>
           ) : derived.liveMonitorUsesForcedRoles ? (
             <span>
               Live Acquisition shows the most recent {liveWindowCount} points,
-              using {derived.liveMonitorOrderByIndexColumnName} as the sweep
-              axis.
+              using {derived.liveMonitorSweepIndexColumnName} as the sweep axis.
             </span>
           ) : (
             <span>

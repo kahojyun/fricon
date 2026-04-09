@@ -24,16 +24,16 @@ pub(crate) fn build_live_heatmap_series(
     index_columns: Option<&[usize]>,
     options: &LiveHeatmapOptions,
 ) -> Result<ChartSnapshot> {
-    let series_name = &options.series;
+    let quantity_name = &options.quantity;
     let data_type = *schema
         .columns()
-        .get(series_name)
+        .get(quantity_name)
         .context("Column not found")?;
     let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
 
     debug!(
         chart_type = "live_heatmap",
-        series = %series_name,
+        quantity = %quantity_name,
         ?data_type,
         rows = batch.num_rows(),
         "Building live heatmap chart series"
@@ -64,7 +64,7 @@ pub(crate) fn build_live_heatmap_series(
 
     // Delegate to the normal heatmap builder with MFI as x, second-MFI as y
     let heatmap_options = HeatmapChartDataOptions {
-        series: series_name.clone(),
+        quantity: quantity_name.clone(),
         x_column: Some(mfi_name.to_string()),
         y_column: second_mfi_name.to_string(),
         complex_view_single: options.complex_view_single,
@@ -82,10 +82,10 @@ fn build_trace_live_heatmap(
     index_columns: Option<&[usize]>,
     options: &LiveHeatmapOptions,
 ) -> Result<ChartSnapshot> {
-    let series_name = &options.series;
+    let quantity_name = &options.quantity;
     let data_type = *schema
         .columns()
-        .get(series_name)
+        .get(quantity_name)
         .context("Column not found")?;
     let is_complex = data_type.is_complex();
     let view_option = options
@@ -101,7 +101,7 @@ fn build_trace_live_heatmap(
     let num_rows = batch.num_rows();
     if num_rows == 0 {
         return Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
-            x_name: format!("{series_name} - X"),
+            x_name: format!("{quantity_name} - X"),
             y_name,
             x_categories: vec![],
             y_categories: vec![],
@@ -120,7 +120,7 @@ fn build_trace_live_heatmap(
     };
 
     let series_array: DatasetArray = batch
-        .column_by_name(series_name)
+        .column_by_name(quantity_name)
         .cloned()
         .context("Column not found")?
         .try_into()?;
@@ -176,16 +176,16 @@ fn build_trace_live_heatmap(
     }
 
     let name = if is_complex {
-        format!("{series_name} ({})", complex_view_label(view_option))
+        format!("{quantity_name} ({})", complex_view_label(view_option))
     } else {
-        series_name.clone()
+        quantity_name.clone()
     };
 
     let mut series = vec![FlatXYZSeries::new(name.clone(), name, values, point_count)];
     let (x_categories, y_categories) = super::heatmap::normalize_heatmap_series(&mut series);
 
     Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
-        x_name: format!("{series_name} - X"),
+        x_name: format!("{quantity_name} - X"),
         y_name,
         x_categories,
         y_categories,
@@ -280,7 +280,7 @@ mod tests {
         ]);
         let schema = numeric_schema(&["sweep", "freq", "point", "val"]);
         let options = LiveHeatmapOptions {
-            series: "val".to_string(),
+            quantity: "val".to_string(),
             complex_view_single: None,
             known_row_count: None,
         };
@@ -300,7 +300,7 @@ mod tests {
         let batch = numeric_batch(&[("idx", &[1.0, 2.0, 3.0]), ("val", &[10.0, 20.0, 30.0])]);
         let schema = numeric_schema(&["idx", "val"]);
         let options = LiveHeatmapOptions {
-            series: "val".to_string(),
+            quantity: "val".to_string(),
             complex_view_single: None,
             known_row_count: None,
         };
@@ -313,7 +313,7 @@ mod tests {
     fn trace_empty_batch_uses_heatmap_contract_defaults() {
         let (batch, schema) = trace_batch(vec![], &[]);
         let options = LiveHeatmapOptions {
-            series: "trace".to_string(),
+            quantity: "trace".to_string(),
             complex_view_single: None,
             known_row_count: None,
         };
@@ -332,7 +332,7 @@ mod tests {
     fn trace_without_index_columns_falls_back_to_row_y_axis() {
         let (batch, schema) = trace_batch(vec![vec![1.0, 2.0]], &[0.0]);
         let options = LiveHeatmapOptions {
-            series: "trace".to_string(),
+            quantity: "trace".to_string(),
             complex_view_single: None,
             known_row_count: None,
         };

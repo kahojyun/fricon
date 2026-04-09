@@ -3,12 +3,12 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 
 use super::{
-    XYIndexRoles, compute_group_starts, format_numeric_value, group_ranges, make_group_id_suffix,
-    make_group_label, resolve_xy_index_roles, row_order_for_group, row_series_id,
+    XYTraceRoles, compute_group_starts, format_numeric_value, group_ranges, make_group_id_suffix,
+    make_group_label, resolve_xy_trace_roles, row_order_for_group, row_series_id,
 };
 use crate::features::charts::types::{
     ChartSnapshot, ComplexViewOption, FlatXYSeries, XYChartDataOptions, XYChartSnapshot,
-    XYDrawStyle, XYIndexRoleOptions, XYProjection, XYProjectionOptions, complex_view_label,
+    XYDrawStyle, XYPlotMode, XYPlotModeOptions, XYTraceRoleOptions, complex_view_label,
     transform_complex_values,
 };
 
@@ -18,49 +18,49 @@ pub(crate) fn build_xy_series(
     index_columns: Option<&[usize]>,
     options: &XYChartDataOptions,
 ) -> Result<ChartSnapshot> {
-    let snapshot = match &options.projection {
-        XYProjectionOptions::Trend {
-            series,
+    let snapshot = match &options.plot_mode {
+        XYPlotModeOptions::QuantityVsSweep {
+            quantity,
             complex_views,
-        } => build_trend_snapshot(
+        } => build_quantity_vs_sweep_snapshot(
             batch,
             schema,
             index_columns,
             options.draw_style,
-            series,
+            quantity,
             complex_views.as_deref().unwrap_or(&[]),
-            &options.index_roles,
+            &options.trace_roles,
         )?,
-        XYProjectionOptions::Xy { x_column, y_column } => build_xy_projection_snapshot(
+        XYPlotModeOptions::Xy { x_column, y_column } => build_xy_snapshot(
             batch,
             schema,
             index_columns,
             options.draw_style,
             x_column,
             y_column,
-            &options.index_roles,
+            &options.trace_roles,
         )?,
-        XYProjectionOptions::ComplexXy { series } => build_complex_xy_snapshot(
+        XYPlotModeOptions::ComplexPlane { quantity } => build_complex_plane_snapshot(
             batch,
             schema,
             index_columns,
             options.draw_style,
-            series,
-            &options.index_roles,
+            quantity,
+            &options.trace_roles,
         )?,
     };
 
     Ok(ChartSnapshot::Xy(snapshot))
 }
 
-fn build_trend_snapshot(
+fn build_quantity_vs_sweep_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     draw_style: XYDrawStyle,
     series_name: &str,
     complex_views: &[ComplexViewOption],
-    index_roles: &XYIndexRoleOptions,
+    trace_roles: &XYTraceRoleOptions,
 ) -> Result<XYChartSnapshot> {
     let data_type = *schema
         .columns()
@@ -70,10 +70,10 @@ fn build_trend_snapshot(
     let is_complex = data_type.is_complex();
 
     let series = if is_trace {
-        build_trace_trend_series(batch, series_name, is_complex, complex_views)?
+        build_trace_quantity_vs_sweep_series(batch, series_name, is_complex, complex_views)?
     } else {
-        let roles = resolve_xy_index_roles(schema, index_columns, index_roles, draw_style)?;
-        build_scalar_trend_series(
+        let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+        build_scalar_quantity_vs_sweep_series(
             batch,
             schema,
             series_name,
@@ -86,11 +86,11 @@ fn build_trend_snapshot(
     let x_name = if is_trace {
         format!("{series_name} - X")
     } else {
-        resolve_trend_x_name(schema, index_columns, index_roles, draw_style)?
+        resolve_quantity_vs_sweep_x_name(schema, index_columns, trace_roles, draw_style)?
     };
 
     Ok(XYChartSnapshot {
-        projection: XYProjection::Trend,
+        plot_mode: XYPlotMode::QuantityVsSweep,
         draw_style,
         x_name,
         y_name: None,
@@ -98,14 +98,14 @@ fn build_trend_snapshot(
     })
 }
 
-fn build_xy_projection_snapshot(
+fn build_xy_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     draw_style: XYDrawStyle,
     x_column: &str,
     y_column: &str,
-    index_roles: &XYIndexRoleOptions,
+    trace_roles: &XYTraceRoleOptions,
 ) -> Result<XYChartSnapshot> {
     let x_type = *schema
         .columns()
@@ -121,14 +121,14 @@ fn build_xy_projection_snapshot(
     let series = match (x_is_trace, y_is_trace) {
         (true, true) => build_trace_xy_series(batch, x_column, y_column)?,
         (false, false) => {
-            let roles = resolve_xy_index_roles(schema, index_columns, index_roles, draw_style)?;
+            let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
             build_scalar_xy_series(batch, schema, x_column, y_column, &roles)?
         }
-        _ => bail!("X/Y projection requires both columns to be trace or both to be scalar"),
+        _ => bail!("X/Y plot mode requires both columns to be trace or both to be scalar"),
     };
 
     Ok(XYChartSnapshot {
-        projection: XYProjection::Xy,
+        plot_mode: XYPlotMode::Xy,
         draw_style,
         x_name: x_column.to_string(),
         y_name: Some(y_column.to_string()),
@@ -136,13 +136,13 @@ fn build_xy_projection_snapshot(
     })
 }
 
-fn build_complex_xy_snapshot(
+fn build_complex_plane_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
     draw_style: XYDrawStyle,
     series_name: &str,
-    index_roles: &XYIndexRoleOptions,
+    trace_roles: &XYTraceRoleOptions,
 ) -> Result<XYChartSnapshot> {
     let data_type = *schema
         .columns()
@@ -151,14 +151,14 @@ fn build_complex_xy_snapshot(
     let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
 
     let series = if is_trace {
-        build_trace_complex_xy_series(batch, schema, series_name)?
+        build_trace_complex_plane_series(batch, schema, series_name)?
     } else {
-        let roles = resolve_xy_index_roles(schema, index_columns, index_roles, draw_style)?;
-        build_scalar_complex_xy_series(batch, schema, series_name, &roles)?
+        let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+        build_scalar_complex_plane_series(batch, schema, series_name, &roles)?
     };
 
     Ok(XYChartSnapshot {
-        projection: XYProjection::ComplexXy,
+        plot_mode: XYPlotMode::ComplexPlane,
         draw_style,
         x_name: format!("{series_name} (real)"),
         y_name: Some(format!("{series_name} (imag)")),
@@ -166,7 +166,7 @@ fn build_complex_xy_snapshot(
     })
 }
 
-fn build_trace_trend_series(
+fn build_trace_quantity_vs_sweep_series(
     batch: &RecordBatch,
     series_name: &str,
     is_complex: bool,
@@ -278,7 +278,7 @@ fn build_trace_xy_series(
     Ok(result)
 }
 
-fn build_trace_complex_xy_series(
+fn build_trace_complex_plane_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     series_name: &str,
@@ -288,7 +288,7 @@ fn build_trace_complex_xy_series(
         .get(series_name)
         .context("Column not found")?;
     if !matches!(data_type, DatasetDataType::Trace(_, _)) {
-        bail!("Complex XY trace projection requires a trace series");
+        bail!("Complex plane trace plot mode requires a trace quantity");
     }
 
     let series_array: DatasetArray = batch
@@ -324,24 +324,24 @@ fn build_trace_complex_xy_series(
     Ok(result)
 }
 
-fn build_scalar_trend_series(
+fn build_scalar_quantity_vs_sweep_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     series_name: &str,
     is_complex: bool,
     complex_views: &[ComplexViewOption],
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
     let series_column = batch
         .column_by_name(series_name)
         .cloned()
         .context("Series column not found")?;
     let ds_y: DatasetArray = series_column.try_into()?;
-    let groups = compute_group_starts(batch, schema, &roles.group_by);
+    let groups = compute_group_starts(batch, schema, &roles.trace_group);
     let ranges = group_ranges(&groups, batch.num_rows());
     let view_options = resolved_complex_views(is_complex, complex_views);
     let x_values = roles
-        .order_by
+        .sweep
         .map(|index| numeric_column_values(batch, schema, index))
         .transpose()?;
 
@@ -351,15 +351,18 @@ fn build_scalar_trend_series(
         let reals = complex_array.real().values();
         let imags = complex_array.imag().values();
         for (group_start, group_end) in ranges {
-            let row_order =
-                row_order_for_group(batch, schema, group_start, group_end, roles.order_by);
-            let group_label = make_group_label(batch, schema, &roles.group_by, group_start);
-            let group_id = make_group_id_suffix(batch, schema, &roles.group_by, group_start);
+            let row_order = row_order_for_group(batch, schema, group_start, group_end, roles.sweep);
+            let group_label = make_group_label(batch, schema, &roles.trace_group, group_start);
+            let group_id = make_group_id_suffix(batch, schema, &roles.trace_group, group_start);
             for &view in &view_options {
                 let mut values = Vec::with_capacity(row_order.len() * 2);
                 let transformed = transform_complex_values(reals, imags, view);
                 for (position, row) in row_order.iter().copied().enumerate() {
-                    values.push(resolve_scalar_trend_x(x_values.as_deref(), position, row)?);
+                    values.push(resolve_scalar_quantity_vs_sweep_x(
+                        x_values.as_deref(),
+                        position,
+                        row,
+                    )?);
                     values.push(transformed[row]);
                 }
                 result.push(FlatXYSeries::new(
@@ -382,13 +385,16 @@ fn build_scalar_trend_series(
             .context("Expected numeric array")?
             .values();
         for (group_start, group_end) in ranges {
-            let row_order =
-                row_order_for_group(batch, schema, group_start, group_end, roles.order_by);
-            let group_label = make_group_label(batch, schema, &roles.group_by, group_start);
-            let group_id = make_group_id_suffix(batch, schema, &roles.group_by, group_start);
+            let row_order = row_order_for_group(batch, schema, group_start, group_end, roles.sweep);
+            let group_label = make_group_label(batch, schema, &roles.trace_group, group_start);
+            let group_id = make_group_id_suffix(batch, schema, &roles.trace_group, group_start);
             let mut values = Vec::with_capacity(row_order.len() * 2);
             for (position, row) in row_order.iter().copied().enumerate() {
-                values.push(resolve_scalar_trend_x(x_values.as_deref(), position, row)?);
+                values.push(resolve_scalar_quantity_vs_sweep_x(
+                    x_values.as_deref(),
+                    position,
+                    row,
+                )?);
                 values.push(y_values[row]);
             }
             result.push(FlatXYSeries::new(
@@ -408,7 +414,7 @@ fn build_scalar_xy_series(
     schema: &DatasetSchema,
     x_column: &str,
     y_column: &str,
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
     let x_values = batch
         .column_by_name(x_column)
@@ -432,11 +438,11 @@ fn build_scalar_xy_series(
     ))
 }
 
-fn build_scalar_complex_xy_series(
+fn build_scalar_complex_plane_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     series_name: &str,
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
     let series_column = batch
         .column_by_name(series_name)
@@ -460,17 +466,17 @@ fn build_grouped_xy_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     base_label: &str,
-    roles: &XYIndexRoles,
+    roles: &XYTraceRoles,
     point_at: impl Fn(usize) -> (f64, f64),
 ) -> Vec<FlatXYSeries> {
-    let groups = compute_group_starts(batch, schema, &roles.group_by);
+    let groups = compute_group_starts(batch, schema, &roles.trace_group);
     let ranges = group_ranges(&groups, batch.num_rows());
     let mut result = Vec::new();
 
     for (group_start, group_end) in ranges {
-        let row_order = row_order_for_group(batch, schema, group_start, group_end, roles.order_by);
-        let group_label = make_group_label(batch, schema, &roles.group_by, group_start);
-        let group_id = make_group_id_suffix(batch, schema, &roles.group_by, group_start);
+        let row_order = row_order_for_group(batch, schema, group_start, group_end, roles.sweep);
+        let group_label = make_group_label(batch, schema, &roles.trace_group, group_start);
+        let group_id = make_group_id_suffix(batch, schema, &roles.trace_group, group_start);
         let mut values = Vec::with_capacity(row_order.len() * 2);
         for row in row_order.iter().copied() {
             let (x, y) = point_at(row);
@@ -488,14 +494,14 @@ fn build_grouped_xy_series(
     result
 }
 
-fn resolve_trend_x_name(
+fn resolve_quantity_vs_sweep_x_name(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
-    index_roles: &XYIndexRoleOptions,
+    trace_roles: &XYTraceRoleOptions,
     draw_style: XYDrawStyle,
 ) -> Result<String> {
-    let roles = resolve_xy_index_roles(schema, index_columns, index_roles, draw_style)?;
-    Ok(match roles.order_by {
+    let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+    Ok(match roles.sweep {
         Some(index) => schema
             .columns()
             .get_index(index)
@@ -546,7 +552,11 @@ fn row_axis_value(row: usize) -> Result<f64> {
     Ok(f64::from(row))
 }
 
-fn resolve_scalar_trend_x(x_values: Option<&[f64]>, position: usize, row: usize) -> Result<f64> {
+fn resolve_scalar_quantity_vs_sweep_x(
+    x_values: Option<&[f64]>,
+    position: usize,
+    row: usize,
+) -> Result<f64> {
     Ok(x_values
         .and_then(|values| values.get(row).copied())
         .unwrap_or(row_axis_value(position)?))
@@ -604,7 +614,10 @@ mod tests {
     use super::*;
     use crate::features::charts::{
         transform::test_utils::{numeric_batch, numeric_schema},
-        types::{ChartCommonOptions, XYChartDataOptions, XYDrawStyle},
+        types::{
+            ChartCommonOptions, XYChartDataOptions, XYDrawStyle, XYPlotModeOptions,
+            XYTraceRoleOptions,
+        },
     };
 
     fn xy_snapshot(snapshot: ChartSnapshot) -> XYChartSnapshot {
@@ -625,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_scalar_trend_from_order_index() {
+    fn builds_scalar_quantity_vs_sweep_from_sweep_index() {
         let batch = numeric_batch(&[
             ("sweep", &[1.0, 1.0, 2.0, 2.0]),
             ("t", &[0.0, 1.0, 0.0, 1.0]),
@@ -640,13 +653,13 @@ mod tests {
                 Some(&[0, 1]),
                 &XYChartDataOptions {
                     draw_style: XYDrawStyle::Line,
-                    projection: XYProjectionOptions::Trend {
-                        series: "y".to_string(),
+                    plot_mode: XYPlotModeOptions::QuantityVsSweep {
+                        quantity: "y".to_string(),
                         complex_views: None,
                     },
-                    index_roles: XYIndexRoleOptions {
-                        group_by_index_columns: Some(vec!["sweep".to_string()]),
-                        order_by_index_column: Some("t".to_string()),
+                    trace_roles: XYTraceRoleOptions {
+                        trace_group_index_columns: Some(vec!["sweep".to_string()]),
+                        sweep_index_column: Some("t".to_string()),
                     },
                     common: ChartCommonOptions::default(),
                 },
@@ -654,7 +667,7 @@ mod tests {
             .unwrap(),
         );
 
-        assert_eq!(snapshot.projection, XYProjection::Trend);
+        assert_eq!(snapshot.plot_mode, XYPlotMode::QuantityVsSweep);
         assert_eq!(snapshot.x_name, "t");
         assert_eq!(snapshot.series.len(), 2);
         assert_eq!(
@@ -680,13 +693,13 @@ mod tests {
                 Some(&[0, 1]),
                 &XYChartDataOptions {
                     draw_style: XYDrawStyle::Points,
-                    projection: XYProjectionOptions::Xy {
+                    plot_mode: XYPlotModeOptions::Xy {
                         x_column: "x".to_string(),
                         y_column: "y".to_string(),
                     },
-                    index_roles: XYIndexRoleOptions {
-                        group_by_index_columns: Some(vec!["outer".to_string()]),
-                        order_by_index_column: None,
+                    trace_roles: XYTraceRoleOptions {
+                        trace_group_index_columns: Some(vec!["outer".to_string()]),
+                        sweep_index_column: None,
                     },
                     common: ChartCommonOptions::default(),
                 },
@@ -702,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_complex_xy_from_scalar_complex_series() {
+    fn builds_complex_plane_from_scalar_complex_series() {
         let batch = numeric_batch(&[("sweep", &[1.0, 1.0, 2.0]), ("value", &[1.0, 2.0, 3.0])]);
         let schema = numeric_schema(&["sweep", "value"]);
 
@@ -712,10 +725,10 @@ mod tests {
             Some(&[0]),
             &XYChartDataOptions {
                 draw_style: XYDrawStyle::Points,
-                projection: XYProjectionOptions::ComplexXy {
-                    series: "value".to_string(),
+                plot_mode: XYPlotModeOptions::ComplexPlane {
+                    quantity: "value".to_string(),
                 },
-                index_roles: XYIndexRoleOptions::default(),
+                trace_roles: XYTraceRoleOptions::default(),
                 common: ChartCommonOptions::default(),
             },
         );

@@ -42,9 +42,9 @@ describe("useLiveChartDataQuery", () => {
     const wrapper = createWrapper(queryClient);
     const options = {
       view: "xy" as const,
-      projection: "trend" as const,
+      plotMode: "quantity_vs_sweep" as const,
       drawStyle: "line" as const,
-      series: "signal",
+      quantity: "signal",
       tailCount: 5,
     };
 
@@ -54,7 +54,7 @@ describe("useLiveChartDataQuery", () => {
         rowCount: 3,
         snapshot: {
           type: "xy",
-          projection: "trend",
+          plotMode: "quantity_vs_sweep",
           drawStyle: "line",
           xName: "t",
           yName: null,
@@ -66,7 +66,7 @@ describe("useLiveChartDataQuery", () => {
         rowCount: 3,
         snapshot: {
           type: "xy",
-          projection: "trend",
+          plotMode: "quantity_vs_sweep",
           drawStyle: "line",
           xName: "t",
           yName: null,

@@ -166,7 +166,7 @@ function makeLineData(
 ): Extract<ChartOptions, { type: "xy" }> {
   return {
     type: "xy",
-    projection: "trend",
+    plotMode: "quantity_vs_sweep",
     drawStyle: "line",
     xName: "x",
     yName: null,
@@ -319,7 +319,7 @@ describe("useWebGLChart", () => {
   it("uses the shared trend series label for the y axis when available", () => {
     expect(
       resolveXYYAxisLabel({
-        projection: "trend",
+        plotMode: "quantity_vs_sweep",
         yName: null,
         series: [
           xySeries("sig-real", "signal (real)", [

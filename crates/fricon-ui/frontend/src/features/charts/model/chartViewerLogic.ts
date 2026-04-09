@@ -8,7 +8,7 @@ import type {
   ChartView,
   ComplexViewOption,
   XYDrawStyle,
-  XYProjection,
+  XYPlotMode,
 } from "@/shared/lib/chartTypes";
 
 export const complexSeriesOptions: ComplexViewOption[] = [
@@ -24,17 +24,17 @@ export function isComplexViewOption(value: string): value is ComplexViewOption {
 
 export interface ChartViewerSelectionState {
   view: ChartView;
-  projection: XYProjection;
+  plotMode: XYPlotMode;
   drawStyle: XYDrawStyle;
-  trendSeriesName: string | null;
-  heatmapSeriesName: string | null;
-  complexXYSeriesName: string | null;
+  sweepQuantityName: string | null;
+  heatmapQuantityName: string | null;
+  complexPlaneQuantityName: string | null;
   xyXName: string | null;
   xyYName: string | null;
   heatmapXName: string | null;
   heatmapYName: string | null;
-  groupByIndexColumnNames: string[];
-  orderByIndexColumnName: string | null;
+  traceGroupIndexColumnNames: string[];
+  sweepIndexColumnName: string | null;
 }
 
 function pickSelection(
@@ -74,9 +74,9 @@ export function deriveChartViewerState(
 ) {
   const indexColumns = columns.filter((column) => column.isIndex);
   const nonIndexColumns = columns.filter((column) => !column.isIndex);
-  const trendSeriesOptions = nonIndexColumns;
-  const heatmapSeriesOptions = nonIndexColumns;
-  const complexXYSeriesOptions = nonIndexColumns.filter(
+  const sweepQuantityOptions = nonIndexColumns;
+  const heatmapQuantityOptions = nonIndexColumns;
+  const complexPlaneQuantityOptions = nonIndexColumns.filter(
     (column) => column.isComplex,
   );
   const scalarXYColumnOptions = nonIndexColumns.filter(
@@ -99,48 +99,51 @@ export function deriveChartViewerState(
       ? state.view
       : (availableViews[0] ?? state.view);
 
-  const availableProjections = (() => {
-    const projections: { label: string; value: XYProjection }[] = [];
-    if (trendSeriesOptions.length > 0) {
-      projections.push({ label: "Trend", value: "trend" });
+  const availablePlotModes = (() => {
+    const plotModes: { label: string; value: XYPlotMode }[] = [];
+    if (sweepQuantityOptions.length > 0) {
+      plotModes.push({
+        label: "Quantity vs Sweep",
+        value: "quantity_vs_sweep",
+      });
     }
     if (scalarXYColumnOptions.length >= 2 || traceXYColumnOptions.length >= 2) {
-      projections.push({ label: "X-Y", value: "xy" });
+      plotModes.push({ label: "X-Y Plot", value: "xy" });
     }
-    if (complexXYSeriesOptions.length > 0) {
-      projections.push({ label: "Complex Plane", value: "complex_xy" });
+    if (complexPlaneQuantityOptions.length > 0) {
+      plotModes.push({ label: "Complex Plane", value: "complex_plane" });
     }
-    return projections;
+    return plotModes;
   })();
 
-  const effectiveProjection = availableProjections.some(
-    (option) => option.value === state.projection,
+  const effectivePlotMode = availablePlotModes.some(
+    (option) => option.value === state.plotMode,
   )
-    ? state.projection
-    : (availableProjections[0]?.value ?? state.projection);
+    ? state.plotMode
+    : (availablePlotModes[0]?.value ?? state.plotMode);
 
-  const effectiveTrendSeriesName = pickSelection(
-    trendSeriesOptions,
-    state.trendSeriesName,
+  const effectiveSweepQuantityName = pickSelection(
+    sweepQuantityOptions,
+    state.sweepQuantityName,
   );
-  const trendSeries = columns.find(
-    (column) => column.name === effectiveTrendSeriesName,
-  );
-
-  const effectiveHeatmapSeriesName = pickSelection(
-    heatmapSeriesOptions,
-    state.heatmapSeriesName,
-  );
-  const heatmapSeries = columns.find(
-    (column) => column.name === effectiveHeatmapSeriesName,
+  const sweepQuantity = columns.find(
+    (column) => column.name === effectiveSweepQuantityName,
   );
 
-  const effectiveComplexXYSeriesName = pickSelection(
-    complexXYSeriesOptions,
-    state.complexXYSeriesName,
+  const effectiveHeatmapQuantityName = pickSelection(
+    heatmapQuantityOptions,
+    state.heatmapQuantityName,
   );
-  const complexXYSeries = columns.find(
-    (column) => column.name === effectiveComplexXYSeriesName,
+  const heatmapQuantity = columns.find(
+    (column) => column.name === effectiveHeatmapQuantityName,
+  );
+
+  const effectiveComplexPlaneQuantityName = pickSelection(
+    complexPlaneQuantityOptions,
+    state.complexPlaneQuantityName,
+  );
+  const complexPlaneQuantity = columns.find(
+    (column) => column.name === effectiveComplexPlaneQuantityName,
   );
 
   const defaultXYXOptions =
@@ -165,7 +168,7 @@ export function deriveChartViewerState(
     state.heatmapXName,
     heatmapXOptions.length - 1,
   );
-  const heatmapYSelectionOptions = heatmapSeries?.isTrace
+  const heatmapYSelectionOptions = heatmapQuantity?.isTrace
     ? heatmapYOptions
     : heatmapYOptions.filter((column) => column.name !== effectiveHeatmapXName);
   const heatmapYDefaultIndex = Math.max(heatmapYSelectionOptions.length - 1, 0);
@@ -182,26 +185,27 @@ export function deriveChartViewerState(
   );
 
   const activeXYSource = (() => {
-    if (effectiveProjection === "trend") return trendSeries;
-    if (effectiveProjection === "complex_xy") return complexXYSeries;
+    if (effectivePlotMode === "quantity_vs_sweep") return sweepQuantity;
+    if (effectivePlotMode === "complex_plane") return complexPlaneQuantity;
     return xyXColumn;
   })();
 
   const xyUsesTraceSource =
     effectiveView === "xy" &&
-    ((effectiveProjection === "trend" && Boolean(trendSeries?.isTrace)) ||
-      (effectiveProjection === "complex_xy" &&
-        Boolean(complexXYSeries?.isTrace)) ||
-      (effectiveProjection === "xy" && Boolean(xyXColumn?.isTrace)));
+    ((effectivePlotMode === "quantity_vs_sweep" &&
+      Boolean(sweepQuantity?.isTrace)) ||
+      (effectivePlotMode === "complex_plane" &&
+        Boolean(complexPlaneQuantity?.isTrace)) ||
+      (effectivePlotMode === "xy" && Boolean(xyXColumn?.isTrace)));
   const liveMonitorUsesForcedRoles =
     effectiveView === "xy" &&
     !xyUsesTraceSource &&
     activeXYSource !== undefined &&
     indexColumns.length > 0;
-  const liveMonitorOrderByIndexColumnName = liveMonitorUsesForcedRoles
+  const liveMonitorSweepIndexColumnName = liveMonitorUsesForcedRoles
     ? (indexColumns[indexColumns.length - 1]?.name ?? null)
     : null;
-  const liveMonitorGroupByIndexColumnNames =
+  const liveMonitorTraceGroupIndexColumnNames =
     liveMonitorUsesForcedRoles && indexColumns.length > 1
       ? indexColumns.slice(0, -1).map((column) => column.name)
       : [];
@@ -212,40 +216,41 @@ export function deriveChartViewerState(
     indexColumns.length > 0 &&
     activeXYSource !== undefined;
 
-  const orderByOptions = xyRoleControlsVisible
+  const sweepAxisOptions = xyRoleControlsVisible
     ? indexColumns.filter(
-        (column) => !state.groupByIndexColumnNames.includes(column.name),
+        (column) => !state.traceGroupIndexColumnNames.includes(column.name),
       )
     : [];
 
-  const orderByFallback = "last";
-  const effectiveOrderByIndexColumnName = xyRoleControlsVisible
+  const sweepAxisFallback =
+    effectivePlotMode === "quantity_vs_sweep" ? "last" : "last";
+  const effectiveSweepIndexColumnName = xyRoleControlsVisible
     ? pickOptionalSelection(
-        orderByOptions,
-        state.orderByIndexColumnName,
-        orderByFallback,
+        sweepAxisOptions,
+        state.sweepIndexColumnName,
+        sweepAxisFallback,
       )
     : null;
-  const orderByColumn = columns.find(
-    (column) => column.name === effectiveOrderByIndexColumnName,
+  const sweepAxisColumn = columns.find(
+    (column) => column.name === effectiveSweepIndexColumnName,
   );
 
-  const groupByOptions = xyRoleControlsVisible
+  const traceGroupOptions = xyRoleControlsVisible
     ? indexColumns.filter(
-        (column) => column.name !== effectiveOrderByIndexColumnName,
+        (column) => column.name !== effectiveSweepIndexColumnName,
       )
     : [];
-  const effectiveGroupByIndexColumnNames = groupByOptions
-    .filter((column) => state.groupByIndexColumnNames.includes(column.name))
+  const effectiveTraceGroupIndexColumnNames = traceGroupOptions
+    .filter((column) => state.traceGroupIndexColumnNames.includes(column.name))
     .map((column) => column.name);
 
   const effectiveDrawStyle =
     effectiveView === "heatmap" ? null : state.drawStyle;
 
   const complexControlsDisabled = (() => {
-    if (effectiveView === "heatmap") return !heatmapSeries?.isComplex;
-    if (effectiveView === "xy" && effectiveProjection === "trend") {
-      return !trendSeries?.isComplex;
+    if (effectiveView === "heatmap") return !heatmapQuantity?.isComplex;
+    if (effectiveView === "xy" && effectivePlotMode === "quantity_vs_sweep") {
+      return !sweepQuantity?.isComplex;
     }
     return true;
   })();
@@ -253,7 +258,7 @@ export function deriveChartViewerState(
   const excludeColumns = (() => {
     if (effectiveView === "heatmap") {
       const excludes: string[] = [];
-      if (heatmapSeries?.isTrace) {
+      if (heatmapQuantity?.isTrace) {
         if (heatmapYColumn) excludes.push(heatmapYColumn.name);
       } else {
         if (heatmapXColumn) excludes.push(heatmapXColumn.name);
@@ -267,53 +272,51 @@ export function deriveChartViewerState(
     }
 
     return [
-      ...effectiveGroupByIndexColumnNames,
-      ...(effectiveOrderByIndexColumnName
-        ? [effectiveOrderByIndexColumnName]
-        : []),
+      ...effectiveTraceGroupIndexColumnNames,
+      ...(effectiveSweepIndexColumnName ? [effectiveSweepIndexColumnName] : []),
     ];
   })();
 
   return {
     availableViews,
-    availableProjections,
+    availablePlotModes,
     drawStyleOptions,
     effectiveView,
-    effectiveProjection,
+    effectivePlotMode,
     effectiveDrawStyle,
-    trendSeriesOptions,
-    heatmapSeriesOptions,
-    complexXYSeriesOptions,
+    sweepQuantityOptions,
+    heatmapQuantityOptions,
+    complexPlaneQuantityOptions,
     scalarXYColumnOptions,
     traceXYColumnOptions,
     xyXOptions: defaultXYXOptions,
     xyYOptions: xyYOptions.filter((column) => column.name !== effectiveXYXName),
     heatmapXOptions,
     heatmapYOptions: heatmapYSelectionOptions,
-    effectiveTrendSeriesName,
-    effectiveHeatmapSeriesName,
-    effectiveComplexXYSeriesName,
+    effectiveSweepQuantityName,
+    effectiveHeatmapQuantityName,
+    effectiveComplexPlaneQuantityName,
     effectiveXYXName,
     effectiveXYYName,
     effectiveHeatmapXName,
     effectiveHeatmapYName,
-    trendSeries,
-    heatmapSeries,
-    complexXYSeries,
+    sweepQuantity,
+    heatmapQuantity,
+    complexPlaneQuantity,
     xyXColumn,
     xyYColumn,
     heatmapXColumn,
     heatmapYColumn,
     xyUsesTraceSource,
     liveMonitorUsesForcedRoles,
-    liveMonitorOrderByIndexColumnName,
-    liveMonitorGroupByIndexColumnNames,
+    liveMonitorSweepIndexColumnName,
+    liveMonitorTraceGroupIndexColumnNames,
     xyRoleControlsVisible,
-    orderByOptions,
-    effectiveOrderByIndexColumnName,
-    orderByColumn,
-    groupByOptions,
-    effectiveGroupByIndexColumnNames,
+    sweepAxisOptions,
+    effectiveSweepIndexColumnName,
+    sweepAxisColumn,
+    traceGroupOptions,
+    effectiveTraceGroupIndexColumnNames,
     excludeColumns,
     complexControlsDisabled,
   };
@@ -347,20 +350,20 @@ export function buildChartRequest(
   if (hasFilters && !filterRow) return null;
 
   if (derived.effectiveView === "heatmap") {
-    if (!derived.heatmapSeries || !derived.heatmapYColumn) {
+    if (!derived.heatmapQuantity || !derived.heatmapYColumn) {
       return null;
     }
-    if (!derived.heatmapSeries.isTrace && !derived.heatmapXColumn) {
+    if (!derived.heatmapQuantity.isTrace && !derived.heatmapXColumn) {
       return null;
     }
     return {
       view: "heatmap",
-      series: derived.heatmapSeries.name,
-      xColumn: derived.heatmapSeries.isTrace
+      quantity: derived.heatmapQuantity.name,
+      xColumn: derived.heatmapQuantity.isTrace
         ? undefined
         : (derived.heatmapXColumn?.name ?? undefined),
       yColumn: derived.heatmapYColumn.name,
-      complexViewSingle: derived.heatmapSeries.isComplex
+      complexViewSingle: derived.heatmapQuantity.isComplex
         ? selectedComplexViewSingle
         : undefined,
       indexFilters,
@@ -374,22 +377,24 @@ export function buildChartRequest(
 
   const roleOptions = derived.xyRoleControlsVisible
     ? {
-        groupByIndexColumns:
-          derived.effectiveGroupByIndexColumnNames.length > 0
-            ? derived.effectiveGroupByIndexColumnNames
+        traceGroupIndexColumns:
+          derived.effectiveTraceGroupIndexColumnNames.length > 0
+            ? derived.effectiveTraceGroupIndexColumnNames
             : undefined,
-        orderByIndexColumn:
-          derived.effectiveOrderByIndexColumnName ?? undefined,
+        sweepIndexColumn: derived.effectiveSweepIndexColumnName ?? undefined,
       }
     : {};
 
-  if (derived.effectiveProjection === "trend" && derived.trendSeries) {
+  if (
+    derived.effectivePlotMode === "quantity_vs_sweep" &&
+    derived.sweepQuantity
+  ) {
     return {
       view: "xy",
-      projection: "trend",
+      plotMode: "quantity_vs_sweep",
       drawStyle: derived.effectiveDrawStyle,
-      series: derived.trendSeries.name,
-      complexViews: derived.trendSeries.isComplex
+      quantity: derived.sweepQuantity.name,
+      complexViews: derived.sweepQuantity.isComplex
         ? selectedComplexView
         : undefined,
       indexFilters,
@@ -399,13 +404,13 @@ export function buildChartRequest(
   }
 
   if (
-    derived.effectiveProjection === "xy" &&
+    derived.effectivePlotMode === "xy" &&
     derived.xyXColumn &&
     derived.xyYColumn
   ) {
     return {
       view: "xy",
-      projection: "xy",
+      plotMode: "xy",
       drawStyle: derived.effectiveDrawStyle,
       xColumn: derived.xyXColumn.name,
       yColumn: derived.xyYColumn.name,
@@ -415,12 +420,15 @@ export function buildChartRequest(
     };
   }
 
-  if (derived.effectiveProjection === "complex_xy" && derived.complexXYSeries) {
+  if (
+    derived.effectivePlotMode === "complex_plane" &&
+    derived.complexPlaneQuantity
+  ) {
     return {
       view: "xy",
-      projection: "complex_xy",
+      plotMode: "complex_plane",
       drawStyle: derived.effectiveDrawStyle,
-      series: derived.complexXYSeries.name,
+      quantity: derived.complexPlaneQuantity.name,
       indexFilters,
       excludeColumns: derived.excludeColumns,
       ...roleOptions,

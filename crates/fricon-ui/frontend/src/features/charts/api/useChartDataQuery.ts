@@ -24,7 +24,7 @@ function buildChartDataKey(
       ...chartKeys.chartData(datasetId),
       {
         ...common,
-        series: options.series,
+        quantity: options.quantity,
         xColumn: options.xColumn ?? null,
         yColumn: options.yColumn,
         complexViewSingle: options.complexViewSingle ?? null,
@@ -33,22 +33,22 @@ function buildChartDataKey(
   }
 
   const roleOptions = {
-    groupByIndexColumns: options.groupByIndexColumns
-      ? [...options.groupByIndexColumns].sort()
+    traceGroupIndexColumns: options.traceGroupIndexColumns
+      ? [...options.traceGroupIndexColumns].sort()
       : null,
-    orderByIndexColumn: options.orderByIndexColumn ?? null,
+    sweepIndexColumn: options.sweepIndexColumn ?? null,
   };
 
-  switch (options.projection) {
-    case "trend":
+  switch (options.plotMode) {
+    case "quantity_vs_sweep":
       return [
         ...chartKeys.chartData(datasetId),
         {
           ...common,
           ...roleOptions,
           drawStyle: options.drawStyle,
-          projection: "trend",
-          series: options.series,
+          plotMode: "quantity_vs_sweep",
+          quantity: options.quantity,
           complexViews: options.complexViews
             ? [...options.complexViews].sort()
             : null,
@@ -61,20 +61,20 @@ function buildChartDataKey(
           ...common,
           ...roleOptions,
           drawStyle: options.drawStyle,
-          projection: "xy",
+          plotMode: "xy",
           xColumn: options.xColumn,
           yColumn: options.yColumn,
         },
       ] as const;
-    case "complex_xy":
+    case "complex_plane":
       return [
         ...chartKeys.chartData(datasetId),
         {
           ...common,
           ...roleOptions,
           drawStyle: options.drawStyle,
-          projection: "complex_xy",
-          series: options.series,
+          plotMode: "complex_plane",
+          quantity: options.quantity,
         },
       ] as const;
   }

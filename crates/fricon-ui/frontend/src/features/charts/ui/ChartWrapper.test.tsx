@@ -80,7 +80,7 @@ describe("ChartWrapper", () => {
   it("renders a canvas and svg for line chart data", () => {
     const data: ChartOptions = {
       type: "xy",
-      projection: "trend",
+      plotMode: "quantity_vs_sweep",
       drawStyle: "line",
       xName: "x",
       yName: null,
@@ -101,7 +101,7 @@ describe("ChartWrapper", () => {
   it("keeps svg interactions enabled in live mode for zoomable charts", () => {
     const data: ChartOptions = {
       type: "xy",
-      projection: "trend",
+      plotMode: "quantity_vs_sweep",
       drawStyle: "line",
       xName: "x",
       yName: null,
@@ -122,7 +122,7 @@ describe("ChartWrapper", () => {
   it("shows the legend for multi-series live xy charts", () => {
     const data: ChartOptions = {
       type: "xy",
-      projection: "trend",
+      plotMode: "quantity_vs_sweep",
       drawStyle: "line",
       xName: "x",
       yName: null,
@@ -153,7 +153,7 @@ describe("ChartWrapper", () => {
   it("renders a chart frame header inside the plot area", () => {
     const data: ChartOptions = {
       type: "xy",
-      projection: "trend",
+      plotMode: "quantity_vs_sweep",
       drawStyle: "line",
       xName: "step",
       yName: null,
@@ -179,7 +179,7 @@ describe("ChartWrapper", () => {
   it("renders a canvas for scatter chart data", () => {
     const data: ChartOptions = {
       type: "xy",
-      projection: "xy",
+      plotMode: "xy",
       drawStyle: "points",
       xName: "x",
       yName: "y",

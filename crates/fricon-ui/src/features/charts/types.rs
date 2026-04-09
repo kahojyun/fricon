@@ -13,10 +13,10 @@ pub(crate) enum ComplexViewOption {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum XYProjection {
-    Trend,
+pub(crate) enum XYPlotMode {
+    QuantityVsSweep,
     Xy,
-    ComplexXy,
+    ComplexPlane,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
@@ -44,18 +44,18 @@ pub(crate) struct ChartCommonOptions {
 
 #[derive(Debug, Clone, Default, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct XYIndexRoleOptions {
+pub(crate) struct XYTraceRoleOptions {
     #[specta(optional)]
-    pub(crate) group_by_index_columns: Option<Vec<String>>,
+    pub(crate) trace_group_index_columns: Option<Vec<String>>,
     #[specta(optional)]
-    pub(crate) order_by_index_column: Option<String>,
+    pub(crate) sweep_index_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
-#[serde(tag = "projection", rename_all = "snake_case")]
-pub(crate) enum XYProjectionOptions {
-    Trend {
-        series: String,
+#[serde(tag = "plotMode", rename_all = "snake_case")]
+pub(crate) enum XYPlotModeOptions {
+    QuantityVsSweep {
+        quantity: String,
         complex_views: Option<Vec<ComplexViewOption>>,
     },
     Xy {
@@ -64,17 +64,17 @@ pub(crate) enum XYProjectionOptions {
         #[serde(rename = "yColumn")]
         y_column: String,
     },
-    ComplexXy {
-        series: String,
+    ComplexPlane {
+        quantity: String,
     },
 }
 
-impl XYProjectionOptions {
-    pub(crate) const fn projection(&self) -> XYProjection {
+impl XYPlotModeOptions {
+    pub(crate) const fn plot_mode(&self) -> XYPlotMode {
         match self {
-            Self::Trend { .. } => XYProjection::Trend,
-            Self::Xy { .. } => XYProjection::Xy,
-            Self::ComplexXy { .. } => XYProjection::ComplexXy,
+            Self::QuantityVsSweep { .. } => XYPlotMode::QuantityVsSweep,
+            Self::Xy { .. } => XYPlotMode::Xy,
+            Self::ComplexPlane { .. } => XYPlotMode::ComplexPlane,
         }
     }
 }
@@ -84,9 +84,9 @@ impl XYProjectionOptions {
 pub(crate) struct XYChartDataOptions {
     pub(crate) draw_style: XYDrawStyle,
     #[serde(flatten)]
-    pub(crate) projection: XYProjectionOptions,
+    pub(crate) plot_mode: XYPlotModeOptions,
     #[serde(flatten)]
-    pub(crate) index_roles: XYIndexRoleOptions,
+    pub(crate) trace_roles: XYTraceRoleOptions,
     #[serde(flatten)]
     pub(crate) common: ChartCommonOptions,
 }
@@ -94,7 +94,7 @@ pub(crate) struct XYChartDataOptions {
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HeatmapChartDataOptions {
-    pub(crate) series: String,
+    pub(crate) quantity: String,
     pub(crate) x_column: Option<String>,
     pub(crate) y_column: String,
     pub(crate) complex_view_single: Option<ComplexViewOption>,
@@ -146,7 +146,7 @@ pub(crate) struct FlatXYZSeries {
 #[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct XYChartSnapshot {
-    pub(crate) projection: XYProjection,
+    pub(crate) plot_mode: XYPlotMode,
     pub(crate) draw_style: XYDrawStyle,
     pub(crate) x_name: String,
     pub(crate) y_name: Option<String>,
@@ -279,15 +279,15 @@ pub(crate) struct LiveXYOptions {
     #[specta(optional)]
     pub(crate) known_row_count: Option<usize>,
     #[serde(flatten)]
-    pub(crate) projection: XYProjectionOptions,
+    pub(crate) plot_mode: XYPlotModeOptions,
     #[serde(flatten)]
-    pub(crate) index_roles: XYIndexRoleOptions,
+    pub(crate) trace_roles: XYTraceRoleOptions,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LiveHeatmapOptions {
-    pub(crate) series: String,
+    pub(crate) quantity: String,
     pub(crate) complex_view_single: Option<ComplexViewOption>,
     #[specta(optional)]
     pub(crate) known_row_count: Option<usize>,

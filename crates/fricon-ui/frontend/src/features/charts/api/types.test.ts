@@ -5,7 +5,7 @@ describe("chart api types", () => {
   it("preserves 64-bit precision for snapshot series values", () => {
     const result = normalizeChartSnapshot({
       type: "xy",
-      projection: "xy",
+      plotMode: "xy",
       drawStyle: "points",
       xName: "timestamp",
       yName: "value",
