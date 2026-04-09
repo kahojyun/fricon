@@ -43,7 +43,7 @@ export function buildChartFrameHeader({
   if (groupBy.length > 0) {
     meta.push(`grouped by ${groupBy.join(", ")}`);
   }
-  if (isLiveMode) {
+  if (isLiveMode && data.type === "xy") {
     meta.push(`recent ${liveWindowCount} ${liveWindowUnit(derived)}`);
   }
 

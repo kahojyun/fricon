@@ -92,4 +92,43 @@ describe("buildChartFrameHeader", () => {
       meta: [],
     });
   });
+
+  it("omits live window metadata for live heatmaps", () => {
+    expect(
+      buildChartFrameHeader({
+        datasetId: 11,
+        datasetStatus: "Writing",
+        data: {
+          type: "heatmap",
+          xName: "x",
+          yName: "y",
+          xCategories: [0],
+          yCategories: [0],
+          series: [],
+        },
+        derived: {
+          effectiveView: "heatmap",
+          effectivePlotMode: "quantity_vs_sweep",
+          effectiveDrawStyle: null,
+          sweepQuantity: undefined,
+          heatmapQuantity: { name: "signal" },
+          complexPlaneQuantity: undefined,
+          xyXColumn: undefined,
+          xyYColumn: undefined,
+          xyUsesTraceSource: false,
+          liveMonitorUsesForcedRoles: false,
+          liveMonitorSweepIndexColumnName: null,
+          liveMonitorTraceGroupIndexColumnNames: [],
+          xyRoleControlsVisible: false,
+          effectiveSweepIndexColumnName: null,
+          effectiveTraceGroupIndexColumnNames: [],
+        } as never,
+        isLiveMode: true,
+        liveWindowCount: 5,
+      }),
+    ).toEqual({
+      title: "Dataset #11",
+      meta: ["Live Acquisition"],
+    });
+  });
 });
