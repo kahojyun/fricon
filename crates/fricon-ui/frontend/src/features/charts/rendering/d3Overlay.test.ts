@@ -1,5 +1,6 @@
+import { scaleLinear } from "d3-scale";
 import { describe, expect, it } from "vitest";
-import { renderColorScale, LIGHT_THEME } from "./d3Overlay";
+import { renderAxes, renderColorScale, LIGHT_THEME } from "./d3Overlay";
 import type { ChartMargin } from "./webgl";
 
 const margin: ChartMargin = {
@@ -52,5 +53,41 @@ describe("renderColorScale", () => {
     expect(rect?.getAttribute("fill")).toMatch(
       /^url\(#heatmap-color-scale-grad-/,
     );
+  });
+
+  it("removes stale heatmap legend when cartesian axes are rendered", () => {
+    const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.appendChild(svgEl);
+    Object.defineProperty(svgEl, "clientWidth", {
+      configurable: true,
+      value: 320,
+    });
+    Object.defineProperty(svgEl, "clientHeight", {
+      configurable: true,
+      value: 220,
+    });
+
+    renderColorScale(
+      svgEl,
+      ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"],
+      1,
+      9,
+      margin,
+      LIGHT_THEME,
+    );
+    expect(svgEl.querySelector(".color-scale")).not.toBeNull();
+
+    renderAxes(
+      svgEl,
+      scaleLinear().domain([0, 10]).range([0, 100]),
+      scaleLinear().domain([0, 10]).range([100, 0]),
+      "x",
+      "y",
+      margin,
+      LIGHT_THEME,
+    );
+
+    expect(svgEl.querySelector(".color-scale")).toBeNull();
+    expect(svgEl.querySelector(".axes")).not.toBeNull();
   });
 });

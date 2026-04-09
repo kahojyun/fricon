@@ -5,6 +5,7 @@
 
 import { axisBottom, axisLeft } from "d3-axis";
 import { select } from "d3-selection";
+import type { Selection } from "d3-selection";
 import type { ScaleBand, ScaleLinear } from "d3-scale";
 import type { ChartMargin } from "./webgl";
 
@@ -54,7 +55,7 @@ export function renderAxes(
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
 
-  svg.selectAll(".axes").remove();
+  clearOverlayLayers(svg);
 
   const g = svg
     .append("g")
@@ -160,7 +161,7 @@ export function renderCategoryAxes(
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
 
-  svg.selectAll(".axes").remove();
+  clearOverlayLayers(svg);
 
   const g = svg
     .append("g")
@@ -316,4 +317,10 @@ export function renderColorScale(
     .attr("fill", theme.textColor)
     .style("font-size", "10px")
     .text(fmt(valueMin));
+}
+
+function clearOverlayLayers(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+): void {
+  svg.selectAll(".axes, .color-scale").remove();
 }
