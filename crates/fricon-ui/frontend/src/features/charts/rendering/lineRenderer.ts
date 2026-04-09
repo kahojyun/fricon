@@ -16,6 +16,9 @@ import { lineFragmentSource, lineVertexSource } from "./shaders/line";
 
 export interface LineRenderState {
   program: WebGLProgram;
+  uMatrix: WebGLUniformLocation | null;
+  uColor: WebGLUniformLocation | null;
+  aPosition: number;
   seriesBuffers: { buffer: WebGLBuffer; count: number }[];
 }
 
@@ -55,18 +58,42 @@ function liveSeriesStyle(
 
 export function createLineRenderState(
   gl: WebGL2RenderingContext,
-  series: ChartSeries[],
 ): LineRenderState {
   const program = createProgram(gl, lineVertexSource, lineFragmentSource);
-  const seriesBuffers = series.map((s) => {
-    const flat = new Float32Array(s.data.length * 2);
-    for (let i = 0; i < s.data.length; i++) {
-      flat[i * 2] = s.data[i][0]!;
-      flat[i * 2 + 1] = s.data[i][1]!;
+  return {
+    program,
+    uMatrix: gl.getUniformLocation(program, "u_matrix"),
+    uColor: gl.getUniformLocation(program, "u_color"),
+    aPosition: gl.getAttribLocation(program, "a_position"),
+    seriesBuffers: [],
+  };
+}
+
+export function syncLineRenderState(
+  gl: WebGL2RenderingContext,
+  state: LineRenderState,
+  series: ChartSeries[],
+): void {
+  for (let i = 0; i < series.length; i++) {
+    const flat = flattenSeriesPoints(series[i]);
+    const existing = state.seriesBuffers[i];
+    if (existing) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, existing.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, flat, gl.DYNAMIC_DRAW);
+      existing.count = series[i].data.length;
+      continue;
     }
-    return { buffer: createBuffer(gl, flat), count: s.data.length };
-  });
-  return { program, seriesBuffers };
+
+    state.seriesBuffers.push({
+      buffer: createBuffer(gl, flat, gl.DYNAMIC_DRAW),
+      count: series[i].data.length,
+    });
+  }
+
+  while (state.seriesBuffers.length > series.length) {
+    const removed = state.seriesBuffers.pop();
+    if (removed) gl.deleteBuffer(removed.buffer);
+  }
 }
 
 export function drawLines(
@@ -76,12 +103,8 @@ export function drawLines(
   data: Extract<ChartOptions, { type: "line" }>,
   liveMode: boolean,
 ): void {
-  const { program, seriesBuffers } = state;
+  const { program, seriesBuffers, uMatrix, uColor, aPosition } = state;
   gl.useProgram(program);
-
-  const uMatrix = gl.getUniformLocation(program, "u_matrix");
-  const uColor = gl.getUniformLocation(program, "u_color");
-  const aPosition = gl.getAttribLocation(program, "a_position");
 
   gl.uniformMatrix3fv(uMatrix, false, matrix);
 
@@ -117,6 +140,15 @@ export function drawLines(
 
     gl.drawArrays(gl.LINE_STRIP, 0, count);
   }
+}
+
+function flattenSeriesPoints(series: ChartSeries): Float32Array {
+  const flat = new Float32Array(series.data.length * 2);
+  for (let i = 0; i < series.data.length; i++) {
+    flat[i * 2] = series.data[i][0]!;
+    flat[i * 2 + 1] = series.data[i][1]!;
+  }
+  return flat;
 }
 
 export function destroyLineRenderState(

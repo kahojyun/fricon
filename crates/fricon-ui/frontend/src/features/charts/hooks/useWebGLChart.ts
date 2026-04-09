@@ -41,6 +41,7 @@ import {
 } from "../rendering/crosshairOverlay";
 import {
   createLineRenderState,
+  syncLineRenderState,
   drawLines,
   destroyLineRenderState,
   lineDataBounds,
@@ -48,6 +49,7 @@ import {
 } from "../rendering/lineRenderer";
 import {
   createScatterRenderState,
+  syncScatterRenderState,
   drawScatter,
   destroyScatterRenderState,
   scatterDataBounds,
@@ -55,6 +57,7 @@ import {
 } from "../rendering/scatterRenderer";
 import {
   createHeatmapRenderState,
+  syncHeatmapRenderState,
   drawHeatmap,
   destroyHeatmapRenderState,
   COLOR_RAMP,
@@ -66,8 +69,15 @@ type RenderState =
   | { type: "scatter"; state: ScatterRenderState }
   | { type: "heatmap"; state: HeatmapRenderState };
 
+interface RenderStateCache {
+  line: LineRenderState | null;
+  scatter: ScatterRenderState | null;
+  heatmap: HeatmapRenderState | null;
+}
+
 interface WebGLChartRefs {
   gl: WebGL2RenderingContext | null;
+  renderStateCache: RenderStateCache;
   renderState: RenderState | null;
   zoomController: ZoomController | null;
   crosshairController: CrosshairController | null;
@@ -135,6 +145,7 @@ export function useWebGLChart({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const chartRef = useRef<WebGLChartRefs>({
     gl: null,
+    renderStateCache: createRenderStateCache(),
     renderState: null,
     zoomController: null,
     crosshairController: null,
@@ -334,11 +345,9 @@ export function useWebGLChart({
       e.preventDefault();
       const currentRefs = chartRef.current;
       currentRefs.contextLost = true;
-      if (currentRefs.renderState && currentRefs.gl) {
-        // GPU resources are implicitly destroyed on context loss;
-        // null out so we don't try to use stale handles.
-        currentRefs.renderState = null;
-      }
+      // GPU resources are implicitly destroyed on context loss.
+      currentRefs.renderState = null;
+      currentRefs.renderStateCache = createRenderStateCache();
       currentRefs.gl = null;
     }
 
@@ -351,22 +360,7 @@ export function useWebGLChart({
       const currentData = currentRefs.data;
       if (!gl || !currentData) return;
 
-      if (currentData.type === "line") {
-        currentRefs.renderState = {
-          type: "line",
-          state: createLineRenderState(gl, currentData.series),
-        };
-      } else if (currentData.type === "scatter") {
-        currentRefs.renderState = {
-          type: "scatter",
-          state: createScatterRenderState(gl, currentData.series),
-        };
-      } else if (currentData.type === "heatmap") {
-        currentRefs.renderState = {
-          type: "heatmap",
-          state: createHeatmapRenderState(gl, currentData.series),
-        };
-      }
+      currentRefs.renderState = syncRenderState(gl, currentRefs, currentData);
       scheduleRender();
     }
 
@@ -380,10 +374,11 @@ export function useWebGLChart({
       canvas.removeEventListener("webglcontextrestored", handleContextRestored);
       cancelAnimationFrame(effectRefs.animFrameId);
       effectRefs.animFrameId = 0;
-      if (effectRefs.renderState && effectRefs.gl) {
-        destroyRenderState(effectRefs.gl, effectRefs.renderState);
-        effectRefs.renderState = null;
+      if (effectRefs.gl) {
+        destroyRenderStateCache(effectRefs.gl, effectRefs.renderStateCache);
       }
+      effectRefs.renderStateCache = createRenderStateCache();
+      effectRefs.renderState = null;
       effectRefs.gl = null;
     };
   }, [scheduleRender]);
@@ -396,12 +391,6 @@ export function useWebGLChart({
 
     const interactionChanged =
       r.lastResolvedInteractionKey !== r.interactionKey;
-
-    // Destroy old state
-    if (r.renderState) {
-      destroyRenderState(gl, r.renderState);
-      r.renderState = null;
-    }
 
     const nextDefaultZoom = getDefaultZoomState();
     const nextZoomState = resolveNextZoomState({
@@ -422,6 +411,7 @@ export function useWebGLChart({
     });
 
     if (!data) {
+      r.renderState = null;
       r.defaultZoomState = nextDefaultZoom;
       r.zoomState = nextZoomState;
       r.followsDefaultView = true;
@@ -433,22 +423,7 @@ export function useWebGLChart({
       return;
     }
 
-    if (data.type === "line") {
-      r.renderState = {
-        type: "line",
-        state: createLineRenderState(gl, data.series),
-      };
-    } else if (data.type === "scatter") {
-      r.renderState = {
-        type: "scatter",
-        state: createScatterRenderState(gl, data.series),
-      };
-    } else if (data.type === "heatmap") {
-      r.renderState = {
-        type: "heatmap",
-        state: createHeatmapRenderState(gl, data.series),
-      };
-    }
+    r.renderState = syncRenderState(gl, r, data);
 
     r.defaultZoomState = nextDefaultZoom;
     r.zoomState = nextZoomState;
@@ -731,17 +706,55 @@ function getNumericBounds(
     : scatterDataBounds(data.series);
 }
 
-function destroyRenderState(gl: WebGL2RenderingContext, rs: RenderState): void {
-  switch (rs.type) {
-    case "line":
-      destroyLineRenderState(gl, rs.state);
-      break;
-    case "scatter":
-      destroyScatterRenderState(gl, rs.state);
-      break;
-    case "heatmap":
-      destroyHeatmapRenderState(gl, rs.state);
-      break;
+function createRenderStateCache(): RenderStateCache {
+  return {
+    line: null,
+    scatter: null,
+    heatmap: null,
+  };
+}
+
+function syncRenderState(
+  gl: WebGL2RenderingContext,
+  refs: Pick<WebGLChartRefs, "renderStateCache">,
+  data: ChartOptions,
+): RenderState {
+  switch (data.type) {
+    case "line": {
+      const state = refs.renderStateCache.line ?? createLineRenderState(gl);
+      refs.renderStateCache.line = state;
+      syncLineRenderState(gl, state, data.series);
+      return { type: "line", state };
+    }
+    case "scatter": {
+      const state =
+        refs.renderStateCache.scatter ?? createScatterRenderState(gl);
+      refs.renderStateCache.scatter = state;
+      syncScatterRenderState(gl, state, data.series);
+      return { type: "scatter", state };
+    }
+    case "heatmap": {
+      const state =
+        refs.renderStateCache.heatmap ?? createHeatmapRenderState(gl);
+      refs.renderStateCache.heatmap = state;
+      syncHeatmapRenderState(gl, state, data.series);
+      return { type: "heatmap", state };
+    }
+  }
+}
+
+function destroyRenderStateCache(
+  gl: WebGL2RenderingContext,
+  cache: RenderStateCache,
+): void {
+  if (cache.line) {
+    destroyLineRenderState(gl, cache.line);
+  }
+  if (cache.scatter) {
+    destroyScatterRenderState(gl, cache.scatter);
+  }
+  if (cache.heatmap) {
+    destroyHeatmapRenderState(gl, cache.heatmap);
   }
 }
 

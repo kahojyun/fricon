@@ -5,7 +5,7 @@
  */
 
 import type { ChartSeries } from "@/shared/lib/chartTypes";
-import { createProgram, hexToRgb } from "./webgl";
+import { createBuffer, createProgram, hexToRgb } from "./webgl";
 import { heatmapFragmentSource, heatmapVertexSource } from "./shaders/heatmap";
 
 export const COLOR_RAMP = [
@@ -24,41 +24,14 @@ export interface HeatmapRenderState {
   vao: WebGLVertexArrayObject;
   valueMin: number;
   valueMax: number;
+  uMatrix: WebGLUniformLocation | null;
+  uColorRamp: WebGLUniformLocation | null;
 }
 
 export function createHeatmapRenderState(
   gl: WebGL2RenderingContext,
-  series: ChartSeries[],
 ): HeatmapRenderState {
   const program = createProgram(gl, heatmapVertexSource, heatmapFragmentSource);
-
-  // Compute value range for normalization
-  let min = Infinity;
-  let max = -Infinity;
-  for (const s of series) {
-    for (const v of s.data) {
-      const val = v[2];
-      if (val === undefined) continue;
-      if (val < min) min = val;
-      if (val > max) max = val;
-    }
-  }
-  if (!isFinite(min)) min = 0;
-  if (!isFinite(max)) max = 1;
-  const range = max !== min ? max - min : 1;
-
-  // Build per-instance data: (col, row, normalizedValue)
-  const instances: number[] = [];
-  for (const s of series) {
-    for (const d of s.data) {
-      const col = d[0];
-      const row = d[1];
-      const val = d[2];
-      if (val === undefined || !Number.isFinite(val)) continue;
-      instances.push(col, row, (val - min) / range);
-    }
-  }
-  const instanceCount = instances.length / 3;
 
   // Unit quad corners (two triangles)
   // prettier-ignore
@@ -72,20 +45,17 @@ export function createHeatmapRenderState(
   ]);
 
   const vao = gl.createVertexArray();
+  if (!vao) throw new Error("Failed to create vertex array");
   gl.bindVertexArray(vao);
 
   // Corner buffer (per-vertex)
-  const cornerBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, corners, gl.STATIC_DRAW);
+  const cornerBuffer = createBuffer(gl, corners);
   const aCorner = gl.getAttribLocation(program, "a_corner");
   gl.enableVertexAttribArray(aCorner);
   gl.vertexAttribPointer(aCorner, 2, gl.FLOAT, false, 0, 0);
 
   // Cell buffer (per-instance)
-  const cellBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, cellBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(instances), gl.STATIC_DRAW);
+  const cellBuffer = createBuffer(gl, new Float32Array(0), gl.DYNAMIC_DRAW);
   const aCell = gl.getAttribLocation(program, "a_cell");
   gl.enableVertexAttribArray(aCell);
   gl.vertexAttribPointer(aCell, 3, gl.FLOAT, false, 0, 0);
@@ -97,11 +67,26 @@ export function createHeatmapRenderState(
     program,
     cornerBuffer,
     cellBuffer,
-    instanceCount,
+    instanceCount: 0,
     vao,
-    valueMin: min,
-    valueMax: max,
+    valueMin: 0,
+    valueMax: 1,
+    uMatrix: gl.getUniformLocation(program, "u_matrix"),
+    uColorRamp: gl.getUniformLocation(program, "u_colorRamp"),
   };
+}
+
+export function syncHeatmapRenderState(
+  gl: WebGL2RenderingContext,
+  state: HeatmapRenderState,
+  series: ChartSeries[],
+): void {
+  const { valueMin, valueMax, instanceData } = buildHeatmapInstances(series);
+  gl.bindBuffer(gl.ARRAY_BUFFER, state.cellBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, instanceData, gl.DYNAMIC_DRAW);
+  state.instanceCount = instanceData.length / 3;
+  state.valueMin = valueMin;
+  state.valueMax = valueMax;
 }
 
 export function drawHeatmap(
@@ -110,7 +95,7 @@ export function drawHeatmap(
   numCols: number,
   numRows: number,
 ): void {
-  const { program, vao, instanceCount } = state;
+  const { program, vao, instanceCount, uMatrix, uColorRamp } = state;
   gl.useProgram(program);
 
   // Build matrix that maps grid coords (0..numCols, 0..numRows) → clip space
@@ -123,11 +108,9 @@ export function drawHeatmap(
     -1, -1, 1,
   ]);
 
-  const uMatrix = gl.getUniformLocation(program, "u_matrix");
   gl.uniformMatrix3fv(uMatrix, false, matrix);
 
   // Upload color ramp
-  const uColorRamp = gl.getUniformLocation(program, "u_colorRamp");
   const rampFlat = new Float32Array(15);
   for (let i = 0; i < 5; i++) {
     const [r, g, b] = hexToRgb(COLOR_RAMP[i]);
@@ -150,4 +133,39 @@ export function destroyHeatmapRenderState(
   gl.deleteBuffer(state.cellBuffer);
   gl.deleteVertexArray(state.vao);
   gl.deleteProgram(state.program);
+}
+
+function buildHeatmapInstances(series: ChartSeries[]): {
+  valueMin: number;
+  valueMax: number;
+  instanceData: Float32Array;
+} {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const s of series) {
+    for (const value of s.data) {
+      const cellValue = value[2];
+      if (cellValue === undefined) continue;
+      if (cellValue < min) min = cellValue;
+      if (cellValue > max) max = cellValue;
+    }
+  }
+  if (!isFinite(min)) min = 0;
+  if (!isFinite(max)) max = 1;
+  const range = max !== min ? max - min : 1;
+
+  const instances: number[] = [];
+  for (const s of series) {
+    for (const point of s.data) {
+      const value = point[2];
+      if (value === undefined || !Number.isFinite(value)) continue;
+      instances.push(point[0], point[1], (value - min) / range);
+    }
+  }
+
+  return {
+    valueMin: min,
+    valueMax: max,
+    instanceData: new Float32Array(instances),
+  };
 }
