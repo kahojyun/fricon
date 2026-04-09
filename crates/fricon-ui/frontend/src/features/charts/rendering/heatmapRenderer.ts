@@ -145,7 +145,7 @@ function buildHeatmapInstances(series: ChartSeries[]): {
   for (const s of series) {
     for (const value of s.data) {
       const cellValue = value[2];
-      if (cellValue === undefined) continue;
+      if (cellValue === undefined || !Number.isFinite(cellValue)) continue;
       if (cellValue < min) min = cellValue;
       if (cellValue > max) max = cellValue;
     }

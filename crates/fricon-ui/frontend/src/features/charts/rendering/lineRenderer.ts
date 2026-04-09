@@ -176,6 +176,7 @@ export function lineDataBounds(series: ChartSeries[]): {
     for (const d of s.data) {
       const x = d[0];
       const y = d[1];
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       if (x < xMin) xMin = x;
       if (x > xMax) xMax = x;
       if (y < yMin) yMin = y;
