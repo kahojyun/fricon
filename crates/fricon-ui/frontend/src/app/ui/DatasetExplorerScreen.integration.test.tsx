@@ -149,8 +149,11 @@ describe("DatasetExplorerScreen integration", () => {
           };
         case "dataset_chart_data":
           return {
-            type: "line",
+            type: "xy",
+            plotMode: "quantity_vs_sweep",
+            drawStyle: "line",
             xName: "t",
+            yName: null,
             series: [
               {
                 id: "signal",
@@ -236,9 +239,9 @@ describe("DatasetExplorerScreen integration", () => {
                 id?: number;
                 options?: {
                   view?: string;
-                  projection?: string;
-                  series?: string;
-                  orderByIndexColumn?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
             )?.id === 1 &&
@@ -246,9 +249,9 @@ describe("DatasetExplorerScreen integration", () => {
               payload as {
                 options?: {
                   view?: string;
-                  projection?: string;
-                  series?: string;
-                  orderByIndexColumn?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
             )?.options?.view === "xy" &&
@@ -256,32 +259,32 @@ describe("DatasetExplorerScreen integration", () => {
               payload as {
                 options?: {
                   view?: string;
-                  projection?: string;
-                  series?: string;
-                  orderByIndexColumn?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.projection === "trend" &&
+            )?.options?.plotMode === "quantity_vs_sweep" &&
             (
               payload as {
                 options?: {
                   view?: string;
-                  projection?: string;
-                  series?: string;
-                  orderByIndexColumn?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.series === "signal" &&
+            )?.options?.quantity === "signal" &&
             (
               payload as {
                 options?: {
                   view?: string;
-                  projection?: string;
-                  series?: string;
-                  orderByIndexColumn?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.orderByIndexColumn === "t",
+            )?.options?.sweepIndexColumn === "t",
         ),
       ).toBe(true);
     });

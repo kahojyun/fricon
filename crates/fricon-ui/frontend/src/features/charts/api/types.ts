@@ -194,43 +194,55 @@ export function toWireLiveChartOptions(
 }
 
 export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
-  if (result.type === "heatmap") {
-    return {
-      type: "heatmap",
-      xName: result.xName,
-      yName: result.yName,
-      xCategories: result.xCategories,
-      yCategories: result.yCategories,
-      series: result.series.map(normalizeXYZSeries),
-    };
+  switch (result.type) {
+    case "heatmap":
+      return {
+        type: "heatmap",
+        xName: result.xName,
+        yName: result.yName,
+        xCategories: result.xCategories,
+        yCategories: result.yCategories,
+        series: result.series.map(normalizeXYZSeries),
+      };
+    case "xy":
+      return {
+        type: "xy",
+        plotMode: result.plotMode,
+        drawStyle: result.drawStyle,
+        xName: result.xName,
+        yName: result.yName,
+        series: result.series.map(normalizeXYSeries),
+      };
+    default:
+      return assertNever(
+        result,
+        `Unknown chart snapshot type: ${String((result as { type?: unknown }).type)}`,
+      );
   }
-
-  return {
-    type: "xy",
-    plotMode: result.plotMode,
-    drawStyle: result.drawStyle,
-    xName: result.xName,
-    yName: result.yName,
-    series: result.series.map(normalizeXYSeries),
-  };
 }
 
 export function normalizeLiveChartUpdate(
   result: WireLiveChartResponse,
 ): LiveChartUpdate {
-  if (result.mode === "reset") {
-    return {
-      mode: "reset",
-      rowCount: result.row_count,
-      snapshot: normalizeChartSnapshot(result.snapshot),
-    };
+  switch (result.mode) {
+    case "reset":
+      return {
+        mode: "reset",
+        rowCount: result.row_count,
+        snapshot: normalizeChartSnapshot(result.snapshot),
+      };
+    case "append":
+      return {
+        mode: "append",
+        rowCount: result.row_count,
+        ops: result.ops.map(normalizeLiveChartAppendOperation),
+      };
+    default:
+      return assertNever(
+        result,
+        `Unknown live chart update mode: ${String((result as { mode?: unknown }).mode)}`,
+      );
   }
-
-  return {
-    mode: "append",
-    rowCount: result.row_count,
-    ops: result.ops.map(normalizeLiveChartAppendOperation),
-  };
 }
 
 export function normalizeFilterTableData(
@@ -304,41 +316,55 @@ function normalizeXYZSeries(series: WireFlatXYZSeries) {
 }
 
 function normalizeFlatSeries(series: WireFlatSeries) {
-  if (series.shape === "xy") {
-    return {
-      shape: "xy" as const,
-      series: normalizeXYSeries(series),
-    };
+  switch (series.shape) {
+    case "xy":
+      return {
+        shape: "xy" as const,
+        series: normalizeXYSeries(series),
+      };
+    case "xyz":
+      return {
+        shape: "xyz" as const,
+        series: normalizeXYZSeries(series),
+      };
+    default:
+      return assertNever(
+        series,
+        `Unknown flat series shape: ${String((series as { shape?: unknown }).shape)}`,
+      );
   }
-
-  return {
-    shape: "xyz" as const,
-    series: normalizeXYZSeries(series),
-  };
 }
 
 function normalizeLiveChartAppendOperation(
   operation: WireLiveChartAppendOperation,
 ): LiveChartAppendOperation {
-  if (operation.kind === "append_points") {
-    return {
-      kind: "append_points",
-      seriesId: operation.series_id,
-      values: Float64Array.from(operation.values),
-      pointCount: operation.point_count,
-    };
+  switch (operation.kind) {
+    case "append_points":
+      return {
+        kind: "append_points",
+        seriesId: operation.series_id,
+        values: Float64Array.from(operation.values),
+        pointCount: operation.point_count,
+      };
+    case "append_series":
+      return {
+        kind: "append_series",
+        series: normalizeFlatSeries(operation.series),
+      };
+    case "append_heatmap_categories":
+      return {
+        kind: "append_heatmap_categories",
+        xCategories: operation.x_categories ?? undefined,
+        yCategories: operation.y_categories ?? undefined,
+      };
+    default:
+      return assertNever(
+        operation,
+        `Unknown live chart operation kind: ${String((operation as { kind?: unknown }).kind)}`,
+      );
   }
+}
 
-  if (operation.kind === "append_series") {
-    return {
-      kind: "append_series",
-      series: normalizeFlatSeries(operation.series),
-    };
-  }
-
-  return {
-    kind: "append_heatmap_categories",
-    xCategories: operation.x_categories ?? undefined,
-    yCategories: operation.y_categories ?? undefined,
-  };
+function assertNever(_value: never, message: string): never {
+  throw new Error(message);
 }

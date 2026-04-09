@@ -247,8 +247,11 @@ describe("ChartViewer", () => {
       if (cmd === "dataset_chart_data") {
         chartCallCount += 1;
         return {
-          type: "line",
+          type: "xy",
+          plotMode: "quantity_vs_sweep",
+          drawStyle: "line",
           xName: "t",
+          yName: null,
           series: [
             {
               id: "signal",

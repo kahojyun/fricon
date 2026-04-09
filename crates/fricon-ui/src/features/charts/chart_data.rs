@@ -513,8 +513,17 @@ fn diff_heatmap(
 
 #[cfg(test)]
 mod tests {
-    use super::{recent_group_starts_in_scan_batch, resolve_group_tail_start_in_scan_batch};
-    use crate::features::charts::transform::test_utils::{numeric_batch, numeric_schema};
+    use super::{
+        diff_heatmap, diff_live_snapshots, diff_xy_series, recent_group_starts_in_scan_batch,
+        resolve_group_tail_start_in_scan_batch,
+    };
+    use crate::features::charts::{
+        transform::test_utils::{numeric_batch, numeric_schema},
+        types::{
+            ChartSnapshot, FlatSeries, FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot,
+            LiveChartAppendOperation, XYChartSnapshot, XYDrawStyle, XYPlotMode,
+        },
+    };
 
     #[test]
     fn resolve_group_tail_start_handles_scan_prefix_row() {
@@ -544,5 +553,97 @@ mod tests {
             resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 5, 6, 2),
             None
         );
+    }
+
+    #[test]
+    fn diff_xy_series_emits_append_points_and_new_series() {
+        let previous = vec![xy_series("signal", "signal", &[0.0, 1.0])];
+        let current = vec![
+            xy_series("signal", "signal", &[0.0, 1.0, 1.0, 2.0]),
+            xy_series("signal:imag", "signal (imag)", &[0.0, 3.0, 1.0, 4.0]),
+        ];
+
+        let ops = diff_xy_series(&previous, &current).expect("expected append ops");
+
+        assert_eq!(
+            ops,
+            vec![
+                LiveChartAppendOperation::AppendPoints {
+                    series_id: "signal".to_string(),
+                    values: vec![1.0, 2.0],
+                    point_count: 1,
+                },
+                LiveChartAppendOperation::AppendSeries {
+                    series: FlatSeries::Xy(xy_series(
+                        "signal:imag",
+                        "signal (imag)",
+                        &[0.0, 3.0, 1.0, 4.0],
+                    )),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn diff_heatmap_emits_category_and_point_appends() {
+        let previous = HeatmapChartSnapshot {
+            x_name: "x".to_string(),
+            y_name: "y".to_string(),
+            x_categories: vec![0.0],
+            y_categories: vec![0.0],
+            series: vec![xyz_series("heat", "heat", &[0.0, 0.0, 1.0])],
+        };
+        let current = HeatmapChartSnapshot {
+            x_name: "x".to_string(),
+            y_name: "y".to_string(),
+            x_categories: vec![0.0, 1.0],
+            y_categories: vec![0.0, 2.0],
+            series: vec![xyz_series("heat", "heat", &[0.0, 0.0, 1.0, 1.0, 2.0, 5.0])],
+        };
+
+        let ops = diff_heatmap(&previous, &current).expect("expected append ops");
+
+        assert_eq!(
+            ops,
+            vec![
+                LiveChartAppendOperation::AppendHeatmapCategories {
+                    x_categories: Some(vec![1.0]),
+                    y_categories: Some(vec![2.0]),
+                },
+                LiveChartAppendOperation::AppendPoints {
+                    series_id: "heat".to_string(),
+                    values: vec![1.0, 2.0, 5.0],
+                    point_count: 1,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn diff_live_snapshots_resets_when_xy_metadata_changes() {
+        let previous = ChartSnapshot::Xy(XYChartSnapshot {
+            plot_mode: XYPlotMode::QuantityVsSweep,
+            draw_style: XYDrawStyle::Line,
+            x_name: "t".to_string(),
+            y_name: None,
+            series: vec![xy_series("signal", "signal", &[0.0, 1.0])],
+        });
+        let current = ChartSnapshot::Xy(XYChartSnapshot {
+            plot_mode: XYPlotMode::QuantityVsSweep,
+            draw_style: XYDrawStyle::Points,
+            x_name: "t".to_string(),
+            y_name: None,
+            series: vec![xy_series("signal", "signal", &[0.0, 1.0, 1.0, 2.0])],
+        });
+
+        assert_eq!(diff_live_snapshots(&previous, &current), None);
+    }
+
+    fn xy_series(id: &str, label: &str, values: &[f64]) -> FlatXYSeries {
+        FlatXYSeries::new(id, label, values.to_vec(), values.len() / 2)
+    }
+
+    fn xyz_series(id: &str, label: &str, values: &[f64]) -> FlatXYZSeries {
+        FlatXYZSeries::new(id, label, values.to_vec(), values.len() / 3)
     }
 }
