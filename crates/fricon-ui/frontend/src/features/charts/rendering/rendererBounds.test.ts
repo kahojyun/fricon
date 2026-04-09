@@ -5,6 +5,7 @@ import {
   type HeatmapRenderState,
 } from "./heatmapRenderer";
 import { lineDataBounds } from "./lineRenderer";
+import { scatterDataBounds } from "./scatterRenderer";
 
 describe("lineDataBounds", () => {
   it("ignores non-finite points when computing chart bounds", () => {
@@ -21,6 +22,29 @@ describe("lineDataBounds", () => {
     ];
 
     expect(lineDataBounds(series)).toEqual({
+      xMin: -0.2,
+      xMax: 4.2,
+      yMin: 0.8,
+      yMax: 5.2,
+    });
+  });
+});
+
+describe("scatterDataBounds", () => {
+  it("ignores non-finite points when computing chart bounds", () => {
+    const series: ChartSeries[] = [
+      {
+        name: "points",
+        data: [
+          [0, 1],
+          [2, NaN],
+          [Infinity, 3],
+          [4, 5],
+        ],
+      },
+    ];
+
+    expect(scatterDataBounds(series)).toEqual({
       xMin: -0.2,
       xMax: 4.2,
       yMin: 0.8,
