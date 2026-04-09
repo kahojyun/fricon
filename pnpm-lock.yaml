@@ -174,9 +174,6 @@ importers:
       jsdom:
         specifier: 29.0.1
         version: 29.0.1(@noble/hashes@1.8.0)
-      rollup-license-plugin:
-        specifier: 3.2.1
-        version: 3.2.1
       shadcn:
         specifier: 4.1.2
         version: 4.1.2(@types/node@24.12.2)(typescript@6.0.2)
@@ -2329,10 +2326,6 @@ packages:
     resolution: {integrity: sha512-FJhYRoDaiatfEkUK8HKlicmu/3SGFD51q3itKDGoSTysQJBnfOcxU5GxnhE1E6soB76MbT0MBtnKJuXyAx+96Q==}
     engines: {node: '>=6'}
 
-  get-npm-tarball-url@2.1.0:
-    resolution: {integrity: sha512-ro+DiMu5DXgRBabqXupW38h7WPZ9+Ad8UjwhvsmmN8w1sU7ab0nzAXvVZ4kqYg57OrqomRtJvepX5/xvFKNtjA==}
-    engines: {node: '>=12.17'}
-
   get-own-enumerable-keys@1.0.0:
     resolution: {integrity: sha512-PKsK2FSrQCyxcGHsGrLDcK0lx+0Ke+6e8KFFozA9/fIQLhQzPaRvJFdcz7+Axg3jUH/Mq+NI4xa5u/UT2tQskA==}
     engines: {node: '>=14.16'}
@@ -3224,10 +3217,6 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
-  rollup-license-plugin@3.2.1:
-    resolution: {integrity: sha512-66iiym49fU6YDJW4DPEYbmUwm4emHXP048lJM9YkecADYGO4cKf0gQZ13U/IqRN00DXbKz0g7O3yOt8m4BNFew==}
-    engines: {node: '>=18.0.0'}
-
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
     engines: {node: '>= 18'}
@@ -3344,18 +3333,6 @@ packages:
   source-map@0.7.6:
     resolution: {integrity: sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ==}
     engines: {node: '>= 12'}
-
-  spdx-exceptions@2.5.0:
-    resolution: {integrity: sha512-PiU42r+xO4UbUS1buo3LPJkjlO7430Xn5SVAhdpzzsPHsjbYVflnnFdATgabnLude+Cqu25p6N+g2lw/PFsa4w==}
-
-  spdx-expression-parse@3.0.1:
-    resolution: {integrity: sha512-cbqHunsQWnJNE6KhVSMsMeH5H/L9EpymbzqTQ3uLwNCLZ1Q481oWaofqH7nO6V07xlXwY6PhQdQ2IedWx/ZK4Q==}
-
-  spdx-expression-validate@2.0.0:
-    resolution: {integrity: sha512-b3wydZLM+Tc6CFvaRDBOF9d76oGIHNCLYFeHbftFXUWjnfZWganmDmvtM5sm1cRwJc/VDBMLyGGrsLFd1vOxbg==}
-
-  spdx-license-ids@3.0.23:
-    resolution: {integrity: sha512-CWLcCCH7VLu13TgOH+r8p1O/Znwhqv/dbb6lqWy67G+pT1kHmeD/+V36AVb/vq8QMIQwVShJ6Ssl5FPh0fuSdw==}
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -5962,8 +5939,6 @@ snapshots:
 
   get-nonce@1.0.1: {}
 
-  get-npm-tarball-url@2.1.0: {}
-
   get-own-enumerable-keys@1.0.0: {}
 
   get-proto@1.0.1:
@@ -6690,13 +6665,6 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  rollup-license-plugin@3.2.1:
-    dependencies:
-      get-npm-tarball-url: 2.1.0
-      node-fetch: 3.3.2
-      semver: 7.7.4
-      spdx-expression-validate: 2.0.0
-
   router@2.2.0:
     dependencies:
       debug: 4.4.3
@@ -6859,19 +6827,6 @@ snapshots:
   source-map@0.6.1: {}
 
   source-map@0.7.6: {}
-
-  spdx-exceptions@2.5.0: {}
-
-  spdx-expression-parse@3.0.1:
-    dependencies:
-      spdx-exceptions: 2.5.0
-      spdx-license-ids: 3.0.23
-
-  spdx-expression-validate@2.0.0:
-    dependencies:
-      spdx-expression-parse: 3.0.1
-
-  spdx-license-ids@3.0.23: {}
 
   stackback@0.0.2: {}
 
