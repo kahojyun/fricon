@@ -150,6 +150,45 @@ describe("ChartWrapper", () => {
     expect(screen.queryByText("signal (imag)")).not.toBeInTheDocument();
   });
 
+  it("omits hover tooltips in live mode", () => {
+    const data: ChartOptions = {
+      type: "heatmap",
+      xName: "x",
+      yName: "y",
+      xCategories: [1, 2],
+      yCategories: [10],
+      series: [
+        xyzSeries("z", "z", [
+          [0, 0, 100],
+          [1, 0, 200],
+        ]),
+      ],
+    };
+
+    const { container } = render(<ChartWrapper data={data} liveMode />);
+    const svg = container.querySelector("svg");
+    expect(svg).toBeInTheDocument();
+
+    Object.defineProperty(svg!, "getBoundingClientRect", {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: 300,
+        height: 200,
+        right: 300,
+        bottom: 200,
+        x: 0,
+        y: 0,
+        toJSON: () => undefined,
+      }),
+    });
+
+    fireEvent.pointerMove(svg!, { clientX: 180, clientY: 80 });
+
+    expect(screen.queryByText("x: 2, y: 10")).not.toBeInTheDocument();
+    expect(screen.queryByText("z: 200")).not.toBeInTheDocument();
+  });
+
   it("renders a chart frame header inside the plot area", () => {
     const data: ChartOptions = {
       type: "xy",

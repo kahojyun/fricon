@@ -48,6 +48,8 @@ export function ChartWrapper({
         className="absolute inset-0 size-full"
         style={{ pointerEvents: "auto" }}
       />
+      {/* Live mode intentionally omits hover tooltips to avoid noisy multi-sweep
+          overlays; users rely on the chart readout/crosshair instead. */}
       {!liveMode && data ? (
         <ChartTooltip
           data={data}
