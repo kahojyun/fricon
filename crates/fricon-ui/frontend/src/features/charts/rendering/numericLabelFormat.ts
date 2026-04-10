@@ -76,7 +76,9 @@ function formatDecimal(value: number, significantDigits: number): string {
   }
 
   const roundingFactor = 10 ** -decimals;
-  const rounded = Math.round(value / roundingFactor) * roundingFactor;
+  const scaled = value / roundingFactor;
+  const rounded =
+    Math.sign(scaled) * Math.round(Math.abs(scaled)) * roundingFactor;
   return normalizeFormattedNumber(d3Format(".0f")(rounded));
 }
 

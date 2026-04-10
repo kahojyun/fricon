@@ -34,6 +34,9 @@ describe("formatNumericLabel", () => {
       formatNumericLabel(12345, { mode: "decimal", significantDigits: 4 }),
     ).toBe("12350");
     expect(
+      formatNumericLabel(-12345, { mode: "decimal", significantDigits: 4 }),
+    ).toBe("-12350");
+    expect(
       formatNumericLabel(12.34, { mode: "decimal", significantDigits: 4 }),
     ).toBe("12.34");
   });
