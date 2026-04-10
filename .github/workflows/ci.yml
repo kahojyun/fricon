@@ -79,7 +79,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
       - name: Rust cache
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@b5ec9edd911d3bf82c74038b0a28791e0aa24d6f # v2.0.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2
@@ -163,7 +163,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
       - name: Rust cache
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@b5ec9edd911d3bf82c74038b0a28791e0aa24d6f # v2.0.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2
