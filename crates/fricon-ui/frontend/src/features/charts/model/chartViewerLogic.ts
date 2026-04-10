@@ -224,8 +224,7 @@ export function deriveChartViewerState(
       )
     : [];
 
-  const sweepAxisFallback =
-    effectivePlotMode === "quantity_vs_sweep" ? "last" : "last";
+  const sweepAxisFallback = "last" as const;
   const effectiveSweepIndexColumnName = xyRoleControlsVisible
     ? pickOptionalSelection(
         sweepAxisOptions,

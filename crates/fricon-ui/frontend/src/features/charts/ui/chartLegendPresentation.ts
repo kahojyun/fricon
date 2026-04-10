@@ -10,7 +10,7 @@ export function deriveLegendPresentation(
 ): LegendPresentation {
   const parsed = series.map((item) => ({
     id: item.id,
-    ...parseLegendLabel(item.label),
+    ...parseSeriesLabel(item.label),
   }));
   const firstBase = parsed[0]?.base ?? null;
 
@@ -48,8 +48,4 @@ export function deriveLegendPresentation(
   });
 
   return { items };
-}
-
-function parseLegendLabel(label: string) {
-  return parseSeriesLabel(label);
 }

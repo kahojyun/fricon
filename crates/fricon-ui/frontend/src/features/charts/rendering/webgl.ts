@@ -1,6 +1,7 @@
 /** Low-level WebGL2 utilities: shader compilation, buffer management, uniforms, resize. */
 
 import type { ChartSeries } from "@/shared/lib/chartTypes";
+import { liveSeriesGroupId } from "../model/liveChartModel";
 
 export function createShader(
   gl: WebGL2RenderingContext,
@@ -275,12 +276,6 @@ export function getLiveSeriesAppearance(
     opacity: 0.16 + 0.2 * normalizedAge,
     isCurrent: false,
   };
-}
-
-function liveSeriesGroupId(id: string | undefined): string | null {
-  if (!id) return null;
-  const match = /^(row:\d+|group:\d+)(?::|$)/.exec(id);
-  return match?.[1] ?? null;
 }
 
 function liveSeriesSemanticKey(label: string): string {

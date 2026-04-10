@@ -140,3 +140,9 @@ export function cloneHeatmapSeries(series: HeatmapSeries): HeatmapSeries {
     values: new Float64Array(series.values),
   };
 }
+
+export function liveSeriesGroupId(id: string | undefined): string | null {
+  if (!id) return null;
+  const match = /^(row:\d+|group:\d+)(?::|$)/.exec(id);
+  return match?.[1] ?? null;
+}

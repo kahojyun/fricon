@@ -1,6 +1,7 @@
 import { useTheme } from "next-themes";
 import type { ChartOptions, ChartSeries } from "@/shared/lib/chartTypes";
 import { useWebGLChart } from "../hooks/useWebGLChart";
+import { liveSeriesGroupId } from "../model/liveChartModel";
 import { ChartFrameHeader } from "./ChartFrameHeader";
 import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
@@ -83,10 +84,4 @@ function currentLiveLegendSeries(series: ChartSeries[]): ChartSeries[] {
   }
 
   return series.filter((item) => liveSeriesGroupId(item.id) === currentGroup);
-}
-
-function liveSeriesGroupId(id: string | undefined): string | null {
-  if (!id) return null;
-  const match = /^(row:\d+|group:\d+)(?::|$)/.exec(id);
-  return match?.[1] ?? null;
 }

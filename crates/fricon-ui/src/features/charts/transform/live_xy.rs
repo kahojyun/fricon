@@ -83,16 +83,30 @@ fn build_live_quantity_vs_sweep_snapshot(
             &options.trace_roles,
             options.draw_style,
         )?;
-        build_live_scalar_quantity_vs_sweep(
+        let series_column = batch
+            .column_by_name(series_name)
+            .cloned()
+            .context("Series column not found")?;
+        let ds_y: DatasetArray = series_column.try_into()?;
+        let x_values = roles
+            .sweep
+            .map(|index| numeric_values(batch, schema, index))
+            .transpose()?;
+        let ctx = LiveScalarQuantityVsSweepContext {
             batch,
             schema,
             series_name,
-            is_complex,
-            complex_views,
+            ds_y: &ds_y,
+            roles: &roles,
+            x_values: x_values.as_deref(),
             tail_count,
             row_start,
-            &roles,
-        )?
+        };
+        if roles.trace_group.is_empty() {
+            build_live_scalar_quantity_vs_sweep_rows(&ctx, is_complex, complex_views)?
+        } else {
+            build_live_scalar_quantity_vs_sweep_groups(&ctx, is_complex, complex_views)?
+        }
     };
 
     let x_name = if is_trace {
@@ -353,53 +367,6 @@ fn build_live_trace_complex_plane(
     Ok(result)
 }
 
-fn build_live_scalar_quantity_vs_sweep(
-    batch: &RecordBatch,
-    schema: &DatasetSchema,
-    series_name: &str,
-    is_complex: bool,
-    complex_views: &[ComplexViewOption],
-    tail_count: usize,
-    row_start: usize,
-    roles: &XYTraceRoles,
-) -> Result<Vec<FlatXYSeries>> {
-    let series_column = batch
-        .column_by_name(series_name)
-        .cloned()
-        .context("Series column not found")?;
-    let ds_y: DatasetArray = series_column.try_into()?;
-    let x_values = roles
-        .sweep
-        .map(|index| numeric_values(batch, schema, index))
-        .transpose()?;
-    let ctx = LiveScalarQuantityVsSweepContext {
-        batch,
-        schema,
-        series_name,
-        ds_y: &ds_y,
-        roles,
-        x_values: x_values.as_deref(),
-    };
-
-    if roles.trace_group.is_empty() {
-        return build_live_scalar_quantity_vs_sweep_rows(
-            &ctx,
-            is_complex,
-            complex_views,
-            tail_count,
-            row_start,
-        );
-    }
-
-    build_live_scalar_quantity_vs_sweep_groups(
-        &ctx,
-        is_complex,
-        complex_views,
-        tail_count,
-        row_start,
-    )
-}
-
 fn build_live_scalar_xy(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -607,17 +574,17 @@ struct LiveScalarQuantityVsSweepContext<'a> {
     ds_y: &'a DatasetArray,
     roles: &'a XYTraceRoles,
     x_values: Option<&'a [f64]>,
+    tail_count: usize,
+    row_start: usize,
 }
 
 fn build_live_scalar_quantity_vs_sweep_rows(
     ctx: &LiveScalarQuantityVsSweepContext<'_>,
     is_complex: bool,
     complex_views: &[ComplexViewOption],
-    tail_count: usize,
-    row_start: usize,
 ) -> Result<Vec<FlatXYSeries>> {
     let num_rows = ctx.batch.num_rows();
-    let start = num_rows.saturating_sub(tail_count);
+    let start = num_rows.saturating_sub(ctx.tail_count);
     let rows = row_order_for_group(ctx.batch, ctx.schema, start, num_rows, ctx.roles.sweep);
 
     if is_complex {
@@ -630,7 +597,11 @@ fn build_live_scalar_quantity_vs_sweep_rows(
                 let transformed = transform_complex_values(reals, imags, view);
                 let mut values = Vec::with_capacity(rows.len() * 2);
                 for row in rows.iter().copied() {
-                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
+                    values.push(resolve_quantity_vs_sweep_x(
+                        ctx.x_values,
+                        ctx.row_start,
+                        row,
+                    )?);
                     values.push(transformed[row]);
                 }
                 Ok(FlatXYSeries::new(
@@ -650,7 +621,11 @@ fn build_live_scalar_quantity_vs_sweep_rows(
         .values();
     let mut values = Vec::with_capacity(rows.len() * 2);
     for row in rows.iter().copied() {
-        values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
+        values.push(resolve_quantity_vs_sweep_x(
+            ctx.x_values,
+            ctx.row_start,
+            row,
+        )?);
         values.push(y_values[row]);
     }
     Ok(vec![FlatXYSeries::new(
@@ -665,12 +640,10 @@ fn build_live_scalar_quantity_vs_sweep_groups(
     ctx: &LiveScalarQuantityVsSweepContext<'_>,
     is_complex: bool,
     complex_views: &[ComplexViewOption],
-    tail_count: usize,
-    row_start: usize,
 ) -> Result<Vec<FlatXYSeries>> {
     let groups = compute_group_starts(ctx.batch, ctx.schema, &ctx.roles.trace_group);
     let ranges = group_ranges(&groups, ctx.batch.num_rows());
-    let selected = &ranges[ranges.len().saturating_sub(tail_count)..];
+    let selected = &ranges[ranges.len().saturating_sub(ctx.tail_count)..];
 
     if is_complex {
         let complex_array = ctx.ds_y.as_complex().context("Expected complex array")?;
@@ -695,7 +668,11 @@ fn build_live_scalar_quantity_vs_sweep_groups(
                 let transformed = transform_complex_values(reals, imags, view);
                 let mut values = Vec::with_capacity(rows.len() * 2);
                 for row in rows.iter().copied() {
-                    values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
+                    values.push(resolve_quantity_vs_sweep_x(
+                        ctx.x_values,
+                        ctx.row_start,
+                        row,
+                    )?);
                     values.push(transformed[row]);
                 }
                 result.push(FlatXYSeries::new(
@@ -736,7 +713,11 @@ fn build_live_scalar_quantity_vs_sweep_groups(
             make_group_label(ctx.batch, ctx.schema, &ctx.roles.trace_group, group_start);
         let mut values = Vec::with_capacity(rows.len() * 2);
         for row in rows.iter().copied() {
-            values.push(resolve_quantity_vs_sweep_x(ctx.x_values, row_start, row)?);
+            values.push(resolve_quantity_vs_sweep_x(
+                ctx.x_values,
+                ctx.row_start,
+                row,
+            )?);
             values.push(y_values[row]);
         }
         result.push(FlatXYSeries::new(
