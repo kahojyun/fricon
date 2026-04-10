@@ -6,6 +6,13 @@ export type XYDrawStyle = "line" | "points" | "line_points";
 
 export type ComplexViewOption = "real" | "imag" | "mag" | "arg";
 
+export type NumericLabelFormatMode = "auto" | "decimal" | "scientific" | "si";
+
+export interface NumericLabelFormatOptions {
+  mode: NumericLabelFormatMode;
+  significantDigits: number;
+}
+
 export interface ChartSeries {
   id: string;
   label: string;

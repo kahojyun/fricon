@@ -2,15 +2,18 @@ import {
   getXYPoint,
   getXYZPoint,
   type ChartOptions,
+  type NumericLabelFormatOptions,
 } from "@/shared/lib/chartTypes";
 import type { ChartInteractionState } from "../hooks/useWebGLChart";
 import {
   invertZoomedLinearRange,
   projectLinearRange,
 } from "../rendering/mathUtils";
+import { formatNumericLabel } from "../rendering/numericLabelFormat";
 
 export function getTooltipLines(
   data: ChartOptions,
+  numericLabelFormat: NumericLabelFormatOptions,
   interactionState: ChartInteractionState,
   chartX: number,
   chartY: number,
@@ -41,7 +44,9 @@ export function getTooltipLines(
               chartHeight,
             );
       return nearest
-        ? [`${series.label}: (${fmt(nearest.x)}, ${fmt(nearest.y)})`]
+        ? [
+            `${series.label}: (${formatNumericLabel(nearest.x, numericLabelFormat)}, ${formatNumericLabel(nearest.y, numericLabelFormat)})`,
+          ]
         : [];
     });
   }
@@ -63,13 +68,15 @@ export function getTooltipLines(
     if (col < 0 || row < 0) return [];
 
     const lines = [
-      `${data.xName}: ${fmt(interactionState.xCategories[col])}, ${data.yName}: ${fmt(interactionState.yCategories[row])}`,
+      `${data.xName}: ${formatNumericLabel(interactionState.xCategories[col], numericLabelFormat)}, ${data.yName}: ${formatNumericLabel(interactionState.yCategories[row], numericLabelFormat)}`,
     ];
 
     for (const series of data.series) {
       const cellValue = findHeatmapCellValue(series, col, row);
       if (cellValue !== null) {
-        lines.push(`${series.label}: ${fmt(cellValue)}`);
+        lines.push(
+          `${series.label}: ${formatNumericLabel(cellValue, numericLabelFormat)}`,
+        );
       }
     }
 
@@ -155,10 +162,6 @@ function findHeatmapCellValue(
     }
   }
   return null;
-}
-
-function fmt(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toPrecision(6);
 }
 
 function clampIndex(index: number, length: number): number {

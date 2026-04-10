@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
 import type { ChartInteractionState } from "../hooks/useWebGLChart";
+import { DEFAULT_NUMERIC_LABEL_FORMAT } from "../rendering/numericLabelFormat";
 import { getTooltipLines } from "./tooltipLines";
 
 const margin = {
@@ -42,9 +43,17 @@ describe("getTooltipLines", () => {
       },
     };
 
-    expect(getTooltipLines(data, interactionState, 50, 50, 100, 100)).toEqual([
-      "series: (5, 5)",
-    ]);
+    expect(
+      getTooltipLines(
+        data,
+        DEFAULT_NUMERIC_LABEL_FORMAT,
+        interactionState,
+        50,
+        50,
+        100,
+        100,
+      ),
+    ).toEqual(["series: (5, 5)"]);
   });
 
   it("matches scatter points in zoomed screen space", () => {
@@ -72,9 +81,17 @@ describe("getTooltipLines", () => {
       },
     };
 
-    expect(getTooltipLines(data, interactionState, 50, 50, 100, 100)).toEqual([
-      "series: (5, 5)",
-    ]);
+    expect(
+      getTooltipLines(
+        data,
+        DEFAULT_NUMERIC_LABEL_FORMAT,
+        interactionState,
+        50,
+        50,
+        100,
+        100,
+      ),
+    ).toEqual(["series: (5, 5)"]);
   });
 
   it("requires point proximity for point-only quantity-vs-sweep charts", () => {
@@ -102,9 +119,17 @@ describe("getTooltipLines", () => {
       },
     };
 
-    expect(getTooltipLines(data, interactionState, 50, 0, 100, 100)).toEqual(
-      [],
-    );
+    expect(
+      getTooltipLines(
+        data,
+        DEFAULT_NUMERIC_LABEL_FORMAT,
+        interactionState,
+        50,
+        0,
+        100,
+        100,
+      ),
+    ).toEqual([]);
   });
 
   it("returns heatmap categories and cell values", () => {
@@ -124,10 +149,55 @@ describe("getTooltipLines", () => {
       margin,
     };
 
-    expect(getTooltipLines(data, interactionState, 75, 25, 100, 100)).toEqual([
-      "x: 2, y: 20",
-      "z: 200",
-    ]);
+    expect(
+      getTooltipLines(
+        data,
+        DEFAULT_NUMERIC_LABEL_FORMAT,
+        interactionState,
+        75,
+        25,
+        100,
+        100,
+      ),
+    ).toEqual(["x: 2, y: 20", "z: 200"]);
+  });
+
+  it("reuses the configured formatter for tooltip values", () => {
+    const data: ChartOptions = {
+      type: "xy",
+      plotMode: "quantity_vs_sweep",
+      drawStyle: "line",
+      xName: "x",
+      yName: null,
+      series: [xySeries("series", "series", [[0.0001234, 12340]])],
+    };
+
+    const interactionState: ChartInteractionState = {
+      type: "xy",
+      xMin: 0,
+      xMax: 0.001,
+      yMin: 12000,
+      yMax: 13000,
+      margin,
+      zoomState: {
+        scaleX: 1,
+        scaleY: 1,
+        translateX: 0,
+        translateY: 0,
+      },
+    };
+
+    expect(
+      getTooltipLines(
+        data,
+        { mode: "scientific", significantDigits: 4 },
+        interactionState,
+        50,
+        50,
+        100,
+        100,
+      ),
+    ).toEqual(["series: (1.234e-4, 1.234e+4)"]);
   });
 });
 

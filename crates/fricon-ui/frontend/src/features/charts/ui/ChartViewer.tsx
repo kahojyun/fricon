@@ -95,6 +95,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
             <ChartWrapper
               data={chartData}
               interactionKey={chartInteractionKey}
+              numericLabelFormat={selection.controlState.numericLabelFormat}
               liveMode
               header={chartHeader}
             />
@@ -109,6 +110,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
                 <ChartWrapper
                   data={chartData}
                   interactionKey={chartInteractionKey}
+                  numericLabelFormat={selection.controlState.numericLabelFormat}
                   header={chartHeader}
                 />
               </div>

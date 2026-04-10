@@ -4,10 +4,12 @@
  */
 
 import { select, type Selection } from "d3-selection";
+import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
 import type { ChartMargin } from "./webgl";
 import type { ZoomState } from "./zoomController";
 import type { OverlayTheme } from "./d3Overlay";
 import { invertZoomedLinearRange } from "./mathUtils";
+import { formatNumericLabel } from "./numericLabelFormat";
 
 export interface CrosshairChartState {
   margin: ChartMargin;
@@ -17,6 +19,7 @@ export interface CrosshairChartState {
   yMin: number;
   yMax: number;
   theme: OverlayTheme;
+  numericLabelFormat: NumericLabelFormatOptions;
 }
 
 export interface CrosshairController {
@@ -26,10 +29,6 @@ export interface CrosshairController {
 const LABEL_PADDING_X = 6;
 const LABEL_PADDING_Y = 3;
 const LABEL_RADIUS = 4;
-
-function fmt(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toPrecision(6);
-}
 
 export function attachCrosshair(
   svgElement: SVGSVGElement,
@@ -103,7 +102,16 @@ export function attachCrosshair(
       return;
     }
 
-    const { margin, zoomState, xMin, xMax, yMin, yMax, theme } = state;
+    const {
+      margin,
+      zoomState,
+      xMin,
+      xMax,
+      yMin,
+      yMax,
+      theme,
+      numericLabelFormat,
+    } = state;
     const rect = svgElement.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
@@ -166,14 +174,14 @@ export function attachCrosshair(
       .attr("x", mouseX)
       .attr("y", margin.top + chartHeight + 13)
       .attr("fill", theme.textColor)
-      .text(fmt(dataX));
+      .text(formatNumericLabel(dataX, numericLabelFormat));
     syncLabelBackground(xLabelBg, xLabelText, theme);
 
     yLabelText
       .attr("x", margin.left - 8)
       .attr("y", mouseY)
       .attr("fill", theme.textColor)
-      .text(fmt(dataY));
+      .text(formatNumericLabel(dataY, numericLabelFormat));
     syncLabelBackground(yLabelBg, yLabelText, theme);
   }
 
