@@ -179,9 +179,13 @@ fn resolve_live_row_start(
                 .context("Column not found")?;
             if matches!(data_type, DatasetDataType::Trace(_, _)) {
                 match index_columns {
-                    Some(idx_cols) if idx_cols.len() >= 2 => {
-                        resolve_group_tail_start(dataset, schema, idx_cols, total_rows, 1)
-                    }
+                    Some(idx_cols) if idx_cols.len() >= 2 => resolve_group_tail_start(
+                        dataset,
+                        schema,
+                        &idx_cols[..idx_cols.len() - 1],
+                        total_rows,
+                        1,
+                    ),
                     _ => Ok(total_rows.saturating_sub(1)),
                 }
             } else if let Some(idx_cols) = index_columns {
@@ -189,7 +193,7 @@ fn resolve_live_row_start(
                     resolve_group_tail_start(
                         dataset,
                         schema,
-                        &idx_cols[..idx_cols.len() - 1],
+                        &idx_cols[..idx_cols.len() - 2],
                         total_rows,
                         1,
                     )
@@ -521,15 +525,23 @@ fn diff_heatmap(
 
 #[cfg(test)]
 mod tests {
+    use fricon::{AppManager, Client, DatasetRow, DatasetScalar, WorkspaceRoot};
+    use indexmap::IndexMap;
+    use tempfile::TempDir;
+
     use super::{
-        diff_heatmap, diff_live_snapshots, diff_xy_series, recent_group_starts_in_scan_batch,
-        resolve_group_tail_start_in_scan_batch,
+        dataset_live_chart_data as load_live_chart_data, diff_heatmap, diff_live_snapshots,
+        diff_xy_series, recent_group_starts_in_scan_batch, resolve_group_tail_start_in_scan_batch,
     };
-    use crate::features::charts::{
-        transform::test_utils::{numeric_batch, numeric_schema},
-        types::{
-            ChartSnapshot, FlatSeries, FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot,
-            LiveChartAppendOperation, XYChartSnapshot, XYDrawStyle, XYPlotMode,
+    use crate::{
+        desktop_runtime::session::WorkspaceSession,
+        features::charts::{
+            transform::test_utils::{numeric_batch, numeric_schema},
+            types::{
+                ChartSnapshot, FlatSeries, FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot,
+                LiveChartAppendOperation, LiveChartDataOptions, LiveChartDataResponse,
+                LiveHeatmapOptions, XYChartSnapshot, XYDrawStyle, XYPlotMode,
+            },
         },
     };
 
@@ -560,6 +572,43 @@ mod tests {
         assert_eq!(
             resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 5, 6, 2),
             None
+        );
+    }
+
+    #[test]
+    fn resolve_group_tail_start_for_scalar_live_heatmap_uses_outer_sweep_key() {
+        let batch = numeric_batch(&[
+            ("cycle", &[0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
+            ("y", &[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0]),
+            ("x", &[0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0]),
+        ]);
+        let schema = numeric_schema(&["cycle", "y", "x"]);
+
+        assert_eq!(
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 0, 0, 1),
+            Some(4)
+        );
+        assert_eq!(
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], 0, 0, 1),
+            Some(8)
+        );
+    }
+
+    #[test]
+    fn resolve_group_tail_start_for_trace_live_heatmap_uses_outer_sweep_key() {
+        let batch = numeric_batch(&[
+            ("outer", &[0.0, 0.0, 0.0, 1.0, 1.0, 1.0]),
+            ("row", &[0.0, 1.0, 2.0, 0.0, 1.0, 2.0]),
+        ]);
+        let schema = numeric_schema(&["outer", "row"]);
+
+        assert_eq!(
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 0, 0, 1),
+            Some(3)
+        );
+        assert_eq!(
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], 0, 0, 1),
+            Some(5)
         );
     }
 
@@ -653,5 +702,146 @@ mod tests {
 
     fn xyz_series(id: &str, label: &str, values: &[f64]) -> FlatXYZSeries {
         FlatXYZSeries::new(id, label, values.to_vec(), values.len() / 3)
+    }
+
+    async fn create_live_chart_test_session(
+        rows: Vec<DatasetRow>,
+    ) -> anyhow::Result<(TempDir, AppManager, WorkspaceSession, i32)> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let schema = rows[0].to_schema();
+        let mut writer = client
+            .create_dataset(
+                "live-heatmap-test".to_string(),
+                String::new(),
+                vec![],
+                schema,
+            )
+            .await?;
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+        Ok((temp_dir, app_manager, session, dataset.id()))
+    }
+
+    fn scalar_heatmap_rows() -> Vec<DatasetRow> {
+        vec![
+            scalar_row(0.0, 0.0, 0.0, 0.0),
+            scalar_row(0.0, 0.0, 1.0, 1.0),
+            scalar_row(0.0, 1.0, 0.0, 10.0),
+            scalar_row(0.0, 1.0, 1.0, 11.0),
+            scalar_row(1.0, 0.0, 0.0, 100.0),
+            scalar_row(1.0, 0.0, 1.0, 101.0),
+            scalar_row(1.0, 1.0, 0.0, 110.0),
+            scalar_row(1.0, 1.0, 1.0, 111.0),
+            scalar_row(1.0, 2.0, 0.0, 120.0),
+            scalar_row(1.0, 2.0, 1.0, 121.0),
+        ]
+    }
+
+    fn scalar_row(cycle: f64, y: f64, x: f64, val: f64) -> DatasetRow {
+        DatasetRow(IndexMap::from([
+            ("cycle".to_string(), DatasetScalar::Numeric(cycle)),
+            ("y".to_string(), DatasetScalar::Numeric(y)),
+            ("x".to_string(), DatasetScalar::Numeric(x)),
+            ("val".to_string(), DatasetScalar::Numeric(val)),
+        ]))
+    }
+
+    fn trace_heatmap_rows() -> Vec<DatasetRow> {
+        vec![
+            trace_row(0.0, 0.0, &[1.0, 2.0]),
+            trace_row(0.0, 1.0, &[3.0, 4.0]),
+            trace_row(1.0, 0.0, &[5.0, 6.0]),
+            trace_row(1.0, 1.0, &[7.0, 8.0]),
+        ]
+    }
+
+    fn trace_row(outer: f64, row: f64, values: &[f64]) -> DatasetRow {
+        DatasetRow(IndexMap::from([
+            ("outer".to_string(), DatasetScalar::Numeric(outer)),
+            ("row".to_string(), DatasetScalar::Numeric(row)),
+            (
+                "trace".to_string(),
+                DatasetScalar::SimpleTrace(values.iter().copied().collect()),
+            ),
+        ]))
+    }
+
+    fn heatmap_snapshot_from_live_response(
+        response: LiveChartDataResponse,
+    ) -> HeatmapChartSnapshot {
+        match response {
+            LiveChartDataResponse::Reset { snapshot, .. } => match snapshot {
+                ChartSnapshot::Heatmap(snapshot) => snapshot,
+                other @ ChartSnapshot::Xy(_) => panic!("expected heatmap snapshot, got {other:?}"),
+            },
+            LiveChartDataResponse::Append { .. } => {
+                panic!("expected reset response for initial live request")
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn live_scalar_heatmap_keeps_latest_outer_sweep_end_to_end() -> anyhow::Result<()> {
+        let (_temp_dir, app_manager, session, dataset_id) =
+            create_live_chart_test_session(scalar_heatmap_rows()).await?;
+
+        let response = load_live_chart_data(
+            &session,
+            dataset_id,
+            &LiveChartDataOptions::Heatmap(LiveHeatmapOptions {
+                quantity: "val".to_string(),
+                complex_view_single: None,
+                known_row_count: None,
+            }),
+        )
+        .await?;
+        let snapshot = heatmap_snapshot_from_live_response(response);
+
+        assert_eq!(snapshot.x_name, "x");
+        assert_eq!(snapshot.y_name, "y");
+        assert_eq!(snapshot.x_categories, vec![0.0, 1.0]);
+        assert_eq!(snapshot.y_categories, vec![0.0, 1.0, 2.0]);
+        assert_eq!(snapshot.series.len(), 1);
+        assert_eq!(snapshot.series[0].point_count, 6);
+
+        app_manager.shutdown().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn live_trace_heatmap_keeps_latest_outer_sweep_end_to_end() -> anyhow::Result<()> {
+        let (_temp_dir, app_manager, session, dataset_id) =
+            create_live_chart_test_session(trace_heatmap_rows()).await?;
+
+        let response = load_live_chart_data(
+            &session,
+            dataset_id,
+            &LiveChartDataOptions::Heatmap(LiveHeatmapOptions {
+                quantity: "trace".to_string(),
+                complex_view_single: None,
+                known_row_count: None,
+            }),
+        )
+        .await?;
+        let snapshot = heatmap_snapshot_from_live_response(response);
+
+        assert_eq!(snapshot.x_name, "trace - X");
+        assert_eq!(snapshot.y_name, "row");
+        assert_eq!(snapshot.x_categories, vec![0.0, 1.0]);
+        assert_eq!(snapshot.y_categories, vec![0.0, 1.0]);
+        assert_eq!(snapshot.series.len(), 1);
+        assert_eq!(snapshot.series[0].point_count, 4);
+
+        app_manager.shutdown().await;
+        Ok(())
     }
 }

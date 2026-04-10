@@ -264,6 +264,55 @@ mod tests {
         (batch, DatasetSchema::new(columns))
     }
 
+    fn trace_batch_with_two_indices(
+        trace_rows: Vec<Vec<f64>>,
+        outer_values: &[f64],
+        row_values: &[f64],
+    ) -> (RecordBatch, DatasetSchema) {
+        let trace_array: ArrayRef = if trace_rows.is_empty() {
+            let sample: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
+                ScalarArray::from_iter(Vec::<f64>::new()),
+            ))
+            .into();
+            sample.slice(0, 0)
+        } else {
+            let row_arrays: Vec<ArrayRef> = trace_rows
+                .into_iter()
+                .map(|row| {
+                    DatasetArray::from(DatasetScalar::SimpleTrace(ScalarArray::from_iter(row)))
+                        .into()
+                })
+                .collect();
+            let row_refs: Vec<&dyn arrow_array::Array> =
+                row_arrays.iter().map(|array| &**array).collect();
+            concat(&row_refs).unwrap()
+        };
+        let outer_array: ArrayRef = Arc::new(Float64Array::from(outer_values.to_vec()));
+        let row_array: ArrayRef = Arc::new(Float64Array::from(row_values.to_vec()));
+        let arrow_schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("outer", DataType::Float64, false),
+            Field::new("row", DataType::Float64, false),
+            Field::new("trace", trace_array.data_type().clone(), false),
+        ]));
+        let batch =
+            RecordBatch::try_new(arrow_schema, vec![outer_array, row_array, trace_array]).unwrap();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "outer".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "row".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        );
+        columns.insert(
+            "trace".to_string(),
+            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+        );
+        (batch, DatasetSchema::new(columns))
+    }
+
     /// 9 rows: 3 outer sweeps × 3 inner points.
     /// Index columns: sweep (outer), freq (MFI-2), point (MFI).
     /// Only the last outer sweep should appear.
@@ -293,6 +342,49 @@ mod tests {
         assert_eq!(res.series.len(), 1);
         // The heatmap should contain data from the last 3 rows only
         assert_eq!(res.series[0].point_count, 3);
+    }
+
+    #[test]
+    fn scalar_keeps_all_rows_from_latest_outer_sweep() {
+        let batch = numeric_batch(&[
+            ("cycle", &[0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]),
+            ("y", &[0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0]),
+            ("x", &[0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0]),
+            (
+                "val",
+                &[
+                    0.0, 1.0, 10.0, 11.0, 100.0, 101.0, 110.0, 111.0, 120.0, 121.0,
+                ],
+            ),
+        ]);
+        let schema = numeric_schema(&["cycle", "y", "x", "val"]);
+        let options = LiveHeatmapOptions {
+            quantity: "val".to_string(),
+            complex_view_single: None,
+            known_row_count: None,
+        };
+
+        let res = heatmap_snapshot(
+            build_live_heatmap_series(&batch, &schema, Some(&[0, 1, 2]), &options).unwrap(),
+        );
+
+        assert_eq!(res.x_name, "x");
+        assert_eq!(res.y_name, "y");
+        assert_eq!(res.x_categories, vec![0.0, 1.0]);
+        assert_eq!(res.y_categories, vec![0.0, 1.0, 2.0]);
+        assert_eq!(res.series.len(), 1);
+        assert_eq!(res.series[0].point_count, 6);
+        assert_eq!(
+            xyz_points(&res.series[0]),
+            vec![
+                vec![0.0, 0.0, 100.0],
+                vec![1.0, 0.0, 101.0],
+                vec![0.0, 1.0, 110.0],
+                vec![1.0, 1.0, 111.0],
+                vec![0.0, 2.0, 120.0],
+                vec![1.0, 2.0, 121.0],
+            ]
+        );
     }
 
     #[test]
@@ -346,6 +438,45 @@ mod tests {
         assert_eq!(
             xyz_points(&res.series[0]),
             vec![vec![0.0, 0.0, 1.0], vec![1.0, 0.0, 2.0]]
+        );
+    }
+
+    #[test]
+    fn trace_keeps_all_rows_from_latest_outer_sweep() {
+        let (batch, schema) = trace_batch_with_two_indices(
+            vec![
+                vec![1.0, 2.0],
+                vec![3.0, 4.0],
+                vec![5.0, 6.0],
+                vec![7.0, 8.0],
+            ],
+            &[0.0, 0.0, 1.0, 1.0],
+            &[0.0, 1.0, 0.0, 1.0],
+        );
+        let options = LiveHeatmapOptions {
+            quantity: "trace".to_string(),
+            complex_view_single: None,
+            known_row_count: None,
+        };
+
+        let res = heatmap_snapshot(
+            build_live_heatmap_series(&batch, &schema, Some(&[0, 1]), &options).unwrap(),
+        );
+
+        assert_eq!(res.x_name, "trace - X");
+        assert_eq!(res.y_name, "row");
+        assert_eq!(res.x_categories, vec![0.0, 1.0]);
+        assert_eq!(res.y_categories, vec![0.0, 1.0]);
+        assert_eq!(res.series.len(), 1);
+        assert_eq!(res.series[0].point_count, 4);
+        assert_eq!(
+            xyz_points(&res.series[0]),
+            vec![
+                vec![0.0, 0.0, 5.0],
+                vec![1.0, 0.0, 6.0],
+                vec![0.0, 1.0, 7.0],
+                vec![1.0, 1.0, 8.0],
+            ]
         );
     }
 }
