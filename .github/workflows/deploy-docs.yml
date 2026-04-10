@@ -34,7 +34,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install build dependencies
-        uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2
+        uses: taiki-e/install-action@be9d4e566a6d59aa24f9976dab45072b36fc8b45 # v2.0.3
         with:
           tool: protoc
       - name: Set docs version tag
