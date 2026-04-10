@@ -1,87 +1,137 @@
 pub(crate) mod heatmap;
-pub(crate) mod line;
 pub(crate) mod live_heatmap;
-pub(crate) mod live_line;
-pub(crate) mod live_scatter;
+pub(crate) mod live_xy;
 pub(crate) mod mapping;
-pub(crate) mod scatter;
+pub(crate) mod xy;
 
+use anyhow::{Context, Result, bail};
 use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetSchema};
 
 pub(crate) use self::{
-    heatmap::build_heatmap_series, line::build_line_series,
-    live_heatmap::build_live_heatmap_series, live_line::build_live_line_series,
-    live_scatter::build_live_scatter_series, scatter::build_scatter_series,
+    heatmap::build_heatmap_series, live_heatmap::build_live_heatmap_series,
+    live_xy::build_live_xy_series, xy::build_xy_series,
 };
+use crate::features::charts::types::{XYDrawStyle, XYTraceRoleOptions};
 
-/// Format a sweep-age label: the newest sweep is `"current"`, older ones are
-/// `"-1"`, `"-2"`, etc.
-pub(super) fn sweep_name(age: usize, total: usize) -> String {
-    if age == total - 1 {
-        "current".to_string()
-    } else {
-        let offset = total - 1 - age;
-        format!("-{offset}")
-    }
+pub(super) struct XYTraceRoles {
+    pub(super) trace_group: Vec<usize>,
+    pub(super) sweep: Option<usize>,
 }
 
-/// Compute sweep group start indices based on outer index column transitions.
-///
-/// Outer indices are all index columns except the most-frequent (last) one.
-/// A new group starts when any outer index value changes from the previous row.
-/// Falls back to one-row-per-group when there are fewer than two index columns.
-pub(super) fn compute_sweep_groups(
-    batch: &RecordBatch,
+pub(super) fn row_series_id(row: usize) -> String {
+    format!("row:{row}")
+}
+
+pub(super) fn group_series_id(group_start: usize) -> String {
+    format!("group:{group_start}")
+}
+
+pub(super) fn resolve_xy_trace_roles(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    options: &XYTraceRoleOptions,
+    draw_style: XYDrawStyle,
+) -> Result<XYTraceRoles> {
+    let Some(index_columns) = index_columns else {
+        if options.sweep_index_column.is_some()
+            || options
+                .trace_group_index_columns
+                .as_ref()
+                .is_some_and(|columns| !columns.is_empty())
+        {
+            bail!("Trace roles require dataset index columns");
+        }
+        return Ok(XYTraceRoles {
+            trace_group: vec![],
+            sweep: None,
+        });
+    };
+
+    let trace_group = resolve_named_index_columns(
+        schema,
+        index_columns,
+        options.trace_group_index_columns.as_deref().unwrap_or(&[]),
+    )?;
+
+    let explicit_sweep = options
+        .sweep_index_column
+        .as_deref()
+        .map(|name| resolve_named_index_column(schema, index_columns, name))
+        .transpose()?;
+
+    if explicit_sweep.is_some_and(|sweep| trace_group.contains(&sweep)) {
+        bail!("sweepIndexColumn must not also be used in traceGroupIndexColumns");
+    }
+
+    let default_sweep = if draw_style.includes_lines() {
+        index_columns
+            .iter()
+            .rev()
+            .find(|&&index| !trace_group.contains(&index))
+            .copied()
+    } else {
+        None
+    };
+
+    Ok(XYTraceRoles {
+        trace_group,
+        sweep: explicit_sweep.or(default_sweep),
+    })
+}
+
+pub(super) fn compute_group_starts(
+    batch: &RecordBatch,
+    schema: &DatasetSchema,
+    group_columns: &[usize],
 ) -> Vec<usize> {
     let num_rows = batch.num_rows();
     if num_rows == 0 {
         return vec![];
     }
-
-    if let Some(idx_cols) = index_columns
-        && idx_cols.len() >= 2
-    {
-        let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
-        let outer_indices = &idx_cols[..idx_cols.len() - 1];
-        let outer_columns: Vec<Vec<f64>> = outer_indices
-            .iter()
-            .map(|&idx| {
-                let arr = batch
-                    .column_by_name(column_names[idx])
-                    .expect("index column present");
-                let ds: DatasetArray = arr.clone().try_into().expect("valid array");
-                ds.as_numeric().expect("numeric index").values().to_vec()
-            })
-            .collect();
-
-        let mut group_starts = vec![0_usize];
-        for row in 1..num_rows {
-            #[expect(
-                clippy::float_cmp,
-                reason = "Index values are stored, not computed; exact comparison is correct"
-            )]
-            if outer_columns.iter().any(|col| col[row] != col[row - 1]) {
-                group_starts.push(row);
-            }
-        }
-        group_starts
-    } else {
-        // No meaningful grouping: each row is its own "sweep"
-        (0..num_rows).collect()
+    if group_columns.is_empty() {
+        return vec![0];
     }
+
+    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
+    let group_values: Vec<Vec<f64>> = group_columns
+        .iter()
+        .map(|&idx| {
+            let arr = batch
+                .column_by_name(column_names[idx])
+                .expect("group column present");
+            let ds: DatasetArray = arr.clone().try_into().expect("valid group column");
+            ds.as_numeric()
+                .expect("numeric group column")
+                .values()
+                .to_vec()
+        })
+        .collect();
+
+    let mut group_starts = vec![0];
+    for row in 1..num_rows {
+        #[expect(
+            clippy::float_cmp,
+            reason = "Index values are stored, not computed; exact comparison is correct"
+        )]
+        if group_values.iter().any(|col| col[row] != col[row - 1]) {
+            group_starts.push(row);
+        }
+    }
+    group_starts
 }
 
-/// Find the start row of the last outer-index group.
-///
-/// Like [`compute_sweep_groups`] but only needs the final boundary, so it
-/// avoids allocating the full group list.
-///
-/// `outer_index_count` specifies how many leading index columns form the
-/// "outer" key. When `outer_index_count == 0` the whole batch is the last group
-/// (returns 0).
+pub(super) fn group_ranges(starts: &[usize], num_rows: usize) -> Vec<(usize, usize)> {
+    starts
+        .iter()
+        .enumerate()
+        .map(|(i, &start)| {
+            let end = starts.get(i + 1).copied().unwrap_or(num_rows);
+            (start, end)
+        })
+        .collect()
+}
+
 pub(super) fn last_outer_group_start(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -93,30 +143,121 @@ pub(super) fn last_outer_group_start(
         return 0;
     }
 
-    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
     let outer_indices = &index_columns[..outer_index_count];
-    let outer_columns: Vec<Vec<f64>> = outer_indices
+    let starts = compute_group_starts(batch, schema, outer_indices);
+    starts.last().copied().unwrap_or(0)
+}
+
+pub(super) fn row_order_for_group(
+    batch: &RecordBatch,
+    schema: &DatasetSchema,
+    start: usize,
+    end: usize,
+    sweep: Option<usize>,
+) -> Vec<usize> {
+    let mut rows: Vec<usize> = (start..end).collect();
+    let Some(sweep) = sweep else {
+        return rows;
+    };
+
+    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
+    let arr = batch
+        .column_by_name(column_names[sweep])
+        .expect("order column present");
+    let ds: DatasetArray = arr.clone().try_into().expect("valid order column");
+    let values = ds.as_numeric().expect("numeric order column").values();
+
+    rows.sort_by(|&left, &right| {
+        let ordering = values[left].total_cmp(&values[right]);
+        if ordering.is_eq() {
+            left.cmp(&right)
+        } else {
+            ordering
+        }
+    });
+    rows
+}
+
+pub(super) fn make_group_label(
+    batch: &RecordBatch,
+    schema: &DatasetSchema,
+    group_columns: &[usize],
+    row: usize,
+) -> Option<String> {
+    if group_columns.is_empty() {
+        return None;
+    }
+
+    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
+    let parts = group_columns
         .iter()
         .map(|&idx| {
-            let arr = batch
-                .column_by_name(column_names[idx])
-                .expect("index column present");
-            let ds: DatasetArray = arr.clone().try_into().expect("valid array");
-            ds.as_numeric().expect("numeric index").values().to_vec()
+            let name = column_names[idx];
+            let arr = batch.column_by_name(name).expect("group column present");
+            let ds: DatasetArray = arr.clone().try_into().expect("valid group column");
+            let value = ds.as_numeric().expect("numeric group column").values()[row];
+            format!("{name}={}", format_numeric_value(value))
         })
-        .collect();
+        .collect::<Vec<_>>();
 
-    let mut last_group_start = 0;
-    for row in 1..num_rows {
-        #[expect(
-            clippy::float_cmp,
-            reason = "Index values are stored, not computed; exact comparison is correct"
-        )]
-        if outer_columns.iter().any(|col| col[row] != col[row - 1]) {
-            last_group_start = row;
+    Some(parts.join(", "))
+}
+
+pub(super) fn make_group_id_suffix(
+    batch: &RecordBatch,
+    schema: &DatasetSchema,
+    group_columns: &[usize],
+    row: usize,
+) -> Option<String> {
+    make_group_label(batch, schema, group_columns, row)
+        .map(|label| label.replace(", ", "|").replace('=', ":"))
+}
+
+pub(super) fn format_numeric_value(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.6}")
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
+    }
+}
+
+fn resolve_named_index_columns(
+    schema: &DatasetSchema,
+    index_columns: &[usize],
+    names: &[String],
+) -> Result<Vec<usize>> {
+    let mut resolved = Vec::new();
+    for name in names {
+        let index = resolve_named_index_column(schema, index_columns, name)?;
+        if !resolved.contains(&index) {
+            resolved.push(index);
         }
     }
-    last_group_start
+    resolved.sort_by_key(|index| {
+        index_columns
+            .iter()
+            .position(|candidate| candidate == index)
+            .expect("resolved index is present in index_columns")
+    });
+    Ok(resolved)
+}
+
+fn resolve_named_index_column(
+    schema: &DatasetSchema,
+    index_columns: &[usize],
+    name: &str,
+) -> Result<usize> {
+    let (idx, _, _) = schema
+        .columns()
+        .get_full(name)
+        .with_context(|| format!("Column '{name}' not found"))?;
+    if !index_columns.contains(&idx) {
+        bail!("Column '{name}' is not an index column");
+    }
+    Ok(idx)
 }
 
 #[cfg(test)]
@@ -154,51 +295,31 @@ pub(super) mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::{
+        compute_group_starts, group_ranges, last_outer_group_start, resolve_xy_trace_roles,
         test_utils::{numeric_batch, numeric_schema},
-        *,
     };
+    use crate::features::charts::types::{XYDrawStyle, XYTraceRoleOptions};
 
     #[test]
-    fn sweep_name_labels() {
-        assert_eq!(sweep_name(0, 3), "-2");
-        assert_eq!(sweep_name(1, 3), "-1");
-        assert_eq!(sweep_name(2, 3), "current");
-        assert_eq!(sweep_name(0, 1), "current");
-    }
-
-    #[test]
-    fn compute_sweep_groups_with_two_indices() {
+    fn compute_group_starts_for_named_groups() {
         let batch = numeric_batch(&[
             ("outer", &[1.0, 1.0, 1.0, 2.0, 2.0]),
             ("inner", &[10.0, 20.0, 30.0, 10.0, 20.0]),
         ]);
         let schema = numeric_schema(&["outer", "inner"]);
-        let groups = compute_sweep_groups(&batch, &schema, Some(&[0, 1]));
+        let groups = compute_group_starts(&batch, &schema, &[0]);
         assert_eq!(groups, vec![0, 3]);
+        assert_eq!(
+            group_ranges(&groups, batch.num_rows()),
+            vec![(0, 3), (3, 5)]
+        );
     }
 
     #[test]
-    fn compute_sweep_groups_single_index_falls_back_to_per_row() {
+    fn compute_group_starts_empty_group_columns_returns_whole_batch() {
         let batch = numeric_batch(&[("idx", &[1.0, 2.0, 3.0])]);
         let schema = numeric_schema(&["idx"]);
-        let groups = compute_sweep_groups(&batch, &schema, Some(&[0]));
-        assert_eq!(groups, vec![0, 1, 2]);
-    }
-
-    #[test]
-    fn compute_sweep_groups_none_falls_back_to_per_row() {
-        let batch = numeric_batch(&[("x", &[1.0, 2.0])]);
-        let schema = numeric_schema(&["x"]);
-        let groups = compute_sweep_groups(&batch, &schema, None);
-        assert_eq!(groups, vec![0, 1]);
-    }
-
-    #[test]
-    fn compute_sweep_groups_empty_batch() {
-        let batch = numeric_batch(&[("x", &[])]);
-        let schema = numeric_schema(&["x"]);
-        let groups = compute_sweep_groups(&batch, &schema, Some(&[0]));
-        assert!(groups.is_empty());
+        assert_eq!(compute_group_starts(&batch, &schema, &[]), vec![0]);
     }
 
     #[test]
@@ -208,14 +329,40 @@ mod tests {
             ("inner", &[10.0, 20.0, 10.0, 20.0, 10.0, 20.0]),
         ]);
         let schema = numeric_schema(&["outer", "inner"]);
-        // outer_index_count = 1 (just "outer"), index_columns = [0, 1]
         assert_eq!(last_outer_group_start(&batch, &schema, &[0, 1], 1), 4);
     }
 
     #[test]
-    fn last_outer_group_start_zero_outer_returns_zero() {
-        let batch = numeric_batch(&[("x", &[1.0, 2.0, 3.0])]);
-        let schema = numeric_schema(&["x"]);
-        assert_eq!(last_outer_group_start(&batch, &schema, &[0], 0), 0);
+    fn resolve_xy_trace_roles_uses_explicit_group_and_default_sweep() {
+        let schema = numeric_schema(&["outer", "middle", "inner"]);
+        let roles = resolve_xy_trace_roles(
+            &schema,
+            Some(&[0, 1, 2]),
+            &XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["outer".to_string()]),
+                sweep_index_column: None,
+            },
+            XYDrawStyle::Line,
+        )
+        .unwrap();
+
+        assert_eq!(roles.trace_group, vec![0]);
+        assert_eq!(roles.sweep, Some(2));
+    }
+
+    #[test]
+    fn resolve_xy_trace_roles_rejects_overlap() {
+        let schema = numeric_schema(&["outer", "inner"]);
+        let result = resolve_xy_trace_roles(
+            &schema,
+            Some(&[0, 1]),
+            &XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["inner".to_string()]),
+                sweep_index_column: Some("inner".to_string()),
+            },
+            XYDrawStyle::Line,
+        );
+
+        assert!(result.is_err());
     }
 }

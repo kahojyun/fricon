@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { ColumnInfo, DatasetStatus } from "../api/types";
 import type {
-  ChartType,
+  ChartView,
   ComplexViewOption,
-  ScatterMode,
+  XYDrawStyle,
+  XYPlotMode,
 } from "@/shared/lib/chartTypes";
 import { deriveChartViewerState } from "../model/chartViewerLogic";
 
@@ -11,104 +12,126 @@ export interface ChartViewerControlState {
   selectedComplexView: ComplexViewOption[];
   selectedComplexViewSingle: ComplexViewOption;
   isLiveMode: boolean;
+  liveWindowCount: number;
+}
+
+interface LiveModeSelection {
+  datasetStatus?: DatasetStatus;
+  value: boolean;
 }
 
 export interface ChartViewerControlActions {
-  setChartType: (next: ChartType) => void;
-  setSeriesName: (next: string | null) => void;
-  setXColumnName: (next: string | null) => void;
-  setYColumnName: (next: string | null) => void;
-  setScatterMode: (next: ScatterMode) => void;
-  setScatterSeriesName: (next: string | null) => void;
-  setScatterTraceXName: (next: string | null) => void;
-  setScatterTraceYName: (next: string | null) => void;
-  setScatterXName: (next: string | null) => void;
-  setScatterYName: (next: string | null) => void;
-  setScatterBinName: (next: string | null) => void;
+  setView: (next: ChartView) => void;
+  setPlotMode: (next: XYPlotMode) => void;
+  setDrawStyle: (next: XYDrawStyle) => void;
+  setSweepQuantityName: (next: string | null) => void;
+  setHeatmapQuantityName: (next: string | null) => void;
+  setComplexPlaneQuantityName: (next: string | null) => void;
+  setXYXName: (next: string | null) => void;
+  setXYYName: (next: string | null) => void;
+  setHeatmapXName: (next: string | null) => void;
+  setHeatmapYName: (next: string | null) => void;
+  toggleTraceGroupIndexColumnName: (name: string) => void;
+  setSweepIndexColumnName: (next: string | null) => void;
   setSelectedComplexView: (next: ComplexViewOption[]) => void;
   setSelectedComplexViewSingle: (next: ComplexViewOption) => void;
   setLiveMode: (next: boolean) => void;
+  setLiveWindowCount: (next: number) => void;
 }
 
 export function useChartViewerSelection(
   columns: ColumnInfo[],
   datasetStatus?: DatasetStatus,
 ) {
-  const [chartType, setChartType] = useState<ChartType>("line");
+  const [view, setView] = useState<ChartView>("xy");
+  const [plotMode, setPlotMode] = useState<XYPlotMode>("quantity_vs_sweep");
+  const [drawStyle, setDrawStyle] = useState<XYDrawStyle>("line");
+
   const [selectedComplexView, setSelectedComplexView] = useState<
     ComplexViewOption[]
   >(["real", "imag"]);
   const [selectedComplexViewSingle, setSelectedComplexViewSingle] =
     useState<ComplexViewOption>("mag");
 
-  const [seriesName, setSeriesName] = useState<string | null>(null);
-  const [xColumnName, setXColumnName] = useState<string | null>(null);
-  const [yColumnName, setYColumnName] = useState<string | null>(null);
-
-  const [scatterMode, setScatterMode] = useState<ScatterMode>("complex");
-  const [scatterSeriesName, setScatterSeriesName] = useState<string | null>(
+  const [sweepQuantityName, setSweepQuantityName] = useState<string | null>(
     null,
   );
-  const [scatterTraceXName, setScatterTraceXName] = useState<string | null>(
+  const [heatmapQuantityName, setHeatmapQuantityName] = useState<string | null>(
     null,
   );
-  const [scatterTraceYName, setScatterTraceYName] = useState<string | null>(
-    null,
-  );
-  const [scatterXName, setScatterXName] = useState<string | null>(null);
-  const [scatterYName, setScatterYName] = useState<string | null>(null);
-  const [scatterBinName, setScatterBinName] = useState<string | null>(null);
+  const [complexPlaneQuantityName, setComplexPlaneQuantityName] = useState<
+    string | null
+  >(null);
+  const [xyXName, setXyXName] = useState<string | null>(null);
+  const [xyYName, setXyYName] = useState<string | null>(null);
+  const [heatmapXName, setHeatmapXName] = useState<string | null>(null);
+  const [heatmapYName, setHeatmapYName] = useState<string | null>(null);
+  const [traceGroupIndexColumnNames, setTraceGroupIndexColumnNames] = useState<
+    string[]
+  >([]);
+  const [sweepIndexColumnName, setSweepIndexColumnName] = useState<
+    string | null
+  >(null);
 
-  const [isLiveMode, setIsLiveMode] = useState(datasetStatus === "Writing");
-
-  // Auto-toggle live mode on dataset status transitions.
-  // Uses the "adjusting state during rendering" pattern (stores previous
-  // status in state instead of using an effect) so the React compiler is happy.
-  const [prevDatasetStatus, setPrevDatasetStatus] = useState(datasetStatus);
-  if (prevDatasetStatus !== datasetStatus) {
-    setPrevDatasetStatus(datasetStatus);
-    if (datasetStatus === "Writing") {
-      setIsLiveMode(true);
-    } else if (prevDatasetStatus === "Writing") {
-      setIsLiveMode(false);
-    }
-  }
+  const [liveModeSelection, setLiveModeSelection] =
+    useState<LiveModeSelection | null>(null);
+  const [liveWindowCount, setLiveWindowCount] = useState(5);
+  const currentLiveModeSelection =
+    liveModeSelection?.datasetStatus === datasetStatus
+      ? liveModeSelection
+      : null;
+  const isLiveMode =
+    currentLiveModeSelection?.value ?? datasetStatus === "Writing";
 
   const derived = deriveChartViewerState(columns, {
-    chartType,
-    seriesName,
-    xColumnName,
-    yColumnName,
-    scatterMode,
-    scatterSeriesName,
-    scatterTraceXName,
-    scatterTraceYName,
-    scatterXName,
-    scatterYName,
-    scatterBinName,
+    view,
+    plotMode,
+    drawStyle,
+    sweepQuantityName,
+    heatmapQuantityName,
+    complexPlaneQuantityName,
+    xyXName,
+    xyYName,
+    heatmapXName,
+    heatmapYName,
+    traceGroupIndexColumnNames,
+    sweepIndexColumnName,
   });
 
   const controlState: ChartViewerControlState = {
     selectedComplexView,
     selectedComplexViewSingle,
     isLiveMode,
+    liveWindowCount,
   };
 
   const actions: ChartViewerControlActions = {
-    setChartType,
-    setSeriesName,
-    setXColumnName,
-    setYColumnName,
-    setScatterMode,
-    setScatterSeriesName,
-    setScatterTraceXName,
-    setScatterTraceYName,
-    setScatterXName,
-    setScatterYName,
-    setScatterBinName,
+    setView,
+    setPlotMode,
+    setDrawStyle,
+    setSweepQuantityName,
+    setHeatmapQuantityName,
+    setComplexPlaneQuantityName,
+    setXYXName: setXyXName,
+    setXYYName: setXyYName,
+    setHeatmapXName,
+    setHeatmapYName,
+    toggleTraceGroupIndexColumnName: (name) => {
+      setTraceGroupIndexColumnNames((current) =>
+        current.includes(name)
+          ? current.filter((item) => item !== name)
+          : [...current, name],
+      );
+    },
+    setSweepIndexColumnName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
-    setLiveMode: setIsLiveMode,
+    setLiveMode: (next) =>
+      setLiveModeSelection({
+        datasetStatus,
+        value: next,
+      }),
+    setLiveWindowCount,
   };
 
   return {

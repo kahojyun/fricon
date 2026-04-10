@@ -162,11 +162,10 @@ describe("ChartViewer", () => {
           yCategories: [10],
           series: [
             {
-              name: "trace_signal",
-              data: [
-                [0, 0, 1],
-                [1, 0, 2],
-              ],
+              id: "trace_signal",
+              label: "trace_signal",
+              pointCount: 2,
+              values: [0, 0, 1, 1, 0, 2],
             },
           ],
         };
@@ -200,18 +199,19 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const chartTypeTrigger = await getSelectTrigger("Chart Type");
-    await user.click(chartTypeTrigger);
-    await user.click(await screen.findByRole("option", { name: "heatmap" }));
+    const viewTrigger = await getSelectTrigger("View");
+    expect(viewTrigger).toHaveTextContent("XY");
+    await user.click(viewTrigger);
+    await user.click(await screen.findByRole("option", { name: "Heatmap" }));
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);
       const options = lastPayload?.options as {
-        chartType: string;
+        view: string;
         xColumn?: string | null;
         yColumn?: string;
       };
-      expect(options.chartType).toBe("heatmap");
+      expect(options.view).toBe("heatmap");
       expect(options.xColumn).toBeNull();
       expect(options.yColumn).toBe("idxB");
     });
@@ -247,15 +247,17 @@ describe("ChartViewer", () => {
       if (cmd === "dataset_chart_data") {
         chartCallCount += 1;
         return {
-          type: "line",
+          type: "xy",
+          plotMode: "quantity_vs_sweep",
+          drawStyle: "line",
           xName: "t",
+          yName: null,
           series: [
             {
-              name: "signal",
-              data: [
-                [0, 1],
-                [1, 2],
-              ],
+              id: "signal",
+              label: "signal",
+              pointCount: 2,
+              values: [0, 1, 1, 2],
             },
           ],
         };
@@ -311,7 +313,7 @@ describe("ChartViewer", () => {
     clearMocks();
   });
 
-  it("allows index exclusion for scalar complex scatter mode", async () => {
+  it("keeps order-by stable for complex plane points", async () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
       if (cmd === "get_filter_table_data") {
@@ -331,10 +333,12 @@ describe("ChartViewer", () => {
           chartPayloads.push(payload as Record<string, unknown>);
         }
         return {
-          type: "scatter",
+          type: "xy",
+          plotMode: "complex_plane",
+          drawStyle: "points",
           xName: "c (real)",
           yName: "c (imag)",
-          series: [{ name: "c", data: [[1, 2]] }],
+          series: [{ id: "c", label: "c", pointCount: 1, values: [1, 2] }],
         };
       }
       if (cmd === "get_dataset_write_status") {
@@ -361,31 +365,96 @@ describe("ChartViewer", () => {
 
     await screen.findByTestId("chart");
 
-    const chartTypeTrigger = await getSelectTrigger("Chart Type");
-    await user.click(chartTypeTrigger);
-    await user.click(await screen.findByRole("option", { name: "scatter" }));
+    const projectionTrigger = await getSelectTrigger("Plot Mode");
+    await user.click(projectionTrigger);
+    await user.click(
+      await screen.findByRole("option", { name: "Complex Plane" }),
+    );
 
     await waitFor(() => {
       const lastPayload = chartPayloads.at(-1);
       const options = lastPayload?.options as {
-        chartType: string;
-        scatter: { mode: string };
+        view: string;
+        plotMode: string;
+        sweepIndexColumn?: string;
         excludeColumns?: string[];
       };
-      expect(options.chartType).toBe("scatter");
-      expect(options.scatter.mode).toBe("complex");
+      expect(options.view).toBe("xy");
+      expect(options.plotMode).toBe("complex_plane");
+      expect(options.sweepIndexColumn).toBe("idxB");
       expect(options.excludeColumns).toEqual(["idxB"]);
     });
 
-    const excludeTrigger = await getSelectTrigger("Index Column (excluded)");
-    await user.click(excludeTrigger);
-    await user.click(await screen.findByRole("option", { name: "idxA" }));
+    clearMocks();
+  });
 
-    await waitFor(() => {
-      const lastPayload = chartPayloads.at(-1);
-      const options = lastPayload?.options as { excludeColumns?: string[] };
-      expect(options.excludeColumns).toEqual(["idxA"]);
+  it("does not offer a None sweep axis for quantity-vs-sweep plots", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "get_filter_table_data") {
+        return {
+          fields: ["idxA", "idxB"],
+          rows: [
+            { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
+          ],
+          columnUniqueValues: {
+            idxA: [{ index: 1, displayValue: "1" }],
+            idxB: [{ index: 1, displayValue: "10" }],
+          },
+        };
+      }
+      if (cmd === "dataset_chart_data") {
+        return {
+          type: "xy",
+          plotMode: "quantity_vs_sweep",
+          drawStyle: "line",
+          xName: "idxB",
+          yName: null,
+          series: [
+            { id: "signal", label: "signal", pointCount: 1, values: [0, 1] },
+          ],
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 0 };
+      }
+      return null;
     });
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
+              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "signal",
+                isComplex: false,
+                isTrace: false,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+
+    const sweepAxisTrigger = await getSelectTrigger("Sweep Axis");
+    await user.click(sweepAxisTrigger);
+
+    expect(
+      screen.queryByRole("option", { name: "None" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: "idxA" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: "idxB" }),
+    ).toBeInTheDocument();
 
     clearMocks();
   });
@@ -398,9 +467,23 @@ describe("ChartViewer", () => {
           livePayloads.push(payload as Record<string, unknown>);
         }
         return {
-          type: "line",
-          xName: "t",
-          series: [{ name: "sig (real)", data: [[0, 1]] }],
+          mode: "reset",
+          row_count: 1,
+          snapshot: {
+            type: "xy",
+            plotMode: "quantity_vs_sweep",
+            drawStyle: "line",
+            xName: "t",
+            yName: null,
+            series: [
+              {
+                id: "sig:real",
+                label: "sig (real)",
+                pointCount: 1,
+                values: [0, 1],
+              },
+            ],
+          },
         };
       }
       if (cmd === "get_dataset_write_status") {
@@ -430,14 +513,23 @@ describe("ChartViewer", () => {
     await waitFor(() => {
       const lastPayload = livePayloads.at(-1);
       const options = lastPayload?.options as {
-        chartType: string;
-        complexViews?: string[] | null;
+        view: string;
+        plotMode: string;
+        drawStyle?: string;
+        sweepIndexColumn?: string;
+        complex_views?: string[] | null;
+        tailCount?: number;
       };
-      expect(options.chartType).toBe("line");
-      expect(options.complexViews).toEqual(["real", "imag"]);
+      expect(options.view).toBe("xy");
+      expect(options.plotMode).toBe("quantity_vs_sweep");
+      expect(options.drawStyle).toBe("line");
+      expect(options.sweepIndexColumn).toBe("t");
+      expect(options.tailCount).toBe(5);
+      expect(options.complex_views).toEqual(["real", "imag"]);
     });
 
-    const magLabel = await screen.findByText("mag");
+    await user.click(await screen.findByRole("button", { name: /advanced/i }));
+    const magLabel = await screen.findByText("Magnitude");
     const magToggle =
       magLabel.parentElement?.querySelector('[role="checkbox"]');
     if (!(magToggle instanceof HTMLElement)) {
@@ -448,9 +540,122 @@ describe("ChartViewer", () => {
     await waitFor(() => {
       const lastPayload = livePayloads.at(-1);
       const options = lastPayload?.options as {
-        complexViews?: string[] | null;
+        complex_views?: string[] | null;
       };
-      expect(options.complexViews).toEqual(["real", "imag", "mag"]);
+      expect(options.complex_views).toEqual(["real", "imag", "mag"]);
+    });
+
+    clearMocks();
+  });
+
+  it("forces live scalar complex-plane requests to use sweep grouping", async () => {
+    const livePayloads: Record<string, unknown>[] = [];
+    mockIPC((cmd, payload) => {
+      if (cmd === "dataset_live_chart_data") {
+        if (payload && typeof payload === "object") {
+          livePayloads.push(payload as Record<string, unknown>);
+        }
+        return {
+          mode: "reset",
+          row_count: 6,
+          snapshot: {
+            type: "xy",
+            plotMode: "complex_plane",
+            drawStyle: "points",
+            xName: "impedance (real)",
+            yName: "impedance (imag)",
+            series: [
+              {
+                id: "group:4",
+                label: "impedance [idx_cycle=2, idx_y=1]",
+                pointCount: 2,
+                values: [1, 2, 3, 4],
+              },
+            ],
+          },
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 6 };
+      }
+      return null;
+    });
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            status: "Writing",
+            columns: [
+              {
+                name: "idx_cycle",
+                isComplex: false,
+                isTrace: false,
+                isIndex: true,
+              },
+              {
+                name: "idx_y",
+                isComplex: false,
+                isTrace: false,
+                isIndex: true,
+              },
+              {
+                name: "idx_x",
+                isComplex: false,
+                isTrace: false,
+                isIndex: true,
+              },
+              {
+                name: "complex_impedance_ohm",
+                isComplex: true,
+                isTrace: false,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+
+    const projectionTrigger = await getSelectTrigger("Plot Mode");
+    await user.click(projectionTrigger);
+    await user.click(
+      await screen.findByRole("option", { name: "Complex Plane" }),
+    );
+
+    expect(screen.queryByText("Sweep Axis")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /advanced/i }));
+    expect(screen.queryByText("Group By")).not.toBeInTheDocument();
+    expect(await screen.findByText("Recent Sweeps")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const lastPayload = livePayloads.at(-1);
+      const options = lastPayload?.options as {
+        plotMode: string;
+        tailCount?: number;
+        sweepIndexColumn?: string;
+        traceGroupIndexColumns?: string[];
+      };
+      expect(options.plotMode).toBe("complex_plane");
+      expect(options.tailCount).toBe(5);
+      expect(options.sweepIndexColumn).toBe("idx_x");
+      expect(options.traceGroupIndexColumns).toEqual(["idx_cycle", "idx_y"]);
+    });
+
+    const liveWindowTrigger = await getSelectTrigger("Recent Sweeps");
+    await user.click(liveWindowTrigger);
+    await user.click(await screen.findByRole("option", { name: "10 sweeps" }));
+
+    await waitFor(() => {
+      const lastPayload = livePayloads.at(-1);
+      const options = lastPayload?.options as {
+        tailCount?: number;
+      };
+      expect(options.tailCount).toBe(10);
     });
 
     clearMocks();

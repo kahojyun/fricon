@@ -1,5 +1,8 @@
 /** Low-level WebGL2 utilities: shader compilation, buffer management, uniforms, resize. */
 
+import type { ChartSeries } from "@/shared/lib/chartTypes";
+import { liveSeriesGroupId } from "../model/liveChartModel";
+
 export function createShader(
   gl: WebGL2RenderingContext,
   type: number,
@@ -206,5 +209,82 @@ export const SERIES_COLORS = [
   "#ea7ccc",
 ];
 
-export const LIVE_NEWEST_COLOR = "#2563eb";
-export const LIVE_OLD_COLOR = "#94a3b8";
+export function getSeriesColor(index: number): [number, number, number] {
+  return hexToRgb(SERIES_COLORS[index % SERIES_COLORS.length]);
+}
+
+export function getLiveSeriesAppearance(
+  series: ChartSeries,
+  allSeries: ChartSeries[],
+  fallbackIndex: number,
+): {
+  color: [number, number, number];
+  opacity: number;
+  isCurrent: boolean;
+} {
+  const currentGroup = liveSeriesGroupId(allSeries[allSeries.length - 1]?.id);
+  const currentSemanticKeys = currentGroup
+    ? Array.from(
+        new Set(
+          allSeries
+            .filter((item) => liveSeriesGroupId(item.id) === currentGroup)
+            .map((item) => liveSeriesSemanticKey(item.label)),
+        ),
+      )
+    : [];
+  const semanticKey = liveSeriesSemanticKey(series.label);
+  const semanticIndex = currentSemanticKeys.indexOf(semanticKey);
+  const baseColor = getSeriesColor(
+    semanticIndex >= 0 ? semanticIndex : fallbackIndex,
+  );
+
+  if (!currentGroup) {
+    return {
+      color: baseColor,
+      opacity: 1,
+      isCurrent: true,
+    };
+  }
+
+  const groupId = liveSeriesGroupId(series.id);
+  if (groupId === currentGroup) {
+    return {
+      color: baseColor,
+      opacity: 1,
+      isCurrent: true,
+    };
+  }
+
+  const historyGroups = Array.from(
+    new Set(
+      allSeries
+        .map((item) => liveSeriesGroupId(item.id))
+        .filter(
+          (candidate): candidate is string =>
+            candidate !== null && candidate !== currentGroup,
+        ),
+    ),
+  );
+  const historyIndex = groupId ? historyGroups.indexOf(groupId) : -1;
+  const normalizedAge =
+    historyIndex >= 0 && historyGroups.length > 1
+      ? historyIndex / (historyGroups.length - 1)
+      : 0;
+
+  return {
+    color: scaleColor(baseColor, 0.55 + 0.2 * normalizedAge),
+    opacity: 0.16 + 0.2 * normalizedAge,
+    isCurrent: false,
+  };
+}
+
+function liveSeriesSemanticKey(label: string): string {
+  return label.replace(/ \[[^\]]+\]$/, "");
+}
+
+function scaleColor(
+  color: [number, number, number],
+  factor: number,
+): [number, number, number] {
+  return [color[0] * factor, color[1] * factor, color[2] * factor];
+}

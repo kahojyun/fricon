@@ -1,35 +1,43 @@
 import {
   commands,
-  type ChartDataResponse as WireChartResponse,
   type DatasetWriteStatus,
-  type LiveChartDataOptions,
   type TableData as WireFilterTableData,
 } from "@/shared/lib/bindings";
 import { invoke } from "@/shared/lib/tauri";
 import {
-  normalizeChartOptions,
+  normalizeChartSnapshot,
   normalizeFilterTableData,
+  normalizeLiveChartUpdate,
   toWireChartOptions,
+  toWireLiveChartOptions,
   type ChartDataOptions,
   type FilterTableData,
   type FilterTableOptions,
+  type LiveChartDataOptions,
 } from "./types";
 
 export async function fetchChartData(id: number, options: ChartDataOptions) {
-  const result: WireChartResponse = await invoke(
-    commands.datasetChartData(id, toWireChartOptions(options)),
+  return normalizeChartSnapshot(
+    await invoke(commands.datasetChartData(id, toWireChartOptions(options))),
   );
-  return normalizeChartOptions(result);
 }
 
 export async function fetchLiveChartData(
   id: number,
   options: LiveChartDataOptions,
+  knownRowCount: number | null,
 ) {
-  const result: WireChartResponse = await invoke(
-    commands.datasetLiveChartData(id, options),
+  return normalizeLiveChartUpdate(
+    await invoke(
+      commands.datasetLiveChartData(
+        id,
+        toWireLiveChartOptions({
+          ...options,
+          knownRowCount,
+        }),
+      ),
+    ),
   );
-  return normalizeChartOptions(result);
 }
 
 export async function getFilterTableData(

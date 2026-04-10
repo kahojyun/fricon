@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ColumnInfo, DatasetStatus } from "../api/types";
 import {
   complexSeriesOptions,
@@ -18,9 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select";
+import { Button } from "@/shared/ui/button";
 import { Toggle } from "@/shared/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
-import { Activity } from "lucide-react";
+import { Activity, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
 interface ChartViewerControlsProps {
@@ -30,63 +32,92 @@ interface ChartViewerControlsProps {
   datasetStatus?: DatasetStatus;
 }
 
+const viewLabels = {
+  xy: "XY",
+  heatmap: "Heatmap",
+} as const;
+
+const plotModeLabels = {
+  quantity_vs_sweep: "Quantity vs Sweep",
+  xy: "X-Y Plot",
+  complex_plane: "Complex Plane",
+} as const;
+
+const drawStyleLabels = {
+  line: "Line",
+  points: "Points",
+  line_points: "Line + Points",
+} as const;
+
+const complexViewLabels = {
+  real: "Real",
+  imag: "Imaginary",
+  mag: "Magnitude",
+  arg: "Phase",
+} as const;
+
+const liveWindowOptions = [1, 3, 5, 10, 20] as const;
+
 export function ChartViewerControls({
   derived,
   controlState,
   actions,
   datasetStatus,
 }: ChartViewerControlsProps) {
-  const { selectedComplexView, selectedComplexViewSingle, isLiveMode } =
-    controlState;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const {
-    setChartType,
-    setSeriesName,
-    setXColumnName,
-    setYColumnName,
-    setScatterMode,
-    setScatterSeriesName,
-    setScatterTraceXName,
-    setScatterTraceYName,
-    setScatterXName,
-    setScatterYName,
-    setScatterBinName,
+    selectedComplexView,
+    selectedComplexViewSingle,
+    isLiveMode,
+    liveWindowCount,
+  } = controlState;
+  const {
+    setView,
+    setPlotMode,
+    setDrawStyle,
+    setSweepQuantityName,
+    setHeatmapQuantityName,
+    setComplexPlaneQuantityName,
+    setXYXName,
+    setXYYName,
+    setHeatmapXName,
+    setHeatmapYName,
+    toggleTraceGroupIndexColumnName,
+    setSweepIndexColumnName,
     setSelectedComplexView,
     setSelectedComplexViewSingle,
+    setLiveWindowCount,
   } = actions;
-
-  const {
-    availableChartTypes,
-    complexControlsDisabled,
-    effectiveChartType,
-    effectiveScatterBinName,
-    effectiveScatterMode,
-    effectiveScatterSeriesName,
-    effectiveScatterTraceXName,
-    effectiveScatterTraceYName,
-    effectiveScatterXName,
-    effectiveScatterYName,
-    effectiveSeriesName,
-    effectiveXColumnName,
-    effectiveYColumnName,
-    isTraceSeries,
-    scatterBinColumnOptions,
-    scatterComplexOptions,
-    scatterIsTraceBased,
-    scatterModeOptions,
-    scatterTraceXYOptions,
-    scatterXYOptions,
-    series,
-    seriesOptions,
-    xColumnOptions,
-    yColumnOptions,
-  } = derived;
+  const showPrimaryPlotMode = derived.effectiveView === "xy";
+  const showPrimaryLiveWindow = isLiveMode && derived.effectiveView === "xy";
+  const showPrimarySweepAxis = derived.xyRoleControlsVisible && !isLiveMode;
+  const showAdvancedStyle = derived.effectiveView === "xy";
+  const showAdvancedHeatmapAxes =
+    derived.effectiveView === "heatmap" && !isLiveMode;
+  const showAdvancedGrouping = derived.xyRoleControlsVisible && !isLiveMode;
+  const showAdvancedComplexControls =
+    derived.effectiveView === "heatmap" ||
+    (derived.effectiveView === "xy" &&
+      derived.effectivePlotMode === "quantity_vs_sweep");
+  const showAdvancedControls =
+    showAdvancedStyle ||
+    showAdvancedHeatmapAxes ||
+    showAdvancedGrouping ||
+    showAdvancedComplexControls;
+  const allowEmptySweepAxis = derived.effectivePlotMode !== "quantity_vs_sweep";
+  const liveWindowUnit =
+    derived.xyUsesTraceSource ||
+    derived.liveMonitorTraceGroupIndexColumnNames.length > 0
+      ? "sweeps"
+      : "points";
+  const liveWindowLabel = `Recent ${capitalize(liveWindowUnit)}`;
 
   return (
     <>
       <div className="flex flex-wrap items-end gap-1.5 p-1.5">
         {datasetStatus === "Writing" ? (
           <div className="flex flex-col">
-            <Label className="mb-1 block">Live</Label>
+            <Label className="mb-1 block">Live Acquisition</Label>
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -94,183 +125,119 @@ export function ChartViewerControls({
                     pressed={isLiveMode}
                     onPressedChange={actions.setLiveMode}
                     variant="outline"
-                    aria-label="Toggle live monitor"
+                    aria-label="Toggle live acquisition"
                   />
                 }
               >
                 <Activity />
               </TooltipTrigger>
-              <TooltipContent>Live Monitor</TooltipContent>
+              <TooltipContent>Live Acquisition</TooltipContent>
             </Tooltip>
           </div>
         ) : null}
 
         <div className="min-w-40">
-          <Label className="mb-1 block">Chart Type</Label>
+          <Label className="mb-1 block">View</Label>
           <Select
-            value={effectiveChartType}
+            value={derived.effectiveView}
             onValueChange={(value) => {
-              if (value) {
-                setChartType(value);
+              if (value === "xy" || value === "heatmap") {
+                setView(value);
               }
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select chart type" />
+              <SelectValue placeholder="Select view">
+                {viewLabels[derived.effectiveView]}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {availableChartTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
+              {derived.availableViews.map((view) => (
+                <SelectItem key={view} value={view}>
+                  {viewLabels[view]}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {effectiveChartType !== "scatter" ? (
-          <div className="min-w-45">
-            <Label className="mb-1 block">Series</Label>
-            <Select
-              value={effectiveSeriesName ?? ""}
-              onValueChange={(value) =>
-                setSeriesName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select series" />
-              </SelectTrigger>
-              <SelectContent>
-                {seriesOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType !== "scatter" &&
-        (effectiveChartType === "line" ||
-          (effectiveChartType === "heatmap" && !series?.isTrace)) ? (
-          <div className="min-w-40">
-            <Label className="mb-1 block">X</Label>
-            <Select
-              disabled={effectiveChartType === "line" && isTraceSeries}
-              value={effectiveXColumnName ?? ""}
-              onValueChange={(value) =>
-                setXColumnName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger
-                className="w-full"
-                disabled={effectiveChartType === "line" && isTraceSeries}
-              >
-                <SelectValue placeholder="Select X" />
-              </SelectTrigger>
-              <SelectContent>
-                {xColumnOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "heatmap" ? (
-          <div className="min-w-40">
-            <Label className="mb-1 block">Y</Label>
-            <Select
-              value={effectiveYColumnName ?? ""}
-              onValueChange={(value) =>
-                setYColumnName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Y" />
-              </SelectTrigger>
-              <SelectContent>
-                {yColumnOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "scatter" ? (
-          <div className="min-w-50">
-            <Label className="mb-1 block">Point Cloud Source</Label>
-            <Select
-              value={effectiveScatterMode}
-              onValueChange={(value) => {
-                if (
-                  value === "complex" ||
-                  value === "trace_xy" ||
-                  value === "xy"
-                ) {
-                  setScatterMode(value);
-                }
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select mode" />
-              </SelectTrigger>
-              <SelectContent>
-                {scatterModeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "scatter" &&
-        effectiveScatterMode === "complex" ? (
-          <div className="min-w-50">
-            <Label className="mb-1 block">Complex Series</Label>
-            <Select
-              value={effectiveScatterSeriesName ?? ""}
-              onValueChange={(value) =>
-                setScatterSeriesName(value === "" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select series" />
-              </SelectTrigger>
-              <SelectContent>
-                {scatterComplexOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        {effectiveChartType === "scatter" && effectiveScatterMode === "xy" ? (
+        {showPrimaryPlotMode ? (
           <>
             <div className="min-w-40">
-              <Label className="mb-1 block">X Column</Label>
+              <Label className="mb-1 block">Plot Mode</Label>
               <Select
-                value={effectiveScatterXName ?? ""}
+                value={derived.effectivePlotMode}
+                onValueChange={(value) => {
+                  if (
+                    value === "quantity_vs_sweep" ||
+                    value === "xy" ||
+                    value === "complex_plane"
+                  ) {
+                    setPlotMode(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select plot mode">
+                    {plotModeLabels[derived.effectivePlotMode]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {derived.availablePlotModes.map((plotMode) => (
+                    <SelectItem key={plotMode.value} value={plotMode.value}>
+                      {plotMode.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        ) : null}
+
+        {derived.effectiveView === "xy" &&
+        derived.effectivePlotMode === "quantity_vs_sweep" ? (
+          <div className="min-w-50">
+            <Label className="mb-1 block">Quantity</Label>
+            <Select
+              value={derived.effectiveSweepQuantityName ?? ""}
+              onValueChange={(value) =>
+                setSweepQuantityName(value === "" ? null : value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select quantity">
+                  {derived.effectiveSweepQuantityName ?? undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {derived.sweepQuantityOptions.map((option: ColumnInfo) => (
+                  <SelectItem key={option.name} value={option.name}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {derived.effectiveView === "xy" &&
+        derived.effectivePlotMode === "xy" ? (
+          <>
+            <div className="min-w-40">
+              <Label className="mb-1 block">X Axis</Label>
+              <Select
+                value={derived.effectiveXYXName ?? ""}
                 onValueChange={(value) =>
-                  setScatterXName(value === "" ? null : value)
+                  setXYXName(value === "" ? null : value)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select X" />
+                  <SelectValue placeholder="Select X">
+                    {derived.effectiveXYXName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {scatterXYOptions.map((option: ColumnInfo) => (
+                  {derived.xyXOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
@@ -279,18 +246,20 @@ export function ChartViewerControls({
               </Select>
             </div>
             <div className="min-w-40">
-              <Label className="mb-1 block">Y Column</Label>
+              <Label className="mb-1 block">Y Axis</Label>
               <Select
-                value={effectiveScatterYName ?? ""}
+                value={derived.effectiveXYYName ?? ""}
                 onValueChange={(value) =>
-                  setScatterYName(value === "" ? null : value)
+                  setXYYName(value === "" ? null : value)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Y" />
+                  <SelectValue placeholder="Select Y">
+                    {derived.effectiveXYYName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {scatterXYOptions.map((option: ColumnInfo) => (
+                  {derived.xyYOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
@@ -301,42 +270,51 @@ export function ChartViewerControls({
           </>
         ) : null}
 
-        {effectiveChartType === "scatter" &&
-        effectiveScatterMode === "trace_xy" ? (
-          <>
-            <div className="min-w-40">
-              <Label className="mb-1 block">Trace X</Label>
-              <Select
-                value={effectiveScatterTraceXName ?? ""}
-                onValueChange={(value) =>
-                  setScatterTraceXName(value === "" ? null : value)
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select trace X" />
-                </SelectTrigger>
-                <SelectContent>
-                  {scatterTraceXYOptions.map((option: ColumnInfo) => (
+        {derived.effectiveView === "xy" &&
+        derived.effectivePlotMode === "complex_plane" ? (
+          <div className="min-w-50">
+            <Label className="mb-1 block">Complex Quantity</Label>
+            <Select
+              value={derived.effectiveComplexPlaneQuantityName ?? ""}
+              onValueChange={(value) =>
+                setComplexPlaneQuantityName(value === "" ? null : value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select quantity">
+                  {derived.effectiveComplexPlaneQuantityName ?? undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {derived.complexPlaneQuantityOptions.map(
+                  (option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="min-w-40">
-              <Label className="mb-1 block">Trace Y</Label>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {derived.effectiveView === "heatmap" ? (
+          <>
+            <div className="min-w-50">
+              <Label className="mb-1 block">Quantity</Label>
               <Select
-                value={effectiveScatterTraceYName ?? ""}
+                value={derived.effectiveHeatmapQuantityName ?? ""}
                 onValueChange={(value) =>
-                  setScatterTraceYName(value === "" ? null : value)
+                  setHeatmapQuantityName(value === "" ? null : value)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select trace Y" />
+                  <SelectValue placeholder="Select quantity">
+                    {derived.effectiveHeatmapQuantityName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {scatterTraceXYOptions.map((option: ColumnInfo) => (
+                  {derived.heatmapQuantityOptions.map((option: ColumnInfo) => (
                     <SelectItem key={option.name} value={option.name}>
                       {option.name}
                     </SelectItem>
@@ -347,97 +325,299 @@ export function ChartViewerControls({
           </>
         ) : null}
 
-        {effectiveChartType === "scatter" &&
-        (effectiveScatterMode === "xy" || effectiveScatterMode === "complex") &&
-        !scatterIsTraceBased ? (
-          <div className="min-w-50">
-            <Label className="mb-1 block">Index Column (excluded)</Label>
+        {showPrimarySweepAxis ? (
+          <div className="min-w-40">
+            <Label className="mb-1 block">Sweep Axis</Label>
             <Select
-              value={effectiveScatterBinName ?? ""}
+              value={
+                allowEmptySweepAxis
+                  ? (derived.effectiveSweepIndexColumnName ?? "__none__")
+                  : (derived.effectiveSweepIndexColumnName ?? "")
+              }
               onValueChange={(value) =>
-                setScatterBinName(value === "" ? null : value)
+                setSweepIndexColumnName(value === "__none__" ? null : value)
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select index column" />
+                <SelectValue
+                  placeholder={
+                    allowEmptySweepAxis ? "No sweep axis" : "Select sweep axis"
+                  }
+                >
+                  {derived.effectiveSweepIndexColumnName ??
+                    (allowEmptySweepAxis ? "None" : undefined)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {scatterBinColumnOptions.map((option: ColumnInfo) => (
+                {allowEmptySweepAxis ? (
+                  <SelectItem value="__none__">None</SelectItem>
+                ) : null}
+                {derived.sweepAxisOptions.map((option: ColumnInfo) => (
                   <SelectItem key={option.name} value={option.name}>
                     {option.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        ) : null}
+
+        {showPrimaryLiveWindow ? (
+          <div className="min-w-32">
+            <Label className="mb-1 block">{liveWindowLabel}</Label>
+            <Select
+              value={String(liveWindowCount)}
+              onValueChange={(value) => setLiveWindowCount(Number(value))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select window">
+                  {`${liveWindowCount} ${liveWindowUnit}`}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {liveWindowOptions.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {`${option} ${liveWindowUnit}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {showAdvancedControls ? (
+          <div className="flex flex-col">
+            <Label className="mb-1 block opacity-0">Advanced</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              aria-expanded={advancedOpen}
+              onClick={() => setAdvancedOpen((current) => !current)}
+            >
+              {advancedOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+              Advanced
+            </Button>
           </div>
         ) : null}
       </div>
 
-      {effectiveChartType !== "scatter" ? (
-        <div className="flex flex-wrap items-center gap-2 px-1.5 pb-1.5 text-xs">
-          <span className="font-medium">Complex:</span>
-          {effectiveChartType === "heatmap" ? (
-            <RadioGroup
-              className="flex flex-wrap gap-2"
-              value={selectedComplexViewSingle}
-              onValueChange={(value: string) => {
-                if (complexControlsDisabled) return;
-                if (isComplexViewOption(value)) {
-                  setSelectedComplexViewSingle(value);
-                }
-              }}
-            >
-              {complexSeriesOptions.map((option) => (
-                <label key={option} className="flex items-center gap-2">
-                  <RadioGroupItem
-                    value={option}
-                    disabled={complexControlsDisabled}
-                  />
-                  <span
-                    className={cn(
-                      "text-xs",
-                      complexControlsDisabled && "opacity-50",
-                    )}
-                  >
-                    {option}
-                  </span>
-                </label>
-              ))}
-            </RadioGroup>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {complexSeriesOptions.map((option) => {
-                const isChecked = selectedComplexView.includes(option);
-                return (
-                  <label key={option} className="flex items-center gap-2">
-                    <Checkbox
-                      checked={isChecked}
-                      disabled={complexControlsDisabled}
-                      onCheckedChange={(checked) => {
-                        if (complexControlsDisabled) return;
-                        const next = checked
-                          ? [...selectedComplexView, option]
-                          : selectedComplexView.filter(
-                              (item) => item !== option,
-                            );
-                        setSelectedComplexView(next);
-                      }}
-                    />
-                    <span
-                      className={cn(
-                        "text-xs",
-                        complexControlsDisabled && "opacity-50",
-                      )}
-                    >
-                      {option}
-                    </span>
-                  </label>
-                );
-              })}
+      {showAdvancedControls && advancedOpen ? (
+        <div className="flex flex-wrap items-end gap-1.5 border-t border-border/60 px-1.5 pt-1.5 pb-1.5">
+          {showAdvancedStyle ? (
+            <div className="min-w-40">
+              <Label className="mb-1 block">Style</Label>
+              <Select
+                value={derived.effectiveDrawStyle ?? "line"}
+                onValueChange={(value) => {
+                  if (
+                    value === "line" ||
+                    value === "points" ||
+                    value === "line_points"
+                  ) {
+                    setDrawStyle(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select style">
+                    {derived.effectiveDrawStyle
+                      ? drawStyleLabels[derived.effectiveDrawStyle]
+                      : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {derived.drawStyleOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          ) : null}
+
+          {showAdvancedHeatmapAxes ? (
+            <>
+              <div className="min-w-40">
+                <Label className="mb-1 block">X Index</Label>
+                <Select
+                  value={derived.effectiveHeatmapXName ?? ""}
+                  onValueChange={(value) =>
+                    setHeatmapXName(value === "" ? null : value)
+                  }
+                  disabled={Boolean(derived.heatmapQuantity?.isTrace)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select X index">
+                      {derived.effectiveHeatmapXName ?? undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {derived.heatmapXOptions.map((option: ColumnInfo) => (
+                      <SelectItem key={option.name} value={option.name}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-40">
+                <Label className="mb-1 block">Y Index</Label>
+                <Select
+                  value={derived.effectiveHeatmapYName ?? ""}
+                  onValueChange={(value) =>
+                    setHeatmapYName(value === "" ? null : value)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Y index">
+                      {derived.effectiveHeatmapYName ?? undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {derived.heatmapYOptions.map((option: ColumnInfo) => (
+                      <SelectItem key={option.name} value={option.name}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : null}
+
+          {showAdvancedGrouping ? (
+            <div className="flex min-w-60 flex-col">
+              <Label className="mb-1 block">Group By</Label>
+              <div className="flex flex-wrap gap-2 rounded border border-border/60 px-2 py-1.5">
+                {derived.traceGroupOptions.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    No remaining grouping axes
+                  </span>
+                ) : (
+                  derived.traceGroupOptions.map((option: ColumnInfo) => {
+                    const checked =
+                      derived.effectiveTraceGroupIndexColumnNames.includes(
+                        option.name,
+                      );
+                    return (
+                      <label
+                        key={option.name}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() =>
+                            toggleTraceGroupIndexColumnName(option.name)
+                          }
+                        />
+                        <span>{option.name}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {showAdvancedComplexControls ? (
+            <div className="flex min-w-full flex-wrap items-center gap-2 text-xs">
+              <span className="font-medium">Complex:</span>
+              {derived.effectiveView === "heatmap" ? (
+                <RadioGroup
+                  className="flex flex-wrap gap-2"
+                  value={selectedComplexViewSingle}
+                  onValueChange={(value: string) => {
+                    if (derived.complexControlsDisabled) return;
+                    if (isComplexViewOption(value)) {
+                      setSelectedComplexViewSingle(value);
+                    }
+                  }}
+                >
+                  {complexSeriesOptions.map((option) => (
+                    <label key={option} className="flex items-center gap-2">
+                      <RadioGroupItem
+                        value={option}
+                        disabled={derived.complexControlsDisabled}
+                      />
+                      <span
+                        className={cn(
+                          "text-xs",
+                          derived.complexControlsDisabled && "opacity-50",
+                        )}
+                      >
+                        {complexViewLabels[option]}
+                      </span>
+                    </label>
+                  ))}
+                </RadioGroup>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {complexSeriesOptions.map((option) => {
+                    const isChecked = selectedComplexView.includes(option);
+                    return (
+                      <label key={option} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={isChecked}
+                          disabled={derived.complexControlsDisabled}
+                          onCheckedChange={(checked) => {
+                            if (derived.complexControlsDisabled) return;
+                            const next = checked
+                              ? [...selectedComplexView, option]
+                              : selectedComplexView.filter(
+                                  (item) => item !== option,
+                                );
+                            setSelectedComplexView(next);
+                          }}
+                        />
+                        <span
+                          className={cn(
+                            "text-xs",
+                            derived.complexControlsDisabled && "opacity-50",
+                          )}
+                        >
+                          {complexViewLabels[option]}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {isLiveMode && derived.effectiveView === "xy" ? (
+        <div className="px-1.5 pb-1.5 text-xs text-muted-foreground">
+          {derived.xyUsesTraceSource ? (
+            <span>
+              Live Acquisition shows the most recent {liveWindowCount} sweeps.
+            </span>
+          ) : derived.liveMonitorTraceGroupIndexColumnNames.length > 0 ? (
+            <span>
+              Live Acquisition shows the most recent {liveWindowCount} sweeps,
+              grouped by{" "}
+              {derived.liveMonitorTraceGroupIndexColumnNames.join(", ")} and
+              swept along {derived.liveMonitorSweepIndexColumnName}.
+            </span>
+          ) : derived.liveMonitorUsesForcedRoles ? (
+            <span>
+              Live Acquisition shows the most recent {liveWindowCount} points,
+              using {derived.liveMonitorSweepIndexColumnName} as the sweep axis.
+            </span>
+          ) : (
+            <span>
+              Live Acquisition shows the most recent {liveWindowCount} points.
+            </span>
           )}
         </div>
       ) : null}
     </>
   );
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

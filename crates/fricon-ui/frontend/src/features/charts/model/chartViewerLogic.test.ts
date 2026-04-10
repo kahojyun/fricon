@@ -28,17 +28,18 @@ function makeState(
   overrides: Partial<ChartViewerSelectionState> = {},
 ): ChartViewerSelectionState {
   return {
-    chartType: "line",
-    seriesName: null,
-    xColumnName: null,
-    yColumnName: null,
-    scatterMode: "complex",
-    scatterSeriesName: null,
-    scatterTraceXName: null,
-    scatterTraceYName: null,
-    scatterXName: null,
-    scatterYName: null,
-    scatterBinName: null,
+    view: "xy",
+    plotMode: "quantity_vs_sweep",
+    drawStyle: "line",
+    sweepQuantityName: null,
+    heatmapQuantityName: null,
+    complexPlaneQuantityName: null,
+    xyXName: null,
+    xyYName: null,
+    heatmapXName: null,
+    heatmapYName: null,
+    traceGroupIndexColumnNames: [],
+    sweepIndexColumnName: null,
     ...overrides,
   };
 }
@@ -62,7 +63,7 @@ function makeFilterTableData(): FilterTableData {
 }
 
 describe("chartViewerLogic", () => {
-  it("selects trailing index columns as default X/Y", () => {
+  it("defaults trend ordering to the trailing index column", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -71,25 +72,63 @@ describe("chartViewerLogic", () => {
 
     const derived = deriveChartViewerState(columns, makeState());
 
-    expect(derived.effectiveXColumnName).toBe("idxB");
-    expect(derived.effectiveYColumnName).toBe("idxA");
+    expect(derived.effectiveSweepIndexColumnName).toBe("idxB");
   });
 
-  it("falls back scatter mode to available option", () => {
+  it("keeps the same default order-by when style changes", () => {
+    const columns = [
+      makeColumn({ name: "idxA", isIndex: true }),
+      makeColumn({ name: "idxB", isIndex: true }),
+      makeColumn({ name: "signal" }),
+    ];
+
+    const lineDerived = deriveChartViewerState(
+      columns,
+      makeState({ plotMode: "complex_plane", drawStyle: "line" }),
+    );
+    const pointsDerived = deriveChartViewerState(
+      columns,
+      makeState({ plotMode: "complex_plane", drawStyle: "points" }),
+    );
+
+    expect(lineDerived.effectiveSweepIndexColumnName).toBe("idxB");
+    expect(pointsDerived.effectiveSweepIndexColumnName).toBe("idxB");
+  });
+
+  it("defaults scalar heatmap axes to the two trailing index columns", () => {
+    const columns = [
+      makeColumn({ name: "idxSlow", isIndex: true }),
+      makeColumn({ name: "idxMid", isIndex: true }),
+      makeColumn({ name: "idxFast", isIndex: true }),
+      makeColumn({ name: "signal" }),
+    ];
+
+    const derived = deriveChartViewerState(
+      columns,
+      makeState({ view: "heatmap" }),
+    );
+
+    expect(derived.effectiveHeatmapXName).toBe("idxFast");
+    expect(derived.effectiveHeatmapYName).toBe("idxMid");
+    expect(derived.excludeColumns).toEqual(["idxFast", "idxMid"]);
+  });
+
+  it("falls back plot mode to available option", () => {
     const columns = [makeColumn({ name: "c", isComplex: true })];
 
     const derived = deriveChartViewerState(
       columns,
-      makeState({ chartType: "scatter", scatterMode: "trace_xy" }),
+      makeState({ plotMode: "xy" }),
     );
 
-    expect(derived.effectiveScatterMode).toBe("complex");
-    expect(derived.scatterModeOptions.map((item) => item.value)).toEqual([
-      "complex",
+    expect(derived.effectivePlotMode).toBe("quantity_vs_sweep");
+    expect(derived.availablePlotModes.map((item) => item.value)).toEqual([
+      "quantity_vs_sweep",
+      "complex_plane",
     ]);
   });
 
-  it("computes scatter exclusion from selected bin column", () => {
+  it("excludes explicit index roles from filter-table columns", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -99,11 +138,17 @@ describe("chartViewerLogic", () => {
 
     const derived = deriveChartViewerState(
       columns,
-      makeState({ chartType: "scatter", scatterMode: "xy" }),
+      makeState({
+        plotMode: "xy",
+        drawStyle: "line_points",
+        xyXName: "xVal",
+        xyYName: "yVal",
+        traceGroupIndexColumnNames: ["idxA"],
+        sweepIndexColumnName: "idxB",
+      }),
     );
 
-    expect(derived.effectiveScatterBinName).toBe("idxB");
-    expect(derived.excludeColumns).toEqual(["idxB"]);
+    expect(derived.excludeColumns).toEqual(["idxA", "idxB"]);
   });
 
   it("returns null request when filters exist but no resolved row", () => {
@@ -127,7 +172,7 @@ describe("chartViewerLogic", () => {
     expect(request).toBeNull();
   });
 
-  it("builds scatter xy request with derived bin exclusion", () => {
+  it("builds scalar XY requests with explicit group/order roles", () => {
     const columns = [
       makeColumn({ name: "idxA", isIndex: true }),
       makeColumn({ name: "idxB", isIndex: true }),
@@ -136,7 +181,14 @@ describe("chartViewerLogic", () => {
     ];
     const derived = deriveChartViewerState(
       columns,
-      makeState({ chartType: "scatter", scatterMode: "xy" }),
+      makeState({
+        plotMode: "xy",
+        drawStyle: "line_points",
+        xyXName: "xVal",
+        xyYName: "yVal",
+        traceGroupIndexColumnNames: ["idxA"],
+        sweepIndexColumnName: "idxB",
+      }),
     );
     const filterRow: FilterTableRow = {
       index: 1,
@@ -156,15 +208,64 @@ describe("chartViewerLogic", () => {
     });
 
     expect(request).toEqual({
-      chartType: "scatter",
-      scatter: {
-        mode: "xy",
-        xColumn: "xVal",
-        yColumn: "yVal",
-        binColumn: "idxB",
-      },
+      view: "xy",
+      plotMode: "xy",
+      drawStyle: "line_points",
+      xColumn: "xVal",
+      yColumn: "yVal",
+      traceGroupIndexColumns: ["idxA"],
+      sweepIndexColumn: "idxB",
       indexFilters: [1],
-      excludeColumns: ["idxB"],
+      excludeColumns: ["idxA", "idxB"],
+    });
+  });
+
+  it("preserves trace XY selections when scalar XY columns are also available", () => {
+    const columns = [
+      makeColumn({ name: "idxA", isIndex: true }),
+      makeColumn({ name: "scalarX" }),
+      makeColumn({ name: "scalarY" }),
+      makeColumn({ name: "traceX", isTrace: true }),
+      makeColumn({ name: "traceY", isTrace: true }),
+    ];
+    const derived = deriveChartViewerState(
+      columns,
+      makeState({
+        plotMode: "xy",
+        drawStyle: "points",
+        xyXName: "traceX",
+        xyYName: "traceY",
+      }),
+    );
+
+    expect(derived.xyXOptions.map((column) => column.name)).toEqual([
+      "scalarX",
+      "scalarY",
+      "traceX",
+      "traceY",
+    ]);
+    expect(derived.effectiveXYXName).toBe("traceX");
+    expect(derived.effectiveXYYName).toBe("traceY");
+
+    const request = buildChartRequest({
+      datasetDetail: makeDatasetDetail(columns),
+      filterTableData: makeFilterTableData(),
+      hasFilters: false,
+      filterRow: null,
+      selectedComplexView: ["real", "imag"],
+      selectedComplexViewSingle: "mag",
+      indexFilters: undefined,
+      derived,
+    });
+
+    expect(request).toEqual({
+      view: "xy",
+      plotMode: "xy",
+      drawStyle: "points",
+      xColumn: "traceX",
+      yColumn: "traceY",
+      indexFilters: undefined,
+      excludeColumns: [],
     });
   });
 });

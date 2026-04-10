@@ -5,7 +5,7 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 
 use crate::features::charts::types::{
-    ChartDataResponse, ChartType, ComplexViewOption, HeatmapChartDataOptions, Series,
+    ChartSnapshot, ComplexViewOption, FlatXYZSeries, HeatmapChartDataOptions, HeatmapChartSnapshot,
     complex_view_label, transform_complex_values,
 };
 
@@ -13,23 +13,23 @@ pub(crate) fn build_heatmap_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     options: &HeatmapChartDataOptions,
-) -> Result<ChartDataResponse> {
-    let series_name = &options.series;
+) -> Result<ChartSnapshot> {
+    let quantity_name = &options.quantity;
     let y_column = &options.y_column;
     let data_type = *schema
         .columns()
-        .get(series_name)
+        .get(quantity_name)
         .context("Column not found")?;
     let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
     let is_complex = data_type.is_complex();
     let x_name = if is_trace {
-        format!("{series_name} - X")
+        format!("{quantity_name} - X")
     } else {
         options.x_column.clone().unwrap_or_else(|| "X".to_string())
     };
 
     let series_array: DatasetArray = batch
-        .column_by_name(series_name)
+        .column_by_name(quantity_name)
         .cloned()
         .context("Column not found")?
         .try_into()?;
@@ -40,7 +40,7 @@ pub(crate) fn build_heatmap_series(
     let mut series = if is_trace {
         process_trace_heatmap(
             batch,
-            series_name,
+            quantity_name,
             y_column,
             &series_array,
             is_complex,
@@ -53,7 +53,7 @@ pub(crate) fn build_heatmap_series(
             .context("Heatmap chart requires x column")?;
         process_scalar_heatmap(
             batch,
-            series_name,
+            quantity_name,
             x_column,
             y_column,
             &series_array,
@@ -64,17 +64,16 @@ pub(crate) fn build_heatmap_series(
 
     let (x_categories, y_categories) = normalize_heatmap_series(&mut series);
 
-    Ok(ChartDataResponse {
-        r#type: ChartType::Heatmap,
+    Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
         x_name,
-        y_name: Some(y_column.clone()),
-        x_categories: Some(x_categories),
-        y_categories: Some(y_categories),
+        y_name: y_column.clone(),
+        x_categories,
+        y_categories,
         series,
-    })
+    }))
 }
 
-pub(crate) fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<f64>) {
+pub(crate) fn normalize_heatmap_series(series: &mut [FlatXYZSeries]) -> (Vec<f64>, Vec<f64>) {
     fn f64_key(value: f64) -> u64 {
         if value == 0.0 { 0_u64 } else { value.to_bits() }
     }
@@ -85,10 +84,7 @@ pub(crate) fn normalize_heatmap_series(series: &mut [Series]) -> (Vec<f64>, Vec<
     let mut y_index_by_value: HashMap<u64, usize> = HashMap::new();
 
     for item in series.iter_mut() {
-        for point in &mut item.data {
-            if point.len() < 3 {
-                continue;
-            }
+        for point in item.values.chunks_exact_mut(3) {
             let x_value = point[0];
             let y_value = point[1];
 
@@ -132,14 +128,15 @@ fn process_trace_heatmap(
     series_array: &DatasetArray,
     is_complex: bool,
     view_option: ComplexViewOption,
-) -> Result<Vec<Series>> {
+) -> Result<Vec<FlatXYZSeries>> {
     let y_array = batch
         .column_by_name(y_column)
         .cloned()
         .context("Y column not found")?;
     let ds_y: DatasetArray = y_array.try_into()?;
     let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
-    let mut data = Vec::new();
+    let mut values = Vec::new();
+    let mut point_count = 0;
     for row in 0..batch.num_rows() {
         let Some((x_values, trace_values)) = series_array.expand_trace(row)? else {
             continue;
@@ -155,8 +152,11 @@ fn process_trace_heatmap(
             );
             let len = x_values.len().min(z_values.len());
             for i in 0..len {
-                data.push(vec![x_values[i], y_value, z_values[i]]);
+                values.push(x_values[i]);
+                values.push(y_value);
+                values.push(z_values[i]);
             }
+            point_count += len;
         } else {
             let z_values = ds_trace
                 .as_numeric()
@@ -164,8 +164,11 @@ fn process_trace_heatmap(
                 .values();
             let len = x_values.len().min(z_values.len());
             for i in 0..len {
-                data.push(vec![x_values[i], y_value, z_values[i]]);
+                values.push(x_values[i]);
+                values.push(y_value);
+                values.push(z_values[i]);
             }
+            point_count += len;
         }
     }
     let name = if is_complex {
@@ -173,7 +176,12 @@ fn process_trace_heatmap(
     } else {
         series_name.to_string()
     };
-    Ok(vec![Series { name, data }])
+    Ok(vec![FlatXYZSeries::new(
+        name.clone(),
+        name,
+        values,
+        point_count,
+    )])
 }
 
 fn process_scalar_heatmap(
@@ -184,7 +192,7 @@ fn process_scalar_heatmap(
     series_array: &DatasetArray,
     is_complex: bool,
     view_option: ComplexViewOption,
-) -> Result<Vec<Series>> {
+) -> Result<Vec<FlatXYZSeries>> {
     let x_array = batch
         .column_by_name(x_column)
         .cloned()
@@ -198,7 +206,7 @@ fn process_scalar_heatmap(
     let x_values = ds_x.as_numeric().context("X must be numeric")?.values();
     let y_values = ds_y.as_numeric().context("Y must be numeric")?.values();
 
-    let data = if is_complex {
+    let (values, point_count) = if is_complex {
         let complex_array = series_array
             .as_complex()
             .context("Expected complex array")?;
@@ -208,25 +216,38 @@ fn process_scalar_heatmap(
             view_option,
         );
         let len = x_values.len().min(y_values.len()).min(z_values.len());
-        (0..len)
-            .map(|i| vec![x_values[i], y_values[i], z_values[i]])
-            .collect()
+        let mut values = Vec::with_capacity(len * 3);
+        for i in 0..len {
+            values.push(x_values[i]);
+            values.push(y_values[i]);
+            values.push(z_values[i]);
+        }
+        (values, len)
     } else {
         let z_values = series_array
             .as_numeric()
             .context("Expected numeric array")?
             .values();
         let len = x_values.len().min(y_values.len()).min(z_values.len());
-        (0..len)
-            .map(|i| vec![x_values[i], y_values[i], z_values[i]])
-            .collect()
+        let mut values = Vec::with_capacity(len * 3);
+        for i in 0..len {
+            values.push(x_values[i]);
+            values.push(y_values[i]);
+            values.push(z_values[i]);
+        }
+        (values, len)
     };
     let name = if is_complex {
         format!("{series_name} ({})", complex_view_label(view_option))
     } else {
         series_name.to_string()
     };
-    Ok(vec![Series { name, data }])
+    Ok(vec![FlatXYZSeries::new(
+        name.clone(),
+        name,
+        values,
+        point_count,
+    )])
 }
 
 #[cfg(test)]
@@ -247,6 +268,23 @@ mod tests {
         types::ChartCommonOptions,
     };
 
+    fn heatmap_snapshot(snapshot: ChartSnapshot) -> HeatmapChartSnapshot {
+        match snapshot {
+            ChartSnapshot::Heatmap(snapshot) => snapshot,
+            other @ ChartSnapshot::Xy(_) => {
+                panic!("expected heatmap snapshot, got {other:?}")
+            }
+        }
+    }
+
+    fn xyz_points(series: &FlatXYZSeries) -> Vec<Vec<f64>> {
+        series
+            .values
+            .chunks_exact(3)
+            .map(|point| vec![point[0], point[1], point[2]])
+            .collect()
+    }
+
     #[test]
     fn test_build_heatmap_series_numeric() {
         let batch = numeric_batch(&[
@@ -257,19 +295,19 @@ mod tests {
         let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
-            series: "z".to_string(),
+            quantity: "z".to_string(),
             x_column: Some("x".to_string()),
             y_column: "y".to_string(),
             complex_view_single: None,
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
+        let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
         assert_eq!(res.series.len(), 1);
-        assert_eq!(res.x_categories, Some(vec![1.0, 2.0]));
-        assert_eq!(res.y_categories, Some(vec![10.0]));
+        assert_eq!(res.x_categories, vec![1.0, 2.0]);
+        assert_eq!(res.y_categories, vec![10.0]);
         assert_eq!(
-            res.series[0].data,
+            xyz_points(&res.series[0]),
             vec![vec![0.0, 0.0, 100.0], vec![1.0, 0.0, 200.0]]
         );
     }
@@ -284,18 +322,18 @@ mod tests {
         let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
-            series: "z".to_string(),
+            quantity: "z".to_string(),
             x_column: Some("x".to_string()),
             y_column: "y".to_string(),
             complex_view_single: None,
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
-        assert_eq!(res.x_categories, Some(vec![1.0, 2.0]));
-        assert_eq!(res.y_categories, Some(vec![1.0, 2.0]));
+        let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
+        assert_eq!(res.x_categories, vec![1.0, 2.0]);
+        assert_eq!(res.y_categories, vec![1.0, 2.0]);
         assert_eq!(
-            res.series[0].data,
+            xyz_points(&res.series[0]),
             vec![
                 vec![0.0, 0.0, 10.0],
                 vec![1.0, 0.0, 20.0],
@@ -314,18 +352,18 @@ mod tests {
         let schema = numeric_schema(&["x", "y", "z"]);
 
         let options = HeatmapChartDataOptions {
-            series: "z".to_string(),
+            quantity: "z".to_string(),
             x_column: Some("x".to_string()),
             y_column: "y".to_string(),
             complex_view_single: None,
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
-        assert_eq!(res.x_categories, Some(vec![10.0, 20.0, 40.0]));
-        assert_eq!(res.y_categories, Some(vec![5.0, 9.0]));
+        let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
+        assert_eq!(res.x_categories, vec![10.0, 20.0, 40.0]);
+        assert_eq!(res.y_categories, vec![5.0, 9.0]);
         assert_eq!(
-            res.series[0].data,
+            xyz_points(&res.series[0]),
             vec![
                 vec![0.0, 0.0, 1.0],
                 vec![1.0, 0.0, 2.0],
@@ -358,18 +396,18 @@ mod tests {
         let schema = DatasetSchema::new(columns);
 
         let options = HeatmapChartDataOptions {
-            series: "trace".to_string(),
+            quantity: "trace".to_string(),
             x_column: None,
             y_column: "y".to_string(),
             complex_view_single: None,
             common: ChartCommonOptions::default(),
         };
 
-        let res = build_heatmap_series(&batch, &schema, &options).unwrap();
-        assert_eq!(res.x_categories, Some(vec![0.0, 1.0, 2.0]));
-        assert_eq!(res.y_categories, Some(vec![100.0]));
+        let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
+        assert_eq!(res.x_categories, vec![0.0, 1.0, 2.0]);
+        assert_eq!(res.y_categories, vec![100.0]);
         assert_eq!(
-            res.series[0].data,
+            xyz_points(&res.series[0]),
             vec![
                 vec![0.0, 0.0, 1.0],
                 vec![1.0, 0.0, 2.0],

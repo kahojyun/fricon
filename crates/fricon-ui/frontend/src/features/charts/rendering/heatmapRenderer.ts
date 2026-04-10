@@ -4,7 +4,7 @@
  * that maps to a 5-stop color ramp matching the previous ECharts palette.
  */
 
-import type { ChartSeries } from "@/shared/lib/chartTypes";
+import type { HeatmapSeries } from "@/shared/lib/chartTypes";
 import { createBuffer, createProgram, hexToRgb } from "./webgl";
 import { heatmapFragmentSource, heatmapVertexSource } from "./shaders/heatmap";
 
@@ -21,6 +21,8 @@ export interface HeatmapRenderState {
   cornerBuffer: WebGLBuffer;
   cellBuffer: WebGLBuffer;
   instanceCount: number;
+  capacity: number;
+  instanceData: Float64Array;
   vao: WebGLVertexArrayObject;
   valueMin: number;
   valueMax: number;
@@ -68,6 +70,8 @@ export function createHeatmapRenderState(
     cornerBuffer,
     cellBuffer,
     instanceCount: 0,
+    capacity: 0,
+    instanceData: new Float64Array(0),
     vao,
     valueMin: 0,
     valueMax: 1,
@@ -79,12 +83,42 @@ export function createHeatmapRenderState(
 export function syncHeatmapRenderState(
   gl: WebGL2RenderingContext,
   state: HeatmapRenderState,
-  series: ChartSeries[],
+  series: HeatmapSeries[],
 ): void {
   const { valueMin, valueMax, instanceData } = buildHeatmapInstances(series);
   gl.bindBuffer(gl.ARRAY_BUFFER, state.cellBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, instanceData, gl.DYNAMIC_DRAW);
+  if (
+    instanceData.length >= state.instanceData.length &&
+    hasPrefix(instanceData, state.instanceData)
+  ) {
+    if (instanceData.length > state.capacity) {
+      state.capacity = Math.max(instanceData.length, state.capacity * 2, 3);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(state.capacity),
+        gl.DYNAMIC_DRAW,
+      );
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, toFloat32Array(instanceData));
+    } else if (instanceData.length > state.instanceData.length) {
+      gl.bufferSubData(
+        gl.ARRAY_BUFFER,
+        state.instanceData.length * 4,
+        toFloat32Array(instanceData.subarray(state.instanceData.length)),
+      );
+    }
+  } else {
+    if (instanceData.length > state.capacity) {
+      state.capacity = instanceData.length;
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(state.capacity),
+        gl.DYNAMIC_DRAW,
+      );
+    }
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, toFloat32Array(instanceData));
+  }
   state.instanceCount = instanceData.length / 3;
+  state.instanceData = instanceData;
   state.valueMin = valueMin;
   state.valueMax = valueMax;
 }
@@ -135,16 +169,16 @@ export function destroyHeatmapRenderState(
   gl.deleteProgram(state.program);
 }
 
-function buildHeatmapInstances(series: ChartSeries[]): {
+function buildHeatmapInstances(series: HeatmapSeries[]): {
   valueMin: number;
   valueMax: number;
-  instanceData: Float32Array;
+  instanceData: Float64Array;
 } {
   let min = Infinity;
   let max = -Infinity;
   for (const s of series) {
-    for (const value of s.data) {
-      const cellValue = value[2];
+    for (let i = 0; i < s.values.length; i += 3) {
+      const cellValue = s.values[i + 2];
       if (cellValue === undefined || !Number.isFinite(cellValue)) continue;
       if (cellValue < min) min = cellValue;
       if (cellValue > max) max = cellValue;
@@ -156,16 +190,28 @@ function buildHeatmapInstances(series: ChartSeries[]): {
 
   const instances: number[] = [];
   for (const s of series) {
-    for (const point of s.data) {
-      const value = point[2];
+    for (let i = 0; i < s.values.length; i += 3) {
+      const value = s.values[i + 2];
       if (value === undefined || !Number.isFinite(value)) continue;
-      instances.push(point[0], point[1], (value - min) / range);
+      instances.push(s.values[i], s.values[i + 1], (value - min) / range);
     }
   }
 
   return {
     valueMin: min,
     valueMax: max,
-    instanceData: new Float32Array(instances),
+    instanceData: Float64Array.from(instances),
   };
+}
+
+function hasPrefix(values: Float64Array, prefix: Float64Array) {
+  if (prefix.length > values.length) return false;
+  for (let i = 0; i < prefix.length; i++) {
+    if (values[i] !== prefix[i]) return false;
+  }
+  return true;
+}
+
+function toFloat32Array(values: Float64Array) {
+  return Float32Array.from(values);
 }

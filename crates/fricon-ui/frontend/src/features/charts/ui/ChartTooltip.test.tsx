@@ -13,22 +13,22 @@ const margin = {
 describe("getTooltipLines", () => {
   it("maps line hover positions through the zoom transform", () => {
     const data: ChartOptions = {
-      type: "line",
+      type: "xy",
+      plotMode: "quantity_vs_sweep",
+      drawStyle: "line",
       xName: "x",
+      yName: null,
       series: [
-        {
-          name: "series",
-          data: [
-            [0, 0],
-            [5, 5],
-            [10, 10],
-          ],
-        },
+        xySeries("series", "series", [
+          [0, 0],
+          [5, 5],
+          [10, 10],
+        ]),
       ],
     };
 
     const interactionState: ChartInteractionState = {
-      type: "line",
+      type: "xy",
       xMin: 0,
       xMax: 10,
       yMin: 0,
@@ -49,19 +49,16 @@ describe("getTooltipLines", () => {
 
   it("matches scatter points in zoomed screen space", () => {
     const data: ChartOptions = {
-      type: "scatter",
+      type: "xy",
+      plotMode: "xy",
+      drawStyle: "points",
       xName: "x",
       yName: "y",
-      series: [
-        {
-          name: "series",
-          data: [[5, 5]],
-        },
-      ],
+      series: [xySeries("series", "series", [[5, 5]])],
     };
 
     const interactionState: ChartInteractionState = {
-      type: "scatter",
+      type: "xy",
       xMin: 0,
       xMax: 10,
       yMin: 0,
@@ -80,6 +77,36 @@ describe("getTooltipLines", () => {
     ]);
   });
 
+  it("requires point proximity for point-only quantity-vs-sweep charts", () => {
+    const data: ChartOptions = {
+      type: "xy",
+      plotMode: "quantity_vs_sweep",
+      drawStyle: "points",
+      xName: "x",
+      yName: null,
+      series: [xySeries("series", "series", [[5, 5]])],
+    };
+
+    const interactionState: ChartInteractionState = {
+      type: "xy",
+      xMin: 0,
+      xMax: 10,
+      yMin: 0,
+      yMax: 10,
+      margin,
+      zoomState: {
+        scaleX: 1,
+        scaleY: 1,
+        translateX: 0,
+        translateY: 0,
+      },
+    };
+
+    expect(getTooltipLines(data, interactionState, 50, 0, 100, 100)).toEqual(
+      [],
+    );
+  });
+
   it("returns heatmap categories and cell values", () => {
     const data: ChartOptions = {
       type: "heatmap",
@@ -87,12 +114,7 @@ describe("getTooltipLines", () => {
       yName: "y",
       xCategories: [1, 2],
       yCategories: [10, 20],
-      series: [
-        {
-          name: "z",
-          data: [[1, 1, 200]],
-        },
-      ],
+      series: [xyzSeries("z", "z", [[1, 1, 200]])],
     };
 
     const interactionState: ChartInteractionState = {
@@ -108,3 +130,25 @@ describe("getTooltipLines", () => {
     ]);
   });
 });
+
+function xySeries(id: string, label: string, points: [number, number][]) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float64Array.from(points.flat()),
+  };
+}
+
+function xyzSeries(
+  id: string,
+  label: string,
+  points: [number, number, number][],
+) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float64Array.from(points.flat()),
+  };
+}

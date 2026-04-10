@@ -149,18 +149,17 @@ describe("DatasetExplorerScreen integration", () => {
           };
         case "dataset_chart_data":
           return {
-            type: "line",
+            type: "xy",
+            plotMode: "quantity_vs_sweep",
+            drawStyle: "line",
             xName: "t",
             yName: null,
-            xCategories: null,
-            yCategories: null,
             series: [
               {
-                name: "signal",
-                data: [
-                  [0, 1],
-                  [1, 2],
-                ],
+                id: "signal",
+                label: "signal",
+                pointCount: 2,
+                values: [0, 1, 1, 2],
               },
             ],
           };
@@ -239,39 +238,53 @@ describe("DatasetExplorerScreen integration", () => {
               payload as {
                 id?: number;
                 options?: {
-                  chartType?: string;
-                  series?: string;
-                  xColumn?: string;
+                  view?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
             )?.id === 1 &&
             (
               payload as {
                 options?: {
-                  chartType?: string;
-                  series?: string;
-                  xColumn?: string;
+                  view?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.chartType === "line" &&
+            )?.options?.view === "xy" &&
             (
               payload as {
                 options?: {
-                  chartType?: string;
-                  series?: string;
-                  xColumn?: string;
+                  view?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.series === "signal" &&
+            )?.options?.plotMode === "quantity_vs_sweep" &&
             (
               payload as {
                 options?: {
-                  chartType?: string;
-                  series?: string;
-                  xColumn?: string;
+                  view?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.xColumn === "t",
+            )?.options?.quantity === "signal" &&
+            (
+              payload as {
+                options?: {
+                  view?: string;
+                  plotMode?: string;
+                  quantity?: string;
+                  sweepIndexColumn?: string;
+                };
+              } | null
+            )?.options?.sweepIndexColumn === "t",
         ),
       ).toBe(true);
     });

@@ -11,7 +11,12 @@
 import { useEffect, useRef, useCallback } from "react";
 import { scaleLinear, scaleBand } from "d3-scale";
 import { select } from "d3-selection";
-import type { ChartOptions } from "@/shared/lib/chartTypes";
+import {
+  xyDrawStyleIncludesLine,
+  xyDrawStyleIncludesPoints,
+  type ChartOptions,
+} from "@/shared/lib/chartTypes";
+import { resolveXYYAxisLabel } from "../model/seriesLabeling";
 import {
   resizeCanvas,
   dataToClipMatrix,
@@ -52,7 +57,6 @@ import {
   syncScatterRenderState,
   drawScatter,
   destroyScatterRenderState,
-  scatterDataBounds,
   type ScatterRenderState,
 } from "../rendering/scatterRenderer";
 import {
@@ -65,8 +69,11 @@ import {
 } from "../rendering/heatmapRenderer";
 
 type RenderState =
-  | { type: "line"; state: LineRenderState }
-  | { type: "scatter"; state: ScatterRenderState }
+  | {
+      type: "xy";
+      lineState: LineRenderState | null;
+      scatterState: ScatterRenderState | null;
+    }
   | { type: "heatmap"; state: HeatmapRenderState };
 
 interface RenderStateCache {
@@ -111,16 +118,7 @@ export interface UseWebGLChartReturn {
 
 export type ChartInteractionState =
   | {
-      type: "line";
-      xMin: number;
-      xMax: number;
-      yMin: number;
-      yMax: number;
-      margin: ChartMargin;
-      zoomState: ZoomState;
-    }
-  | {
-      type: "scatter";
+      type: "xy";
       xMin: number;
       xMax: number;
       yMin: number;
@@ -223,35 +221,24 @@ export function useWebGLChart({
 
     const rs = r.renderState;
 
-    if (rs.type === "line" && currentData.type === "line") {
+    if (rs.type === "xy" && currentData.type === "xy") {
       const bounds = r.viewBounds ?? lineDataBounds(currentData.series);
       const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
         buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
 
-      drawLines(gl, rs.state, finalMatrix, currentData, currentLive);
+      if (rs.lineState) {
+        drawLines(gl, rs.lineState, finalMatrix, currentData, currentLive);
+      }
+      if (rs.scatterState) {
+        drawScatter(gl, rs.scatterState, finalMatrix, currentData, currentLive);
+      }
 
       renderAxes(
         svgEl,
         zoomedXScale,
         zoomedYScale,
         currentData.xName,
-        "",
-        margin,
-        overlayTheme,
-      );
-    } else if (rs.type === "scatter" && currentData.type === "scatter") {
-      const bounds = r.viewBounds ?? scatterDataBounds(currentData.series);
-      const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
-        buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
-
-      drawScatter(gl, rs.state, finalMatrix, currentData, currentLive);
-
-      renderAxes(
-        svgEl,
-        zoomedXScale,
-        zoomedYScale,
-        currentData.xName,
-        currentData.yName,
+        resolveXYYAxisLabel(currentData),
         margin,
         overlayTheme,
       );
@@ -520,11 +507,7 @@ export function useWebGLChart({
       const d = currentRefs.data;
       if (!d || d.type === "heatmap") return null;
 
-      const bounds =
-        currentRefs.viewBounds ??
-        (d.type === "line"
-          ? lineDataBounds(d.series)
-          : scatterDataBounds(d.series));
+      const bounds = currentRefs.viewBounds ?? lineDataBounds(d.series);
 
       return {
         margin,
@@ -591,19 +574,10 @@ export function useWebGLChart({
     const margin =
       currentData.type === "heatmap" ? HEATMAP_MARGIN : DEFAULT_MARGIN;
 
-    if (currentData.type === "line") {
+    if (currentData.type === "xy") {
       return {
-        type: "line" as const,
+        type: "xy" as const,
         ...(chartRef.current.viewBounds ?? lineDataBounds(currentData.series)),
-        margin,
-        zoomState: chartRef.current.zoomState,
-      };
-    }
-    if (currentData.type === "scatter") {
-      return {
-        type: "scatter" as const,
-        ...(chartRef.current.viewBounds ??
-          scatterDataBounds(currentData.series)),
         margin,
         zoomState: chartRef.current.zoomState,
       };
@@ -622,7 +596,6 @@ export function useWebGLChart({
 
   return { canvasRef, svgRef, getInteractionState };
 }
-
 interface ResolveNextZoomStateArgs {
   liveMode: boolean;
   data?: ChartOptions;
@@ -701,9 +674,7 @@ function getNumericBounds(
   data: ChartOptions | undefined,
 ): NumericBounds | null {
   if (!data || data.type === "heatmap") return null;
-  return data.type === "line"
-    ? lineDataBounds(data.series)
-    : scatterDataBounds(data.series);
+  return lineDataBounds(data.series);
 }
 
 function createRenderStateCache(): RenderStateCache {
@@ -720,18 +691,24 @@ function syncRenderState(
   data: ChartOptions,
 ): RenderState {
   switch (data.type) {
-    case "line": {
-      const state = refs.renderStateCache.line ?? createLineRenderState(gl);
-      refs.renderStateCache.line = state;
-      syncLineRenderState(gl, state, data.series);
-      return { type: "line", state };
-    }
-    case "scatter": {
-      const state =
-        refs.renderStateCache.scatter ?? createScatterRenderState(gl);
-      refs.renderStateCache.scatter = state;
-      syncScatterRenderState(gl, state, data.series);
-      return { type: "scatter", state };
+    case "xy": {
+      const lineState = xyDrawStyleIncludesLine(data.drawStyle)
+        ? (refs.renderStateCache.line ?? createLineRenderState(gl))
+        : null;
+      const scatterState = xyDrawStyleIncludesPoints(data.drawStyle)
+        ? (refs.renderStateCache.scatter ?? createScatterRenderState(gl))
+        : null;
+
+      if (lineState) {
+        refs.renderStateCache.line = lineState;
+        syncLineRenderState(gl, lineState, data.series);
+      }
+      if (scatterState) {
+        refs.renderStateCache.scatter = scatterState;
+        syncScatterRenderState(gl, scatterState, data.series);
+      }
+
+      return { type: "xy", lineState, scatterState };
     }
     case "heatmap": {
       const state =

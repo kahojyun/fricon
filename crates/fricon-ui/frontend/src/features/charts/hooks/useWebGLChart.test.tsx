@@ -2,6 +2,7 @@ import { useLayoutEffect, useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
+import { resolveXYYAxisLabel } from "../model/seriesLabeling";
 import { useWebGLChart, type ChartInteractionState } from "./useWebGLChart";
 
 const noop = () => undefined;
@@ -22,6 +23,7 @@ const glStub = {
   createBuffer: () => ({}),
   bindBuffer: noop,
   bufferData: noop,
+  bufferSubData: noop,
   useProgram: noop,
   getUniformLocation: () => ({}),
   getAttribLocation: () => 0,
@@ -161,11 +163,14 @@ function HookHarness({
 
 function makeLineData(
   points: [number, number][],
-): Extract<ChartOptions, { type: "line" }> {
+): Extract<ChartOptions, { type: "xy" }> {
   return {
-    type: "line",
+    type: "xy",
+    plotMode: "quantity_vs_sweep",
+    drawStyle: "line",
     xName: "x",
-    series: [{ name: "sig", data: points }],
+    yName: null,
+    series: [xySeries("sig", "sig", points)],
   };
 }
 
@@ -177,14 +182,33 @@ function makeHeatmapData(): Extract<ChartOptions, { type: "heatmap" }> {
     xCategories: [0, 1],
     yCategories: [0, 1],
     series: [
-      {
-        name: "z",
-        data: [
-          [0, 0, 1],
-          [1, 1, 2],
-        ],
-      },
+      xyzSeries("z", "z", [
+        [0, 0, 1],
+        [1, 1, 2],
+      ]),
     ],
+  };
+}
+
+function xySeries(id: string, label: string, points: [number, number][]) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float64Array.from(points.flat()),
+  };
+}
+
+function xyzSeries(
+  id: string,
+  label: string,
+  points: [number, number, number][],
+) {
+  return {
+    id,
+    label,
+    pointCount: points.length,
+    values: Float64Array.from(points.flat()),
   };
 }
 
@@ -290,6 +314,25 @@ describe("useWebGLChart", () => {
     expect(autoFollow?.zoomState?.translateY).toBeCloseTo(0);
     expect(autoFollow?.xMax).toBeGreaterThan(reset?.xMax ?? 0);
     expect(autoFollow?.yMax).toBeGreaterThan(reset?.yMax ?? 0);
+  });
+
+  it("uses the shared trend series label for the y axis when available", () => {
+    expect(
+      resolveXYYAxisLabel({
+        plotMode: "quantity_vs_sweep",
+        yName: null,
+        series: [
+          xySeries("sig-real", "signal (real)", [
+            [0, 1],
+            [1, 2],
+          ]),
+          xySeries("sig-imag", "signal (imag)", [
+            [0, 2],
+            [1, 3],
+          ]),
+        ],
+      }),
+    ).toBe("signal");
   });
 
   it("resets non-live charts back to the default view on data changes", () => {

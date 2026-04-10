@@ -1,16 +1,25 @@
 import type {
-  ChartDataResponse as WireChartResponse,
+  ChartSnapshot as WireChartSnapshot,
   ColumnUniqueValue,
   ColumnInfo,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
+  FlatSeries as WireFlatSeries,
+  FlatXYSeries as WireFlatXYSeries,
+  FlatXYZSeries as WireFlatXYZSeries,
+  LiveChartAppendOperation as WireLiveChartAppendOperation,
+  LiveChartDataOptions as WireLiveChartDataOptions,
+  LiveChartDataResponse as WireLiveChartResponse,
   Row as FilterTableRow,
-  ScatterModeOptions as WireScatterModeOptions,
   TableData as WireFilterTableData,
   UiDatasetStatus as DatasetStatus,
 } from "@/shared/lib/bindings";
-import type { ChartOptions, ComplexViewOption } from "@/shared/lib/chartTypes";
+import type {
+  ChartModel,
+  ComplexViewOption,
+  XYDrawStyle,
+} from "@/shared/lib/chartTypes";
 
 export type {
   ColumnInfo,
@@ -42,47 +51,102 @@ interface BaseChartDataOptions {
   excludeColumns?: string[];
 }
 
+interface XYRoleOptions {
+  traceGroupIndexColumns?: string[];
+  sweepIndexColumn?: string | null;
+}
+
+interface QuantityVsSweepPlotModeOptions {
+  plotMode: "quantity_vs_sweep";
+  quantity: string;
+  complexViews?: ComplexViewOption[];
+}
+
+type XYPlotModeOptions =
+  | QuantityVsSweepPlotModeOptions
+  | {
+      plotMode: "xy";
+      xColumn: string;
+      yColumn: string;
+    }
+  | {
+      plotMode: "complex_plane";
+      quantity: string;
+    };
+
 export type ChartDataOptions =
   | (BaseChartDataOptions & {
-      chartType: "line";
-      series: string;
-      xColumn?: string;
-      complexViews?: ComplexViewOption[];
-    })
+      view: "xy";
+      drawStyle: XYDrawStyle;
+    } & XYRoleOptions &
+      XYPlotModeOptions)
   | (BaseChartDataOptions & {
-      chartType: "heatmap";
-      series: string;
+      view: "heatmap";
+      quantity: string;
       xColumn?: string;
       yColumn: string;
       complexViewSingle?: ComplexViewOption;
-    })
-  | (BaseChartDataOptions & {
-      chartType: "scatter";
-      scatter: ScatterModeOptions;
     });
 
-export type ScatterModeOptions = WireScatterModeOptions;
+export type LiveChartDataOptions =
+  | ({
+      view: "xy";
+      drawStyle: XYDrawStyle;
+      tailCount: number;
+      knownRowCount?: number | null;
+    } & XYRoleOptions &
+      XYPlotModeOptions)
+  | {
+      view: "heatmap";
+      quantity: string;
+      complexViewSingle?: ComplexViewOption;
+      knownRowCount?: number | null;
+    };
+
+export type LiveChartAppendOperation =
+  | {
+      kind: "append_points";
+      seriesId: string;
+      values: Float64Array;
+      pointCount: number;
+    }
+  | {
+      kind: "append_series";
+      series:
+        | {
+            shape: "xy";
+            series: import("@/shared/lib/chartTypes").ChartSeries;
+          }
+        | {
+            shape: "xyz";
+            series: import("@/shared/lib/chartTypes").HeatmapSeries;
+          };
+    }
+  | {
+      kind: "append_heatmap_categories";
+      xCategories?: number[];
+      yCategories?: number[];
+    };
+
+export type LiveChartUpdate =
+  | {
+      mode: "reset";
+      rowCount: number;
+      snapshot: ChartModel;
+    }
+  | {
+      mode: "append";
+      rowCount: number;
+      ops: LiveChartAppendOperation[];
+    };
 
 export function toWireChartOptions(
   options: ChartDataOptions,
 ): WireChartDataOptions {
-  if (options.chartType === "line") {
+  if (options.view === "heatmap") {
     return {
-      chartType: "line",
-      series: options.series,
-      xColumn: options.xColumn ?? null,
-      complexViews: options.complexViews ?? null,
-      start: options.start ?? null,
-      end: options.end ?? null,
-      indexFilters: options.indexFilters ?? null,
-      excludeColumns: options.excludeColumns ?? null,
-    };
-  }
-
-  if (options.chartType === "heatmap") {
-    return {
-      chartType: "heatmap",
-      series: options.series,
+      view: "heatmap",
+      quantity: options.quantity,
       xColumn: options.xColumn ?? null,
       yColumn: options.yColumn,
       complexViewSingle: options.complexViewSingle ?? null,
@@ -93,31 +157,12 @@ export function toWireChartOptions(
     };
   }
 
-  const scatter = (() => {
-    if (options.scatter.mode === "complex") {
-      return {
-        mode: "complex" as const,
-        series: options.scatter.series,
-      };
-    }
-    if (options.scatter.mode === "trace_xy") {
-      return {
-        mode: "trace_xy" as const,
-        traceXColumn: options.scatter.traceXColumn,
-        traceYColumn: options.scatter.traceYColumn,
-      };
-    }
-    return {
-      mode: "xy" as const,
-      xColumn: options.scatter.xColumn,
-      yColumn: options.scatter.yColumn,
-      binColumn: options.scatter.binColumn ?? null,
-    };
-  })();
-
   return {
-    chartType: "scatter",
-    scatter,
+    view: "xy",
+    drawStyle: options.drawStyle,
+    ...toWireXYPlotMode(options),
+    traceGroupIndexColumns: options.traceGroupIndexColumns ?? null,
+    sweepIndexColumn: options.sweepIndexColumn ?? null,
     start: options.start ?? null,
     end: options.end ?? null,
     indexFilters: options.indexFilters ?? null,
@@ -125,41 +170,79 @@ export function toWireChartOptions(
   };
 }
 
-export function normalizeChartOptions(result: WireChartResponse): ChartOptions {
-  if (result.type === "line") {
+export function toWireLiveChartOptions(
+  options: LiveChartDataOptions,
+): WireLiveChartDataOptions {
+  if (options.view === "heatmap") {
     return {
-      type: "line",
-      xName: result.xName,
-      series: result.series,
-    };
-  }
-
-  if (result.yName == null) {
-    throw new Error(
-      `Missing yName for chart type '${result.type}' in backend response`,
-    );
-  }
-
-  if (result.type === "heatmap") {
-    if (result.xCategories == null || result.yCategories == null) {
-      throw new Error("Missing heatmap categories in backend response");
-    }
-    return {
-      type: "heatmap",
-      xName: result.xName,
-      yName: result.yName,
-      xCategories: result.xCategories,
-      yCategories: result.yCategories,
-      series: result.series,
+      view: "heatmap",
+      quantity: options.quantity,
+      complexViewSingle: options.complexViewSingle ?? null,
+      knownRowCount: options.knownRowCount ?? null,
     };
   }
 
   return {
-    type: result.type,
-    xName: result.xName,
-    yName: result.yName,
-    series: result.series,
+    view: "xy",
+    drawStyle: options.drawStyle,
+    tailCount: options.tailCount,
+    knownRowCount: options.knownRowCount ?? null,
+    traceGroupIndexColumns: options.traceGroupIndexColumns ?? null,
+    sweepIndexColumn: options.sweepIndexColumn ?? null,
+    ...toWireXYPlotMode(options),
   };
+}
+
+export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
+  switch (result.type) {
+    case "heatmap":
+      return {
+        type: "heatmap",
+        xName: result.xName,
+        yName: result.yName,
+        xCategories: result.xCategories,
+        yCategories: result.yCategories,
+        series: result.series.map(normalizeXYZSeries),
+      };
+    case "xy":
+      return {
+        type: "xy",
+        plotMode: result.plotMode,
+        drawStyle: result.drawStyle,
+        xName: result.xName,
+        yName: result.yName,
+        series: result.series.map(normalizeXYSeries),
+      };
+    default:
+      return assertNever(
+        result,
+        `Unknown chart snapshot type: ${String((result as { type?: unknown }).type)}`,
+      );
+  }
+}
+
+export function normalizeLiveChartUpdate(
+  result: WireLiveChartResponse,
+): LiveChartUpdate {
+  switch (result.mode) {
+    case "reset":
+      return {
+        mode: "reset",
+        rowCount: result.row_count,
+        snapshot: normalizeChartSnapshot(result.snapshot),
+      };
+    case "append":
+      return {
+        mode: "append",
+        rowCount: result.row_count,
+        ops: result.ops.map(normalizeLiveChartAppendOperation),
+      };
+    default:
+      return assertNever(
+        result,
+        `Unknown live chart update mode: ${String((result as { mode?: unknown }).mode)}`,
+      );
+  }
 }
 
 export function normalizeFilterTableData(
@@ -176,4 +259,112 @@ export function normalizeFilterTableData(
     rows: result.rows,
     columnUniqueValues,
   };
+}
+
+function toWireXYPlotMode(options: XYPlotModeOptions):
+  | {
+      plotMode: "quantity_vs_sweep";
+      quantity: string;
+      complex_views: ComplexViewOption[] | null;
+    }
+  | {
+      plotMode: "xy";
+      xColumn: string;
+      yColumn: string;
+    }
+  | {
+      plotMode: "complex_plane";
+      quantity: string;
+    } {
+  switch (options.plotMode) {
+    case "quantity_vs_sweep":
+      return {
+        plotMode: "quantity_vs_sweep",
+        quantity: options.quantity,
+        complex_views: options.complexViews ?? null,
+      };
+    case "xy":
+      return {
+        plotMode: "xy",
+        xColumn: options.xColumn,
+        yColumn: options.yColumn,
+      };
+    case "complex_plane":
+      return {
+        plotMode: "complex_plane",
+        quantity: options.quantity,
+      };
+  }
+}
+
+function normalizeXYSeries(series: WireFlatXYSeries) {
+  return {
+    id: series.id,
+    label: series.label,
+    values: Float64Array.from(series.values),
+    pointCount: series.pointCount,
+  };
+}
+
+function normalizeXYZSeries(series: WireFlatXYZSeries) {
+  return {
+    id: series.id,
+    label: series.label,
+    values: Float64Array.from(series.values),
+    pointCount: series.pointCount,
+  };
+}
+
+function normalizeFlatSeries(series: WireFlatSeries) {
+  switch (series.shape) {
+    case "xy":
+      return {
+        shape: "xy" as const,
+        series: normalizeXYSeries(series),
+      };
+    case "xyz":
+      return {
+        shape: "xyz" as const,
+        series: normalizeXYZSeries(series),
+      };
+    default:
+      return assertNever(
+        series,
+        `Unknown flat series shape: ${String((series as { shape?: unknown }).shape)}`,
+      );
+  }
+}
+
+function normalizeLiveChartAppendOperation(
+  operation: WireLiveChartAppendOperation,
+): LiveChartAppendOperation {
+  switch (operation.kind) {
+    case "append_points":
+      return {
+        kind: "append_points",
+        seriesId: operation.series_id,
+        values: Float64Array.from(operation.values),
+        pointCount: operation.point_count,
+      };
+    case "append_series":
+      return {
+        kind: "append_series",
+        series: normalizeFlatSeries(operation.series),
+      };
+    case "append_heatmap_categories":
+      return {
+        kind: "append_heatmap_categories",
+        xCategories: operation.x_categories ?? undefined,
+        yCategories: operation.y_categories ?? undefined,
+      };
+    default:
+      return assertNever(
+        operation,
+        `Unknown live chart operation kind: ${String((operation as { kind?: unknown }).kind)}`,
+      );
+  }
+}
+
+function assertNever(_value: never, message: string): never {
+  throw new Error(message);
 }
