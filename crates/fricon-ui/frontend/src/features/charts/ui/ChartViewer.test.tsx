@@ -1,16 +1,31 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { describe, expect, it, vi } from "vitest";
 import type { DatasetDetail } from "../api/types";
+import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
 import { ChartViewer } from "./ChartViewer";
 
+const chartWrapperMock = vi.fn();
+
+interface ChartWrapperMockProps {
+  data?: unknown;
+  numericLabelFormat?: NumericLabelFormatOptions;
+}
+
 vi.mock("./ChartWrapper", () => ({
-  ChartWrapper: ({ data }: { data?: unknown }) => (
-    <div data-testid="chart">{data ? "data" : "empty"}</div>
-  ),
+  ChartWrapper: (props: ChartWrapperMockProps) => {
+    chartWrapperMock(props);
+    return <div data-testid="chart">{props.data ? "data" : "empty"}</div>;
+  },
 }));
 
 vi.mock("@tanstack/react-virtual", () => ({
@@ -60,7 +75,143 @@ async function getSelectTrigger(label: string) {
   return within(container).getByRole("combobox");
 }
 
+function lastChartWrapperCall(): ChartWrapperMockProps | undefined {
+  const lastCall = chartWrapperMock.mock.calls.at(-1);
+  return lastCall?.[0] as ChartWrapperMockProps | undefined;
+}
+
 describe("ChartViewer", () => {
+  it("defaults chart numeric formatting to SI prefix with 4 significant digits", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "get_filter_table_data") {
+        return { fields: [], rows: [], columnUniqueValues: {} };
+      }
+      if (cmd === "dataset_chart_data") {
+        return {
+          type: "xy",
+          plotMode: "quantity_vs_sweep",
+          drawStyle: "line",
+          xName: "t",
+          yName: null,
+          series: [
+            {
+              id: "signal",
+              label: "signal",
+              pointCount: 2,
+              values: [0, 1, 1, 2],
+            },
+          ],
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 0 };
+      }
+      return null;
+    });
+
+    chartWrapperMock.mockClear();
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "signal",
+                isComplex: false,
+                isTrace: false,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+
+    const lastCall = lastChartWrapperCall();
+    expect(lastCall?.numericLabelFormat).toEqual({
+      mode: "si",
+      significantDigits: 4,
+    });
+
+    clearMocks();
+  });
+
+  it("updates chart numeric formatting from advanced controls", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "get_filter_table_data") {
+        return { fields: [], rows: [], columnUniqueValues: {} };
+      }
+      if (cmd === "dataset_chart_data") {
+        return {
+          type: "xy",
+          plotMode: "quantity_vs_sweep",
+          drawStyle: "line",
+          xName: "t",
+          yName: null,
+          series: [
+            {
+              id: "signal",
+              label: "signal",
+              pointCount: 2,
+              values: [0, 1, 1, 2],
+            },
+          ],
+        };
+      }
+      if (cmd === "get_dataset_write_status") {
+        return { rowCount: 0 };
+      }
+      return null;
+    });
+
+    const user = userEvent.setup();
+    chartWrapperMock.mockClear();
+
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <ChartViewer
+          datasetId={1}
+          datasetDetail={makeDetail({
+            columns: [
+              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "signal",
+                isComplex: false,
+                isTrace: false,
+                isIndex: false,
+              },
+            ],
+          })}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByTestId("chart");
+    await user.click(screen.getByRole("button", { name: /advanced/i }));
+
+    const formatTrigger = await getSelectTrigger("Format");
+    await user.click(formatTrigger);
+    await user.click(await screen.findByRole("option", { name: "Scientific" }));
+
+    const digitsInput = screen.getByLabelText("Significant Digits");
+    fireEvent.change(digitsInput, { target: { value: "6" } });
+
+    await waitFor(() => {
+      const lastCall = lastChartWrapperCall();
+      expect(lastCall?.numericLabelFormat).toEqual({
+        mode: "scientific",
+        significantDigits: 6,
+      });
+    });
+
+    clearMocks();
+  });
+
   it("renders a neutral loading state while dataset detail is loading", () => {
     mockIPC(() => null);
 

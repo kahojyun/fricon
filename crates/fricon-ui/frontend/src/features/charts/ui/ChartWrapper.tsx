@@ -1,5 +1,9 @@
 import { useTheme } from "next-themes";
-import type { ChartOptions, ChartSeries } from "@/shared/lib/chartTypes";
+import type {
+  ChartOptions,
+  ChartSeries,
+  NumericLabelFormatOptions,
+} from "@/shared/lib/chartTypes";
 import { useWebGLChart } from "../hooks/useWebGLChart";
 import { liveSeriesGroupId } from "../model/liveChartModel";
 import { ChartFrameHeader } from "./ChartFrameHeader";
@@ -7,12 +11,14 @@ import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
 import type { ChartFrameHeaderData } from "./chartFrameHeaderModel";
 import { deriveLegendPresentation } from "./chartLegendPresentation";
+import { DEFAULT_NUMERIC_LABEL_FORMAT } from "../rendering/numericLabelFormat";
 
 interface ChartWrapperProps {
   data?: ChartOptions;
   interactionKey?: string | null;
   liveMode?: boolean;
   header?: ChartFrameHeaderData | null;
+  numericLabelFormat?: NumericLabelFormatOptions;
 }
 
 export function ChartWrapper({
@@ -20,6 +26,7 @@ export function ChartWrapper({
   interactionKey,
   liveMode,
   header,
+  numericLabelFormat = DEFAULT_NUMERIC_LABEL_FORMAT,
 }: ChartWrapperProps) {
   const { resolvedTheme } = useTheme();
   const visibleLegendSeries =
@@ -35,6 +42,7 @@ export function ChartWrapper({
     interactionKey,
     liveMode,
     theme: resolvedTheme,
+    numericLabelFormat,
   });
 
   return (
@@ -54,6 +62,7 @@ export function ChartWrapper({
       {!liveMode && data ? (
         <ChartTooltip
           data={data}
+          numericLabelFormat={numericLabelFormat}
           svgRef={svgRef}
           getInteractionState={getInteractionState}
         />

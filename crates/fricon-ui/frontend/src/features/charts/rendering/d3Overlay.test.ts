@@ -1,5 +1,6 @@
 import { scaleLinear } from "d3-scale";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_NUMERIC_LABEL_FORMAT } from "./numericLabelFormat";
 import { renderAxes, renderColorScale, LIGHT_THEME } from "./d3Overlay";
 import type { ChartMargin } from "./webgl";
 
@@ -30,6 +31,7 @@ describe("renderColorScale", () => {
       9,
       margin,
       LIGHT_THEME,
+      DEFAULT_NUMERIC_LABEL_FORMAT,
     );
 
     const stops = Array.from(svgEl.getElementsByTagName("stop"));
@@ -74,6 +76,7 @@ describe("renderColorScale", () => {
       9,
       margin,
       LIGHT_THEME,
+      DEFAULT_NUMERIC_LABEL_FORMAT,
     );
     expect(svgEl.querySelector(".color-scale")).not.toBeNull();
 
@@ -85,9 +88,71 @@ describe("renderColorScale", () => {
       "y",
       margin,
       LIGHT_THEME,
+      DEFAULT_NUMERIC_LABEL_FORMAT,
     );
 
     expect(svgEl.querySelector(".color-scale")).toBeNull();
     expect(svgEl.querySelector(".axes")).not.toBeNull();
+  });
+
+  it("formats cartesian axis ticks with SI prefixes", () => {
+    const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.appendChild(svgEl);
+    Object.defineProperty(svgEl, "clientWidth", {
+      configurable: true,
+      value: 320,
+    });
+    Object.defineProperty(svgEl, "clientHeight", {
+      configurable: true,
+      value: 220,
+    });
+
+    renderAxes(
+      svgEl,
+      scaleLinear().domain([0, 2000]).range([0, 100]),
+      scaleLinear().domain([0, 1]).range([100, 0]),
+      "x",
+      "y",
+      margin,
+      LIGHT_THEME,
+      { mode: "si", significantDigits: 4 },
+    );
+
+    const labels = Array.from(svgEl.querySelectorAll(".axes text")).map(
+      (node) => node.textContent,
+    );
+
+    expect(labels).toContain("1k");
+    expect(labels).toContain("2k");
+  });
+
+  it("formats heatmap color scale labels with scientific notation", () => {
+    const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.appendChild(svgEl);
+    Object.defineProperty(svgEl, "clientWidth", {
+      configurable: true,
+      value: 320,
+    });
+    Object.defineProperty(svgEl, "clientHeight", {
+      configurable: true,
+      value: 220,
+    });
+
+    renderColorScale(
+      svgEl,
+      ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"],
+      0.00001234,
+      123400,
+      margin,
+      LIGHT_THEME,
+      { mode: "scientific", significantDigits: 4 },
+    );
+
+    const labels = Array.from(svgEl.querySelectorAll(".color-scale text")).map(
+      (node) => node.textContent,
+    );
+
+    expect(labels).toContain("1.234e+5");
+    expect(labels).toContain("1.234e-5");
   });
 });

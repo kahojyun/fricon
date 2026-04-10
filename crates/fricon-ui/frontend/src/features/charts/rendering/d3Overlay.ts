@@ -7,7 +7,9 @@ import { axisBottom, axisLeft } from "d3-axis";
 import { select } from "d3-selection";
 import type { Selection } from "d3-selection";
 import type { ScaleBand, ScaleLinear } from "d3-scale";
+import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
 import type { ChartMargin } from "./webgl";
+import { formatAxisTickLabel, formatNumericLabel } from "./numericLabelFormat";
 
 export type AxisScale =
   | ScaleLinear<number, number>
@@ -48,6 +50,7 @@ export function renderAxes(
   yName: string,
   margin: ChartMargin,
   theme: OverlayTheme,
+  numericLabelFormat: NumericLabelFormatOptions,
 ): void {
   const svg = select(svgEl);
   const width = svgEl.clientWidth;
@@ -65,6 +68,9 @@ export function renderAxes(
   // X axis
   const xAxis = axisBottom(xScale.range([0, chartWidth])).ticks(
     Math.max(2, Math.floor(chartWidth / 80)),
+  );
+  xAxis.tickFormat((value) =>
+    formatAxisTickLabel(value as number, numericLabelFormat),
   );
   g.append("g")
     .attr("transform", `translate(0,${chartHeight})`)
@@ -96,6 +102,9 @@ export function renderAxes(
   // Y axis
   const yAxis = axisLeft(yScale.range([chartHeight, 0])).ticks(
     Math.max(2, Math.floor(chartHeight / 50)),
+  );
+  yAxis.tickFormat((value) =>
+    formatAxisTickLabel(value as number, numericLabelFormat),
   );
   g.append("g")
     .call(yAxis)
@@ -154,6 +163,7 @@ export function renderCategoryAxes(
   yName: string,
   margin: ChartMargin,
   theme: OverlayTheme,
+  numericLabelFormat: NumericLabelFormatOptions,
 ): void {
   const svg = select(svgEl);
   const width = svgEl.clientWidth;
@@ -179,6 +189,7 @@ export function renderCategoryAxes(
   const xAxis = axisBottom(xScale.range([0, chartWidth])).tickValues(
     xTickValues,
   );
+  xAxis.tickFormat((value) => formatAxisTickLabel(value, numericLabelFormat));
   g.append("g")
     .attr("transform", `translate(0,${chartHeight})`)
     .call(xAxis)
@@ -200,6 +211,7 @@ export function renderCategoryAxes(
   const yAxis = axisLeft(yScale.range([chartHeight, 0])).tickValues(
     yTickValues,
   );
+  yAxis.tickFormat((value) => formatAxisTickLabel(value, numericLabelFormat));
   g.append("g")
     .call(yAxis)
     .call((g) => {
@@ -242,6 +254,7 @@ export function renderColorScale(
   valueMax: number,
   margin: ChartMargin,
   theme: OverlayTheme,
+  numericLabelFormat: NumericLabelFormatOptions,
 ): void {
   const svg = select(svgEl);
   const height = svgEl.clientHeight;
@@ -290,14 +303,6 @@ export function renderColorScale(
     .attr("stroke", theme.gridColor)
     .attr("stroke-width", 0.5);
 
-  // Format labels
-  const fmt = (v: number) => {
-    if (Math.abs(v) >= 1000 || (Math.abs(v) < 0.01 && v !== 0)) {
-      return v.toExponential(1);
-    }
-    return Number.isInteger(v) ? String(v) : v.toPrecision(3);
-  };
-
   // Max label (top)
   g.append("text")
     .attr("x", barWidth + 4)
@@ -306,7 +311,7 @@ export function renderColorScale(
     .attr("dominant-baseline", "hanging")
     .attr("fill", theme.textColor)
     .style("font-size", "10px")
-    .text(fmt(valueMax));
+    .text(formatNumericLabel(valueMax, numericLabelFormat));
 
   // Min label (bottom)
   g.append("text")
@@ -316,7 +321,7 @@ export function renderColorScale(
     .attr("dominant-baseline", "auto")
     .attr("fill", theme.textColor)
     .style("font-size", "10px")
-    .text(fmt(valueMin));
+    .text(formatNumericLabel(valueMin, numericLabelFormat));
 }
 
 function clearOverlayLayers(

@@ -3,16 +3,20 @@ import type { ColumnInfo, DatasetStatus } from "../api/types";
 import type {
   ChartView,
   ComplexViewOption,
+  NumericLabelFormatOptions,
+  NumericLabelFormatMode,
   XYDrawStyle,
   XYPlotMode,
 } from "@/shared/lib/chartTypes";
 import { deriveChartViewerState } from "../model/chartViewerLogic";
+import { DEFAULT_NUMERIC_LABEL_FORMAT } from "../rendering/numericLabelFormat";
 
 export interface ChartViewerControlState {
   selectedComplexView: ComplexViewOption[];
   selectedComplexViewSingle: ComplexViewOption;
   isLiveMode: boolean;
   liveWindowCount: number;
+  numericLabelFormat: NumericLabelFormatOptions;
 }
 
 interface LiveModeSelection {
@@ -37,6 +41,8 @@ export interface ChartViewerControlActions {
   setSelectedComplexViewSingle: (next: ComplexViewOption) => void;
   setLiveMode: (next: boolean) => void;
   setLiveWindowCount: (next: number) => void;
+  setNumericLabelFormatMode: (next: NumericLabelFormatMode) => void;
+  setNumericLabelSignificantDigits: (next: number) => void;
 }
 
 export function useChartViewerSelection(
@@ -76,6 +82,8 @@ export function useChartViewerSelection(
   const [liveModeSelection, setLiveModeSelection] =
     useState<LiveModeSelection | null>(null);
   const [liveWindowCount, setLiveWindowCount] = useState(5);
+  const [numericLabelFormat, setNumericLabelFormat] =
+    useState<NumericLabelFormatOptions>(DEFAULT_NUMERIC_LABEL_FORMAT);
   const currentLiveModeSelection =
     liveModeSelection?.datasetStatus === datasetStatus
       ? liveModeSelection
@@ -103,6 +111,7 @@ export function useChartViewerSelection(
     selectedComplexViewSingle,
     isLiveMode,
     liveWindowCount,
+    numericLabelFormat,
   };
 
   const actions: ChartViewerControlActions = {
@@ -132,6 +141,13 @@ export function useChartViewerSelection(
         value: next,
       }),
     setLiveWindowCount,
+    setNumericLabelFormatMode: (next) =>
+      setNumericLabelFormat((current) => ({ ...current, mode: next })),
+    setNumericLabelSignificantDigits: (next) =>
+      setNumericLabelFormat((current) => ({
+        ...current,
+        significantDigits: next,
+      })),
   };
 
   return {

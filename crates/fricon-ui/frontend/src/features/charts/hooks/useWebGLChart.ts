@@ -15,6 +15,7 @@ import {
   xyDrawStyleIncludesLine,
   xyDrawStyleIncludesPoints,
   type ChartOptions,
+  type NumericLabelFormatOptions,
 } from "@/shared/lib/chartTypes";
 import { resolveXYYAxisLabel } from "../model/seriesLabeling";
 import {
@@ -33,6 +34,7 @@ import {
   renderColorScale,
   getOverlayTheme,
 } from "../rendering/d3Overlay";
+import { DEFAULT_NUMERIC_LABEL_FORMAT } from "../rendering/numericLabelFormat";
 import {
   attachZoom,
   IDENTITY_ZOOM,
@@ -97,6 +99,7 @@ interface WebGLChartRefs {
   lastResolvedInteractionKey: string | null;
   liveMode: boolean;
   theme: string | undefined;
+  numericLabelFormat: NumericLabelFormatOptions;
   animFrameId: number;
   needsRender: boolean;
   contextLost: boolean;
@@ -107,6 +110,7 @@ export interface UseWebGLChartOptions {
   interactionKey?: string | null;
   liveMode?: boolean;
   theme?: string;
+  numericLabelFormat?: NumericLabelFormatOptions;
 }
 
 export interface UseWebGLChartReturn {
@@ -138,6 +142,7 @@ export function useWebGLChart({
   interactionKey,
   liveMode = false,
   theme,
+  numericLabelFormat = DEFAULT_NUMERIC_LABEL_FORMAT,
 }: UseWebGLChartOptions): UseWebGLChartReturn {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -156,6 +161,7 @@ export function useWebGLChart({
     lastResolvedInteractionKey: null,
     liveMode: false,
     theme: undefined,
+    numericLabelFormat,
     animFrameId: 0,
     needsRender: true,
     contextLost: false,
@@ -177,6 +183,10 @@ export function useWebGLChart({
   useEffect(() => {
     chartRef.current.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    chartRef.current.numericLabelFormat = numericLabelFormat;
+  }, [numericLabelFormat]);
 
   // Main render function
   const render = useCallback(() => {
@@ -241,6 +251,7 @@ export function useWebGLChart({
         resolveXYYAxisLabel(currentData),
         margin,
         overlayTheme,
+        r.numericLabelFormat,
       );
     } else if (rs.type === "heatmap" && currentData.type === "heatmap") {
       const numCols = currentData.xCategories.length;
@@ -268,6 +279,7 @@ export function useWebGLChart({
         currentData.yName,
         margin,
         overlayTheme,
+        r.numericLabelFormat,
       );
       renderColorScale(
         svgEl,
@@ -276,6 +288,7 @@ export function useWebGLChart({
         rs.state.valueMax,
         margin,
         overlayTheme,
+        r.numericLabelFormat,
       );
     }
 
@@ -426,7 +439,7 @@ export function useWebGLChart({
   // Re-render on theme change
   useEffect(() => {
     scheduleRender();
-  }, [theme, scheduleRender]);
+  }, [theme, numericLabelFormat, scheduleRender]);
 
   // Re-render on liveMode change
   useEffect(() => {
@@ -514,6 +527,7 @@ export function useWebGLChart({
         zoomState: currentRefs.zoomState,
         ...bounds,
         theme: getOverlayTheme(currentRefs.theme),
+        numericLabelFormat: currentRefs.numericLabelFormat,
       };
     });
     currentRefs.crosshairController = crosshair;

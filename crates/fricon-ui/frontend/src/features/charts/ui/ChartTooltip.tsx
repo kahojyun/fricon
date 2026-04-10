@@ -5,9 +5,13 @@
  */
 
 import { useEffect, useState } from "react";
-import type { ChartOptions } from "@/shared/lib/chartTypes";
+import type {
+  ChartOptions,
+  NumericLabelFormatOptions,
+} from "@/shared/lib/chartTypes";
 import type { ChartInteractionState } from "../hooks/useWebGLChart";
 import { getTooltipLines } from "./tooltipLines";
+import { DEFAULT_NUMERIC_LABEL_FORMAT } from "../rendering/numericLabelFormat";
 
 interface TooltipState {
   visible: boolean;
@@ -21,12 +25,14 @@ interface ChartTooltipProps {
   /** Ref to the SVG overlay element – pointer events are tracked here for chart interactions. */
   svgRef: React.RefObject<SVGSVGElement | null>;
   getInteractionState: () => ChartInteractionState | null;
+  numericLabelFormat?: NumericLabelFormatOptions;
 }
 
 export function ChartTooltip({
   data,
   svgRef,
   getInteractionState,
+  numericLabelFormat = DEFAULT_NUMERIC_LABEL_FORMAT,
 }: ChartTooltipProps) {
   const [tooltip, setTooltip] = useState<TooltipState>({
     visible: false,
@@ -80,6 +86,7 @@ export function ChartTooltip({
 
       const lines = getTooltipLines(
         data,
+        numericLabelFormat,
         interactionState,
         chartX,
         chartY,
@@ -106,7 +113,7 @@ export function ChartTooltip({
       svgElement.removeEventListener("pointermove", handlePointerMove);
       svgElement.removeEventListener("pointerleave", handlePointerLeave);
     };
-  }, [data, getInteractionState, svgRef]);
+  }, [data, getInteractionState, numericLabelFormat, svgRef]);
 
   return (
     <div className="pointer-events-none absolute inset-0">

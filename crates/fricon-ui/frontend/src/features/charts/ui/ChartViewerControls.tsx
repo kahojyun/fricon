@@ -20,10 +20,16 @@ import {
   SelectValue,
 } from "@/shared/ui/select";
 import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
 import { Toggle } from "@/shared/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { Activity, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import {
+  clampSignificantDigits,
+  MAX_SIGNIFICANT_DIGITS,
+  MIN_SIGNIFICANT_DIGITS,
+} from "../rendering/numericLabelFormat";
 
 interface ChartViewerControlsProps {
   derived: ReturnType<typeof deriveChartViewerState>;
@@ -56,6 +62,13 @@ const complexViewLabels = {
   arg: "Phase",
 } as const;
 
+const numericLabelFormatLabels = {
+  auto: "Auto",
+  decimal: "Decimal",
+  scientific: "Scientific",
+  si: "SI Prefix",
+} as const;
+
 const liveWindowOptions = [1, 3, 5, 10, 20] as const;
 
 export function ChartViewerControls({
@@ -70,6 +83,7 @@ export function ChartViewerControls({
     selectedComplexViewSingle,
     isLiveMode,
     liveWindowCount,
+    numericLabelFormat,
   } = controlState;
   const {
     setView,
@@ -87,6 +101,8 @@ export function ChartViewerControls({
     setSelectedComplexView,
     setSelectedComplexViewSingle,
     setLiveWindowCount,
+    setNumericLabelFormatMode,
+    setNumericLabelSignificantDigits,
   } = actions;
   const showPrimaryPlotMode = derived.effectiveView === "xy";
   const showPrimaryLiveWindow = isLiveMode && derived.effectiveView === "xy";
@@ -99,11 +115,13 @@ export function ChartViewerControls({
     derived.effectiveView === "heatmap" ||
     (derived.effectiveView === "xy" &&
       derived.effectivePlotMode === "quantity_vs_sweep");
+  const showAdvancedNumericFormat = true;
   const showAdvancedControls =
     showAdvancedStyle ||
     showAdvancedHeatmapAxes ||
     showAdvancedGrouping ||
-    showAdvancedComplexControls;
+    showAdvancedComplexControls ||
+    showAdvancedNumericFormat;
   const allowEmptySweepAxis = derived.effectivePlotMode !== "quantity_vs_sweep";
   const liveWindowUnit =
     derived.xyUsesTraceSource ||
@@ -586,6 +604,69 @@ export function ChartViewerControls({
               )}
             </div>
           ) : null}
+
+          <div className="min-w-40">
+            <Label className="mb-1 block">Format</Label>
+            <Select
+              value={numericLabelFormat.mode}
+              onValueChange={(value) => {
+                if (
+                  value === "auto" ||
+                  value === "decimal" ||
+                  value === "scientific" ||
+                  value === "si"
+                ) {
+                  setNumericLabelFormatMode(value);
+                }
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select format">
+                  {numericLabelFormatLabels[numericLabelFormat.mode]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(numericLabelFormatLabels).map(
+                  ([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-32">
+            <Label htmlFor="chart-significant-digits" className="mb-1 block">
+              Significant Digits
+            </Label>
+            <Input
+              id="chart-significant-digits"
+              type="number"
+              min={MIN_SIGNIFICANT_DIGITS}
+              max={MAX_SIGNIFICANT_DIGITS}
+              step={1}
+              value={numericLabelFormat.significantDigits}
+              onChange={(event) => {
+                if (event.target.value === "") {
+                  return;
+                }
+                setNumericLabelSignificantDigits(
+                  clampSignificantDigits(Number(event.target.value)),
+                );
+              }}
+              onBlur={(event) => {
+                setNumericLabelSignificantDigits(
+                  clampSignificantDigits(
+                    event.target.value === ""
+                      ? numericLabelFormat.significantDigits
+                      : Number(event.target.value),
+                  ),
+                );
+              }}
+            />
+          </div>
         </div>
       ) : null}
 
