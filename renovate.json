@@ -7,14 +7,23 @@
     ":automergePatch",
     ":automergeStableNonMajor",
     ":approveMajorUpdates",
+    "helpers:pinGitHubActionDigestsToSemver",
     "customManagers:githubActionsVersions"
   ],
   "packageRules": [
     {
+      "description": "Pin all npm dependencies except peer dependencies",
       "matchManagers": ["npm"],
       "extends": [":pinAllExceptPeerDependencies"]
     },
     {
+      "description": "Set minimum release age for all npm dependencies to 14 days",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "Require approval for minor updates to dependencies with major version <1.0.0",
       "matchCurrentVersion": "<1.0.0",
       "matchUpdateTypes": ["minor"],
       "dependencyDashboardApproval": true
