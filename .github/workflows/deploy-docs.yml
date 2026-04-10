@@ -30,7 +30,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
       - name: Rust cache
-        uses: Swatinem/rust-cache@b5ec9edd911d3bf82c74038b0a28791e0aa24d6f # v2.0.2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install build dependencies
