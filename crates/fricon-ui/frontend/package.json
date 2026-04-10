@@ -55,7 +55,7 @@
     "@types/d3-format": "3.0.4",
     "@types/d3-scale": "4.0.9",
     "@types/d3-selection": "3.0.11",
-    "@types/node": "24.11.2",
+    "@types/node": "24.12.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.1",
