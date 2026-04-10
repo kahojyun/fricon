@@ -82,7 +82,7 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2
+      - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2
         with:
           tool: protoc
       - name: Install pnpm
@@ -130,7 +130,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2
+      - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2
         with:
           tool: cargo-deny
       - name: Check cargo dependencies
@@ -166,7 +166,7 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2
+      - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2
         with:
           tool: protoc,cargo-bundle-licenses
       - name: Install pnpm
@@ -202,7 +202,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2
+      - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2
         with:
           tool: cargo-bundle-licenses
       - name: Install pnpm
