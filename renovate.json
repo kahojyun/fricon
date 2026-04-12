@@ -3,7 +3,6 @@
   "minimumReleaseAge": "14 days",
   "extends": [
     "config:best-practices",
-    ":automergeDigest",
     ":automergePatch",
     ":automergeStableNonMajor",
     ":approveMajorUpdates",
