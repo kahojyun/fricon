@@ -212,12 +212,10 @@ export type HeatmapChartDataOptions = {
 export type HeatmapChartSnapshot = {
 	xName: string,
 	yName: string,
-	xCategories: number[],
-	yCategories: number[],
 	series: FlatXYZSeries[],
 };
 
-export type LiveChartAppendOperation = { kind: "append_points"; series_id: string; values: number[]; point_count: number } | { kind: "append_series"; series: FlatSeries } | { kind: "append_heatmap_categories"; x_categories: number[] | null; y_categories: number[] | null };
+export type LiveChartAppendOperation = { kind: "append_points"; series_id: string; values: number[]; point_count: number } | { kind: "append_series"; series: FlatSeries };
 
 export type LiveChartDataOptions = { view: "xy" } & (LiveXYOptions) | { view: "heatmap" } & (LiveHeatmapOptions);
 

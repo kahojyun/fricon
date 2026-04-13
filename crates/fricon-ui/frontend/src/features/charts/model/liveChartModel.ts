@@ -56,10 +56,6 @@ function appendToChart(
 
   const series = chart.series.map((item) => ({ ...item }));
   for (const operation of update.ops) {
-    if (operation.kind === "append_heatmap_categories") {
-      return null;
-    }
-
     if (operation.kind === "append_points") {
       const target = series.find((item) => item.id === operation.seriesId);
       if (!target) return null;
@@ -83,20 +79,8 @@ function appendToHeatmap(
   update: Extract<LiveChartUpdate, { mode: "append" }>,
 ): ChartModel | null {
   const series = chart.series.map((item) => ({ ...item }));
-  let xCategories = chart.xCategories;
-  let yCategories = chart.yCategories;
 
   for (const operation of update.ops) {
-    if (operation.kind === "append_heatmap_categories") {
-      xCategories = operation.xCategories
-        ? [...xCategories, ...operation.xCategories]
-        : xCategories;
-      yCategories = operation.yCategories
-        ? [...yCategories, ...operation.yCategories]
-        : yCategories;
-      continue;
-    }
-
     if (operation.kind === "append_points") {
       const target = series.find((item) => item.id === operation.seriesId);
       if (!target) return null;
@@ -114,8 +98,6 @@ function appendToHeatmap(
 
   return {
     ...chart,
-    xCategories,
-    yCategories,
     series,
   };
 }

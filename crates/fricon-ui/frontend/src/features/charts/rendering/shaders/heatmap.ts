@@ -2,8 +2,8 @@
  * GLSL 300 es shaders for heatmap rendering via instanced quads.
  *
  * Each instance is a single heatmap cell. Per-instance attributes provide
- * the cell position (col, row) and the normalized value (0..1) which is
- * mapped to a color ramp in the fragment shader.
+ * the numeric cell bounds and the normalized value (0..1) which is mapped
+ * to a color ramp in the fragment shader.
  */
 
 export const heatmapVertexSource = `#version 300 es
@@ -13,19 +13,21 @@ precision highp float;
 in vec2 a_corner;
 
 // Per-instance
-in vec3 a_cell; // (col, row, normalizedValue)
+in vec4 a_rect; // (x0, y0, x1, y1)
+in float a_value;
 
-uniform mat3 u_matrix; // maps (col, row) grid coords → clip space
-uniform vec2 u_cellSize; // (1.0 / numCols, 1.0 / numRows) in grid-coord units — unused, we just offset by 1
+uniform mat3 u_matrix; // maps data coords → clip space
 
 out float v_value;
 
 void main() {
-  // Cell spans from (col, row) to (col+1, row+1) in grid coordinates
-  vec2 pos = a_cell.xy + a_corner;
+  vec2 pos = vec2(
+    mix(a_rect.x, a_rect.z, a_corner.x),
+    mix(a_rect.y, a_rect.w, a_corner.y)
+  );
   vec3 clip = u_matrix * vec3(pos, 1.0);
   gl_Position = vec4(clip.xy, 0.0, 1.0);
-  v_value = a_cell.z;
+  v_value = a_value;
 }
 `;
 

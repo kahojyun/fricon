@@ -126,6 +126,43 @@ describe("renderColorScale", () => {
     expect(labels).toContain("2k");
   });
 
+  it("renders requested numeric tick values for heatmap center labels", () => {
+    const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.appendChild(svgEl);
+    Object.defineProperty(svgEl, "clientWidth", {
+      configurable: true,
+      value: 320,
+    });
+    Object.defineProperty(svgEl, "clientHeight", {
+      configurable: true,
+      value: 220,
+    });
+
+    renderAxes(
+      svgEl,
+      scaleLinear().domain([5, 50]).range([0, 100]),
+      scaleLinear().domain([110, 320]).range([100, 0]),
+      "x",
+      "y",
+      margin,
+      LIGHT_THEME,
+      DEFAULT_NUMERIC_LABEL_FORMAT,
+      {
+        showGrid: false,
+        xTickValues: [7, 19, 46],
+        yTickValues: [120, 185, 310],
+      },
+    );
+
+    const axisLabels = Array.from(
+      svgEl.querySelectorAll(".axes .tick text"),
+    ).map((node) => node.textContent);
+
+    expect(axisLabels).toEqual(
+      expect.arrayContaining(["7", "19", "46", "120", "185", "310"]),
+    );
+  });
+
   it("formats heatmap color scale labels with scientific notation", () => {
     const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     document.body.appendChild(svgEl);

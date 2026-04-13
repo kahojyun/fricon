@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
@@ -37,7 +35,7 @@ pub(crate) fn build_heatmap_series(
         .complex_view_single
         .unwrap_or(ComplexViewOption::Mag);
 
-    let mut series = if is_trace {
+    let series = if is_trace {
         process_trace_heatmap(
             batch,
             quantity_name,
@@ -62,63 +60,11 @@ pub(crate) fn build_heatmap_series(
         )?
     };
 
-    let (x_categories, y_categories) = normalize_heatmap_series(&mut series);
-
     Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
         x_name,
         y_name: y_column.clone(),
-        x_categories,
-        y_categories,
         series,
     }))
-}
-
-pub(crate) fn normalize_heatmap_series(series: &mut [FlatXYZSeries]) -> (Vec<f64>, Vec<f64>) {
-    fn f64_key(value: f64) -> u64 {
-        if value == 0.0 { 0_u64 } else { value.to_bits() }
-    }
-
-    let mut x_categories: Vec<f64> = Vec::new();
-    let mut y_categories: Vec<f64> = Vec::new();
-    let mut x_index_by_value: HashMap<u64, usize> = HashMap::new();
-    let mut y_index_by_value: HashMap<u64, usize> = HashMap::new();
-
-    for item in series.iter_mut() {
-        for point in item.values.chunks_exact_mut(3) {
-            let x_value = point[0];
-            let y_value = point[1];
-
-            let x_index = if let Some(index) = x_index_by_value.get(&f64_key(x_value)) {
-                *index
-            } else {
-                let index = x_categories.len();
-                x_categories.push(x_value);
-                x_index_by_value.insert(f64_key(x_value), index);
-                index
-            };
-
-            let y_index = if let Some(index) = y_index_by_value.get(&f64_key(y_value)) {
-                *index
-            } else {
-                let index = y_categories.len();
-                y_categories.push(y_value);
-                y_index_by_value.insert(f64_key(y_value), index);
-                index
-            };
-
-            #[expect(
-                clippy::cast_precision_loss,
-                reason = "Heatmap category indices are bounded by dataset size and safe for \
-                          plotting"
-            )]
-            {
-                point[0] = x_index as f64;
-                point[1] = y_index as f64;
-            }
-        }
-    }
-
-    (x_categories, y_categories)
 }
 
 fn process_trace_heatmap(
@@ -304,11 +250,9 @@ mod tests {
 
         let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
         assert_eq!(res.series.len(), 1);
-        assert_eq!(res.x_categories, vec![1.0, 2.0]);
-        assert_eq!(res.y_categories, vec![10.0]);
         assert_eq!(
             xyz_points(&res.series[0]),
-            vec![vec![0.0, 0.0, 100.0], vec![1.0, 0.0, 200.0]]
+            vec![vec![1.0, 10.0, 100.0], vec![2.0, 10.0, 200.0]]
         );
     }
 
@@ -330,14 +274,12 @@ mod tests {
         };
 
         let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
-        assert_eq!(res.x_categories, vec![1.0, 2.0]);
-        assert_eq!(res.y_categories, vec![1.0, 2.0]);
         assert_eq!(
             xyz_points(&res.series[0]),
             vec![
-                vec![0.0, 0.0, 10.0],
-                vec![1.0, 0.0, 20.0],
-                vec![0.0, 1.0, 30.0]
+                vec![1.0, 1.0, 10.0],
+                vec![2.0, 1.0, 20.0],
+                vec![1.0, 2.0, 30.0]
             ]
         );
     }
@@ -360,14 +302,12 @@ mod tests {
         };
 
         let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
-        assert_eq!(res.x_categories, vec![10.0, 20.0, 40.0]);
-        assert_eq!(res.y_categories, vec![5.0, 9.0]);
         assert_eq!(
             xyz_points(&res.series[0]),
             vec![
-                vec![0.0, 0.0, 1.0],
-                vec![1.0, 0.0, 2.0],
-                vec![2.0, 1.0, 3.0]
+                vec![10.0, 5.0, 1.0],
+                vec![20.0, 5.0, 2.0],
+                vec![40.0, 9.0, 3.0]
             ]
         );
     }
@@ -404,14 +344,12 @@ mod tests {
         };
 
         let res = heatmap_snapshot(build_heatmap_series(&batch, &schema, &options).unwrap());
-        assert_eq!(res.x_categories, vec![0.0, 1.0, 2.0]);
-        assert_eq!(res.y_categories, vec![100.0]);
         assert_eq!(
             xyz_points(&res.series[0]),
             vec![
-                vec![0.0, 0.0, 1.0],
-                vec![1.0, 0.0, 2.0],
-                vec![2.0, 0.0, 3.0]
+                vec![0.0, 100.0, 1.0],
+                vec![1.0, 100.0, 2.0],
+                vec![2.0, 100.0, 3.0]
             ]
         );
     }

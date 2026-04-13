@@ -309,14 +309,12 @@ describe("ChartViewer", () => {
           type: "heatmap",
           xName: "trace index",
           yName: "idxB",
-          xCategories: [0, 1],
-          yCategories: [10],
           series: [
             {
               id: "trace_signal",
               label: "trace_signal",
               pointCount: 2,
-              values: [0, 0, 1, 1, 0, 2],
+              values: [0, 10, 1, 1, 10, 2],
             },
           ],
         };

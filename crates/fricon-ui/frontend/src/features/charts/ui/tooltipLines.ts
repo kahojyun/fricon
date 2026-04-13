@@ -1,6 +1,5 @@
 import {
   getXYPoint,
-  getXYZPoint,
   type ChartOptions,
   type NumericLabelFormatOptions,
 } from "@/shared/lib/chartTypes";
@@ -52,35 +51,47 @@ export function getTooltipLines(
   }
 
   if (data.type === "heatmap" && interactionState.type === "heatmap") {
-    const col = clampIndex(
-      Math.floor((chartX / chartWidth) * interactionState.xCategories.length),
-      interactionState.xCategories.length,
+    const dataX = invertZoomedLinearRange(
+      chartX,
+      interactionState.zoomState.translateX,
+      interactionState.zoomState.scaleX,
+      interactionState.xMin,
+      interactionState.xMax,
+      0,
+      chartWidth,
     );
-    const row = clampIndex(
-      interactionState.yCategories.length -
-        1 -
-        Math.floor(
-          (chartY / chartHeight) * interactionState.yCategories.length,
-        ),
-      interactionState.yCategories.length,
+    const dataY = invertZoomedLinearRange(
+      chartY,
+      interactionState.zoomState.translateY,
+      interactionState.zoomState.scaleY,
+      interactionState.yMin,
+      interactionState.yMax,
+      chartHeight,
+      0,
     );
-
-    if (col < 0 || row < 0) return [];
-
-    const lines = [
-      `${data.xName}: ${formatNumericLabel(interactionState.xCategories[col], numericLabelFormat)}, ${data.yName}: ${formatNumericLabel(interactionState.yCategories[row], numericLabelFormat)}`,
-    ];
+    const lines: string[] = [];
+    let hoveredCell: { x: number; y: number } | null = null;
 
     for (const series of data.series) {
-      const cellValue = findHeatmapCellValue(series, col, row);
-      if (cellValue !== null) {
-        lines.push(
-          `${series.label}: ${formatNumericLabel(cellValue, numericLabelFormat)}`,
-        );
-      }
+      const cellValue = findHeatmapCellValue(
+        interactionState,
+        series.id,
+        dataX,
+        dataY,
+      );
+      if (!cellValue) continue;
+      hoveredCell ??= { x: cellValue.x, y: cellValue.y };
+      lines.push(
+        `${series.label}: ${formatNumericLabel(cellValue.z, numericLabelFormat)}`,
+      );
     }
 
-    return lines.length > 1 ? lines : [];
+    if (!hoveredCell || lines.length === 0) return [];
+
+    return [
+      `${data.xName}: ${formatNumericLabel(hoveredCell.x, numericLabelFormat)}, ${data.yName}: ${formatNumericLabel(hoveredCell.y, numericLabelFormat)}`,
+      ...lines,
+    ];
   }
 
   return [];
@@ -151,20 +162,25 @@ function findNearestPoint(
 }
 
 function findHeatmapCellValue(
-  series: import("@/shared/lib/chartTypes").HeatmapSeries,
-  col: number,
-  row: number,
+  interactionState: Extract<ChartInteractionState, { type: "heatmap" }>,
+  seriesId: string,
+  dataX: number,
+  dataY: number,
 ) {
-  for (let i = 0; i < series.pointCount; i++) {
-    const point = getXYZPoint(series, i);
-    if (point.x === col && point.y === row) {
-      return point.z;
+  const geometry = interactionState.geometry.series.find(
+    (item) => item.seriesId === seriesId,
+  );
+  if (!geometry) return null;
+
+  for (const cell of geometry.cells) {
+    if (
+      dataX >= cell.x0 &&
+      dataX <= cell.x1 &&
+      dataY >= cell.y0 &&
+      dataY <= cell.y1
+    ) {
+      return cell;
     }
   }
   return null;
-}
-
-function clampIndex(index: number, length: number): number {
-  if (length <= 0) return -1;
-  return Math.min(Math.max(index, 0), length - 1);
 }

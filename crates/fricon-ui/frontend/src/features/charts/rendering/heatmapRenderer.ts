@@ -1,11 +1,17 @@
 /**
  * Heatmap renderer — draws a heatmap using instanced quads.
- * Each cell is an instance with position (col, row) and a normalized value
- * that maps to a 5-stop color ramp matching the previous ECharts palette.
+ * Each cell is an instance with numeric bounds and a normalized value that
+ * maps to a 5-stop color ramp matching the previous ECharts palette.
  */
 
 import type { HeatmapSeries } from "@/shared/lib/chartTypes";
 import { createBuffer, createProgram, hexToRgb } from "./webgl";
+import {
+  deriveHeatmapLayout,
+  EMPTY_HEATMAP_GEOMETRY,
+  type HeatmapAxisCenters,
+  type HeatmapGeometry,
+} from "./heatmapGeometry";
 import { heatmapFragmentSource, heatmapVertexSource } from "./shaders/heatmap";
 
 export const COLOR_RAMP = [
@@ -23,6 +29,14 @@ export interface HeatmapRenderState {
   instanceCount: number;
   capacity: number;
   instanceData: Float64Array;
+  bounds: {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+  };
+  centers: HeatmapAxisCenters;
+  geometry: HeatmapGeometry;
   vao: WebGLVertexArrayObject;
   valueMin: number;
   valueMax: number;
@@ -58,10 +72,15 @@ export function createHeatmapRenderState(
 
   // Cell buffer (per-instance)
   const cellBuffer = createBuffer(gl, new Float32Array(0), gl.DYNAMIC_DRAW);
-  const aCell = gl.getAttribLocation(program, "a_cell");
-  gl.enableVertexAttribArray(aCell);
-  gl.vertexAttribPointer(aCell, 3, gl.FLOAT, false, 0, 0);
-  gl.vertexAttribDivisor(aCell, 1); // per-instance
+  const aRect = gl.getAttribLocation(program, "a_rect");
+  gl.enableVertexAttribArray(aRect);
+  gl.vertexAttribPointer(aRect, 4, gl.FLOAT, false, 20, 0);
+  gl.vertexAttribDivisor(aRect, 1); // per-instance
+
+  const aValue = gl.getAttribLocation(program, "a_value");
+  gl.enableVertexAttribArray(aValue);
+  gl.vertexAttribPointer(aValue, 1, gl.FLOAT, false, 20, 16);
+  gl.vertexAttribDivisor(aValue, 1); // per-instance
 
   gl.bindVertexArray(null);
 
@@ -72,6 +91,17 @@ export function createHeatmapRenderState(
     instanceCount: 0,
     capacity: 0,
     instanceData: new Float64Array(0),
+    bounds: {
+      xMin: EMPTY_HEATMAP_GEOMETRY.xMin,
+      xMax: EMPTY_HEATMAP_GEOMETRY.xMax,
+      yMin: EMPTY_HEATMAP_GEOMETRY.yMin,
+      yMax: EMPTY_HEATMAP_GEOMETRY.yMax,
+    },
+    centers: {
+      xValues: [],
+      yValues: [],
+    },
+    geometry: EMPTY_HEATMAP_GEOMETRY,
     vao,
     valueMin: 0,
     valueMax: 1,
@@ -85,7 +115,8 @@ export function syncHeatmapRenderState(
   state: HeatmapRenderState,
   series: HeatmapSeries[],
 ): void {
-  const { valueMin, valueMax, instanceData } = buildHeatmapInstances(series);
+  const { geometry, bounds, centers } = deriveHeatmapLayout(series);
+  const { valueMin, valueMax, instanceData } = buildHeatmapInstances(geometry);
   gl.bindBuffer(gl.ARRAY_BUFFER, state.cellBuffer);
   if (
     instanceData.length >= state.instanceData.length &&
@@ -117,8 +148,11 @@ export function syncHeatmapRenderState(
     }
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, toFloat32Array(instanceData));
   }
-  state.instanceCount = instanceData.length / 3;
+  state.instanceCount = instanceData.length / 5;
   state.instanceData = instanceData;
+  state.bounds = bounds;
+  state.centers = centers;
+  state.geometry = geometry;
   state.valueMin = valueMin;
   state.valueMax = valueMax;
 }
@@ -126,21 +160,10 @@ export function syncHeatmapRenderState(
 export function drawHeatmap(
   gl: WebGL2RenderingContext,
   state: HeatmapRenderState,
-  numCols: number,
-  numRows: number,
+  matrix: Float32Array,
 ): void {
   const { program, vao, instanceCount, uMatrix, uColorRamp } = state;
   gl.useProgram(program);
-
-  // Build matrix that maps grid coords (0..numCols, 0..numRows) → clip space
-  const sx = numCols > 0 ? 2 / numCols : 1;
-  const sy = numRows > 0 ? 2 / numRows : 1;
-  // prettier-ignore
-  const matrix = new Float32Array([
-    sx, 0,  0,
-    0,  sy, 0,
-    -1, -1, 1,
-  ]);
 
   gl.uniformMatrix3fv(uMatrix, false, matrix);
 
@@ -169,17 +192,16 @@ export function destroyHeatmapRenderState(
   gl.deleteProgram(state.program);
 }
 
-function buildHeatmapInstances(series: HeatmapSeries[]): {
+function buildHeatmapInstances(geometry: HeatmapGeometry): {
   valueMin: number;
   valueMax: number;
   instanceData: Float64Array;
 } {
   let min = Infinity;
   let max = -Infinity;
-  for (const s of series) {
-    for (let i = 0; i < s.values.length; i += 3) {
-      const cellValue = s.values[i + 2];
-      if (cellValue === undefined || !Number.isFinite(cellValue)) continue;
+  for (const item of geometry.series) {
+    for (const cell of item.cells) {
+      const cellValue = cell.z;
       if (cellValue < min) min = cellValue;
       if (cellValue > max) max = cellValue;
     }
@@ -189,11 +211,15 @@ function buildHeatmapInstances(series: HeatmapSeries[]): {
   const range = max !== min ? max - min : 1;
 
   const instances: number[] = [];
-  for (const s of series) {
-    for (let i = 0; i < s.values.length; i += 3) {
-      const value = s.values[i + 2];
-      if (value === undefined || !Number.isFinite(value)) continue;
-      instances.push(s.values[i], s.values[i + 1], (value - min) / range);
+  for (const item of geometry.series) {
+    for (const cell of item.cells) {
+      instances.push(
+        cell.x0,
+        cell.y0,
+        cell.x1,
+        cell.y1,
+        (cell.z - min) / range,
+      );
     }
   }
 

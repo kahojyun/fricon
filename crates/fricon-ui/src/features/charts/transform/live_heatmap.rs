@@ -103,8 +103,6 @@ fn build_trace_live_heatmap(
         return Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
             x_name: format!("{quantity_name} - X"),
             y_name,
-            x_categories: vec![],
-            y_categories: vec![],
             series: vec![],
         }));
     }
@@ -181,14 +179,11 @@ fn build_trace_live_heatmap(
         quantity_name.clone()
     };
 
-    let mut series = vec![FlatXYZSeries::new(name.clone(), name, values, point_count)];
-    let (x_categories, y_categories) = super::heatmap::normalize_heatmap_series(&mut series);
+    let series = vec![FlatXYZSeries::new(name.clone(), name, values, point_count)];
 
     Ok(ChartSnapshot::Heatmap(HeatmapChartSnapshot {
         x_name: format!("{quantity_name} - X"),
         y_name,
-        x_categories,
-        y_categories,
         series,
     }))
 }
@@ -370,8 +365,6 @@ mod tests {
 
         assert_eq!(res.x_name, "x");
         assert_eq!(res.y_name, "y");
-        assert_eq!(res.x_categories, vec![0.0, 1.0]);
-        assert_eq!(res.y_categories, vec![0.0, 1.0, 2.0]);
         assert_eq!(res.series.len(), 1);
         assert_eq!(res.series[0].point_count, 6);
         assert_eq!(
@@ -415,8 +408,6 @@ mod tests {
         );
 
         assert_eq!(res.y_name, "idx");
-        assert_eq!(res.x_categories, Vec::<f64>::new());
-        assert_eq!(res.y_categories, Vec::<f64>::new());
         assert!(res.series.is_empty());
     }
 
@@ -433,8 +424,6 @@ mod tests {
             heatmap_snapshot(build_live_heatmap_series(&batch, &schema, None, &options).unwrap());
 
         assert_eq!(res.y_name, "row");
-        assert_eq!(res.x_categories, vec![0.0, 1.0]);
-        assert_eq!(res.y_categories, vec![0.0]);
         assert_eq!(
             xyz_points(&res.series[0]),
             vec![vec![0.0, 0.0, 1.0], vec![1.0, 0.0, 2.0]]
@@ -465,8 +454,6 @@ mod tests {
 
         assert_eq!(res.x_name, "trace - X");
         assert_eq!(res.y_name, "row");
-        assert_eq!(res.x_categories, vec![0.0, 1.0]);
-        assert_eq!(res.y_categories, vec![0.0, 1.0]);
         assert_eq!(res.series.len(), 1);
         assert_eq!(res.series[0].point_count, 4);
         assert_eq!(

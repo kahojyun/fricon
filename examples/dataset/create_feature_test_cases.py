@@ -7,6 +7,7 @@ The dataset names use `testcase_dataset_XX_<purpose>` so each case is obvious:
 - testcase_dataset_04_trace_signal_for_line_and_trace_xy
 - testcase_dataset_05_heatmap_grid_for_xy_heatmap
 - testcase_dataset_06_column_name_variants_for_field_rendering
+- testcase_dataset_07_heatmap_irregular_scan_for_axis_edge_bug
 
 Run:
     uv run python examples/dataset/create_feature_test_cases.py
@@ -184,6 +185,41 @@ def case_06_column_name_variants(manager: DatasetManager) -> None:
             )
 
 
+def case_07_heatmap_irregular_scan(manager: DatasetManager) -> None:
+    with manager.create(
+        "testcase_dataset_07_heatmap_irregular_scan_for_axis_edge_bug",
+        description=(
+            "Irregular scan spacing to expose heatmap axes rendered from cell "
+            "edges instead of coordinate centers"
+        ),
+        tags=["testcase", "heatmap", "irregular-axis", "bug-demo"],
+    ) as writer:
+        idx_scan_x_irregular = [7.0, 19.0, 46.0]
+        idx_scan_y_irregular = [120.0, 185.0, 310.0]
+
+        for idx_wafer in range(1, 3):
+            for x_pos in idx_scan_x_irregular:
+                for y_pos in idx_scan_y_irregular:
+                    center_distance = math.sqrt(
+                        ((x_pos - 26.0) / 14.0) ** 2 + ((y_pos - 215.0) / 75.0) ** 2
+                    )
+                    scalar_regular_sheet_resistance_ohm_sq = (
+                        92.0
+                        + idx_wafer * 1.7
+                        + x_pos * 0.08
+                        - y_pos * 0.015
+                        - center_distance * 4.5
+                    )
+                    writer.write(
+                        idx_wafer=idx_wafer,
+                        idx_scan_x_irregular_mm=x_pos,
+                        idx_scan_y_irregular_mm=y_pos,
+                        scalar_regular_sheet_resistance_ohm_sq=(
+                            scalar_regular_sheet_resistance_ohm_sq
+                        ),
+                    )
+
+
 def main() -> None:
     default_workspace = _load_workspace_from_env() or ".dev/ws"
     parser = argparse.ArgumentParser(description=__doc__)
@@ -204,6 +240,7 @@ def main() -> None:
     case_04_trace_signal(manager)
     case_05_heatmap_grid(manager)
     case_06_column_name_variants(manager)
+    case_07_heatmap_irregular_scan(manager)
 
 
 if __name__ == "__main__":

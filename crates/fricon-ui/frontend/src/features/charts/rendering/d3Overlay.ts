@@ -51,6 +51,12 @@ export function renderAxes(
   margin: ChartMargin,
   theme: OverlayTheme,
   numericLabelFormat: NumericLabelFormatOptions,
+  options?: {
+    gridSvgEl?: SVGSVGElement | null;
+    showGrid?: boolean;
+    xTickValues?: number[];
+    yTickValues?: number[];
+  },
 ): void {
   const svg = select(svgEl);
   const width = svgEl.clientWidth;
@@ -58,17 +64,33 @@ export function renderAxes(
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
 
-  clearOverlayLayers(svg);
+  clearForegroundOverlayLayers(svg);
 
   const g = svg
     .append("g")
     .attr("class", "axes")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
+  const gridSvgEl = options?.gridSvgEl ?? null;
+  const showGrid = options?.showGrid ?? true;
+  const xTickValues = options?.xTickValues;
+  const yTickValues = options?.yTickValues;
+  const gridContainer = gridSvgEl ? select(gridSvgEl) : svg;
+  clearGridOverlayLayers(gridContainer);
+  const gridGroup = showGrid
+    ? gridContainer
+        .append("g")
+        .attr("class", "grid-layer")
+        .attr("transform", `translate(${margin.left},${margin.top})`)
+    : null;
+
   // X axis
   const xAxis = axisBottom(xScale.range([0, chartWidth])).ticks(
     Math.max(2, Math.floor(chartWidth / 80)),
   );
+  if (xTickValues) {
+    xAxis.tickValues(xTickValues);
+  }
   xAxis.tickFormat((value) =>
     formatAxisTickLabel(value as number, numericLabelFormat),
   );
@@ -83,14 +105,19 @@ export function renderAxes(
     });
 
   // X grid lines
-  g.append("g")
+  gridGroup
+    ?.append("g")
     .attr("class", "grid")
-    .call(
-      axisBottom(xScale.range([0, chartWidth]))
+    .call((gridAxisGroup) => {
+      const gridAxis = axisBottom(xScale.range([0, chartWidth]))
         .ticks(Math.max(2, Math.floor(chartWidth / 80)))
         .tickSize(-chartHeight)
-        .tickFormat(() => ""),
-    )
+        .tickFormat(() => "");
+      if (xTickValues) {
+        gridAxis.tickValues(xTickValues);
+      }
+      gridAxisGroup.call(gridAxis);
+    })
     .attr("transform", `translate(0,${chartHeight})`)
     .call((g) => {
       g.selectAll("line")
@@ -103,6 +130,9 @@ export function renderAxes(
   const yAxis = axisLeft(yScale.range([chartHeight, 0])).ticks(
     Math.max(2, Math.floor(chartHeight / 50)),
   );
+  if (yTickValues) {
+    yAxis.tickValues(yTickValues);
+  }
   yAxis.tickFormat((value) =>
     formatAxisTickLabel(value as number, numericLabelFormat),
   );
@@ -116,14 +146,19 @@ export function renderAxes(
     });
 
   // Y grid lines
-  g.append("g")
+  gridGroup
+    ?.append("g")
     .attr("class", "grid")
-    .call(
-      axisLeft(yScale.range([chartHeight, 0]))
+    .call((gridAxisGroup) => {
+      const gridAxis = axisLeft(yScale.range([chartHeight, 0]))
         .ticks(Math.max(2, Math.floor(chartHeight / 50)))
         .tickSize(-chartWidth)
-        .tickFormat(() => ""),
-    )
+        .tickFormat(() => "");
+      if (yTickValues) {
+        gridAxis.tickValues(yTickValues);
+      }
+      gridAxisGroup.call(gridAxis);
+    })
     .call((g) => {
       g.selectAll("line")
         .attr("stroke", theme.gridColor)
@@ -327,5 +362,17 @@ export function renderColorScale(
 function clearOverlayLayers(
   svg: Selection<SVGSVGElement, unknown, null, undefined>,
 ): void {
+  svg.selectAll(".axes, .color-scale, .grid-layer").remove();
+}
+
+function clearForegroundOverlayLayers(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+): void {
   svg.selectAll(".axes, .color-scale").remove();
+}
+
+function clearGridOverlayLayers(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+): void {
+  svg.selectAll(".grid-layer").remove();
 }

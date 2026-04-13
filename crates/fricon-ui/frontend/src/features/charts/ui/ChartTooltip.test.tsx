@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
 import type { ChartInteractionState } from "../hooks/useWebGLChart";
+import { deriveHeatmapLayout } from "../rendering/heatmapGeometry";
 import { DEFAULT_NUMERIC_LABEL_FORMAT } from "../rendering/numericLabelFormat";
 import { getTooltipLines } from "./tooltipLines";
 
@@ -137,16 +138,23 @@ describe("getTooltipLines", () => {
       type: "heatmap",
       xName: "x",
       yName: "y",
-      xCategories: [1, 2],
-      yCategories: [10, 20],
-      series: [xyzSeries("z", "z", [[1, 1, 200]])],
+      series: [xyzSeries("z", "z", [[2, 20, 200]])],
     };
 
     const interactionState: ChartInteractionState = {
       type: "heatmap",
-      xCategories: [1, 2],
-      yCategories: [10, 20],
+      xMin: 1.5,
+      xMax: 2.5,
+      yMin: 19.5,
+      yMax: 20.5,
       margin,
+      zoomState: {
+        scaleX: 1,
+        scaleY: 1,
+        translateX: 0,
+        translateY: 0,
+      },
+      geometry: deriveHeatmapLayout(data.series).geometry,
     };
 
     expect(

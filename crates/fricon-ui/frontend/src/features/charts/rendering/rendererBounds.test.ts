@@ -5,6 +5,7 @@ import {
   lineDataBounds,
   type LineRenderState,
 } from "./lineRenderer";
+import { deriveHeatmapLayout, EMPTY_HEATMAP_GEOMETRY } from "./heatmapGeometry";
 import {
   syncHeatmapRenderState,
   type HeatmapRenderState,
@@ -212,6 +213,93 @@ describe("scatterDataBounds", () => {
 });
 
 describe("syncHeatmapRenderState", () => {
+  it("builds midpoint-derived numeric cell geometry", () => {
+    const { geometry } = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [10, 5, 1],
+        [20, 5, 2],
+        [40, 9, 3],
+      ]),
+    ]);
+
+    expect(geometry).toEqual({
+      xMin: 5,
+      xMax: 50,
+      yMin: 3,
+      yMax: 11,
+      series: [
+        {
+          seriesId: "heat",
+          cells: [
+            { x: 10, y: 5, z: 1, x0: 5, x1: 15, y0: 3, y1: 7 },
+            { x: 20, y: 5, z: 2, x0: 15, x1: 30, y0: 3, y1: 7 },
+            { x: 40, y: 9, z: 3, x0: 30, x1: 50, y0: 7, y1: 11 },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("uses a default half-step for singleton axes", () => {
+    expect(
+      deriveHeatmapLayout([xyzSeries("heat", "heat", [[7, 11, 5]])]).geometry,
+    ).toEqual({
+      xMin: 6.5,
+      xMax: 7.5,
+      yMin: 10.5,
+      yMax: 11.5,
+      series: [
+        {
+          seriesId: "heat",
+          cells: [{ x: 7, y: 11, z: 5, x0: 6.5, x1: 7.5, y0: 10.5, y1: 11.5 }],
+        },
+      ],
+    });
+  });
+
+  it("returns sorted unique heatmap axis centers", () => {
+    expect(
+      deriveHeatmapLayout([
+        xyzSeries("heat", "heat", [
+          [46, 310, 1],
+          [7, 120, 2],
+          [19, 185, 3],
+          [7, 310, 4],
+        ]),
+      ]).centers,
+    ).toEqual({
+      xValues: [7, 19, 46],
+      yValues: [120, 185, 310],
+    });
+  });
+
+  it("preserves heatmap bounds for coordinates whose values are all NaN", () => {
+    expect(
+      deriveHeatmapLayout([xyzSeries("heat", "heat", [[0, 0, Number.NaN]])])
+        .bounds,
+    ).toEqual({
+      xMin: -0.5,
+      xMax: 0.5,
+      yMin: -0.5,
+      yMax: 0.5,
+    });
+  });
+
+  it("preserves NaN-only rows and columns in axis centers", () => {
+    expect(
+      deriveHeatmapLayout([
+        xyzSeries("heat", "heat", [
+          [0, 0, 1],
+          [1, 0, Number.NaN],
+          [0, 2, 3],
+        ]),
+      ]).centers,
+    ).toEqual({
+      xValues: [0, 1],
+      yValues: [0, 2],
+    });
+  });
+
   it("uses only finite cell values for min/max normalization", () => {
     const bufferData = vi.fn();
     const bufferSubData = vi.fn();
@@ -228,6 +316,17 @@ describe("syncHeatmapRenderState", () => {
       instanceCount: 0,
       capacity: 0,
       instanceData: new Float64Array(0),
+      bounds: {
+        xMin: 0,
+        xMax: 1,
+        yMin: 0,
+        yMax: 1,
+      },
+      centers: {
+        xValues: [],
+        yValues: [],
+      },
+      geometry: EMPTY_HEATMAP_GEOMETRY,
       valueMin: 0,
       valueMax: 0,
     } as unknown as HeatmapRenderState;
@@ -245,15 +344,40 @@ describe("syncHeatmapRenderState", () => {
     expect(state.valueMin).toBe(1);
     expect(state.valueMax).toBe(5);
     expect(state.instanceCount).toBe(2);
+    expect(state.geometry).toEqual({
+      xMin: -0.5,
+      xMax: 1.5,
+      yMin: -0.5,
+      yMax: 1.5,
+      series: [
+        {
+          seriesId: "heat",
+          cells: [
+            { x: 0, y: 0, z: 1, x0: -0.5, x1: 0.5, y0: -0.5, y1: 0.5 },
+            { x: 0, y: 1, z: 5, x0: -0.5, x1: 0.5, y0: 0.5, y1: 1.5 },
+          ],
+        },
+      ],
+    });
+    expect(state.bounds).toEqual({
+      xMin: -0.5,
+      xMax: 1.5,
+      yMin: -0.5,
+      yMax: 1.5,
+    });
+    expect(state.centers).toEqual({
+      xValues: [0, 1],
+      yValues: [0, 1],
+    });
     expect(bufferData).toHaveBeenCalledWith(
       gl.ARRAY_BUFFER,
-      new Float32Array(6),
+      new Float32Array(10),
       gl.DYNAMIC_DRAW,
     );
     expect(bufferSubData).toHaveBeenCalledWith(
       gl.ARRAY_BUFFER,
       0,
-      new Float32Array([0, 0, 0, 0, 1, 1]),
+      new Float32Array([-0.5, -0.5, 0.5, 0.5, 0, -0.5, 0.5, 0.5, 1.5, 1]),
     );
   });
 });

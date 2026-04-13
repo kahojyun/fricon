@@ -155,12 +155,10 @@ describe("ChartWrapper", () => {
       type: "heatmap",
       xName: "x",
       yName: "y",
-      xCategories: [1, 2],
-      yCategories: [10],
       series: [
         xyzSeries("z", "z", [
-          [0, 0, 100],
-          [1, 0, 200],
+          [1, 10, 100],
+          [2, 10, 200],
         ]),
       ],
     };
@@ -240,12 +238,10 @@ describe("ChartWrapper", () => {
       type: "heatmap",
       xName: "x",
       yName: "y",
-      xCategories: [1, 2],
-      yCategories: [10],
       series: [
         xyzSeries("z", "z", [
-          [0, 0, 100],
-          [1, 0, 200],
+          [1, 10, 100],
+          [2, 10, 200],
         ]),
       ],
     };
@@ -260,12 +256,10 @@ describe("ChartWrapper", () => {
       type: "heatmap",
       xName: "x",
       yName: "y",
-      xCategories: [1, 2],
-      yCategories: [10],
       series: [
         xyzSeries("z", "z", [
-          [0, 0, 100],
-          [1, 0, 200],
+          [1, 10, 100],
+          [2, 10, 200],
         ]),
       ],
     };

@@ -476,21 +476,8 @@ fn diff_heatmap(
     if previous.series.len() > current.series.len() {
         return None;
     }
-    if !current.x_categories.starts_with(&previous.x_categories)
-        || !current.y_categories.starts_with(&previous.y_categories)
-    {
-        return None;
-    }
 
     let mut ops = Vec::new();
-    let appended_x = current.x_categories[previous.x_categories.len()..].to_vec();
-    let appended_y = current.y_categories[previous.y_categories.len()..].to_vec();
-    if !appended_x.is_empty() || !appended_y.is_empty() {
-        ops.push(LiveChartAppendOperation::AppendHeatmapCategories {
-            x_categories: (!appended_x.is_empty()).then_some(appended_x),
-            y_categories: (!appended_y.is_empty()).then_some(appended_y),
-        });
-    }
 
     for (previous_series, current_series) in previous.series.iter().zip(&current.series) {
         if previous_series.id != current_series.id || previous_series.label != current_series.label
@@ -642,19 +629,15 @@ mod tests {
     }
 
     #[test]
-    fn diff_heatmap_emits_category_and_point_appends() {
+    fn diff_heatmap_emits_point_appends() {
         let previous = HeatmapChartSnapshot {
             x_name: "x".to_string(),
             y_name: "y".to_string(),
-            x_categories: vec![0.0],
-            y_categories: vec![0.0],
             series: vec![xyz_series("heat", "heat", &[0.0, 0.0, 1.0])],
         };
         let current = HeatmapChartSnapshot {
             x_name: "x".to_string(),
             y_name: "y".to_string(),
-            x_categories: vec![0.0, 1.0],
-            y_categories: vec![0.0, 2.0],
             series: vec![xyz_series("heat", "heat", &[0.0, 0.0, 1.0, 1.0, 2.0, 5.0])],
         };
 
@@ -662,17 +645,11 @@ mod tests {
 
         assert_eq!(
             ops,
-            vec![
-                LiveChartAppendOperation::AppendHeatmapCategories {
-                    x_categories: Some(vec![1.0]),
-                    y_categories: Some(vec![2.0]),
-                },
-                LiveChartAppendOperation::AppendPoints {
-                    series_id: "heat".to_string(),
-                    values: vec![1.0, 2.0, 5.0],
-                    point_count: 1,
-                },
-            ]
+            vec![LiveChartAppendOperation::AppendPoints {
+                series_id: "heat".to_string(),
+                values: vec![1.0, 2.0, 5.0],
+                point_count: 1,
+            },]
         );
     }
 
@@ -808,8 +785,6 @@ mod tests {
 
         assert_eq!(snapshot.x_name, "x");
         assert_eq!(snapshot.y_name, "y");
-        assert_eq!(snapshot.x_categories, vec![0.0, 1.0]);
-        assert_eq!(snapshot.y_categories, vec![0.0, 1.0, 2.0]);
         assert_eq!(snapshot.series.len(), 1);
         assert_eq!(snapshot.series[0].point_count, 6);
 
@@ -836,8 +811,6 @@ mod tests {
 
         assert_eq!(snapshot.x_name, "trace - X");
         assert_eq!(snapshot.y_name, "row");
-        assert_eq!(snapshot.x_categories, vec![0.0, 1.0]);
-        assert_eq!(snapshot.y_categories, vec![0.0, 1.0]);
         assert_eq!(snapshot.series.len(), 1);
         assert_eq!(snapshot.series[0].point_count, 4);
 

@@ -121,11 +121,6 @@ export type LiveChartAppendOperation =
             shape: "xyz";
             series: import("@/shared/lib/chartTypes").HeatmapSeries;
           };
-    }
-  | {
-      kind: "append_heatmap_categories";
-      xCategories?: number[];
-      yCategories?: number[];
     };
 
 export type LiveChartUpdate =
@@ -200,8 +195,6 @@ export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
         type: "heatmap",
         xName: result.xName,
         yName: result.yName,
-        xCategories: result.xCategories,
-        yCategories: result.yCategories,
         series: result.series.map(normalizeXYZSeries),
       };
     case "xy":
@@ -350,12 +343,6 @@ function normalizeLiveChartAppendOperation(
       return {
         kind: "append_series",
         series: normalizeFlatSeries(operation.series),
-      };
-    case "append_heatmap_categories":
-      return {
-        kind: "append_heatmap_categories",
-        xCategories: operation.x_categories ?? undefined,
-        yCategories: operation.y_categories ?? undefined,
       };
     default:
       return assertNever(
