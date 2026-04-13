@@ -273,15 +273,30 @@ describe("syncHeatmapRenderState", () => {
     });
   });
 
-  it("returns default bounds when there are no finite heatmap cells", () => {
+  it("preserves heatmap bounds for coordinates whose values are all NaN", () => {
     expect(
       deriveHeatmapLayout([xyzSeries("heat", "heat", [[0, 0, Number.NaN]])])
         .bounds,
     ).toEqual({
-      xMin: EMPTY_HEATMAP_GEOMETRY.xMin,
-      xMax: EMPTY_HEATMAP_GEOMETRY.xMax,
-      yMin: EMPTY_HEATMAP_GEOMETRY.yMin,
-      yMax: EMPTY_HEATMAP_GEOMETRY.yMax,
+      xMin: -0.5,
+      xMax: 0.5,
+      yMin: -0.5,
+      yMax: 0.5,
+    });
+  });
+
+  it("preserves NaN-only rows and columns in axis centers", () => {
+    expect(
+      deriveHeatmapLayout([
+        xyzSeries("heat", "heat", [
+          [0, 0, 1],
+          [1, 0, Number.NaN],
+          [0, 2, 3],
+        ]),
+      ]).centers,
+    ).toEqual({
+      xValues: [0, 1],
+      yValues: [0, 2],
     });
   });
 
@@ -321,7 +336,7 @@ describe("syncHeatmapRenderState", () => {
     expect(state.instanceCount).toBe(2);
     expect(state.geometry).toEqual({
       xMin: -0.5,
-      xMax: 0.5,
+      xMax: 1.5,
       yMin: -0.5,
       yMax: 1.5,
       series: [

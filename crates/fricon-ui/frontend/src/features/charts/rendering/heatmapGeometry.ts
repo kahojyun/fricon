@@ -53,21 +53,18 @@ const EMPTY_HEATMAP_AXIS_CENTERS: HeatmapAxisCenters = {
 };
 
 export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
-  const validPoints = series.flatMap((item) =>
+  const coordinatePoints = series.flatMap((item) =>
     readSeriesPoints(item).filter(
-      (point) =>
-        Number.isFinite(point.x) &&
-        Number.isFinite(point.y) &&
-        Number.isFinite(point.z),
+      (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
     ),
   );
 
-  const xValues = Array.from(new Set(validPoints.map((point) => point.x))).sort(
-    (left, right) => left - right,
-  );
-  const yValues = Array.from(new Set(validPoints.map((point) => point.y))).sort(
-    (left, right) => left - right,
-  );
+  const xValues = Array.from(
+    new Set(coordinatePoints.map((point) => point.x)),
+  ).sort((left, right) => left - right);
+  const yValues = Array.from(
+    new Set(coordinatePoints.map((point) => point.y)),
+  ).sort((left, right) => left - right);
   const xBounds = buildAxisBounds(xValues);
   const yBounds = buildAxisBounds(yValues);
 
