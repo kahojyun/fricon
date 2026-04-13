@@ -23,6 +23,22 @@ export interface HeatmapGeometry {
   series: HeatmapSeriesGeometry[];
 }
 
+export interface HeatmapAxisCenters {
+  xValues: number[];
+  yValues: number[];
+}
+
+export interface HeatmapLayout {
+  geometry: HeatmapGeometry;
+  bounds: {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+  };
+  centers: HeatmapAxisCenters;
+}
+
 export const EMPTY_HEATMAP_GEOMETRY: HeatmapGeometry = {
   xMin: 0,
   xMax: 1,
@@ -31,7 +47,12 @@ export const EMPTY_HEATMAP_GEOMETRY: HeatmapGeometry = {
   series: [],
 };
 
-export function buildHeatmapGeometry(series: HeatmapSeries[]): HeatmapGeometry {
+const EMPTY_HEATMAP_AXIS_CENTERS: HeatmapAxisCenters = {
+  xValues: [],
+  yValues: [],
+};
+
+export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
   const validPoints = series.flatMap((item) =>
     readSeriesPoints(item).filter(
       (point) =>
@@ -41,14 +62,29 @@ export function buildHeatmapGeometry(series: HeatmapSeries[]): HeatmapGeometry {
     ),
   );
 
-  const xBounds = buildAxisBounds(validPoints.map((point) => point.x));
-  const yBounds = buildAxisBounds(validPoints.map((point) => point.y));
+  const xValues = Array.from(new Set(validPoints.map((point) => point.x))).sort(
+    (left, right) => left - right,
+  );
+  const yValues = Array.from(new Set(validPoints.map((point) => point.y))).sort(
+    (left, right) => left - right,
+  );
+  const xBounds = buildAxisBounds(xValues);
+  const yBounds = buildAxisBounds(yValues);
 
   if (xBounds.spanByValue.size === 0 || yBounds.spanByValue.size === 0) {
-    return EMPTY_HEATMAP_GEOMETRY;
+    return {
+      geometry: EMPTY_HEATMAP_GEOMETRY,
+      bounds: {
+        xMin: EMPTY_HEATMAP_GEOMETRY.xMin,
+        xMax: EMPTY_HEATMAP_GEOMETRY.xMax,
+        yMin: EMPTY_HEATMAP_GEOMETRY.yMin,
+        yMax: EMPTY_HEATMAP_GEOMETRY.yMax,
+      },
+      centers: EMPTY_HEATMAP_AXIS_CENTERS,
+    };
   }
 
-  return {
+  const geometry = {
     xMin: xBounds.min,
     xMax: xBounds.max,
     yMin: yBounds.min,
@@ -78,35 +114,19 @@ export function buildHeatmapGeometry(series: HeatmapSeries[]): HeatmapGeometry {
         }),
     })),
   };
-}
-
-export function heatmapDataBounds(series: HeatmapSeries[]) {
-  const geometry = buildHeatmapGeometry(series);
-  return {
-    xMin: geometry.xMin,
-    xMax: geometry.xMax,
-    yMin: geometry.yMin,
-    yMax: geometry.yMax,
-  };
-}
-
-export function heatmapAxisCenters(series: HeatmapSeries[]) {
-  const validPoints = series.flatMap((item) =>
-    readSeriesPoints(item).filter(
-      (point) =>
-        Number.isFinite(point.x) &&
-        Number.isFinite(point.y) &&
-        Number.isFinite(point.z),
-    ),
-  );
 
   return {
-    xValues: Array.from(new Set(validPoints.map((point) => point.x))).sort(
-      (left, right) => left - right,
-    ),
-    yValues: Array.from(new Set(validPoints.map((point) => point.y))).sort(
-      (left, right) => left - right,
-    ),
+    geometry,
+    bounds: {
+      xMin: geometry.xMin,
+      xMax: geometry.xMax,
+      yMin: geometry.yMin,
+      yMax: geometry.yMax,
+    },
+    centers: {
+      xValues,
+      yValues,
+    },
   };
 }
 

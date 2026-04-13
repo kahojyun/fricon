@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChartOptions } from "@/shared/lib/chartTypes";
 import type { ChartInteractionState } from "../hooks/useWebGLChart";
-import { buildHeatmapGeometry } from "../rendering/heatmapGeometry";
+import { deriveHeatmapLayout } from "../rendering/heatmapGeometry";
 import { DEFAULT_NUMERIC_LABEL_FORMAT } from "../rendering/numericLabelFormat";
 import { getTooltipLines } from "./tooltipLines";
 
@@ -154,7 +154,7 @@ describe("getTooltipLines", () => {
         translateX: 0,
         translateY: 0,
       },
-      geometry: buildHeatmapGeometry(data.series),
+      geometry: deriveHeatmapLayout(data.series).geometry,
     };
 
     expect(

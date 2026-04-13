@@ -69,9 +69,7 @@ import {
   type HeatmapRenderState,
 } from "../rendering/heatmapRenderer";
 import {
-  buildHeatmapGeometry,
-  heatmapAxisCenters,
-  heatmapDataBounds,
+  deriveHeatmapLayout,
   type HeatmapGeometry,
 } from "../rendering/heatmapGeometry";
 
@@ -263,8 +261,8 @@ export function useWebGLChart({
         r.numericLabelFormat,
       );
     } else if (rs.type === "heatmap" && currentData.type === "heatmap") {
-      const bounds = r.viewBounds ?? heatmapDataBounds(currentData.series);
-      const axisCenters = heatmapAxisCenters(currentData.series);
+      const layout = deriveHeatmapLayout(currentData.series);
+      const bounds = r.viewBounds ?? layout.bounds;
       const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
         buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
 
@@ -282,9 +280,13 @@ export function useWebGLChart({
         {
           showGrid: false,
           xTickValues:
-            axisCenters.xValues.length <= 10 ? axisCenters.xValues : undefined,
+            layout.centers.xValues.length <= 10
+              ? layout.centers.xValues
+              : undefined,
           yTickValues:
-            axisCenters.yValues.length <= 10 ? axisCenters.yValues : undefined,
+            layout.centers.yValues.length <= 10
+              ? layout.centers.yValues
+              : undefined,
         },
       );
       renderColorScale(
@@ -609,11 +611,11 @@ export function useWebGLChart({
       const geometry =
         chartRef.current.renderState?.type === "heatmap"
           ? chartRef.current.renderState.state.geometry
-          : buildHeatmapGeometry(currentData.series);
+          : deriveHeatmapLayout(currentData.series).geometry;
       return {
         type: "heatmap" as const,
         ...(chartRef.current.viewBounds ??
-          heatmapDataBounds(currentData.series)),
+          deriveHeatmapLayout(currentData.series).bounds),
         margin,
         zoomState: chartRef.current.zoomState,
         geometry,
@@ -704,7 +706,7 @@ function getNumericBounds(
 ): NumericBounds | null {
   if (!data) return null;
   return data.type === "heatmap"
-    ? heatmapDataBounds(data.series)
+    ? deriveHeatmapLayout(data.series).bounds
     : lineDataBounds(data.series);
 }
 

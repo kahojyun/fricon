@@ -5,12 +5,7 @@ import {
   lineDataBounds,
   type LineRenderState,
 } from "./lineRenderer";
-import {
-  buildHeatmapGeometry,
-  heatmapAxisCenters,
-  heatmapDataBounds,
-  EMPTY_HEATMAP_GEOMETRY,
-} from "./heatmapGeometry";
+import { deriveHeatmapLayout, EMPTY_HEATMAP_GEOMETRY } from "./heatmapGeometry";
 import {
   syncHeatmapRenderState,
   type HeatmapRenderState,
@@ -219,7 +214,7 @@ describe("scatterDataBounds", () => {
 
 describe("syncHeatmapRenderState", () => {
   it("builds midpoint-derived numeric cell geometry", () => {
-    const geometry = buildHeatmapGeometry([
+    const { geometry } = deriveHeatmapLayout([
       xyzSeries("heat", "heat", [
         [10, 5, 1],
         [20, 5, 2],
@@ -247,7 +242,7 @@ describe("syncHeatmapRenderState", () => {
 
   it("uses a default half-step for singleton axes", () => {
     expect(
-      buildHeatmapGeometry([xyzSeries("heat", "heat", [[7, 11, 5]])]),
+      deriveHeatmapLayout([xyzSeries("heat", "heat", [[7, 11, 5]])]).geometry,
     ).toEqual({
       xMin: 6.5,
       xMax: 7.5,
@@ -264,14 +259,14 @@ describe("syncHeatmapRenderState", () => {
 
   it("returns sorted unique heatmap axis centers", () => {
     expect(
-      heatmapAxisCenters([
+      deriveHeatmapLayout([
         xyzSeries("heat", "heat", [
           [46, 310, 1],
           [7, 120, 2],
           [19, 185, 3],
           [7, 310, 4],
         ]),
-      ]),
+      ]).centers,
     ).toEqual({
       xValues: [7, 19, 46],
       yValues: [120, 185, 310],
@@ -280,7 +275,8 @@ describe("syncHeatmapRenderState", () => {
 
   it("returns default bounds when there are no finite heatmap cells", () => {
     expect(
-      heatmapDataBounds([xyzSeries("heat", "heat", [[0, 0, Number.NaN]])]),
+      deriveHeatmapLayout([xyzSeries("heat", "heat", [[0, 0, Number.NaN]])])
+        .bounds,
     ).toEqual({
       xMin: EMPTY_HEATMAP_GEOMETRY.xMin,
       xMax: EMPTY_HEATMAP_GEOMETRY.xMax,

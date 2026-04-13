@@ -7,7 +7,7 @@
 import type { HeatmapSeries } from "@/shared/lib/chartTypes";
 import { createBuffer, createProgram, hexToRgb } from "./webgl";
 import {
-  buildHeatmapGeometry,
+  deriveHeatmapLayout,
   EMPTY_HEATMAP_GEOMETRY,
   type HeatmapGeometry,
 } from "./heatmapGeometry";
@@ -97,7 +97,7 @@ export function syncHeatmapRenderState(
   state: HeatmapRenderState,
   series: HeatmapSeries[],
 ): void {
-  const geometry = buildHeatmapGeometry(series);
+  const { geometry } = deriveHeatmapLayout(series);
   const { valueMin, valueMax, instanceData } = buildHeatmapInstances(geometry);
   gl.bindBuffer(gl.ARRAY_BUFFER, state.cellBuffer);
   if (
