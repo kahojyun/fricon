@@ -153,6 +153,7 @@ export function useWebGLChart({
 }: UseWebGLChartOptions): UseWebGLChartReturn {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const chartType = data?.type;
   const chartRef = useRef<WebGLChartRefs>({
     gl: null,
     renderStateCache: createRenderStateCache(),
@@ -454,11 +455,13 @@ export function useWebGLChart({
   }, [liveMode, scheduleRender]);
 
   // Zoom controller, crosshair, and brush overlay
+  // Keep the controller stable across live data refreshes so active drags are not interrupted.
   useEffect(() => {
     const currentRefs = chartRef.current;
     const svgEl = svgRef.current;
     const canvas = canvasRef.current;
-    if (!svgEl || !canvas || !data) {
+    const currentData = currentRefs.data;
+    if (!svgEl || !canvas || !currentData) {
       currentRefs.crosshairController?.destroy();
       currentRefs.crosshairController = null;
       currentRefs.zoomController?.destroy();
@@ -466,7 +469,8 @@ export function useWebGLChart({
       return;
     }
 
-    const margin = data.type === "heatmap" ? HEATMAP_MARGIN : DEFAULT_MARGIN;
+    const margin =
+      currentData.type === "heatmap" ? HEATMAP_MARGIN : DEFAULT_MARGIN;
     const chartW = canvas.clientWidth - margin.left - margin.right;
     const chartH = canvas.clientHeight - margin.top - margin.bottom;
 
@@ -546,7 +550,7 @@ export function useWebGLChart({
       currentRefs.zoomController = null;
       brushGroup.remove();
     };
-  }, [data, liveMode, scheduleRender]);
+  }, [chartType, scheduleRender]);
 
   // Resize observer — use devicePixelContentBoxSize when available for accurate DPR sizing
   useEffect(() => {

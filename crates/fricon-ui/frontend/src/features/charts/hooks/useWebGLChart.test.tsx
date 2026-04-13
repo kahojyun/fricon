@@ -133,6 +133,18 @@ function HookHarness({
         toJSON: () => undefined,
       }),
     });
+    Object.defineProperty(svg, "setPointerCapture", {
+      configurable: true,
+      value: () => undefined,
+    });
+    Object.defineProperty(svg, "releasePointerCapture", {
+      configurable: true,
+      value: () => undefined,
+    });
+    Object.defineProperty(svg, "hasPointerCapture", {
+      configurable: true,
+      value: () => true,
+    });
   }, [canvasRef, svgRef]);
 
   return (
@@ -305,6 +317,70 @@ describe("useWebGLChart", () => {
     expect(autoFollow?.zoomState?.translateY).toBeCloseTo(0);
     expect(autoFollow?.xMax).toBeGreaterThan(reset?.xMax ?? 0);
     expect(autoFollow?.yMax).toBeGreaterThan(reset?.yMax ?? 0);
+  });
+
+  it("keeps a live pan gesture active while data updates", () => {
+    const { rerender } = render(
+      <HookHarness
+        data={makeLineData([
+          [0, 0],
+          [10, 10],
+        ])}
+        interactionKey="live-line"
+        liveMode
+      />,
+    );
+
+    const svg = screen.getByTestId("chart-svg");
+    const snapshotButton = screen.getByRole("button", { name: "Snapshot" });
+
+    fireEvent.pointerDown(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 120,
+      clientY: 80,
+    });
+    fireEvent.pointerMove(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 150,
+      clientY: 100,
+    });
+    fireEvent.click(snapshotButton);
+    const beforeUpdate = readSnapshot();
+
+    rerender(
+      <HookHarness
+        data={makeLineData([
+          [0, 0],
+          [20, 20],
+        ])}
+        interactionKey="live-line"
+        liveMode
+      />,
+    );
+
+    fireEvent.pointerMove(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 180,
+      clientY: 130,
+    });
+    fireEvent.pointerUp(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 180,
+      clientY: 130,
+    });
+    fireEvent.click(snapshotButton);
+    const afterUpdate = readSnapshot();
+
+    expect(afterUpdate?.zoomState?.translateX).toBeGreaterThan(
+      beforeUpdate?.zoomState?.translateX ?? 0,
+    );
+    expect(afterUpdate?.zoomState?.translateY).toBeGreaterThan(
+      beforeUpdate?.zoomState?.translateY ?? 0,
+    );
   });
 
   it("uses the shared trend series label for the y axis when available", () => {
