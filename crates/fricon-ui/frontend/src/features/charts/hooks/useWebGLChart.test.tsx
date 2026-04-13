@@ -5,6 +5,10 @@ import type { ChartOptions } from "@/shared/lib/chartTypes";
 import { resolveXYYAxisLabel } from "../model/seriesLabeling";
 import { useWebGLChart, type ChartInteractionState } from "./useWebGLChart";
 
+vi.mock("../rendering/crosshairOverlay", () => ({
+  attachCrosshair: () => ({ destroy: noop }),
+}));
+
 const noop = () => undefined;
 
 const glStub = {
