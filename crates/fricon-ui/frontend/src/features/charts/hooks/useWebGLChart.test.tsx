@@ -387,6 +387,68 @@ describe("useWebGLChart", () => {
     );
   });
 
+  it("cancels an active drag when the interaction key changes", () => {
+    const { rerender } = render(
+      <HookHarness
+        data={makeLineData([
+          [0, 0],
+          [10, 10],
+        ])}
+        interactionKey="live-line-a"
+        liveMode
+      />,
+    );
+
+    const svg = screen.getByTestId("chart-svg");
+    const snapshotButton = screen.getByRole("button", { name: "Snapshot" });
+
+    fireEvent.pointerDown(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 120,
+      clientY: 80,
+    });
+    fireEvent.pointerMove(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 150,
+      clientY: 100,
+    });
+
+    rerender(
+      <HookHarness
+        data={makeLineData([
+          [0, 0],
+          [20, 20],
+        ])}
+        interactionKey="live-line-b"
+        liveMode
+      />,
+    );
+
+    fireEvent.pointerMove(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 180,
+      clientY: 130,
+    });
+    fireEvent.pointerUp(svg, {
+      button: 0,
+      pointerId: 1,
+      clientX: 180,
+      clientY: 130,
+    });
+    fireEvent.click(snapshotButton);
+    const afterSwitch = readSnapshot();
+
+    expect(afterSwitch?.zoomState?.scaleX).toBeCloseTo(1);
+    expect(afterSwitch?.zoomState?.scaleY).toBeCloseTo(1);
+    expect(afterSwitch?.zoomState?.translateX).toBeCloseTo(0);
+    expect(afterSwitch?.zoomState?.translateY).toBeCloseTo(0);
+    expect(afterSwitch?.xMax).toBeGreaterThan(10);
+    expect(afterSwitch?.yMax).toBeGreaterThan(10);
+  });
+
   it("uses the shared trend series label for the y axis when available", () => {
     expect(
       resolveXYYAxisLabel({

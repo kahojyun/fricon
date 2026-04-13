@@ -455,7 +455,8 @@ export function useWebGLChart({
   }, [liveMode, scheduleRender]);
 
   // Zoom controller, crosshair, and brush overlay
-  // Keep the controller stable across live data refreshes so active drags are not interrupted.
+  // Keep the controller stable across live data refreshes so active drags are not interrupted,
+  // but reset controller-local gesture state when the interaction identity changes.
   useEffect(() => {
     const currentRefs = chartRef.current;
     const svgEl = svgRef.current;
@@ -550,7 +551,7 @@ export function useWebGLChart({
       currentRefs.zoomController = null;
       brushGroup.remove();
     };
-  }, [chartType, scheduleRender]);
+  }, [chartType, interactionKey, scheduleRender]);
 
   // Resize observer — use devicePixelContentBoxSize when available for accurate DPR sizing
   useEffect(() => {
