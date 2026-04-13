@@ -316,6 +316,16 @@ describe("syncHeatmapRenderState", () => {
       instanceCount: 0,
       capacity: 0,
       instanceData: new Float64Array(0),
+      bounds: {
+        xMin: 0,
+        xMax: 1,
+        yMin: 0,
+        yMax: 1,
+      },
+      centers: {
+        xValues: [],
+        yValues: [],
+      },
       geometry: EMPTY_HEATMAP_GEOMETRY,
       valueMin: 0,
       valueMax: 0,
@@ -348,6 +358,16 @@ describe("syncHeatmapRenderState", () => {
           ],
         },
       ],
+    });
+    expect(state.bounds).toEqual({
+      xMin: -0.5,
+      xMax: 1.5,
+      yMin: -0.5,
+      yMax: 1.5,
+    });
+    expect(state.centers).toEqual({
+      xValues: [0, 1],
+      yValues: [0, 1],
     });
     expect(bufferData).toHaveBeenCalledWith(
       gl.ARRAY_BUFFER,

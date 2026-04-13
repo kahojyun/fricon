@@ -9,6 +9,7 @@ import { createBuffer, createProgram, hexToRgb } from "./webgl";
 import {
   deriveHeatmapLayout,
   EMPTY_HEATMAP_GEOMETRY,
+  type HeatmapAxisCenters,
   type HeatmapGeometry,
 } from "./heatmapGeometry";
 import { heatmapFragmentSource, heatmapVertexSource } from "./shaders/heatmap";
@@ -28,6 +29,13 @@ export interface HeatmapRenderState {
   instanceCount: number;
   capacity: number;
   instanceData: Float64Array;
+  bounds: {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+  };
+  centers: HeatmapAxisCenters;
   geometry: HeatmapGeometry;
   vao: WebGLVertexArrayObject;
   valueMin: number;
@@ -83,6 +91,16 @@ export function createHeatmapRenderState(
     instanceCount: 0,
     capacity: 0,
     instanceData: new Float64Array(0),
+    bounds: {
+      xMin: EMPTY_HEATMAP_GEOMETRY.xMin,
+      xMax: EMPTY_HEATMAP_GEOMETRY.xMax,
+      yMin: EMPTY_HEATMAP_GEOMETRY.yMin,
+      yMax: EMPTY_HEATMAP_GEOMETRY.yMax,
+    },
+    centers: {
+      xValues: [],
+      yValues: [],
+    },
     geometry: EMPTY_HEATMAP_GEOMETRY,
     vao,
     valueMin: 0,
@@ -97,7 +115,7 @@ export function syncHeatmapRenderState(
   state: HeatmapRenderState,
   series: HeatmapSeries[],
 ): void {
-  const { geometry } = deriveHeatmapLayout(series);
+  const { geometry, bounds, centers } = deriveHeatmapLayout(series);
   const { valueMin, valueMax, instanceData } = buildHeatmapInstances(geometry);
   gl.bindBuffer(gl.ARRAY_BUFFER, state.cellBuffer);
   if (
@@ -132,6 +150,8 @@ export function syncHeatmapRenderState(
   }
   state.instanceCount = instanceData.length / 5;
   state.instanceData = instanceData;
+  state.bounds = bounds;
+  state.centers = centers;
   state.geometry = geometry;
   state.valueMin = valueMin;
   state.valueMax = valueMax;

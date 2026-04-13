@@ -261,8 +261,7 @@ export function useWebGLChart({
         r.numericLabelFormat,
       );
     } else if (rs.type === "heatmap" && currentData.type === "heatmap") {
-      const layout = deriveHeatmapLayout(currentData.series);
-      const bounds = r.viewBounds ?? layout.bounds;
+      const bounds = r.viewBounds ?? rs.state.bounds;
       const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
         buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
 
@@ -280,12 +279,12 @@ export function useWebGLChart({
         {
           showGrid: false,
           xTickValues:
-            layout.centers.xValues.length <= 10
-              ? layout.centers.xValues
+            rs.state.centers.xValues.length <= 10
+              ? rs.state.centers.xValues
               : undefined,
           yTickValues:
-            layout.centers.yValues.length <= 10
-              ? layout.centers.yValues
+            rs.state.centers.yValues.length <= 10
+              ? rs.state.centers.yValues
               : undefined,
         },
       );
@@ -608,17 +607,21 @@ export function useWebGLChart({
       };
     }
     if (currentData.type === "heatmap") {
-      const geometry =
+      const cachedState =
         chartRef.current.renderState?.type === "heatmap"
-          ? chartRef.current.renderState.state.geometry
-          : deriveHeatmapLayout(currentData.series).geometry;
+          ? chartRef.current.renderState.state
+          : null;
+      const layout = cachedState
+        ? null
+        : deriveHeatmapLayout(currentData.series);
       return {
         type: "heatmap" as const,
         ...(chartRef.current.viewBounds ??
-          deriveHeatmapLayout(currentData.series).bounds),
+          cachedState?.bounds ??
+          layout!.bounds),
         margin,
         zoomState: chartRef.current.zoomState,
-        geometry,
+        geometry: cachedState?.geometry ?? layout!.geometry,
       };
     }
 
