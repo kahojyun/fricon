@@ -158,8 +158,6 @@ pub(crate) struct XYChartSnapshot {
 pub(crate) struct HeatmapChartSnapshot {
     pub(crate) x_name: String,
     pub(crate) y_name: String,
-    pub(crate) x_categories: Vec<f64>,
-    pub(crate) y_categories: Vec<f64>,
     pub(crate) series: Vec<FlatXYZSeries>,
 }
 
@@ -179,10 +177,6 @@ pub(crate) enum FlatSeries {
 
 #[derive(Serialize, Clone, Debug, PartialEq, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-#[expect(
-    clippy::enum_variant_names,
-    reason = "Wire format uses append-prefixed operation names"
-)]
 pub(crate) enum LiveChartAppendOperation {
     AppendPoints {
         series_id: String,
@@ -191,10 +185,6 @@ pub(crate) enum LiveChartAppendOperation {
     },
     AppendSeries {
         series: FlatSeries,
-    },
-    AppendHeatmapCategories {
-        x_categories: Option<Vec<f64>>,
-        y_categories: Option<Vec<f64>>,
     },
 }
 

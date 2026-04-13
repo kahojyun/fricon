@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef, useCallback } from "react";
-import { scaleLinear, scaleBand } from "d3-scale";
+import { scaleLinear } from "d3-scale";
 import { select } from "d3-selection";
 import {
   xyDrawStyleIncludesLine,
@@ -30,7 +30,6 @@ import {
 } from "../rendering/webgl";
 import {
   renderAxes,
-  renderCategoryAxes,
   renderColorScale,
   getOverlayTheme,
 } from "../rendering/d3Overlay";
@@ -69,6 +68,11 @@ import {
   COLOR_RAMP,
   type HeatmapRenderState,
 } from "../rendering/heatmapRenderer";
+import {
+  buildHeatmapGeometry,
+  heatmapDataBounds,
+  type HeatmapGeometry,
+} from "../rendering/heatmapGeometry";
 
 type RenderState =
   | {
@@ -132,9 +136,13 @@ export type ChartInteractionState =
     }
   | {
       type: "heatmap";
-      xCategories: number[];
-      yCategories: number[];
+      xMin: number;
+      xMax: number;
+      yMin: number;
+      yMax: number;
       margin: ChartMargin;
+      zoomState: ZoomState;
+      geometry: HeatmapGeometry;
     };
 
 export function useWebGLChart({
@@ -254,32 +262,22 @@ export function useWebGLChart({
         r.numericLabelFormat,
       );
     } else if (rs.type === "heatmap" && currentData.type === "heatmap") {
-      const numCols = currentData.xCategories.length;
-      const numRows = currentData.yCategories.length;
+      const bounds = r.viewBounds ?? heatmapDataBounds(currentData.series);
+      const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
+        buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
 
-      // For heatmap, we render fullscreen in the viewport (no zoom for now)
-      drawHeatmap(gl, rs.state, numCols, numRows);
+      drawHeatmap(gl, rs.state, finalMatrix);
 
-      const overlayTheme = getOverlayTheme(r.theme);
-      const chartW = canvas.clientWidth - margin.left - margin.right;
-      const chartH = canvas.clientHeight - margin.top - margin.bottom;
-      const xScale = scaleBand<string | number>()
-        .domain(currentData.xCategories)
-        .range([0, chartW])
-        .padding(0);
-      const yScale = scaleBand<string | number>()
-        .domain(currentData.yCategories)
-        .range([chartH, 0])
-        .padding(0);
-      renderCategoryAxes(
+      renderAxes(
         svgEl,
-        xScale,
-        yScale,
+        zoomedXScale,
+        zoomedYScale,
         currentData.xName,
         currentData.yName,
         margin,
         overlayTheme,
         r.numericLabelFormat,
+        { showGrid: false },
       );
       renderColorScale(
         svgEl,
@@ -451,8 +449,7 @@ export function useWebGLChart({
     const currentRefs = chartRef.current;
     const svgEl = svgRef.current;
     const canvas = canvasRef.current;
-    if (!svgEl || !canvas || !data || data.type === "heatmap") {
-      // No zoom for heatmap
+    if (!svgEl || !canvas || !data) {
       currentRefs.crosshairController?.destroy();
       currentRefs.crosshairController = null;
       currentRefs.zoomController?.destroy();
@@ -460,7 +457,7 @@ export function useWebGLChart({
       return;
     }
 
-    const margin = DEFAULT_MARGIN;
+    const margin = data.type === "heatmap" ? HEATMAP_MARGIN : DEFAULT_MARGIN;
     const chartW = canvas.clientWidth - margin.left - margin.right;
     const chartH = canvas.clientHeight - margin.top - margin.bottom;
 
@@ -518,9 +515,10 @@ export function useWebGLChart({
     // Crosshair overlay
     const crosshair = attachCrosshair(svgEl, () => {
       const d = currentRefs.data;
-      if (!d || d.type === "heatmap") return null;
+      if (!d) return null;
 
-      const bounds = currentRefs.viewBounds ?? lineDataBounds(d.series);
+      const bounds = currentRefs.viewBounds ?? getNumericBounds(d);
+      if (!bounds) return null;
 
       return {
         margin,
@@ -563,7 +561,10 @@ export function useWebGLChart({
       // Update zoom translate extents so pan/zoom clamps match the new size
       const currentRefs = chartRef.current;
       if (currentRefs.zoomController) {
-        const margin = DEFAULT_MARGIN;
+        const margin =
+          currentRefs.data?.type === "heatmap"
+            ? HEATMAP_MARGIN
+            : DEFAULT_MARGIN;
         const chartW = canvas.clientWidth - margin.left - margin.right;
         const chartH = canvas.clientHeight - margin.top - margin.bottom;
         currentRefs.zoomController.updateExtents(chartW, chartH, margin);
@@ -597,11 +598,17 @@ export function useWebGLChart({
       };
     }
     if (currentData.type === "heatmap") {
+      const geometry =
+        chartRef.current.renderState?.type === "heatmap"
+          ? chartRef.current.renderState.state.geometry
+          : buildHeatmapGeometry(currentData.series);
       return {
         type: "heatmap" as const,
-        xCategories: currentData.xCategories,
-        yCategories: currentData.yCategories,
+        ...(chartRef.current.viewBounds ??
+          heatmapDataBounds(currentData.series)),
         margin,
+        zoomState: chartRef.current.zoomState,
+        geometry,
       };
     }
 
@@ -657,7 +664,7 @@ function resolveNextZoomState({
 }: ResolveNextZoomStateArgs): ZoomState {
   const nextDefaultZoom = getDefaultZoomState();
 
-  if (!data || data.type === "heatmap") {
+  if (!data) {
     return nextDefaultZoom;
   }
 
@@ -673,7 +680,7 @@ function resolveNextViewBounds({
   followsDefaultView,
   previousViewBounds,
 }: ResolveNextViewBoundsArgs): NumericBounds | null {
-  if (!data || data.type === "heatmap") {
+  if (!data) {
     return null;
   }
 
@@ -687,8 +694,10 @@ function resolveNextViewBounds({
 function getNumericBounds(
   data: ChartOptions | undefined,
 ): NumericBounds | null {
-  if (!data || data.type === "heatmap") return null;
-  return lineDataBounds(data.series);
+  if (!data) return null;
+  return data.type === "heatmap"
+    ? heatmapDataBounds(data.series)
+    : lineDataBounds(data.series);
 }
 
 function createRenderStateCache(): RenderStateCache {

@@ -102,8 +102,6 @@ describe("buildChartFrameHeader", () => {
           type: "heatmap",
           xName: "x",
           yName: "y",
-          xCategories: [0],
-          yCategories: [0],
           series: [],
         },
         derived: {

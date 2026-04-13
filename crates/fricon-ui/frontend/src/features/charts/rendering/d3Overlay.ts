@@ -51,6 +51,10 @@ export function renderAxes(
   margin: ChartMargin,
   theme: OverlayTheme,
   numericLabelFormat: NumericLabelFormatOptions,
+  options?: {
+    gridSvgEl?: SVGSVGElement | null;
+    showGrid?: boolean;
+  },
 ): void {
   const svg = select(svgEl);
   const width = svgEl.clientWidth;
@@ -58,12 +62,23 @@ export function renderAxes(
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
 
-  clearOverlayLayers(svg);
+  clearForegroundOverlayLayers(svg);
 
   const g = svg
     .append("g")
     .attr("class", "axes")
     .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const gridSvgEl = options?.gridSvgEl ?? null;
+  const showGrid = options?.showGrid ?? true;
+  const gridContainer = gridSvgEl ? select(gridSvgEl) : svg;
+  clearGridOverlayLayers(gridContainer);
+  const gridGroup = showGrid
+    ? gridContainer
+        .append("g")
+        .attr("class", "grid-layer")
+        .attr("transform", `translate(${margin.left},${margin.top})`)
+    : null;
 
   // X axis
   const xAxis = axisBottom(xScale.range([0, chartWidth])).ticks(
@@ -83,7 +98,8 @@ export function renderAxes(
     });
 
   // X grid lines
-  g.append("g")
+  gridGroup
+    ?.append("g")
     .attr("class", "grid")
     .call(
       axisBottom(xScale.range([0, chartWidth]))
@@ -116,7 +132,8 @@ export function renderAxes(
     });
 
   // Y grid lines
-  g.append("g")
+  gridGroup
+    ?.append("g")
     .attr("class", "grid")
     .call(
       axisLeft(yScale.range([chartHeight, 0]))
@@ -327,5 +344,17 @@ export function renderColorScale(
 function clearOverlayLayers(
   svg: Selection<SVGSVGElement, unknown, null, undefined>,
 ): void {
+  svg.selectAll(".axes, .color-scale, .grid-layer").remove();
+}
+
+function clearForegroundOverlayLayers(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+): void {
   svg.selectAll(".axes, .color-scale").remove();
+}
+
+function clearGridOverlayLayers(
+  svg: Selection<SVGSVGElement, unknown, null, undefined>,
+): void {
+  svg.selectAll(".grid-layer").remove();
 }

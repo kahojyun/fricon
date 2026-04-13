@@ -75,20 +75,13 @@ interface HookHarnessProps {
 
 function serializeInteractionState(state: ChartInteractionState | null) {
   if (!state) return null;
-  if ("zoomState" in state) {
-    return {
-      type: state.type,
-      xMin: state.xMin,
-      xMax: state.xMax,
-      yMin: state.yMin,
-      yMax: state.yMax,
-      zoomState: state.zoomState,
-    };
-  }
   return {
     type: state.type,
-    xCategories: state.xCategories,
-    yCategories: state.yCategories,
+    xMin: state.xMin,
+    xMax: state.xMax,
+    yMin: state.yMin,
+    yMax: state.yMax,
+    zoomState: state.zoomState,
   };
 }
 
@@ -179,8 +172,6 @@ function makeHeatmapData(): Extract<ChartOptions, { type: "heatmap" }> {
     type: "heatmap",
     xName: "x",
     yName: "y",
-    xCategories: [0, 1],
-    yCategories: [0, 1],
     series: [
       xyzSeries("z", "z", [
         [0, 0, 1],
@@ -443,7 +434,7 @@ describe("useWebGLChart", () => {
     expect(followed?.xMax).toBeGreaterThan(reset?.xMax ?? 0);
   });
 
-  it("does not expose zoom interactions for heatmaps", () => {
+  it("exposes zoom interactions for heatmaps", () => {
     render(
       <HookHarness
         data={makeHeatmapData()}
@@ -456,13 +447,27 @@ describe("useWebGLChart", () => {
     const snapshotButton = screen.getByRole("button", { name: "Snapshot" });
 
     fireEvent.wheel(svg, { clientX: 170, clientY: 90, deltaY: -240 });
+    fireEvent.click(snapshotButton);
+    const zoomed = readSnapshot();
+    expect(zoomed?.type).toBe("heatmap");
+    expect(zoomed?.zoomState?.scaleX).toBeGreaterThan(1);
+    expect(zoomed?.zoomState?.scaleY).toBeGreaterThan(1);
+
     fireEvent.dblClick(svg, { clientX: 170, clientY: 90 });
     fireEvent.click(snapshotButton);
 
     expect(readSnapshot()).toEqual({
       type: "heatmap",
-      xCategories: [0, 1],
-      yCategories: [0, 1],
+      xMin: -0.5,
+      xMax: 1.5,
+      yMin: -0.5,
+      yMax: 1.5,
+      zoomState: {
+        scaleX: 1,
+        scaleY: 1,
+        translateX: 0,
+        translateY: 0,
+      },
     });
   });
 });
