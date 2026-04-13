@@ -54,6 +54,8 @@ export function renderAxes(
   options?: {
     gridSvgEl?: SVGSVGElement | null;
     showGrid?: boolean;
+    xTickValues?: number[];
+    yTickValues?: number[];
   },
 ): void {
   const svg = select(svgEl);
@@ -71,6 +73,8 @@ export function renderAxes(
 
   const gridSvgEl = options?.gridSvgEl ?? null;
   const showGrid = options?.showGrid ?? true;
+  const xTickValues = options?.xTickValues;
+  const yTickValues = options?.yTickValues;
   const gridContainer = gridSvgEl ? select(gridSvgEl) : svg;
   clearGridOverlayLayers(gridContainer);
   const gridGroup = showGrid
@@ -84,6 +88,9 @@ export function renderAxes(
   const xAxis = axisBottom(xScale.range([0, chartWidth])).ticks(
     Math.max(2, Math.floor(chartWidth / 80)),
   );
+  if (xTickValues) {
+    xAxis.tickValues(xTickValues);
+  }
   xAxis.tickFormat((value) =>
     formatAxisTickLabel(value as number, numericLabelFormat),
   );
@@ -101,12 +108,16 @@ export function renderAxes(
   gridGroup
     ?.append("g")
     .attr("class", "grid")
-    .call(
-      axisBottom(xScale.range([0, chartWidth]))
+    .call((gridAxisGroup) => {
+      const gridAxis = axisBottom(xScale.range([0, chartWidth]))
         .ticks(Math.max(2, Math.floor(chartWidth / 80)))
         .tickSize(-chartHeight)
-        .tickFormat(() => ""),
-    )
+        .tickFormat(() => "");
+      if (xTickValues) {
+        gridAxis.tickValues(xTickValues);
+      }
+      gridAxisGroup.call(gridAxis);
+    })
     .attr("transform", `translate(0,${chartHeight})`)
     .call((g) => {
       g.selectAll("line")
@@ -119,6 +130,9 @@ export function renderAxes(
   const yAxis = axisLeft(yScale.range([chartHeight, 0])).ticks(
     Math.max(2, Math.floor(chartHeight / 50)),
   );
+  if (yTickValues) {
+    yAxis.tickValues(yTickValues);
+  }
   yAxis.tickFormat((value) =>
     formatAxisTickLabel(value as number, numericLabelFormat),
   );
@@ -135,12 +149,16 @@ export function renderAxes(
   gridGroup
     ?.append("g")
     .attr("class", "grid")
-    .call(
-      axisLeft(yScale.range([chartHeight, 0]))
+    .call((gridAxisGroup) => {
+      const gridAxis = axisLeft(yScale.range([chartHeight, 0]))
         .ticks(Math.max(2, Math.floor(chartHeight / 50)))
         .tickSize(-chartWidth)
-        .tickFormat(() => ""),
-    )
+        .tickFormat(() => "");
+      if (yTickValues) {
+        gridAxis.tickValues(yTickValues);
+      }
+      gridAxisGroup.call(gridAxis);
+    })
     .call((g) => {
       g.selectAll("line")
         .attr("stroke", theme.gridColor)

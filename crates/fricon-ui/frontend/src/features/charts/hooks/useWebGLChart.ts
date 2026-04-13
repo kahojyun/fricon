@@ -70,6 +70,7 @@ import {
 } from "../rendering/heatmapRenderer";
 import {
   buildHeatmapGeometry,
+  heatmapAxisCenters,
   heatmapDataBounds,
   type HeatmapGeometry,
 } from "../rendering/heatmapGeometry";
@@ -263,6 +264,7 @@ export function useWebGLChart({
       );
     } else if (rs.type === "heatmap" && currentData.type === "heatmap") {
       const bounds = r.viewBounds ?? heatmapDataBounds(currentData.series);
+      const axisCenters = heatmapAxisCenters(currentData.series);
       const { finalMatrix, zoomedXScale, zoomedYScale, overlayTheme } =
         buildZoomedAxes(canvas, margin, bounds, r.zoomState, r.theme);
 
@@ -277,7 +279,13 @@ export function useWebGLChart({
         margin,
         overlayTheme,
         r.numericLabelFormat,
-        { showGrid: false },
+        {
+          showGrid: false,
+          xTickValues:
+            axisCenters.xValues.length <= 10 ? axisCenters.xValues : undefined,
+          yTickValues:
+            axisCenters.yValues.length <= 10 ? axisCenters.yValues : undefined,
+        },
       );
       renderColorScale(
         svgEl,

@@ -7,6 +7,7 @@ import {
 } from "./lineRenderer";
 import {
   buildHeatmapGeometry,
+  heatmapAxisCenters,
   heatmapDataBounds,
   EMPTY_HEATMAP_GEOMETRY,
 } from "./heatmapGeometry";
@@ -258,6 +259,22 @@ describe("syncHeatmapRenderState", () => {
           cells: [{ x: 7, y: 11, z: 5, x0: 6.5, x1: 7.5, y0: 10.5, y1: 11.5 }],
         },
       ],
+    });
+  });
+
+  it("returns sorted unique heatmap axis centers", () => {
+    expect(
+      heatmapAxisCenters([
+        xyzSeries("heat", "heat", [
+          [46, 310, 1],
+          [7, 120, 2],
+          [19, 185, 3],
+          [7, 310, 4],
+        ]),
+      ]),
+    ).toEqual({
+      xValues: [7, 19, 46],
+      yValues: [120, 185, 310],
     });
   });
 

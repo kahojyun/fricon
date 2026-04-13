@@ -90,6 +90,26 @@ export function heatmapDataBounds(series: HeatmapSeries[]) {
   };
 }
 
+export function heatmapAxisCenters(series: HeatmapSeries[]) {
+  const validPoints = series.flatMap((item) =>
+    readSeriesPoints(item).filter(
+      (point) =>
+        Number.isFinite(point.x) &&
+        Number.isFinite(point.y) &&
+        Number.isFinite(point.z),
+    ),
+  );
+
+  return {
+    xValues: Array.from(new Set(validPoints.map((point) => point.x))).sort(
+      (left, right) => left - right,
+    ),
+    yValues: Array.from(new Set(validPoints.map((point) => point.y))).sort(
+      (left, right) => left - right,
+    ),
+  };
+}
+
 interface SeriesPoint {
   x: number;
   y: number;
