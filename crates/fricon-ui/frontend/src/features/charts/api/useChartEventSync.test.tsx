@@ -88,15 +88,15 @@ describe("useChartEventSync", () => {
       listener?.({ payload: createDatasetEvent("writeProgress", 11) });
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: chartKeys.chartData(11),
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: chartKeys.filterTableData(11),
-    });
     expect(refetchSpy).toHaveBeenCalledWith({
       queryKey: chartKeys.liveChartData(11),
       type: "active",
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: chartKeys.chartData(11),
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: chartKeys.filterTableData(11),
     });
     expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: chartKeys.liveChartData(11),

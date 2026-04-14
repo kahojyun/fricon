@@ -19,12 +19,6 @@ export function useChartEventSync() {
   const handleEvent = useEffectEvent((payload: DatasetChanged) => {
     if (payload.kind === "writeProgress") {
       const datasetId = payload.progress.id;
-      void queryClient.invalidateQueries({
-        queryKey: chartKeys.chartData(datasetId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: chartKeys.filterTableData(datasetId),
-      });
       void queryClient.refetchQueries({
         queryKey: chartKeys.liveChartData(datasetId),
         type: "active",
