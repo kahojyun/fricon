@@ -103,7 +103,7 @@ export function createHeatmapRenderState(
       xValues: [],
       yValues: [],
     },
-    xTopology: "shared_uniform",
+    xTopology: "shared_grid",
     geometry: EMPTY_HEATMAP_GEOMETRY,
     vao,
     valueMin: 0,

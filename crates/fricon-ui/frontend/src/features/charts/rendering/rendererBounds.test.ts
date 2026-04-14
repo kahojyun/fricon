@@ -261,24 +261,29 @@ describe("syncHeatmapRenderState", () => {
     });
   });
 
-  it("suppresses shared x centers for non-shared uniform heatmaps", () => {
+  it("keeps shared x centers for shared-grid heatmaps", () => {
     const layout = deriveHeatmapLayout([
       xyzSeries("heat", "heat", [
-        [46, 310, 1],
+        [46, 120, 1],
         [7, 120, 2],
-        [19, 185, 3],
-        [7, 310, 4],
+        [19, 120, 3],
+        [46, 185, 4],
+        [7, 185, 5],
+        [19, 185, 6],
       ]),
     ]);
 
-    expect(layout.xTopology).toBe("row_local_uniform");
+    expect(layout.xTopology).toBe("shared_grid");
     expect(layout.centers).toEqual({
-      xValues: [],
-      yValues: [120, 185, 310],
+      xValues: [7, 19, 46],
+      yValues: [120, 185],
     });
+    expect(getHeatmapXTickValues(layout.centers, layout.xTopology)).toEqual([
+      7, 19, 46,
+    ]);
   });
 
-  it("keeps shared x centers only for shared uniform heatmaps", () => {
+  it("keeps shared x centers for regular shared-grid heatmaps", () => {
     const layout = deriveHeatmapLayout([
       xyzSeries("heat", "heat", [
         [7, 120, 1],
@@ -288,7 +293,7 @@ describe("syncHeatmapRenderState", () => {
       ]),
     ]);
 
-    expect(layout.xTopology).toBe("shared_uniform");
+    expect(layout.xTopology).toBe("shared_grid");
     expect(layout.centers).toEqual({
       xValues: [7, 19],
       yValues: [120, 185],
@@ -298,7 +303,7 @@ describe("syncHeatmapRenderState", () => {
     ]);
   });
 
-  it("classifies row-local uniform x grids and suppresses explicit x ticks", () => {
+  it("classifies row-local x grids and suppresses explicit x ticks", () => {
     const layout = deriveHeatmapLayout([
       xyzSeries("heat", "heat", [
         [0, 0, 1],
@@ -308,7 +313,7 @@ describe("syncHeatmapRenderState", () => {
       ]),
     ]);
 
-    expect(layout.xTopology).toBe("row_local_uniform");
+    expect(layout.xTopology).toBe("row_local_grid");
     expect(layout.centers).toEqual({
       xValues: [],
       yValues: [0, 1],
@@ -328,7 +333,7 @@ describe("syncHeatmapRenderState", () => {
       ]),
     ]);
 
-    expect(layout.xTopology).toBe("row_local_uniform");
+    expect(layout.xTopology).toBe("row_local_grid");
     expect(layout.centers.xValues).toEqual([]);
   });
 
@@ -342,7 +347,7 @@ describe("syncHeatmapRenderState", () => {
       ]),
     ]);
 
-    expect(layout.xTopology).toBe("shared_uniform");
+    expect(layout.xTopology).toBe("shared_grid");
     expect(layout.centers.xValues).toEqual([1e9, 2e9]);
   });
 
@@ -375,7 +380,7 @@ describe("syncHeatmapRenderState", () => {
     });
   });
 
-  it("uses row-local midpoint spans for jagged x rows", () => {
+  it("uses row-local midpoint spans for non-shared x rows", () => {
     const layout = deriveHeatmapLayout([
       xyzSeries("heat", "heat", [
         [0, 0, 1],
@@ -386,7 +391,7 @@ describe("syncHeatmapRenderState", () => {
       ]),
     ]);
 
-    expect(layout.xTopology).toBe("jagged");
+    expect(layout.xTopology).toBe("row_local_grid");
     expect(layout.geometry).toEqual({
       xMin: -50,
       xMax: 150,
@@ -455,7 +460,7 @@ describe("syncHeatmapRenderState", () => {
       ]),
     ]);
 
-    expect(layout.xTopology).toBe("row_local_uniform");
+    expect(layout.xTopology).toBe("row_local_grid");
     expect(layout.centers).toEqual({
       xValues: [],
       yValues: [0, 2],
@@ -488,7 +493,7 @@ describe("syncHeatmapRenderState", () => {
         xValues: [],
         yValues: [],
       },
-      xTopology: "shared_uniform",
+      xTopology: "shared_grid",
       geometry: EMPTY_HEATMAP_GEOMETRY,
       valueMin: 0,
       valueMax: 0,
@@ -532,7 +537,7 @@ describe("syncHeatmapRenderState", () => {
       xValues: [],
       yValues: [0, 1],
     });
-    expect(state.xTopology).toBe("row_local_uniform");
+    expect(state.xTopology).toBe("row_local_grid");
     expect(bufferData).toHaveBeenCalledWith(
       gl.ARRAY_BUFFER,
       new Float32Array(10),

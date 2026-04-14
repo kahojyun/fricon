@@ -31,10 +31,7 @@ export interface HeatmapAxisCenters {
   yValues: number[];
 }
 
-export type HeatmapXAxisTopology =
-  | "shared_uniform"
-  | "row_local_uniform"
-  | "jagged";
+export type HeatmapXAxisTopology = "shared_grid" | "row_local_grid";
 
 export interface HeatmapLayout {
   geometry: HeatmapGeometry;
@@ -87,7 +84,7 @@ export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
         yMax: EMPTY_HEATMAP_GEOMETRY.yMax,
       },
       centers: EMPTY_HEATMAP_AXIS_CENTERS,
-      xTopology: "shared_uniform",
+      xTopology: "shared_grid",
     };
   }
 
@@ -132,7 +129,7 @@ export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
     },
     centers: {
       xValues:
-        rowSpans.xTopology === "shared_uniform"
+        rowSpans.xTopology === "shared_grid"
           ? rowSpans.sharedCenters
           : EMPTY_HEATMAP_AXIS_CENTERS.xValues,
       yValues,
@@ -146,7 +143,7 @@ export function getHeatmapXTickValues(
   xTopology: HeatmapXAxisTopology,
   maxExplicitTicks = 10,
 ) {
-  return xTopology === "shared_uniform" &&
+  return xTopology === "shared_grid" &&
     centers.xValues.length <= maxExplicitTicks
     ? centers.xValues
     : undefined;
@@ -233,9 +230,7 @@ function buildRowSpansByY(
     min,
     max,
     sharedCenters:
-      rowCenters.length > 0 && xTopology === "shared_uniform"
-        ? rowCenters[0]
-        : [],
+      rowCenters.length > 0 && xTopology === "shared_grid" ? rowCenters[0] : [],
     xTopology,
   };
 }
@@ -290,35 +285,16 @@ function classifyXTopology(
   rowCenters: number[][],
   xTolerance: number,
 ): HeatmapXAxisTopology {
-  if (rowCenters.length === 0) return "shared_uniform";
+  if (rowCenters.length === 0) return "shared_grid";
 
   const firstCenters = rowCenters[0];
   const sharesCommonGrid = rowCenters.every((centers) =>
     arraysAlmostEqual(centers, firstCenters, xTolerance),
   );
-  const everyRowUniform = rowCenters.every((centers) =>
-    isUniformRow(centers, xTolerance),
-  );
-
-  if (sharesCommonGrid && everyRowUniform) {
-    return "shared_uniform";
+  if (sharesCommonGrid) {
+    return "shared_grid";
   }
-  if (everyRowUniform) {
-    return "row_local_uniform";
-  }
-  return "jagged";
-}
-
-function isUniformRow(centers: number[], xTolerance: number) {
-  if (centers.length <= 2) return true;
-
-  const baselineStep = centers[1] - centers[0];
-  for (let i = 2; i < centers.length; i++) {
-    if (!almostEqual(centers[i] - centers[i - 1], baselineStep, xTolerance)) {
-      return false;
-    }
-  }
-  return true;
+  return "row_local_grid";
 }
 
 function arraysAlmostEqual(
