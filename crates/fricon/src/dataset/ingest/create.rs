@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     dataset::{
-        events::{DatasetEvent, DatasetEventPublisher},
+        events::{DatasetEvent, DatasetEventPublisher, DatasetWriteProgress},
         ingest::{
             CreateDatasetInput, CreateDatasetRequest, DatasetIngestRepository, IngestError,
             WriteSessionRegistry,
@@ -84,6 +84,10 @@ where
                     debug!(error = %error, "Failed to write batch into dataset session");
                     break CreateDatasetInput::Abort;
                 }
+                events.publish(DatasetEvent::WriteProgress(DatasetWriteProgress {
+                    id: dataset_record.id,
+                    row_count: session_ref.num_rows(),
+                }));
             }
             CreateDatasetInput::Finish | CreateDatasetInput::Abort => break event,
         }
@@ -305,6 +309,43 @@ mod tests {
     }
 
     #[test]
+    fn batch_write_emits_write_progress_before_terminal_status() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
+        let paths = workspace.paths().clone();
+        let repo = FakeRepo::new();
+        let events = CollectEvents::default();
+        let write_sessions = WriteSessionRegistry::new();
+        let mut inputs = VecDeque::from(vec![
+            CreateDatasetInput::Batch(one_col_batch()),
+            CreateDatasetInput::Finish,
+        ]);
+
+        let record = create_dataset_with(
+            &repo,
+            &paths,
+            &events,
+            &write_sessions,
+            &create_request(),
+            || inputs.pop_front(),
+        )
+        .expect("create dataset");
+
+        assert_eq!(record.metadata.status, DatasetStatus::Completed);
+        assert!(matches!(
+            events.snapshot().as_slice(),
+            [
+                DatasetEvent::Created(created),
+                DatasetEvent::WriteProgress(progress),
+                DatasetEvent::StatusChanged(status)
+            ] if created.id == record.id
+                && progress.id == record.id
+                && progress.row_count == 1
+                && status.id == record.id
+        ));
+    }
+
+    #[test]
     fn finalize_failure_marks_dataset_aborted_and_returns_error() {
         let temp_dir = TempDir::new().expect("temp dir");
         let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
@@ -340,7 +381,8 @@ mod tests {
         assert_eq!(repo.updated_statuses(), vec![DatasetStatus::Aborted]);
         assert!(matches!(
             events.snapshot().as_slice(),
-            [DatasetEvent::Created(created)] if created.id == 7
+            [DatasetEvent::Created(created), DatasetEvent::WriteProgress(progress)]
+            if created.id == 7 && progress.id == 7 && progress.row_count == 1
         ));
         assert!(matches!(error, IngestError::DatasetFs(_)));
     }

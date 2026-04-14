@@ -133,10 +133,9 @@ export function useChartViewerData({
   const filterRow = cascade.resolvedRow ?? null;
   const hasFilters = (filterTableData?.fields.length ?? 0) > 0;
   const indexFilters = hasFilters ? filterRow?.valueIndices : undefined;
-
   const writeStatus = useDatasetWriteStatusQuery(
     datasetId,
-    queriesEnabled && datasetDetail?.status === "Writing",
+    queriesEnabled && datasetDetail?.status === "Writing" && !isLiveMode,
   );
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   events,
   type DatasetChanged as WireDatasetChanged,
+  type DatasetWriteProgress,
 } from "@/shared/lib/bindings";
 import { normalizeDataset, type DatasetInfo } from "./types";
 
@@ -13,6 +14,7 @@ type WireDatasetChangedWithInfo = Extract<
 /** Normalized dataset change event (info.createdAt etc. are Date objects). */
 export type DatasetChangedEvent =
   | { kind: WireDatasetChangedWithInfo["kind"]; info: DatasetInfo }
+  | { kind: "writeProgress"; progress: DatasetWriteProgress }
   | { kind: "globalTagsChanged" };
 
 export function onDatasetChanged(
@@ -21,6 +23,8 @@ export function onDatasetChanged(
   return events.datasetChanged.listen((event) => {
     const p = event.payload;
     if (p.kind === "globalTagsChanged") {
+      callback(p);
+    } else if (p.kind === "writeProgress") {
       callback(p);
     } else {
       callback({ kind: p.kind, info: normalizeDataset(p.info) });

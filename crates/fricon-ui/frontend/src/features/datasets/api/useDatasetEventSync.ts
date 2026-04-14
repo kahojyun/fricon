@@ -27,6 +27,9 @@ export function useDatasetEventSync() {
         invalidateTags();
         break;
 
+      case "writeProgress":
+        break;
+
       case "statusChanged":
       case "metadataUpdated":
         invalidateList();

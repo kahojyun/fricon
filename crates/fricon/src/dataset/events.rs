@@ -16,11 +16,19 @@
 
 use crate::dataset::model::DatasetRecord;
 
-/// A dataset lifecycle event carrying the resulting record state.
+#[derive(Clone, Debug)]
+pub struct DatasetWriteProgress {
+    pub id: i32,
+    pub row_count: usize,
+}
+
+/// A dataset lifecycle event for cross-layer notifications.
 #[derive(Clone, Debug)]
 pub enum DatasetEvent {
     /// A new dataset was created by ingest (Writing status).
     Created(DatasetRecord),
+    /// Additional rows were appended while the dataset is still in Writing.
+    WriteProgress(DatasetWriteProgress),
     /// A write session transitioned a dataset from Writing to Completed or
     /// Aborted.
     StatusChanged(DatasetRecord),

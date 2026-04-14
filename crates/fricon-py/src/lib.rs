@@ -622,7 +622,7 @@ impl DatasetWriter {
 impl DatasetWriter {
     /// Write a row of values to the dataset.
     ///
-    /// Rows are buffered client-side and flushed automatically every second or
+    /// Rows are buffered client-side and flushed automatically every 200 ms or
     /// once 16 rows have accumulated.
     ///
     /// Parameters:
@@ -641,7 +641,7 @@ impl DatasetWriter {
 
     /// Write a row of values to the dataset.
     ///
-    /// Rows are buffered client-side and flushed automatically every second or
+    /// Rows are buffered client-side and flushed automatically every 200 ms or
     /// once 16 rows have accumulated.
     ///
     /// Parameters:

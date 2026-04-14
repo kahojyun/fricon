@@ -41,6 +41,10 @@ impl WriteSession {
         WriteSessionHandle(self.in_progress_table.clone())
     }
 
+    pub(super) fn num_rows(&self) -> usize {
+        self.in_progress_table_mut().num_rows()
+    }
+
     pub(super) fn finish(self) -> Result<(), IngestError> {
         self.writer.finish()?;
         Ok(())

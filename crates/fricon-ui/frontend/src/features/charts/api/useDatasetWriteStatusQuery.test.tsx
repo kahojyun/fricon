@@ -58,7 +58,7 @@ describe("useDatasetWriteStatusQuery", () => {
     expect(chartKeys.writeStatus(42)).toEqual(["charts", "writeStatus", 42]);
   });
 
-  it("has refetchInterval set for live-write polling", () => {
+  it("has refetchInterval set for non-live write polling", () => {
     getDatasetWriteStatusMock.mockResolvedValue({
       rowCount: 0,
     });
@@ -68,8 +68,5 @@ describe("useDatasetWriteStatusQuery", () => {
     });
 
     expect(result.current.isLoading).toBe(true);
-    // The hook is configured with refetchInterval; React Query sets it on the
-    // observer. We verify the query was initiated (not skipped) and the mock
-    // was eventually called, confirming the hook is enabled and polling.
   });
 });

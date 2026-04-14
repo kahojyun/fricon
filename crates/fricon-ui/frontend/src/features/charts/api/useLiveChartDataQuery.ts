@@ -62,7 +62,6 @@ export function useLiveChartDataQuery(
       return nextState?.chart;
     },
     enabled: Boolean(options),
-    refetchInterval: 1000,
   });
 
   return query;

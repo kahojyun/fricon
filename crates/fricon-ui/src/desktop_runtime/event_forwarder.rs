@@ -8,7 +8,10 @@ use tracing::{error, warn};
 
 use crate::{
     desktop_runtime::{runtime::show_main_window, session::WorkspaceSession},
-    features::datasets::{tauri::DatasetChanged, types::DatasetInfo},
+    features::datasets::{
+        tauri::{DatasetChanged, DatasetWriteProgress},
+        types::DatasetInfo,
+    },
 };
 
 pub(crate) fn start_event_forwarder(session: &WorkspaceSession, app_handle: tauri::AppHandle) {
@@ -56,6 +59,12 @@ fn emit_dataset_event(event: &DatasetEvent, app_handle: &tauri::AppHandle) {
     let changed = match event {
         DatasetEvent::Created(r) => DatasetChanged::Created {
             info: DatasetInfo::from(r),
+        },
+        DatasetEvent::WriteProgress(progress) => DatasetChanged::WriteProgress {
+            progress: DatasetWriteProgress {
+                id: progress.id,
+                row_count: progress.row_count,
+            },
         },
         DatasetEvent::StatusChanged(r) => DatasetChanged::StatusChanged {
             info: DatasetInfo::from(r),
