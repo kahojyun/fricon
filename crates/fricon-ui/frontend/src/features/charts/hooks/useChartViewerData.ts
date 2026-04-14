@@ -1,5 +1,3 @@
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import type {
   ChartViewerAvailability,
   DatasetDetail,
@@ -8,9 +6,7 @@ import type {
 import type { ComplexViewOption } from "@/shared/lib/chartTypes";
 import { useChartDataQuery } from "../api/useChartDataQuery";
 import { useLiveChartDataQuery } from "../api/useLiveChartDataQuery";
-import { useDatasetWriteStatusQuery } from "../api/useDatasetWriteStatusQuery";
 import { useFilterTableDataQuery } from "../api/useFilterTableDataQuery";
-import { chartKeys } from "../api/queryKeys";
 import { useCascadeSelection } from "./useCascadeSelection";
 import {
   buildChartRequest,
@@ -120,7 +116,6 @@ export function useChartViewerData({
   isLiveMode,
   liveWindowCount,
 }: UseChartViewerDataArgs) {
-  const queryClient = useQueryClient();
   const queriesEnabled = availability === "available";
   const filterTableQuery = useFilterTableDataQuery(
     datasetId,
@@ -133,22 +128,6 @@ export function useChartViewerData({
   const filterRow = cascade.resolvedRow ?? null;
   const hasFilters = (filterTableData?.fields.length ?? 0) > 0;
   const indexFilters = hasFilters ? filterRow?.valueIndices : undefined;
-
-  const writeStatus = useDatasetWriteStatusQuery(
-    datasetId,
-    queriesEnabled && datasetDetail?.status === "Writing",
-  );
-
-  useEffect(() => {
-    if (writeStatus.data?.rowCount !== undefined) {
-      void queryClient.invalidateQueries({
-        queryKey: chartKeys.chartData(datasetId),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: chartKeys.filterTableData(datasetId),
-      });
-    }
-  }, [queryClient, datasetId, writeStatus.data?.rowCount]);
 
   const liveChartRequest =
     isLiveMode && queriesEnabled

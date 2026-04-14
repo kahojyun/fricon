@@ -1,11 +1,12 @@
 import { useEffect, useEffectEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { events } from "@/shared/lib/bindings";
+import { events, type DatasetChanged } from "@/shared/lib/bindings";
 import { chartKeys } from "./queryKeys";
 
 /**
  * Subscribes to backend dataset change events and invalidates chart-specific
  * queries. Handles only the event kinds that affect chart data:
+ * - `writeProgress`: writer appended rows while the dataset is still open
  * - `statusChanged`: dataset transitions from Writing to Completed/Aborted
  * - `imported`: a force-import replaced existing dataset data
  *
@@ -15,7 +16,32 @@ import { chartKeys } from "./queryKeys";
 export function useChartEventSync() {
   const queryClient = useQueryClient();
 
-  const handleEvent = useEffectEvent((datasetId: number) => {
+  const handleEvent = useEffectEvent((payload: DatasetChanged) => {
+    if (payload.kind === "writeProgress") {
+      const datasetId = payload.progress.id;
+      void queryClient.invalidateQueries({
+        queryKey: chartKeys.chartData(datasetId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: chartKeys.filterTableData(datasetId),
+      });
+      void queryClient.refetchQueries({
+        queryKey: chartKeys.liveChartData(datasetId),
+        type: "active",
+      });
+      return;
+    }
+
+    if (payload.kind === "globalTagsChanged") {
+      return;
+    }
+
+    const datasetId = payload.info.id;
+
+    if (payload.kind !== "statusChanged" && payload.kind !== "imported") {
+      return;
+    }
+
     void queryClient.invalidateQueries({
       queryKey: chartKeys.chartData(datasetId),
     });
@@ -34,10 +60,7 @@ export function useChartEventSync() {
     void events.datasetChanged
       .listen((event) => {
         if (!active) return;
-        const p = event.payload;
-        if (p.kind === "statusChanged" || p.kind === "imported") {
-          handleEvent(p.info.id);
-        }
+        handleEvent(event.payload);
       })
       .then((fn) => {
         if (!active) {

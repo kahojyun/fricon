@@ -78,16 +78,26 @@ pub(crate) struct DatasetFavoriteUpdate {
     favorite: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DatasetWriteProgress {
+    pub(crate) id: i32,
+    pub(crate) row_count: usize,
+}
+
 /// Payload for the `dataset-changed` Tauri event.
 ///
 /// Serialised as an internally-tagged JSON object (discriminant field: `kind`).
-/// Variants that concern a specific dataset carry an `info` field; the
-/// `globalTagsChanged` variant has no `info`.
+/// Most dataset lifecycle variants carry an `info` field; `writeProgress`
+/// carries a lightweight `progress` payload, and `globalTagsChanged` carries
+/// no dataset payload.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub(crate) enum DatasetChanged {
     /// New dataset was created by ingest (Writing status).
     Created { info: DatasetInfo },
+    /// Additional rows were appended while the dataset is still in Writing.
+    WriteProgress { progress: DatasetWriteProgress },
     /// Write session transitioned the dataset to Completed or Aborted.
     StatusChanged { info: DatasetInfo },
     /// Name, description, or favorite flag changed.

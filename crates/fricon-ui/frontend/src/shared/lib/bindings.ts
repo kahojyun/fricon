@@ -86,12 +86,15 @@ export type ComplexViewOption = "real" | "imag" | "mag" | "arg";
  *  Payload for the `dataset-changed` Tauri event.
  * 
  *  Serialised as an internally-tagged JSON object (discriminant field: `kind`).
- *  Variants that concern a specific dataset carry an `info` field; the
- *  `globalTagsChanged` variant has no `info`.
+ *  Most dataset lifecycle variants carry an `info` field; `writeProgress`
+ *  carries a lightweight `progress` payload, and `globalTagsChanged` carries
+ *  no dataset payload.
  */
 export type DatasetChanged = 
 // New dataset was created by ingest (Writing status).
 { kind: "created"; info: DatasetInfo } | 
+// Additional rows were appended while the dataset is still in Writing.
+{ kind: "writeProgress"; progress: DatasetWriteProgress } | 
 // Write session transitioned the dataset to Completed or Aborted.
 { kind: "statusChanged"; info: DatasetInfo } | 
 // Name, description, or favorite flag changed.
@@ -176,6 +179,11 @@ export type DatasetTagBatchResult = {
 	success: boolean,
 	addError: DatasetOperationError | null,
 	removeError: DatasetOperationError | null,
+};
+
+export type DatasetWriteProgress = {
+	id: number,
+	rowCount: number,
 };
 
 export type DatasetWriteStatus = {

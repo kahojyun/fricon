@@ -25,11 +25,19 @@ impl WriteSessionGuard {
         self.session.as_mut().expect("Write session missing")
     }
 
+    fn session_ref(&self) -> &WriteSession {
+        self.session.as_ref().expect("Write session missing")
+    }
+
     pub(crate) fn write_batch(
         &mut self,
         batch: arrow_array::RecordBatch,
     ) -> Result<(), IngestError> {
         self.session_mut().write(batch)
+    }
+
+    pub(crate) fn num_rows(&self) -> usize {
+        self.session_ref().num_rows()
     }
 
     pub(crate) fn finalize_session(mut self) -> Result<(), IngestError> {

@@ -109,7 +109,7 @@ pub enum ClientError {
 
 const MAX_PAYLOAD_CHUNK_SIZE: usize = 1024 * 1024;
 const MAX_BATCH_ROWS: usize = 16;
-const BATCH_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
+const BATCH_FLUSH_INTERVAL: Duration = Duration::from_millis(200);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExistingUiProbeResult {
