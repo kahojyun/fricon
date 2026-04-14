@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.3 (2026-04-14)
+
+### Features
+
+- replace ECharts with WebGL2 + d3.js chart renderer (#373)
+- add chart numeric label formatting controls (#386)
+- use numeric axes for heatmaps (#407)
+- add dataset stress test generators (#409)
+- support jagged heatmap x grids (#416)
+
+### Fixes
+
+- pin dependencies (#375)
+- update tanstack-router monorepo (patch) (#401)
+- update dependency react-resizable-panels to v4.8.0 (#400)
+- stabilize live mode interactions (#408)
+- update tanstack-router monorepo (patch) (#410)
+
 ## 0.1.2 (2026-04-07)
 
 ### Features
