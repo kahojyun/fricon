@@ -1,5 +1,8 @@
 import type { HeatmapSeries } from "@/shared/lib/chartTypes";
 
+const MIN_COMPARISON_TOLERANCE = 1e-15;
+const COMPARISON_TOLERANCE_RATIO = 1e-12;
+
 export interface HeatmapCellGeometry {
   x: number;
   y: number;
@@ -28,6 +31,8 @@ export interface HeatmapAxisCenters {
   yValues: number[];
 }
 
+export type HeatmapXAxisTopology = "shared_grid" | "row_local_grid";
+
 export interface HeatmapLayout {
   geometry: HeatmapGeometry;
   bounds: {
@@ -37,6 +42,7 @@ export interface HeatmapLayout {
     yMax: number;
   };
   centers: HeatmapAxisCenters;
+  xTopology: HeatmapXAxisTopology;
 }
 
 export const EMPTY_HEATMAP_GEOMETRY: HeatmapGeometry = {
@@ -65,10 +71,10 @@ export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
   const yValues = Array.from(
     new Set(coordinatePoints.map((point) => point.y)),
   ).sort((left, right) => left - right);
-  const xBounds = buildAxisBounds(xValues);
   const yBounds = buildAxisBounds(yValues);
+  const rowSpans = buildRowSpansByY(yValues, coordinatePoints, xValues);
 
-  if (xBounds.spanByValue.size === 0 || yBounds.spanByValue.size === 0) {
+  if (rowSpans.byY.size === 0 || yBounds.spanByValue.size === 0) {
     return {
       geometry: EMPTY_HEATMAP_GEOMETRY,
       bounds: {
@@ -78,12 +84,13 @@ export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
         yMax: EMPTY_HEATMAP_GEOMETRY.yMax,
       },
       centers: EMPTY_HEATMAP_AXIS_CENTERS,
+      xTopology: "shared_grid",
     };
   }
 
   const geometry = {
-    xMin: xBounds.min,
-    xMax: xBounds.max,
+    xMin: rowSpans.min,
+    xMax: rowSpans.max,
     yMin: yBounds.min,
     yMax: yBounds.max,
     series: series.map((item) => ({
@@ -96,7 +103,7 @@ export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
             Number.isFinite(point.z),
         )
         .flatMap((point) => {
-          const xSpan = xBounds.spanByValue.get(point.x);
+          const xSpan = rowSpans.byY.get(point.y)?.spanByValue.get(point.x);
           const ySpan = yBounds.spanByValue.get(point.y);
           if (!xSpan || !ySpan) return [];
           return [
@@ -121,10 +128,25 @@ export function deriveHeatmapLayout(series: HeatmapSeries[]): HeatmapLayout {
       yMax: geometry.yMax,
     },
     centers: {
-      xValues,
+      xValues:
+        rowSpans.xTopology === "shared_grid"
+          ? rowSpans.sharedCenters
+          : EMPTY_HEATMAP_AXIS_CENTERS.xValues,
       yValues,
     },
+    xTopology: rowSpans.xTopology,
   };
+}
+
+export function getHeatmapXTickValues(
+  centers: HeatmapAxisCenters,
+  xTopology: HeatmapXAxisTopology,
+  maxExplicitTicks = 10,
+) {
+  return xTopology === "shared_grid" &&
+    centers.xValues.length <= maxExplicitTicks
+    ? centers.xValues
+    : undefined;
 }
 
 interface SeriesPoint {
@@ -139,6 +161,14 @@ interface AxisBounds {
   spanByValue: Map<number, [number, number]>;
 }
 
+interface RowSpanState {
+  byY: Map<number, AxisBounds>;
+  min: number;
+  max: number;
+  sharedCenters: number[];
+  xTopology: HeatmapXAxisTopology;
+}
+
 function readSeriesPoints(series: HeatmapSeries): SeriesPoint[] {
   const points: SeriesPoint[] = [];
   for (let i = 0; i < series.pointCount; i++) {
@@ -150,6 +180,144 @@ function readSeriesPoints(series: HeatmapSeries): SeriesPoint[] {
     });
   }
   return points;
+}
+
+function buildRowSpansByY(
+  yValues: number[],
+  coordinatePoints: SeriesPoint[],
+  globalXValues: number[],
+): RowSpanState {
+  const xTolerance = deriveXTolerance(globalXValues);
+  const xValuesByY = new Map<number, number[]>();
+  for (const point of coordinatePoints) {
+    const values = xValuesByY.get(point.y);
+    if (values) {
+      values.push(point.x);
+    } else {
+      xValuesByY.set(point.y, [point.x]);
+    }
+  }
+
+  const byY = new Map<number, AxisBounds>();
+  const rowCenters: number[][] = [];
+  let min = Infinity;
+  let max = -Infinity;
+
+  for (const y of yValues) {
+    const rowXValues = xValuesByY.get(y);
+    if (!rowXValues || rowXValues.length === 0) continue;
+
+    const uniqueRowXValues = Array.from(new Set(rowXValues)).sort(
+      (left, right) => left - right,
+    );
+    const bounds = buildRowAxisBounds(
+      uniqueRowXValues,
+      globalXValues,
+      xTolerance,
+    );
+    if (bounds.spanByValue.size === 0) continue;
+
+    byY.set(y, bounds);
+    rowCenters.push(uniqueRowXValues);
+    min = Math.min(min, bounds.min);
+    max = Math.max(max, bounds.max);
+  }
+
+  const xTopology = classifyXTopology(rowCenters, xTolerance);
+
+  return {
+    byY,
+    min,
+    max,
+    sharedCenters:
+      rowCenters.length > 0 && xTopology === "shared_grid" ? rowCenters[0] : [],
+    xTopology,
+  };
+}
+
+function buildRowAxisBounds(
+  values: number[],
+  globalValues: number[],
+  xTolerance: number,
+): AxisBounds {
+  if (values.length === 0) {
+    return {
+      min: 0,
+      max: 1,
+      spanByValue: new Map(),
+    };
+  }
+
+  if (values.length === 1) {
+    const center = values[0];
+    const halfWidth = resolveSingletonHalfWidth(
+      center,
+      globalValues,
+      xTolerance,
+    );
+    return {
+      min: center - halfWidth,
+      max: center + halfWidth,
+      spanByValue: new Map([
+        [center, [center - halfWidth, center + halfWidth]],
+      ]),
+    };
+  }
+
+  return buildAxisBounds(values);
+}
+
+function resolveSingletonHalfWidth(
+  center: number,
+  globalValues: number[],
+  xTolerance: number,
+) {
+  let nearest = Infinity;
+  for (const value of globalValues) {
+    const distance = Math.abs(value - center);
+    if (distance <= xTolerance || distance >= nearest) continue;
+    nearest = distance;
+  }
+  return Number.isFinite(nearest) ? nearest / 2 : 0.5;
+}
+
+function classifyXTopology(
+  rowCenters: number[][],
+  xTolerance: number,
+): HeatmapXAxisTopology {
+  if (rowCenters.length === 0) return "shared_grid";
+
+  const firstCenters = rowCenters[0];
+  const sharesCommonGrid = rowCenters.every((centers) =>
+    arraysAlmostEqual(centers, firstCenters, xTolerance),
+  );
+  if (sharesCommonGrid) {
+    return "shared_grid";
+  }
+  return "row_local_grid";
+}
+
+function arraysAlmostEqual(
+  left: number[],
+  right: number[],
+  xTolerance: number,
+) {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i++) {
+    if (!almostEqual(left[i], right[i], xTolerance)) return false;
+  }
+  return true;
+}
+
+function almostEqual(left: number, right: number, tolerance: number) {
+  return Math.abs(left - right) <= tolerance;
+}
+
+function deriveXTolerance(values: number[]) {
+  if (values.length <= 1) return MIN_COMPARISON_TOLERANCE;
+
+  const span = Math.abs(values[values.length - 1] - values[0]);
+  return Math.max(MIN_COMPARISON_TOLERANCE, span * COMPARISON_TOLERANCE_RATIO);
 }
 
 function buildAxisBounds(values: number[]): AxisBounds {

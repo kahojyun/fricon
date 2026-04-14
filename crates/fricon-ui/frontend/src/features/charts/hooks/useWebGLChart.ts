@@ -70,6 +70,7 @@ import {
 } from "../rendering/heatmapRenderer";
 import {
   deriveHeatmapLayout,
+  getHeatmapXTickValues,
   type HeatmapGeometry,
 } from "../rendering/heatmapGeometry";
 
@@ -279,10 +280,10 @@ export function useWebGLChart({
         r.numericLabelFormat,
         {
           showGrid: false,
-          xTickValues:
-            rs.state.centers.xValues.length <= 10
-              ? rs.state.centers.xValues
-              : undefined,
+          xTickValues: getHeatmapXTickValues(
+            rs.state.centers,
+            rs.state.xTopology,
+          ),
           yTickValues:
             rs.state.centers.yValues.length <= 10
               ? rs.state.centers.yValues

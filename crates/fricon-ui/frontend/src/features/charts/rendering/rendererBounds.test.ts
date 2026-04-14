@@ -5,7 +5,11 @@ import {
   lineDataBounds,
   type LineRenderState,
 } from "./lineRenderer";
-import { deriveHeatmapLayout, EMPTY_HEATMAP_GEOMETRY } from "./heatmapGeometry";
+import {
+  deriveHeatmapLayout,
+  EMPTY_HEATMAP_GEOMETRY,
+  getHeatmapXTickValues,
+} from "./heatmapGeometry";
 import {
   syncHeatmapRenderState,
   type HeatmapRenderState,
@@ -232,7 +236,7 @@ describe("syncHeatmapRenderState", () => {
           seriesId: "heat",
           cells: [
             { x: 10, y: 5, z: 1, x0: 5, x1: 15, y0: 3, y1: 7 },
-            { x: 20, y: 5, z: 2, x0: 15, x1: 30, y0: 3, y1: 7 },
+            { x: 20, y: 5, z: 2, x0: 15, x1: 25, y0: 3, y1: 7 },
             { x: 40, y: 9, z: 3, x0: 30, x1: 50, y0: 7, y1: 11 },
           ],
         },
@@ -257,19 +261,181 @@ describe("syncHeatmapRenderState", () => {
     });
   });
 
-  it("returns sorted unique heatmap axis centers", () => {
+  it("keeps shared x centers for shared-grid heatmaps", () => {
+    const layout = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [46, 120, 1],
+        [7, 120, 2],
+        [19, 120, 3],
+        [46, 185, 4],
+        [7, 185, 5],
+        [19, 185, 6],
+      ]),
+    ]);
+
+    expect(layout.xTopology).toBe("shared_grid");
+    expect(layout.centers).toEqual({
+      xValues: [7, 19, 46],
+      yValues: [120, 185],
+    });
+    expect(getHeatmapXTickValues(layout.centers, layout.xTopology)).toEqual([
+      7, 19, 46,
+    ]);
+  });
+
+  it("keeps shared x centers for regular shared-grid heatmaps", () => {
+    const layout = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [7, 120, 1],
+        [19, 120, 2],
+        [7, 185, 3],
+        [19, 185, 4],
+      ]),
+    ]);
+
+    expect(layout.xTopology).toBe("shared_grid");
+    expect(layout.centers).toEqual({
+      xValues: [7, 19],
+      yValues: [120, 185],
+    });
+    expect(getHeatmapXTickValues(layout.centers, layout.xTopology)).toEqual([
+      7, 19,
+    ]);
+  });
+
+  it("classifies row-local x grids and suppresses explicit x ticks", () => {
+    const layout = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [0, 0, 1],
+        [10, 0, 2],
+        [10, 1, 3],
+        [30, 1, 4],
+      ]),
+    ]);
+
+    expect(layout.xTopology).toBe("row_local_grid");
+    expect(layout.centers).toEqual({
+      xValues: [],
+      yValues: [0, 1],
+    });
+    expect(
+      getHeatmapXTickValues(layout.centers, layout.xTopology),
+    ).toBeUndefined();
+  });
+
+  it("uses axis-span-aware tolerance for very small x ranges", () => {
+    const layout = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [0, 0, 1],
+        [1e-10, 0, 2],
+        [1e-10, 1, 3],
+        [3e-10, 1, 4],
+      ]),
+    ]);
+
+    expect(layout.xTopology).toBe("row_local_grid");
+    expect(layout.centers.xValues).toEqual([]);
+  });
+
+  it("uses axis-span-aware tolerance for large x ranges with tiny noise", () => {
+    const layout = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [1e9, 0, 1],
+        [2e9, 0, 2],
+        [1e9 + 1e-6, 1, 3],
+        [2e9 + 1e-6, 1, 4],
+      ]),
+    ]);
+
+    expect(layout.xTopology).toBe("shared_grid");
+    expect(layout.centers.xValues).toEqual([1e9, 2e9]);
+  });
+
+  it("uses row-local x spans when rows use different steps", () => {
     expect(
       deriveHeatmapLayout([
         xyzSeries("heat", "heat", [
-          [46, 310, 1],
-          [7, 120, 2],
-          [19, 185, 3],
-          [7, 310, 4],
+          [0, 0, 1],
+          [10, 0, 2],
+          [10, 1, 3],
+          [30, 1, 4],
         ]),
-      ]).centers,
+      ]).geometry,
     ).toEqual({
-      xValues: [7, 19, 46],
-      yValues: [120, 185, 310],
+      xMin: -5,
+      xMax: 40,
+      yMin: -0.5,
+      yMax: 1.5,
+      series: [
+        {
+          seriesId: "heat",
+          cells: [
+            { x: 0, y: 0, z: 1, x0: -5, x1: 5, y0: -0.5, y1: 0.5 },
+            { x: 10, y: 0, z: 2, x0: 5, x1: 15, y0: -0.5, y1: 0.5 },
+            { x: 10, y: 1, z: 3, x0: 0, x1: 20, y0: 0.5, y1: 1.5 },
+            { x: 30, y: 1, z: 4, x0: 20, x1: 40, y0: 0.5, y1: 1.5 },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("uses row-local midpoint spans for non-shared x rows", () => {
+    const layout = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [0, 0, 1],
+        [100, 0, 2],
+        [10, 1, 3],
+        [30, 1, 4],
+        [35, 1, 5],
+      ]),
+    ]);
+
+    expect(layout.xTopology).toBe("row_local_grid");
+    expect(layout.geometry).toEqual({
+      xMin: -50,
+      xMax: 150,
+      yMin: -0.5,
+      yMax: 1.5,
+      series: [
+        {
+          seriesId: "heat",
+          cells: [
+            { x: 0, y: 0, z: 1, x0: -50, x1: 50, y0: -0.5, y1: 0.5 },
+            { x: 100, y: 0, z: 2, x0: 50, x1: 150, y0: -0.5, y1: 0.5 },
+            { x: 10, y: 1, z: 3, x0: 0, x1: 20, y0: 0.5, y1: 1.5 },
+            { x: 30, y: 1, z: 4, x0: 20, x1: 32.5, y0: 0.5, y1: 1.5 },
+            { x: 35, y: 1, z: 5, x0: 32.5, x1: 37.5, y0: 0.5, y1: 1.5 },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("uses the nearest chart-wide spacing for singleton rows", () => {
+    expect(
+      deriveHeatmapLayout([
+        xyzSeries("heat", "heat", [
+          [0, 0, 1],
+          [100, 0, 2],
+          [10, 1, 3],
+        ]),
+      ]).geometry,
+    ).toEqual({
+      xMin: -50,
+      xMax: 150,
+      yMin: -0.5,
+      yMax: 1.5,
+      series: [
+        {
+          seriesId: "heat",
+          cells: [
+            { x: 0, y: 0, z: 1, x0: -50, x1: 50, y0: -0.5, y1: 0.5 },
+            { x: 100, y: 0, z: 2, x0: 50, x1: 150, y0: -0.5, y1: 0.5 },
+            { x: 10, y: 1, z: 3, x0: 5, x1: 15, y0: 0.5, y1: 1.5 },
+          ],
+        },
+      ],
     });
   });
 
@@ -286,16 +452,17 @@ describe("syncHeatmapRenderState", () => {
   });
 
   it("preserves NaN-only rows and columns in axis centers", () => {
-    expect(
-      deriveHeatmapLayout([
-        xyzSeries("heat", "heat", [
-          [0, 0, 1],
-          [1, 0, Number.NaN],
-          [0, 2, 3],
-        ]),
-      ]).centers,
-    ).toEqual({
-      xValues: [0, 1],
+    const layout = deriveHeatmapLayout([
+      xyzSeries("heat", "heat", [
+        [0, 0, 1],
+        [1, 0, Number.NaN],
+        [0, 2, 3],
+      ]),
+    ]);
+
+    expect(layout.xTopology).toBe("row_local_grid");
+    expect(layout.centers).toEqual({
+      xValues: [],
       yValues: [0, 2],
     });
   });
@@ -326,6 +493,7 @@ describe("syncHeatmapRenderState", () => {
         xValues: [],
         yValues: [],
       },
+      xTopology: "shared_grid",
       geometry: EMPTY_HEATMAP_GEOMETRY,
       valueMin: 0,
       valueMax: 0,
@@ -366,9 +534,10 @@ describe("syncHeatmapRenderState", () => {
       yMax: 1.5,
     });
     expect(state.centers).toEqual({
-      xValues: [0, 1],
+      xValues: [],
       yValues: [0, 1],
     });
+    expect(state.xTopology).toBe("row_local_grid");
     expect(bufferData).toHaveBeenCalledWith(
       gl.ARRAY_BUFFER,
       new Float32Array(10),

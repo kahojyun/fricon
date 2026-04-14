@@ -11,6 +11,7 @@ import {
   EMPTY_HEATMAP_GEOMETRY,
   type HeatmapAxisCenters,
   type HeatmapGeometry,
+  type HeatmapXAxisTopology,
 } from "./heatmapGeometry";
 import { heatmapFragmentSource, heatmapVertexSource } from "./shaders/heatmap";
 
@@ -36,6 +37,7 @@ export interface HeatmapRenderState {
     yMax: number;
   };
   centers: HeatmapAxisCenters;
+  xTopology: HeatmapXAxisTopology;
   geometry: HeatmapGeometry;
   vao: WebGLVertexArrayObject;
   valueMin: number;
@@ -101,6 +103,7 @@ export function createHeatmapRenderState(
       xValues: [],
       yValues: [],
     },
+    xTopology: "shared_grid",
     geometry: EMPTY_HEATMAP_GEOMETRY,
     vao,
     valueMin: 0,
@@ -115,7 +118,7 @@ export function syncHeatmapRenderState(
   state: HeatmapRenderState,
   series: HeatmapSeries[],
 ): void {
-  const { geometry, bounds, centers } = deriveHeatmapLayout(series);
+  const { geometry, bounds, centers, xTopology } = deriveHeatmapLayout(series);
   const { valueMin, valueMax, instanceData } = buildHeatmapInstances(geometry);
   gl.bindBuffer(gl.ARRAY_BUFFER, state.cellBuffer);
   if (
@@ -152,6 +155,7 @@ export function syncHeatmapRenderState(
   state.instanceData = instanceData;
   state.bounds = bounds;
   state.centers = centers;
+  state.xTopology = xTopology;
   state.geometry = geometry;
   state.valueMin = valueMin;
   state.valueMax = valueMax;
