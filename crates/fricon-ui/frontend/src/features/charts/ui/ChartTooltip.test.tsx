@@ -170,6 +170,51 @@ describe("getTooltipLines", () => {
     ).toEqual(["x: 2, y: 20", "z: 200"]);
   });
 
+  it("uses row-local heatmap geometry for hover hit testing", () => {
+    const data: ChartOptions = {
+      type: "heatmap",
+      xName: "x",
+      yName: "y",
+      series: [
+        xyzSeries("z", "z", [
+          [0, 0, 1],
+          [100, 0, 2],
+          [10, 20, 3],
+          [30, 20, 4],
+        ]),
+      ],
+    };
+    const layout = deriveHeatmapLayout(data.series);
+
+    const interactionState: ChartInteractionState = {
+      type: "heatmap",
+      xMin: layout.bounds.xMin,
+      xMax: layout.bounds.xMax,
+      yMin: layout.bounds.yMin,
+      yMax: layout.bounds.yMax,
+      margin,
+      zoomState: {
+        scaleX: 1,
+        scaleY: 1,
+        translateX: 0,
+        translateY: 0,
+      },
+      geometry: layout.geometry,
+    };
+
+    expect(
+      getTooltipLines(
+        data,
+        DEFAULT_NUMERIC_LABEL_FORMAT,
+        interactionState,
+        25.5,
+        25,
+        100,
+        100,
+      ),
+    ).toEqual(["x: 10, y: 20", "z: 3"]);
+  });
+
   it("reuses the configured formatter for tooltip values", () => {
     const data: ChartOptions = {
       type: "xy",
