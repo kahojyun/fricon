@@ -14,10 +14,6 @@ DEV_FOLDER = ".dev"
 WORKSPACE_DIR = "ws"
 WORKSPACE_DB = "fricon.sqlite3"
 WORKSPACE_METADATA = ".fricon_workspace.json"
-WORKSPACE_DATA_DIR = "data"
-WORKSPACE_GRAVEYARD_DIR = ".graveyard"
-WORKSPACE_LOG_DIR = "log"
-WORKSPACE_BACKUP_DIR = "backup"
 WORKSPACE_LOCK_FILE = ".fricon.lock"
 MANAGED_ENV_KEYS = ("FRICON_WORKSPACE", "DATABASE_URL")
 
@@ -160,17 +156,7 @@ def update_managed_env_file(path: Path, updates: Mapping[str, str]) -> None:
 
 
 def is_valid_workspace(paths: ProjectPaths) -> bool:
-    workspace_root = paths.fricon_workspace_path
-    if not paths.workspace_metadata_path.is_file():
-        return False
-
-    required_directories = (
-        workspace_root / WORKSPACE_DATA_DIR,
-        workspace_root / WORKSPACE_DATA_DIR / WORKSPACE_GRAVEYARD_DIR,
-        workspace_root / WORKSPACE_LOG_DIR,
-        workspace_root / WORKSPACE_BACKUP_DIR,
-    )
-    return all(directory.is_dir() for directory in required_directories)
+    return paths.workspace_metadata_path.is_file()
 
 
 def can_initialize_workspace(paths: ProjectPaths) -> bool:
