@@ -29,7 +29,9 @@ __pycache__/
 .dev/
 
 # Rust
-.cargo/
+.cargo/*
+!.cargo/config.toml
+!.cargo/config.shared.toml
 
 # Python
 .mypy_cache/
