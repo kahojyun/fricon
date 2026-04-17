@@ -1,5 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "semanticCommitType": "chore",
   "minimumReleaseAge": "14 days",
   "extends": [
     "config:best-practices",
