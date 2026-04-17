@@ -3,6 +3,7 @@
   "minimumReleaseAge": "14 days",
   "extends": [
     "config:best-practices",
+    ":semanticCommitTypeAll(chore)",
     ":automergePatch",
     ":automergeStableNonMajor",
     ":approveMajorUpdates",
