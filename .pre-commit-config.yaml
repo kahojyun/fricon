@@ -22,20 +22,20 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
   - repo: https://github.com/tombi-toml/tombi-pre-commit
-    rev: 278e5cffad3af72e94baa7f447ee9d4752ef43c7  # frozen: v0.9.15
+    rev: fab64dc97d9fc7fdb2ff99d22c304bf681bc5b37  # frozen: v0.9.17
     hooks:
       - id: tombi-format
         args: ["--offline"]
   - repo: https://github.com/crate-ci/typos
-    rev: 02ea592e44b3a53c302f697cddca7641cd051c3d  # frozen: v1.45.0
+    rev: 141bf8d1d11823cd5dc44d6b3c17d83b19015bcb  # frozen: v1
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0397b68f6f88c024f1d2b355a9818779f6336d16  # frozen: 0.11.3
+    rev: e99c5b43aa41681e83d439e6ebf3c82d7f3f6426  # frozen: 0.11.6
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: c60c980e561ed3e73101667fe8365c609d19a438  # frozen: v0.15.9
+    rev: b831c3dc5d27d9da294ae4e915773b99aa24a7c5  # frozen: v0.15.10
     hooks:
       - id: ruff-check
         args: [--fix]
