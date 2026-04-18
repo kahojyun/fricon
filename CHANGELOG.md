@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.4 (2026-04-18)
+
+### Fixes
+
+- update chart viewer refreshes to use write progress events (#417)
+- update tanstack-query monorepo to v5.96.0 (minor) (#419)
+- update tanstack-query monorepo to v5.96.1 (patch) (#421)
+
 ## 0.1.3 (2026-04-14)
 
 ### Features
