@@ -21,6 +21,14 @@ impl Gui {
         self.run_with_command_name("fricon-ui")
     }
 
+    pub fn run_standalone(self, default_workspace_path: Option<PathBuf>) -> Result<()> {
+        crate::run_with_context(&crate::LaunchContext {
+            launch_source: crate::LaunchSource::Standalone,
+            workspace_path: self.path.or(default_workspace_path),
+            interaction_mode: crate::InteractionMode::Dialog,
+        })
+    }
+
     pub fn run_with_command_name(self, command_name: impl Into<String>) -> Result<()> {
         let command_name = command_name.into();
         let cli_help = render_help_for_command::<Gui>(&command_name)?;
