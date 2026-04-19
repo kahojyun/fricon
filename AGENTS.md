@@ -10,6 +10,11 @@
 
 ## Repo-Wide Rules
 
+- On a fresh clone or `git worktree`, run `python3 scripts/bootstrap-checkout.py`
+  before edits or checks. Use `python3 scripts/setup-dev.py` only when you need
+  the dev workspace created through `fricon init`.
+- Keep setup lazy: run `uv sync`, `uv run maturin develop`, `pnpm install`, and
+  broader builds only when the task actually needs them.
 - Users interact with this repo through the Python API, CLI, and desktop UI. Internal Rust APIs between crates have no stability guarantees and may be aggressively refactored or broken when it improves the architecture.
 - Use non-`mod.rs` layout for Rust modules (`foo.rs` plus optional `foo/*.rs` submodules).
 - Rust use nightly rustfmt: `cargo +nightly fmt`.
