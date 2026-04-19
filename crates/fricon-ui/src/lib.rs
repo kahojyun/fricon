@@ -1,3 +1,4 @@
+pub mod cli;
 mod desktop_runtime;
 mod features;
 mod launch;

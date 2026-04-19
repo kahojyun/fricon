@@ -1557,6 +1557,7 @@ dependencies = [
  "async-stream",
  "bytes",
  "chrono",
+ "clap",
  "derive_more 2.1.1",
  "diesel",
  "diesel_migrations",
@@ -1583,19 +1584,9 @@ dependencies = [
  "tonic-prost-build",
  "tower",
  "tracing",
+ "tracing-subscriber",
  "uuid",
  "zstd",
-]
-
-[[package]]
-name = "fricon-cli"
-version = "0.1.3"
-dependencies = [
- "anyhow",
- "clap",
- "fricon",
- "fricon-ui",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1606,8 +1597,9 @@ dependencies = [
  "arrow-array",
  "arrow-pyarrow",
  "chrono",
+ "clap",
  "fricon",
- "fricon-cli",
+ "fricon-ui",
  "indexmap 2.14.0",
  "itertools",
  "num",
@@ -1627,6 +1619,7 @@ dependencies = [
  "arrow-select",
  "base64 0.22.1",
  "chrono",
+ "clap",
  "dotenvy",
  "fricon",
  "indexmap 2.14.0",

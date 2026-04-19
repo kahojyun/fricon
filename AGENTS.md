@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Rust crates are under `crates/`: `fricon`, `fricon-py`, `fricon-ui`, `fricon-cli`.
+- Rust crates are under `crates/`: `fricon`, `fricon-py`, `fricon-ui`.
 - Frontend is under `crates/fricon-ui/frontend`.
 - `examples/` contains runnable examples.
 - `scripts/` contains development helpers.

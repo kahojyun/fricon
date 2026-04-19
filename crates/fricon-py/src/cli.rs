@@ -3,7 +3,7 @@ use std::{
     io::{IsTerminal, stderr, stdout},
 };
 
-use fricon_cli::clap::{Parser, error::ErrorKind};
+use clap::{Parser, error::ErrorKind};
 use pyo3::{prelude::*, pyfunction};
 
 fn ignore_python_sigint(py: Python<'_>) -> PyResult<()> {
@@ -34,15 +34,15 @@ fn parse_error_exit_code(kind: ErrorKind) -> i32 {
 }
 
 #[expect(clippy::print_stderr, reason = "Error messages for CLI tool")]
-fn main_impl<T: Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
+fn main_impl(py: Python<'_>) -> i32 {
     if ignore_python_sigint(py).is_err() {
         eprintln!("Failed to reset python SIGINT handler.");
         return 1;
     }
 
     let argv = env::args_os().skip(1);
-    let cli = T::parse_from(argv);
-    match cli.main() {
+    let cli = fricon::cli::Cli::parse_from(argv);
+    match cli.run() {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("Error: {e}");
@@ -51,14 +51,14 @@ fn main_impl<T: Parser + fricon_cli::Main>(py: Python<'_>) -> i32 {
     }
 }
 
-/// Main CLI entry point that delegates to fricon-cli binary.
+/// Main CLI entry point for the fricon command.
 ///
 /// Returns:
 ///     Exit code.
 #[pyfunction]
 #[must_use]
 pub(crate) fn main(py: Python<'_>) -> i32 {
-    main_impl::<fricon_cli::Cli>(py)
+    main_impl(py)
 }
 
 /// GUI only CLI entry point.
@@ -79,15 +79,16 @@ pub(crate) fn main_gui(py: Python<'_>) -> i32 {
         || "fricon-gui".to_string(),
         |arg| command_name_from_argv0(arg),
     );
-    let cli_help = match fricon_cli::render_help_for_command::<fricon_cli::Gui>(&command_name) {
-        Ok(help) => help,
-        Err(e) => {
-            eprintln!("Error: {e}");
-            return 1;
-        }
-    };
-    match fricon_cli::Gui::try_parse_from(argv) {
-        Ok(cli) => match cli.main_with_help(command_name, cli_help) {
+    let cli_help =
+        match fricon_ui::cli::render_help_for_command::<fricon_ui::cli::GuiArgs>(&command_name) {
+            Ok(help) => help,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                return 1;
+            }
+        };
+    match fricon_ui::cli::parse_gui_args_or_fallback(argv, has_console_output()) {
+        Ok(gui_args) => match gui_args.launch_with_cli_context(command_name, cli_help) {
             Ok(()) => 0,
             Err(e) => {
                 eprintln!("Error: {e}");
@@ -95,26 +96,16 @@ pub(crate) fn main_gui(py: Python<'_>) -> i32 {
             }
         },
         Err(parse_error) => {
-            if has_console_output() {
-                let exit_code = parse_error_exit_code(parse_error.kind());
-                eprint!("{parse_error}");
-                exit_code
-            } else {
-                match fricon_cli::launch_gui_with_context(command_name, cli_help, None, false) {
-                    Ok(()) => 0,
-                    Err(e) => {
-                        eprintln!("Error: {e}");
-                        1
-                    }
-                }
-            }
+            let exit_code = parse_error_exit_code(parse_error.kind());
+            eprint!("{parse_error}");
+            exit_code
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use fricon_cli::clap::error::ErrorKind;
+    use clap::error::ErrorKind;
 
     use super::parse_error_exit_code;
 

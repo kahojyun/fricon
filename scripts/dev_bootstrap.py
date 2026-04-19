@@ -74,7 +74,7 @@ def ensure_workspace_exists(paths: ProjectPaths) -> bool:
             "run",
             "--quiet",
             "-p",
-            "fricon-cli",
+            "fricon",
             "--",
             "init",
             paths.fricon_workspace_path.as_posix(),
