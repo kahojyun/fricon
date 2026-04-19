@@ -90,32 +90,30 @@ impl TraceKind {
     #[must_use]
     pub fn parse_data_type(data_type: &DataType) -> Option<(TraceKind, &Field)> {
         fn parse_fixed_step(fields: &[FieldRef]) -> Option<(TraceKind, &Field)> {
+            let [x0, step, y] = fields.as_array::<3>()?;
             (fields.iter().map(|f| f.name()).eq(["x0", "step", "y"])
-                && !fields[0].is_nullable()
-                && !fields[1].is_nullable()
-                && !fields[2].is_nullable())
-            .then(|| match [0, 1, 2].map(|i| fields[i].data_type()) {
+                && !x0.is_nullable()
+                && !step.is_nullable()
+                && !y.is_nullable())
+            .then(|| match [x0.data_type(), step.data_type(), y.data_type()] {
                 [DataType::Float64, DataType::Float64, DataType::List(y)] => {
                     Some((TraceKind::FixedStep, y.as_ref()))
                 }
                 _ => None,
-            })
-            .flatten()
+            })?
         }
 
         fn parse_variable_step(fields: &[FieldRef]) -> Option<(TraceKind, &Field)> {
-            (fields.iter().map(|f| f.name()).eq(["x", "y"])
-                && !fields[0].is_nullable()
-                && !fields[1].is_nullable())
-            .then(|| match [0, 1].map(|i| fields[i].data_type()) {
-                [DataType::List(x), DataType::List(y)]
-                    if matches!(x.data_type(), DataType::Float64) && !x.is_nullable() =>
-                {
-                    Some((TraceKind::VariableStep, y.as_ref()))
-                }
-                _ => None,
-            })
-            .flatten()
+            let [x, y] = fields.as_array::<2>()?;
+            (fields.iter().map(|f| f.name()).eq(["x", "y"]) && !x.is_nullable() && !y.is_nullable())
+                .then(|| match [x.data_type(), y.data_type()] {
+                    [DataType::List(x), DataType::List(y)]
+                        if matches!(x.data_type(), DataType::Float64) && !x.is_nullable() =>
+                    {
+                        Some((TraceKind::VariableStep, y.as_ref()))
+                    }
+                    _ => None,
+                })?
         }
 
         match data_type {

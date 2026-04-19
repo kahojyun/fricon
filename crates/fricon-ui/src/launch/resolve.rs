@@ -52,17 +52,18 @@ pub(crate) fn select_workspace_path(launch_source: &LaunchSource) -> Result<Opti
     loop {
         match prompt_missing_workspace_action(launch_source) {
             MissingWorkspaceAction::ChooseWorkspace => {}
-            MissingWorkspaceAction::ShowCliHelpAndExit => {
+            MissingWorkspaceAction::ShowCliHelpAndExit
                 if let LaunchSource::Cli {
                     command_name,
                     cli_help,
-                } = launch_source
-                {
-                    show_cli_help(command_name, cli_help);
-                }
+                } = launch_source =>
+            {
+                show_cli_help(command_name, cli_help);
                 return Ok(None);
             }
-            MissingWorkspaceAction::Exit => return Ok(None),
+            MissingWorkspaceAction::ShowCliHelpAndExit | MissingWorkspaceAction::Exit => {
+                return Ok(None);
+            }
         }
 
         let Some(path) = FileDialog::new().pick_folder() else {
