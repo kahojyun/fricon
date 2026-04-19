@@ -150,7 +150,10 @@ def update_managed_env_file(path: Path, updates: Mapping[str, str]) -> None:
 
     for key, value in updates.items():
         if key not in seen:
+            if updated_lines and not updated_lines[-1].endswith("\n"):
+                updated_lines.append("\n")
             updated_lines.append(f"{key}={value}\n")
+
 
     path.write_text("".join(updated_lines), encoding="utf-8")
 
