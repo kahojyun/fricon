@@ -154,7 +154,6 @@ def update_managed_env_file(path: Path, updates: Mapping[str, str]) -> None:
                 updated_lines.append("\n")
             updated_lines.append(f"{key}={value}\n")
 
-
     path.write_text("".join(updated_lines), encoding="utf-8")
 
 
