@@ -16,7 +16,10 @@ def main() -> None:
     )
     print(f"Cargo worktree config: {paths.cargo_worktree_path}")
     print(f"PYO3_PYTHON: {python_path}")
-    print(f"Shared target dir: {target_dir}")
+    if target_dir is None:
+        print("Shared target dir: not configured")
+    else:
+        print(f"Shared target dir: {target_dir}")
     print("")
     print("Next steps:")
     print("- Install only the dependencies your task needs")
