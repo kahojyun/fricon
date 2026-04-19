@@ -52,11 +52,14 @@ function renderRowActions(
       .mockResolvedValue([
         { id: 11, success: true, error: null },
       ] satisfies DatasetDeleteResult[]),
-    children: <div>Row trigger</div>,
     ...overrides,
   };
 
-  render(<DatasetTableRowActions {...props} />);
+  render(
+    <DatasetTableRowActions {...props}>
+      <div>Row trigger</div>
+    </DatasetTableRowActions>,
+  );
   return props;
 }
 
