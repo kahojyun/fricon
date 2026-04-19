@@ -25,8 +25,7 @@ fn find_pnpm_executable() -> &'static str {
             if Command::new(candidate)
                 .arg("--version")
                 .output()
-                .map(|output| output.status.success())
-                .unwrap_or(false)
+                .is_ok_and(|output| output.status.success())
             {
                 return candidate;
             }

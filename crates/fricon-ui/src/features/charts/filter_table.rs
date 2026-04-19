@@ -112,11 +112,12 @@ fn build_float64_array(value: &serde_json::Value) -> Result<ArrayRef> {
 }
 
 fn is_complex_fields(fields: &Fields) -> bool {
-    fields.len() == 2
-        && fields[0].name() == "real"
-        && fields[1].name() == "imag"
-        && matches!(fields[0].data_type(), DataType::Float64)
-        && matches!(fields[1].data_type(), DataType::Float64)
+    fields.as_ref().as_array::<2>().is_some_and(|[real, imag]| {
+        real.name() == "real"
+            && imag.name() == "imag"
+            && matches!(real.data_type(), DataType::Float64)
+            && matches!(imag.data_type(), DataType::Float64)
+    })
 }
 
 fn build_complex_array(fields: &Fields, value: &serde_json::Value) -> Result<ArrayRef> {
@@ -269,7 +270,7 @@ pub(crate) async fn build_filter_batch(
     let arrays = filter_schema
         .fields()
         .iter()
-        .zip(selected_filters.into_iter())
+        .zip(selected_filters)
         .map(|(field, (_, value))| build_filter_array(field.data_type(), value))
         .collect::<Result<Vec<_>>>()?;
 
