@@ -4,5 +4,5 @@
 use anyhow::Result;
 
 fn main() -> Result<()> {
-    fricon_ui::cli::run_standalone_entrypoint()
+    fricon_ui::cli::run_standalone_from_env()
 }

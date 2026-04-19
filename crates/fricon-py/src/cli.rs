@@ -80,15 +80,15 @@ pub(crate) fn main_gui(py: Python<'_>) -> i32 {
         |arg| command_name_from_argv0(arg),
     );
     let cli_help =
-        match fricon_ui::cli::render_help_for_command::<fricon_ui::cli::Gui>(&command_name) {
+        match fricon_ui::cli::render_help_for_command::<fricon_ui::cli::GuiArgs>(&command_name) {
             Ok(help) => help,
             Err(e) => {
                 eprintln!("Error: {e}");
                 return 1;
             }
         };
-    match fricon_ui::cli::parse_gui_launch_args(argv, has_console_output()) {
-        Ok(cli) => match cli.run_with_help(command_name, cli_help) {
+    match fricon_ui::cli::parse_gui_args_or_fallback(argv, has_console_output()) {
+        Ok(gui_args) => match gui_args.launch_with_cli_context(command_name, cli_help) {
             Ok(()) => 0,
             Err(e) => {
                 eprintln!("Error: {e}");
