@@ -1,10 +1,12 @@
 use std::{
+    env,
     io::{IsTerminal, stderr, stdout},
     path::PathBuf,
 };
 
 use anyhow::Result;
 use clap::Parser;
+use dotenvy::dotenv;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -38,6 +40,15 @@ impl Gui {
     pub fn run_with_help(self, command_name: String, cli_help: String) -> Result<()> {
         launch_gui_with_context(command_name, cli_help, self.path, self.force_dialog)
     }
+}
+
+pub fn run_standalone_entrypoint() -> Result<()> {
+    let _ = dotenv();
+    let default_workspace_path = env::var("FRICON_WORKSPACE").ok().map(PathBuf::from);
+    let gui = parse_gui_launch_args(env::args_os(), has_tty()).unwrap_or_else(|error| {
+        error.exit();
+    });
+    gui.run_standalone(default_workspace_path)
 }
 
 pub fn launch_gui_with_context(
@@ -77,6 +88,24 @@ pub fn render_help_for_command<T: clap::CommandFactory>(bin_name: &str) -> Resul
     let mut help = Vec::new();
     command.write_long_help(&mut help)?;
     Ok(String::from_utf8_lossy(&help).into_owned())
+}
+
+pub fn parse_gui_launch_args<I, T>(
+    argv: I,
+    has_console_output: bool,
+) -> std::result::Result<Gui, clap::error::Error>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<std::ffi::OsString> + Clone,
+{
+    match Gui::try_parse_from(argv) {
+        Ok(gui) => Ok(gui),
+        Err(parse_error) if has_console_output => Err(parse_error),
+        Err(_) => Ok(Gui {
+            path: None,
+            force_dialog: false,
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -124,5 +153,19 @@ mod tests {
     fn gui_cli_parses_force_dialog_without_path_argument() {
         let parsed = Gui::try_parse_from(["fricon-ui", "--force-dialog"]);
         assert!(parsed.is_ok());
+    }
+
+    #[test]
+    fn standalone_entrypoint_ignores_unknown_args_without_console_output() {
+        let parsed = parse_gui_launch_args(["fricon-ui", "--launcher-token"], false);
+        let gui = parsed.expect("non-console launches should ignore unknown args");
+        assert!(gui.path.is_none());
+        assert!(!gui.force_dialog);
+    }
+
+    #[test]
+    fn standalone_entrypoint_reports_unknown_args_with_console_output() {
+        let parsed = parse_gui_launch_args(["fricon-ui", "--launcher-token"], true);
+        assert!(parsed.is_err());
     }
 }

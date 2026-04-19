@@ -87,7 +87,7 @@ pub(crate) fn main_gui(py: Python<'_>) -> i32 {
                 return 1;
             }
         };
-    match fricon_ui::cli::Gui::try_parse_from(argv) {
+    match fricon_ui::cli::parse_gui_launch_args(argv, has_console_output()) {
         Ok(cli) => match cli.run_with_help(command_name, cli_help) {
             Ok(()) => 0,
             Err(e) => {
@@ -96,19 +96,9 @@ pub(crate) fn main_gui(py: Python<'_>) -> i32 {
             }
         },
         Err(parse_error) => {
-            if has_console_output() {
-                let exit_code = parse_error_exit_code(parse_error.kind());
-                eprint!("{parse_error}");
-                exit_code
-            } else {
-                match fricon_ui::cli::launch_gui_with_context(command_name, cli_help, None, false) {
-                    Ok(()) => 0,
-                    Err(e) => {
-                        eprintln!("Error: {e}");
-                        1
-                    }
-                }
-            }
+            let exit_code = parse_error_exit_code(parse_error.kind());
+            eprint!("{parse_error}");
+            exit_code
         }
     }
 }
