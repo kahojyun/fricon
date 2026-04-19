@@ -3,7 +3,6 @@ versioned_files = [
   "Cargo.toml",
   "package.json",
   { path = "Cargo.lock", dependency = "fricon" },
-  { path = "Cargo.lock", dependency = "fricon-cli" },
   { path = "Cargo.lock", dependency = "fricon-py" },
   { path = "Cargo.lock", dependency = "fricon-ui" },
   "crates/fricon-ui/frontend/package.json",

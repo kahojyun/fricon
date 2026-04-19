@@ -7,6 +7,7 @@
 //!   Arrow format
 //! - **Client-Server Architecture**: gRPC-based communication
 pub mod app;
+pub mod cli;
 pub mod client;
 mod database;
 pub mod dataset;

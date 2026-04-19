@@ -9,6 +9,11 @@ license.workspace = true
 keywords.workspace = true
 publish = false
 
+[[bin]]
+doc = false
+name = "fricon"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 arrow-arith = { workspace = true }
@@ -21,6 +26,7 @@ arrow-select = { workspace = true }
 async-stream = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
+clap = { workspace = true, features = ["derive"] }
 derive_more = { workspace = true, features = ["from"] }
 diesel = { workspace = true, features = [
   "chrono",
@@ -50,6 +56,7 @@ tonic = { workspace = true }
 tonic-prost = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 uuid = { workspace = true, features = ["fast-rng", "serde", "v4"] }
 zstd = { workspace = true }
 

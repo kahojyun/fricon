@@ -18,7 +18,7 @@ arrow-schema = { workspace = true }
 arrow-select = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
-dotenvy = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 fricon = { path = "../fricon" }
 indexmap = { workspace = true }
 rfd = { workspace = true }
