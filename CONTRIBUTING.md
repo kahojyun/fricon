@@ -18,11 +18,25 @@ Essential steps:
     git clone https://github.com/kahojyun/fricon.git
     cd fricon
 
-2. Run the development setup (creates .dev, .env, runs migrations):
+2. Run the development setup (creates .dev, .env, and ensures the dev workspace exists via `fricon init`):
 
     python3 scripts/setup-dev.py
 
 3. Install language/tool-specific dependencies as needed (see sections below).
+
+### Working with git worktrees
+
+For a new worktree, bootstrap only the checkout-local state first:
+
+    git worktree add ../fricon-my-task -b my-task
+    cd ../fricon-my-task
+    python3 scripts/bootstrap-checkout.py
+
+Then install and run only the task-specific tooling you need. `.venv/` and
+`node_modules/` remain worktree-local; Rust build output is shared through
+Cargo configuration. The checkout bootstrap does not create the workspace; use
+`python3 scripts/setup-dev.py` when you want the dev workspace to be created
+through `fricon init`.
 
 ## Install / Tooling notes
 
@@ -36,11 +50,17 @@ Essential steps:
 
     uv sync --all-groups
 
+For a fresh worktree, only run this when the current task needs Python
+dependencies.
+
 - Frontend (pnpm workspace)
 
 The repository uses a pnpm workspace. Run pnpm commands from the project root so workspace packages (including the frontend) are handled automatically:
 
     pnpm install          # run at project root to install all workspace deps
+
+For a fresh worktree, only run this when the current task needs frontend
+dependencies.
 
 ### Tauri v2 dependencies for Linux
 
@@ -67,6 +87,10 @@ Rust (workspace):
     cargo build
     cargo test
 
+Bootstrap a fresh worktree first:
+
+    python3 scripts/bootstrap-checkout.py
+
 Python:
 
     uv run maturin develop   # build extension for development
@@ -88,6 +112,13 @@ Common frontend commands:
     pnpm run depcruise:frontend
     pnpm tauri dev
 
+## Workspace setup
+
+The dev workspace lives at `.dev/ws`. `python3 scripts/setup-dev.py` ensures it
+exists by calling `fricon init` through the repo CLI entrypoint. The lighter
+`python3 scripts/bootstrap-checkout.py` command only aligns checkout-local
+configuration; it does not create the workspace.
+
 ## Database migrations
 
 The project uses SQLite + Diesel. Typical commands (from crates/fricon):
@@ -96,7 +127,9 @@ The project uses SQLite + Diesel. Typical commands (from crates/fricon):
     diesel migration run
     diesel migration redo
 
-(Ensure `DATABASE_URL` is set in `.env` or created by setup script.)
+(Ensure `DATABASE_URL` is set in `.env` or created by setup script. It should
+point at `.dev/ws/fricon.sqlite3` for the current checkout.)
+(New worktrees should use `python3 scripts/bootstrap-checkout.py`.)
 
 ## Code style and linting
 
