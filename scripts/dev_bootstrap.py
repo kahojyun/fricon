@@ -169,14 +169,6 @@ def resolve_pyo3_python(root: Path) -> Path:
     if main_checkout_python is not None:
         return main_checkout_python
 
-    if sys.platform == "win32":
-        worktree_python = root / ".venv" / "Scripts" / "python.exe"
-    else:
-        worktree_python = root / ".venv" / "bin" / "python"
-
-    if worktree_python.exists():
-        return worktree_python
-
     return Path(sys.executable)
 
 
