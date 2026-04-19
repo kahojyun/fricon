@@ -12,7 +12,7 @@ git diff --name-only
 ```
 
 Use the result to choose areas:
-- Rust core/CLI (`crates/fricon`, `crates/fricon-cli`, shared Rust)
+- Rust core/CLI (`crates/fricon`, shared Rust CLI, non-frontend Rust)
 - Python bindings (`crates/fricon-py`, Python tests, `pyproject.toml`)
 - Frontend (`crates/fricon-ui/frontend`, root JS/TS config)
 - Tauri IPC signatures (Rust command/event changes used by UI)
