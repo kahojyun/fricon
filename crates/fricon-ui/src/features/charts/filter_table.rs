@@ -269,7 +269,7 @@ pub(crate) async fn build_filter_batch(
     let arrays = filter_schema
         .fields()
         .iter()
-        .zip(selected_filters.into_iter())
+        .zip(selected_filters)
         .map(|(field, (_, value))| build_filter_array(field.data_type(), value))
         .collect::<Result<Vec<_>>>()?;
 
