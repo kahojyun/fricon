@@ -109,6 +109,9 @@ export const config = {
     timeout: 60_000,
   },
   onPrepare: () => {
+    // This helper binary runs without `custom-protocol`, so `tauri_build::is_dev()`
+    // stays true and `crates/fricon-ui/build.rs` skips the frontend bundle work.
+    // The packaged app build below is the step that intentionally pays that cost.
     runChecked(
       "cargo",
       [
