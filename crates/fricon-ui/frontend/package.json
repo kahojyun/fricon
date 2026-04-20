@@ -18,7 +18,7 @@
     "test:unit": "vitest --project unit --run",
     "test:browser": "vitest --project browser --run",
     "test:browser:headed": "vitest --project browser --run",
-    "test": "pnpm run test:unit && pnpm run test:browser"
+    "test": "vitest --run"
   },
   "dependencies": {
     "@base-ui/react": "1.3.0",

@@ -35,6 +35,7 @@ export default defineConfig({
     },
   },
   test: {
+    watch: false,
     projects: [
       {
         resolve: {
