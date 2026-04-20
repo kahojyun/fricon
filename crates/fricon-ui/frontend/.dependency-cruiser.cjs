@@ -268,8 +268,6 @@ module.exports = {
           "[.]browser[.]test[.](?:ts|tsx)$",
           "[.]smoke[.]test[.](?:ts|tsx)$",
           "^src/features/[^/]+/ui/use[^/]+[.]test[.](?:ts|tsx)$",
-          "^src/features/charts/ui/ChartWrapper[.]test[.]tsx$",
-          "^src/features/charts/rendering/zoomController[.]test[.]ts$",
         ],
       },
       to: { path: "^@testing-library/react$" },

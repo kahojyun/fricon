@@ -1,10 +1,33 @@
-import { fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   attachZoom,
   IDENTITY_ZOOM,
   scaleZoomStateAroundPoint,
 } from "./zoomController";
+
+function dispatchPointerEvent(
+  target: SVGSVGElement,
+  type: string,
+  init: PointerEventInit,
+) {
+  target.dispatchEvent(
+    new PointerEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    }),
+  );
+}
+
+function dispatchWheelEvent(target: SVGSVGElement, init: WheelEventInit) {
+  target.dispatchEvent(
+    new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    }),
+  );
+}
 
 describe("scaleZoomStateAroundPoint", () => {
   it("scales around the cursor on the x axis", () => {
@@ -77,13 +100,13 @@ describe("scaleZoomStateAroundPoint", () => {
       (state) => states.push(state),
     );
 
-    fireEvent.pointerDown(svg, {
+    dispatchPointerEvent(svg, "pointerdown", {
       button: 2,
       pointerId: 1,
       clientX: 120,
       clientY: 80,
     });
-    fireEvent.pointerMove(svg, {
+    dispatchPointerEvent(svg, "pointermove", {
       button: 2,
       pointerId: 1,
       clientX: 170,
@@ -127,13 +150,13 @@ describe("scaleZoomStateAroundPoint", () => {
       (state) => states.push(state),
     );
 
-    fireEvent.pointerDown(svg, {
+    dispatchPointerEvent(svg, "pointerdown", {
       button: 0,
       pointerId: 1,
       clientX: 120,
       clientY: 80,
     });
-    fireEvent.pointerMove(svg, {
+    dispatchPointerEvent(svg, "pointermove", {
       button: 0,
       pointerId: 1,
       clientX: 340,
@@ -175,7 +198,7 @@ describe("scaleZoomStateAroundPoint", () => {
       (state) => states.push(state),
     );
 
-    fireEvent.wheel(svg, {
+    dispatchWheelEvent(svg, {
       clientX: 160,
       clientY: 90,
       deltaY: 600,

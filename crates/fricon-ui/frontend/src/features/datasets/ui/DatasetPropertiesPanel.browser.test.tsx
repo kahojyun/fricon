@@ -209,7 +209,7 @@ describe("DatasetPropertiesPanel", () => {
     fireEvent.change(nameInput, { target: { value: "Local draft" } });
     expect(nameInput).toHaveValue("Local draft");
 
-    await act(async () => {
+    act(() => {
       rerender(
         <DatasetPropertiesPanel
           datasetId={1}
@@ -254,7 +254,7 @@ describe("DatasetPropertiesPanel", () => {
     expect(await screen.findByLabelText("Name")).toHaveValue("a");
     expect(screen.getByLabelText("Description")).toHaveValue("b::c");
 
-    await act(async () => {
+    act(() => {
       rerender(
         <DatasetPropertiesPanel
           datasetId={1}
