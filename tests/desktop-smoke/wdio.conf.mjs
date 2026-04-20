@@ -82,7 +82,7 @@ function onShutdown(fn) {
 export const config = {
   host: "127.0.0.1",
   port: 4444,
-  specs: ["./tests/desktop-smoke/specs/**/*.smoke.test.mjs"],
+  specs: ["./specs/**/*.smoke.test.mjs"],
   maxInstances: 1,
   capabilities: [
     {
