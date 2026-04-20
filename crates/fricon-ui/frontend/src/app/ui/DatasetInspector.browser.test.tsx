@@ -55,13 +55,20 @@ function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
   };
 }
 
+function renderWithUser() {
+  return {
+    user: userEvent.setup(),
+    ...render(<DatasetInspector />),
+  };
+}
+
 describe("DatasetInspector", () => {
   beforeEach(() => {
     useDatasetDetailQueryMock.mockReset();
   });
 
   it("renders the empty state when no dataset is selected", () => {
-    render(<DatasetInspector />);
+    renderWithUser();
 
     expect(screen.getByText("No dataset selected")).toBeInTheDocument();
     expect(

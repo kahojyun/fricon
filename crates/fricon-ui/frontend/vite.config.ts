@@ -2,6 +2,7 @@
 
 import { fileURLToPath } from "node:url";
 import babel from "@rolldown/plugin-babel";
+import { playwright } from "@vitest/browser-playwright";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
@@ -10,6 +11,10 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 const host = process.env.TAURI_DEV_HOST;
 const isLicenseBundle = process.env.npm_lifecycle_event === "bundle-licenses";
 const isVitest = process.env.VITEST === "true";
+const isBrowserHeaded =
+  process.env.VITEST_BROWSER_HEADED === "true" ||
+  process.env.npm_lifecycle_event === "test:browser:headed";
+const srcDir = fileURLToPath(new URL("./src", import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -26,16 +31,54 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": srcDir,
     },
   },
   test: {
-    environment: "jsdom",
-    setupFiles: "./src/shared/test/setup.ts",
-    css: true,
     watch: false,
-    globals: true,
-    execArgv: ["--no-experimental-webstorage"],
+    projects: [
+      {
+        resolve: {
+          alias: {
+            "@": srcDir,
+          },
+        },
+        test: {
+          name: "unit",
+          include: ["src/**/*.test.*"],
+          exclude: ["src/**/*.browser.test.*", "src/**/*.smoke.test.*"],
+          environment: "jsdom",
+          setupFiles: "./src/shared/test/setup.ts",
+          css: true,
+          globals: true,
+          execArgv: ["--no-experimental-webstorage"],
+        },
+      },
+      {
+        resolve: {
+          alias: {
+            "@": srcDir,
+          },
+        },
+        test: {
+          name: "browser",
+          include: ["src/**/*.browser.test.*"],
+          setupFiles: "./src/shared/test/browser/setup.ts",
+          css: true,
+          globals: true,
+          browser: {
+            enabled: true,
+            provider: playwright({
+              launchOptions: {
+                channel: "chromium",
+              },
+            }),
+            headless: !isBrowserHeaded,
+            instances: [{ browser: "chromium" }],
+          },
+        },
+      },
+    ],
   },
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

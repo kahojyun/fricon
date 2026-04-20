@@ -19,7 +19,9 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 4. Run selected checks in fail-fast order:
    - run format and static checks first
    - for frontend changes, prefer `pnpm run check` as the default combined gate
-   - split frontend commands only when diagnosing a failure or when you intentionally need a narrower rerun (`type-check`, `lint`, or `depcruise:frontend`)
+   - use `pnpm run test` for the full frontend batch
+   - use `pnpm run test:unit` or `pnpm run test:browser` when you intentionally need one test mode
+   - for targeted frontend reruns, pass file filters to `test:unit` or `test:browser` instead of the batch `test` script
    - build/test next
    - strict-only checks last (dependency/license checks included)
 5. If the PR includes user-facing behavior changes, release-note-worthy fixes, or an intended version bump, add a Knope changeset file under `.changeset/`.
@@ -43,6 +45,7 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 - Run `uv run maturin develop` before `uv run pytest` for Python binding tests.
 - Never hand-edit `crates/fricon-ui/frontend/src/shared/lib/bindings.ts`; regenerate it.
 - Treat `pnpm run check` as the default frontend gate and ensure frontend slice-boundary validation is covered by it or by `pnpm run depcruise:frontend` when commands are split.
+- Treat `pnpm run test` as a batch command only; choose `test:unit` or `test:browser` for targeted reruns.
 - AI agents should create Knope changeset files directly under `.changeset/` instead of using the interactive `knope document-change` command.
 - Do not place templates, README files, or other helper Markdown files inside `.changeset/`; Knope treats them as real changesets. `.changeset/.gitkeep` is acceptable.
 - Workspace structure changes are not complete until migration logic, the `WORKSPACE_VERSION` decision, and docs/rules are updated together.

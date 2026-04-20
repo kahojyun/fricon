@@ -13,7 +13,8 @@
 - Inside a feature, prefer relative imports for feature-local code.
 - Validate frontend slice-boundary changes with `pnpm run depcruise:frontend` or the repo-root `pnpm run check`.
 - `src/app/**` and `src/routes/**` should consume only feature barrel exports such as `@/features/<feature>`.
-- Test support modules should be named `test-utils.ts` or `test-utils.tsx`, colocated with the tests they support.
+- Test files should use `*.test.*` by default, `*.browser.test.*` for browser-mode coverage, and `*.smoke.test.*` for desktop smoke coverage.
+- Test support modules should be named `test-utils.*`, colocated with the tests they support. For shared browser-only helpers, prefer a browser-specific directory over encoding the runner in the helper filename.
 
 ## Generated Files (Do Not Edit Manually)
 
