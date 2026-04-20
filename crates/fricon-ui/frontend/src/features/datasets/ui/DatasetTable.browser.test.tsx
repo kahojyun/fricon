@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DuplicateBatchConflict } from "./useDatasetImportFlow";
+import type { DuplicateBatchConflict } from "../hooks/useDatasetImportFlow";
 import { useDatasetTableData } from "../api/useDatasetTableData";
 import {
   COLUMN_VISIBILITY_STORAGE_KEY,
@@ -44,7 +44,7 @@ vi.mock("../api/events", () => ({
   onDatasetArchiveDrop: onDatasetArchiveDropMock,
 }));
 
-vi.mock("./useDatasetImportFlow", () => ({
+vi.mock("../hooks/useDatasetImportFlow", () => ({
   useDatasetImportFlow: useDatasetImportFlowMock,
 }));
 

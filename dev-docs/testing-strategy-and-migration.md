@@ -192,9 +192,8 @@ For `src/app/**`, `src/features/**/ui/**`, and
 `src/features/**/rendering/**`, UI-facing render tests should default to
 `*.browser.test.*`. The frontend `dependency-cruiser` config now blocks new
 `@testing-library/react` and `@testing-library/user-event` imports in default
-`*.test.*` files in those directories. The remaining carve-outs should stay
-small and principled: `use*.test.*` hook tests that remain intentionally
-unit-scoped even when they live under `ui/`.
+`*.test.*` files in those directories. Hook tests that remain intentionally
+unit-scoped should live under `hooks/`, `api/`, or `model/`, not under `ui/`.
 
 Do not encode extra scope labels such as `integration` in the filename unless
 they are required by a tool. Test scope should usually live in the directory

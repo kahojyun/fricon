@@ -15,7 +15,7 @@
 - `src/app/**` and `src/routes/**` should consume only feature barrel exports such as `@/features/<feature>`.
 - Test files should use `*.test.*` by default, `*.browser.test.*` for browser-mode coverage, and `*.smoke.test.*` for desktop smoke coverage.
 - Test support modules should be named `test-utils.*`, colocated with the tests they support. For shared browser-only helpers, prefer a browser-specific directory over encoding the runner in the helper filename.
-- UI-facing render tests in `src/app/**`, `src/features/**/ui/**`, and `src/features/**/rendering/**` should default to `*.browser.test.*`. The frontend `dependency-cruiser` config blocks new `@testing-library/react` and `@testing-library/user-event` imports in default `*.test.*` files there. The only standing category-level carve-out should be `use*.test.*` hook tests that remain intentionally unit-scoped even when they live under `ui/`.
+- UI-facing render tests in `src/app/**`, `src/features/**/ui/**`, and `src/features/**/rendering/**` should default to `*.browser.test.*`. The frontend `dependency-cruiser` config blocks new `@testing-library/react` and `@testing-library/user-event` imports in default `*.test.*` files there. Hook tests that stay unit-scoped should live under `hooks/`, `api/`, or `model/` rather than `ui/`.
 
 ## Generated Files (Do Not Edit Manually)
 

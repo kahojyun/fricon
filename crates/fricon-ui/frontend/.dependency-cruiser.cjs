@@ -259,7 +259,7 @@ module.exports = {
     {
       name: "ui-tests-no-react-testing-library-by-default",
       comment:
-        "UI-facing render tests should live in *.browser.test.*. Default *.test.* files under app/ui/rendering stay unit-scoped unless they are an explicit legacy exception.",
+        "UI-facing render tests should live in *.browser.test.*. Default *.test.* files under app/ui/rendering should avoid React Testing Library imports.",
       severity: "error",
       from: {
         path:
@@ -267,7 +267,6 @@ module.exports = {
         pathNot: [
           "[.]browser[.]test[.](?:ts|tsx)$",
           "[.]smoke[.]test[.](?:ts|tsx)$",
-          "^src/features/[^/]+/ui/use[^/]+[.]test[.](?:ts|tsx)$",
         ],
       },
       to: { path: "^@testing-library/react$" },
@@ -275,7 +274,7 @@ module.exports = {
     {
       name: "ui-tests-no-user-event-by-default",
       comment:
-        "user-event coverage should live in *.browser.test.*. Default *.test.* files under app/ui/rendering stay unit-scoped unless they are an explicit legacy exception.",
+        "user-event coverage should live in *.browser.test.*. Default *.test.* files under app/ui/rendering should avoid user-event imports.",
       severity: "error",
       from: {
         path:

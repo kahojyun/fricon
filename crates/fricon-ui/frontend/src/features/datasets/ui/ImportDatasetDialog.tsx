@@ -1,6 +1,6 @@
 import { AlertTriangle, DownloadCloud } from "lucide-react";
 import type { UiPreviewImportResult } from "../api/types";
-import type { DuplicateBatchConflict } from "./useDatasetImportFlow";
+import type { DuplicateBatchConflict } from "../hooks/useDatasetImportFlow";
 import {
   AlertDialog,
   AlertDialogAction,
