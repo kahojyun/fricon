@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { datasetKeys } from "../api/queryKeys";
@@ -152,7 +158,10 @@ describe("DatasetPropertiesPanel", () => {
       await user.click(screen.getByRole("switch"));
     });
     await waitFor(() => {
-      expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+      expect(screen.getByRole("switch")).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
     });
     await user.click(screen.getByRole("button", { name: "Save" }));
 

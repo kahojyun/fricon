@@ -262,8 +262,7 @@ module.exports = {
         "UI-facing render tests should live in *.browser.test.*. Default *.test.* files under app/ui/rendering should avoid React Testing Library imports.",
       severity: "error",
       from: {
-        path:
-          "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
+        path: "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
         pathNot: [
           "[.]browser[.]test[.](?:ts|tsx)$",
           "[.]smoke[.]test[.](?:ts|tsx)$",
@@ -277,8 +276,7 @@ module.exports = {
         "user-event coverage should live in *.browser.test.*. Default *.test.* files under app/ui/rendering should avoid user-event imports.",
       severity: "error",
       from: {
-        path:
-          "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
+        path: "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
         pathNot: [
           "[.]browser[.]test[.](?:ts|tsx)$",
           "[.]smoke[.]test[.](?:ts|tsx)$",
