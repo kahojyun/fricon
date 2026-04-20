@@ -71,7 +71,6 @@ export default defineConfig({
               launchOptions: {
                 channel: "chromium",
               },
-              persistentContext: true,
             }),
             headless: !isBrowserHeaded,
             instances: [{ browser: "chromium" }],
