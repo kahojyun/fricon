@@ -7,15 +7,15 @@
 - `src/shared/ui/` is reserved for shadcn/ui primitives and thin local patches to those files.
 - Repo-owned shared components must not be added under `src/shared/ui/`; place them in a separate shared directory such as `src/shared/components/` so they stay linted.
 - Shared helpers live under `src/shared/lib/`.
-- Feature internals should default to `ui/`, `api/`, `model/`, and `hooks/`.
 - The frontend uses vertical feature slices rooted under `src/features/`.
+- Feature internals should default to `ui/`, `api/`, `model/`, and `hooks/`.
 - Slice boundaries between `src/app/**`, `src/routes/**`, and `src/features/**` are enforced with `dependency-cruiser`.
 - Inside a feature, prefer relative imports for feature-local code.
 - Validate frontend slice-boundary changes with `pnpm run depcruise:frontend` or the repo-root `pnpm run check`.
 - `src/app/**` and `src/routes/**` should consume only feature barrel exports such as `@/features/<feature>`.
-- Test files should use `*.test.*` by default, `*.browser.test.*` for browser-mode coverage, and `*.smoke.test.*` for desktop smoke coverage.
-- Test support modules should be named `test-utils.*`, colocated with the tests they support. For shared browser-only helpers, prefer a browser-specific directory over encoding the runner in the helper filename.
-- UI-facing render tests in `src/app/**`, `src/features/**/ui/**`, and `src/features/**/rendering/**` should default to `*.browser.test.*`. The frontend `dependency-cruiser` config blocks new `@testing-library/react` and `@testing-library/user-event` imports in default `*.test.*` files there. Hook tests that stay unit-scoped should live under `hooks/`, `api/`, or `model/` rather than `ui/`.
+- Test files use `*.test.*` by default, `*.browser.test.*` for browser-mode coverage, and `*.smoke.test.*` for desktop smoke coverage. Test support modules should be named `test-utils.*` and colocated with the tests they support; for shared browser-only helpers, prefer a browser-specific directory over encoding the runner in the helper filename.
+- `ui/` is browser-first: UI-facing render tests under `src/app/**`, `src/features/**/ui/**`, and `src/features/**/rendering/**` should default to `*.browser.test.*`.
+- Unit-scoped tests that genuinely need `@testing-library/react` or `@testing-library/user-event` belong under `hooks/`, `api/`, or `model/`, not under `ui/`. `dependency-cruiser` enforces this path-based restriction.
 
 ## Generated Files (Do Not Edit Manually)
 
