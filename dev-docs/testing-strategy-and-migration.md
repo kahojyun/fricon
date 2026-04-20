@@ -11,28 +11,51 @@ The goal is to reduce long-term test debt, not just to add another test runner.
 
 ## Current State
 
-Today the repo uses:
+The repo now uses:
 
-- Rust tests through `cargo test` in CI.
+- Rust tests through `cargo nextest` in CI, with doctests kept separate.
 - Python tests through `uv run pytest`.
-- Frontend tests through a single `vitest` command backed by `jsdom`.
+- Frontend tests through split Vitest projects:
+  - `unit` for fast unit and `jsdom` coverage
+  - `browser` for browser-backed UI and integration coverage
 
 Relevant current files:
 
 - `.github/workflows/ci.yml`
+- `.config/nextest.toml`
 - `crates/fricon-ui/frontend/vite.config.ts`
 - `crates/fricon-ui/frontend/src/shared/test/setup.ts`
+- `crates/fricon-ui/frontend/src/shared/test/browser/`
 
 Current frontend constraints:
 
-- The Vitest config is explicitly `jsdom`-based.
-- The shared setup file contains browser API shims such as `matchMedia` and
-  `ResizeObserver`.
-- Many React UI tests are integration-style tests but still run in a simulated
-  DOM.
+- The browser-mode migration is underway, not finished.
+- Some browser API shims still exist in the shared unit setup and should be
+  revisited once the remaining `jsdom` scope is smaller.
+- A few higher-risk chart and WebGL-adjacent tests are still intentionally left
+  in unit land.
 
-That setup is useful for fast iteration, but it should be treated as
-transitional for UI-heavy tests.
+This means the repo is already on the target path, but the testing boundaries
+are not fully finalized yet.
+
+## Progress Snapshot
+
+As of PR [#434](https://github.com/kahojyun/fricon/pull/434), the migration has
+already covered:
+
+- the CI and runner foundation work
+- the browser test harness and naming convention
+- the first browser migration wave for app shell, dataset UI, and one
+  frontend integration slice
+- most of the low-risk chart UI migration
+- command-surface cleanup plus matching updates to docs, `AGENTS.md`, and
+  skills
+
+In terms of the original plan, this PR effectively collapses the old PR1
+through PR5 and most of PR6 into one reviewed unit.
+
+This roadmap should therefore be read as delivery phases, not as a promise
+that each phase maps one-to-one to a pull request.
 
 ## Target State
 
@@ -148,11 +171,19 @@ Do not use Tauri WebDriver for broad component coverage.
 
 Recommended conventions:
 
-- `*.test.ts` for pure unit tests.
-- `*.test.tsx` for small component or hook tests that remain in unit/jsdom
-  scope.
-- `*.browser.test.tsx` for Vitest Browser Mode tests.
-- `*.smoke.ts` or a dedicated smoke directory for Tauri desktop smoke tests.
+- `*.test.*` for default unit and `jsdom` tests.
+- `*.browser.test.*` for Vitest Browser Mode tests.
+- `*.smoke.test.*` for Tauri desktop smoke tests.
+- `test-utils.*` for colocated test helpers.
+
+If a helper is shared only by browser-mode tests, prefer placing it under a
+browser-specific test directory instead of adding a runner prefix to the helper
+filename.
+
+Do not encode extra scope labels such as `integration` in the filename unless
+they are required by a tool. Test scope should usually live in the directory
+and in the test description, while the filename suffix should communicate the
+execution mode.
 
 Vitest should be split into explicit projects instead of one global mode.
 
@@ -180,8 +211,8 @@ and pass the filter to `test:unit` or `test:browser`.
 
 ## Current Frontend Test Buckets
 
-The current frontend suite is roughly split between `.ts` logic tests and
-`.tsx` UI tests. The following buckets should guide migration work.
+The current frontend suite contains a mix of logic tests and UI tests. The
+following buckets should guide migration work.
 
 ### Keep in fast unit land
 
@@ -207,7 +238,7 @@ not be migrated just for consistency.
 First-wave candidates:
 
 - `crates/fricon-ui/frontend/src/app/router.test.tsx`
-- `crates/fricon-ui/frontend/src/app/ui/DatasetExplorerScreen.integration.test.tsx`
+- `crates/fricon-ui/frontend/src/app/ui/DatasetExplorerScreen.browser.test.tsx`
 - `crates/fricon-ui/frontend/src/app/ui/DatasetInspector.test.tsx`
 - `crates/fricon-ui/frontend/src/features/datasets/ui/DatasetTable.test.tsx`
 - `crates/fricon-ui/frontend/src/features/datasets/ui/DatasetTableToolbar.test.tsx`
@@ -233,127 +264,93 @@ reviewed deliberately instead of being ported mechanically.
 
 ## Migration Plan
 
-The migration should be executed in multiple PRs so that each change set is
-reviewable and reversible.
+The migration should still be executed in multiple PRs, but the original
+eight-PR ladder was more granular than the implementation reality justified.
+The work fell into a smaller number of tightly coupled phases, and future PRs
+may cover one phase, multiple phases, or part of a phase depending on review
+scope.
 
-### PR1: CI runner foundations
+### Phase 1: Foundation
 
 Changes:
 
 - Add `.config/nextest.toml` with a `ci` profile.
 - Replace Rust CI execution from `cargo test` to `cargo nextest`.
-- Keep doctests separate if needed.
-- Add explicit frontend scripts for `test`, `test:unit`, and `test:browser`.
-- Make the repo-root scripts the canonical frontend test entrypoints.
+- Keep doctests separate.
 - Split Vitest configuration into `unit` and `browser` projects.
-- Add Playwright-backed browser provider dependencies and CI install step.
+- Add Playwright-backed browser dependencies and CI install step.
+- Establish the canonical repo-root frontend test commands.
+- Add browser harness utilities and the `*.browser.test.*` convention.
+- Update docs, `AGENTS.md`, and skills to match the new command surface.
 
 Acceptance criteria:
 
-- CI stays green with existing frontend tests still running in unit mode.
-- Browser project exists and can run at least a trivial test in CI.
+- CI stays green.
 - Rust tests pass under `cargo nextest`.
-
-Risk:
-
-- Low
-
-### PR2: Browser harness and conventions
-
-Changes:
-
-- Add browser-specific setup utilities for React Query, router, and mocked
-  Tauri runtime state.
-- Establish the `*.browser.test.tsx` naming convention.
-- Validate the harness with an intentionally small migrated browser test.
-
-Acceptance criteria:
-
-- A minimal browser-mode test runs headless in CI.
-- Developers have a clear pattern to copy.
-
-Risk:
-
-- Low
-
-### PR3: App shell and routing migration
-
-Changes:
-
-- Port `src/app/router.test.tsx` to browser mode.
-- Port `src/app/ui/DatasetInspector.test.tsx` if it fits the new harness cleanly.
-- Delete or shrink the replaced `jsdom` coverage once parity is confirmed.
-
-Acceptance criteria:
-
-- Route navigation and shell behavior are validated in a real browser.
-- CI demonstrates stable browser test execution.
+- Browser-mode tests can run headless in CI.
+- Developers have one clear frontend command surface to follow.
 
 Risk:
 
 - Low to medium
 
-### PR4: Dataset UI migration
+Status:
+
+- Covered by PR #434.
+
+### Phase 2: First browser migration wave
 
 Changes:
 
-- Port dataset UI behavior tests to browser mode.
-- Start with:
-    - `DatasetTable.test.tsx`
-    - `DatasetTableToolbar.test.tsx`
-    - `DatasetTagFilter.test.tsx`
-    - `DatasetTableRowActions.test.tsx`
-    - `ManageTagsDialog.test.tsx`
-    - `DatasetPropertiesPanel.test.tsx`
+- Port the clearly safe UI and integration tests to browser mode:
+  - app shell and routing
+  - dataset inspector
+  - dataset UI behavior tests
+  - one high-value frontend integration screen flow
 - Delete old `jsdom` copies after parity is proven.
 
 Acceptance criteria:
 
-- Dataset UI behavior is browser-backed rather than `jsdom`-simulated.
-- Unit tests remain only where they add speed or isolation value.
+- Route and dataset UI behavior are browser-backed rather than
+  `jsdom`-simulated.
+- At least one high-value screen flow is covered end to end within the
+  frontend.
 
 Risk:
 
 - Medium
 
-### PR5: Frontend integration slice migration
+Status:
+
+- Covered by PR #434.
+
+### Phase 3: Chart UI migration
 
 Changes:
 
-- Port `DatasetExplorerScreen.integration.test.tsx` to browser mode.
-- Simplify mocks where they exist only to compensate for `jsdom`.
+- Port the low-risk chart UI tests:
+  - `ChartViewer.test.tsx`
+  - `FilterTable.test.tsx`
+  - `ChartLegend.test.tsx`
+  - `ChartTooltip.test.tsx`
+- Explicitly leave low-level WebGL-heavy tests in unit land unless a redesign
+  justifies a smaller browser-backed replacement.
 
 Acceptance criteria:
 
-- At least one high-value screen flow is covered in browser mode end to end
-  within the frontend.
+- Chart UI interactions run in a real browser.
+- Low-level chart tests have an intentional long-term home.
 
 Risk:
 
 - Medium to high
 
-### PR6: Chart UI migration
+Status:
 
-Changes:
+- Mostly covered by PR #434, but follow-up cleanup or reclassification may
+  still be needed.
 
-- Port UI-facing chart tests first:
-    - `ChartViewer.test.tsx`
-    - `FilterTable.test.tsx`
-    - `ChartLegend.test.tsx`
-    - `ChartTooltip.test.tsx`
-- Re-evaluate whether low-level WebGL hook tests should stay synthetic or be
-  replaced by a smaller number of browser-level assertions.
-
-Acceptance criteria:
-
-- Chart UI interactions run in a real browser.
-- Low-level WebGL tests have an intentional long-term home.
-
-Risk:
-
-- High
-
-### PR7: Desktop smoke coverage
+### Phase 4: Desktop smoke coverage
 
 Changes:
 
@@ -369,13 +366,17 @@ Risk:
 
 - Medium to high
 
-### PR8: Cleanup and policy lock-in
+Status:
+
+- Not started.
+
+### Phase 5: Cleanup and policy lock-in
 
 Changes:
 
 - Remove obsolete `jsdom` shims from `src/shared/test/setup.ts` where they are
   no longer needed.
-- Document final placement rules in dev docs and contributor guidance.
+- Document the final placement rules in dev docs and contributor guidance.
 - Add guardrails so new UI integration tests do not silently fall back to
   `jsdom`.
 
@@ -388,20 +389,34 @@ Risk:
 
 - Low
 
+Status:
+
+- Partially started through command and docs cleanup in PR #434, but not yet
+  complete.
+
 ## Ordering
 
-Recommended PR order:
+Recommended remaining order:
 
-1. PR1: CI runner foundations
-2. PR2: Browser harness and conventions
-3. PR3: App shell and routing migration
-4. PR4: Dataset UI migration
-5. PR5: Frontend integration slice migration
-6. PR6: Chart UI migration
-7. PR7: Desktop smoke coverage
-8. PR8: Cleanup and policy lock-in
+1. Phase 4: Desktop smoke coverage
+2. Phase 5: Cleanup and policy lock-in
 
-PR4 and PR5 may overlap once the browser harness is stable.
+If chart-specific follow-up is still needed after review, treat it as a small
+continuation of Phase 3 rather than reopening the old eight-step plan.
+
+## Expected Remaining PR Count
+
+Based on what has already landed and on the coupling we observed during the
+first implementation wave, the remaining migration work will likely take:
+
+- 2 PRs in the most likely case:
+  - one PR for desktop smoke coverage
+  - one PR for cleanup, guardrails, and final policy lock-in
+- 3 PRs if chart-specific follow-up needs to be split out for review clarity
+  before or alongside the cleanup work
+
+The most realistic planning assumption is therefore that the migration can be
+finished in 2 to 3 additional PRs after PR #434.
 
 ## What Not To Do
 

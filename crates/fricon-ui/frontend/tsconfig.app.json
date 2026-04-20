@@ -32,10 +32,8 @@
   },
   "include": ["src"],
   "exclude": [
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/**/test-utils.ts",
-    "src/**/test-utils.tsx",
+    "src/**/*.test.*",
+    "src/**/test-utils.*",
     "src/shared/test/**/*"
   ]
 }

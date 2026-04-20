@@ -64,11 +64,9 @@ export default defineConfig([
   },
   {
     files: [
-      "**/*.test.ts",
-      "**/*.test.tsx",
-      "**/test-utils.ts",
-      "**/test-utils.tsx",
-      "**/src/shared/test/**/*",
+      "crates/fricon-ui/frontend/src/**/*.test.*",
+      "crates/fricon-ui/frontend/src/**/test-utils.*",
+      "crates/fricon-ui/frontend/src/shared/test/**/*",
     ],
     languageOptions: {
       globals: {
@@ -84,10 +82,8 @@ export default defineConfig([
   {
     files: ["crates/fricon-ui/frontend/src/**/use*.{ts,tsx}"],
     ignores: [
-      "**/*.test.ts",
-      "**/*.test.tsx",
-      "**/test-utils.ts",
-      "**/test-utils.tsx",
+      "crates/fricon-ui/frontend/src/**/*.test.*",
+      "crates/fricon-ui/frontend/src/**/test-utils.*",
     ],
     rules: {
       "no-restricted-imports": [

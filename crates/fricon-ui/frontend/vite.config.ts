@@ -44,8 +44,8 @@ export default defineConfig({
         },
         test: {
           name: "unit",
-          include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-          exclude: ["src/**/*.browser.test.tsx"],
+          include: ["src/**/*.test.*"],
+          exclude: ["src/**/*.browser.test.*", "src/**/*.smoke.test.*"],
           environment: "jsdom",
           setupFiles: "./src/shared/test/setup.ts",
           css: true,
@@ -61,7 +61,7 @@ export default defineConfig({
         },
         test: {
           name: "browser",
-          include: ["src/**/*.browser.test.tsx"],
+          include: ["src/**/*.browser.test.*"],
           setupFiles: "./src/shared/test/browser/setup.ts",
           css: true,
           globals: true,
