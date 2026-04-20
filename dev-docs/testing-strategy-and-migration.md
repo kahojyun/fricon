@@ -35,8 +35,9 @@ Relevant current files:
 Current frontend constraints:
 
 - The browser-mode migration is underway, not finished.
-- Some browser API shims still exist in the shared unit setup and should be
-  revisited once the remaining `jsdom` scope is smaller.
+- Only one shared browser API shim remains in the unit setup:
+    - `ResizeObserver`, kept for the intentionally retained `useWebGLChart` /
+      `ChartWrapper` unit coverage
 - A few higher-risk chart and WebGL-adjacent tests are still intentionally left
   in unit land.
 
@@ -186,6 +187,14 @@ Recommended conventions:
 If a helper is shared only by browser-mode tests, prefer placing it under a
 browser-specific test directory instead of adding a runner prefix to the helper
 filename.
+
+For `src/app/**`, `src/features/**/ui/**`, and
+`src/features/**/rendering/**`, UI-facing render tests should default to
+`*.browser.test.*`. The frontend `dependency-cruiser` config now blocks new
+`@testing-library/react` and `@testing-library/user-event` imports in default
+`*.test.*` files in those directories. The remaining carve-outs should stay
+small and principled: explicit chart-unit holdouts plus `use*.test.*` hook
+tests that remain intentionally unit-scoped even when they live under `ui/`.
 
 Do not encode extra scope labels such as `integration` in the filename unless
 they are required by a tool. Test scope should usually live in the directory
@@ -403,8 +412,11 @@ Risk:
 
 Status:
 
-- Partially started through command and docs cleanup in PR #434, but not yet
-  complete.
+- In progress:
+    - obsolete `matchMedia` and `getAnimations` unit shims removed
+    - only `ResizeObserver` remains as a shared unit shim
+    - `dependency-cruiser` guardrails now block new UI-facing render tests from
+      defaulting to `*.test.*` in app/ui/rendering directories
 
 ## Ordering
 

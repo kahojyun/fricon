@@ -256,6 +256,39 @@ module.exports = {
       },
       to: { path: "^@tauri-apps/(?:api(?:/|$)|plugin-)" },
     },
+    {
+      name: "ui-tests-no-react-testing-library-by-default",
+      comment:
+        "UI-facing render tests should live in *.browser.test.*. Default *.test.* files under app/ui/rendering stay unit-scoped unless they are an explicit legacy exception.",
+      severity: "error",
+      from: {
+        path:
+          "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
+        pathNot: [
+          "[.]browser[.]test[.](?:ts|tsx)$",
+          "[.]smoke[.]test[.](?:ts|tsx)$",
+          "^src/features/[^/]+/ui/use[^/]+[.]test[.](?:ts|tsx)$",
+          "^src/features/charts/ui/ChartWrapper[.]test[.]tsx$",
+          "^src/features/charts/rendering/zoomController[.]test[.]ts$",
+        ],
+      },
+      to: { path: "^@testing-library/react$" },
+    },
+    {
+      name: "ui-tests-no-user-event-by-default",
+      comment:
+        "user-event coverage should live in *.browser.test.*. Default *.test.* files under app/ui/rendering stay unit-scoped unless they are an explicit legacy exception.",
+      severity: "error",
+      from: {
+        path:
+          "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
+        pathNot: [
+          "[.]browser[.]test[.](?:ts|tsx)$",
+          "[.]smoke[.]test[.](?:ts|tsx)$",
+        ],
+      },
+      to: { path: "^@testing-library/user-event$" },
+    },
   ],
   options: {
     // Which modules not to follow further when encountered

@@ -41,6 +41,8 @@ __pycache__/
 
 # Node
 .eslintcache
+**/__screenshots__/
+**/.vitest-attachments/
 
 # Editor & Tool cache
 .serena/
