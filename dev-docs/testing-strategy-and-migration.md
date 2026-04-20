@@ -16,8 +16,8 @@ The repo now uses:
 - Rust tests through `cargo nextest` in CI, with doctests kept separate.
 - Python tests through `uv run pytest`.
 - Frontend tests through split Vitest projects:
-  - `unit` for fast unit and `jsdom` coverage
-  - `browser` for browser-backed UI and integration coverage
+    - `unit` for fast unit and `jsdom` coverage
+    - `browser` for browser-backed UI and integration coverage
 
 Relevant current files:
 
@@ -303,10 +303,10 @@ Status:
 Changes:
 
 - Port the clearly safe UI and integration tests to browser mode:
-  - app shell and routing
-  - dataset inspector
-  - dataset UI behavior tests
-  - one high-value frontend integration screen flow
+    - app shell and routing
+    - dataset inspector
+    - dataset UI behavior tests
+    - one high-value frontend integration screen flow
 - Delete old `jsdom` copies after parity is proven.
 
 Acceptance criteria:
@@ -329,10 +329,10 @@ Status:
 Changes:
 
 - Port the low-risk chart UI tests:
-  - `ChartViewer.test.tsx`
-  - `FilterTable.test.tsx`
-  - `ChartLegend.test.tsx`
-  - `ChartTooltip.test.tsx`
+    - `ChartViewer.test.tsx`
+    - `FilterTable.test.tsx`
+    - `ChartLegend.test.tsx`
+    - `ChartTooltip.test.tsx`
 - Explicitly leave low-level WebGL-heavy tests in unit land unless a redesign
   justifies a smaller browser-backed replacement.
 
@@ -410,8 +410,8 @@ Based on what has already landed and on the coupling we observed during the
 first implementation wave, the remaining migration work will likely take:
 
 - 2 PRs in the most likely case:
-  - one PR for desktop smoke coverage
-  - one PR for cleanup, guardrails, and final policy lock-in
+    - one PR for desktop smoke coverage
+    - one PR for cleanup, guardrails, and final policy lock-in
 - 3 PRs if chart-specific follow-up needs to be split out for review clarity
   before or alongside the cleanup work
 
