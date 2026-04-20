@@ -128,6 +128,38 @@ jobs:
       - name: Build docs
         run: uv run --group docs mkdocs build -s -v
 
+  desktop-smoke:
+    name: Desktop Smoke (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install matching Edge driver (Windows)
+        shell: pwsh
+        run: |
+          cargo install --git https://github.com/chippers/msedgedriver-tool
+          & "$HOME/.cargo/bin/msedgedriver-tool.exe"
+          $PWD.Path >> $env:GITHUB_PATH
+      - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2.75.4
+        with:
+          tool: protoc,tauri-driver
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "24.x"
+          cache: "pnpm"
+      - name: Install Node dependencies
+        run: pnpm install
+      - name: Desktop smoke (Windows)
+        run: pnpm run test:smoke
+
   cargo-deny:
     name: Audit Cargo Dependencies
     runs-on: ubuntu-latest
@@ -211,7 +243,7 @@ jobs:
   check:
     name: Report Required CI Status
     if: always()
-    needs: [fmt, test, cargo-deny, build, sdist]
+    needs: [fmt, test, desktop-smoke, cargo-deny, build, sdist]
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed

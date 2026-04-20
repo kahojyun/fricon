@@ -18,6 +18,8 @@ The repo now uses:
 - Frontend tests through split Vitest projects:
     - `unit` for fast unit and `jsdom` coverage
     - `browser` for browser-backed UI and integration coverage
+- Desktop smoke coverage through a tiny WebdriverIO + `tauri-driver` suite on
+  Windows CI.
 
 Relevant current files:
 
@@ -26,6 +28,9 @@ Relevant current files:
 - `crates/fricon-ui/frontend/vite.config.ts`
 - `crates/fricon-ui/frontend/src/shared/test/setup.ts`
 - `crates/fricon-ui/frontend/src/shared/test/browser/`
+- `tests/desktop-smoke/wdio.conf.mjs`
+- `tests/desktop-smoke/specs/app.smoke.test.mjs`
+- `crates/fricon-ui/src/bin/create-smoke-workspace.rs`
 
 Current frontend constraints:
 
@@ -50,6 +55,8 @@ already covered:
 - most of the low-risk chart UI migration
 - command-surface cleanup plus matching updates to docs, `AGENTS.md`, and
   skills
+- the desktop smoke phase with a deterministic workspace fixture, a single
+  WebdriverIO smoke spec, and a dedicated Windows CI job
 
 In terms of the original plan, this PR effectively collapses the old PR1
 through PR5 and most of PR6 into one reviewed unit.
@@ -66,7 +73,7 @@ The steady-state testing stack should be layered:
 - Frontend unit and logic tests: Vitest in `node` or `jsdom`.
 - Frontend UI and integration tests: Vitest Browser Mode with Playwright
   provider.
-- Desktop smoke tests: a very small Tauri WebDriver suite on Linux and Windows.
+- Desktop smoke tests: a very small Tauri WebDriver suite on Windows.
 
 This is the intended long-term split:
 
@@ -204,6 +211,8 @@ Keep frontend test commands explicit.
 - `pnpm run test:browser` from repo root runs only browser-mode tests.
 - `pnpm run test:browser:headed` from repo root is the opt-in headed debug
   variant.
+- `pnpm run test:smoke` from repo root runs the desktop smoke suite.
+  The supported CI path is Windows-only.
 
 Do not rely on the batch `test` script for file filters, watch mode, or
 project selection. When a targeted rerun is needed, choose the test mode first
@@ -354,7 +363,7 @@ Status:
 
 Changes:
 
-- Add a very small Tauri WebDriver suite for Linux and Windows.
+- Add a very small Tauri WebDriver suite for Windows.
 - Keep it limited to runtime/package smoke validation.
 
 Acceptance criteria:
@@ -368,7 +377,10 @@ Risk:
 
 Status:
 
-- Not started.
+- Covered by the current implementation:
+    - deterministic workspace fixture generation
+    - one minimal app-launch / dataset-open / chart-render smoke path
+    - separate Windows CI job
 
 ### Phase 5: Cleanup and policy lock-in
 
@@ -398,8 +410,7 @@ Status:
 
 Recommended remaining order:
 
-1. Phase 4: Desktop smoke coverage
-2. Phase 5: Cleanup and policy lock-in
+1. Phase 5: Cleanup and policy lock-in
 
 If chart-specific follow-up is still needed after review, treat it as a small
 continuation of Phase 3 rather than reopening the old eight-step plan.
@@ -409,14 +420,13 @@ continuation of Phase 3 rather than reopening the old eight-step plan.
 Based on what has already landed and on the coupling we observed during the
 first implementation wave, the remaining migration work will likely take:
 
-- 2 PRs in the most likely case:
-    - one PR for desktop smoke coverage
+- 1 PR in the most likely case:
     - one PR for cleanup, guardrails, and final policy lock-in
-- 3 PRs if chart-specific follow-up needs to be split out for review clarity
+- 2 PRs if chart-specific follow-up needs to be split out for review clarity
   before or alongside the cleanup work
 
 The most realistic planning assumption is therefore that the migration can be
-finished in 2 to 3 additional PRs after PR #434.
+finished in 1 to 2 additional PRs after the desktop smoke phase lands.
 
 ## What Not To Do
 

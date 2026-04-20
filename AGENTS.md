@@ -27,6 +27,10 @@
   `pnpm run test:browser` for browser-mode tests.
   For targeted reruns, pass file filters to `test:unit` or `test:browser`
   directly instead of passing them through the batch `test` script.
+- Desktop smoke checks (from repo root):
+  use `pnpm run test:smoke` for the Tauri WebDriver suite.
+  CI currently validates this path on Windows only.
+  Tauri does not provide desktop WebDriver support on macOS.
 - When changing workspace on-disk structure or `.fricon_workspace.json`, update
   `crates/fricon/src/workspace.rs` migration steps, decide whether
   `WORKSPACE_VERSION` must change, and update developer-facing documentation

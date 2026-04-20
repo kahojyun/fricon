@@ -30,6 +30,7 @@ export default defineConfig([
     "site/**",
     "target/**",
     "**/node_modules/**",
+    "tests/desktop-smoke/**",
     "crates/fricon-ui/frontend/.dependency-cruiser.cjs",
     "**/src/shared/lib/bindings.ts",
     // shadcn/ui source files live here; keep repo-owned shared components elsewhere so they remain linted.
