@@ -21,9 +21,12 @@
 - Python bindings and tests (from repo root):
   run `uv run maturin develop` before `uv run pytest` when Rust bindings may be stale.
 - Frontend checks (from repo root):
-  use `pnpm run check` as the default frontend quality gate; run
-  `pnpm run [type-check|lint|format:check|depcruise:frontend|test --run]`
-  individually when needed.
+  use `pnpm run check` as the default frontend quality gate.
+  Use `pnpm run test` for the full frontend test batch,
+  `pnpm run test:unit` for unit/jsdom tests, and
+  `pnpm run test:browser` for browser-mode tests.
+  For targeted reruns, pass file filters to `test:unit` or `test:browser`
+  directly instead of passing them through the batch `test` script.
 - When changing workspace on-disk structure or `.fricon_workspace.json`, update
   `crates/fricon/src/workspace.rs` migration steps, decide whether
   `WORKSPACE_VERSION` must change, and update developer-facing documentation

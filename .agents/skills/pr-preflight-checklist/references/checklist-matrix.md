@@ -49,7 +49,7 @@ uv run pytest
 ```bash
 pnpm run check
 pnpm run format:check
-pnpm run test --run
+pnpm run test
 ```
 
 Optional split for diagnosis or narrow reruns:
@@ -58,6 +58,10 @@ pnpm run format:check
 pnpm run type-check
 pnpm run lint
 pnpm run depcruise:frontend
+pnpm run test:unit
+pnpm run test:browser
+pnpm run test:unit -- <path-or-pattern>
+pnpm run test:browser -- <path-or-pattern>
 ```
 
 ### Tauri IPC changed
@@ -121,7 +125,7 @@ uv run stubtest fricon._core
 ```bash
 pnpm run check
 pnpm run format:check
-pnpm run test --run
+pnpm run test
 pnpm run build
 git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ```
@@ -132,6 +136,10 @@ pnpm run format:check
 pnpm run type-check
 pnpm run lint
 pnpm run depcruise:frontend
+pnpm run test:unit
+pnpm run test:browser
+pnpm run test:unit -- <path-or-pattern>
+pnpm run test:browser -- <path-or-pattern>
 ```
 
 ### Tauri IPC changed

@@ -85,6 +85,9 @@ jobs:
       - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2.75.4
         with:
           tool: protoc
+      - uses: taiki-e/install-action@97a5807a604e12de3a13b52d868ebecaeeea757c # v2.75.4
+        with:
+          tool: cargo-nextest
       - name: Install pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
       - name: Setup Node.js
@@ -94,6 +97,8 @@ jobs:
           cache: "pnpm"
       - name: Install Node dependencies
         run: pnpm install
+      - name: Install Playwright browser
+        run: pnpm --dir crates/fricon-ui/frontend exec playwright install --with-deps chromium
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
@@ -104,8 +109,10 @@ jobs:
         run: pnpm --filter fricon-ui run gen:bindings
       - name: Check Tauri bindings are up-to-date
         run: git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
-      - name: Cargo test
-        run: cargo test --workspace --verbose --locked
+      - name: Cargo nextest
+        run: cargo nextest run --workspace --profile ci --locked
+      - name: Cargo doctest
+        run: cargo test --workspace --doc --locked
       - name: Cargo clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Sync project

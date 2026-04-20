@@ -4,7 +4,7 @@ import {
   createMemoryHistory,
   createRouter,
 } from "@tanstack/react-router";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,8 +67,6 @@ describe("router app shell", () => {
     clearMocks();
     datasetChangedListenMock.mockReset();
     datasetChangedListenMock.mockResolvedValue(() => undefined);
-    window.localStorage.clear();
-    Element.prototype.scrollIntoView = vi.fn();
 
     mockIPC((cmd) => {
       switch (cmd) {
@@ -108,16 +106,15 @@ describe("router app shell", () => {
       }),
     });
 
-    await act(async () => {
-      render(<RouterProvider router={router} />);
-      await router.load();
-    });
+    render(<RouterProvider router={router} />);
 
     expect(await screen.findByText("No dataset selected")).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("Filter datasets..."),
     ).toBeInTheDocument();
-    expect(screen.getByText("/tmp/fricon-workspace")).toBeInTheDocument();
+    expect(
+      await screen.findByText("/tmp/fricon-workspace"),
+    ).toBeInTheDocument();
 
     const dataLink = screen.getByRole("button", { name: "Data" });
     const creditsLink = screen.getByRole("button", { name: "Credits" });

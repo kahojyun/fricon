@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DatasetDetail } from "@/features/datasets";
 import { useDatasetDetailQuery } from "@/features/datasets";
+import { renderWithUser } from "@/shared/test/browser/test-utils";
 import { DatasetInspector } from "./DatasetInspector";
 
 vi.mock("@/features/charts", () => ({
@@ -61,7 +61,7 @@ describe("DatasetInspector", () => {
   });
 
   it("renders the empty state when no dataset is selected", () => {
-    render(<DatasetInspector />);
+    renderWithUser(<DatasetInspector />);
 
     expect(screen.getByText("No dataset selected")).toBeInTheDocument();
     expect(
@@ -76,8 +76,7 @@ describe("DatasetInspector", () => {
       error: null,
     } as unknown as ReturnType<typeof useDatasetDetailQuery>);
 
-    const user = userEvent.setup();
-    render(<DatasetInspector datasetId={7} />);
+    const { user } = renderWithUser(<DatasetInspector datasetId={7} />);
 
     expect(screen.getByRole("tab", { name: "Charts" })).toBeInTheDocument();
     expect(screen.getByTestId("chart-viewer")).toHaveTextContent("7:no-detail");
@@ -93,8 +92,7 @@ describe("DatasetInspector", () => {
       error: null,
     } as unknown as ReturnType<typeof useDatasetDetailQuery>);
 
-    const user = userEvent.setup();
-    render(<DatasetInspector datasetId={7} />);
+    const { user } = renderWithUser(<DatasetInspector datasetId={7} />);
 
     expect(screen.getByTestId("chart-viewer")).toHaveTextContent("7:Dataset 7");
 
