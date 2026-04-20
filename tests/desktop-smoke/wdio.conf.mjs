@@ -10,15 +10,40 @@ const smokeWorkspacePath = path.join(
   "desktop-smoke",
   "workspace",
 );
-const tauriBinaryPath = path.join(
-  repoRoot,
-  "target",
-  "debug",
-  process.platform === "win32" ? "fricon-ui.exe" : "fricon-ui",
-);
 
 let tauriDriver;
 let shuttingDown = false;
+
+function cargoTargetDirPath() {
+  const result = spawnSync(
+    "cargo",
+    ["metadata", "--format-version", "1", "--no-deps"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  if (result.error) {
+    throw new Error(
+      `Failed to query cargo metadata for smoke target dir: ${result.error.message}`,
+    );
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      `cargo metadata failed while resolving smoke target dir: ${result.stderr}`,
+    );
+  }
+
+  const metadata = JSON.parse(result.stdout);
+  return metadata.target_directory;
+}
+
+const tauriBinaryPath = path.join(
+  cargoTargetDirPath(),
+  "debug",
+  process.platform === "win32" ? "fricon-ui.exe" : "fricon-ui",
+);
 
 function runChecked(command, args, description) {
   const result = spawnSync(command, args, {
