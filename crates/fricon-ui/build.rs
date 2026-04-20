@@ -41,6 +41,9 @@ fn find_pnpm_executable() -> &'static str {
 fn main() {
     tauri_build::build();
     if !tauri_build::is_dev() {
+        // Tauri marks packaged/custom-protocol builds as non-dev. Only that path
+        // should pay the frontend bundle cost; dev-mode helper binaries (such as
+        // the desktop smoke workspace seeder) stay on the lightweight branch.
         let target_triple = env::var("TARGET").expect("TARGET environment variable not set");
         let target = Target::from_triple(&target_triple);
         let (config, _) = parse(
