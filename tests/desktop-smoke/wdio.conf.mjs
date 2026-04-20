@@ -1,4 +1,3 @@
-import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -80,15 +79,6 @@ function onShutdown(fn) {
   process.on("SIGBREAK", cleanup);
 }
 
-function tauriDriverBinaryPath() {
-  return path.resolve(
-    os.homedir(),
-    ".cargo",
-    "bin",
-    process.platform === "win32" ? "tauri-driver.exe" : "tauri-driver",
-  );
-}
-
 export const config = {
   host: "127.0.0.1",
   port: 4444,
@@ -141,7 +131,7 @@ export const config = {
     );
   },
   beforeSession: () => {
-    tauriDriver = spawn(tauriDriverBinaryPath(), [], {
+    tauriDriver = spawn("tauri-driver", [], {
       stdio: [null, process.stdout, process.stderr],
       env: {
         ...process.env,
