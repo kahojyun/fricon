@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ImportDatasetDialog } from "./ImportDatasetDialog";
 import type { UiPreviewImportResult } from "../api/types";
-import type { DuplicateBatchConflict } from "./useDatasetImportFlow";
+import type { DuplicateBatchConflict } from "../hooks/useDatasetImportFlow";
 
 function makePreviewResult(
   archivePath: string,

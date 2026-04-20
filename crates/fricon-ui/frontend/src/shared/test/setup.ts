@@ -1,21 +1,5 @@
 import "@testing-library/jest-dom/vitest";
 
-const noop = () => undefined;
-
-if (!window.matchMedia) {
-  window.matchMedia = (query) =>
-    ({
-      matches: false,
-      media: query,
-      addEventListener: noop,
-      removeEventListener: noop,
-      onchange: null,
-      addListener: noop,
-      removeListener: noop,
-      dispatchEvent: () => false,
-    }) as MediaQueryList;
-}
-
 class ResizeObserverStub {
   observe() {
     return undefined;
@@ -29,11 +13,9 @@ class ResizeObserverStub {
 }
 
 if (!window.ResizeObserver) {
+  // A few intentionally retained unit tests still exercise chart hooks/components
+  // that subscribe to ResizeObserver under jsdom.
   window.ResizeObserver = ResizeObserverStub;
 }
 
 // Tauri's official mockIPC will be configured in tests as needed.
-
-if (!Element.prototype.getAnimations) {
-  Element.prototype.getAnimations = () => [];
-}

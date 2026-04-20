@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { datasetKeys } from "../api/queryKeys";
@@ -29,6 +35,29 @@ vi.mock("../api/client", () => ({
       tags: string[];
     },
   ) => updateDatasetInfoMock(id, update),
+}));
+
+vi.mock("@/shared/ui/switch", () => ({
+  Switch: ({
+    checked,
+    disabled,
+    id,
+    onCheckedChange,
+  }: {
+    checked: boolean;
+    disabled?: boolean;
+    id?: string;
+    onCheckedChange: (checked: boolean) => void;
+  }) => (
+    <button
+      id={id}
+      type="button"
+      role="switch"
+      aria-checked={checked ? "true" : "false"}
+      disabled={disabled}
+      onClick={() => onCheckedChange(!checked)}
+    />
+  ),
 }));
 
 function createWrapper() {
@@ -125,7 +154,15 @@ describe("DatasetPropertiesPanel", () => {
       screen.getByPlaceholderText("Comma separated tags"),
       " zeta, alpha, beta, alpha ",
     );
-    await user.click(screen.getByRole("switch"));
+    await act(async () => {
+      await user.click(screen.getByRole("switch"));
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("switch")).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+    });
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -166,7 +203,6 @@ describe("DatasetPropertiesPanel", () => {
   });
 
   it("resyncs form fields when refreshed detail data changes", async () => {
-    const user = userEvent.setup();
     const { wrapper } = createWrapper();
     const { rerender } = render(
       <DatasetPropertiesPanel
@@ -179,23 +215,24 @@ describe("DatasetPropertiesPanel", () => {
     );
 
     const nameInput = await screen.findByLabelText("Name");
-    await user.clear(nameInput);
-    await user.type(nameInput, "Local draft");
+    fireEvent.change(nameInput, { target: { value: "Local draft" } });
     expect(nameInput).toHaveValue("Local draft");
 
-    rerender(
-      <DatasetPropertiesPanel
-        datasetId={1}
-        detail={makeDetail({
-          name: "Dataset 1 (server)",
-          description: "Server description",
-          favorite: true,
-          tags: ["beta", "gamma"],
-        })}
-        isLoading={false}
-        loadErrorMessage={null}
-      />,
-    );
+    act(() => {
+      rerender(
+        <DatasetPropertiesPanel
+          datasetId={1}
+          detail={makeDetail({
+            name: "Dataset 1 (server)",
+            description: "Server description",
+            favorite: true,
+            tags: ["beta", "gamma"],
+          })}
+          isLoading={false}
+          loadErrorMessage={null}
+        />,
+      );
+    });
 
     expect(await screen.findByLabelText("Name")).toHaveValue(
       "Dataset 1 (server)",
@@ -226,18 +263,20 @@ describe("DatasetPropertiesPanel", () => {
     expect(await screen.findByLabelText("Name")).toHaveValue("a");
     expect(screen.getByLabelText("Description")).toHaveValue("b::c");
 
-    rerender(
-      <DatasetPropertiesPanel
-        datasetId={1}
-        detail={makeDetail({
-          name: "a::b",
-          description: "c",
-          tags: [],
-        })}
-        isLoading={false}
-        loadErrorMessage={null}
-      />,
-    );
+    act(() => {
+      rerender(
+        <DatasetPropertiesPanel
+          datasetId={1}
+          detail={makeDetail({
+            name: "a::b",
+            description: "c",
+            tags: [],
+          })}
+          isLoading={false}
+          loadErrorMessage={null}
+        />,
+      );
+    });
 
     expect(await screen.findByLabelText("Name")).toHaveValue("a::b");
     expect(screen.getByLabelText("Description")).toHaveValue("c");

@@ -256,6 +256,34 @@ module.exports = {
       },
       to: { path: "^@tauri-apps/(?:api(?:/|$)|plugin-)" },
     },
+    {
+      name: "ui-tests-no-react-testing-library-by-default",
+      comment:
+        "UI-facing render tests should live in *.browser.test.*. Default *.test.* files under app/ui/rendering should avoid React Testing Library imports.",
+      severity: "error",
+      from: {
+        path: "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
+        pathNot: [
+          "[.]browser[.]test[.](?:ts|tsx)$",
+          "[.]smoke[.]test[.](?:ts|tsx)$",
+        ],
+      },
+      to: { path: "^@testing-library/react$" },
+    },
+    {
+      name: "ui-tests-no-user-event-by-default",
+      comment:
+        "user-event coverage should live in *.browser.test.*. Default *.test.* files under app/ui/rendering should avoid user-event imports.",
+      severity: "error",
+      from: {
+        path: "^src/(?:app|features/[^/]+/(?:ui|rendering))/.+[.]test[.](?:ts|tsx)$",
+        pathNot: [
+          "[.]browser[.]test[.](?:ts|tsx)$",
+          "[.]smoke[.]test[.](?:ts|tsx)$",
+        ],
+      },
+      to: { path: "^@testing-library/user-event$" },
+    },
   ],
   options: {
     // Which modules not to follow further when encountered

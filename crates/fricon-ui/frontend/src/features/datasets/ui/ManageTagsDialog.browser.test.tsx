@@ -151,6 +151,9 @@ describe("ManageTagsDialog", () => {
     const input = screen.getByDisplayValue("vision");
     await user.clear(input);
     await user.type(input, "audio");
+    await waitFor(() => {
+      expect(input).toHaveValue("audio");
+    });
     await user.click(screen.getByRole("button", { name: "Confirm rename" }));
 
     expect(props.onRenameTag).not.toHaveBeenCalled();

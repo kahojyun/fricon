@@ -16,9 +16,9 @@ import {
 } from "./DatasetTableColumns";
 import { DatasetTableBody } from "./DatasetTableBody";
 import { DatasetTableToolbar } from "./DatasetTableToolbar";
-import { useDatasetDeleteFlow } from "./useDatasetDeleteFlow";
-import { useDatasetTableSelection } from "./useDatasetTableSelection";
-import { useDatasetImportFlow } from "./useDatasetImportFlow";
+import { useDatasetDeleteFlow } from "../hooks/useDatasetDeleteFlow";
+import { useDatasetTableSelection } from "../hooks/useDatasetTableSelection";
+import { useDatasetImportFlow } from "../hooks/useDatasetImportFlow";
 import { ImportDatasetDialog } from "./ImportDatasetDialog";
 import { summarizeDatasetDeleteResults } from "../model/datasetTableDeleteFlowLogic";
 import {
