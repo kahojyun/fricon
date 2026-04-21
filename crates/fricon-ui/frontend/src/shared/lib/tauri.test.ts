@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { tauriInvokeMock } = vi.hoisted(() => ({
+  tauriInvokeMock: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: tauriInvokeMock,
+}));
+
 import {
   ApiError,
+  invokeRaw,
+  invokeRawBytes,
   isApiError,
   normalizeRawBytes,
   normalizeCreatedAtDate,
@@ -10,6 +21,10 @@ import {
 } from "./tauri";
 
 describe("tauri helpers", () => {
+  beforeEach(() => {
+    tauriInvokeMock.mockReset();
+  });
+
   it("unwraps ok results", () => {
     expect(unwrapResult({ status: "ok", data: 42 })).toBe(42);
   });
@@ -39,6 +54,41 @@ describe("tauri helpers", () => {
       expect((error as ApiError).code).toBe("archive_version_unsupported");
       expect((error as ApiError).apiMessage).toBe("archive is too new");
     }
+  });
+
+  it("wraps raw invoke object rejections as ApiError", async () => {
+    tauriInvokeMock.mockRejectedValueOnce({
+      code: "charts",
+      message: "binary payload decode failed",
+    });
+
+    await expect(invokeRaw("dataset_chart_data")).rejects.toMatchObject({
+      name: "ApiError",
+      code: "charts",
+      apiMessage: "binary payload decode failed",
+      message: "[charts] binary payload decode failed",
+    });
+  });
+
+  it("passes through raw invoke Error rejections unchanged", async () => {
+    const error = new Error("transport exploded");
+    tauriInvokeMock.mockRejectedValueOnce(error);
+
+    await expect(invokeRaw("dataset_chart_data")).rejects.toBe(error);
+  });
+
+  it("wraps raw byte invoke object rejections as ApiError", async () => {
+    tauriInvokeMock.mockRejectedValueOnce({
+      code: "workspace",
+      message: "workspace unavailable",
+    });
+
+    await expect(invokeRawBytes("dataset_chart_data")).rejects.toMatchObject({
+      name: "ApiError",
+      code: "workspace",
+      apiMessage: "workspace unavailable",
+      message: "[workspace] workspace unavailable",
+    });
   });
 
   it("rejects invalid date values", () => {
