@@ -410,8 +410,8 @@ mod tests {
 
     use super::{MAGIC, VERSION, encode_chart_snapshot, encode_live_chart_data};
     use crate::features::charts::types::{
-        ChartSnapshot, FlatSeries, FlatXYSeries, FlatXYZSeries, LiveChartAppendOperation,
-        LiveChartDataResponse, XYChartSnapshot,
+        ChartSnapshot, FlatSeries, FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot,
+        LiveChartAppendOperation, LiveChartDataResponse, XYChartSnapshot, XYDrawStyle, XYPlotMode,
     };
 
     fn parse_metadata(bytes: &[u8]) -> Value {
@@ -429,8 +429,8 @@ mod tests {
     #[test]
     fn encodes_xy_snapshot_frame() {
         let bytes = encode_chart_snapshot(&ChartSnapshot::Xy(XYChartSnapshot {
-            plot_mode: crate::features::charts::types::XYPlotMode::Xy,
-            draw_style: crate::features::charts::types::XYDrawStyle::Points,
+            plot_mode: XYPlotMode::Xy,
+            draw_style: XYDrawStyle::Points,
             x_name: "time".to_string(),
             y_name: Some("value".to_string()),
             series: vec![FlatXYSeries::new(
@@ -459,18 +459,16 @@ mod tests {
 
     #[test]
     fn encodes_heatmap_snapshot_frame() {
-        let bytes = encode_chart_snapshot(&ChartSnapshot::Heatmap(
-            crate::features::charts::types::HeatmapChartSnapshot {
-                x_name: "x".to_string(),
-                y_name: "y".to_string(),
-                series: vec![FlatXYZSeries::new(
-                    "heat",
-                    "heat",
-                    vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
-                    2,
-                )],
-            },
-        ))
+        let bytes = encode_chart_snapshot(&ChartSnapshot::Heatmap(HeatmapChartSnapshot {
+            x_name: "x".to_string(),
+            y_name: "y".to_string(),
+            series: vec![FlatXYZSeries::new(
+                "heat",
+                "heat",
+                vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+                2,
+            )],
+        }))
         .expect("frame");
 
         assert_eq!(bytes[5], 2);
@@ -485,8 +483,8 @@ mod tests {
         let reset = encode_live_chart_data(&LiveChartDataResponse::Reset {
             row_count: 5,
             snapshot: ChartSnapshot::Xy(XYChartSnapshot {
-                plot_mode: crate::features::charts::types::XYPlotMode::QuantityVsSweep,
-                draw_style: crate::features::charts::types::XYDrawStyle::Line,
+                plot_mode: XYPlotMode::QuantityVsSweep,
+                draw_style: XYDrawStyle::Line,
                 x_name: "step".to_string(),
                 y_name: None,
                 series: vec![FlatXYSeries::new("signal", "signal", vec![0.0, 1.0], 1)],
@@ -525,8 +523,8 @@ mod tests {
     #[test]
     fn rejects_invalid_series_lengths() {
         let error = encode_chart_snapshot(&ChartSnapshot::Xy(XYChartSnapshot {
-            plot_mode: crate::features::charts::types::XYPlotMode::Xy,
-            draw_style: crate::features::charts::types::XYDrawStyle::Points,
+            plot_mode: XYPlotMode::Xy,
+            draw_style: XYDrawStyle::Points,
             x_name: "x".to_string(),
             y_name: Some("y".to_string()),
             series: vec![FlatXYSeries::new(

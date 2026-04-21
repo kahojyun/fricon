@@ -28,7 +28,7 @@ Run only for changed areas.
 ```bash
 cargo +nightly fmt --all --check
 cargo check
-cargo clippy --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace
 ```
 
@@ -101,7 +101,7 @@ Run once before opening/updating PR.
 cargo +nightly fmt --all --check
 cargo check
 cargo build --workspace --locked
-cargo clippy --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace
 cargo deny --workspace --all-features check
 ```

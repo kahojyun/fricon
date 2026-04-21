@@ -14,7 +14,10 @@ use tauri::ipc::Invoke;
 use tauri_specta::{Builder, collect_commands, collect_events};
 
 use crate::features::{
-    charts::tauri as charts,
+    charts::{
+        tauri as charts,
+        types::{DatasetChartDataOptions, LiveChartDataOptions},
+    },
     datasets::{
         error::UiDatasetError,
         tauri as datasets,
@@ -206,8 +209,8 @@ pub(crate) fn specta_builder() -> Builder {
         .commands(app_commands!(specta))
         .events(collect_events![DatasetChanged])
         .typ::<DatasetInfo>()
-        .typ::<crate::features::charts::types::DatasetChartDataOptions>()
-        .typ::<crate::features::charts::types::LiveChartDataOptions>()
+        .typ::<DatasetChartDataOptions>()
+        .typ::<LiveChartDataOptions>()
 }
 
 pub(crate) fn invoke_handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {

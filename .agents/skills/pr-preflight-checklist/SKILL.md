@@ -43,6 +43,7 @@ Reduce PR back-and-forth by running the smallest complete check set before pushi
 
 - Prefer `pnpm` and `uv` for package management commands.
 - Run `uv run maturin develop` before `uv run pytest` for Python binding tests.
+- Treat `cargo clippy --all-targets --all-features -- -D warnings` as the required Rust lint gate for preflight, not a warnings-only advisory pass.
 - Never hand-edit `crates/fricon-ui/frontend/src/shared/lib/bindings.ts`; regenerate it.
 - Treat `pnpm run check` as the default frontend gate and ensure frontend slice-boundary validation is covered by it or by `pnpm run depcruise:frontend` when commands are split.
 - Treat `pnpm run test` as a batch command only; choose `test:unit` or `test:browser` for targeted reruns.

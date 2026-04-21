@@ -154,7 +154,9 @@ function parseFrame(bytes: Uint8Array): {
     throw new Error("Chart wire numeric payload offset is invalid.");
   }
   if (numericOffset % 8 !== 0) {
-    throw new Error("Chart wire numeric payload offset must be 8-byte aligned.");
+    throw new Error(
+      "Chart wire numeric payload offset must be 8-byte aligned.",
+    );
   }
 
   const metadataBytes = bytes.subarray(HEADER_LENGTH, metadataEnd);
@@ -293,10 +295,7 @@ function createNumericReader(bytes: Uint8Array) {
       }
 
       offset += byteLength;
-      return alignedFloatView.subarray(
-        (offset - byteLength) / 8,
-        offset / 8,
-      );
+      return alignedFloatView.subarray((offset - byteLength) / 8, offset / 8);
     },
     finish() {
       if (offset !== bytes.byteLength) {
