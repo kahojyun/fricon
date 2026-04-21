@@ -12,6 +12,10 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { describe, expect, it, vi } from "vitest";
 import type { DatasetDetail } from "../api/types";
 import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
+import {
+  encodeChartSnapshotForTest,
+  encodeLiveChartUpdateForTest,
+} from "@/shared/test/chartWire";
 import { ChartViewer } from "./ChartViewer";
 
 const chartWrapperMock = vi.fn();
@@ -87,7 +91,7 @@ describe("ChartViewer", () => {
         return { fields: [], rows: [], columnUniqueValues: {} };
       }
       if (cmd === "dataset_chart_data") {
-        return {
+        return encodeChartSnapshotForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
@@ -98,10 +102,10 @@ describe("ChartViewer", () => {
               id: "signal",
               label: "signal",
               pointCount: 2,
-              values: [0, 1, 1, 2],
+              values: new Float64Array([0, 1, 1, 2]),
             },
           ],
-        };
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 0 };
@@ -147,7 +151,7 @@ describe("ChartViewer", () => {
         return { fields: [], rows: [], columnUniqueValues: {} };
       }
       if (cmd === "dataset_chart_data") {
-        return {
+        return encodeChartSnapshotForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
@@ -158,10 +162,10 @@ describe("ChartViewer", () => {
               id: "signal",
               label: "signal",
               pointCount: 2,
-              values: [0, 1, 1, 2],
+              values: new Float64Array([0, 1, 1, 2]),
             },
           ],
-        };
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 0 };
@@ -305,7 +309,7 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           chartPayloads.push(payload as Record<string, unknown>);
         }
-        return {
+        return encodeChartSnapshotForTest({
           type: "heatmap",
           xName: "trace index",
           yName: "idxB",
@@ -314,10 +318,10 @@ describe("ChartViewer", () => {
               id: "trace_signal",
               label: "trace_signal",
               pointCount: 2,
-              values: [0, 10, 1, 1, 10, 2],
+              values: new Float64Array([0, 10, 1, 1, 10, 2]),
             },
           ],
-        };
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 0 };
@@ -395,7 +399,7 @@ describe("ChartViewer", () => {
       }
       if (cmd === "dataset_chart_data") {
         chartCallCount += 1;
-        return {
+        return encodeChartSnapshotForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
@@ -406,10 +410,10 @@ describe("ChartViewer", () => {
               id: "signal",
               label: "signal",
               pointCount: 2,
-              values: [0, 1, 1, 2],
+              values: new Float64Array([0, 1, 1, 2]),
             },
           ],
-        };
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 0 };
@@ -481,14 +485,21 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           chartPayloads.push(payload as Record<string, unknown>);
         }
-        return {
+        return encodeChartSnapshotForTest({
           type: "xy",
           plotMode: "complex_plane",
           drawStyle: "points",
           xName: "c (real)",
           yName: "c (imag)",
-          series: [{ id: "c", label: "c", pointCount: 1, values: [1, 2] }],
-        };
+          series: [
+            {
+              id: "c",
+              label: "c",
+              pointCount: 1,
+              values: new Float64Array([1, 2]),
+            },
+          ],
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 0 };
@@ -552,16 +563,21 @@ describe("ChartViewer", () => {
         };
       }
       if (cmd === "dataset_chart_data") {
-        return {
+        return encodeChartSnapshotForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
           xName: "idxB",
           yName: null,
           series: [
-            { id: "signal", label: "signal", pointCount: 1, values: [0, 1] },
+            {
+              id: "signal",
+              label: "signal",
+              pointCount: 1,
+              values: new Float64Array([0, 1]),
+            },
           ],
-        };
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 0 };
@@ -615,9 +631,9 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           livePayloads.push(payload as Record<string, unknown>);
         }
-        return {
+        return encodeLiveChartUpdateForTest({
           mode: "reset",
-          row_count: 1,
+          rowCount: 1,
           snapshot: {
             type: "xy",
             plotMode: "quantity_vs_sweep",
@@ -629,11 +645,11 @@ describe("ChartViewer", () => {
                 id: "sig:real",
                 label: "sig (real)",
                 pointCount: 1,
-                values: [0, 1],
+                values: new Float64Array([0, 1]),
               },
             ],
           },
-        };
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 1 };
@@ -704,9 +720,9 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           livePayloads.push(payload as Record<string, unknown>);
         }
-        return {
+        return encodeLiveChartUpdateForTest({
           mode: "reset",
-          row_count: 6,
+          rowCount: 6,
           snapshot: {
             type: "xy",
             plotMode: "complex_plane",
@@ -718,11 +734,11 @@ describe("ChartViewer", () => {
                 id: "group:4",
                 label: "impedance [idx_cycle=2, idx_y=1]",
                 pointCount: 2,
-                values: [1, 2, 3, 4],
+                values: new Float64Array([1, 2, 3, 4]),
               },
             ],
           },
-        };
+        });
       }
       if (cmd === "get_dataset_write_status") {
         return { rowCount: 6 };

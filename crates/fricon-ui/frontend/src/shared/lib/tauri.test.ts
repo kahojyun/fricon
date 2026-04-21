@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApiError,
   isApiError,
+  normalizeRawBytes,
   normalizeCreatedAtDate,
   normalizeDatasetDates,
   toDate,
@@ -70,5 +71,19 @@ describe("tauri helpers", () => {
       "2026-01-02T03:04:05.000Z",
     );
     expect(normalized.deletedAt).toBeNull();
+  });
+
+  it("normalizes raw number arrays to Uint8Array", () => {
+    expect(normalizeRawBytes([1, 2, 3])).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("normalizes ArrayBuffer payloads to Uint8Array", () => {
+    const value = new Uint8Array([4, 5, 6]).buffer;
+    expect(normalizeRawBytes(value)).toEqual(new Uint8Array([4, 5, 6]));
+  });
+
+  it("passes through Uint8Array payloads", () => {
+    const value = new Uint8Array([7, 8, 9]);
+    expect(normalizeRawBytes(value)).toBe(value);
   });
 });

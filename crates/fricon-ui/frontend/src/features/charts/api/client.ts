@@ -1,13 +1,11 @@
 import {
-  commands,
   type DatasetWriteStatus,
   type TableData as WireFilterTableData,
+  commands,
 } from "@/shared/lib/bindings";
-import { invoke } from "@/shared/lib/tauri";
+import { invoke, invokeRawBytes } from "@/shared/lib/tauri";
 import {
-  normalizeChartSnapshot,
   normalizeFilterTableData,
-  normalizeLiveChartUpdate,
   toWireChartOptions,
   toWireLiveChartOptions,
   type ChartDataOptions,
@@ -15,10 +13,14 @@ import {
   type FilterTableOptions,
   type LiveChartDataOptions,
 } from "./types";
+import { decodeChartSnapshot, decodeLiveChartUpdate } from "./wire";
 
 export async function fetchChartData(id: number, options: ChartDataOptions) {
-  return normalizeChartSnapshot(
-    await invoke(commands.datasetChartData(id, toWireChartOptions(options))),
+  return decodeChartSnapshot(
+    await invokeRawBytes("dataset_chart_data", {
+      id,
+      options: toWireChartOptions(options),
+    }),
   );
 }
 
@@ -27,16 +29,14 @@ export async function fetchLiveChartData(
   options: LiveChartDataOptions,
   knownRowCount: number | null,
 ) {
-  return normalizeLiveChartUpdate(
-    await invoke(
-      commands.datasetLiveChartData(
-        id,
-        toWireLiveChartOptions({
-          ...options,
-          knownRowCount,
-        }),
-      ),
-    ),
+  return decodeLiveChartUpdate(
+    await invokeRawBytes("dataset_live_chart_data", {
+      id,
+      options: toWireLiveChartOptions({
+        ...options,
+        knownRowCount,
+      }),
+    }),
   );
 }
 
