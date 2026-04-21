@@ -78,6 +78,13 @@ export function decodeChartSnapshot(bytes: Uint8Array): ChartModel {
   }
 }
 
+/**
+ * Decodes the feature-local `FCHT` chart frame emitted by the Tauri backend.
+ *
+ * This decoder assumes the transport hands back an aligned `ArrayBuffer`
+ * wrapped as a zero-offset `Uint8Array` at the raw invoke boundary. The frame
+ * still validates its own numeric offset so payload corruption fails loudly.
+ */
 export function decodeLiveChartUpdate(bytes: Uint8Array): LiveChartUpdate {
   const frame = parseFrame(bytes);
   switch (frame.kind) {

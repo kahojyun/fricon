@@ -7,7 +7,18 @@ use super::types::{
 };
 
 const MAGIC: &[u8; 4] = b"FCHT";
+/// Feature-local chart wire format version.
+///
+/// Bump this whenever the binary frame layout changes incompatibly, including
+/// header shape, metadata encoding, numeric payload layout, or alignment rules.
 const VERSION: u8 = 2;
+/// Frame header layout:
+/// - bytes 0..4: magic (`FCHT`)
+/// - byte 4: version
+/// - byte 5: payload kind
+/// - bytes 6..8: reserved
+/// - bytes 8..12: metadata byte length (little-endian u32)
+/// - bytes 12..16: numeric payload start offset (little-endian u32)
 const HEADER_LENGTH: usize = 16;
 
 #[derive(Clone, Copy)]
@@ -93,6 +104,12 @@ struct LiveAppendMetadata<'a> {
     ops: Vec<LiveAppendOperationMetadata<'a>>,
 }
 
+/// Encodes a chart snapshot into the feature-local `FCHT` binary frame.
+///
+/// The numeric payload is stored as host-native `f64` bytes and padded so the
+/// numeric section begins at an 8-byte-aligned offset for typed-array views on
+/// the frontend. This format is intentionally local to the desktop UI bridge
+/// and is not a portable persistence or interchange format.
 pub(crate) fn encode_chart_snapshot(snapshot: &ChartSnapshot) -> anyhow::Result<Vec<u8>> {
     match snapshot {
         ChartSnapshot::Xy(snapshot) => {
@@ -144,6 +161,8 @@ pub(crate) fn encode_chart_snapshot(snapshot: &ChartSnapshot) -> anyhow::Result<
     }
 }
 
+/// Encodes a live chart update into the same `FCHT` frame family used for
+/// snapshots, with payload kind distinguishing reset and append variants.
 pub(crate) fn encode_live_chart_data(response: &LiveChartDataResponse) -> anyhow::Result<Vec<u8>> {
     match response {
         LiveChartDataResponse::Reset {
