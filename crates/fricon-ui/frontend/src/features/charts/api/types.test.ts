@@ -143,6 +143,31 @@ describe("chart api wire decoding", () => {
     );
   });
 
+  it("rejects trailing numeric payload bytes in snapshots", () => {
+    const bytes = encodeChartSnapshotForTest({
+      type: "xy",
+      plotMode: "xy",
+      drawStyle: "points",
+      xName: "timestamp",
+      yName: "value",
+      series: [
+        {
+          id: "signal",
+          label: "signal",
+          pointCount: 1,
+          values: new Float64Array([1, 2]),
+        },
+      ],
+    });
+    const extended = new Uint8Array(bytes.byteLength + 8);
+    extended.set(bytes, 0);
+    new Float64Array(extended.buffer, bytes.byteLength, 1)[0] = 99;
+
+    expect(() => decodeChartSnapshot(extended)).toThrow(
+      "Chart wire payload has trailing numeric bytes.",
+    );
+  });
+
   it("rejects invalid live payload metadata", () => {
     const bytes = encodeLiveChartUpdateForTest({
       mode: "append",

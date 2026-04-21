@@ -183,7 +183,7 @@ function decodeXySnapshot(
 ): Extract<ChartModel, { type: "xy" }> {
   const metadata = readXySnapshotMetadata(metadataValue);
   const reader = createNumericReader(values);
-  return {
+  const snapshot: Extract<ChartModel, { type: "xy" }> = {
     type: "xy",
     plotMode: metadata.plotMode,
     drawStyle: metadata.drawStyle,
@@ -194,6 +194,8 @@ function decodeXySnapshot(
       values: reader.read(series.valueCount),
     })),
   };
+  reader.finish();
+  return snapshot;
 }
 
 function decodeHeatmapSnapshot(
@@ -202,7 +204,7 @@ function decodeHeatmapSnapshot(
 ): Extract<ChartModel, { type: "heatmap" }> {
   const metadata = readHeatmapSnapshotMetadata(metadataValue);
   const reader = createNumericReader(values);
-  return {
+  const snapshot: Extract<ChartModel, { type: "heatmap" }> = {
     type: "heatmap",
     xName: metadata.xName,
     yName: metadata.yName,
@@ -211,6 +213,8 @@ function decodeHeatmapSnapshot(
       values: reader.read(series.valueCount),
     })),
   };
+  reader.finish();
+  return snapshot;
 }
 
 function decodeLiveAppend(
