@@ -1,16 +1,10 @@
 import type {
-  ChartSnapshot as WireChartSnapshot,
   ColumnUniqueValue,
   ColumnInfo,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
-  FlatSeries as WireFlatSeries,
-  FlatXYSeries as WireFlatXYSeries,
-  FlatXYZSeries as WireFlatXYZSeries,
-  LiveChartAppendOperation as WireLiveChartAppendOperation,
   LiveChartDataOptions as WireLiveChartDataOptions,
-  LiveChartDataResponse as WireLiveChartResponse,
   Row as FilterTableRow,
   TableData as WireFilterTableData,
   UiDatasetStatus as DatasetStatus,
@@ -188,56 +182,6 @@ export function toWireLiveChartOptions(
   };
 }
 
-export function normalizeChartSnapshot(result: WireChartSnapshot): ChartModel {
-  switch (result.type) {
-    case "heatmap":
-      return {
-        type: "heatmap",
-        xName: result.xName,
-        yName: result.yName,
-        series: result.series.map(normalizeXYZSeries),
-      };
-    case "xy":
-      return {
-        type: "xy",
-        plotMode: result.plotMode,
-        drawStyle: result.drawStyle,
-        xName: result.xName,
-        yName: result.yName,
-        series: result.series.map(normalizeXYSeries),
-      };
-    default:
-      return assertNever(
-        result,
-        `Unknown chart snapshot type: ${String((result as { type?: unknown }).type)}`,
-      );
-  }
-}
-
-export function normalizeLiveChartUpdate(
-  result: WireLiveChartResponse,
-): LiveChartUpdate {
-  switch (result.mode) {
-    case "reset":
-      return {
-        mode: "reset",
-        rowCount: result.row_count,
-        snapshot: normalizeChartSnapshot(result.snapshot),
-      };
-    case "append":
-      return {
-        mode: "append",
-        rowCount: result.row_count,
-        ops: result.ops.map(normalizeLiveChartAppendOperation),
-      };
-    default:
-      return assertNever(
-        result,
-        `Unknown live chart update mode: ${String((result as { mode?: unknown }).mode)}`,
-      );
-  }
-}
-
 export function normalizeFilterTableData(
   result: WireFilterTableData,
 ): FilterTableData {
@@ -288,70 +232,4 @@ function toWireXYPlotMode(options: XYPlotModeOptions):
         quantity: options.quantity,
       };
   }
-}
-
-function normalizeXYSeries(series: WireFlatXYSeries) {
-  return {
-    id: series.id,
-    label: series.label,
-    values: Float64Array.from(series.values),
-    pointCount: series.pointCount,
-  };
-}
-
-function normalizeXYZSeries(series: WireFlatXYZSeries) {
-  return {
-    id: series.id,
-    label: series.label,
-    values: Float64Array.from(series.values),
-    pointCount: series.pointCount,
-  };
-}
-
-function normalizeFlatSeries(series: WireFlatSeries) {
-  switch (series.shape) {
-    case "xy":
-      return {
-        shape: "xy" as const,
-        series: normalizeXYSeries(series),
-      };
-    case "xyz":
-      return {
-        shape: "xyz" as const,
-        series: normalizeXYZSeries(series),
-      };
-    default:
-      return assertNever(
-        series,
-        `Unknown flat series shape: ${String((series as { shape?: unknown }).shape)}`,
-      );
-  }
-}
-
-function normalizeLiveChartAppendOperation(
-  operation: WireLiveChartAppendOperation,
-): LiveChartAppendOperation {
-  switch (operation.kind) {
-    case "append_points":
-      return {
-        kind: "append_points",
-        seriesId: operation.series_id,
-        values: Float64Array.from(operation.values),
-        pointCount: operation.point_count,
-      };
-    case "append_series":
-      return {
-        kind: "append_series",
-        series: normalizeFlatSeries(operation.series),
-      };
-    default:
-      return assertNever(
-        operation,
-        `Unknown live chart operation kind: ${String((operation as { kind?: unknown }).kind)}`,
-      );
-  }
-}
-
-function assertNever(_value: never, message: string): never {
-  throw new Error(message);
 }

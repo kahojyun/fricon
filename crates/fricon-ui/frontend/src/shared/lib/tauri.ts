@@ -1,3 +1,4 @@
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type { ApiError as WireError } from "@/shared/lib/bindings";
 
 export class ApiError extends Error {
@@ -32,6 +33,35 @@ export async function invoke<T>(
   >,
 ): Promise<T> {
   return unwrapResult(await commandCall);
+}
+
+export async function invokeRaw<T>(
+  command: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
+  try {
+    return await tauriInvoke<T>(command, args);
+  } catch (error) {
+    const apiError = toApiError(error);
+    if (apiError) {
+      throw apiError;
+    }
+    throw error;
+  }
+}
+
+export function normalizeRawBytes(value: unknown): Uint8Array {
+  if (value instanceof ArrayBuffer) {
+    return new Uint8Array(value);
+  }
+  throw new Error("Expected an ArrayBuffer raw response from backend.");
+}
+
+export async function invokeRawBytes(
+  command: string,
+  args?: Record<string, unknown>,
+): Promise<Uint8Array> {
+  return normalizeRawBytes(await invokeRaw<ArrayBuffer>(command, args));
 }
 
 export function toDate(value: string): Date {
@@ -70,4 +100,18 @@ export function normalizeDatasetDates<
     trashedAt: value.trashedAt === null ? null : toDate(value.trashedAt),
     deletedAt: value.deletedAt === null ? null : toDate(value.deletedAt),
   };
+}
+
+function toApiError(error: unknown): ApiError | null {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    "message" in error &&
+    typeof error.code === "string" &&
+    typeof error.message === "string"
+  ) {
+    return new ApiError(error as WireError);
+  }
+  return null;
 }

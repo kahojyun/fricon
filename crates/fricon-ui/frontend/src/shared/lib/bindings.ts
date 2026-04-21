@@ -20,9 +20,7 @@ export const commands = {
 } | null) => typedError<DatasetInfo[], ApiError>(__TAURI_INVOKE("list_datasets", { options })),
 	listDatasetTags: () => typedError<string[], ApiError>(__TAURI_INVOKE("list_dataset_tags")),
 	datasetDetail: (id: number) => typedError<DatasetDetail, ApiError>(__TAURI_INVOKE("dataset_detail", { id })),
-	datasetChartData: (id: number, options: DatasetChartDataOptions) => typedError<ChartSnapshot, ApiError>(__TAURI_INVOKE("dataset_chart_data", { id, options })),
 	getFilterTableData: (id: number, options: FilterTableOptions) => typedError<TableData, ApiError>(__TAURI_INVOKE("get_filter_table_data", { id, options })),
-	datasetLiveChartData: (id: number, options: LiveChartDataOptions) => typedError<LiveChartDataResponse, ApiError>(__TAURI_INVOKE("dataset_live_chart_data", { id, options })),
 	updateDatasetFavorite: (id: number, update: DatasetFavoriteUpdate) => typedError<null, ApiError>(__TAURI_INVOKE("update_dataset_favorite", { id, update })),
 	updateDatasetInfo: (id: number, update: DatasetInfoUpdate) => typedError<null, ApiError>(__TAURI_INVOKE("update_dataset_info", { id, update })),
 	getDatasetWriteStatus: (id: number) => typedError<DatasetWriteStatus, ApiError>(__TAURI_INVOKE("get_dataset_write_status", { id })),
@@ -65,8 +63,6 @@ export type ChartCommonOptions = {
 	indexFilters: number[] | null,
 	excludeColumns: string[] | null,
 };
-
-export type ChartSnapshot = { type: "xy" } & (XYChartSnapshot) | { type: "heatmap" } & (HeatmapChartSnapshot);
 
 export type ColumnInfo = {
 	name: string,
@@ -194,22 +190,6 @@ export type FilterTableOptions = {
 	excludeColumns?: string[] | null,
 };
 
-export type FlatSeries = { shape: "xy" } & (FlatXYSeries) | { shape: "xyz" } & (FlatXYZSeries);
-
-export type FlatXYSeries = {
-	id: string,
-	label: string,
-	values: number[],
-	pointCount: number,
-};
-
-export type FlatXYZSeries = {
-	id: string,
-	label: string,
-	values: number[],
-	pointCount: number,
-};
-
 export type HeatmapChartDataOptions = {
 	quantity: string,
 	xColumn: string | null,
@@ -217,17 +197,7 @@ export type HeatmapChartDataOptions = {
 	complexViewSingle: ComplexViewOption | null,
 } & (ChartCommonOptions);
 
-export type HeatmapChartSnapshot = {
-	xName: string,
-	yName: string,
-	series: FlatXYZSeries[],
-};
-
-export type LiveChartAppendOperation = { kind: "append_points"; series_id: string; values: number[]; point_count: number } | { kind: "append_series"; series: FlatSeries };
-
 export type LiveChartDataOptions = { view: "xy" } & (LiveXYOptions) | { view: "heatmap" } & (LiveHeatmapOptions);
-
-export type LiveChartDataResponse = { mode: "reset"; row_count: number; snapshot: ChartSnapshot } | { mode: "append"; row_count: number; ops: LiveChartAppendOperation[] };
 
 export type LiveHeatmapOptions = {
 	quantity: string,
@@ -298,17 +268,7 @@ export type XYChartDataOptions = {
 	drawStyle: XYDrawStyle,
 } & (XYPlotModeOptions) & (XYTraceRoleOptions) & (ChartCommonOptions);
 
-export type XYChartSnapshot = {
-	plotMode: XYPlotMode,
-	drawStyle: XYDrawStyle,
-	xName: string,
-	yName: string | null,
-	series: FlatXYSeries[],
-};
-
 export type XYDrawStyle = "line" | "points" | "line_points";
-
-export type XYPlotMode = "quantity_vs_sweep" | "xy" | "complex_plane";
 
 export type XYPlotModeOptions = { plotMode: "quantity_vs_sweep"; quantity: string; complex_views: ComplexViewOption[] | null } | { plotMode: "xy"; xColumn: string; yColumn: string } | { plotMode: "complex_plane"; quantity: string };
 

@@ -102,10 +102,11 @@ fn prepare_workspace_runtime(workspace_path: &Path) -> Result<WorkspaceLaunchOut
 
 fn run_with_app_state(app_state: AppState) -> Result<()> {
     let specta_builder = tauri_api::specta_builder();
+    let invoke_handler = tauri_api::invoke_handler();
     #[expect(clippy::exit, reason = "Required by Tauri framework")]
     let tauri_app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(specta_builder.invoke_handler())
+        .invoke_handler(invoke_handler)
         .manage(app_state)
         .setup(move |app| {
             install_ctrl_c_handler(app);

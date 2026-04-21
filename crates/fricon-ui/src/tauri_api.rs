@@ -10,10 +10,14 @@ use fricon::{
     CatalogAppError, ReadAppError,
     dataset::{catalog::CatalogError, read::ReadError},
 };
+use tauri::ipc::Invoke;
 use tauri_specta::{Builder, collect_commands, collect_events};
 
 use crate::features::{
-    charts::tauri as charts,
+    charts::{
+        tauri as charts,
+        types::{DatasetChartDataOptions, LiveChartDataOptions},
+    },
     datasets::{
         error::UiDatasetError,
         tauri as datasets,
@@ -22,6 +26,56 @@ use crate::features::{
     },
     workspace::tauri as workspace,
 };
+
+macro_rules! define_app_commands {
+    (
+        shared: [$($shared:tt)*],
+        raw_only: [$($raw_only:tt)*]
+    ) => {
+        macro_rules! app_commands {
+            (specta) => {
+                collect_commands![
+                    $($shared)*
+                ]
+            };
+            (invoke) => {
+                tauri::generate_handler![
+                    $($shared)*
+                    $($raw_only)*
+                ]
+            };
+        }
+    };
+}
+
+define_app_commands! {
+    shared: [
+        workspace::get_workspace_info,
+        datasets::list_datasets,
+        datasets::list_dataset_tags,
+        datasets::dataset_detail,
+        charts::get_filter_table_data,
+        datasets::update_dataset_favorite,
+        datasets::update_dataset_info,
+        datasets::get_dataset_write_status,
+        datasets::delete_datasets,
+        datasets::trash_datasets,
+        datasets::restore_datasets,
+        datasets::empty_trash,
+        datasets::batch_update_dataset_tags,
+        datasets::delete_tag,
+        datasets::rename_tag,
+        datasets::merge_tag,
+        datasets::export_datasets_dialog,
+        datasets::preview_import_dialog,
+        datasets::preview_import_files,
+        datasets::import_dataset,
+    ],
+    raw_only: [
+        charts::dataset_chart_data,
+        charts::dataset_live_chart_data
+    ]
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
@@ -152,32 +206,15 @@ impl From<UiDatasetError> for ApiError {
 
 pub(crate) fn specta_builder() -> Builder {
     Builder::new()
-        .commands(collect_commands![
-            workspace::get_workspace_info,
-            datasets::list_datasets,
-            datasets::list_dataset_tags,
-            datasets::dataset_detail,
-            charts::dataset_chart_data,
-            charts::get_filter_table_data,
-            charts::dataset_live_chart_data,
-            datasets::update_dataset_favorite,
-            datasets::update_dataset_info,
-            datasets::get_dataset_write_status,
-            datasets::delete_datasets,
-            datasets::trash_datasets,
-            datasets::restore_datasets,
-            datasets::empty_trash,
-            datasets::batch_update_dataset_tags,
-            datasets::delete_tag,
-            datasets::rename_tag,
-            datasets::merge_tag,
-            datasets::export_datasets_dialog,
-            datasets::preview_import_dialog,
-            datasets::preview_import_files,
-            datasets::import_dataset
-        ])
+        .commands(app_commands!(specta))
         .events(collect_events![DatasetChanged])
         .typ::<DatasetInfo>()
+        .typ::<DatasetChartDataOptions>()
+        .typ::<LiveChartDataOptions>()
+}
+
+pub(crate) fn invoke_handler() -> impl Fn(Invoke) -> bool + Send + Sync + 'static {
+    app_commands!(invoke)
 }
 
 pub fn export_bindings(path: impl AsRef<Path>) -> anyhow::Result<()> {
