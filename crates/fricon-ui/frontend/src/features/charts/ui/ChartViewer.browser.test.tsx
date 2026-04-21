@@ -13,8 +13,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { DatasetDetail } from "../api/types";
 import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
 import {
-  encodeChartSnapshotForTest,
-  encodeLiveChartUpdateForTest,
+  encodeChartSnapshotBufferForTest,
+  encodeLiveChartUpdateBufferForTest,
 } from "@/shared/test/chartWire";
 import { ChartViewer } from "./ChartViewer";
 
@@ -91,7 +91,7 @@ describe("ChartViewer", () => {
         return { fields: [], rows: [], columnUniqueValues: {} };
       }
       if (cmd === "dataset_chart_data") {
-        return encodeChartSnapshotForTest({
+        return encodeChartSnapshotBufferForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
@@ -151,7 +151,7 @@ describe("ChartViewer", () => {
         return { fields: [], rows: [], columnUniqueValues: {} };
       }
       if (cmd === "dataset_chart_data") {
-        return encodeChartSnapshotForTest({
+        return encodeChartSnapshotBufferForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
@@ -309,7 +309,7 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           chartPayloads.push(payload as Record<string, unknown>);
         }
-        return encodeChartSnapshotForTest({
+        return encodeChartSnapshotBufferForTest({
           type: "heatmap",
           xName: "trace index",
           yName: "idxB",
@@ -399,7 +399,7 @@ describe("ChartViewer", () => {
       }
       if (cmd === "dataset_chart_data") {
         chartCallCount += 1;
-        return encodeChartSnapshotForTest({
+        return encodeChartSnapshotBufferForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
@@ -485,7 +485,7 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           chartPayloads.push(payload as Record<string, unknown>);
         }
-        return encodeChartSnapshotForTest({
+        return encodeChartSnapshotBufferForTest({
           type: "xy",
           plotMode: "complex_plane",
           drawStyle: "points",
@@ -563,7 +563,7 @@ describe("ChartViewer", () => {
         };
       }
       if (cmd === "dataset_chart_data") {
-        return encodeChartSnapshotForTest({
+        return encodeChartSnapshotBufferForTest({
           type: "xy",
           plotMode: "quantity_vs_sweep",
           drawStyle: "line",
@@ -631,7 +631,7 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           livePayloads.push(payload as Record<string, unknown>);
         }
-        return encodeLiveChartUpdateForTest({
+        return encodeLiveChartUpdateBufferForTest({
           mode: "reset",
           rowCount: 1,
           snapshot: {
@@ -720,7 +720,7 @@ describe("ChartViewer", () => {
         if (payload && typeof payload === "object") {
           livePayloads.push(payload as Record<string, unknown>);
         }
-        return encodeLiveChartUpdateForTest({
+        return encodeLiveChartUpdateBufferForTest({
           mode: "reset",
           rowCount: 6,
           snapshot: {

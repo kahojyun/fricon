@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { encodeChartSnapshotForTest } from "@/shared/test/chartWire";
+import { encodeChartSnapshotBufferForTest } from "@/shared/test/chartWire";
 import { DatasetExplorerScreen } from "./DatasetExplorerScreen";
 
 const { datasetCreatedListenMock, datasetUpdatedListenMock } = vi.hoisted(
@@ -149,7 +149,7 @@ describe("DatasetExplorerScreen integration", () => {
             columnUniqueValues: {},
           };
         case "dataset_chart_data":
-          return encodeChartSnapshotForTest({
+          return encodeChartSnapshotBufferForTest({
             type: "xy",
             plotMode: "quantity_vs_sweep",
             drawStyle: "line",

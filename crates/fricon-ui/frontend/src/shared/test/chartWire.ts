@@ -42,6 +42,12 @@ export function encodeChartSnapshotForTest(chart: ChartModel): Uint8Array {
   );
 }
 
+export function encodeChartSnapshotBufferForTest(
+  chart: ChartModel,
+): ArrayBuffer {
+  return toExactArrayBuffer(encodeChartSnapshotForTest(chart));
+}
+
 export function encodeLiveChartUpdateForTest(
   update: LiveChartUpdate,
 ): Uint8Array {
@@ -114,6 +120,12 @@ export function encodeLiveChartUpdateForTest(
   );
 }
 
+export function encodeLiveChartUpdateBufferForTest(
+  update: LiveChartUpdate,
+): ArrayBuffer {
+  return toExactArrayBuffer(encodeLiveChartUpdateForTest(update));
+}
+
 function encodeFrame(
   kind: number,
   metadata: unknown,
@@ -159,4 +171,11 @@ function inferShape(pointCount: number, valueCount: number): SeriesShape {
     return "xyz";
   }
   throw new Error("Test payload values do not match XY or XYZ layout.");
+}
+
+function toExactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  );
 }
