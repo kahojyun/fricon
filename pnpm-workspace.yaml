@@ -7,5 +7,7 @@ minimumReleaseAgeExclude:
 
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"
+  - edgedriver
   - esbuild
+  - geckodriver
   - msw
