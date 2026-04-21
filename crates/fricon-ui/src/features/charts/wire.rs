@@ -82,12 +82,14 @@ struct LiveResetMetadata<T> {
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum LiveAppendOperationMetadata<'a> {
+    #[serde(rename_all = "camelCase")]
     AppendPoints {
         series_id: &'a str,
         shape: SeriesShape,
         point_count: usize,
         value_count: usize,
     },
+    #[serde(rename_all = "camelCase")]
     AppendSeries {
         shape: SeriesShape,
         id: &'a str,
@@ -517,7 +519,12 @@ mod tests {
         let metadata = parse_metadata(&append);
         assert_eq!(metadata["rowCount"], 6);
         assert_eq!(metadata["ops"][0]["kind"], "append_points");
+        assert_eq!(metadata["ops"][0]["seriesId"], "signal");
+        assert_eq!(metadata["ops"][0]["pointCount"], 1);
+        assert_eq!(metadata["ops"][0]["valueCount"], 2);
         assert_eq!(metadata["ops"][1]["shape"], "xyz");
+        assert_eq!(metadata["ops"][1]["pointCount"], 1);
+        assert_eq!(metadata["ops"][1]["valueCount"], 3);
     }
 
     #[test]
