@@ -5,6 +5,11 @@ import {
   encodeLiveChartUpdateForTest,
 } from "@/shared/test/chartWire";
 
+function alignUp(value: number, alignment: number): number {
+  const remainder = value % alignment;
+  return remainder === 0 ? value : value + alignment - remainder;
+}
+
 describe("chart api wire decoding", () => {
   it("preserves 64-bit precision for snapshot series values", () => {
     const snapshot = encodeChartSnapshotForTest({
@@ -26,9 +31,34 @@ describe("chart api wire decoding", () => {
     const result = decodeChartSnapshot(snapshot);
 
     expect(result.series[0]?.values).toBeInstanceOf(Float64Array);
+    expect(result.series[0]?.values.buffer).toBe(snapshot.buffer);
     expect(Array.from(result.series[0]?.values ?? [])).toEqual([
       1710000000000, 1, 1710000000001, 2,
     ]);
+  });
+
+  it("rejects misaligned numeric payload views", () => {
+    const snapshot = encodeChartSnapshotForTest({
+      type: "xy",
+      plotMode: "xy",
+      drawStyle: "points",
+      xName: "timestamp",
+      yName: "value",
+      series: [
+        {
+          id: "signal",
+          label: "signal",
+          pointCount: 1,
+          values: new Float64Array([1, 2]),
+        },
+      ],
+    });
+    const container = new Uint8Array(snapshot.length + 1);
+    container.set(snapshot, 1);
+
+    expect(() => decodeChartSnapshot(container.subarray(1))).toThrow(
+      "Chart wire numeric payload is not aligned.",
+    );
   });
 
   it("preserves 64-bit precision for live append payloads", () => {
@@ -84,10 +114,10 @@ describe("chart api wire decoding", () => {
       yName: "value",
       series: [],
     });
-    bytes[4] = 2;
+    bytes[4] = 3;
 
     expect(() => decodeChartSnapshot(bytes)).toThrow(
-      "Unsupported chart wire version: 2",
+      "Unsupported chart wire version: 3",
     );
   });
 
@@ -126,9 +156,11 @@ describe("chart api wire decoding", () => {
         },
       ],
     });
-    const metadataLength = new DataView(bytes.buffer).getUint32(6, true);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const metadataLength = view.getUint32(8, true);
+    const numericOffset = view.getUint32(12, true);
     const metadata = JSON.parse(
-      new TextDecoder().decode(bytes.subarray(10, 10 + metadataLength)),
+      new TextDecoder().decode(bytes.subarray(16, 16 + metadataLength)),
     ) as {
       ops: Record<string, unknown>[];
     };
@@ -139,13 +171,16 @@ describe("chart api wire decoding", () => {
       shape: "xy",
     };
     const metadataBytes = new TextEncoder().encode(JSON.stringify(metadata));
+    const patchedNumericOffset = alignUp(16 + metadataBytes.length, 8);
     const patched = new Uint8Array(
-      10 + metadataBytes.length + (bytes.length - 10 - metadataLength),
+      patchedNumericOffset + (bytes.length - numericOffset),
     );
-    patched.set(bytes.subarray(0, 10), 0);
-    new DataView(patched.buffer).setUint32(6, metadataBytes.length, true);
-    patched.set(metadataBytes, 10);
-    patched.set(bytes.subarray(10 + metadataLength), 10 + metadataBytes.length);
+    patched.set(bytes.subarray(0, 16), 0);
+    const patchedView = new DataView(patched.buffer);
+    patchedView.setUint32(8, metadataBytes.length, true);
+    patchedView.setUint32(12, patchedNumericOffset, true);
+    patched.set(metadataBytes, 16);
+    patched.set(bytes.subarray(numericOffset), patchedNumericOffset);
 
     expect(() => decodeLiveChartUpdate(patched)).toThrow(
       "Expected ops[0].seriesId to be a string.",

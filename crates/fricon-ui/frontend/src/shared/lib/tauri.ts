@@ -51,35 +51,17 @@ export async function invokeRaw<T>(
 }
 
 export function normalizeRawBytes(value: unknown): Uint8Array {
-  if (value instanceof Uint8Array) {
-    return value;
-  }
   if (value instanceof ArrayBuffer) {
     return new Uint8Array(value);
   }
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
-  if (
-    Array.isArray(value) &&
-    value.every(
-      (item) =>
-        typeof item === "number" &&
-        Number.isInteger(item) &&
-        item >= 0 &&
-        item <= 255,
-    )
-  ) {
-    return Uint8Array.from(value);
-  }
-  throw new Error("Expected a raw byte response from backend.");
+  throw new Error("Expected an ArrayBuffer raw response from backend.");
 }
 
 export async function invokeRawBytes(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<Uint8Array> {
-  return normalizeRawBytes(await invokeRaw(command, args));
+  return normalizeRawBytes(await invokeRaw<ArrayBuffer>(command, args));
 }
 
 export function toDate(value: string): Date {

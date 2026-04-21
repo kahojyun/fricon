@@ -8,8 +8,8 @@ import type {
 import type { LiveChartAppendOperation, LiveChartUpdate } from "./types";
 
 const MAGIC = "FCHT";
-const VERSION = 1;
-const HEADER_LENGTH = 10;
+const VERSION = 2;
+const HEADER_LENGTH = 16;
 
 const textDecoder = new TextDecoder();
 
@@ -137,10 +137,17 @@ function parseFrame(bytes: Uint8Array): {
   }
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const metadataLength = view.getUint32(6, true);
+  const metadataLength = view.getUint32(8, true);
   const metadataEnd = HEADER_LENGTH + metadataLength;
+  const numericOffset = view.getUint32(12, true);
   if (metadataEnd > bytes.byteLength) {
     throw new Error("Chart wire metadata is truncated.");
+  }
+  if (numericOffset < metadataEnd || numericOffset > bytes.byteLength) {
+    throw new Error("Chart wire numeric payload offset is invalid.");
+  }
+  if (numericOffset % 8 !== 0) {
+    throw new Error("Chart wire numeric payload offset must be 8-byte aligned.");
   }
 
   const metadataBytes = bytes.subarray(HEADER_LENGTH, metadataEnd);
@@ -157,7 +164,7 @@ function parseFrame(bytes: Uint8Array): {
   return {
     kind,
     metadata,
-    values: bytes.subarray(metadataEnd),
+    values: bytes.subarray(numericOffset),
   };
 }
 
@@ -261,8 +268,14 @@ function createNumericReader(bytes: Uint8Array) {
   if (bytes.byteLength % 8 !== 0) {
     throw new Error("Chart wire numeric payload is truncated.");
   }
-
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.byteOffset % 8 !== 0) {
+    throw new Error("Chart wire numeric payload is not aligned.");
+  }
+  const alignedFloatView = new Float64Array(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength / 8,
+  );
   let offset = 0;
 
   return {
@@ -272,12 +285,11 @@ function createNumericReader(bytes: Uint8Array) {
         throw new Error("Chart wire numeric payload is truncated.");
       }
 
-      const result = new Float64Array(valueCount);
-      for (let index = 0; index < valueCount; index += 1) {
-        result[index] = view.getFloat64(offset + index * 8, true);
-      }
       offset += byteLength;
-      return result;
+      return alignedFloatView.subarray(
+        (offset - byteLength) / 8,
+        offset / 8,
+      );
     },
     finish() {
       if (offset !== bytes.byteLength) {

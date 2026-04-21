@@ -2,6 +2,7 @@ import type { ChartModel } from "@/shared/lib/chartTypes";
 import type { LiveChartUpdate } from "@/features/charts/api/types";
 
 const encoder = new TextEncoder();
+const HEADER_LENGTH = 16;
 
 type SeriesShape = "xy" | "xyz";
 
@@ -119,27 +120,35 @@ function encodeFrame(
   values: Float64Array[],
 ): Uint8Array {
   const metadataBytes = encoder.encode(JSON.stringify(metadata));
+  const numericOffset = alignUp(HEADER_LENGTH + metadataBytes.length, 8);
   const numericBytes = values.reduce(
     (total, item) => total + item.length * 8,
     0,
   );
-  const bytes = new Uint8Array(10 + metadataBytes.length + numericBytes);
+  const bytes = new Uint8Array(numericOffset + numericBytes);
   bytes.set(encoder.encode("FCHT"), 0);
-  bytes[4] = 1;
+  bytes[4] = 2;
   bytes[5] = kind;
-  new DataView(bytes.buffer).setUint32(6, metadataBytes.length, true);
-  bytes.set(metadataBytes, 10);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(8, metadataBytes.length, true);
+  view.setUint32(12, numericOffset, true);
+  bytes.set(metadataBytes, HEADER_LENGTH);
 
-  let offset = 10 + metadataBytes.length;
+  let offset = numericOffset;
   for (const block of values) {
-    const view = new DataView(bytes.buffer, offset, block.length * 8);
+    const blockView = new Float64Array(bytes.buffer, offset, block.length);
     for (let index = 0; index < block.length; index += 1) {
-      view.setFloat64(index * 8, block[index] ?? 0, true);
+      blockView[index] = block[index] ?? 0;
     }
     offset += block.length * 8;
   }
 
   return bytes;
+}
+
+function alignUp(value: number, alignment: number): number {
+  const remainder = value % alignment;
+  return remainder === 0 ? value : value + alignment - remainder;
 }
 
 function inferShape(pointCount: number, valueCount: number): SeriesShape {

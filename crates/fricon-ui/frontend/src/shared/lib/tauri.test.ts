@@ -123,17 +123,15 @@ describe("tauri helpers", () => {
     expect(normalized.deletedAt).toBeNull();
   });
 
-  it("normalizes raw number arrays to Uint8Array", () => {
-    expect(normalizeRawBytes([1, 2, 3])).toEqual(new Uint8Array([1, 2, 3]));
-  });
-
   it("normalizes ArrayBuffer payloads to Uint8Array", () => {
     const value = new Uint8Array([4, 5, 6]).buffer;
     expect(normalizeRawBytes(value)).toEqual(new Uint8Array([4, 5, 6]));
   });
 
-  it("passes through Uint8Array payloads", () => {
+  it("rejects non-ArrayBuffer raw payloads", () => {
     const value = new Uint8Array([7, 8, 9]);
-    expect(normalizeRawBytes(value)).toBe(value);
+    expect(() => normalizeRawBytes(value)).toThrow(
+      "Expected an ArrayBuffer raw response from backend.",
+    );
   });
 });

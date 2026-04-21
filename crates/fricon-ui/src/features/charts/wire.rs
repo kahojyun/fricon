@@ -7,7 +7,8 @@ use super::types::{
 };
 
 const MAGIC: &[u8; 4] = b"FCHT";
-const VERSION: u8 = 1;
+const VERSION: u8 = 2;
+const HEADER_LENGTH: usize = 16;
 
 #[derive(Clone, Copy)]
 #[repr(u8)]
@@ -242,6 +243,15 @@ fn encode_frame(
     let metadata =
         serde_json::to_vec(metadata).context("Failed to serialize chart wire metadata")?;
     let metadata_len = u32::try_from(metadata.len()).context("Chart wire metadata too large")?;
+    let metadata_end = HEADER_LENGTH
+        .checked_add(metadata.len())
+        .context("Chart wire metadata too large")?;
+    let numeric_offset = align_up(metadata_end, 8)?;
+    let numeric_offset_u32 =
+        u32::try_from(numeric_offset).context("Chart wire numeric payload offset too large")?;
+    let padding_len = numeric_offset
+        .checked_sub(metadata_end)
+        .context("Chart wire padding underflow")?;
     let value_bytes_len = value_blocks
         .iter()
         .try_fold(0usize, |acc, block| {
@@ -249,18 +259,32 @@ fn encode_frame(
         })
         .context("Chart wire numeric payload too large")?;
 
-    let mut bytes = Vec::with_capacity(10 + metadata.len() + value_bytes_len);
+    let mut bytes = Vec::with_capacity(numeric_offset + value_bytes_len);
     bytes.extend_from_slice(MAGIC);
     bytes.push(VERSION);
     bytes.push(payload_kind.as_byte());
+    bytes.extend_from_slice(&[0, 0]);
     bytes.extend_from_slice(&metadata_len.to_le_bytes());
+    bytes.extend_from_slice(&numeric_offset_u32.to_le_bytes());
     bytes.extend_from_slice(&metadata);
+    bytes.extend(std::iter::repeat_n(0, padding_len));
     for block in value_blocks {
         for value in block {
-            bytes.extend_from_slice(&value.to_le_bytes());
+            bytes.extend_from_slice(&value.to_ne_bytes());
         }
     }
     Ok(bytes)
+}
+
+fn align_up(value: usize, alignment: usize) -> anyhow::Result<usize> {
+    let remainder = value % alignment;
+    if remainder == 0 {
+        Ok(value)
+    } else {
+        value
+            .checked_add(alignment - remainder)
+            .context("Chart wire payload offset overflowed")
+    }
 }
 
 fn encode_xy_series_metadata(series: &FlatXYSeries) -> anyhow::Result<SeriesMetadata<'_>> {
@@ -373,14 +397,14 @@ mod tests {
 
     fn parse_metadata(bytes: &[u8]) -> Value {
         let metadata_len =
-            u32::from_le_bytes(bytes[6..10].try_into().expect("metadata length")) as usize;
-        serde_json::from_slice(&bytes[10..10 + metadata_len]).expect("metadata json")
+            u32::from_le_bytes(bytes[8..12].try_into().expect("metadata length")) as usize;
+        serde_json::from_slice(&bytes[16..16 + metadata_len]).expect("metadata json")
     }
 
     fn numeric_payload(bytes: &[u8]) -> &[u8] {
-        let metadata_len =
-            u32::from_le_bytes(bytes[6..10].try_into().expect("metadata length")) as usize;
-        &bytes[10 + metadata_len..]
+        let numeric_offset =
+            u32::from_le_bytes(bytes[12..16].try_into().expect("numeric offset")) as usize;
+        &bytes[numeric_offset..]
     }
 
     #[test]
@@ -407,6 +431,10 @@ mod tests {
         assert_eq!(metadata["plotMode"], "xy");
         assert_eq!(metadata["drawStyle"], "points");
         assert_eq!(metadata["series"][0]["valueCount"], 4);
+        assert_eq!(
+            u32::from_le_bytes(bytes[12..16].try_into().expect("numeric offset")) as usize % 8,
+            0
+        );
         assert_eq!(numeric_payload(&bytes).len(), 4 * 8);
     }
 
