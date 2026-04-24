@@ -21,8 +21,8 @@ The target architecture should:
 - stop treating chart semantics as a side effect of row adjacency heuristics
 - keep dataset-local meaning separate from higher-level run or measurement
   context
-- preserve the existing scalar, complex, and trace payload types as orthogonal
-  to semantic interpretation
+- keep scalar, complex, and trace payload types as the primary description of
+  column kind, with metadata used only for display and chart hints
 
 ## Why Change
 
@@ -72,6 +72,8 @@ workspace/
         dataset_manifest.json
         data_chunk_0.arrow
         data_chunk_1.arrow
+        index_chunk_0.arrow      # optional logical-index sidecar
+        index_chunk_1.arrow      # optional logical-index sidecar
         ...
 ```
 
@@ -79,6 +81,9 @@ Notes:
 
 - File names can still be revised, but the proposal assumes chunked Arrow IPC
   files remain the physical storage substrate.
+- Logical index sidecar chunks are optional. Regular ordered scans should not
+  pay a main-payload storage cost for indices that can be derived from append
+  order and scan shape.
 - SQLite dataset metadata remains separate and continues to own workspace-level
   catalog concerns such as name, description, tags, favorite state, and status.
 - A higher-level run or measurement manifest is explicitly out of scope for
@@ -91,19 +96,30 @@ Notes:
 Each stored row records an observation that happened. Rows are not overwritten
 in place to represent retries, resumes, or corrections.
 
-### 2. Schema Is Fixed At Dataset Creation
+### 2. Schema Is Fixed Once Writing Starts
 
 Fricon currently fixes schema from the first row and requires later rows to
 match exactly. The clean architecture should keep the "fixed schema" invariant,
-but move schema choice to dataset creation rather than accidental first-row
-shape.
+while allowing the simple API to infer schema from the first written row.
+Semantic mode may declare columns earlier; minimal mode freezes payload columns
+once writing starts.
 
 Implication:
 
-- any system columns that may appear later must be declared up front
-- optional system columns should be nullable, not absent from some rows
+- payload columns are fixed once the dataset starts writing
+- `__ds_point_id` is always materialized by the writer
+- durable logical indices live in an index sidecar when they cannot be derived
+  from append order
+- optional future system payload columns should be declared explicitly rather
+  than appearing mid-stream
 
 This avoids hidden schema drift and keeps the write path simple.
+
+For v1, null-heavy workflows are deliberately out of scope:
+
+- the first written row should contain all payload columns
+- values should be non-null
+- nullable or late-appearing columns should require an explicit future API
 
 ### 3. `__ds_` Is Reserved For System Fields
 
@@ -117,11 +133,6 @@ Examples:
 
 - `__ds_point_id`
 - `__ds_time_ns`
-- `__ds_idx_x`
-- `__ds_idx_y`
-- `__ds_sweep_id`
-- `__ds_frame_id`
-- `__ds_status`
 
 Collision with user columns should be a hard creation-time error.
 
@@ -145,11 +156,11 @@ Semantics:
 The manifest, not Arrow field order and not chart heuristics, is the canonical
 source for:
 
-- column roles
+- column metadata and display hints
 - axis identity
 - logical index mapping
 - scan-plan hints
-- live grouping semantics
+- active live grouping defaults
 - default view suggestions
 
 ### 6. Compatibility Inference Is A Fallback Layer
@@ -175,16 +186,91 @@ Recommended top-level sections:
 
 - `manifest_version`
 - `columns`
-- `scan_plan`
 - `realization`
-- `live_grouping`
-- `view_defaults`
 - `compatibility`
+- `scan_plan`
+- `live_defaults`
+- `view_defaults`
 
-### Semantic Roles Are Orthogonal To Data Types
+Only the first four sections are required for the minimal manifest. Other
+sections should be added only when the user or a higher-level system supplies
+the relevant information, or when an implementation needs to cache a resolved
+interpretation.
 
-The semantic layer describes what a column means in the experiment, not how its
-payload is encoded inside a row.
+### Minimal Manifest
+
+Bare `write(col=...)` should create a small manifest that records only the
+durable facts needed by all datasets:
+
+```json
+{
+    "manifest_version": 1,
+    "columns": {
+        "__ds_point_id": {
+            "dtype": {
+                "kind": "uint64"
+            },
+            "system": {
+                "kind": "point_id"
+            }
+        },
+        "x": {
+            "dtype": {
+                "kind": "float64"
+            }
+        },
+        "signal": {
+            "dtype": {
+                "kind": "float64"
+            }
+        }
+    },
+    "realization": {
+        "append_only": true,
+        "point_id_column": "__ds_point_id",
+        "index_realization": {
+            "kind": "none"
+        },
+        "duplicate_resolution_default": {
+            "kind": "latest_by_point_id"
+        }
+    },
+    "compatibility": {
+        "allow_inference": true
+    }
+}
+```
+
+This is the baseline for datasets created without `columns=`, `scan=`, or
+explicit `logical_indices=`.
+
+Notes:
+
+- `columns` mirrors the frozen payload schema plus Fricon-owned system fields.
+- `scan_plan` is absent until the user passes `scan=` or the system later
+  materializes inferred scan metadata.
+- `index_realization.kind = "none"` means no durable logical index space has
+  been declared yet; charts may use compatibility inference if needed.
+- `live_defaults` and `view_defaults` are absent until explicitly provided or
+  cached by a future implementation.
+- Adding optional sections later should not require rewriting payload chunks.
+
+The manifest is not a user-authored JSON format. Design it for Rust serde
+maintenance:
+
+- prefer internally tagged enums such as `{"kind": "none"}` over bare strings
+  or booleans when a value may later gain fields
+- keep optional top-level sections as `Option<T>` with serde defaults
+- avoid `untagged` enums for durable manifest fields
+- do not use `deny_unknown_fields` unless intentionally rejecting newer
+  manifests
+- keep invariant checks in explicit validation code after deserialization
+
+### Column Metadata Complements Data Types
+
+Do not introduce a broad separate column-role system in v1. Most remaining
+role-like concepts are better expressed by dataset data types plus small display
+or chart hints.
 
 This proposal should preserve Fricon's existing data-type distinctions:
 
@@ -192,46 +278,44 @@ This proposal should preserve Fricon's existing data-type distinctions:
 - complex scalar columns
 - trace columns
 
-Examples:
+V1 may extend or refine the datatype vocabulary when a distinction has direct
+storage or rendering consequences, for example:
 
-- a `measurement` may be a scalar or a trace
-- a `scan_axis` is usually scalar
-- grid and live-grouping semantics describe row-to-row structure, not the
-  internal X axis of a trace payload
+- timestamp-like scalar columns, if user-provided timestamps need first-class
+  rendering or formatting
+- categorical scalar columns, if categorical handling differs from plain string
+  or numeric values
 
-This separation avoids forcing scan semantics and trace rendering into the same
-abstraction.
+System timestamps should use an explicit Fricon-owned system field such as
+`__ds_time_ns` when needed. A normal user timestamp column should just be a
+typed payload column.
 
-### Column Semantics
+### Column Metadata And Chart Hints
 
-Each column may declare:
+Column metadata should stay lightweight. Users more naturally describe:
 
-- `role`
+- stored payload columns and their optional types, units, and labels
+- scan axes and optional static coordinate values
+- framework-owned logical indices when append order is insufficient
+
+The public API should therefore accept column metadata such as:
+
+- `dtype`
 - `label`
 - `unit`
 - `hidden_by_default`
-- `axis_id`
+- `chart_axis`
 
-Recommended v1 role vocabulary:
-
-- `point_id`
-- `scan_axis`
-- `logical_index`
-- `measurement`
-- `timestamp`
-- `sweep_id`
-- `frame_id`
-- `status`
-- `categorical`
-- `annotation`
-- `unknown`
-
-Do not add a large ontology in v1.
+`chart_axis` means "this stored column is a good coordinate-axis candidate in
+chart UI." It does not create a separate durable coordinate model. All other
+chart defaults should be resolved from datatype, scan axes, index realization,
+and compatibility inference.
 
 ### Scan Plan
 
-`scan_plan` should be lightweight and permissive. It is a hint layer, not a
-full planner state dump.
+`scan_plan` should be lightweight and permissive. It describes the dataset's
+logical index space and optional static coordinate values, not a full planner
+state dump.
 
 Recommended fields:
 
@@ -241,14 +325,66 @@ Recommended fields:
 - `strictness`
 - `allows_partial`
 - `allows_duplicate_positions`
+- `index_realization`
 
 Each axis should describe:
 
 - axis identity
-- value column
-- optional logical index column
+- optional static coordinate values
 - mode: `linear`, `list`, `categorical`, `adaptive`, `implicit_index`,
   `unknown`
+
+Scan axes are not necessarily stored Arrow payload columns. For example,
+`scan={"x": [1, 2, 3], "y": ["left", "right"]}` declares a logical scan grid
+whose coordinate lookup values can live in the manifest. For unbounded or
+unknown-length axes such as minimizer steps, use an implicit integer index axis
+rather than a static list.
+
+If a dataset also stores user columns such as `gate_v` or `field_t`, those
+columns remain ordinary payload columns. The scan axis and the payload column
+may share a practical relationship, but v1 should not require a one-to-one
+mapping between them.
+
+Do not add a separate derived-coordinate model in v1. Scan axes and chart
+coordinates can be many-to-many, and derived coordinates are often transforms
+of multiple logical indices. If a derived coordinate must be visible after
+reopen or export, materialize it as an ordinary stored column and mark it as
+usable for chart axes with column metadata such as `chart_axis=True`.
+
+### Logical Index Realization
+
+Logical indices should have three realization modes:
+
+- `implicit`: derive indices from `__ds_point_id`, scan shape, and traversal
+- `sidecar`: store append-only index chunks mapping `__ds_point_id` to logical
+  index values
+- `embedded`: reserve for rare future cases where indices are part of the main
+  payload schema
+
+V1 should implement `implicit` and `sidecar`.
+
+Regular ordered scans should default to `implicit`. A scan like:
+
+```python
+scan={"gate": [-0.2, -0.1, 0.0, 0.1], "bias": [0.0, 0.01, 0.02]}
+```
+
+can derive logical indices from append order and traversal. No per-row index
+columns are needed in the main payload.
+
+When append order is insufficient, for example shuffled acquisition, retries,
+resumes, adaptive scans, or ragged groups, the writer can persist a sidecar
+index table. The sidecar schema should be compact:
+
+```text
+__ds_point_id: uint64
+<axis_id>: int64
+...
+```
+
+Sidecar chunks remain append-only and use the same chunking discipline as the
+payload. They are dataset facts, but they stay separate from user payload
+columns.
 
 ### Realization
 
@@ -259,6 +395,7 @@ Recommended v1 fields:
 
 - `append_only: true`
 - `point_id_column`
+- `index_realization`
 - `duplicate_resolution_default`
 
 Avoid storing counters such as `actual_points` in the manifest unless there is
@@ -266,19 +403,21 @@ clear write ownership and consistency logic.
 
 ### Live Grouping
 
-Live grouping must become explicit.
+Live grouping should be explicit in the active write session, but it does not
+need to be persisted as dataset payload in v1.
 
-Recommended fields:
+Recommended v1 behavior:
 
-- `sweep_id_column`
-- `frame_id_column`
-- `fallback_group_by_axes`
-
-Critical rule:
-
-- non-contiguous scans should require explicit `sweep_id` or `frame_id` for
-  correct live grouping
+- live refresh grouping may use in-memory write-session state
+- chart projections after reopen should depend on persisted facts:
+  `__ds_point_id`, manifest scan axes, and optional sidecar logical indices
 - adjacency-based grouping remains valid only for contiguous legacy scans
+- non-contiguous scans that must be reproducible after reopen should persist
+  logical indices in the sidecar, not live-only frame markers
+
+Do not persist `sweep_id` or `frame_id` by default in v1. They mainly control
+when live charts refresh, and durable execution segments belong more naturally
+to a future run or measurement layer.
 
 ### View Defaults Versus Saved Views
 
@@ -333,8 +472,10 @@ stable, chart-ready semantics.
 It should expose a resolved model such as:
 
 - scan axes
-- logical index columns
-- measurement candidates
+- logical index realization
+- value columns
+- chart-axis candidate columns
+- column display metadata
 - live grouping rules
 - default views
 - duplicate resolution policy
@@ -349,12 +490,13 @@ primary abstraction.
 Instead, `crates/fricon-ui` should receive richer dataset interpretation data,
 for example:
 
-- `role`
-- `isMeasurement`
-- `isScanAxis`
 - `isLogicalIndex`
+- `isChartAxisCandidate`
 - `axisId`
 - `hiddenByDefault`
+- `label`
+- `unit`
+- resolved scan axes
 - resolved live grouping defaults
 - resolved default views
 
@@ -365,27 +507,88 @@ but it should not remain the canonical contract.
 
 ### Creation Phase
 
-Dataset creation should become explicit even for the simple API.
+Dataset creation should support progressive optional metadata while preserving
+the simple `write(col=...)` path.
 
-Creation computes and freezes:
-
-- payload schema
-- selected system columns
-- initial manifest
-
-Suggested API shape:
+Public Python API shape:
 
 ```python
 with manager.create(
     "name",
-    semantics=DatasetSemantics(
-        columns=...,
-        scan_plan=...,
-        system_fields=...,
-    ),
+    columns={
+        "signal": float,
+        "phase": Column(float, unit="rad"),
+        "trace": Trace[float],
+    },
+    scan={
+        "gate": [-0.2, -0.1, 0.0, 0.1],
+        "bias": [0.0, 0.01, 0.02],
+        "step": IndexAxis(),
+    },
+    description="optional",
+    tags=["optional"],
 ) as writer:
     ...
 ```
+
+All new semantic parameters should be optional. Users can start with no
+metadata, then progressively add the information they consider useful.
+
+Recommended top-level creation arguments:
+
+- `columns`: optional stored payload column definitions
+- `scan`: optional logical scan-axis definitions
+- future `views`: optional dataset-owned default views, if needed
+
+Avoid making normal users construct or edit the raw manifest. A `semantics=`
+escape hatch may be useful later for framework authors, but the primary public
+API should stay close to the user's mental model.
+
+### Python Typing Goals
+
+The public Python API should have modern, explicit typing in the `.pyi` stubs so
+IDEs, AI coding tools, and static checkers can understand common usage.
+
+Recommended typing direction:
+
+```python
+@dataclass(frozen=True)
+class Column:
+    dtype: ColumnDType | None = None
+    unit: str | None = None
+    label: str | None = None
+    chart_axis: bool | None = None
+    hidden_by_default: bool = False
+
+@dataclass(frozen=True)
+class IndexAxis:
+    label: str | None = None
+
+ColumnSpec = type[float] | type[int] | TraceType | Column
+ScanAxisSpec = Sequence[ScalarValue] | IndexAxis | None
+```
+
+The runtime may accept plain mappings for convenience, but the documented API
+should prefer typed helpers for completion and readability.
+
+Column definitions should support both concise and typed forms:
+
+```python
+with manager.create(
+    "typed_dataset",
+    columns={
+        "a": float,
+        "b": int,
+        "c": Trace[float],
+        "v": Column(float, unit="V", label="Voltage"),
+    },
+) as writer:
+    ...
+```
+
+If a column definition omits `dtype`, the type is inferred from the first
+written row. If no column metadata is supplied, the first row still determines
+the user payload schema.
 
 For bare writes:
 
@@ -399,24 +602,42 @@ For bare writes:
 Each row writes:
 
 - user fields
-- nullable system fields declared at creation
+- `__ds_point_id`, materialized automatically
+- optional logical index entries through a sidecar when append-order inference
+  is insufficient
 
-Suggested ergonomic Python surface:
+Keep the high-friction system path out of `write(**kwargs)`. The public
+`write()` method should remain a clean row-writing API:
 
 ```python
-writer.write(
-    x=0.1,
-    y=2.0,
-    signal=0.95,
-    ds={
-        "idx": {"x": 10, "y": 2},
-        "sweep_id": 7,
-    },
+writer.write(x=0.1, y=2.0, signal=0.95)
+```
+
+Framework and advanced callers should use `write_dict` for structured write
+context:
+
+```python
+writer.write_dict(
+    {"gate_v": gate_v, "bias_v": bias_v, "signal_v": signal_v},
+    logical_indices={"gate": gate_index, "bias": bias_index},
 )
 ```
 
-The `ds` helper is only API sugar. Internally it maps to fixed nullable
-`__ds_*` columns.
+`logical_indices` is durable dataset context. Supplying it should switch the
+dataset's index realization to a sidecar table if implicit realization is not
+already sufficient. Do not introduce `status`, `sweep_id`, or `frame_id` as v1
+write parameters unless a future run/execution model gives them durable
+meaning.
+
+### Transport Creation Contract
+
+Arrow schema should continue to be carried by the IPC stream payload. Creation
+metadata should carry only dataset catalog metadata plus optional semantic
+creation metadata such as `columns` and `scan`.
+
+This avoids duplicating schema ownership between `CreateMetadata` and the Arrow
+payload. If semantic creation metadata changes the protobuf request shape,
+`IPC_PROTOCOL_VERSION` should be bumped.
 
 ## Reader Architecture
 
@@ -427,15 +648,19 @@ Suggested responsibilities:
 - `reader.points()` -> raw row access
 - `reader.manifest()` -> raw manifest
 - `reader.interpret()` -> resolved dataset semantics
+- `reader.indexes()` -> resolved logical indices, derived or sidecar-backed
 - `reader.grid(value=...)` -> grid projection using resolved interpretation
-- `reader.live_groups(k=...)` -> live grouping using resolved semantics
+- `reader.select(index={...})` -> selection in logical index coordinates
+- `reader.live_groups(k=...)` -> live grouping using active-session semantics
 
 Important rule:
 
 - duplicate grid placement must be resolved in the interpretation layer, not
   separately reimplemented in each chart path
+- ragged grids should be represented as observed sparse index pairs rather than
+  forced into rectangular planned shapes
 
-## Duplicate And Status Semantics
+## Duplicate Semantics
 
 Duplicate logical positions are allowed and expected.
 
@@ -443,15 +668,12 @@ Recommended v1 rule:
 
 - default duplicate policy: `latest_by_point_id`
 
-Do not use `latest_valid_by_point_id` in v1 unless status semantics are made
-mandatory and precisely defined.
-
-If status support is needed, define a compact status vocabulary first:
-
-- `valid`
-- `invalid`
-- `aborted`
-- `unknown`
+Do not add status-aware duplicate policies in v1. Dataset payloads are
+append-only facts; when the same logical scan point is written more than once,
+the default projection should use the later `__ds_point_id`. If a future
+workflow needs invalidation or execution-quality state, it should be designed
+with the run or measurement layer rather than added as an under-specified
+dataset column.
 
 ## Live Monitor Rules
 
@@ -466,19 +688,48 @@ Allowed fallback:
 
 Preferred path:
 
-- use explicit `sweep_id`
-- use explicit `frame_id`
-- use manifest-configured fallback grouping only when scans are still
-  contiguous
+- use manifest scan axes and resolved logical indices
+- use in-memory live grouping for active write-session refresh timing
+- use manifest-configured fallback grouping only when scans are contiguous
 
 ### Non-Contiguous Scans
 
 For shuffled scans, resumes, ROI-first acquisition, or retries:
 
-- explicit grouping IDs are required for correctness
+- explicit logical indices are required for durable correctness
 - adjacency heuristics are not sufficient
+- the durable representation should be the logical-index sidecar, not
+  `sweep_id` or `frame_id` payload columns
 
 This should be documented as a hard semantic contract, not a best-effort hope.
+
+### Unknown-Length And Ragged Scans
+
+Unknown-length axes are first-class in v1 for minimizer and adaptive workflows.
+The common minimizer case should be modeled as an implicit integer index:
+
+```python
+scan={"step": IndexAxis()}
+```
+
+or a concise equivalent chosen by the Python API.
+
+This axis has no planned length and no static coordinate list. By default,
+`step` is derived from append order. If a workflow has multiple ragged groups,
+for example restarts with different minimizer lengths, it should persist a
+sidecar logical index table:
+
+```text
+__ds_point_id | restart | step
+0             | 0       | 0
+1             | 0       | 1
+2             | 0       | 2
+3             | 1       | 0
+4             | 1       | 1
+```
+
+Charts should treat this as an observed sparse grid. Missing cells are empty;
+the dataset does not need to claim a rectangular `planned_shape`.
 
 ## V1 Scope
 
@@ -487,21 +738,32 @@ The clean v1 should include:
 - chunked append-only Arrow payloads
 - `dataset_manifest.json`
 - `__ds_point_id`
-- explicit column roles
-- optional logical index columns
+- a minimal manifest for bare writes with column metadata, realization, and
+  compatibility settings
+- optional typed `columns=` creation metadata
+- optional `scan=` creation metadata
+- implicit logical-index realization for regular ordered scans
+- optional append-only logical-index sidecar chunks
 - scan-plan-lite
-- explicit live grouping fields
+- active-session live grouping that does not require durable `sweep_id` or
+  `frame_id` payload columns
 - resolved interpretation API
 - chart integration that prefers resolved semantics over inference
+- column metadata that can mark stored columns as chart-axis candidates
+- unknown-length integer index axes for minimizer-style workflows
+- ragged heatmap projection from observed sparse index pairs
 
 The clean v1 should defer:
 
 - measurement or run manifest design
 - execution segment tables
+- status or invalidation semantics
 - rich provenance graph
 - expanded planned-point tables
 - multiple duplicate-resolution policies
 - user-editable manifest history
+- a separate durable derived-coordinate model
+- null-heavy or late-appearing column workflows
 
 ## Worked Use Cases
 
@@ -557,8 +819,10 @@ Recommended internal behavior:
 1. The first row determines the user column set and data types.
 2. Fricon materializes `__ds_point_id` automatically.
 3. Fricon writes a minimal manifest with:
-    - all user columns marked as `unknown`
-    - `__ds_point_id` marked as `point_id`
+    - observed payload column metadata
+    - `__ds_point_id` as the point-id system field
+    - no scan plan
+    - no durable logical index realization
     - compatibility mode enabled
 4. Readers and charts may still use compatibility inference for this dataset.
 
@@ -571,17 +835,19 @@ Result:
 Optional upgrade path:
 
 If the user wants slightly better semantics without much extra ceremony, the
-API should allow a small amount of opt-in metadata:
+API should allow top-level `columns` and `scan` metadata:
 
 ```python
 with ws.dataset_manager.create(
     "quick_iv_map",
-    semantics={
-        "columns": {
-            "gate_v": {"role": "scan_axis", "axis_id": "gate", "unit": "V"},
-            "bias_v": {"role": "scan_axis", "axis_id": "bias", "unit": "V"},
-            "current_a": {"role": "measurement", "unit": "A"},
-        }
+    columns={
+        "gate_v": Column(float, unit="V"),
+        "bias_v": Column(float, unit="V"),
+        "current_a": Column(float, unit="A"),
+    },
+    scan={
+        "gate": [-0.2, -0.1, 0.0, 0.1, 0.2],
+        "bias": [0.0, 0.01, 0.02],
     },
 ) as ds:
     for ix, gate_v in enumerate([-0.2, -0.1, 0.0, 0.1, 0.2]):
@@ -589,8 +855,24 @@ with ws.dataset_manager.create(
             ds.write(gate_v=gate_v, bias_v=bias_v, current_a=measure_current())
 ```
 
-This is still small enough for a Python user to tolerate. The key is that the
-semantic path is available but not mandatory.
+The `scan` declaration communicates logical axes without asking the user to
+learn role vocabulary. For this regular ordered scan, Fricon can derive logical
+indices from append order and scan traversal.
+
+For a minimizer or adaptive workflow, the user can declare an unknown-length
+integer index axis:
+
+```python
+with ws.dataset_manager.create(
+    "minimize",
+    columns={"loss": float, "x": float, "y": float},
+    scan={"step": IndexAxis()},
+) as ds:
+    for step in optimizer:
+        ds.write(loss=step.loss, x=step.x, y=step.y)
+```
+
+This keeps the semantic path available but not mandatory.
 
 ### Use Case 2: Fully Wired Experiment System
 
@@ -599,7 +881,7 @@ Scenario:
 - the user works inside a higher-level experiment system
 - scan configuration, loop structure, planner state, and system columns are
   wired by the experiment runtime
-- the experiment author should focus on semantic intent and the loop body, not
+- the experiment author should focus on dataset intent and the loop body, not
   on dataset plumbing
 
 Recommended split of responsibility:
@@ -608,10 +890,11 @@ Recommended split of responsibility:
     - scan specification
     - traversal policy
     - retry or resume policy
-    - grouping IDs
+    - explicit logical indices when append order is insufficient
+    - live grouping state for active refresh timing
     - loop orchestration
 - the experiment author owns:
-    - semantic declarations that matter to the experiment
+    - dataset declarations that matter to the experiment
     - the loop body function or measurement function
 
 Example shape:
@@ -621,16 +904,14 @@ Example shape:
     dataset={
         "name": "transport_map",
         "columns": {
-            "gate_v": {"role": "scan_axis", "axis_id": "gate", "unit": "V"},
-            "field_t": {"role": "scan_axis", "axis_id": "field", "unit": "T"},
-            "signal_v": {"role": "measurement", "unit": "V"},
+            "gate_v": {"dtype": float, "unit": "V"},
+            "field_t": {"dtype": float, "unit": "T"},
+            "signal_v": {"dtype": float, "unit": "V"},
         },
     },
     scan={
-        "axes": [
-            {"id": "gate", "values": gate_points},
-            {"id": "field", "values": field_points},
-        ],
+        "gate": gate_points,
+        "field": field_points,
         "traversal": {"fast_axis": "gate", "slow_axes": ["field"]},
     },
 )
@@ -644,31 +925,26 @@ Recommended runtime behavior:
 
 1. The experiment system computes the full dataset schema before acquisition
    starts.
-2. It requests the system fields it needs up front, for example:
-    - `__ds_point_id`
-    - `__ds_idx_gate`
-    - `__ds_idx_field`
-    - `__ds_sweep_id`
-    - `__ds_frame_id` when relevant
-    - `__ds_status` if retries or invalidation are supported
+2. It decides whether logical indices are implicit or sidecar-backed:
+    - regular ordered scans can use implicit realization
+    - shuffled, resumed, adaptive, or ragged scans should use sidecar
+      realization
 3. It creates the manifest before the first data row is written.
-4. Each loop iteration writes one row with both user values and system values.
+4. Each loop iteration writes one payload row, plus sidecar logical indices
+   when needed.
 
-The actual write path may look like:
+The actual write path for a non-contiguous or ragged scan may look like:
 
 ```python
-ds.write(
-    gate_v=ctx.axis("gate").value,
-    field_t=ctx.axis("field").value,
-    signal_v=lockin_read(),
-    ds={
-        "idx": {
-            "gate": ctx.axis("gate").index,
-            "field": ctx.axis("field").index,
-        },
-        "sweep_id": ctx.sweep_id,
-        "frame_id": ctx.frame_id,
-        "status": "valid",
+ds.write_dict(
+    {
+        "gate_v": ctx.axis("gate").value,
+        "field_t": ctx.axis("field").value,
+        "signal_v": lockin_read(),
+    },
+    logical_indices={
+        "gate": ctx.axis("gate").index,
+        "field": ctx.axis("field").index,
     },
 )
 ```
@@ -682,7 +958,7 @@ Result:
 - live monitor and chart behavior become correct for non-trivial scans
 - retries, resumes, and non-contiguous acquisition can be represented without
   hacking chart heuristics
-- the experiment author only writes semantic intent plus measurement logic
+- the experiment author only writes dataset intent plus measurement logic
 
 ## API Design Implication
 
@@ -694,8 +970,9 @@ The public API should intentionally support two entry modes:
     - compatibility inference remains acceptable
 - semantic mode:
     - optimized for framework-owned execution
-    - semantics declared before acquisition starts
-    - fixed schema, fixed system columns, explicit grouping, explicit scan plan
+    - columns and scan declared before acquisition starts where possible
+    - fixed payload schema, explicit logical indices when needed, explicit scan
+      plan
 
 These modes should converge on the same storage and interpretation model. They
 should differ only in how much information is supplied at creation time.
@@ -770,11 +1047,15 @@ The architecture is considered successful when:
 
 - a known 2D scan opens correctly from explicit semantics without relying on
   first-two-row inference
-- shuffled scans with logical indices render to the correct grid cells
+- regular ordered scans can derive logical indices implicitly without storing
+  index columns in the main payload
+- shuffled scans with sidecar logical indices render to the correct grid cells
 - retries and resumes preserve all fact rows while default projections use the
   latest row by `__ds_point_id`
-- live views for non-contiguous scans behave correctly when explicit grouping
-  IDs are present
+- live views for active writes can use in-memory grouping without requiring
+  durable `sweep_id` or `frame_id` payload columns
+- minimizer-style unknown-length index axes can be sliced by index coordinate
+- ragged heatmaps render from observed sparse index pairs
 - bare `write(col=...)` still works, but now produces a minimal semantic
   manifest owned by the dataset layer
 
