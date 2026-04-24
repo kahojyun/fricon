@@ -13,6 +13,8 @@ sidecar, API, and UI behavior.
 
 - Start with the smallest durable manifest that every new dataset can own.
 - Keep payload storage append-only and continue using chunked Arrow IPC files.
+- Store plain Arrow physical schemas. Do not write Fricon Arrow extension types
+  for new semantic datasets; the manifest owns Fricon-specific meaning.
 - Keep Arrow schema in the create stream payload; use create metadata only for
   catalog metadata and optional semantic creation metadata.
 - Treat manifest JSON as a Rust serde-maintained format, not a user-authored
@@ -33,13 +35,23 @@ The initial manifest implementation should include:
 - Optional `scan_plan`, `live_defaults`, and `view_defaults` fields with serde
   defaults and `skip_serializing_if`.
 - Serde-friendly tagged enums for durable values:
-    - Fricon dataset datatype, for example `{ "kind": "float64" }` for a
-      primitive scalar and `{ "kind": "timestamp_us" }` for a business dtype
+    - Fricon dataset datatype. Examples: `{ "kind": "float64" }`,
+      `{ "kind": "complex128" }`, `{ "kind": "timestamp_us" }`, and a trace
+      value with `kind = "trace"`, `layout = "variable_step"`,
+      `axis = { "kind": "float64" }`, and `value = { "kind": "float64" }`.
     - system column kind, for example `{ "kind": "record_id" }`
     - index realization, starting with `{ "kind": "none" }`
     - duplicate policy, starting with `{ "kind": "latest_by_record_id" }`
 - A `dataset_manifest.json` layout helper colocated with storage layout naming.
 - Atomic manifest writes through a temporary file in the dataset directory.
+- A constrained dtype model that replaces the current broad
+  `DatasetDataType::Scalar(ScalarKind::Numeric)` style for semantic datasets
+  with Arrow-aligned primitive variants plus structured business variants such
+  as `Complex128` and `Trace { layout, axis, value }`.
+- Dedicated trace axis and trace value dtype enums. Trace axes should support
+  numeric dtypes beyond `float64` over time, while trace values should be
+  limited to scalar value dtypes such as numeric primitives and `Complex128`.
+  Nested traces should not be representable in the Rust dtype model.
 
 Validation must check:
 
@@ -47,12 +59,22 @@ Validation must check:
 - `columns` contains the configured `record_id_column`.
 - `__ds_record_id` is a `uint64` system `record_id` column in minimal
   manifests.
+- each manifest dtype is compatible with the actual plain Arrow physical field.
+- trace dtype invariants are enforced both by Rust types and validation:
+  `axis` is numeric, `value` is a scalar trace value, and nested traces are
+  rejected.
 - user-visible columns do not use the reserved `__ds_` prefix.
 - `duplicate_resolution_default` is `latest_by_record_id` in v1.
 - `index_realization.kind = "none"` does not claim sidecar state.
 
 Do not use `deny_unknown_fields` in the durable manifest structs. Rejecting
 future manifests should be an explicit version/validation decision.
+
+Because the project has not reached production use, remove `fricon.complex` and
+`fricon.trace` Arrow extension metadata as part of the semantic storage cleanup
+instead of preserving it as a long-term compatibility contract. If old local
+fixtures need to keep opening during the transition, infer their semantics from
+plain Arrow field shapes.
 
 ## Phase 2: Ingest And Storage Integration
 
@@ -72,6 +94,11 @@ Implementation details:
   begin.
 - Assign `__ds_record_id` monotonically from zero in append order.
 - Include `__ds_record_id` in read schemas for semantic datasets.
+- Write complex and trace payloads with plain Arrow physical layouts:
+  `struct<real: float64, imag: float64>` for `complex128`, `list<T>` for simple
+  traces, `struct<x0: axis, step: axis, y: list<value>>` for fixed-step traces,
+  and `struct<x: list<axis>, y: list<value>>` for variable-step traces. Do not
+  attach Fricon Arrow extension metadata.
 - Keep `__ds_recorded_at` optional. If added later, represent it as Fricon's
   `timestamp_us` business dtype and map that internally to Arrow timestamp
   storage.
@@ -101,6 +128,10 @@ The resolved model should expose:
 - data columns with dtype, label, unit, hidden state, and chart-axis candidate
   metadata.
 - system columns such as `__ds_record_id`.
+- physical Arrow dtype and semantic dataset dtype separately enough that
+  consumers can distinguish chartable numeric scalars, complex values, traces,
+  timestamps, and non-chartable payloads without inspecting Arrow extension
+  metadata.
 - logical index realization: `none`, `implicit`, or later `sidecar`.
 - duplicate resolution policy.
 - compatibility-derived index columns when no durable scan/index metadata
@@ -215,6 +246,9 @@ Rust:
   unsupported version, and invalid realization combinations.
 - ingest tests proving bare writes create `dataset_manifest.json`, append
   `__ds_record_id`, and reject user `__ds_` columns.
+- schema tests proving new complex and trace fields are written as plain Arrow
+  physical layouts without `fricon.complex` or `fricon.trace` extension
+  metadata.
 - reader tests for manifest loading, compatibility fallback, resolved
   interpretation, duplicate policy, implicit indices, sidecar indices, and
   ragged grids.
@@ -250,8 +284,10 @@ Quality gates:
 
 Preferred PR sequence:
 
-1. Manifest serde model, IO helpers, validation, and tests.
-2. Ingest integration for minimal manifests and `__ds_record_id`.
+1. Manifest serde model, constrained dtype model, IO helpers, validation, and
+   tests.
+2. Plain Arrow storage cleanup, ingest integration for minimal manifests, and
+   `__ds_record_id`.
 3. Reader interpretation layer and compatibility fallback.
 4. Portability updates for manifests.
 5. Optional `columns=` creation metadata.

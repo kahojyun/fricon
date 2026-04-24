@@ -254,8 +254,11 @@ Notes:
   Dtypes are Fricon dataset dtypes. Primitive scalar variants should use the
   same concrete names as Arrow where there is a direct one-to-one mapping, such
   as `float64`, `int64`, and `uint64`. Avoid arbitrary bit-width fields in the
-  durable JSON. Fricon-owned business dtypes such as `trace[float]` and
+  durable JSON. Fricon-owned business dtypes such as `trace[float64]` and
   `timestamp_us` can extend that vocabulary when they carry semantic meaning.
+- Arrow payload schema remains the physical schema. The manifest is the
+  semantic authority. New semantic datasets should not rely on Arrow extension
+  types to identify Fricon concepts.
 - `scan_plan` is absent until the user passes `scan=` or the system later
   materializes inferred scan metadata.
 - `index_realization.kind = "none"` means no durable logical index space has
@@ -298,6 +301,85 @@ direct storage or rendering consequences, for example:
 System timestamps should use `__ds_recorded_at` with the Fricon `timestamp_us`
 business dtype when needed. A normal user timestamp column should just be a
 typed payload column. The manifest should not expose Arrow timestamp internals.
+
+### Plain Arrow Storage, Manifest Semantics
+
+With a dataset manifest, Arrow extension types become redundant. New semantic
+datasets should store plain Arrow physical schemas and put all Fricon-specific
+meaning in `dataset_manifest.json`.
+
+Recommended physical layouts:
+
+- `complex128`: `struct<real: float64, imag: float64>`
+- simple trace: `list<value>`, with an implicit integer sample index axis
+- fixed-step trace: `struct<x0: axis, step: axis, y: list<value>>`
+- variable-step trace: `struct<x: list<axis>, y: list<value>>`
+
+`axis` should be a numeric trace-axis dtype, not hard-coded to `float64`.
+`value` should be a scalar trace-value dtype such as `float64` or
+`complex128`. Nested traces are not a meaningful dataset value and should not
+be representable in the trace value type.
+
+The current project has not reached production use, so this is the right time
+to remove `fricon.complex` and `fricon.trace` extension metadata as a durable
+storage dependency. Compatibility fallback, where kept, should infer from plain
+Arrow field shape rather than treating extension metadata as canonical.
+
+### DatasetDataType Refactor Direction
+
+The current runtime `DatasetDataType` collapses physical details into broad
+business categories such as numeric scalar, complex scalar, and trace. That was
+simple, but it makes future support for `float32`, `int64`, `uint64`,
+timestamps, strings, or booleans awkward.
+
+Do not replace it with an arbitrary `(business_kind, arrow_type)` pair. That
+would be easy to serialize but would allow many invalid combinations. Prefer a
+constrained Fricon-owned dtype enum that uses Arrow-aligned primitive variants
+and structured business variants:
+
+```rust
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum DatasetDType {
+    Float64,
+    Float32,
+    Int64,
+    UInt64,
+    Bool,
+    Utf8,
+    TimestampUs,
+    Complex128,
+    Trace(TraceDType),
+}
+
+struct TraceDType {
+    layout: TraceLayout,
+    axis: TraceAxisDType,
+    value: TraceValueDType,
+}
+
+enum TraceAxisDType {
+    Float64,
+    Float32,
+    Int64,
+    UInt64,
+}
+
+enum TraceValueDType {
+    Float64,
+    Float32,
+    Int64,
+    UInt64,
+    Complex128,
+}
+```
+
+Validation should check each dtype against the actual plain Arrow physical
+schema, but basic invariants should also be encoded in the Rust types. In
+particular, nested traces should be impossible to construct rather than merely
+rejected later by validation. Runtime consumers should ask semantic questions
+through helper methods such as `is_trace`, `is_complex`, `is_numeric`, and
+`is_chart_scalar`, instead of pattern-matching every physical primitive
+everywhere.
 
 ### Column Metadata And Chart Hints
 
