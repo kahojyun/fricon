@@ -33,20 +33,22 @@ The initial manifest implementation should include:
 - Optional `scan_plan`, `live_defaults`, and `view_defaults` fields with serde
   defaults and `skip_serializing_if`.
 - Serde-friendly tagged enums for durable values:
-    - dataset datatype, for example `{ "kind": "float64" }`
-    - system column kind, for example `{ "kind": "point_id" }`
+    - Fricon dataset datatype, for example `{ "kind": "float64" }` for a
+      primitive scalar and `{ "kind": "timestamp_us" }` for a business dtype
+    - system column kind, for example `{ "kind": "record_id" }`
     - index realization, starting with `{ "kind": "none" }`
-    - duplicate policy, starting with `{ "kind": "latest_by_point_id" }`
+    - duplicate policy, starting with `{ "kind": "latest_by_record_id" }`
 - A `dataset_manifest.json` layout helper colocated with storage layout naming.
 - Atomic manifest writes through a temporary file in the dataset directory.
 
 Validation must check:
 
 - `manifest_version` is supported.
-- `columns` contains the configured `point_id_column`.
-- `__ds_point_id` is a `uint64` system `point_id` column in minimal manifests.
+- `columns` contains the configured `record_id_column`.
+- `__ds_record_id` is a `uint64` system `record_id` column in minimal
+  manifests.
 - user-visible columns do not use the reserved `__ds_` prefix.
-- `duplicate_resolution_default` is `latest_by_point_id` in v1.
+- `duplicate_resolution_default` is `latest_by_record_id` in v1.
 - `index_realization.kind = "none"` does not claim sidecar state.
 
 Do not use `deny_unknown_fields` in the durable manifest structs. Rejecting
@@ -54,13 +56,13 @@ future manifests should be an explicit version/validation decision.
 
 ## Phase 2: Ingest And Storage Integration
 
-Make every new dataset write a manifest and materialize `__ds_point_id`.
+Make every new dataset write a manifest and materialize `__ds_record_id`.
 
 Bare write behavior:
 
 1. Python or Rust client creates a dataset as it does today.
 2. First payload row still freezes the user payload schema in minimal mode.
-3. Ingest augments the stored Arrow schema and every row with `__ds_point_id`.
+3. Ingest augments the stored Arrow schema and every row with `__ds_record_id`.
 4. Ingest writes `dataset_manifest.json` before finalizing the first chunk.
 5. Finalized datasets always have both payload chunks and a manifest.
 
@@ -68,8 +70,11 @@ Implementation details:
 
 - Reject user columns whose names start with `__ds_` before storage writes
   begin.
-- Assign `__ds_point_id` monotonically from zero in append order.
-- Include `__ds_point_id` in read schemas for semantic datasets.
+- Assign `__ds_record_id` monotonically from zero in append order.
+- Include `__ds_record_id` in read schemas for semantic datasets.
+- Keep `__ds_recorded_at` optional. If added later, represent it as Fricon's
+  `timestamp_us` business dtype and map that internally to Arrow timestamp
+  storage.
 - Preserve existing abort behavior: rows successfully written before abort stay
   on disk and the manifest remains valid for those rows.
 - Keep sidecar logical-index files out of this phase.
@@ -95,7 +100,7 @@ The resolved model should expose:
 
 - data columns with dtype, label, unit, hidden state, and chart-axis candidate
   metadata.
-- system columns such as `__ds_point_id`.
+- system columns such as `__ds_record_id`.
 - logical index realization: `none`, `implicit`, or later `sidecar`.
 - duplicate resolution policy.
 - compatibility-derived index columns when no durable scan/index metadata
@@ -137,8 +142,8 @@ Sidecar support:
 
 - Add append-only `index_chunk_*.arrow` files only when explicit logical
   indices are provided.
-- Sidecar schema is `__ds_point_id: uint64` plus one `int64` column per logical
-  axis.
+- Sidecar schema is `__ds_record_id: uint64` plus one `int64` column per
+  logical axis.
 - Sidecar chunks follow payload chunk naming and atomic write discipline.
 - `index_realization.kind = "sidecar"` records the sidecar naming pattern and
   logical axis order.
@@ -206,10 +211,10 @@ Once chart paths no longer depend on `isIndex`, remove direct use of
 Rust:
 
 - manifest serde round trips for minimal manifests and optional sections.
-- manifest validation failures for missing point id, reserved user prefixes,
+- manifest validation failures for missing record id, reserved user prefixes,
   unsupported version, and invalid realization combinations.
 - ingest tests proving bare writes create `dataset_manifest.json`, append
-  `__ds_point_id`, and reject user `__ds_` columns.
+  `__ds_record_id`, and reject user `__ds_` columns.
 - reader tests for manifest loading, compatibility fallback, resolved
   interpretation, duplicate policy, implicit indices, sidecar indices, and
   ragged grids.
@@ -246,7 +251,7 @@ Quality gates:
 Preferred PR sequence:
 
 1. Manifest serde model, IO helpers, validation, and tests.
-2. Ingest integration for minimal manifests and `__ds_point_id`.
+2. Ingest integration for minimal manifests and `__ds_record_id`.
 3. Reader interpretation layer and compatibility fallback.
 4. Portability updates for manifests.
 5. Optional `columns=` creation metadata.

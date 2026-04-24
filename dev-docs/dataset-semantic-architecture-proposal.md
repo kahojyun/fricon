@@ -107,7 +107,7 @@ once writing starts.
 Implication:
 
 - payload columns are fixed once the dataset starts writing
-- `__ds_point_id` is always materialized by the writer
+- `__ds_record_id` is always materialized by the writer
 - durable logical indices live in an index sidecar when they cannot be derived
   from append order
 - optional future system payload columns should be declared explicitly rather
@@ -131,17 +131,17 @@ __ds_
 
 Examples:
 
-- `__ds_point_id`
-- `__ds_time_ns`
+- `__ds_record_id`
+- `__ds_recorded_at`
 
 Collision with user columns should be a hard creation-time error.
 
-### 4. `__ds_point_id` Is Mandatory For New Semantic Datasets
+### 4. `__ds_record_id` Is Mandatory For New Semantic Datasets
 
 New-format datasets should always materialize:
 
 ```text
-__ds_point_id: uint64
+__ds_record_id: uint64
 ```
 
 Semantics:
@@ -150,6 +150,10 @@ Semantics:
 - stable across restarts, export, and import
 - defines append order
 - is the tie-breaker for duplicate logical positions
+
+`__ds_recorded_at` is optional in v1. When present, it should use Fricon's
+timestamp business dtype with microsecond precision, mapped internally to the
+appropriate Arrow timestamp representation.
 
 ### 5. Manifest Is Canonical For Dataset Meaning
 
@@ -206,12 +210,12 @@ durable facts needed by all datasets:
 {
     "manifest_version": 1,
     "columns": {
-        "__ds_point_id": {
+        "__ds_record_id": {
             "dtype": {
                 "kind": "uint64"
             },
             "system": {
-                "kind": "point_id"
+                "kind": "record_id"
             }
         },
         "x": {
@@ -227,12 +231,12 @@ durable facts needed by all datasets:
     },
     "realization": {
         "append_only": true,
-        "point_id_column": "__ds_point_id",
+        "record_id_column": "__ds_record_id",
         "index_realization": {
             "kind": "none"
         },
         "duplicate_resolution_default": {
-            "kind": "latest_by_point_id"
+            "kind": "latest_by_record_id"
         }
     },
     "compatibility": {
@@ -247,6 +251,11 @@ explicit `logical_indices=`.
 Notes:
 
 - `columns` mirrors the frozen payload schema plus Fricon-owned system fields.
+  Dtypes are Fricon dataset dtypes. Primitive scalar variants should use the
+  same concrete names as Arrow where there is a direct one-to-one mapping, such
+  as `float64`, `int64`, and `uint64`. Avoid arbitrary bit-width fields in the
+  durable JSON. Fricon-owned business dtypes such as `trace[float]` and
+  `timestamp_us` can extend that vocabulary when they carry semantic meaning.
 - `scan_plan` is absent until the user passes `scan=` or the system later
   materializes inferred scan metadata.
 - `index_realization.kind = "none"` means no durable logical index space has
@@ -278,17 +287,17 @@ This proposal should preserve Fricon's existing data-type distinctions:
 - complex scalar columns
 - trace columns
 
-V1 may extend or refine the datatype vocabulary when a distinction has direct
-storage or rendering consequences, for example:
+V1 may extend or refine the Fricon datatype vocabulary when a distinction has
+direct storage or rendering consequences, for example:
 
 - timestamp-like scalar columns, if user-provided timestamps need first-class
   rendering or formatting
 - categorical scalar columns, if categorical handling differs from plain string
   or numeric values
 
-System timestamps should use an explicit Fricon-owned system field such as
-`__ds_time_ns` when needed. A normal user timestamp column should just be a
-typed payload column.
+System timestamps should use `__ds_recorded_at` with the Fricon `timestamp_us`
+business dtype when needed. A normal user timestamp column should just be a
+typed payload column. The manifest should not expose Arrow timestamp internals.
 
 ### Column Metadata And Chart Hints
 
@@ -355,8 +364,8 @@ usable for chart axes with column metadata such as `chart_axis=True`.
 
 Logical indices should have three realization modes:
 
-- `implicit`: derive indices from `__ds_point_id`, scan shape, and traversal
-- `sidecar`: store append-only index chunks mapping `__ds_point_id` to logical
+- `implicit`: derive indices from `__ds_record_id`, scan shape, and traversal
+- `sidecar`: store append-only index chunks mapping `__ds_record_id` to logical
   index values
 - `embedded`: reserve for rare future cases where indices are part of the main
   payload schema
@@ -377,7 +386,7 @@ resumes, adaptive scans, or ragged groups, the writer can persist a sidecar
 index table. The sidecar schema should be compact:
 
 ```text
-__ds_point_id: uint64
+__ds_record_id: uint64
 <axis_id>: int64
 ...
 ```
@@ -394,7 +403,7 @@ mutable summaries that are easy to let drift.
 Recommended v1 fields:
 
 - `append_only: true`
-- `point_id_column`
+- `record_id_column`
 - `index_realization`
 - `duplicate_resolution_default`
 
@@ -410,7 +419,7 @@ Recommended v1 behavior:
 
 - live refresh grouping may use in-memory write-session state
 - chart projections after reopen should depend on persisted facts:
-  `__ds_point_id`, manifest scan axes, and optional sidecar logical indices
+  `__ds_record_id`, manifest scan axes, and optional sidecar logical indices
 - adjacency-based grouping remains valid only for contiguous legacy scans
 - non-contiguous scans that must be reproducible after reopen should persist
   logical indices in the sidecar, not live-only frame markers
@@ -602,7 +611,7 @@ For bare writes:
 Each row writes:
 
 - user fields
-- `__ds_point_id`, materialized automatically
+- `__ds_record_id`, materialized automatically
 - optional logical index entries through a sidecar when append-order inference
   is insufficient
 
@@ -666,11 +675,11 @@ Duplicate logical positions are allowed and expected.
 
 Recommended v1 rule:
 
-- default duplicate policy: `latest_by_point_id`
+- default duplicate policy: `latest_by_record_id`
 
 Do not add status-aware duplicate policies in v1. Dataset payloads are
 append-only facts; when the same logical scan point is written more than once,
-the default projection should use the later `__ds_point_id`. If a future
+the default projection should use the later `__ds_record_id`. If a future
 workflow needs invalidation or execution-quality state, it should be designed
 with the run or measurement layer rather than added as an under-specified
 dataset column.
@@ -720,7 +729,7 @@ for example restarts with different minimizer lengths, it should persist a
 sidecar logical index table:
 
 ```text
-__ds_point_id | restart | step
+__ds_record_id | restart | step
 0             | 0       | 0
 1             | 0       | 1
 2             | 0       | 2
@@ -737,7 +746,7 @@ The clean v1 should include:
 
 - chunked append-only Arrow payloads
 - `dataset_manifest.json`
-- `__ds_point_id`
+- `__ds_record_id`
 - a minimal manifest for bare writes with column metadata, realization, and
   compatibility settings
 - optional typed `columns=` creation metadata
@@ -817,10 +826,10 @@ Desired behavior:
 Recommended internal behavior:
 
 1. The first row determines the user column set and data types.
-2. Fricon materializes `__ds_point_id` automatically.
+2. Fricon materializes `__ds_record_id` automatically.
 3. Fricon writes a minimal manifest with:
     - observed payload column metadata
-    - `__ds_point_id` as the point-id system field
+    - `__ds_record_id` as the record-id system field
     - no scan plan
     - no durable logical index realization
     - compatibility mode enabled
@@ -1051,7 +1060,7 @@ The architecture is considered successful when:
   index columns in the main payload
 - shuffled scans with sidecar logical indices render to the correct grid cells
 - retries and resumes preserve all fact rows while default projections use the
-  latest row by `__ds_point_id`
+  latest row by `__ds_record_id`
 - live views for active writes can use in-memory grouping without requiring
   durable `sweep_id` or `frame_id` payload columns
 - minimizer-style unknown-length index axes can be sliced by index coordinate
