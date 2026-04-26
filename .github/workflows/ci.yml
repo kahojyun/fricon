@@ -32,7 +32,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: "24.x"
-          cache: "pnpm"
+          package-manager-cache: false
       - name: Install dependencies
         run: pnpm install
       - name: Set up Python
@@ -94,7 +94,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: "24.x"
-          cache: "pnpm"
+          package-manager-cache: false
       - name: Install Node dependencies
         run: pnpm install
       - name: Install Playwright browser
@@ -154,7 +154,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: "24.x"
-          cache: "pnpm"
+          package-manager-cache: false
       - name: Install Node dependencies
         run: pnpm install
       - name: Desktop smoke (Windows)
@@ -205,7 +205,7 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: "24.x"
-          cache: "pnpm"
+          package-manager-cache: false
       - name: Build wheels
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
