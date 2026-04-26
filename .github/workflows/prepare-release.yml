@@ -1,9 +1,7 @@
 name: Prepare Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions: {}
 
@@ -15,9 +13,9 @@ env:
 jobs:
   prepare-release:
     name: Plan And Open Release Pull Request
-    # This must stay in sync with the release gate in `ci.yml`. The release flow depends on
-    # squash-and-merge preserving Knope's `chore: prepare release <version>` subject on `main`.
-    if: "!startsWith(github.event.head_commit.message, 'chore: prepare release ')"
+    # Release preparation must run from main because the release flow depends on
+    # squash-and-merge preserving Knope's `chore: prepare release <version>` subject.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write # Required for knope to create and update the release branch.
