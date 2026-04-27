@@ -110,6 +110,7 @@ git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ### Docs-Only
 
 ```bash
+pnpm run format:check
 uv run --group docs mkdocs build -s -v
 ```
 
@@ -188,6 +189,7 @@ Use the normal Rust test gate for coverage, then apply the IPC/gRPC checklist in
 ### Docs
 
 ```bash
+pnpm run format:check
 uv run --group docs mkdocs build -s -v
 ```
 
