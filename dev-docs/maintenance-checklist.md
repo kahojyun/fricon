@@ -20,13 +20,13 @@ compatibility decision is required, record the decision in the change.
 
 Classify the boundary before deciding which checklist applies:
 
-| Changed surface | Use |
-| --- | --- |
-| `.fricon_workspace.json`, workspace directory layout, durable workspace metadata, or workspace migration semantics | Workspace format changes |
-| Dataset payload files, chunking, durable dataset-side metadata, or dataset payload schema rules | Dataset payload layout changes |
-| SQLite tables, Diesel migrations, generated Diesel schema, or database row models | Database schema changes |
-| `crates/fricon/proto/**`, `crates/fricon/src/transport/**`, IPC/gRPC request or response semantics | Rust IPC / gRPC contract changes |
-| Tauri command/event DTOs, Specta exports, generated frontend bindings, or frontend-only adapter DTOs | Tauri / frontend binding changes |
+| Changed surface                                                                                                    | Use                              |
+| ------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| `.fricon_workspace.json`, workspace directory layout, durable workspace metadata, or workspace migration semantics | Workspace format changes         |
+| Dataset payload files, chunking, durable dataset-side metadata, or dataset payload schema rules                    | Dataset payload layout changes   |
+| SQLite tables, Diesel migrations, generated Diesel schema, or database row models                                  | Database schema changes          |
+| `crates/fricon/proto/**`, `crates/fricon/src/transport/**`, IPC/gRPC request or response semantics                 | Rust IPC / gRPC contract changes |
+| Tauri command/event DTOs, Specta exports, generated frontend bindings, or frontend-only adapter DTOs               | Tauri / frontend binding changes |
 
 ## Workspace Format Changes
 
@@ -42,13 +42,13 @@ workspace metadata semantics, or workspace migration behavior.
 
 Decision guide:
 
-| Change | `WORKSPACE_VERSION` decision |
-| --- | --- |
-| Add optional workspace metadata with a default and old workspaces still open without migration | Usually no bump; document the default and add a compatibility test |
-| Add required workspace metadata or change metadata meaning so old workspaces need transformation | Bump and add a migration step |
-| Rename, remove, or move workspace metadata | Bump and add a migration step |
-| Change workspace directory layout or durable file placement | Bump unless the old layout remains fully supported |
-| SQLite-only Diesel migration with no `.fricon_workspace.json` or layout change | No workspace version bump; Diesel migration handles database compatibility |
+| Change                                                                                           | `WORKSPACE_VERSION` decision                                               |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Add optional workspace metadata with a default and old workspaces still open without migration   | Usually no bump; document the default and add a compatibility test         |
+| Add required workspace metadata or change metadata meaning so old workspaces need transformation | Bump and add a migration step                                              |
+| Rename, remove, or move workspace metadata                                                       | Bump and add a migration step                                              |
+| Change workspace directory layout or durable file placement                                      | Bump unless the old layout remains fully supported                         |
+| SQLite-only Diesel migration with no `.fricon_workspace.json` or layout change                   | No workspace version bump; Diesel migration handles database compatibility |
 
 Examples:
 
@@ -107,14 +107,14 @@ client/server IPC behavior, or protocol compatibility semantics.
 
 Decision guide:
 
-| Change | `IPC_PROTOCOL_VERSION` decision |
-| --- | --- |
+| Change                                                                                  | `IPC_PROTOCOL_VERSION` decision                                     |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Add a backward-compatible optional response field and all current clients can ignore it | Usually no bump; add tests for old/default handling where practical |
-| Add a required request field or require clients to send new data | Bump |
-| Remove, rename, renumber, or change the meaning/type of a protobuf field | Bump |
-| Change protocol handshake, stream sequencing, status semantics, or error meaning | Bump |
-| Internal Rust struct refactor with no wire/protobuf/semantic contract change | No bump |
-| Tauri/Specta-only command shape change not used by Rust IPC/gRPC | No IPC protocol bump; follow the Tauri/frontend binding checklist |
+| Add a required request field or require clients to send new data                        | Bump                                                                |
+| Remove, rename, renumber, or change the meaning/type of a protobuf field                | Bump                                                                |
+| Change protocol handshake, stream sequencing, status semantics, or error meaning        | Bump                                                                |
+| Internal Rust struct refactor with no wire/protobuf/semantic contract change            | No bump                                                             |
+| Tauri/Specta-only command shape change not used by Rust IPC/gRPC                        | No IPC protocol bump; follow the Tauri/frontend binding checklist   |
 
 Examples:
 

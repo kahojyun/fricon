@@ -40,8 +40,8 @@ the feature directly changes dataset semantics.
    command registration and generated bindings only. Native dialog,
    filesystem, shell, window, or other platform permissions may require
    updates under:
-   - `crates/fricon-ui/capabilities/`
-   - `crates/fricon-ui/tauri.conf.json`
+    - `crates/fricon-ui/capabilities/`
+    - `crates/fricon-ui/tauri.conf.json`
 6. Regenerate frontend bindings from the repo root:
 
 ```bash
