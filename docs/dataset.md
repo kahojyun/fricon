@@ -61,18 +61,23 @@ thresholds are implementation details.
 
 `fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
-| Python type        | Dataset data type | Description                                  |
-| ------------------ | ----------------- | -------------------------------------------- |
-| [`float`][]        | `Float64`         | 64-bit floating point numbers                |
-| [`complex`][]      | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
-| [`fricon.Trace`][] | `Trace`           | Time series data with various x-axis formats |
+| Python type              | Dataset data type | Description                                  |
+| ------------------------ | ----------------- | -------------------------------------------- |
+| [`float`][]              | `Float64`         | 64-bit floating point numbers                |
+| [`int`][]                | `Float64`         | Converted to 64-bit floating point numbers   |
+| [`complex`][]            | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
+| [`fricon.Trace`][]       | `Trace`           | Time series data with explicit x-axis values |
+| list, NumPy, Arrow array | `Trace`           | Simple trace with implicit integer x indices |
 
-> **Note**: The current release intentionally limits scalar type support to float and complex values.
+> **Note**: The current release intentionally stores scalar columns as float or complex values.
 
 ### Supported trace variants
 
 Trace data supports three different formats depending on how the x-axis (independent variable) is stored:
 
-- **SimpleList**: Only y-values are stored, x-values are implicit indices (0, 1, 2, ...)
-- **FixedStep**: Regular spacing with x₀ (starting point) and step size
-- **VariableStep**: Arbitrary x-values stored alongside y-values
+- **SimpleList**: pass a list, NumPy array, or Arrow array as the column value;
+  only y-values are stored, and x-values are implicit indices (0, 1, 2, ...).
+- **FixedStep**: use `fricon.Trace.fixed_step(x0, step, y)` for regular
+  spacing with x0 and step size.
+- **VariableStep**: use `fricon.Trace.variable_step(x, y)` for arbitrary
+  x-values stored alongside y-values.
