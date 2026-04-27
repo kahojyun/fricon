@@ -4,4 +4,4 @@ Data collection automation framework:
 
 - **Workspace Management**: Initialize and manage data workspaces
 - **Dataset Operations**: Create, store, and query datasets using Apache Arrow format
-- **Client-Server Architecture**: gRPC-based communication
+- **Client-Server Architecture**: local IPC/gRPC communication

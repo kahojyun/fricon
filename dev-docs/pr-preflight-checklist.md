@@ -33,7 +33,9 @@ Use the result to choose changed areas:
   files, docs describing workspace layout
 - Rust IPC/gRPC compatibility: `crates/fricon/proto/**`,
   `crates/fricon/src/client.rs`, `crates/fricon/src/transport/**`
-- Docs-only: `docs/**`, `dev-docs/**`, and Markdown-only changes
+- Release notes: `.changeset/**`
+- Docs-only: `docs/**`, `dev-docs/**`, and Markdown-only changes outside
+  `.changeset/`
 
 ## Quick Profile
 
@@ -114,6 +116,13 @@ pnpm run format:check
 uv run --group docs mkdocs build -s -v
 ```
 
+### Release Notes
+
+```bash
+pnpm run format:check
+knope --validate
+```
+
 ## Strict Profile
 
 Run once before opening or updating a PR.
@@ -124,8 +133,9 @@ Run once before opening or updating a PR.
 cargo +nightly fmt --all --check
 cargo check
 cargo build --workspace --locked
-cargo clippy --all-targets --all-features -- -D warnings
-cargo nextest run
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo nextest run --workspace --profile ci --locked
+cargo test --workspace --doc --locked
 cargo deny --workspace --all-features check
 ```
 

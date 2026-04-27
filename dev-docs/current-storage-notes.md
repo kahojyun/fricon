@@ -26,6 +26,7 @@ workspace/
   fricon.sqlite3
   fricon.socket
   data/
+    .graveyard/
     <uid[0:2]>/
       <uid>/
         data_chunk_0.arrow
@@ -44,6 +45,8 @@ Notes:
 - `fricon.socket` is runtime IPC state, not durable data.
 - Dataset directories are currently sharded by the first two characters of the
   dataset UID.
+- `data/.graveyard/` stores deleted dataset payload directories before they are
+  permanently removed.
 
 ## Dataset Payload Storage
 
@@ -70,7 +73,7 @@ Current Python dataset writes are buffered on the client and flushed
 automatically when either:
 
 - 16 rows have accumulated, or
-- 1 second has elapsed since the first buffered row.
+- 200 ms have elapsed since the first buffered row.
 
 Calling `finish()`, `abort()`, or dropping the writer flushes pending rows
 before finalizing the dataset stream.

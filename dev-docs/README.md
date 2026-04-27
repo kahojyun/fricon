@@ -25,14 +25,15 @@ every canonical document.
 
 ## Agent Starting Points By Change Type
 
-| Change type                                | Start here                               | Then read                                                                                         | Usually avoid                                                          |
-| ------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| SQLite schema visible through Python       | `database-schema-changes.md`             | `maintenance-checklist.md`, `release-and-versioning.md`, Diesel skill                             | Dataset semantic proposal files unless semantics are changing          |
-| Desktop UI action with Rust Tauri command  | `desktop-ui-feature-playbook.md`         | `architecture-guidelines.md`, `testing-strategy.md`, `release-and-versioning.md`, UI AGENTS files | React/shadcn skills unless touching those APIs                         |
-| Workspace format or metadata compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Architecture background unless boundary design is unclear              |
-| Rust IPC/gRPC contract compatibility       | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
-| Public dataset docs update                 | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
-| Product route or issue planning            | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
+| Change type                                 | Start here                               | Then read                                                                                         | Usually avoid                                                          |
+| ------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| SQLite schema visible through Python        | `database-schema-changes.md`             | `maintenance-checklist.md`, `release-and-versioning.md`, Diesel skill                             | Dataset semantic proposal files unless semantics are changing          |
+| Desktop UI action with Rust Tauri command   | `desktop-ui-feature-playbook.md`         | `architecture-guidelines.md`, `testing-strategy.md`, `release-and-versioning.md`, UI AGENTS files | React/shadcn skills unless touching those APIs                         |
+| Workspace format or metadata compatibility  | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Architecture background unless boundary design is unclear              |
+| Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Public docs unless behavior is user-visible                            |
+| Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
+| Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
+| Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
 
 ## Canonical Guidance
 
