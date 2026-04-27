@@ -10,7 +10,7 @@
     ":enablePreCommit",
     "helpers:pinGitHubActionDigestsToSemver",
     "customManagers:githubActionsVersions",
-    "schedule:weekly",
+    "schedule:weekends",
     ":timezone(Asia/Shanghai)"
   ],
   "packageRules": [
