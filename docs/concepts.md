@@ -9,25 +9,8 @@ the data files and metadata. You can create a workspace using the CLI:
 fricon init path/to/workspace
 ```
 
-Currently a workspace contains the following files:
-
-```tree
-workspace/
-  .fricon_workspace.json
-  fricon.sqlite3
-  fricon.socket
-  data/
-    <uid[0:2]>/
-      <uid>/
-        data_chunk_0.arrow
-        data_chunk_1.arrow (optional, written when first exceeds chunk size)
-  backup/
-  log/
-```
-
-`.fricon_workspace.json` stores the workspace format version as an internal
-integer compatibility counter. Opening an older workspace may trigger a
-stepwise migration before the workspace is usable.
+A workspace should be treated as Fricon-managed storage. Use the CLI, Python
+API, or desktop UI to read and modify it.
 
 ## Fricon Server
 

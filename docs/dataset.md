@@ -1,7 +1,29 @@
 # Dataset
 
-`fricon` uses [Arrow IPC format] to store datasets. A basic knowledge of Arrow
-data structures can be helpful to understand how `fricon` works.
+`fricon` datasets are table-shaped data collections. A basic knowledge of Arrow
+data structures can be helpful because the Python API accepts Arrow-compatible
+values and exposes Arrow-style tables.
+
+## Public dataset contract
+
+Each dataset contains one table. The first written row defines the table schema.
+Later rows must use the same column names and compatible value types as that
+first row. Missing columns, extra columns, and different value kinds are not
+part of the supported write contract.
+
+Supported public write values are currently `float`, `int` values converted to
+`float`, `complex`, and trace values. `None` and nullable columns are not part
+of the current write contract.
+
+Call `finish()` or `close()` to complete a dataset successfully. A writer used
+as a context manager calls `close()` when the block exits normally. Calling
+`abort()`, raising from the context manager block, or dropping a writer before
+successful completion marks the dataset as aborted.
+
+Users do not currently declare dataset semantics, scan axes, or logical indices
+through the public API. The exact workspace file layout, internal metadata
+files, chunk file names, and write-buffer thresholds are implementation details
+rather than public storage contracts.
 
 ## [Apache Arrow](https://arrow.apache.org/docs/index.html)
 
@@ -23,45 +45,39 @@ classes in the python binding of Arrow:
 - [`pyarrow.Table`][]: A helper type to unify representations of single and
   collection of record batches with the same schema.
 
-## How are datasets stored?
+## How datasets work
 
-A dataset is exactly one Arrow table stored in [Arrow IPC format]. When a dataset
-is created, the schema of the table is automatically inferred from the first row
-of data written. This allows for flexible data collection without requiring
-manual schema definition.
+When a dataset is created, the table schema is automatically inferred from the
+first row of data written. This allows for flexible data collection without
+requiring manual schema definition.
 
 ## Write batching
 
-Dataset writes are buffered on the client and flushed automatically when either
-16 rows have accumulated or 1 second has elapsed since the first buffered row.
-This keeps the write API row-oriented while reducing transport overhead for
-larger ingests. Calling `finish()`, `abort()`, or dropping the writer will flush
-any pending rows before the dataset stream is finalized.
+Dataset writes are buffered automatically. This keeps the write API row-oriented
+while reducing transport overhead for larger ingests. The exact buffering
+thresholds are implementation details.
 
 ## Type inference
 
-`fricon` MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
+`fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
-| Python type        | Dataset data type | Description                                  |
-| ------------------ | ----------------- | -------------------------------------------- |
-| [`float`][]        | `Float64`         | 64-bit floating point numbers                |
-| [`complex`][]      | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
-| [`fricon.Trace`][] | `Trace`           | Time series data with various x-axis formats |
+| Python type              | Dataset data type | Description                                  |
+| ------------------------ | ----------------- | -------------------------------------------- |
+| [`float`][]              | `Float64`         | 64-bit floating point numbers                |
+| [`int`][]                | `Float64`         | Converted to 64-bit floating point numbers   |
+| [`complex`][]            | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
+| [`fricon.Trace`][]       | `Trace`           | Time series data with explicit x-axis values |
+| list, NumPy, Arrow array | `Trace`           | Simple trace with implicit integer x indices |
 
-> **Note**: The MVP version intentionally limits type support to float and complex types for simplicity. Additional types (bool, int, str) will be supported in future releases.
+> **Note**: The current release intentionally stores scalar columns as float or complex values.
 
 ### Supported trace variants
 
 Trace data supports three different formats depending on how the x-axis (independent variable) is stored:
 
-- **SimpleList**: Only y-values are stored, x-values are implicit indices (0, 1, 2, ...)
-- **FixedStep**: Regular spacing with x₀ (starting point) and step size
-- **VariableStep**: Arbitrary x-values stored alongside y-values
-
-### Future extensions
-
-Additional data types (bool, int, str, timestamps) will be supported in future versions. The current focus on float, complex, and trace types ensures optimal performance and correctness for the most common scientific use cases.
-
-<!-- TODO: `pyarrow` and `polars` tips -->
-
-[Arrow IPC format]: https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc
+- **SimpleList**: pass a list, NumPy array, or Arrow array as the column value;
+  only y-values are stored, and x-values are implicit indices (0, 1, 2, ...).
+- **FixedStep**: use `fricon.Trace.fixed_step(x0, step, y)` for regular
+  spacing with x0 and step size.
+- **VariableStep**: use `fricon.Trace.variable_step(x, y)` for arbitrary
+  x-values stored alongside y-values.

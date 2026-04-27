@@ -6,6 +6,9 @@ Data collection automation framework.
 
 [GitHub Pages](https://kahojyun.github.io/fricon/)
 
+For implementation guidance, maintainer checklists, and AI-agent starting
+points, see [dev-docs/README.md](dev-docs/README.md).
+
 ## Overview
 
 Fricon is a data collection automation framework designed for managing datasets in scientific and research workflows. It provides:
@@ -63,8 +66,8 @@ ws = Workspace.connect(workspace_path)
 writer = ws.dataset_manager.create("my_dataset", description="My test dataset")
 
 # Write data - schema is inferred from the first row
-# Writes are micro-batched automatically every second or when 16 rows accumulate
-# MVP currently supports float and complex types only
+# Writes are buffered automatically
+# Current scalar writes support float, int-as-float, and complex values
 writer.write(id=1, value=42.0, measurement=3.14 + 2j)
 writer.write(id=2, value=84.0, measurement=1.618 - 1j)
 writer.close()
