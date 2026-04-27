@@ -140,25 +140,7 @@ uv run --group docs mkdocs build -s -v
 Use this when a change is user-facing, release-note-worthy, or intentionally
 changes versioned behavior.
 
-- Add a Knope changeset file under `.changeset/`.
-- AI agents should write changeset files directly rather than using the
-  interactive `knope document-change` CLI.
-- Human contributors may use `knope document-change` or write the file
-  manually.
-- Do not place templates, README files, or other helper Markdown files inside
-  `.changeset/`; Knope treats them as real changesets.
-
-Template:
-
-```md
----
-default: patch
----
-
-# Short user-facing title
-
-Describe the user-visible change in release-note language.
-```
-
-Use `major`, `minor`, and `patch` with standard semantic-versioning intent;
-Knope handles `0.x` version behavior.
+- Apply the policy in `dev-docs/release-and-versioning.md`.
+- Add a Knope changeset file under `.changeset/` when that policy requires one.
+- Record any required compatibility decision, such as `WORKSPACE_VERSION` or
+  `IPC_PROTOCOL_VERSION`, in the implementation change.
