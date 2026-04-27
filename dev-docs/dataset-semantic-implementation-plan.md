@@ -4,6 +4,11 @@
 
 Proposed.
 
+This is not current behavior. Do not execute this plan mechanically without
+checking current code, `dev-docs/current-storage-notes.md`, and the relevant
+checklists in `dev-docs/maintenance-checklist.md` and
+`dev-docs/pr-preflight-checklist.md`.
+
 This plan implements the direction in
 `dev-docs/dataset-semantic-architecture-proposal.md`. The goal is to land the
 minimal durable architecture first, then incrementally add richer scan,

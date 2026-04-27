@@ -31,6 +31,8 @@ skills, prompts, or contributor notes.
 - `pr-preflight-checklist.md` - local and pre-PR validation matrix
 - `release-and-versioning.md` - release model, changeset policy, and version
   bump guidance
+- `architecture-guidelines.md` - current implementation architecture rules and
+  boundary guidance
 - `testing-strategy.md` - test runner split and test placement rules
 - `internal-doc-comments.md` - Rustdoc/comment style for maintainable internal
   code
@@ -44,8 +46,8 @@ implementation changes.
 
 ## Architecture Notes
 
-These files are advisory unless they explicitly point to a canonical checklist
-or policy.
+These files are advisory background unless they explicitly point to a canonical
+checklist, policy, or guideline.
 
 - `architecture-ai-notes.md` - architecture discussion and AI-assisted
   maintainability guidance

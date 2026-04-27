@@ -2,12 +2,17 @@
 
 ## Status
 
-Advisory architecture note. Use canonical checklist and policy files for
+Advisory background discussion. Use `dev-docs/architecture-guidelines.md` for
+current architecture rules and `dev-docs/maintenance-checklist.md` for
 actionable maintenance requirements.
 
 ## Scope
 
 This note summarizes the architectural conclusions from a review and comparison of `fricon` and `crates.io`, with a focus on long-term maintainability in an AI-heavy development workflow.
+
+This file preserves rationale and historical context. Do not treat it as the
+short canonical rule set for new work; use `dev-docs/architecture-guidelines.md`
+first.
 
 ## High-Level Takeaways
 

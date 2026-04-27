@@ -12,6 +12,10 @@ as stable user-facing documentation. Public docs should describe workspaces and
 datasets through the CLI, Python API, and desktop UI rather than through the
 on-disk layout.
 
+Dataset semantics proposal documents describe future direction, not current
+storage facts. Use this file as the current source of truth until those
+proposals are implemented and this note is updated.
+
 ## Workspace Layout
 
 At the time of writing, a workspace contains:
