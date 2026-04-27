@@ -39,6 +39,10 @@ Fricon is expected to provide:
 - Python APIs for scripting and automation
 - reproducibility support for experiment code, environments, parameters, and
   generated datasets
+- workflow definitions above individual experiments for repeated calibration,
+  optimization, and benchmark tasks
+- AI-assisted automation for repetitive scientific data-management work, with
+  explicit review and auditability for mutating actions
 
 The product should make common scientific measurement workflows easier while
 remaining scriptable for users who already use Python in their research.
@@ -61,6 +65,16 @@ Device management should remain a later foundation. Near-term design may keep
 room for device identity and configuration, but should avoid building a broad
 driver framework or hardware orchestration layer before real workflows require
 one.
+
+Workflow automation should be treated as a layer above individual experiments.
+It can eventually coordinate scheduled calibration, optimization, benchmark,
+and repeated measurement tasks, but should rely on clear run records, parameter
+snapshots, provenance, and human approval boundaries.
+
+AI-assisted workflows should be designed as assistive automation rather than
+silent authority. AI may help draft snippets, summaries, reports, metadata
+cleanup, parameter comparisons, and workflow proposals, but mutating workspace
+state should remain explicit, reviewable, and auditable.
 
 ## Runtime Model
 
@@ -113,6 +127,22 @@ For example, dataset detail views may eventually provide Python read snippets
 that reopen selected datasets through the public API without exposing internal
 storage paths.
 
+Quality-of-life features should make common scientific work faster without
+changing the user's mental model. Good candidates include preview/export
+snippets, saved views, aliases, notes, tags, quality flags, compare views, and
+template experiments.
+
+### Preserve Provenance
+
+Scientific workflows need enough traceability to explain where a result came
+from. Fricon should be able to connect runs, datasets, parameters, code
+versions, environments, device configuration, notes, imports, exports, and
+future workflow definitions without exposing internal storage details as the
+user model.
+
+When records need correction, prefer appended correction or event history over
+silent mutation of completed run facts.
+
 ### Make Advanced Workflows Explicit
 
 Experiment execution, parameter management, and device management should become
@@ -129,6 +159,17 @@ environment management. Git-backed code history, including a workspace-managed
 bare repository, and environment tools such as `uv` or `pixi` are plausible
 directions, but they should be designed as explicit product capabilities rather
 than hidden side effects of dataset writes.
+
+Workflow definitions may eventually orchestrate repeated experiment execution,
+scheduled calibration, parameter optimization, and benchmark runs. These
+capabilities should record workflow versions, triggers, inputs, outputs,
+approval checkpoints, failures, and manual overrides.
+
+AI model integration may eventually automate boring or repetitive work, but
+should not bypass product boundaries. AI-generated changes to data,
+parameters, code, workflow definitions, or execution plans should leave
+auditable records and require user approval unless the operation is explicitly
+designed as safe and reversible.
 
 ### Keep Architecture Proportional
 
@@ -160,10 +201,22 @@ These questions are intentionally unresolved:
   sweep definitions, or versioned experiment configurations?
 - How should parameter history and version comparison be represented in the
   Python API and desktop UI?
+- Which run facts should be immutable, and which should allow correction
+  events?
+- How much dataset lineage is needed for measured, processed, simulation, and
+  imported datasets?
 - How should experiment code history be captured without surprising users or
   turning Fricon into a general Git client?
 - What level of automatic `uv` or `pixi` environment management is useful
   without making experiment setup opaque?
+- What should a workflow definition contain beyond a Python entry point,
+  parameters, schedules, approval checkpoints, and expected outputs?
+- Which calibration, optimization, and benchmark tasks should be first-class
+  workflow types?
+- Which AI actions should be suggestion-only, which may mutate workspace state,
+  and what approval or audit metadata should each class require?
+- What AI model/provider/version and prompt-summary metadata is needed for
+  reproducibility without storing unnecessary sensitive context?
 - What level of device abstraction is useful without overbuilding a hardware
   framework?
 - Which data formats and array shapes should be first-class beyond the current

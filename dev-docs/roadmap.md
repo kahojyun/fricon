@@ -34,6 +34,16 @@ Device management remains a later foundation. Near-term work may preserve space
 for device identity and configuration, but should not build a broad driver or
 hardware orchestration framework.
 
+Workflow definitions are a later layer above individual experiments. They may
+eventually coordinate repeated runs, scheduled calibration, optimization, and
+benchmark tasks, but should build on run records, parameter snapshots, and
+provenance first.
+
+AI integration is a cross-cutting automation layer. It should help with
+repetitive scientific data-management work, but actions that mutate data,
+parameters, code, workflow definitions, or execution plans should require clear
+user review and durable audit records.
+
 ## Product Pillars
 
 - Workspace and dataset management
@@ -42,6 +52,9 @@ hardware orchestration framework.
 - Python scripting API for data recording and automation
 - Python-led experiment and parameter workflows
 - Reproducibility support for experiment code and environments
+- Traceability across runs, datasets, parameters, code, and environments
+- Workflow definitions and scheduled automation
+- AI-assisted automation with explicit review and auditability
 - Later device identity and configuration foundations
 
 ## Now
@@ -84,9 +97,13 @@ After the dataset foundation is durable, product work should move toward:
 - richer desktop inspection and charting workflows
 - dataset read snippets that help users reopen or reproduce analysis from
   Python
+- dataset preview, export, and plotting snippets for common Python workflows
+- lightweight run notes, tags, favorites, and quality flags
 - Python-led experiment run records
-- parameter capture and display for recorded runs
+- parameter snapshots, diffs, and display for recorded runs
 - a minimal model for connecting runs to datasets
+- basic run provenance links between datasets, parameters, code, environment,
+  and notes
 
 This phase should avoid turning experiment support into a desktop-first
 workflow engine too early. Python scripts should remain the first-class way to
@@ -118,8 +135,67 @@ Dataset usability may include:
 
 - generated Python read snippets for each dataset
 - copyable examples for loading selected datasets by workspace-local ID or UID
+- preview snippets for pandas, pyarrow, plotting, CSV export, and Parquet export
 - snippets that match the public Python API instead of exposing internal
   storage layout
+- saved table and chart views
+- dataset aliases for important datasets
+- compare views for selected datasets or runs
+
+Scientific quality-of-life features may include:
+
+- run notes for manual observations and experimental context
+- quick tags, favorites, and filters for datasets, runs, and parameter sets
+- data quality flags such as good, suspect, failed, calibration, or test run
+- calibration records linked to runs, parameters, and device configuration
+- unit, label, precision, and display-scale metadata for parameters and dataset
+  columns
+- template experiments that copy parameter structure, code entry points, and
+  output dataset conventions from previous work
+
+Traceability and reproducibility may include:
+
+- a provenance graph from workflow to run, datasets, parameters, code version,
+  environment, device configuration, notes, imports, and exports
+- immutable run records with later corrections recorded as appended events
+- a workspace event timeline for dataset, run, parameter, import, export, and
+  automation events
+- parameter snapshots for each run and parameter diffs between runs
+- input lineage for derived datasets, including measured, processed,
+  simulation, and imported dataset categories
+- import provenance such as source path, file hash, import time, and conversion
+  options
+- export provenance such as exported content, time, format, and destination
+  summary
+- checksums for dataset chunks, exported bundles, code snapshots, and
+  environment lock files
+- human-readable audit summaries for selected runs or workspaces
+
+Workflow automation may include:
+
+- workflow definitions above individual experiments
+- reusable workflow templates
+- workflow versioning and workflow run history
+- scheduled or periodic workflows
+- automatic parameter calibration and optimization
+- periodic instrument or experiment benchmarks
+- benchmark history and trend plots
+- optimization objectives, constraints, chosen parameter changes, and rollback
+  context
+- human approval checkpoints for risky automation
+- failed automation attempts with logs and partial outputs
+
+AI-assisted automation may include:
+
+- metadata cleanup suggestions
+- generated read, plot, export, and report snippets
+- parameter comparison and anomaly-explanation assistance
+- tagging, note summarization, and draft report generation
+- calibration or benchmark interpretation suggestions
+- workflow drafts generated for user review before execution
+- audit records for AI-assisted changes, including model/provider/version when
+  practical and a task summary that avoids storing unnecessary sensitive prompt
+  content
 
 ## Later
 
@@ -129,6 +205,10 @@ Longer-term product direction includes explicit concepts for:
 - richer parameter schemas and sweep definitions
 - parameter history and version comparison workflows
 - experiment code and environment history management
+- run provenance and audit reporting
+- workflow definitions and scheduled automation
+- automatic calibration, optimization, and benchmark workflows
+- AI-assisted repetitive-work automation with human approval boundaries
 - device identity and configuration
 - device integration points once real workflows justify them
 
@@ -171,5 +251,8 @@ be rediscovered or relitigated later. Good ADR candidates include:
 - desktop/runtime architecture decisions
 - experiment, parameter, or device model foundations
 - experiment code history and environment management foundations
+- run provenance and immutability foundations
+- workflow definition and scheduler foundations
+- AI action, approval, and auditability foundations
 
 Use `dev-docs/adr/README.md` for ADR rules and format.
