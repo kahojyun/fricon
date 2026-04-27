@@ -143,6 +143,14 @@ user model.
 When records need correction, prefer appended correction or event history over
 silent mutation of completed run facts.
 
+### Leave Room For Core Scientific Entities
+
+Some concepts may be implemented later but should influence early model
+boundaries because they are expensive to retrofit. Dataset, run, and parameter
+work should leave room for units and display metadata, sample or specimen
+identity, dataset lineage, parameter snapshots, workflow definitions, local
+automation approvals, and event or audit logs.
+
 ### Make Advanced Workflows Explicit
 
 Experiment execution, parameter management, and device management should become
@@ -201,6 +209,10 @@ These questions are intentionally unresolved:
   sweep definitions, or versioned experiment configurations?
 - How should parameter history and version comparison be represented in the
   Python API and desktop UI?
+- What unit and display metadata belongs on dataset columns, parameters, or
+  both?
+- How should sample or specimen identity be represented without overbuilding a
+  lab inventory system?
 - Which run facts should be immutable, and which should allow correction
   events?
 - How much dataset lineage is needed for measured, processed, simulation, and

@@ -90,6 +90,30 @@ Relevant notes:
 - `database-schema-changes.md`
 - `release-and-versioning.md`
 
+## Core Model Pressure
+
+These future concepts have enough model impact that early dataset, run,
+parameter, and workspace work should leave room for them. They are not all
+near-term implementation scope, but ignoring them may cause avoidable schema,
+API, or UI rewrites later.
+
+- provenance graph across runs, datasets, parameters, code versions,
+  environments, device configuration, workflow definitions, imports, exports,
+  and notes
+- parameter snapshots and parameter-set versioning instead of only mutable
+  "current parameter" state
+- unit, label, precision, and display-scale metadata for both dataset columns
+  and parameters
+- sample or specimen identity for workflows where the measured object matters
+  as much as the device or parameter set
+- dataset kind and lineage, including measured, imported, processed, and
+  simulation datasets
+- workflow definition, workflow run, and experiment run as distinct concepts
+- local automation safety and approval boundaries for scheduler, optimizer, and
+  AI-assisted actions
+- event and audit log support for immutable records, corrections, manual
+  overrides, failed automation, and AI-assisted changes
+
 ## After Dataset Semantics
 
 After the dataset foundation is durable, product work should move toward:
@@ -145,6 +169,8 @@ Dataset usability may include:
 Scientific quality-of-life features may include:
 
 - run notes for manual observations and experimental context
+- sample or specimen records for experiments organized around a measured object,
+  batch, preparation, condition, or source
 - quick tags, favorites, and filters for datasets, runs, and parameter sets
 - data quality flags such as good, suspect, failed, calibration, or test run
 - calibration records linked to runs, parameters, and device configuration
@@ -163,6 +189,8 @@ Traceability and reproducibility may include:
 - parameter snapshots for each run and parameter diffs between runs
 - input lineage for derived datasets, including measured, processed,
   simulation, and imported dataset categories
+- sample or specimen provenance when runs and datasets are tied to physical
+  measured objects
 - import provenance such as source path, file hash, import time, and conversion
   options
 - export provenance such as exported content, time, format, and destination
