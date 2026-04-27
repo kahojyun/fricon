@@ -1,5 +1,9 @@
 # Release And Versioning
 
+## Status
+
+Canonical release and versioning policy.
+
 ## Purpose
 
 This note is the canonical release and versioning policy for Fricon. Use it to

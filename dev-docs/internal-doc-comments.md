@@ -1,5 +1,9 @@
 # Internal Rust Doc Comment Guideline
 
+## Status
+
+Canonical style guide for internal Rust documentation.
+
 ## Goal
 
 Higher-signal comments in boundary-heavy and workflow-heavy code, while keeping

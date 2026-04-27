@@ -1,5 +1,9 @@
 # Maintenance Checklist
 
+## Status
+
+Canonical maintenance checklist.
+
 ## Purpose
 
 This is the canonical maintenance checklist for coordinated repository changes.

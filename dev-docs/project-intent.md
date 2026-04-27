@@ -1,5 +1,9 @@
 # Project Intent
 
+## Status
+
+Canonical project direction and AI-assisted development guardrails.
+
 ## Purpose
 
 Fricon aims to become an easy-to-use scientific experiment measurement

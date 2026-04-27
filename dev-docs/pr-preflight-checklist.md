@@ -1,5 +1,9 @@
 # PR Preflight Checklist
 
+## Status
+
+Canonical pre-PR validation matrix.
+
 ## Purpose
 
 This is the canonical pre-PR check matrix for local development and PR

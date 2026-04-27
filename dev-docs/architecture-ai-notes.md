@@ -1,5 +1,10 @@
 # Architecture Notes From AI/Repo Discussion
 
+## Status
+
+Advisory architecture note. Use canonical checklist and policy files for
+actionable maintenance requirements.
+
 ## Scope
 
 This note summarizes the architectural conclusions from a review and comparison of `fricon` and `crates.io`, with a focus on long-term maintainability in an AI-heavy development workflow.

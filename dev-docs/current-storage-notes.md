@@ -1,5 +1,10 @@
 # Current Workspace And Dataset Storage Notes
 
+## Status
+
+Current implementation note. Update this when workspace or dataset storage
+layout changes.
+
 ## Purpose
 
 This note captures current implementation details that should not be presented

@@ -1,5 +1,9 @@
 # Testing Strategy
 
+## Status
+
+Canonical testing strategy.
+
 ## Purpose
 
 This note defines the steady-state automated testing strategy for `fricon`.
