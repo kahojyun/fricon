@@ -32,6 +32,7 @@ every canonical document.
 | Workspace format or metadata compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Architecture background unless boundary design is unclear              |
 | Rust IPC/gRPC contract compatibility       | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
 | Public dataset docs update                 | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
+| Product route or issue planning            | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
 
 ## Canonical Guidance
 
@@ -40,8 +41,8 @@ skills, prompts, or contributor notes.
 
 - `project-intent.md` - product direction, target users, non-goals, and AI
   guardrails
-- `roadmap.md` - AI-oriented product route, sequencing, and decision pressure
-  map
+- `roadmap.md` - AI-oriented product route, sequencing, relationship to current
+  state, and decision pressure map
 - `maintenance-checklist.md` - coordinated update checklist for cross-boundary
   changes
 - `pr-preflight-checklist.md` - local and pre-PR validation matrix

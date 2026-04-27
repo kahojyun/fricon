@@ -16,6 +16,33 @@ implementation facts.
 Keep this file short. If an item needs step-by-step execution details, put those
 details in a focused implementation plan and link it from here.
 
+## Relationship To Current State
+
+Current implemented user-facing behavior is still centered on:
+
+- local workspaces
+- dataset creation, write, list, read, tag, favorite, and delete flows
+- Arrow-compatible table payloads with schema inferred from the first row
+- Python API, CLI, server process, and desktop dataset explorer surfaces
+
+Use `docs/concepts.md`, `docs/dataset.md`, and
+`dev-docs/current-storage-notes.md` as the source of truth for current behavior.
+This roadmap includes future product direction and should not be used as proof
+that experiment, parameter, workflow, device, provenance, AI automation, or
+semantic-manifest behavior has already landed.
+
+The existing dataset semantics proposal and implementation plan are the bridge
+between current dataset behavior and the next product phase:
+
+- `dataset-semantic-architecture-proposal.md` defines the proposed direction:
+  explicit dataset semantics, durable manifests, resolved interpretation, and
+  chart behavior that does not depend on row-order heuristics.
+- `dataset-semantic-implementation-plan.md` breaks that direction into phases.
+  Treat it as proposed execution guidance, not current implementation fact.
+
+When implementation lands, update the current implementation notes and public
+docs before treating proposal content as current behavior.
+
 ## Product Route
 
 The current route is dataset-first, Python-led, and local-first.
@@ -63,6 +90,8 @@ Current work should favor:
 
 - stabilizing the local-first workspace and dataset experience
 - landing the minimal durable dataset semantic model
+- keeping dataset semantics separate from higher-level run, workflow, parameter,
+  device, and AI concepts until those concepts have their own model boundaries
 - keeping Python API and desktop UI behavior coherent as user-facing contracts
 - preserving clear vertical slice boundaries across Rust, Python bindings, and
   the frontend
@@ -82,6 +111,11 @@ Start with:
 Near-term direction should clarify and land the dataset semantic model, then
 make the desktop UI consume resolved dataset interpretation instead of
 rediscovering chart meaning from row heuristics.
+
+Do this before building higher-level experiment, workflow, automation, or AI
+features. Those later features need explicit run and provenance models; they
+should not be smuggled into dataset naming conventions, incidental metadata, or
+chart-specific assumptions.
 
 Relevant notes:
 
