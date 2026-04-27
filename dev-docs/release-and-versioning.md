@@ -106,8 +106,9 @@ these changes.
 
 ## Release Workflow Summary
 
-- A push to `main` refreshes the rolling release preview PR from the `release`
-  branch.
+- The release preparation workflow is started manually from `main` and refreshes
+  the prepared release PR from the `release` branch when Knope finds pending
+  release notes.
 - The release preparation workflow depends on the prepared release commit
   subject `chore: prepare release <version>`.
 - Merging the prepared release PR creates the GitHub release and tag.

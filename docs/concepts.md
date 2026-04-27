@@ -18,7 +18,7 @@ Fricon needs a _server process_ to manage the workspace. The desktop app can
 launch it for you:
 
 ```shell
-fricon gui path/to/workspace
+fricon-gui path/to/workspace
 ```
 
 Python scripts can connect to an already running workspace server:

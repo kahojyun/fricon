@@ -20,13 +20,14 @@ compatibility decision is required, record the decision in the change.
 
 Classify the boundary before deciding which checklist applies:
 
-| Changed surface                                                                                                    | Use                              |
-| ------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| `.fricon_workspace.json`, workspace directory layout, durable workspace metadata, or workspace migration semantics | Workspace format changes         |
-| Dataset payload files, chunking, durable dataset-side metadata, or dataset payload schema rules                    | Dataset payload layout changes   |
-| SQLite tables, Diesel migrations, generated Diesel schema, or database row models                                  | Database schema changes          |
-| `crates/fricon/proto/**`, `crates/fricon/src/transport/**`, IPC/gRPC request or response semantics                 | Rust IPC / gRPC contract changes |
-| Tauri command/event DTOs, Specta exports, generated frontend bindings, or frontend-only adapter DTOs               | Tauri / frontend binding changes |
+| Changed surface                                                                                                    | Use                                   |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `.fricon_workspace.json`, workspace directory layout, durable workspace metadata, or workspace migration semantics | Workspace format changes              |
+| Dataset payload files, chunking, durable dataset-side metadata, or dataset payload schema rules                    | Dataset payload layout changes        |
+| Dataset archive metadata, archive entry allowlist, import/export semantics, or archive version                     | Dataset archive import/export changes |
+| SQLite tables, Diesel migrations, generated Diesel schema, or database row models                                  | Database schema changes               |
+| `crates/fricon/proto/**`, `crates/fricon/src/transport/**`, IPC/gRPC request or response semantics                 | Rust IPC / gRPC contract changes      |
+| Tauri command/event DTOs, Specta exports, generated frontend bindings, or frontend-only adapter DTOs               | Tauri / frontend binding changes      |
 
 ## Workspace Format Changes
 
@@ -70,6 +71,32 @@ payload files.
 - Update public docs only for stable user-facing behavior.
 - Add or update tests for old and new payload expectations when compatibility
   matters.
+
+## Dataset Archive Import/Export Changes
+
+Use this when changing exported dataset archive metadata, archive entry names,
+archive entry allowlists, import conflict behavior, replacement behavior, or
+archive version compatibility.
+
+- Update archive read/write code in `crates/fricon/src/dataset/portability.rs`
+  together with database import/export callers.
+- Decide whether the archive version must change.
+- Update extraction allowlists when new archive entry types are introduced.
+- Update `dev-docs/current-storage-notes.md` if current import/export storage
+  behavior changes.
+- Update public docs only when user-visible import/export behavior changes.
+- Add or update import/export tests for backward compatibility, conflict
+  handling, and rollback behavior where applicable.
+
+Decision guide:
+
+| Change                                                                               | Archive version decision                        |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| Add optional metadata that older import code may ignore                              | Usually no bump; add default-handling tests     |
+| Add required metadata needed to interpret an archive                                 | Bump                                            |
+| Remove, rename, or change the meaning of archive metadata                            | Bump                                            |
+| Add new required archive entries or change entry naming semantics                    | Bump                                            |
+| Expand the extraction allowlist for optional entries that current readers can ignore | Usually no bump; add allowlist and import tests |
 
 ## Database Schema Changes
 

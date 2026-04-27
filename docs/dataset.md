@@ -15,10 +15,11 @@ Supported public write values are currently `float`, `int` values converted to
 `float`, `complex`, and trace values. `None` and nullable columns are not part
 of the current write contract.
 
-Call `finish()` or `close()` to complete a dataset successfully. A writer used
-as a context manager calls `close()` when the block exits normally. Calling
-`abort()`, raising from the context manager block, or dropping a writer before
-successful completion marks the dataset as aborted.
+After writing at least one row, call `finish()` or `close()` to complete a
+dataset successfully. A writer used as a context manager calls `close()` when
+the block exits normally. Calling `abort()`, raising from the context manager
+block, or dropping a writer before successful completion marks the dataset as
+aborted. Finishing an empty writer does not create a completed dataset.
 
 Users do not currently declare dataset semantics, scan axes, or logical indices
 through the public API. The exact workspace file layout, internal metadata

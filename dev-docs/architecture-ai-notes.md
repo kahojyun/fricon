@@ -114,9 +114,10 @@ Guidance:
 
 ## Event Design
 
-Current issue identified:
+Earlier issue identified:
 
-- `AppEvent` currently mixes feature-level notifications and app/UI-shell requests.
+- App-level events can drift into mixing feature-level notifications and
+  app/UI-shell requests.
 
 Recommended distinction:
 

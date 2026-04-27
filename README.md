@@ -22,11 +22,14 @@ Fricon is a data collection automation framework designed for managing datasets 
 
 ### Installation
 
-**For Python users (recommended):**
+**For Python users on supported wheel platforms:**
 
 ```bash
 pip install fricon
 ```
+
+Current PyPI builds may not cover every platform. If `pip install fricon`
+cannot find a compatible wheel for your system, build from source.
 
 **For development or building from source:**
 
@@ -49,7 +52,7 @@ fricon init path/to/workspace
 Launch the desktop UI:
 
 ```bash
-fricon gui path/to/workspace
+fricon-gui path/to/workspace
 ```
 
 Or connect from Python to a workspace with a running server:
