@@ -4,6 +4,27 @@
 data structures can be helpful because the Python API accepts Arrow-compatible
 values and exposes Arrow-style tables.
 
+## Public dataset contract
+
+Each dataset contains one table. The first written row defines the table schema.
+Later rows must use the same column names and compatible value types as that
+first row. Missing columns, extra columns, and different value kinds are not
+part of the supported write contract.
+
+Supported public write values are currently `float`, `int` values converted to
+`float`, `complex`, and trace values. `None` and nullable columns are not part
+of the current write contract.
+
+Call `finish()` or `close()` to complete a dataset successfully. A writer used
+as a context manager calls `close()` when the block exits normally. Calling
+`abort()`, raising from the context manager block, or dropping a writer before
+successful completion marks the dataset as aborted.
+
+Users do not currently declare dataset semantics, scan axes, or logical indices
+through the public API. The exact workspace file layout, internal metadata
+files, chunk file names, and write-buffer thresholds are implementation details
+rather than public storage contracts.
+
 ## [Apache Arrow](https://arrow.apache.org/docs/index.html)
 
 You may be familiar with [pandas](https://pandas.pydata.org/), which is a
@@ -26,16 +47,15 @@ classes in the python binding of Arrow:
 
 ## How datasets work
 
-Each dataset contains one table. When a dataset is created, the table schema is
-automatically inferred from the first row of data written. This allows for
-flexible data collection without requiring manual schema definition.
+When a dataset is created, the table schema is automatically inferred from the
+first row of data written. This allows for flexible data collection without
+requiring manual schema definition.
 
 ## Write batching
 
 Dataset writes are buffered automatically. This keeps the write API row-oriented
-while reducing transport overhead for larger ingests. Calling `finish()`,
-`abort()`, or dropping the writer flushes any pending rows before the dataset
-stream is finalized.
+while reducing transport overhead for larger ingests. The exact buffering
+thresholds are implementation details.
 
 ## Type inference
 

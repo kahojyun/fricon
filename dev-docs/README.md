@@ -19,6 +19,19 @@ Start here when orienting a new human or AI contributor:
 3. `pr-preflight-checklist.md`
 4. The topic-specific note for the area being changed
 
+For narrow tasks, prefer the task-specific starting points below over reading
+every canonical document.
+
+## Agent Starting Points By Change Type
+
+| Change type | Start here | Then read | Usually avoid |
+| --- | --- | --- | --- |
+| SQLite schema visible through Python | `database-schema-changes.md` | `maintenance-checklist.md`, `release-and-versioning.md`, Diesel skill | Dataset semantic proposal files unless semantics are changing |
+| Desktop UI action with Rust Tauri command | `desktop-ui-feature-playbook.md` | `architecture-guidelines.md`, `testing-strategy.md`, `release-and-versioning.md`, UI AGENTS files | React/shadcn skills unless touching those APIs |
+| Workspace format or metadata compatibility | `maintenance-checklist.md` | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md` | Architecture background unless boundary design is unclear |
+| Rust IPC/gRPC contract compatibility | `maintenance-checklist.md` | `pr-preflight-checklist.md`, `release-and-versioning.md` | Public docs unless behavior is user-visible |
+| Public dataset docs update | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only | Implementation plan details unless landed behavior is being documented |
+
 ## Canonical Guidance
 
 These files are active project policy. Prefer them over duplicated guidance in
@@ -33,6 +46,10 @@ skills, prompts, or contributor notes.
   bump guidance
 - `architecture-guidelines.md` - current implementation architecture rules and
   boundary guidance
+- `desktop-ui-feature-playbook.md` - low-context path for Rust Tauri plus
+  frontend feature work
+- `database-schema-changes.md` - low-context path for Diesel changes,
+  especially DB-to-Python changes
 - `testing-strategy.md` - test runner split and test placement rules
 - `internal-doc-comments.md` - Rustdoc/comment style for maintainable internal
   code

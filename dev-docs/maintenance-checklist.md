@@ -16,6 +16,18 @@ When a change crosses a user-facing boundary, update the implementation,
 tests, generated artifacts, and documentation together. If a version or
 compatibility decision is required, record the decision in the change.
 
+## Which Compatibility Surface Is Changing?
+
+Classify the boundary before deciding which checklist applies:
+
+| Changed surface | Use |
+| --- | --- |
+| `.fricon_workspace.json`, workspace directory layout, durable workspace metadata, or workspace migration semantics | Workspace format changes |
+| Dataset payload files, chunking, durable dataset-side metadata, or dataset payload schema rules | Dataset payload layout changes |
+| SQLite tables, Diesel migrations, generated Diesel schema, or database row models | Database schema changes |
+| `crates/fricon/proto/**`, `crates/fricon/src/transport/**`, IPC/gRPC request or response semantics | Rust IPC / gRPC contract changes |
+| Tauri command/event DTOs, Specta exports, generated frontend bindings, or frontend-only adapter DTOs | Tauri / frontend binding changes |
+
 ## Workspace Format Changes
 
 Use this when changing workspace on-disk structure, `.fricon_workspace.json`,
@@ -27,6 +39,23 @@ workspace metadata semantics, or workspace migration behavior.
   compatibility behavior changes.
 - Update user-facing docs only when user-visible workspace behavior changes.
 - Add or update Rust tests that cover migration or compatibility behavior.
+
+Decision guide:
+
+| Change | `WORKSPACE_VERSION` decision |
+| --- | --- |
+| Add optional workspace metadata with a default and old workspaces still open without migration | Usually no bump; document the default and add a compatibility test |
+| Add required workspace metadata or change metadata meaning so old workspaces need transformation | Bump and add a migration step |
+| Rename, remove, or move workspace metadata | Bump and add a migration step |
+| Change workspace directory layout or durable file placement | Bump unless the old layout remains fully supported |
+| SQLite-only Diesel migration with no `.fricon_workspace.json` or layout change | No workspace version bump; Diesel migration handles database compatibility |
+
+Examples:
+
+- Add optional `created_by` metadata with a default and old workspaces still
+  open: usually no bump.
+- Add required `workspace_uuid` metadata needed to open or interpret old
+  workspaces: bump and add a migration step.
 
 ## Dataset Payload Layout Changes
 
@@ -46,6 +75,9 @@ payload files.
 
 Use this when changing SQLite tables, columns, indexes, constraints, Diesel
 migrations, generated Diesel schema, or database model types.
+
+For database fields exposed through Python, use
+`dev-docs/database-schema-changes.md`.
 
 - Create or update a Diesel migration under `crates/fricon/migrations`.
 - Make `down.sql` a real rollback, not a placeholder.
@@ -73,10 +105,36 @@ client/server IPC behavior, or protocol compatibility semantics.
   rule changes.
 - Add or update compatibility and transport tests.
 
+Decision guide:
+
+| Change | `IPC_PROTOCOL_VERSION` decision |
+| --- | --- |
+| Add a backward-compatible optional response field and all current clients can ignore it | Usually no bump; add tests for old/default handling where practical |
+| Add a required request field or require clients to send new data | Bump |
+| Remove, rename, renumber, or change the meaning/type of a protobuf field | Bump |
+| Change protocol handshake, stream sequencing, status semantics, or error meaning | Bump |
+| Internal Rust struct refactor with no wire/protobuf/semantic contract change | No bump |
+| Tauri/Specta-only command shape change not used by Rust IPC/gRPC | No IPC protocol bump; follow the Tauri/frontend binding checklist |
+
+Examples:
+
+- Add an optional protobuf response field that existing clients can ignore:
+  usually no bump.
+- Rename a response field or change an error/status meaning: bump.
+
+Generated protobuf Rust code is produced by `crates/fricon/build.rs` during
+Cargo builds from `crates/fricon/proto/**`. There is no checked-in protobuf
+Rust output to edit. Run Rust checks/builds to regenerate in `OUT_DIR`, and
+regenerate Tauri frontend bindings separately if the desktop frontend consumes
+the changed shape.
+
 ## Tauri / Frontend Binding Changes
 
 Use this when changing Rust commands, events, DTOs, or exported Specta/Tauri
 types consumed by the frontend.
+
+For cross-boundary desktop UI work, use
+`dev-docs/desktop-ui-feature-playbook.md`.
 
 - Update the owning Rust feature adapter, usually
   `crates/fricon-ui/src/features/<feature>/tauri.rs`.
@@ -94,6 +152,8 @@ git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
 
 - Update frontend API adapters, query hooks, events, and tests.
 - Do not hand-edit generated binding files.
+- Apply `dev-docs/release-and-versioning.md` when the UI behavior is
+  user-visible.
 
 ## Python API Changes
 
@@ -101,7 +161,8 @@ Use this when changing Python-visible classes, methods, errors, type stubs, or
 binding behavior.
 
 - Update Rust PyO3 bindings and Python package files together.
-- Update `.pyi` stubs when exported signatures or types change.
+- Update `.pyi` stubs when exported signatures or types change, especially
+  `crates/fricon-py/python/fricon/_core.pyi`.
 - Run `uv run maturin develop` before Python tests when Rust bindings may be
   stale.
 - Update Python integration tests.

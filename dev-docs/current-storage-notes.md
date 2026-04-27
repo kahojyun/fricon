@@ -55,6 +55,15 @@ The physical storage layout is an implementation detail. User-facing docs may
 mention Arrow-compatible tables, but should avoid promising exact file names,
 chunking behavior, or directory structure.
 
+## Dataset Metadata Ownership
+
+Current dataset catalog metadata lives in SQLite. This includes dataset name,
+description, favorite state, status, timestamps, and tags as represented by
+`DatasetRecord` / `DatasetMetadata`.
+
+Dataset payload facts live in Arrow chunk files. Future semantic manifest files
+described by the dataset semantic proposal docs are not current behavior.
+
 ## Write Buffering
 
 Current Python dataset writes are buffered on the client and flushed

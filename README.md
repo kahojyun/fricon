@@ -6,6 +6,9 @@ Data collection automation framework.
 
 [GitHub Pages](https://kahojyun.github.io/fricon/)
 
+For implementation guidance, maintainer checklists, and AI-agent starting
+points, see [dev-docs/README.md](dev-docs/README.md).
+
 ## Overview
 
 Fricon is a data collection automation framework designed for managing datasets in scientific and research workflows. It provides:

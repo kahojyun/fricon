@@ -45,13 +45,13 @@ Run only for changed areas.
 cargo +nightly fmt --all --check
 cargo check
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --workspace
+cargo nextest run
 ```
 
 Optional alternative:
 
 ```bash
-cargo nextest run
+cargo test --workspace
 ```
 
 ### Python
@@ -124,14 +124,14 @@ cargo +nightly fmt --all --check
 cargo check
 cargo build --workspace --locked
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --workspace
+cargo nextest run
 cargo deny --workspace --all-features check
 ```
 
 Optional alternative for Rust tests:
 
 ```bash
-cargo nextest run
+cargo test --workspace
 ```
 
 ### Python
