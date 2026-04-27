@@ -624,10 +624,11 @@ part of the supported write contract.</p>
 <p>Supported public write values are currently <code>float</code>, <code>int</code> values converted to
 <code>float</code>, <code>complex</code>, and trace values. <code>None</code> and nullable columns are not part
 of the current write contract.</p>
-<p>Call <code>finish()</code> or <code>close()</code> to complete a dataset successfully. A writer used
-as a context manager calls <code>close()</code> when the block exits normally. Calling
-<code>abort()</code>, raising from the context manager block, or dropping a writer before
-successful completion marks the dataset as aborted.</p>
+<p>After writing at least one row, call <code>finish()</code> or <code>close()</code> to complete a
+dataset successfully. A writer used as a context manager calls <code>close()</code> when
+the block exits normally. Calling <code>abort()</code>, raising from the context manager
+block, or dropping a writer before successful completion marks the dataset as
+aborted. Finishing an empty writer does not create a completed dataset.</p>
 <p>Users do not currently declare dataset semantics, scan axes, or logical indices
 through the public API. The exact workspace file layout, internal metadata
 files, chunk file names, and write-buffer thresholds are implementation details
