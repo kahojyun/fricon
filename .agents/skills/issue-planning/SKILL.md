@@ -1,6 +1,6 @@
 ---
 name: issue-planning
-description: Convert Fricon roadmap items, product requirements, or milestone ideas into small GitHub issues or task plans suitable for solo development and low-conflict parallel Codex threads. Use when the user asks to create an issue plan, decompose roadmap work, align roadmap with issues/tasks, prepare parallel PR tasks, or create GitHub issues from product direction.
+description: Convert already-aligned Fricon roadmap items or milestones into small GitHub-ready issues or task plans for low-conflict Codex work. Use only when the user explicitly asks to create an issue plan, decompose roadmap work into tasks, align roadmap with issues/tasks, prepare parallel PR tasks, or create GitHub issues. Do not trigger for product brainstorming, roadmap editing, ordinary implementation, or PR preflight.
 ---
 
 # Issue Planning
@@ -10,6 +10,14 @@ description: Convert Fricon roadmap items, product requirements, or milestone id
 Act as the missing lightweight project-manager layer for a solo Fricon
 maintainer. Turn roadmap direction into small, reviewable, low-conflict tasks
 without starting implementation.
+
+## Trigger Boundaries
+
+Use this skill only after the product direction is already clear enough to plan
+tasks. If the user is still deciding what the product should do or where an
+idea belongs in the roadmap, use `roadmap-alignment` first. If the user asks to
+implement issue `#xxx`, do not use this skill unless they also ask to re-plan
+or split that issue.
 
 ## Path Resolution
 
@@ -39,7 +47,8 @@ When planning a UI-heavy milestone, also read:
 ## Workflow
 
 1. Confirm the planning target: roadmap area, milestone, product idea, or issue
-   theme. If the target is ambiguous, make a conservative default and state it.
+   theme. If the target is not aligned with `roadmap.md` yet, stop and use
+   `roadmap-alignment` first.
 2. Identify dependencies and whether any ADR or design note is needed before
    implementation.
 3. Split work into issues that are each suitable for one focused pull request.

@@ -1,6 +1,6 @@
 ---
 name: roadmap-alignment
-description: Align Fricon product ideas, requirement discussions, and proposed docs changes with the current product route, roadmap, existing proposals, and current implementation state. Use when the user asks to discuss product requirements, decide whether an idea belongs in now/next/later/non-goals, update roadmap or project-intent docs, or check whether a future concept conflicts with current dataset semantics work.
+description: Align Fricon product ideas with the existing product route and docs. Use only when the user explicitly asks to discuss product requirements, align an idea with the roadmap, classify an idea as now/next/later/non-goal/ADR-needed, or update `dev-docs/project-intent.md` or `dev-docs/roadmap.md`. Do not trigger for ordinary implementation, bug fixing, PR preflight, or GitHub issue decomposition.
 ---
 
 # Roadmap Alignment
@@ -9,6 +9,14 @@ description: Align Fricon product ideas, requirement discussions, and proposed d
 
 Help a solo maintainer turn product ideas into clear project direction without
 confusing future concepts with current behavior.
+
+## Trigger Boundaries
+
+Use this skill only for product-direction alignment and roadmap/project-intent
+documentation. If the user asks to decompose work into tasks, create GitHub
+issues, or plan parallel PRs, use `issue-planning` instead. If the user asks to
+implement an existing issue or code change, do not use this skill unless the
+issue explicitly requires roadmap or product-intent alignment.
 
 ## Path Resolution
 
@@ -39,9 +47,10 @@ For cross-boundary implementation implications, check:
 
 ## Workflow
 
-1. Identify whether the user wants discussion only, documentation edits, issue
-   planning, or implementation. Do not implement product ideas during roadmap
-   alignment unless explicitly asked.
+1. Identify whether the user wants discussion only or documentation edits. If
+   the user wants issue decomposition, hand off to `issue-planning`. If the
+   user wants implementation, proceed with normal coding workflow unless
+   product alignment is explicitly requested.
 2. Restate the idea in Fricon terms: user value, affected product pillar, and
    likely user surface.
 3. Classify the idea:
