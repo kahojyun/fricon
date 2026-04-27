@@ -40,8 +40,8 @@ skills, prompts, or contributor notes.
 
 - `project-intent.md` - product direction, target users, non-goals, and AI
   guardrails
-- `roadmap.md` - lightweight AI-oriented project direction and decision
-  pressure map
+- `roadmap.md` - AI-oriented product route, sequencing, and decision pressure
+  map
 - `maintenance-checklist.md` - coordinated update checklist for cross-boundary
   changes
 - `pr-preflight-checklist.md` - local and pre-PR validation matrix

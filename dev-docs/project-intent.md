@@ -32,14 +32,35 @@ Fricon is expected to provide:
 
 - data recording
 - experiment execution
-- parameter management
+- parameter management, including future history and versioning workflows
 - device management
 - local experiment workspace management
 - a desktop UI for browsing, managing, and inspecting collected data
 - Python APIs for scripting and automation
+- reproducibility support for experiment code, environments, parameters, and
+  generated datasets
 
 The product should make common scientific measurement workflows easier while
 remaining scriptable for users who already use Python in their research.
+
+## Current Product Route
+
+The current route is dataset-first, Python-led, and local-first.
+
+Fricon should first become reliable for recording, organizing, and inspecting
+scientific measurement datasets. Dataset semantics should be explicit enough
+that later experiment, parameter, and device concepts do not have to be hidden
+inside dataset names, incidental metadata, or chart heuristics.
+
+Initial experiment support should lean on Python scripts as the execution
+entry point. The desktop UI should browse, inspect, and eventually assist those
+workflows, but should not become the primary experiment execution engine before
+the Python-led model is clear.
+
+Device management should remain a later foundation. Near-term design may keep
+room for device identity and configuration, but should avoid building a broad
+driver framework or hardware orchestration layer before real workflows require
+one.
 
 ## Runtime Model
 
@@ -87,11 +108,27 @@ The Python API is a primary user surface. It should support straightforward
 data collection scripts without forcing users to predefine every low-level
 schema detail.
 
+Desktop and documentation workflows should help users get back to Python code.
+For example, dataset detail views may eventually provide Python read snippets
+that reopen selected datasets through the public API without exposing internal
+storage paths.
+
 ### Make Advanced Workflows Explicit
 
 Experiment execution, parameter management, and device management should become
 explicit product concepts as they mature. Avoid hiding those semantics inside
 dataset naming conventions or incidental metadata.
+
+The first explicit experiment model should be Python-led: user scripts perform
+measurement work while Fricon records datasets, run metadata, and parameters.
+UI-led execution can be introduced later if the Python-led workflow proves too
+limited.
+
+Experiment reproducibility may eventually include automatic code history and
+environment management. Git-backed code history, including a workspace-managed
+bare repository, and environment tools such as `uv` or `pixi` are plausible
+directions, but they should be designed as explicit product capabilities rather
+than hidden side effects of dataset writes.
 
 ### Keep Architecture Proportional
 
@@ -108,6 +145,8 @@ This document is a constraint for AI-assisted changes:
 - Keep user-facing docs focused on workflows and stable product concepts.
 - Put implementation details, architectural notes, and maintenance rules in
   `dev-docs/`.
+- Preserve the dataset-first, Python-led product route unless a planning or ADR
+  document explicitly changes it.
 - Prefer feature-local changes that preserve clear ownership.
 - Treat Python API and desktop UI behavior as user-facing contracts.
 - Treat internal Rust module boundaries as changeable when doing so improves
@@ -117,10 +156,14 @@ This document is a constraint for AI-assisted changes:
 
 These questions are intentionally unresolved:
 
-- What experiment execution model should Fricon support first: script-driven,
-  UI-driven, or a hybrid?
 - How should parameters be represented: flat key-value sets, typed schemas,
   sweep definitions, or versioned experiment configurations?
+- How should parameter history and version comparison be represented in the
+  Python API and desktop UI?
+- How should experiment code history be captured without surprising users or
+  turning Fricon into a general Git client?
+- What level of automatic `uv` or `pixi` environment management is useful
+  without making experiment setup opaque?
 - What level of device abstraction is useful without overbuilding a hardware
   framework?
 - Which data formats and array shapes should be first-class beyond the current
