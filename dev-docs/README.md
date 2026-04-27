@@ -15,9 +15,10 @@ not public user docs. Public user-facing docs live in `docs/`.
 Start here when orienting a new human or AI contributor:
 
 1. `project-intent.md`
-2. `maintenance-checklist.md`
-3. `pr-preflight-checklist.md`
-4. The topic-specific note for the area being changed
+2. `roadmap.md`
+3. `maintenance-checklist.md`
+4. `pr-preflight-checklist.md`
+5. The topic-specific note for the area being changed
 
 For narrow tasks, prefer the task-specific starting points below over reading
 every canonical document.
@@ -39,6 +40,8 @@ skills, prompts, or contributor notes.
 
 - `project-intent.md` - product direction, target users, non-goals, and AI
   guardrails
+- `roadmap.md` - lightweight AI-oriented project direction and decision
+  pressure map
 - `maintenance-checklist.md` - coordinated update checklist for cross-boundary
   changes
 - `pr-preflight-checklist.md` - local and pre-PR validation matrix
@@ -68,6 +71,8 @@ checklist, policy, or guideline.
 
 - `architecture-ai-notes.md` - architecture discussion and AI-assisted
   maintainability guidance
+- `adr/` - durable architecture decision records for settled cross-cutting
+  decisions
 
 ## Proposals And Plans
 
@@ -86,3 +91,7 @@ implementation facts unless the implementation has already landed.
   guidance in `dev-docs/`.
 - When a proposal becomes current behavior, update or split the proposal so
   current facts live in a current implementation note.
+- Keep `roadmap.md` short and directional; move detailed execution steps into
+  focused implementation plans.
+- Add ADRs selectively for durable decisions, not for routine local
+  implementation choices.
