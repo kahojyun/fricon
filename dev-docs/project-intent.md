@@ -32,14 +32,49 @@ Fricon is expected to provide:
 
 - data recording
 - experiment execution
-- parameter management
+- parameter management, including future history and versioning workflows
 - device management
 - local experiment workspace management
 - a desktop UI for browsing, managing, and inspecting collected data
 - Python APIs for scripting and automation
+- reproducibility support for experiment code, environments, parameters, and
+  generated datasets
+- workflow definitions above individual experiments for repeated calibration,
+  optimization, and benchmark tasks
+- AI-assisted automation for repetitive scientific data-management work, with
+  explicit review and auditability for mutating actions
 
 The product should make common scientific measurement workflows easier while
 remaining scriptable for users who already use Python in their research.
+
+## Current Product Route
+
+The current route is dataset-first, Python-led, and local-first.
+
+Fricon should first become reliable for recording, organizing, and inspecting
+scientific measurement datasets. Dataset semantics should be explicit enough
+that later experiment, parameter, and device concepts do not have to be hidden
+inside dataset names, incidental metadata, or chart heuristics.
+
+Initial experiment support should lean on Python scripts as the execution
+entry point. The desktop UI should browse, inspect, and eventually assist those
+workflows, but should not become the primary experiment execution engine before
+the Python-led model is clear.
+
+Device management should remain a later foundation. Near-term design may keep
+room for device identity and configuration, but should avoid building a broad
+driver framework or hardware orchestration layer before real workflows require
+one.
+
+Workflow automation should be treated as a layer above individual experiments.
+It can eventually coordinate scheduled calibration, optimization, benchmark,
+and repeated measurement tasks, but should rely on clear run records, parameter
+snapshots, provenance, and human approval boundaries.
+
+AI-assisted workflows should be designed as assistive automation rather than
+silent authority. AI may help draft snippets, summaries, reports, metadata
+cleanup, parameter comparisons, and workflow proposals, but mutating workspace
+state should remain explicit, reviewable, and auditable.
 
 ## Runtime Model
 
@@ -87,11 +122,62 @@ The Python API is a primary user surface. It should support straightforward
 data collection scripts without forcing users to predefine every low-level
 schema detail.
 
+Desktop and documentation workflows should help users get back to Python code.
+For example, dataset detail views may eventually provide Python read snippets
+that reopen selected datasets through the public API without exposing internal
+storage paths.
+
+Quality-of-life features should make common scientific work faster without
+changing the user's mental model. Good candidates include preview/export
+snippets, saved views, aliases, notes, tags, quality flags, compare views, and
+template experiments.
+
+### Preserve Provenance
+
+Scientific workflows need enough traceability to explain where a result came
+from. Fricon should be able to connect runs, datasets, parameters, code
+versions, environments, device configuration, notes, imports, exports, and
+future workflow definitions without exposing internal storage details as the
+user model.
+
+When records need correction, prefer appended correction or event history over
+silent mutation of completed run facts.
+
+### Leave Room For Core Scientific Entities
+
+Some concepts may be implemented later but should influence early model
+boundaries because they are expensive to retrofit. Dataset, run, and parameter
+work should leave room for units and display metadata, sample or specimen
+identity, dataset lineage, parameter snapshots, workflow definitions, local
+automation approvals, and event or audit logs.
+
 ### Make Advanced Workflows Explicit
 
 Experiment execution, parameter management, and device management should become
 explicit product concepts as they mature. Avoid hiding those semantics inside
 dataset naming conventions or incidental metadata.
+
+The first explicit experiment model should be Python-led: user scripts perform
+measurement work while Fricon records datasets, run metadata, and parameters.
+UI-led execution can be introduced later if the Python-led workflow proves too
+limited.
+
+Experiment reproducibility may eventually include automatic code history and
+environment management. Git-backed code history, including a workspace-managed
+bare repository, and environment tools such as `uv` or `pixi` are plausible
+directions, but they should be designed as explicit product capabilities rather
+than hidden side effects of dataset writes.
+
+Workflow definitions may eventually orchestrate repeated experiment execution,
+scheduled calibration, parameter optimization, and benchmark runs. These
+capabilities should record workflow versions, triggers, inputs, outputs,
+approval checkpoints, failures, and manual overrides.
+
+AI model integration may eventually automate boring or repetitive work, but
+should not bypass product boundaries. AI-generated changes to data,
+parameters, code, workflow definitions, or execution plans should leave
+auditable records and require user approval unless the operation is explicitly
+designed as safe and reversible.
 
 ### Keep Architecture Proportional
 
@@ -108,6 +194,8 @@ This document is a constraint for AI-assisted changes:
 - Keep user-facing docs focused on workflows and stable product concepts.
 - Put implementation details, architectural notes, and maintenance rules in
   `dev-docs/`.
+- Preserve the dataset-first, Python-led product route unless a planning or ADR
+  document explicitly changes it.
 - Prefer feature-local changes that preserve clear ownership.
 - Treat Python API and desktop UI behavior as user-facing contracts.
 - Treat internal Rust module boundaries as changeable when doing so improves
@@ -117,10 +205,30 @@ This document is a constraint for AI-assisted changes:
 
 These questions are intentionally unresolved:
 
-- What experiment execution model should Fricon support first: script-driven,
-  UI-driven, or a hybrid?
 - How should parameters be represented: flat key-value sets, typed schemas,
   sweep definitions, or versioned experiment configurations?
+- How should parameter history and version comparison be represented in the
+  Python API and desktop UI?
+- What unit and display metadata belongs on dataset columns, parameters, or
+  both?
+- How should sample or specimen identity be represented without overbuilding a
+  lab inventory system?
+- Which run facts should be immutable, and which should allow correction
+  events?
+- How much dataset lineage is needed for measured, processed, simulation, and
+  imported datasets?
+- How should experiment code history be captured without surprising users or
+  turning Fricon into a general Git client?
+- What level of automatic `uv` or `pixi` environment management is useful
+  without making experiment setup opaque?
+- What should a workflow definition contain beyond a Python entry point,
+  parameters, schedules, approval checkpoints, and expected outputs?
+- Which calibration, optimization, and benchmark tasks should be first-class
+  workflow types?
+- Which AI actions should be suggestion-only, which may mutate workspace state,
+  and what approval or audit metadata should each class require?
+- What AI model/provider/version and prompt-summary metadata is needed for
+  reproducibility without storing unnecessary sensitive context?
 - What level of device abstraction is useful without overbuilding a hardware
   framework?
 - Which data formats and array shapes should be first-class beyond the current

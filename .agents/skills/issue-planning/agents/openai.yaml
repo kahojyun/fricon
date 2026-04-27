@@ -1,0 +1,4 @@
+interface:
+  display_name: "Issue Planning"
+  short_description: "Turn Fricon roadmap work into small low-conflict issues"
+  default_prompt: "Use $issue-planning to turn this roadmap item into small GitHub-ready issues with dependencies and validation."

@@ -197,6 +197,7 @@ Use this when changing public docs, developer docs, or repo guidance.
 - Run:
 
 ```bash
+pnpm run format:check
 uv run --group docs mkdocs build -s -v
 ```
 
