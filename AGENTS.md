@@ -6,7 +6,10 @@
 - Frontend is under `crates/fricon-ui/frontend`.
 - `examples/` contains runnable examples.
 - `scripts/` contains development helpers.
-- `docs/` contains documentation sources.
+- `docs/` contains public user-facing documentation sources.
+- `dev-docs/` contains internal developer notes, implementation details,
+  architecture notes, and maintenance guidance that should not be published as
+  user-facing docs.
 
 ## Repo-Wide Rules
 

@@ -1,7 +1,8 @@
 # Dataset
 
-`fricon` uses [Arrow IPC format] to store datasets. A basic knowledge of Arrow
-data structures can be helpful to understand how `fricon` works.
+`fricon` datasets are table-shaped data collections. A basic knowledge of Arrow
+data structures can be helpful because the Python API accepts Arrow-compatible
+values and exposes Arrow-style tables.
 
 ## [Apache Arrow](https://arrow.apache.org/docs/index.html)
 
@@ -23,24 +24,22 @@ classes in the python binding of Arrow:
 - [`pyarrow.Table`][]: A helper type to unify representations of single and
   collection of record batches with the same schema.
 
-## How are datasets stored?
+## How datasets work
 
-A dataset is exactly one Arrow table stored in [Arrow IPC format]. When a dataset
-is created, the schema of the table is automatically inferred from the first row
-of data written. This allows for flexible data collection without requiring
-manual schema definition.
+Each dataset contains one table. When a dataset is created, the table schema is
+automatically inferred from the first row of data written. This allows for
+flexible data collection without requiring manual schema definition.
 
 ## Write batching
 
-Dataset writes are buffered on the client and flushed automatically when either
-16 rows have accumulated or 1 second has elapsed since the first buffered row.
-This keeps the write API row-oriented while reducing transport overhead for
-larger ingests. Calling `finish()`, `abort()`, or dropping the writer will flush
-any pending rows before the dataset stream is finalized.
+Dataset writes are buffered automatically. This keeps the write API row-oriented
+while reducing transport overhead for larger ingests. Calling `finish()`,
+`abort()`, or dropping the writer flushes any pending rows before the dataset
+stream is finalized.
 
 ## Type inference
 
-`fricon` MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
+`fricon` currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:
 
 | Python type        | Dataset data type | Description                                  |
 | ------------------ | ----------------- | -------------------------------------------- |
@@ -48,7 +47,7 @@ any pending rows before the dataset stream is finalized.
 | [`complex`][]      | `Complex128`      | 128-bit complex numbers (real + imaginary)   |
 | [`fricon.Trace`][] | `Trace`           | Time series data with various x-axis formats |
 
-> **Note**: The MVP version intentionally limits type support to float and complex types for simplicity. Additional types (bool, int, str) will be supported in future releases.
+> **Note**: The current release intentionally limits scalar type support to float and complex values.
 
 ### Supported trace variants
 
@@ -57,11 +56,3 @@ Trace data supports three different formats depending on how the x-axis (indepen
 - **SimpleList**: Only y-values are stored, x-values are implicit indices (0, 1, 2, ...)
 - **FixedStep**: Regular spacing with x₀ (starting point) and step size
 - **VariableStep**: Arbitrary x-values stored alongside y-values
-
-### Future extensions
-
-Additional data types (bool, int, str, timestamps) will be supported in future versions. The current focus on float, complex, and trace types ensures optimal performance and correctness for the most common scientific use cases.
-
-<!-- TODO: `pyarrow` and `polars` tips -->
-
-[Arrow IPC format]: https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc
