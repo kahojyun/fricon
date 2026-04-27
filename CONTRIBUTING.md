@@ -169,11 +169,10 @@ Docs:
 - Run relevant linters and tests before opening a PR.
 - For frontend work, start with `pnpm run check`, then run narrower commands only if you need to investigate a specific failure.
 
-PR checklist (recommended):
-
-- Follow code style and pass linters
-- Include tests or a clear rationale if none
-- Update docs if behavior changes
+Before opening a PR, use the canonical preflight matrix in
+`dev-docs/pr-preflight-checklist.md`. For coordinated maintenance items such as
+workspace format, IPC/gRPC, database schema, generated bindings, or release-note
+changes, use `dev-docs/maintenance-checklist.md`.
 
 ## Release workflow
 

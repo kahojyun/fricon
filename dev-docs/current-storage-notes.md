@@ -63,13 +63,7 @@ a documented performance contract.
 
 ## Maintenance Notes
 
-When changing workspace on-disk structure or `.fricon_workspace.json`, update:
-
-- `crates/fricon/src/workspace.rs` migration steps
-- `WORKSPACE_VERSION`, if the change breaks old workspace assumptions
-- this note, if the current layout or compatibility behavior changes
-
-When changing dataset payload layout, update this note and decide whether the
-workspace compatibility version or migration path must change.
+For workspace format and dataset payload layout changes, use the canonical
+checklists in `dev-docs/maintenance-checklist.md`.
 
 [Arrow IPC]: https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc

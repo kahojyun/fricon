@@ -1,30 +1,42 @@
-# Preflight Matrix
+# PR Preflight Checklist
+
+## Purpose
+
+This is the canonical pre-PR check matrix for local development and PR
+readiness. Skills, agent rules, and contributing docs should link here instead
+of duplicating command lists.
 
 Use one profile per run:
-- `quick` for local development loops (default)
-- `strict` once before opening/updating a PR
+
+- `quick` for local development loops
+- `strict` once before opening or updating a PR
 
 ## Scope Detection
 
 Check changed files first:
+
 ```bash
 git diff --name-only
 ```
 
-Use the result to choose areas:
-- Rust core/CLI (`crates/fricon`, shared Rust CLI, non-frontend Rust)
-- Python bindings (`crates/fricon-py`, Python tests, `pyproject.toml`)
-- Frontend (`crates/fricon-ui/frontend`, root JS/TS config)
-- Tauri IPC signatures (Rust command/event changes used by UI)
-- Workspace structure / migration compatibility (`crates/fricon/src/workspace.rs`, workspace metadata files, docs describing workspace layout)
-- Rust IPC/gRPC protocol compatibility (`crates/fricon/proto/**`, `crates/fricon/src/client.rs`, `crates/fricon/src/transport/**`)
-- Docs-only (`docs/**`, markdown files)
+Use the result to choose changed areas:
 
-## Quick Profile (default)
+- Rust core/CLI: `crates/fricon`, shared Rust CLI, non-frontend Rust
+- Python bindings: `crates/fricon-py`, Python tests, `pyproject.toml`
+- Frontend: `crates/fricon-ui/frontend`, root JS/TS config
+- Tauri IPC signatures: Rust command/event changes used by UI
+- Workspace compatibility: `crates/fricon/src/workspace.rs`, workspace metadata
+  files, docs describing workspace layout
+- Rust IPC/gRPC compatibility: `crates/fricon/proto/**`,
+  `crates/fricon/src/client.rs`, `crates/fricon/src/transport/**`
+- Docs-only: `docs/**`, `dev-docs/**`, and Markdown-only changes
+
+## Quick Profile
 
 Run only for changed areas.
 
 ### Rust
+
 ```bash
 cargo +nightly fmt --all --check
 cargo check
@@ -33,11 +45,13 @@ cargo test --workspace
 ```
 
 Optional alternative:
+
 ```bash
 cargo nextest run
 ```
 
 ### Python
+
 ```bash
 uv run ruff format --check
 uv run maturin develop
@@ -46,6 +60,7 @@ uv run pytest
 ```
 
 ### Frontend
+
 ```bash
 pnpm run check
 pnpm run format:check
@@ -53,6 +68,7 @@ pnpm run test
 ```
 
 Optional split for diagnosis or narrow reruns:
+
 ```bash
 pnpm run format:check
 pnpm run type-check
@@ -64,39 +80,41 @@ pnpm run test:unit -- <path-or-pattern>
 pnpm run test:browser -- <path-or-pattern>
 ```
 
-### Tauri IPC changed
+### Tauri IPC Changed
+
 ```bash
 pnpm --filter fricon-ui run gen:bindings
 git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
 ```
 
-### Workspace structure / migration compatibility changed
-Use the normal Rust test gate for coverage, and also verify:
+### Workspace Compatibility Changed
 
-- whether `WORKSPACE_VERSION` must change
-- the docs and repo rules that describe workspace structure and migration duties
+Use the normal Rust test gate for coverage, then apply the workspace checklist
+in `dev-docs/maintenance-checklist.md`.
 
-### Rust IPC/gRPC protocol compatibility changed
-Use the normal Rust test gate for coverage, and also verify:
+### Rust IPC / gRPC Compatibility Changed
 
-- whether `IPC_PROTOCOL_VERSION` must change
-- the explicit IPC protocol version/handshake logic changed with the protocol contract
+Use the normal Rust test gate for coverage, then apply the IPC/gRPC checklist in
+`dev-docs/maintenance-checklist.md`.
 
-### Route tree guard (when frontend router files changed)
+### Frontend Router Files Changed
+
 ```bash
 git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ```
 
-### Docs-only
+### Docs-Only
+
 ```bash
 uv run --group docs mkdocs build -s -v
 ```
 
-## Strict Profile (PR gate)
+## Strict Profile
 
-Run once before opening/updating PR.
+Run once before opening or updating a PR.
 
 ### Rust
+
 ```bash
 cargo +nightly fmt --all --check
 cargo check
@@ -107,11 +125,13 @@ cargo deny --workspace --all-features check
 ```
 
 Optional alternative for Rust tests:
+
 ```bash
 cargo nextest run
 ```
 
 ### Python
+
 ```bash
 uv run ruff format --check
 uv run maturin develop
@@ -122,6 +142,7 @@ uv run stubtest fricon._core
 ```
 
 ### Frontend
+
 ```bash
 pnpm run check
 pnpm run format:check
@@ -131,6 +152,7 @@ git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ```
 
 Optional split for diagnosis or narrow reruns:
+
 ```bash
 pnpm run format:check
 pnpm run type-check
@@ -142,37 +164,47 @@ pnpm run test:unit -- <path-or-pattern>
 pnpm run test:browser -- <path-or-pattern>
 ```
 
-### Tauri IPC changed
+### Tauri IPC Changed
+
 ```bash
 pnpm --filter fricon-ui run gen:bindings
 git diff --exit-code crates/fricon-ui/frontend/src/shared/lib/bindings.ts
 ```
 
-### Workspace structure / migration compatibility changed
-Use the normal Rust test gate for coverage, and also verify:
+### Workspace Compatibility Changed
 
-- whether `WORKSPACE_VERSION` must change
-- the docs and repo rules that describe workspace structure and migration duties
+Use the normal Rust test gate for coverage, then apply the workspace checklist
+in `dev-docs/maintenance-checklist.md`.
 
-### Rust IPC/gRPC protocol compatibility changed
-Use the normal Rust test gate for coverage, and also verify:
+### Rust IPC / gRPC Compatibility Changed
 
-- whether `IPC_PROTOCOL_VERSION` must change
-- the explicit IPC protocol version/handshake logic changed with the protocol contract
+Use the normal Rust test gate for coverage, then apply the IPC/gRPC checklist in
+`dev-docs/maintenance-checklist.md`.
 
 ### Docs
+
 ```bash
 uv run --group docs mkdocs build -s -v
 ```
 
 ## Environment Notes
 
-- Local development does not need CI-style `uv sync --locked --group ci` by default.
+- Local development does not need CI-style `uv sync --locked --group ci` by
+  default.
 - If required tools are missing locally, run once:
+
 ```bash
 uv sync --all-groups
 ```
 
 ## Final Gate
 
-Do not mark PR ready if selected checks fail.
+Do not mark a PR ready if selected checks fail.
+
+Report:
+
+- changed area classification
+- commands executed
+- pass/fail result per command
+- blocking failures and next fix step
+- final readiness: `ready` or `not ready`

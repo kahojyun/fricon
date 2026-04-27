@@ -225,15 +225,5 @@ and they should be maintained separately.
   workspace is recognizable and that IPC is reachable. They should not take
   over the job of workspace migration.
 
-When changing workspace structure or workspace metadata semantics:
-
-- update the stepwise migration logic
-- decide whether `WORKSPACE_VERSION` must change
-- update developer-facing maintenance docs and repo rules together
-
-When changing IPC/gRPC request or response contracts:
-
-- update the explicit IPC protocol compatibility logic in the client and server
-- decide whether `IPC_PROTOCOL_VERSION` must change
-- update generated bindings and the maintainer-facing docs/rules that describe
-  the protocol change workflow
+For the actionable change checklists, use
+`dev-docs/maintenance-checklist.md`.

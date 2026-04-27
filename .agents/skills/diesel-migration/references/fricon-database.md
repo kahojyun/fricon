@@ -11,7 +11,9 @@
 
 ## Expected CLI Context
 
-Interpret repository paths relative to `<project_root>`. Run Diesel CLI from `<project_root>/crates/fricon` so it picks up `diesel.toml` and writes `src/database/schema.rs`.
+Interpret repository paths relative to `<project_root>`. Run Diesel CLI from
+`<project_root>/crates/fricon` so it picks up crate-local `diesel.toml` and
+writes crate-local `src/database/schema.rs`.
 
 Typical flow:
 
@@ -44,17 +46,14 @@ cargo install diesel_cli --no-default-features --features sqlite
 ## Fricon-Specific Notes
 
 - `crates/fricon/src/database/core.rs` embeds migrations with `embed_migrations!()`. The SQL files are shipped with the app build.
-- `crates/fricon/diesel.toml` configures `print_schema.file = "src/database/schema.rs"`, so schema regeneration is part of the Diesel CLI flow.
+- `crates/fricon/diesel.toml` configures
+  `print_schema.file = "src/database/schema.rs"` relative to
+  `<project_root>/crates/fricon`, so schema regeneration is part of the Diesel
+  CLI flow.
 - The current persistence code lives under `crates/fricon/src/database`. Keep new columns and tables wired into that layer, not service/business modules.
 - Existing migrations are timestamped directories with `up.sql` and `down.sql`. Follow the same layout.
 
-## Verification Checklist
+## Verification
 
-After changing migrations:
-
-1. Inspect the migration SQL diff for reversibility and data safety.
-2. Inspect the generated `crates/fricon/src/database/schema.rs` diff.
-3. Update affected Diesel structs, inserts/changesets, and query code.
-4. Run `cargo check -p fricon`.
-5. Run targeted tests for the touched database slice. Prefer `cargo nextest` when practical.
-6. Rebuild Python bindings before Python tests if the schema change affects exported behavior.
+Use the database schema checklist in
+`<project_root>/dev-docs/maintenance-checklist.md`.
