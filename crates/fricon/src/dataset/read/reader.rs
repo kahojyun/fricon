@@ -74,7 +74,7 @@ impl DatasetSource {
 
 pub struct DatasetReader {
     source: DatasetSource,
-    schema: DatasetSchema,
+    schema: Option<DatasetSchema>,
     arrow_schema: SchemaRef,
     dataset_dir: Option<PathBuf>,
 }
@@ -203,7 +203,7 @@ fn select_data_owned(
 impl DatasetReader {
     pub(crate) fn from_handle(source: WriteSessionHandle) -> Result<Self, ReadError> {
         let arrow_schema = source.schema();
-        let schema = arrow_schema.as_ref().try_into()?;
+        let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::WriteSession(source),
             schema,
@@ -216,7 +216,7 @@ impl DatasetReader {
         let mut reader = ChunkReader::new(path.clone(), None);
         reader.read_all()?;
         let arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
-        let schema = arrow_schema.as_ref().try_into()?;
+        let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::File(reader),
             schema,
@@ -227,7 +227,15 @@ impl DatasetReader {
 
     #[must_use]
     pub fn schema(&self) -> &DatasetSchema {
-        &self.schema
+        self.schema
+            .as_ref()
+            .expect("dataset schema is not compatible with the legacy schema model")
+    }
+
+    pub fn try_schema(&self) -> Result<&DatasetSchema, ReadError> {
+        self.schema
+            .as_ref()
+            .ok_or(ReadError::Dataset(DatasetError::IncompatibleType))
     }
 
     #[must_use]
@@ -268,15 +276,20 @@ impl DatasetReader {
         }
 
         Ok(resolve_from_compatibility_inference(
-            &self.schema,
-            self.index_columns(),
+            self.try_schema()?,
+            self.try_index_columns()?,
         ))
     }
 
     #[must_use]
     pub fn index_columns(&self) -> Option<Vec<usize>> {
+        self.try_index_columns().ok().flatten()
+    }
+
+    pub fn try_index_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
+        let schema = self.try_schema()?;
         if self.source.num_rows() < 2 {
-            None
+            Ok(None)
         } else {
             let sample = self.source.range(..2);
             let sample =
@@ -285,7 +298,7 @@ impl DatasetReader {
             for (index, (sample_array, column_type)) in sample
                 .columns()
                 .iter()
-                .zip(self.schema.columns().values())
+                .zip(schema.columns().values())
                 .enumerate()
             {
                 if !matches!(column_type, DatasetDataType::Scalar(_)) {
@@ -298,7 +311,7 @@ impl DatasetReader {
                     break;
                 }
             }
-            Some(result)
+            Ok(Some(result))
         }
     }
 }

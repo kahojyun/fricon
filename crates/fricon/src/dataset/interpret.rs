@@ -145,7 +145,7 @@ fn trace_value_from_compatibility_type(scalar_kind: ScalarKind) -> TraceValueDTy
 mod tests {
     use std::sync::Arc;
 
-    use arrow_array::{Float64Array, RecordBatch, UInt64Array};
+    use arrow_array::{Float64Array, RecordBatch, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
 
     use super::{
@@ -292,6 +292,46 @@ mod tests {
             ColumnMeaning::SystemRecordId
         );
         assert_eq!(interpretation.value_columns, vec![1]);
+    }
+
+    #[test]
+    fn reader_interpretation_supports_manifest_dtypes_outside_legacy_schema() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("label", DataType::Utf8, false),
+        ]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(
+                    schema,
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1])),
+                        Arc::new(StringArray::from(vec!["first", "second"])),
+                    ],
+                )
+                .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        write_manifest(
+            dir.path(),
+            &DatasetSemanticManifest::minimal([(
+                "label".to_string(),
+                ManifestColumn::new(DatasetDType::Utf8),
+            )]),
+        )
+        .expect("write manifest");
+
+        let reader =
+            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
+        let interpretation = reader.interpret().expect("interpretation");
+
+        assert_eq!(interpretation.source, InterpretationSource::Manifest);
+        assert_eq!(interpretation.value_columns, vec![1]);
+        assert_eq!(interpretation.columns[1].dtype, DatasetDType::Utf8);
+        assert_eq!(interpretation.columns[1].meaning, ColumnMeaning::UserValue);
     }
 
     #[test]
