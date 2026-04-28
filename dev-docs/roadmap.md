@@ -39,6 +39,9 @@ behavior and the next product phase:
   shaped feature sequence that keeps the foundation separate from later scan
   and chart migration work. Treat it as proposed design guidance, not current
   implementation fact.
+- `parameter-management-design.md` defines proposed long-term parameter
+  registry direction after dataset semantics and minimal run records exist.
+  Treat it as future design guidance, not current implementation fact.
 
 When implementation lands, update the current implementation notes and public
 docs before treating proposal content as current behavior.
@@ -134,8 +137,8 @@ API, or UI rewrites later.
 - provenance graph across runs, datasets, parameters, code versions,
   environments, device configuration, workflow definitions, imports, exports,
   and notes
-- parameter snapshots and parameter-set versioning instead of only mutable
-  "current parameter" state
+- parameter snapshots, refs, drafts, table sections, tree sections, and
+  parameter-set versioning instead of only mutable "current parameter" state
 - unit, label, precision, and display-scale metadata for both dataset columns
   and parameters
 - sample or specimen identity for workflows where the measured object matters
@@ -163,6 +166,10 @@ After the dataset foundation is durable, product work should move toward:
 - basic run provenance links between datasets, parameters, code, environment,
   and notes
 
+Relevant future design note:
+
+- `parameter-management-design.md`
+
 This phase should avoid turning experiment support into a desktop-first
 workflow engine too early. Python scripts should remain the first-class way to
 run scientific measurement code.
@@ -175,9 +182,14 @@ details affect storage, API contracts, or user workflows.
 
 Parameter management may grow beyond static run metadata into:
 
+- immutable parameter snapshots that contain one optional tree section and
+  multiple table sections
+- mutable refs or profiles that resolve to immutable snapshots before a run
 - parameter history views
 - plotting parameter values across runs or time
-- parameter versioning for experiment configurations
+- parameter versioning for experiment and numerical simulation configurations
+- structured tree and table diffs with selected apply-to-draft workflows
+- analysis-driven parameter update proposals for calibration workflows
 - links between parameter versions, runs, and generated datasets
 
 Experiment code management may support local reproducibility features such as:

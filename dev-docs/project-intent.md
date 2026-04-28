@@ -32,7 +32,8 @@ Fricon is expected to provide:
 
 - data recording
 - experiment execution
-- parameter management, including future history and versioning workflows
+- parameter management, including future snapshot, history, diff, and
+  versioning workflows
 - device management
 - local experiment workspace management
 - a desktop UI for browsing, managing, and inspecting collected data
@@ -205,10 +206,10 @@ This document is a constraint for AI-assisted changes:
 
 These questions are intentionally unresolved:
 
-- How should parameters be represented: flat key-value sets, typed schemas,
-  sweep definitions, or versioned experiment configurations?
-- How should parameter history and version comparison be represented in the
-  Python API and desktop UI?
+- How should the proposed parameter snapshot model in
+  `parameter-management-design.md` be narrowed into a first implementation?
+- How should parameter history, diff, and selected apply workflows be exposed in
+  the Python API and desktop UI?
 - What unit and display metadata belongs on dataset columns, parameters, or
   both?
 - How should sample or specimen identity be represented without overbuilding a
