@@ -69,6 +69,13 @@ impl DatasetSemanticManifest {
                     found: field.data_type().to_string(),
                 });
             }
+            if field.is_nullable() {
+                return Err(ManifestValidationError::ArrowTypeMismatch {
+                    name: name.clone(),
+                    expected: format!("non-null {expected}"),
+                    found: format!("nullable {}", field.data_type()),
+                });
+            }
         }
 
         for field in schema.fields() {
@@ -545,6 +552,21 @@ mod tests {
             manifest.validate_against_arrow_schema(&schema),
             Err(ManifestValidationError::ArrowTypeMismatch { name, .. })
                 if name == "signal"
+        ));
+    }
+
+    #[test]
+    fn validate_against_arrow_schema_rejects_nullable_record_id() {
+        let manifest = DatasetSemanticManifest::minimal(signal_columns());
+        let schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, true),
+            Field::new("signal", DataType::Float64, false),
+        ]);
+
+        assert!(matches!(
+            manifest.validate_against_arrow_schema(&schema),
+            Err(ManifestValidationError::ArrowTypeMismatch { name, .. })
+                if name == RECORD_ID_COLUMN
         ));
     }
 
