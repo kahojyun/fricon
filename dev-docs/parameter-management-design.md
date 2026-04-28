@@ -105,26 +105,73 @@ The first parameter management design should not include:
 
 ## Core User Model
 
-Use a small set of concepts:
+The parameter system has two audiences:
 
-| Concept              | Meaning                                                                           |
-| -------------------- | --------------------------------------------------------------------------------- |
-| Parameter registry   | Workspace-local store of parameter snapshots, refs, tags, drafts, and history.    |
-| Parameter snapshot   | Immutable full parameter state plus schema at one point in history.               |
-| Tree section         | Optional nested parameter structure for sparse and irregular values.              |
-| Table section        | Named keyed table for regular parameter families.                                 |
-| Ref / profile        | Mutable pointer to a snapshot, such as `main`, `dev`, or `cooldown/2026-04/main`. |
-| Tag                  | Stable human alias for an important snapshot.                                     |
-| Draft                | Editable working state based on a snapshot or import.                             |
-| Patch                | Structured set of tree, table, schema, or metadata changes.                       |
-| Run-local parameters | Inputs specific to one run, not long-lived registry parameters.                   |
-| Runtime overrides    | Temporary modifications of long-lived parameters for one run.                     |
-| Effective run config | Resolved snapshot plus run-local parameters, overrides, and derived values.       |
-| Parameter proposal   | Reviewable patch proposed by analysis, calibration, import, or automation.        |
+- direct users who want to manage scientific parameters through Python or the
+  desktop UI
+- other Fricon systems that need stable parameter bindings, proposals, and
+  validation results
+
+Keep those audiences separate in the terminology. The public user model should
+stay small, while integration and internal terms can be more precise.
+
+### Public Registry Terms
+
+| Concept            | Meaning                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| Parameter registry | Workspace-local store of parameter snapshots, refs, tags, drafts, and history.    |
+| Parameter snapshot | Immutable full parameter state plus schema at one point in history.               |
+| Profile / ref      | Mutable pointer to a snapshot, such as `main`, `dev`, or `cooldown/2026-04/main`. |
+| Tree section       | Optional nested parameter structure for sparse and irregular values.              |
+| Table section      | Named keyed table for regular parameter families.                                 |
+| Schema             | Types, units, constraints, table keys, lifecycle status, and display metadata.    |
+| Tag                | Stable human alias for an important snapshot.                                     |
+| Draft              | Editable working state based on a snapshot or import.                             |
+| Patch              | Structured set of tree, table, schema, or metadata changes.                       |
+| Diff               | Comparison between snapshots, drafts, or selected scopes.                         |
+| History            | Value, schema, ref, and proposal history.                                         |
 
 Avoid using "parameter set" for every nested object. In Fricon terminology, a
 single parameter snapshot should contain sections. Each section may be tree-like
 or table-like, but the snapshot is the unit that a run freezes.
+
+The eventual public API should choose one primary term for mutable pointers.
+`Profile` is friendlier for users, while `ref` is shorter and maps well to
+storage and integration APIs. Avoid exposing `branch` as the primary term unless
+the implementation intentionally supports Git-like expectations.
+
+### Integration Terms
+
+These concepts are needed when other systems connect to the registry, but they
+should not make the registry responsible for execution, analysis, or device
+control.
+
+| Concept              | Meaning                                                                    |
+| -------------------- | -------------------------------------------------------------------------- |
+| Parameter binding    | Result of resolving a profile/ref to an immutable snapshot ID and hash.    |
+| Run-local parameters | Inputs specific to one run, owned by the run or experiment system.         |
+| Runtime overrides    | Run-scoped temporary patch against a resolved parameter snapshot.          |
+| Effective run config | Run/execution-owned configuration derived from parameters and run inputs.  |
+| Parameter proposal   | Reviewable patch proposed by analysis, calibration, import, or automation. |
+| Validation report    | Structured result from checking drafts, proposals, overrides, or commits.  |
+
+Parameter management resolves and versions parameter state. Other systems
+consume, bind, propose changes to, or derive execution configs from that state.
+
+### Internal Identity Terms
+
+Stable IDs and tombstones support history and refactor-aware diff. They should
+exist in storage and advanced APIs, but they are not the default user mental
+model.
+
+| Concept       | Meaning                                                           |
+| ------------- | ----------------------------------------------------------------- |
+| `param_id`    | Stable identity for a tree leaf.                                  |
+| `table_id`    | Stable identity for a table section.                              |
+| `column_id`   | Stable identity for a table column.                               |
+| `row_id`      | Optional identity for rows that survive primary-key changes.      |
+| `tombstone`   | Logical deletion marker that preserves historical interpretation. |
+| snapshot hash | Integrity and reproducibility hash for a materialized snapshot.   |
 
 ## Parameter Snapshot Shape
 
@@ -713,14 +760,21 @@ match by path/name
 create new identities
 ```
 
-## Python API Sketch
+## API Use Cases
 
-The primary API should be Pythonic and script-friendly:
+The parameter API should support direct use and system integration without
+forcing both audiences through the same amount of ceremony.
+
+### Direct Python Registry Use
+
+This path is for users who manage parameters directly from scripts or notebooks.
+It should optimize for the public mental model: profile, snapshot, tree/table
+sections, draft, diff, and commit.
 
 ```python
 params = ws.parameters
 
-# Resolve a mutable ref to an immutable snapshot.
+# Resolve a mutable profile/ref to an immutable snapshot.
 snapshot = params.get_snapshot(ref="main")
 
 # Read tree and table values.
@@ -744,7 +798,90 @@ params.update_ref(
 )
 ```
 
-Run integration should resolve refs before execution:
+Direct use should also cover import, export, history, and diff:
+
+```python
+diff = params.diff("p_old", "p_new", scope="/devices/vna")
+patch = diff.select(paths=["/devices/vna/init/if_bandwidth"])
+
+draft = params.create_draft(base="main")
+draft.apply(patch)
+draft.validate().raise_for_errors()
+snapshot = draft.commit("Update VNA initialization defaults")
+```
+
+### Run System Integration
+
+This path is for experiment or workflow systems that need parameter state as an
+input. The parameter registry should provide resolved bindings and validation,
+but the run system should own run-local inputs, effective configuration, command
+planning, dataset creation, and device interaction.
+
+```python
+binding = params.resolve("main")
+
+snapshot = params.read_snapshot(binding.snapshot_id)
+validation = params.validate_overrides(
+    snapshot_id=binding.snapshot_id,
+    overrides=run_overrides,
+)
+validation.raise_for_errors()
+
+run.record_parameter_binding(binding)
+```
+
+The run system then owns this step:
+
+```text
+parameter snapshot
+  + run-local parameters
+  + runtime overrides
+  -> effective run config
+  -> compiled execution plan
+  -> datasets and run provenance
+```
+
+The registry should not compile waveforms, plan scans, apply instrument
+commands, or decide run state transitions.
+
+### Analysis And Calibration Integration
+
+Analysis, calibration, optimizers, and future AI assistants should propose
+parameter changes as patches. The registry should store the proposal, preserve
+its source links, apply it to a draft, validate it, and commit it only through
+an explicit mutation path.
+
+```python
+proposal = params.create_proposal(
+    base_snapshot=binding.snapshot_id,
+    patch=patch,
+    source={
+        "kind": "analysis",
+        "run_id": run.id,
+        "dataset_id": dataset.id,
+        "analysis_id": analysis.id,
+    },
+)
+
+draft = params.apply_proposal_to_draft(proposal.id)
+draft.validate().raise_for_errors()
+new_snapshot = draft.commit("Apply rabi calibration result")
+```
+
+Promotion to a mutable profile/ref should remain a separate action:
+
+```python
+params.update_ref(
+    "calibration/rabi/latest",
+    new_snapshot.id,
+    expected_old_snapshot=binding.snapshot_id,
+)
+```
+
+### Minimal Experiment Convenience
+
+Higher-level experiment helpers may offer a compact API, but it should still
+resolve refs before execution and store the resulting parameter binding:
 
 ```python
 with experiment.run(parameter_ref="main") as run:
@@ -752,6 +889,9 @@ with experiment.run(parameter_ref="main") as run:
     # The run record stores both the source ref and resolved snapshot.
     ...
 ```
+
+This is convenience over the run integration boundary, not an invitation for
+the parameter registry to own experiment execution.
 
 Typed Python helper generation is a useful later enhancement, not an MVP
 blocker. Helpers should bind to a schema snapshot and include runtime
@@ -784,7 +924,7 @@ Scope:
 - decide durable terminology
 - decide snapshot/ref/draft/patch invariants
 - decide storage and migration strategy
-- decide Python API boundary
+- decide direct Python API and integration API boundaries
 - decide how run records freeze resolved snapshots
 
 ### Feature 1: Run-Linked Parameter Snapshot References
@@ -793,6 +933,8 @@ Classification: `after dataset semantics`, after minimal run records exist.
 
 Scope:
 
+- expose parameter bindings that resolve source refs to immutable snapshot IDs
+  and hashes
 - record source parameter ref and resolved immutable snapshot ID in run records
 - record run-local parameters
 - record runtime overrides separately from run-local parameters
@@ -858,10 +1000,13 @@ Scope:
 
 ## Open Questions
 
-- Should the public term be `profile`, `ref`, or `branch`?
+- Should the public term be `profile`, `ref`, or both with one treated as the
+  Python/API spelling?
 - Should a workspace have one parameter registry or multiple named registries?
 - How much schema metadata belongs in the MVP: dtype only, or dtype, unit,
   nullable, constraints, description, and lifecycle status?
+- What should be available in the direct Python API versus the stricter
+  integration API?
 - Should table row keys be immutable within a snapshot lineage, or can key
   changes be represented as row moves?
 - Should every run persist a full effective config, only a hash, or both?
@@ -888,3 +1033,5 @@ Scope:
 9. Direct hardware application is separate from parameter commit creation.
 10. Large arrays and simulation artifacts should initially be represented by
     dataset or artifact references, not embedded parameter values.
+11. The registry exposes bindings and validation for other systems, but
+    run/execution systems own effective configs and device interaction.
