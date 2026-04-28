@@ -9,8 +9,12 @@ use itertools::{Either, Itertools};
 
 use crate::dataset::{
     ingest::WriteSessionHandle,
+    interpret::{
+        DatasetInterpretation, resolve_from_compatibility_inference, resolve_from_manifest,
+    },
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
+    semantics::{ManifestError, read_manifest_optional},
     storage::ChunkReader,
 };
 
@@ -72,6 +76,7 @@ pub struct DatasetReader {
     source: DatasetSource,
     schema: DatasetSchema,
     arrow_schema: SchemaRef,
+    dataset_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Default)]
@@ -203,11 +208,12 @@ impl DatasetReader {
             source: DatasetSource::WriteSession(source),
             schema,
             arrow_schema,
+            dataset_dir: None,
         })
     }
 
     pub(crate) fn open_dir(path: PathBuf) -> Result<Self, ReadError> {
-        let mut reader = ChunkReader::new(path, None);
+        let mut reader = ChunkReader::new(path.clone(), None);
         reader.read_all()?;
         let arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
         let schema = arrow_schema.as_ref().try_into()?;
@@ -215,6 +221,7 @@ impl DatasetReader {
             source: DatasetSource::File(reader),
             schema,
             arrow_schema,
+            dataset_dir: Some(path),
         })
     }
 
@@ -248,6 +255,22 @@ impl DatasetReader {
         options: &SelectOptions,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), ReadError> {
         self.source.select_data(options)
+    }
+
+    pub fn interpret(&self) -> Result<DatasetInterpretation, ReadError> {
+        if let Some(dataset_dir) = &self.dataset_dir
+            && let Some(manifest) = read_manifest_optional(dataset_dir)?
+        {
+            manifest
+                .validate_against_arrow_schema(self.arrow_schema.as_ref())
+                .map_err(ManifestError::from)?;
+            return Ok(resolve_from_manifest(self.arrow_schema.as_ref(), manifest));
+        }
+
+        Ok(resolve_from_compatibility_inference(
+            &self.schema,
+            self.index_columns(),
+        ))
     }
 
     #[must_use]
