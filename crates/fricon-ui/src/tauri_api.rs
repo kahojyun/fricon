@@ -174,6 +174,7 @@ impl From<ReadError> for ApiError {
             ReadError::Deleted { .. } => ApiErrorCode::DatasetDeleted,
             ReadError::EmptyDataset
             | ReadError::Dataset(_)
+            | ReadError::Manifest(_)
             | ReadError::DatasetFs(_)
             | ReadError::Database(_) => ApiErrorCode::Internal,
         };

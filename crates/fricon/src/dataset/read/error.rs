@@ -1,6 +1,6 @@
 use crate::{
     database::core::DatabaseError,
-    dataset::{schema::DatasetError, storage::error::DatasetFsError},
+    dataset::{schema::DatasetError, semantics::ManifestError, storage::error::DatasetFsError},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -13,6 +13,8 @@ pub enum ReadError {
     EmptyDataset,
     #[error(transparent)]
     Dataset(#[from] DatasetError),
+    #[error(transparent)]
+    Manifest(#[from] ManifestError),
     #[error(transparent)]
     DatasetFs(#[from] DatasetFsError),
     #[error(transparent)]
