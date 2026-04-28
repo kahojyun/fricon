@@ -76,13 +76,12 @@ checklist, policy, or guideline.
 - `adr/` - durable architecture decision records for settled cross-cutting
   decisions
 
-## Proposals And Plans
+## Proposals
 
-These files describe proposed future direction. Do not treat them as current
-implementation facts unless the implementation has already landed.
+This file describes proposed future direction. Do not treat it as current
+implementation fact unless the implementation has already landed.
 
 - `dataset-semantic-architecture-proposal.md`
-- `dataset-semantic-implementation-plan.md`
 
 ## Maintenance Rules
 

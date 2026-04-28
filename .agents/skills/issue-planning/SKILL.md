@@ -37,7 +37,6 @@ When planning dataset semantics work, also read:
 
 - `<project_root>/dev-docs/current-storage-notes.md`
 - `<project_root>/dev-docs/dataset-semantic-architecture-proposal.md`
-- `<project_root>/dev-docs/dataset-semantic-implementation-plan.md`
 
 When planning a UI-heavy milestone, also read:
 

@@ -28,6 +28,39 @@ The target architecture should:
 - keep scalar, complex, and trace payload types as the primary description of
   column kind, with metadata used only for display and chart hints
 
+## Pre-Adoption Breaking Change Policy
+
+Fricon has not reached production adoption yet. Use that timing to clean up
+internal storage and semantic contracts now instead of preserving legacy
+inference paths as long-term architecture.
+
+Feature 1 may make breaking changes to workspace format, dataset payload
+layout, manifest requirements, protocol contracts, generated bindings, and
+desktop detail DTOs when those changes simplify the durable semantics model.
+When a compatibility bump is needed, make it explicit through the normal
+workspace, IPC, release, and maintenance checklists.
+
+Breaking changes are appropriate for:
+
+- making `dataset_manifest.json` mandatory for new datasets
+- materializing `__ds_record_id` in new datasets
+- reserving `__ds_` for Fricon-owned system fields
+- replacing Fricon Arrow extension metadata with plain Arrow physical schemas
+  plus manifest-owned semantics for new datasets
+- making resolved interpretation, not `isIndex`, the canonical consumer
+  contract
+- changing internal chunk layout, DTOs, or protocol versions when they would
+  otherwise preserve the wrong abstraction boundary
+
+Do not use pre-adoption cleanup as a reason to break the simple Python user
+model. Bare `write(col=...)` and first-row schema inference in minimal mode
+should keep working. Users should not need to author raw manifests, declare
+scan plans, or understand storage details for simple datasets.
+
+Compatibility fallback should exist to keep old fixtures and local test data
+readable during the transition. It should not constrain the new semantic model
+or remain the primary path for new datasets.
+
 ## Why Change
 
 Today the dataset stack has one strong property and one weak property:
@@ -826,38 +859,154 @@ __ds_record_id | restart | step
 Charts should treat this as an observed sparse grid. Missing cells are empty;
 the dataset does not need to claim a rectangular `planned_shape`.
 
-## V1 Scope
+## Feature Shaping
 
-The clean v1 should include:
+The architecture should land as shaped feature layers, not as one broad v1.
+This keeps the current route dataset-first while leaving clean attachment
+points for later experiment, parameter, provenance, workflow, AI, and device
+models.
 
-- chunked append-only Arrow payloads
+### Feature 1: Durable Dataset Semantics Foundation
+
+Classification: `now`.
+
+User value:
+
+- bare Python writes keep working
+- every new dataset gets durable local meaning
+- old datasets and fixtures can still open through compatibility inference
+- future run, parameter, provenance, and workflow models get a stable dataset
+  anchor without being hidden inside chart heuristics
+
+Scope:
+
+- chunked append-only Arrow payloads remain the storage substrate
 - `dataset_manifest.json`
 - `__ds_record_id`
-- a minimal manifest for bare writes with column metadata, realization, and
+- reserved `__ds_` system-field prefix
+- minimal manifest for bare writes with column metadata, realization, and
   compatibility settings
-- optional typed `columns=` creation metadata
+- manifest IO, serde model, validation, and defaulting
+- plain Arrow physical schemas for new semantic datasets
+- compatibility fallback for datasets without manifests
+- resolved interpretation API for readers and downstream consumers
+- temporary adapters that preserve existing chart and dataset-detail behavior
+
+Out of scope:
+
+- new public `columns=` metadata
+- public `scan=`
+- logical-index sidecar chunks
+- full chart/live-view rewrite
+- status, invalidation, or quality-state semantics
+- run, measurement, parameter, provenance, workflow, AI, or device manifests
+
+First success criterion:
+
+- new datasets produce a valid manifest and record IDs while existing datasets
+  still open and current user-facing behavior remains equivalent.
+
+ADR need:
+
+- create an ADR before implementation commits to the durable manifest shape,
+  record-id semantics, compatibility policy, and interpretation-layer boundary.
+
+### Feature 2: Progressive Column Metadata API
+
+Classification: `next`, after the foundation can persist and resolve manifest
+column metadata.
+
+User value:
+
+- users can add units, labels, hidden-by-default state, and chart-axis hints
+  without learning scan-plan or manifest vocabulary
+- future parameter and provenance views get consistent display metadata without
+  treating column names as the only source of meaning
+
+Scope:
+
+- optional `columns=` creation metadata
+- typed Python helpers such as `Column`
+- declared dtypes where useful, while still allowing first-row inference when
+  omitted
+- `unit`, `label`, `hidden_by_default`, and `chart_axis` metadata
+- reader and UI detail surfaces expose resolved column metadata
+
+Out of scope:
+
+- `scan=`
+- logical-index sidecar chunks
+- parameter schemas or parameter-set versioning
+- user-authored raw manifests
+
+### Feature 3: Explicit Scan Semantics
+
+Classification: `next`.
+
+User value:
+
+- regular ordered scans can be reopened without row-adjacency guesses
+- non-contiguous, resumed, adaptive, and ragged acquisition can be represented
+  durably
+- framework-owned experiment systems can provide exact logical indices without
+  burdening simple Python scripts
+
+Scope:
+
 - optional `scan=` creation metadata
 - implicit logical-index realization for regular ordered scans
+- unknown-length integer index axes for minimizer-style workflows
 - optional append-only logical-index sidecar chunks
-- scan-plan-lite
+- duplicate projection using `latest_by_record_id`
+- sparse/ragged grid projection from observed index pairs
 - active-session live grouping that does not require durable `sweep_id` or
   `frame_id` payload columns
-- resolved interpretation API
-- chart integration that prefers resolved semantics over inference
-- column metadata that can mark stored columns as chart-axis candidates
-- unknown-length integer index axes for minimizer-style workflows
-- ragged heatmap projection from observed sparse index pairs
 
-The clean v1 should defer:
+Out of scope:
+
+- execution segment tables
+- status-aware duplicate policies
+- expanded planned-point tables
+- a separate durable derived-coordinate model
+- null-heavy or late-appearing column workflows
+
+### Feature 4: Consumer Migration
+
+Classification: `next`, after the foundation is stable.
+
+User value:
+
+- desktop detail, chart defaults, heatmaps, and live views consume resolved
+  dataset interpretation instead of rediscovering semantics from raw rows
+
+Scope:
+
+- dataset detail DTOs expose resolved semantic fields such as logical index,
+  chart-axis candidate, label, unit, scan axes, and defaults
+- chart transforms consume resolved logical indices and duplicate policy
+- `isIndex` remains temporarily as a compatibility projection
+- legacy direct use of index-column inference is removed after migration
+
+Out of scope:
+
+- turning the desktop UI into the primary experiment execution engine
+- saved user-owned chart presets or workspace UI state inside the dataset
+  manifest
+
+### Deferred Concepts
+
+The dataset semantic layer should leave room for these concepts but not
+implement them:
 
 - measurement or run manifest design
 - execution segment tables
 - status or invalidation semantics
 - rich provenance graph
-- expanded planned-point tables
-- multiple duplicate-resolution policies
+- parameter snapshots and diffs
+- workflow definitions and workflow runs
+- AI action approval or audit records
+- device identity and configuration snapshots
 - user-editable manifest history
-- a separate durable derived-coordinate model
 - null-heavy or late-appearing column workflows
 
 ## Worked Use Cases
@@ -949,6 +1098,9 @@ with ws.dataset_manager.create(
         for bias_idx, bias_v in enumerate([0.0, 0.01, 0.02]):
             ds.write(gate_v=gate_v, bias_v=bias_v, current_a=measure_current())
 ```
+
+This example combines the column-metadata and scan-semantics features. Column
+metadata can land first without requiring scan declarations or sidecars.
 
 The `scan` declaration communicates logical axes without asking the user to
 learn role vocabulary. For this regular ordered scan, Fricon can derive logical
@@ -1092,10 +1244,11 @@ This proposal does not optimize for long-lived backward compatibility.
 Recommended approach:
 
 1. Introduce the semantic model and resolved interpretation API.
-2. Switch chart and live-query code to consume resolved interpretation.
-3. Update dataset creation to produce manifests for all new datasets.
-4. Keep a compatibility inference path only for old fixtures and ad hoc test
+2. Update dataset creation to produce manifests for all new datasets.
+3. Keep a compatibility inference path only for old fixtures and ad hoc test
    data.
+4. Switch chart and live-query code to consume resolved interpretation after
+   the foundation is stable.
 5. Remove architecture that treats inferred `isIndex` as the primary semantic
    contract once the new path is stable.
 
@@ -1138,8 +1291,22 @@ frontend/src/features/charts/model/
 
 ## Acceptance Criteria
 
-The architecture is considered successful when:
+The foundation feature is considered successful when:
 
+- bare `write(col=...)` still works, but now produces a minimal semantic
+  manifest owned by the dataset layer
+- every new semantic dataset has stable `__ds_record_id` values
+- old datasets without manifests still open through compatibility inference
+- readers can expose raw rows, raw manifest data, and resolved interpretation
+- current chart and dataset-detail behavior remains equivalent through
+  compatibility adapters
+
+The later column, scan, and consumer-migration features are considered
+successful when:
+
+- declared column units, labels, hidden state, and chart-axis hints round trip
+  through creation, manifest storage, reader interpretation, and dataset detail
+  surfaces
 - a known 2D scan opens correctly from explicit semantics without relying on
   first-two-row inference
 - regular ordered scans can derive logical indices implicitly without storing
@@ -1151,8 +1318,6 @@ The architecture is considered successful when:
   durable `sweep_id` or `frame_id` payload columns
 - minimizer-style unknown-length index axes can be sliced by index coordinate
 - ragged heatmaps render from observed sparse index pairs
-- bare `write(col=...)` still works, but now produces a minimal semantic
-  manifest owned by the dataset layer
 
 ## Summary
 

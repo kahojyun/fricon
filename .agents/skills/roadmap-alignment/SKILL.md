@@ -37,7 +37,6 @@ read:
 - `<project_root>/docs/dataset.md`
 - `<project_root>/dev-docs/current-storage-notes.md`
 - `<project_root>/dev-docs/dataset-semantic-architecture-proposal.md`
-- `<project_root>/dev-docs/dataset-semantic-implementation-plan.md`
 
 For cross-boundary implementation implications, check:
 

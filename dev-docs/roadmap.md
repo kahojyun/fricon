@@ -31,14 +31,14 @@ This roadmap includes future product direction and should not be used as proof
 that experiment, parameter, workflow, device, provenance, AI automation, or
 semantic-manifest behavior has already landed.
 
-The existing dataset semantics proposal and implementation plan are the bridge
-between current dataset behavior and the next product phase:
+The existing dataset semantics proposal is the bridge between current dataset
+behavior and the next product phase:
 
 - `dataset-semantic-architecture-proposal.md` defines the proposed direction:
-  explicit dataset semantics, durable manifests, resolved interpretation, and
-  chart behavior that does not depend on row-order heuristics.
-- `dataset-semantic-implementation-plan.md` breaks that direction into phases.
-  Treat it as proposed execution guidance, not current implementation fact.
+  explicit dataset semantics, durable manifests, resolved interpretation, and a
+  shaped feature sequence that keeps the foundation separate from later scan
+  and chart migration work. Treat it as proposed design guidance, not current
+  implementation fact.
 
 When implementation lands, update the current implementation notes and public
 docs before treating proposal content as current behavior.
@@ -108,9 +108,10 @@ Start with:
 
 ## Next
 
-Near-term direction should clarify and land the dataset semantic model, then
-make the desktop UI consume resolved dataset interpretation instead of
-rediscovering chart meaning from row heuristics.
+Near-term direction should clarify and land the dataset semantic foundation,
+then add progressive column metadata, explicit scan semantics, and desktop UI
+consumption of resolved dataset interpretation instead of rediscovering chart
+meaning from row heuristics.
 
 Do this before building higher-level experiment, workflow, automation, or AI
 features. Those later features need explicit run and provenance models; they
@@ -120,7 +121,6 @@ chart-specific assumptions.
 Relevant notes:
 
 - `dataset-semantic-architecture-proposal.md`
-- `dataset-semantic-implementation-plan.md`
 - `database-schema-changes.md`
 - `release-and-versioning.md`
 
