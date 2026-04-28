@@ -42,6 +42,9 @@ behavior and the next product phase:
 - `parameter-management-design.md` defines proposed long-term parameter
   registry direction after dataset semantics and minimal run records exist.
   Treat it as future design guidance, not current implementation fact.
+- `future-concepts.md` preserves lightweight notes for experiment run,
+  workflow automation, calibration automation, device apply, and AI automation
+  concepts that are not yet ready for focused design proposals.
 
 When implementation lands, update the current implementation notes and public
 docs before treating proposal content as current behavior.
@@ -179,6 +182,9 @@ run scientific measurement code.
 These ideas are promising, but not current implementation commitments. Convert
 them into focused design notes, issues, or ADRs before implementation if the
 details affect storage, API contracts, or user workflows.
+
+Use `future-concepts.md` for lightweight notes that should be preserved but are
+too early for detailed design or issue planning.
 
 Parameter management may grow beyond static run metadata into:
 

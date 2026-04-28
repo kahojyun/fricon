@@ -34,6 +34,7 @@ every canonical document.
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
 | Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
 | Parameter management product planning       | `parameter-management-design.md`         | `project-intent.md`, `roadmap.md`, `adr/README.md`                                                | Treating proposal content as current behavior                          |
+| Future concept capture                      | `future-concepts.md`                     | `project-intent.md`, `roadmap.md`                                                                 | Creating implementation issues before the concept is narrowed          |
 | Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
 
 ## Canonical Guidance
@@ -83,6 +84,8 @@ This file describes proposed future direction. Do not treat it as current
 implementation fact unless the implementation has already landed.
 
 - `dataset-semantic-architecture-proposal.md`
+- `future-concepts.md` - lightweight ledger for useful but not-yet-designed
+  experiment, workflow, device, calibration, and AI concepts
 - `parameter-management-design.md` - proposed long-term versioned parameter
   registry direction for measurement and simulation workflows
 
