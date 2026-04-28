@@ -48,7 +48,7 @@ pub(crate) async fn get_dataset_detail(
     let payload_available = record.metadata.deleted_at.is_none();
     let columns = if payload_available {
         let reader = session.dataset(id).await?;
-        let schema = reader.try_schema().map_err(ReadAppError::from)?;
+        let schema = reader.schema().map_err(ReadAppError::from)?;
         let index = reader.try_index_columns().map_err(ReadAppError::from)?;
         schema
             .columns()

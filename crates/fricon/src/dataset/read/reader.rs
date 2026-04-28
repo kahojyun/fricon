@@ -225,14 +225,7 @@ impl DatasetReader {
         })
     }
 
-    #[must_use]
-    pub fn schema(&self) -> &DatasetSchema {
-        self.schema
-            .as_ref()
-            .expect("dataset schema is not compatible with the legacy schema model")
-    }
-
-    pub fn try_schema(&self) -> Result<&DatasetSchema, ReadError> {
+    pub fn schema(&self) -> Result<&DatasetSchema, ReadError> {
         self.schema
             .as_ref()
             .ok_or(ReadError::Dataset(DatasetError::IncompatibleType))
@@ -276,7 +269,7 @@ impl DatasetReader {
         }
 
         Ok(resolve_from_compatibility_inference(
-            self.try_schema()?,
+            self.schema()?,
             self.try_index_columns()?,
         ))
     }
@@ -287,7 +280,7 @@ impl DatasetReader {
     }
 
     pub fn try_index_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
-        let schema = self.try_schema()?;
+        let schema = self.schema()?;
         if self.source.num_rows() < 2 {
             Ok(None)
         } else {

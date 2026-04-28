@@ -214,7 +214,7 @@ pub(crate) async fn dataset_chart_data(
     options: &DatasetChartDataOptions,
 ) -> anyhow::Result<ChartSnapshot> {
     let dataset = session.dataset(id).await?;
-    let schema = dataset.try_schema()?;
+    let schema = dataset.schema()?;
     let index_columns = dataset.try_index_columns()?;
     let common = options.common();
     let start = common.start.map_or(Bound::Unbounded, Bound::Included);
@@ -300,7 +300,7 @@ pub(crate) async fn dataset_live_chart_data(
     options: &LiveChartDataOptions,
 ) -> anyhow::Result<LiveChartDataResponse> {
     let dataset = session.dataset(id).await?;
-    let schema = dataset.try_schema()?;
+    let schema = dataset.schema()?;
     let index_columns = dataset.try_index_columns()?;
     let total_rows = dataset.num_rows();
     let selected_columns =
