@@ -16,6 +16,10 @@ Dataset semantics proposal documents describe future direction, not current
 storage facts. Use this file as the current source of truth until those
 proposals are implemented and this note is updated.
 
+The accepted future foundation for dataset semantic manifests is recorded in
+`dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`; it is not current
+storage behavior until implementation lands.
+
 ## Workspace Layout
 
 At the time of writing, a workspace contains:
