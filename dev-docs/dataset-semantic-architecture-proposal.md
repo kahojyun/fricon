@@ -314,6 +314,8 @@ maintenance:
 
 - prefer internally tagged enums such as `{"kind": "none"}` over bare strings
   or booleans when a value may later gain fields
+- pin durable JSON names explicitly instead of depending on broad serde rename
+  rules, especially for acronym-heavy dtype variants
 - keep optional top-level sections as `Option<T>` with serde defaults
 - avoid `untagged` enums for durable manifest fields
 - do not use `deny_unknown_fields` unless intentionally rejecting newer
@@ -380,16 +382,25 @@ constrained Fricon-owned dtype enum that uses Arrow-aligned primitive variants
 and structured business variants:
 
 ```rust
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 enum DatasetDType {
+    #[serde(rename = "float64")]
     Float64,
+    #[serde(rename = "float32")]
     Float32,
+    #[serde(rename = "int64")]
     Int64,
+    #[serde(rename = "uint64")]
     UInt64,
+    #[serde(rename = "bool")]
     Bool,
+    #[serde(rename = "utf8")]
     Utf8,
+    #[serde(rename = "timestamp_us")]
     TimestampUs,
+    #[serde(rename = "complex128")]
     Complex128,
+    #[serde(rename = "trace")]
     Trace(TraceDType),
 }
 

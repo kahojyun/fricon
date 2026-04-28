@@ -5,6 +5,7 @@ pub mod model;
 pub mod portability;
 pub mod read;
 pub mod schema;
+pub mod semantics;
 pub mod storage;
 mod tag;
 

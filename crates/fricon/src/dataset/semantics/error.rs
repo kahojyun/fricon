@@ -1,0 +1,45 @@
+use std::io;
+
+use tempfile::PersistError;
+
+#[derive(Debug, thiserror::Error)]
+pub enum ManifestError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Persist(#[from] PersistError),
+    #[error(transparent)]
+    Validation(#[from] ManifestValidationError),
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ManifestValidationError {
+    #[error("Unsupported dataset semantic manifest version: {found}")]
+    UnsupportedVersion { found: u32 },
+    #[error("Dataset semantic manifest must contain at least one column")]
+    EmptyColumns,
+    #[error("Dataset semantic manifest is missing the record id column")]
+    MissingRecordIdColumn,
+    #[error("Record id column must be named {expected}, found {found}")]
+    InvalidRecordIdReference { expected: String, found: String },
+    #[error("Record id column must be a uint64 system record id column")]
+    InvalidRecordIdColumn,
+    #[error("User column uses the reserved __ds_ prefix: {name}")]
+    ReservedUserColumn { name: String },
+    #[error("System column {name} is not valid in v1 dataset semantic manifests")]
+    InvalidSystemColumn { name: String },
+    #[error("Dataset semantic manifest v1 requires append_only=true")]
+    AppendOnlyRequired,
+    #[error("Arrow schema is missing manifest column: {name}")]
+    MissingArrowColumn { name: String },
+    #[error("Arrow schema has a column not declared in the manifest: {name}")]
+    UnexpectedArrowColumn { name: String },
+    #[error("Arrow type mismatch for {name}: expected {expected}, found {found}")]
+    ArrowTypeMismatch {
+        name: String,
+        expected: String,
+        found: String,
+    },
+}
