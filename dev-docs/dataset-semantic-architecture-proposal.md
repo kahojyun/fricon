@@ -4,6 +4,11 @@
 
 Proposed.
 
+The durable foundation decisions for `dataset_manifest.json`,
+`__ds_record_id`, the reserved `__ds_` prefix, v1 dtypes, plain Arrow storage,
+compatibility fallback, and the interpretation boundary are accepted in
+`dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`.
+
 This is not current behavior. Do not implement or document behavior from this
 proposal without checking current code, `dev-docs/current-storage-notes.md`, and
 the relevant checklist in `dev-docs/maintenance-checklist.md`.

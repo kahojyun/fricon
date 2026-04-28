@@ -76,3 +76,5 @@ of copying their full contents.
 
 - `0001-record-architecture-decisions.md` - establishes when and how this
   project records ADRs
+- `0002-decide-dataset-semantic-manifest-v1.md` - accepts the durable v1
+  dataset manifest, record ID, compatibility, and interpretation boundary
