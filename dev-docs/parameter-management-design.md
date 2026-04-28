@@ -760,6 +760,99 @@ match by path/name
 create new identities
 ```
 
+## Additional Design Constraints
+
+### Units And Display Values
+
+Units are a high-risk area because many scientific values remain numerically
+valid while their interpretation changes. The parameter schema should record a
+canonical unit for unit-bearing values, while UI and export layers may expose
+display units.
+
+Diffs should compare canonical values and canonical units. A display-only
+change such as `1000 Hz` to `1 kHz` should not appear as a scientific value
+change if the canonical value is unchanged.
+
+Changing a canonical unit or converting stored values should be an explicit
+schema or migration operation, not an incidental display preference.
+
+### Starting From Empty Or Rough Imports
+
+Users should not need to design a perfect schema before using the registry. A
+new workspace should be able to start from:
+
+```text
+empty draft
+JSON or YAML tree import
+CSV table import
+Python dictionary or list-of-dicts import
+manually entered tree paths and table rows
+```
+
+The registry may infer initial dtypes and mark them as inferred. Users can
+later refine units, constraints, descriptions, lifecycle status, table keys,
+and display metadata through normal drafts and commits.
+
+This keeps the standalone parameter system useful before experiment execution,
+device management, or workflow automation exists.
+
+### Snapshot Usage In Runs
+
+Run records need enough parameter information to reproduce or explain a run
+without making the parameter registry own run execution.
+
+Recommended staged strategy:
+
+```text
+MVP:
+  source profile/ref
+  resolved snapshot ID and hash
+  run-local parameters
+  runtime overrides
+  effective config hash or serialized effective config owned by the run system
+
+Later:
+  used-parameter manifest for impact analysis and stale-parameter detection
+```
+
+A full resolved parameter snapshot is simple and robust but may include values
+unused by a run. A used-parameter manifest is more precise but requires access
+tracing or explicit declaration. Treat used-parameter manifests as a later
+capability, not an MVP requirement.
+
+### Draft Conflicts
+
+The MVP does not need full Git-like merge, but it should define minimal conflict
+semantics for drafts based on the same snapshot.
+
+If two drafts modify the same tree parameter, table cell, table schema, or ref
+from the same base, updating the same profile/ref should require explicit
+resolution. If two drafts modify distinct slots, an automatic rebase can be a
+later convenience.
+
+Conflict resolution should produce an ordinary draft and commit, not a hidden
+mutation.
+
+### Structured Context Metadata
+
+Profile names may encode context, but names should not be the only place where
+scientific context lives. Snapshots, refs, proposals, or future run bindings may
+carry structured context such as:
+
+```text
+device
+sample
+cooldown
+campaign
+temperature_regime
+experiment_type
+simulation_model
+```
+
+Context metadata should identify or label parameter state; it should not make
+the parameter registry own sample records, device state, workflow definitions,
+or simulation artifacts.
+
 ## API Use Cases
 
 The parameter API should support direct use and system integration without
@@ -958,10 +1051,13 @@ Scope:
 - tree CRUD
 - table CRUD with required keys
 - basic schema metadata
+- rough tree/table import with inferred schema
+- canonical unit metadata and display-unit separation
 - stable `param_id`, `table_id`, and `column_id`
 - logical deletion and tombstones
 - snapshot-to-snapshot diff
 - selected diff apply to draft
+- minimal draft conflict detection
 
 Out of scope:
 
@@ -1014,6 +1110,8 @@ Scope:
 - Which parameter changes require human review before moving `main`?
 - How should parameter refs compose with future sample, device, cooldown, or
   workflow definitions?
+- Which structured context fields should be first-class versus free-form
+  metadata?
 - What belongs in parameter snapshots versus code, environment, device state,
   datasets, or run-local inputs?
 
@@ -1035,3 +1133,7 @@ Scope:
     dataset or artifact references, not embedded parameter values.
 11. The registry exposes bindings and validation for other systems, but
     run/execution systems own effective configs and device interaction.
+12. Unit-aware values need canonical storage semantics; display unit changes
+    should not masquerade as scientific value changes.
+13. Users can begin with rough imports and inferred schema, then refine
+    structure through normal draft and commit workflows.
