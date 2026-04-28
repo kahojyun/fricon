@@ -11,6 +11,10 @@ pub struct DatasetInterpretation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "resolved column flags are compatibility and UI-facing projections"
+)]
 pub struct ResolvedColumn {
     pub name: String,
     pub ordinal: usize,

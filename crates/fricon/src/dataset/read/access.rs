@@ -29,7 +29,7 @@ pub(crate) fn get_dataset_reader(
     // Prefer the active write session so reads observe in-progress data for a
     // dataset that has not yet been finalized to disk.
     if let Some(handle) = write_sessions.get(dataset.id) {
-        Ok(DatasetReader::from_handle(handle)?)
+        Ok(DatasetReader::from_handle(handle))
     } else {
         let path = paths.dataset_path_from_uid(dataset.uid);
         Ok(DatasetReader::open_dir(path)?)

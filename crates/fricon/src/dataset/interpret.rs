@@ -18,7 +18,7 @@ use crate::dataset::{
 
 pub(crate) fn resolve_from_manifest(
     arrow_schema: &Schema,
-    manifest: DatasetSemanticManifest,
+    manifest: &DatasetSemanticManifest,
 ) -> DatasetInterpretation {
     let columns: Vec<_> = arrow_schema
         .fields()
@@ -153,6 +153,7 @@ mod tests {
     };
     use crate::dataset::{
         interpret::resolve_from_compatibility_inference,
+        read::ReadError,
         schema::DatasetSchema,
         semantics::{
             DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, write_manifest,
@@ -171,7 +172,7 @@ mod tests {
             Field::new("signal", DataType::Float64, false),
         ]);
 
-        let interpretation = resolve_from_manifest(&schema, manifest);
+        let interpretation = resolve_from_manifest(&schema, &manifest);
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
@@ -368,10 +369,7 @@ mod tests {
             crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
         let error = reader.interpret().expect_err("schema mismatch");
 
-        assert!(matches!(
-            error,
-            crate::dataset::read::ReadError::Manifest(_)
-        ));
+        assert!(matches!(error, ReadError::Manifest(_)));
     }
 
     #[test]

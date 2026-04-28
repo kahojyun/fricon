@@ -201,15 +201,15 @@ fn select_data_owned(
 }
 
 impl DatasetReader {
-    pub(crate) fn from_handle(source: WriteSessionHandle) -> Result<Self, ReadError> {
+    pub(crate) fn from_handle(source: WriteSessionHandle) -> Self {
         let arrow_schema = source.schema();
         let schema = arrow_schema.as_ref().try_into().ok();
-        Ok(Self {
+        Self {
             source: DatasetSource::WriteSession(source),
             schema,
             arrow_schema,
             dataset_dir: None,
-        })
+        }
     }
 
     pub(crate) fn open_dir(path: PathBuf) -> Result<Self, ReadError> {
@@ -265,7 +265,7 @@ impl DatasetReader {
             manifest
                 .validate_against_arrow_schema(self.arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
-            return Ok(resolve_from_manifest(self.arrow_schema.as_ref(), manifest));
+            return Ok(resolve_from_manifest(self.arrow_schema.as_ref(), &manifest));
         }
 
         Ok(resolve_from_compatibility_inference(
