@@ -28,6 +28,39 @@ The target architecture should:
 - keep scalar, complex, and trace payload types as the primary description of
   column kind, with metadata used only for display and chart hints
 
+## Pre-Adoption Breaking Change Policy
+
+Fricon has not reached production adoption yet. Use that timing to clean up
+internal storage and semantic contracts now instead of preserving legacy
+inference paths as long-term architecture.
+
+Feature 1 may make breaking changes to workspace format, dataset payload
+layout, manifest requirements, protocol contracts, generated bindings, and
+desktop detail DTOs when those changes simplify the durable semantics model.
+When a compatibility bump is needed, make it explicit through the normal
+workspace, IPC, release, and maintenance checklists.
+
+Breaking changes are appropriate for:
+
+- making `dataset_manifest.json` mandatory for new datasets
+- materializing `__ds_record_id` in new datasets
+- reserving `__ds_` for Fricon-owned system fields
+- replacing Fricon Arrow extension metadata with plain Arrow physical schemas
+  plus manifest-owned semantics for new datasets
+- making resolved interpretation, not `isIndex`, the canonical consumer
+  contract
+- changing internal chunk layout, DTOs, or protocol versions when they would
+  otherwise preserve the wrong abstraction boundary
+
+Do not use pre-adoption cleanup as a reason to break the simple Python user
+model. Bare `write(col=...)` and first-row schema inference in minimal mode
+should keep working. Users should not need to author raw manifests, declare
+scan plans, or understand storage details for simple datasets.
+
+Compatibility fallback should exist to keep old fixtures and local test data
+readable during the transition. It should not constrain the new semantic model
+or remain the primary path for new datasets.
+
 ## Why Change
 
 Today the dataset stack has one strong property and one weak property:
