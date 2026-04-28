@@ -67,6 +67,8 @@ part of the foundation implementation.
 
 Manifest enums should use internally tagged JSON objects such as
 `{"kind": "none"}` rather than bare strings when a value may later need fields.
+Rust serde definitions should pin durable JSON names explicitly instead of
+depending on broad rename rules, especially for acronym-heavy dtype variants.
 Rust serde structs should keep optional sections defaultable and put invariant
 checks in explicit validation after deserialization. The durable format should
 not use `untagged` enums or broad `deny_unknown_fields` defaults.

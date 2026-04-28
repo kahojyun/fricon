@@ -105,11 +105,10 @@ impl DatasetSemanticManifest {
                         name: name.clone(),
                     });
                 }
-                Some(SystemColumn::RecordId) => {}
                 None if name.starts_with(SYSTEM_COLUMN_PREFIX) => {
                     return Err(ManifestValidationError::ReservedUserColumn { name: name.clone() });
                 }
-                None => {}
+                Some(SystemColumn::RecordId) | None => {}
             }
         }
 
@@ -148,18 +147,25 @@ impl ManifestColumn {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 pub enum DatasetDType {
+    #[serde(rename = "float64")]
     Float64,
+    #[serde(rename = "float32")]
     Float32,
+    #[serde(rename = "int64")]
     Int64,
     #[serde(rename = "uint64")]
     UInt64,
+    #[serde(rename = "bool")]
     Bool,
     #[serde(rename = "utf8")]
     Utf8,
+    #[serde(rename = "timestamp_us")]
     TimestampUs,
+    #[serde(rename = "complex128")]
     Complex128,
+    #[serde(rename = "trace")]
     Trace {
         layout: TraceLayout,
         axis: TraceAxisDType,
@@ -205,18 +211,24 @@ pub struct TraceDType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 pub enum TraceLayout {
+    #[serde(rename = "simple")]
     Simple,
+    #[serde(rename = "fixed_step")]
     FixedStep,
+    #[serde(rename = "variable_step")]
     VariableStep,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 pub enum TraceAxisDType {
+    #[serde(rename = "float64")]
     Float64,
+    #[serde(rename = "float32")]
     Float32,
+    #[serde(rename = "int64")]
     Int64,
     #[serde(rename = "uint64")]
     UInt64,
@@ -235,13 +247,17 @@ impl TraceAxisDType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 pub enum TraceValueDType {
+    #[serde(rename = "float64")]
     Float64,
+    #[serde(rename = "float32")]
     Float32,
+    #[serde(rename = "int64")]
     Int64,
     #[serde(rename = "uint64")]
     UInt64,
+    #[serde(rename = "complex128")]
     Complex128,
 }
 
@@ -278,23 +294,26 @@ impl Default for Realization {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 pub enum IndexRealization {
     #[default]
+    #[serde(rename = "none")]
     None,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 pub enum DuplicateResolutionDefault {
     #[default]
+    #[serde(rename = "latest_by_record_id")]
     LatestByRecordId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind")]
 pub enum SystemColumn {
     #[default]
+    #[serde(rename = "record_id")]
     RecordId,
 }
 
