@@ -187,7 +187,10 @@ impl From<ReadAppError> for Status {
                 error.to_string(),
             ),
             ReadAppError::Domain(
-                ReadError::Dataset(_) | ReadError::DatasetFs(_) | ReadError::Database(_),
+                ReadError::Dataset(_)
+                | ReadError::Manifest(_)
+                | ReadError::DatasetFs(_)
+                | ReadError::Database(_),
             ) => dataset_status(
                 Code::Internal,
                 DatasetTransportErrorCode::Internal,

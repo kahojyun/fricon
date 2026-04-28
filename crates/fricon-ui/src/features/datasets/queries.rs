@@ -1,4 +1,4 @@
-use fricon::{DatasetDataType, DatasetListQuery, dataset::model::DatasetId};
+use fricon::{DatasetDataType, DatasetListQuery, ReadAppError, dataset::model::DatasetId};
 
 use super::{
     error::UiDatasetError,
@@ -48,8 +48,8 @@ pub(crate) async fn get_dataset_detail(
     let payload_available = record.metadata.deleted_at.is_none();
     let columns = if payload_available {
         let reader = session.dataset(id).await?;
-        let schema = reader.schema();
-        let index = reader.index_columns();
+        let schema = reader.schema().map_err(ReadAppError::from)?;
+        let index = reader.try_index_columns().map_err(ReadAppError::from)?;
         schema
             .columns()
             .iter()

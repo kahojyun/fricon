@@ -19,10 +19,11 @@ pub use self::{
     app::{AppHandle, AppManager, CatalogAppError, IngestAppError, ReadAppError},
     client::{Client, ClientError, Dataset, DatasetWriter, ExistingUiProbeResult},
     dataset::{
-        DatasetArray, DatasetDataType, DatasetEvent, DatasetId, DatasetListQuery, DatasetMetadata,
-        DatasetReader, DatasetRecord, DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy,
-        DatasetStatus, DatasetUpdate, FixedStepTrace, ScalarArray, ScalarKind, SelectOptions,
-        SortDirection, TraceKind, VariableStepTrace,
+        ColumnMeaning, DatasetArray, DatasetDataType, DatasetEvent, DatasetId,
+        DatasetInterpretation, DatasetListQuery, DatasetMetadata, DatasetReader, DatasetRecord,
+        DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus, DatasetUpdate,
+        FixedStepTrace, InterpretationSource, ResolvedColumn, ResolvedDuplicatePolicy, ScalarArray,
+        ScalarKind, SelectOptions, SortDirection, TraceKind, VariableStepTrace,
     },
     workspace::{WorkspaceError, WorkspaceRoot, get_log_dir},
 };

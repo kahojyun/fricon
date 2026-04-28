@@ -164,8 +164,8 @@ pub(crate) async fn load_filter_data(
     exclude_columns: Option<Vec<String>>,
 ) -> Result<DataInternal> {
     let dataset = session.dataset(id).await?;
-    let schema = dataset.schema();
-    let index_columns = dataset.index_columns();
+    let schema = dataset.schema()?;
+    let index_columns = dataset.try_index_columns()?;
 
     let Some(index_col_indices) = index_columns else {
         return Ok(DataInternal::empty());

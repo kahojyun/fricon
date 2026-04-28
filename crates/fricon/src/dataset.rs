@@ -1,15 +1,21 @@
 pub mod catalog;
 pub mod events;
 pub mod ingest;
+pub mod interpret;
 pub mod model;
 pub mod portability;
 pub mod read;
 pub mod schema;
+pub mod semantics;
 pub mod storage;
 mod tag;
 
 pub use self::{
     events::DatasetEvent,
+    interpret::{
+        ColumnMeaning, DatasetInterpretation, InterpretationSource, ResolvedColumn,
+        ResolvedDuplicatePolicy,
+    },
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
         DatasetUpdate, SortDirection,
