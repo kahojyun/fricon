@@ -18,6 +18,7 @@ use crate::{
             WriteSessionRegistry,
         },
         model::{DatasetId, DatasetRecord, DatasetStatus},
+        semantics::{DatasetSemanticManifest, ManifestColumn, ManifestError, write_manifest},
         storage,
     },
     workspace::WorkspacePaths,
@@ -66,13 +67,32 @@ where
     events.publish(DatasetEvent::Created(dataset_record.clone()));
 
     let mut session = None;
+    let mut manifest_written = false;
     let terminal = loop {
         let Some(event) = next_input() else {
             break CreateDatasetInput::Abort;
         };
 
         match event {
+            CreateDatasetInput::Schema(schema) => {
+                if !manifest_written {
+                    if let Err(error) = write_minimal_manifest(&dataset_path, schema.as_ref()) {
+                        debug!(error = %error, "Failed to write dataset semantic manifest");
+                        let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
+                        return Err(error);
+                    }
+                    manifest_written = true;
+                }
+            }
             CreateDatasetInput::Batch(batch) => {
+                if !manifest_written {
+                    if let Err(error) = write_minimal_manifest(&dataset_path, batch.schema_ref()) {
+                        debug!(error = %error, "Failed to write dataset semantic manifest");
+                        let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
+                        return Err(error);
+                    }
+                    manifest_written = true;
+                }
                 let session_ref = session.get_or_insert_with(|| {
                     write_sessions.start_session(
                         dataset_record.id,
@@ -95,6 +115,11 @@ where
 
     match terminal {
         CreateDatasetInput::Finish => {
+            if !manifest_written && let Err(error) = write_empty_manifest(&dataset_path) {
+                debug!(error = %error, "Failed to write empty dataset semantic manifest");
+                let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
+                return Err(error);
+            }
             if let Some(session) = session.take()
                 && let Err(error) = session.finalize_session()
             {
@@ -120,7 +145,9 @@ where
             events.publish(DatasetEvent::StatusChanged(record.clone()));
             Ok(record)
         }
-        CreateDatasetInput::Batch(_) => unreachable!("batch cannot terminate dataset creation"),
+        CreateDatasetInput::Schema(_) | CreateDatasetInput::Batch(_) => {
+            unreachable!("non-terminal input cannot terminate dataset creation")
+        }
     }
 }
 
@@ -135,11 +162,27 @@ fn create_dataset_dir(paths: &WorkspacePaths, uid: Uuid) -> Result<PathBuf, Inge
     Ok(path)
 }
 
+fn write_minimal_manifest(
+    dataset_path: &std::path::Path,
+    schema: &arrow_schema::Schema,
+) -> Result<(), IngestError> {
+    let manifest =
+        DatasetSemanticManifest::minimal_from_arrow_schema(schema).map_err(ManifestError::from)?;
+    write_manifest(dataset_path, &manifest)?;
+    Ok(())
+}
+
+fn write_empty_manifest(dataset_path: &std::path::Path) -> Result<(), IngestError> {
+    let manifest = DatasetSemanticManifest::minimal(std::iter::empty::<(String, ManifestColumn)>());
+    write_manifest(dataset_path, &manifest)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::VecDeque, fs, sync::Mutex};
 
-    use arrow_array::{Int32Array, RecordBatch};
+    use arrow_array::{Float64Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
     use chrono::Utc;
     use tempfile::TempDir;
@@ -149,6 +192,11 @@ mod tests {
         dataset::{
             events::{DatasetEvent, test_utils::CollectEvents},
             model::{DatasetMetadata, DatasetStatus},
+            semantics::{
+                DatasetDType, ManifestError, ManifestValidationError, RECORD_ID_COLUMN,
+                read_manifest,
+            },
+            storage::layout::manifest_path,
         },
         workspace::WorkspaceRoot,
     };
@@ -244,10 +292,24 @@ mod tests {
     }
 
     fn one_col_batch() -> RecordBatch {
-        let schema =
-            std::sync::Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
-        RecordBatch::try_new(schema, vec![std::sync::Arc::new(Int32Array::from(vec![1]))])
-            .expect("batch")
+        let schema = std::sync::Arc::new(Schema::new(vec![Field::new(
+            "id",
+            DataType::Float64,
+            false,
+        )]));
+        RecordBatch::try_new(
+            schema,
+            vec![std::sync::Arc::new(Float64Array::from(vec![1.0]))],
+        )
+        .expect("batch")
+    }
+
+    fn one_col_schema() -> std::sync::Arc<Schema> {
+        std::sync::Arc::new(Schema::new(vec![Field::new(
+            "id",
+            DataType::Float64,
+            false,
+        )]))
     }
 
     #[test]
@@ -277,6 +339,15 @@ mod tests {
             [DatasetEvent::Created(created), DatasetEvent::StatusChanged(status)]
             if created.id == record.id && status.id == record.id
         ));
+        let manifest = read_manifest(manifest_path(
+            &paths.dataset_path_from_uid(repo.created_uid()),
+        ))
+        .expect("read manifest");
+        assert_eq!(manifest.columns.len(), 1);
+        assert_eq!(
+            manifest.columns[RECORD_ID_COLUMN].dtype,
+            DatasetDType::UInt64
+        );
     }
 
     #[test]
@@ -342,6 +413,90 @@ mod tests {
                 && progress.id == record.id
                 && progress.row_count == 1
                 && status.id == record.id
+        ));
+
+        let manifest = read_manifest(manifest_path(
+            &paths.dataset_path_from_uid(repo.created_uid()),
+        ))
+        .expect("read manifest");
+        assert_eq!(
+            manifest.columns[RECORD_ID_COLUMN].dtype,
+            DatasetDType::UInt64
+        );
+        assert_eq!(manifest.columns["id"].dtype, DatasetDType::Float64);
+        assert!(manifest.realization.append_only);
+        assert!(manifest.compatibility.allow_inference);
+    }
+
+    #[test]
+    fn finish_after_schema_writes_manifest_without_batches() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
+        let paths = workspace.paths().clone();
+        let repo = FakeRepo::new();
+        let events = CollectEvents::default();
+        let write_sessions = WriteSessionRegistry::new();
+        let mut inputs = VecDeque::from(vec![
+            CreateDatasetInput::Schema(one_col_schema()),
+            CreateDatasetInput::Finish,
+        ]);
+
+        let record = create_dataset_with(
+            &repo,
+            &paths,
+            &events,
+            &write_sessions,
+            &create_request(),
+            || inputs.pop_front(),
+        )
+        .expect("create dataset");
+
+        assert_eq!(record.metadata.status, DatasetStatus::Completed);
+        let manifest = read_manifest(manifest_path(
+            &paths.dataset_path_from_uid(repo.created_uid()),
+        ))
+        .expect("read manifest");
+        assert_eq!(manifest.columns["id"].dtype, DatasetDType::Float64);
+        assert_eq!(
+            manifest.columns[RECORD_ID_COLUMN].dtype,
+            DatasetDType::UInt64
+        );
+    }
+
+    #[test]
+    fn reserved_system_prefix_schema_aborts_and_returns_error() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
+        let paths = workspace.paths().clone();
+        let repo = FakeRepo::new();
+        let events = CollectEvents::default();
+        let write_sessions = WriteSessionRegistry::new();
+        let schema = std::sync::Arc::new(Schema::new(vec![Field::new(
+            "__ds_user",
+            DataType::Float64,
+            false,
+        )]));
+        let mut inputs = VecDeque::from(vec![
+            CreateDatasetInput::Schema(schema),
+            CreateDatasetInput::Finish,
+        ]);
+
+        let error = create_dataset_with(
+            &repo,
+            &paths,
+            &events,
+            &write_sessions,
+            &create_request(),
+            || inputs.pop_front(),
+        )
+        .expect_err("reserved prefix should fail");
+
+        assert_eq!(repo.updated_statuses(), vec![DatasetStatus::Aborted]);
+        assert!(matches!(
+            error,
+            IngestError::Manifest(ManifestError::Validation(
+                ManifestValidationError::ReservedUserColumn { name }
+            )) if name == "__ds_user"
         ));
     }
 

@@ -12,13 +12,9 @@ as stable user-facing documentation. Public docs should describe workspaces and
 datasets through the CLI, Python API, and desktop UI rather than through the
 on-disk layout.
 
-Dataset semantics proposal documents describe future direction, not current
-storage facts. Use this file as the current source of truth until those
-proposals are implemented and this note is updated.
-
-The accepted future foundation for dataset semantic manifests is recorded in
-`dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`; it is not current
-storage behavior until implementation lands.
+Dataset semantics proposal documents describe long-term direction. Use this
+file as the current source of truth for implemented storage facts, including
+the current v1 dataset semantic manifest sidecar.
 
 ## Workspace Layout
 
@@ -33,6 +29,7 @@ workspace/
     .graveyard/
     <uid[0:2]>/
       <uid>/
+        dataset_manifest.json
         data_chunk_0.arrow
         data_chunk_1.arrow
   backup/
@@ -58,6 +55,13 @@ Current dataset payloads are chunked [Arrow IPC][] files under the dataset
 directory. A dataset is modeled as one logical Arrow table split across
 `data_chunk_<n>.arrow` files as needed.
 
+New datasets created through ingest also store `dataset_manifest.json` beside
+the chunk files. The manifest records v1 dataset semantic columns, realization
+defaults, and compatibility settings. During the transition before physical
+record-id materialization, the manifest may declare the Fricon-owned
+`__ds_record_id` system column even when the Arrow chunks do not yet contain
+that physical column.
+
 The physical storage layout is an implementation detail. User-facing docs may
 mention Arrow-compatible tables, but should avoid promising exact file names,
 chunking behavior, or directory structure.
@@ -68,8 +72,8 @@ Current dataset catalog metadata lives in SQLite. This includes dataset name,
 description, favorite state, status, timestamps, and tags as represented by
 `DatasetRecord` / `DatasetMetadata`.
 
-Dataset payload facts live in Arrow chunk files. Future semantic manifest files
-described by the dataset semantic proposal docs are not current behavior.
+Dataset payload facts live in Arrow chunk files. Dataset semantic defaults and
+compatibility settings for new ingested datasets live in `dataset_manifest.json`.
 
 ## Write Buffering
 

@@ -13,6 +13,7 @@ mod session;
 mod storage;
 
 use arrow_array::RecordBatch;
+use arrow_schema::SchemaRef;
 use uuid::Uuid;
 
 pub use self::error::IngestError;
@@ -61,6 +62,7 @@ pub(crate) struct CreateDatasetRequest {
 /// the dataset in `Aborted` status.
 #[derive(Debug)]
 pub(crate) enum CreateDatasetInput {
+    Schema(SchemaRef),
     Batch(RecordBatch),
     Finish,
     Abort,

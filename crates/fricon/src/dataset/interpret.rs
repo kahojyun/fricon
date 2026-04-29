@@ -296,6 +296,40 @@ mod tests {
     }
 
     #[test]
+    fn reader_interpretation_accepts_manifest_before_record_id_materialization() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "signal",
+            DataType::Float64,
+            false,
+        )]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(schema, vec![Arc::new(Float64Array::from(vec![10.0, 20.0]))])
+                    .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        write_manifest(
+            dir.path(),
+            &DatasetSemanticManifest::minimal([(
+                "signal".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            )]),
+        )
+        .expect("write manifest");
+
+        let reader =
+            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
+        let interpretation = reader.interpret().expect("interpretation");
+
+        assert_eq!(interpretation.source, InterpretationSource::Manifest);
+        assert_eq!(interpretation.value_columns, vec![0]);
+        assert_eq!(interpretation.columns[0].meaning, ColumnMeaning::UserValue);
+    }
+
+    #[test]
     fn reader_interpretation_supports_manifest_dtypes_outside_legacy_schema() {
         let dir = tempfile::tempdir().expect("temp dir");
         let schema = Arc::new(Schema::new(vec![

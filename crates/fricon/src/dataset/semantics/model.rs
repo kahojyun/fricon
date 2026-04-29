@@ -30,6 +30,21 @@ impl DatasetSemanticManifest {
         }
     }
 
+    pub fn minimal_from_arrow_schema(schema: &Schema) -> Result<Self, ManifestValidationError> {
+        let columns = schema
+            .fields()
+            .iter()
+            .map(|field| {
+                let name = field.name().clone();
+                let dtype = DatasetDType::try_from_arrow_field(field.as_ref())?;
+                Ok((name, ManifestColumn::new(dtype)))
+            })
+            .collect::<Result<Vec<_>, ManifestValidationError>>()?;
+        let manifest = Self::minimal(columns);
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
     pub fn validate(&self) -> Result<(), ManifestValidationError> {
         if self.manifest_version != MANIFEST_VERSION_V1 {
             return Err(ManifestValidationError::UnsupportedVersion {
@@ -58,6 +73,14 @@ impl DatasetSemanticManifest {
         self.validate()?;
 
         for (name, column) in &self.columns {
+            if column.system == Some(SystemColumn::RecordId)
+                && name == RECORD_ID_COLUMN
+                && schema.field_with_name(name).is_err()
+            {
+                // Temporary compatibility for manifest-only record IDs. Issue
+                // #478 will materialize this column into Arrow payloads.
+                continue;
+            }
             let field = schema
                 .field_with_name(name)
                 .map_err(|_| ManifestValidationError::MissingArrowColumn { name: name.clone() })?;
@@ -199,6 +222,54 @@ impl DatasetDType {
                 axis,
                 value,
             } => trace_data_type(*layout, *axis, *value),
+        }
+    }
+
+    fn try_from_arrow_field(field: &Field) -> Result<Self, ManifestValidationError> {
+        if field.name().starts_with(SYSTEM_COLUMN_PREFIX) {
+            return Err(ManifestValidationError::ReservedUserColumn {
+                name: field.name().clone(),
+            });
+        }
+        if field.is_nullable() {
+            return Err(ManifestValidationError::ArrowTypeMismatch {
+                name: field.name().clone(),
+                expected: "non-null supported v1 dataset dtype".to_string(),
+                found: format!("nullable {}", field.data_type()),
+            });
+        }
+        Self::try_from_arrow_data_type(field.name(), field.data_type())
+    }
+
+    fn try_from_arrow_data_type(
+        name: &str,
+        data_type: &DataType,
+    ) -> Result<Self, ManifestValidationError> {
+        match try_trace_dtype(data_type) {
+            Ok(Some(dtype)) => return Ok(Self::trace(dtype)),
+            Ok(None) => {}
+            Err(_) => {
+                return Err(ManifestValidationError::UnsupportedArrowType {
+                    name: name.to_string(),
+                    found: data_type.to_string(),
+                });
+            }
+        }
+        if *data_type == complex128_data_type() {
+            return Ok(Self::Complex128);
+        }
+        match data_type {
+            DataType::Float64 => Ok(Self::Float64),
+            DataType::Float32 => Ok(Self::Float32),
+            DataType::Int64 => Ok(Self::Int64),
+            DataType::UInt64 => Ok(Self::UInt64),
+            DataType::Boolean => Ok(Self::Bool),
+            DataType::Utf8 => Ok(Self::Utf8),
+            DataType::Timestamp(TimeUnit::Microsecond, None) => Ok(Self::TimestampUs),
+            _ => Err(ManifestValidationError::UnsupportedArrowType {
+                name: name.to_string(),
+                found: data_type.to_string(),
+            }),
         }
     }
 }
@@ -363,11 +434,123 @@ fn complex128_data_type() -> DataType {
     )
 }
 
+fn try_trace_dtype(data_type: &DataType) -> Result<Option<TraceDType>, ManifestValidationError> {
+    match data_type {
+        DataType::List(value) => {
+            if value.is_nullable() {
+                return Err(ManifestValidationError::ArrowTypeMismatch {
+                    name: "trace value".to_string(),
+                    expected: "non-null trace value".to_string(),
+                    found: format!("nullable {}", value.data_type()),
+                });
+            }
+            let value = trace_value_dtype(value.data_type())?;
+            Ok(Some(TraceDType {
+                layout: TraceLayout::Simple,
+                axis: TraceAxisDType::Float64,
+                value,
+            }))
+        }
+        DataType::Struct(fields) => try_struct_trace_dtype(fields),
+        _ => Ok(None),
+    }
+}
+
+fn try_struct_trace_dtype(
+    fields: &arrow_schema::Fields,
+) -> Result<Option<TraceDType>, ManifestValidationError> {
+    match fields.as_ref() {
+        [x0, step, y]
+            if x0.name() == "x0"
+                && step.name() == "step"
+                && y.name() == "y"
+                && !x0.is_nullable()
+                && !step.is_nullable()
+                && !y.is_nullable() =>
+        {
+            let axis = trace_axis_dtype(x0.data_type())?;
+            if step.data_type() != x0.data_type() {
+                return Ok(None);
+            }
+            let DataType::List(value) = y.data_type() else {
+                return Ok(None);
+            };
+            if value.is_nullable() {
+                return Err(ManifestValidationError::ArrowTypeMismatch {
+                    name: "trace value".to_string(),
+                    expected: "non-null trace value".to_string(),
+                    found: format!("nullable {}", value.data_type()),
+                });
+            }
+            Ok(Some(TraceDType {
+                layout: TraceLayout::FixedStep,
+                axis,
+                value: trace_value_dtype(value.data_type())?,
+            }))
+        }
+        [x, y] if x.name() == "x" && y.name() == "y" && !x.is_nullable() && !y.is_nullable() => {
+            let (DataType::List(axis), DataType::List(value)) = (x.data_type(), y.data_type())
+            else {
+                return Ok(None);
+            };
+            if axis.is_nullable() {
+                return Err(ManifestValidationError::ArrowTypeMismatch {
+                    name: "trace axis".to_string(),
+                    expected: "non-null trace axis".to_string(),
+                    found: format!("nullable {}", axis.data_type()),
+                });
+            }
+            if value.is_nullable() {
+                return Err(ManifestValidationError::ArrowTypeMismatch {
+                    name: "trace value".to_string(),
+                    expected: "non-null trace value".to_string(),
+                    found: format!("nullable {}", value.data_type()),
+                });
+            }
+            Ok(Some(TraceDType {
+                layout: TraceLayout::VariableStep,
+                axis: trace_axis_dtype(axis.data_type())?,
+                value: trace_value_dtype(value.data_type())?,
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn trace_axis_dtype(data_type: &DataType) -> Result<TraceAxisDType, ManifestValidationError> {
+    match data_type {
+        DataType::Float64 => Ok(TraceAxisDType::Float64),
+        DataType::Float32 => Ok(TraceAxisDType::Float32),
+        DataType::Int64 => Ok(TraceAxisDType::Int64),
+        DataType::UInt64 => Ok(TraceAxisDType::UInt64),
+        _ => Err(ManifestValidationError::UnsupportedArrowType {
+            name: "trace axis".to_string(),
+            found: data_type.to_string(),
+        }),
+    }
+}
+
+fn trace_value_dtype(data_type: &DataType) -> Result<TraceValueDType, ManifestValidationError> {
+    if *data_type == complex128_data_type() {
+        return Ok(TraceValueDType::Complex128);
+    }
+    match data_type {
+        DataType::Float64 => Ok(TraceValueDType::Float64),
+        DataType::Float32 => Ok(TraceValueDType::Float32),
+        DataType::Int64 => Ok(TraceValueDType::Int64),
+        DataType::UInt64 => Ok(TraceValueDType::UInt64),
+        _ => Err(ManifestValidationError::UnsupportedArrowType {
+            name: "trace value".to_string(),
+            found: data_type.to_string(),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
-    use arrow_schema::{DataType, Field, Schema};
+    use arrow_schema::{DataType, Field, Schema, TimeUnit};
     use serde_json::json;
 
     use super::{
@@ -557,6 +740,102 @@ mod tests {
         manifest
             .validate_against_arrow_schema(&schema)
             .expect("schema should match manifest");
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_records_supported_user_columns() {
+        let schema = Schema::new(vec![
+            Field::new("float", DataType::Float32, false),
+            Field::new("count", DataType::Int64, false),
+            Field::new("flag", DataType::Boolean, false),
+            Field::new("label", DataType::Utf8, false),
+            Field::new(
+                "time",
+                DataType::Timestamp(TimeUnit::Microsecond, None),
+                false,
+            ),
+            Field::new(
+                "trace",
+                DatasetDType::trace(TraceDType {
+                    layout: TraceLayout::VariableStep,
+                    axis: TraceAxisDType::UInt64,
+                    value: TraceValueDType::Float64,
+                })
+                .physical_data_type(),
+                false,
+            ),
+        ]);
+
+        let manifest =
+            DatasetSemanticManifest::minimal_from_arrow_schema(&schema).expect("manifest");
+
+        assert_eq!(manifest.columns["float"].dtype, DatasetDType::Float32);
+        assert_eq!(manifest.columns["count"].dtype, DatasetDType::Int64);
+        assert_eq!(manifest.columns["flag"].dtype, DatasetDType::Bool);
+        assert_eq!(manifest.columns["label"].dtype, DatasetDType::Utf8);
+        assert_eq!(manifest.columns["time"].dtype, DatasetDType::TimestampUs);
+        assert_eq!(
+            manifest.columns["trace"].dtype,
+            DatasetDType::trace(TraceDType {
+                layout: TraceLayout::VariableStep,
+                axis: TraceAxisDType::UInt64,
+                value: TraceValueDType::Float64,
+            })
+        );
+        assert_eq!(
+            manifest.columns.get(RECORD_ID_COLUMN),
+            Some(&ManifestColumn::record_id())
+        );
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_rejects_reserved_user_prefix() {
+        let schema = Schema::new(vec![Field::new("__ds_user", DataType::Float64, false)]);
+
+        assert_eq!(
+            DatasetSemanticManifest::minimal_from_arrow_schema(&schema),
+            Err(ManifestValidationError::ReservedUserColumn {
+                name: "__ds_user".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_rejects_unsupported_arrow_type() {
+        let schema = Schema::new(vec![Field::new("small", DataType::Int32, false)]);
+
+        assert_eq!(
+            DatasetSemanticManifest::minimal_from_arrow_schema(&schema),
+            Err(ManifestValidationError::UnsupportedArrowType {
+                name: "small".to_string(),
+                found: "Int32".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_reports_list_type_with_user_column_name() {
+        let schema = Schema::new(vec![Field::new(
+            "flags",
+            DataType::new_list(DataType::Boolean, false),
+            false,
+        )]);
+
+        assert!(matches!(
+            DatasetSemanticManifest::minimal_from_arrow_schema(&schema),
+            Err(ManifestValidationError::UnsupportedArrowType { name, found })
+                if name == "flags" && found.contains("Boolean")
+        ));
+    }
+
+    #[test]
+    fn validate_against_arrow_schema_allows_temporarily_missing_record_id() {
+        let manifest = DatasetSemanticManifest::minimal(signal_columns());
+        let schema = Schema::new(vec![Field::new("signal", DataType::Float64, false)]);
+
+        manifest
+            .validate_against_arrow_schema(&schema)
+            .expect("record id is manifest-only until materialization lands");
     }
 
     #[test]
