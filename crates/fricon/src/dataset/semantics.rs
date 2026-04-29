@@ -1,7 +1,11 @@
 mod error;
 mod io;
+mod materialize;
 mod model;
 
+pub(crate) use self::materialize::{
+    is_hidden_system_column, materialize_record_ids, materialized_schema,
+};
 pub use self::{
     error::{ManifestError, ManifestValidationError},
     io::{read_manifest, read_manifest_optional, write_manifest},

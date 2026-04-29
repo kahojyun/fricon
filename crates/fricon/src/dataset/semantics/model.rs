@@ -73,30 +73,32 @@ impl DatasetSemanticManifest {
         self.validate()?;
 
         for (name, column) in &self.columns {
-            if column.system == Some(SystemColumn::RecordId)
-                && name == RECORD_ID_COLUMN
-                && schema.field_with_name(name).is_err()
-            {
-                // Temporary compatibility for manifest-only record IDs. Issue
-                // #478 will materialize this column into Arrow payloads.
-                continue;
-            }
             let field = schema
                 .field_with_name(name)
                 .map_err(|_| ManifestValidationError::MissingArrowColumn { name: name.clone() })?;
             let expected = column.dtype.physical_data_type();
-            if field.data_type() != &expected {
-                return Err(ManifestValidationError::ArrowTypeMismatch {
-                    name: name.clone(),
-                    expected: expected.to_string(),
-                    found: field.data_type().to_string(),
-                });
-            }
             if field.is_nullable() {
                 return Err(ManifestValidationError::ArrowTypeMismatch {
                     name: name.clone(),
                     expected: format!("non-null {expected}"),
                     found: format!("nullable {}", field.data_type()),
+                });
+            }
+            if column.system == Some(SystemColumn::RecordId) {
+                if field.data_type() != &expected {
+                    return Err(ManifestValidationError::ArrowTypeMismatch {
+                        name: name.clone(),
+                        expected: expected.to_string(),
+                        found: field.data_type().to_string(),
+                    });
+                }
+            } else if DatasetDType::try_from_arrow_data_type(field.name(), field.data_type())?
+                != column.dtype
+            {
+                return Err(ManifestValidationError::ArrowTypeMismatch {
+                    name: name.clone(),
+                    expected: expected.to_string(),
+                    found: field.data_type().to_string(),
                 });
             }
         }
@@ -829,13 +831,15 @@ mod tests {
     }
 
     #[test]
-    fn validate_against_arrow_schema_allows_temporarily_missing_record_id() {
+    fn validate_against_arrow_schema_rejects_missing_record_id() {
         let manifest = DatasetSemanticManifest::minimal(signal_columns());
         let schema = Schema::new(vec![Field::new("signal", DataType::Float64, false)]);
 
-        manifest
-            .validate_against_arrow_schema(&schema)
-            .expect("record id is manifest-only until materialization lands");
+        assert!(matches!(
+            manifest.validate_against_arrow_schema(&schema),
+            Err(ManifestValidationError::MissingArrowColumn { name })
+                if name == RECORD_ID_COLUMN
+        ));
     }
 
     #[test]

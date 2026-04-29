@@ -285,6 +285,9 @@ mod tests {
 
         let reader =
             crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
+        assert_eq!(reader.schema().expect("visible schema").columns().len(), 1);
+        assert_eq!(reader.arrow_schema().fields().len(), 1);
+        assert_eq!(reader.batches()[0].num_columns(), 1);
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
@@ -296,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn reader_interpretation_accepts_manifest_before_record_id_materialization() {
+    fn reader_interpretation_rejects_manifest_before_record_id_materialization() {
         let dir = tempfile::tempdir().expect("temp dir");
         let schema = Arc::new(Schema::new(vec![Field::new(
             "signal",
@@ -320,13 +323,11 @@ mod tests {
         )
         .expect("write manifest");
 
-        let reader =
-            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
-        let interpretation = reader.interpret().expect("interpretation");
-
-        assert_eq!(interpretation.source, InterpretationSource::Manifest);
-        assert_eq!(interpretation.value_columns, vec![0]);
-        assert_eq!(interpretation.columns[0].meaning, ColumnMeaning::UserValue);
+        let error = match crate::dataset::DatasetReader::open_dir(dir.path().to_owned()) {
+            Ok(_) => panic!("reader should reject manifest-only record ids"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, ReadError::Manifest(_)));
     }
 
     #[test]
@@ -399,9 +400,10 @@ mod tests {
         )
         .expect("write manifest");
 
-        let reader =
-            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
-        let error = reader.interpret().expect_err("schema mismatch");
+        let error = match crate::dataset::DatasetReader::open_dir(dir.path().to_owned()) {
+            Ok(_) => panic!("reader should reject manifest schema mismatch"),
+            Err(error) => error,
+        };
 
         assert!(matches!(error, ReadError::Manifest(_)));
     }
