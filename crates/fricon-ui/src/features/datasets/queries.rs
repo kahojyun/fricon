@@ -1,4 +1,10 @@
-use fricon::{DatasetDataType, DatasetListQuery, ReadAppError, dataset::model::DatasetId};
+use fricon::{
+    DatasetListQuery, ReadAppError, ResolvedColumn,
+    dataset::{
+        model::DatasetId,
+        semantics::{DatasetDType, TraceValueDType},
+    },
+};
 
 use super::{
     error::UiDatasetError,
@@ -48,18 +54,12 @@ pub(crate) async fn get_dataset_detail(
     let payload_available = record.metadata.deleted_at.is_none();
     let columns = if payload_available {
         let reader = session.dataset(id).await?;
-        let schema = reader.schema().map_err(ReadAppError::from)?;
-        let index = reader.try_index_columns().map_err(ReadAppError::from)?;
-        schema
-            .columns()
+        reader
+            .interpret()
+            .map_err(ReadAppError::from)?
+            .columns
             .iter()
-            .enumerate()
-            .map(|(i, (name, data_type))| ColumnInfo {
-                name: name.to_owned(),
-                is_complex: data_type.is_complex(),
-                is_trace: matches!(data_type, DatasetDataType::Trace(_, _)),
-                is_index: index.as_ref().is_some_and(|index| index.contains(&i)),
-            })
+            .filter_map(column_info_from_resolved_column)
             .collect()
     } else {
         Vec::new()
@@ -80,6 +80,27 @@ pub(crate) async fn get_dataset_detail(
     })
 }
 
+fn column_info_from_resolved_column(column: &ResolvedColumn) -> Option<ColumnInfo> {
+    column.visible_ordinal?;
+    Some(ColumnInfo {
+        name: column.name.clone(),
+        is_complex: dtype_is_complex(&column.dtype),
+        is_trace: matches!(column.dtype, DatasetDType::Trace { .. }),
+        is_index: column.is_index,
+    })
+}
+
+fn dtype_is_complex(dtype: &DatasetDType) -> bool {
+    matches!(
+        dtype,
+        DatasetDType::Complex128
+            | DatasetDType::Trace {
+                value: TraceValueDType::Complex128,
+                ..
+            }
+    )
+}
+
 pub(crate) async fn get_dataset_write_status(
     session: &WorkspaceSession,
     id: i32,
@@ -91,11 +112,167 @@ pub(crate) async fn get_dataset_write_status(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_non_negative;
+    use std::{fs::File, sync::Arc};
+
+    use arrow_array::{Float64Array, RecordBatch};
+    use arrow_ipc::writer::FileWriter;
+    use arrow_schema::{DataType, Field, Schema};
+    use fricon::{
+        AppManager, Client, DatasetRow, DatasetScalar, ScalarArray, WorkspaceRoot,
+        workspace::WorkspacePaths,
+    };
+    use indexmap::IndexMap;
+    use num::complex::Complex64;
+    use tempfile::TempDir;
+
+    use super::{get_dataset_detail, validate_non_negative};
+    use crate::desktop_runtime::session::WorkspaceSession;
 
     #[test]
     fn validate_non_negative_rejects_negative_values() {
         let error = validate_non_negative(Some(-1), "limit").expect_err("expected error");
         assert_eq!(error.to_string(), "limit must be non-negative");
+    }
+
+    #[tokio::test]
+    async fn get_dataset_detail_uses_manifest_interpretation_without_exposing_record_id()
+    -> anyhow::Result<()> {
+        let (_temp_dir, _app_manager, session, dataset_id) =
+            create_manifest_dataset(manifest_rows()).await?;
+
+        let detail = get_dataset_detail(&session, dataset_id).await?;
+
+        assert_eq!(detail.columns.len(), 3);
+        assert_eq!(detail.columns[0].name, "signal");
+        assert!(!detail.columns[0].is_index);
+        assert!(!detail.columns[0].is_trace);
+        assert!(!detail.columns[0].is_complex);
+        assert_eq!(detail.columns[1].name, "trace");
+        assert!(!detail.columns[1].is_index);
+        assert!(detail.columns[1].is_trace);
+        assert!(!detail.columns[1].is_complex);
+        assert_eq!(detail.columns[2].name, "complex");
+        assert!(!detail.columns[2].is_index);
+        assert!(!detail.columns[2].is_trace);
+        assert!(detail.columns[2].is_complex);
+        assert!(
+            !detail
+                .columns
+                .iter()
+                .any(|column| column.name == "__ds_record_id")
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_dataset_detail_uses_legacy_interpretation_when_manifest_is_absent()
+    -> anyhow::Result<()> {
+        let (_temp_dir, _app_manager, session, dataset_id) = create_legacy_dataset().await?;
+
+        let detail = get_dataset_detail(&session, dataset_id).await?;
+
+        assert_eq!(detail.columns.len(), 3);
+        assert_eq!(detail.columns[0].name, "run");
+        assert!(detail.columns[0].is_index);
+        assert!(!detail.columns[0].is_trace);
+        assert!(!detail.columns[0].is_complex);
+        assert_eq!(detail.columns[1].name, "step");
+        assert!(detail.columns[1].is_index);
+        assert!(!detail.columns[1].is_trace);
+        assert!(!detail.columns[1].is_complex);
+        assert_eq!(detail.columns[2].name, "value");
+        assert!(!detail.columns[2].is_index);
+        assert!(!detail.columns[2].is_trace);
+        assert!(!detail.columns[2].is_complex);
+
+        Ok(())
+    }
+
+    async fn create_manifest_dataset(
+        rows: Vec<DatasetRow>,
+    ) -> anyhow::Result<(TempDir, AppManager, WorkspaceSession, i32)> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let schema = rows[0].to_schema();
+        let mut writer = client
+            .create_dataset(
+                "manifest-detail-test".to_string(),
+                String::new(),
+                vec!["test".to_string()],
+                schema,
+            )
+            .await?;
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+        Ok((temp_dir, app_manager, session, dataset.id()))
+    }
+
+    async fn create_legacy_dataset() -> anyhow::Result<(TempDir, AppManager, WorkspaceSession, i32)>
+    {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager = AppManager::new_with_path(temp_dir.path())?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let record = session
+            .app()
+            .create_empty_dataset("legacy-detail-test".to_string(), String::new(), vec![])
+            .await?;
+        let dataset_dir =
+            WorkspacePaths::new(temp_dir.path()).dataset_path_from_uid(record.metadata.uid);
+        std::fs::remove_file(dataset_dir.join("dataset_manifest.json"))?;
+        write_legacy_arrow_chunk(&dataset_dir)?;
+
+        Ok((temp_dir, app_manager, session, record.id))
+    }
+
+    fn write_legacy_arrow_chunk(dataset_dir: &std::path::Path) -> anyhow::Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("run", DataType::Float64, false),
+            Field::new("step", DataType::Float64, false),
+            Field::new("value", DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Float64Array::from(vec![1.0, 1.0])),
+                Arc::new(Float64Array::from(vec![0.0, 1.0])),
+                Arc::new(Float64Array::from(vec![10.0, 20.0])),
+            ],
+        )?;
+        let mut writer = FileWriter::try_new(
+            File::create(dataset_dir.join("data_chunk_0.arrow"))?,
+            &schema,
+        )?;
+        writer.write(&batch)?;
+        writer.finish()?;
+        Ok(())
+    }
+
+    fn manifest_rows() -> Vec<DatasetRow> {
+        vec![
+            manifest_row(1.0, &[1.0, 2.0], Complex64::new(1.0, 2.0)),
+            manifest_row(2.0, &[3.0, 4.0], Complex64::new(3.0, 4.0)),
+        ]
+    }
+
+    fn manifest_row(signal: f64, trace: &[f64], complex: Complex64) -> DatasetRow {
+        DatasetRow(IndexMap::from([
+            ("signal".to_string(), DatasetScalar::Numeric(signal)),
+            (
+                "trace".to_string(),
+                DatasetScalar::SimpleTrace(trace.iter().copied().collect::<ScalarArray>()),
+            ),
+            ("complex".to_string(), DatasetScalar::Complex(complex)),
+        ]))
     }
 }
