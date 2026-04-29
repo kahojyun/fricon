@@ -84,6 +84,8 @@ This file describes proposed future direction. Do not treat it as current
 implementation fact unless the implementation has already landed.
 
 - `dataset-semantic-architecture-proposal.md`
+- `experiment-run-and-runner-design.md` - proposed experiment run, generic
+  runner, retry/resume, resource lease, and dataset write provenance model
 - `future-concepts.md` - lightweight ledger for useful but not-yet-designed
   experiment, workflow, device, calibration, and AI concepts
 - `parameter-management-design.md` - proposed long-term versioned parameter
