@@ -667,6 +667,7 @@ mod tests {
         events::{DatasetEvent, test_utils::CollectEvents},
         model::{DatasetId, DatasetMetadata, DatasetStatus},
         portability,
+        storage::layout::MANIFEST_FILENAME,
     };
 
     fn dataset_record(id: i32, uid: Uuid) -> DatasetRecord {
@@ -687,9 +688,21 @@ mod tests {
     }
 
     fn create_import_archive(root: &Path, uid: Uuid, name: &str) -> std::path::PathBuf {
+        create_import_archive_with_manifest(root, uid, name, None)
+    }
+
+    fn create_import_archive_with_manifest(
+        root: &Path,
+        uid: Uuid,
+        name: &str,
+        manifest: Option<&[u8]>,
+    ) -> std::path::PathBuf {
         let source_dir = root.join("source");
         fs::create_dir_all(&source_dir).expect("source dir");
         fs::write(source_dir.join("data_chunk_0.arrow"), b"NEW").expect("source payload");
+        if let Some(manifest) = manifest {
+            fs::write(source_dir.join(MANIFEST_FILENAME), manifest).expect("source manifest");
+        }
         let metadata = DatasetMetadata {
             uid,
             name: name.to_string(),
@@ -934,6 +947,70 @@ mod tests {
             !export_dir.exists(),
             "export directory should not be created when export is rejected"
         );
+    }
+
+    #[test]
+    fn import_dataset_promotes_manifest_sidecar() {
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let paths = WorkspacePaths::new(temp_dir.path());
+        let uid = Uuid::new_v4();
+        let archive =
+            create_import_archive_with_manifest(temp_dir.path(), uid, "with-manifest", Some(b"{}"));
+        let live_dir = paths.dataset_path_from_uid(uid);
+        let imported_record = DatasetRecord {
+            id: 11,
+            metadata: DatasetMetadata {
+                uid,
+                name: "with-manifest".to_string(),
+                description: "imported with-manifest".to_string(),
+                favorite: true,
+                status: DatasetStatus::Completed,
+                created_at: Utc::now(),
+                trashed_at: None,
+                deleted_at: None,
+                tags: vec!["alpha".to_string(), "beta".to_string()],
+            },
+        };
+
+        let mut repository = MockDatasetCatalogRepository::new();
+        repository
+            .expect_find_dataset_by_uid()
+            .once()
+            .withf(move |candidate| *candidate == uid)
+            .return_once(move |_| Ok(None));
+        repository
+            .expect_insert_imported_dataset_record()
+            .once()
+            .withf(move |metadata| metadata.uid == uid && metadata.name == "with-manifest")
+            .return_once(move |_| Ok(imported_record.clone()));
+
+        let service = DatasetCatalogService::new(Arc::new(repository), paths);
+        let events = CollectEvents::default();
+
+        let record = service
+            .import_dataset(&archive, false, &events)
+            .expect("import should succeed");
+
+        assert_eq!(record.id, 11);
+        assert!(
+            live_dir.join("data_chunk_0.arrow").exists(),
+            "data chunk should be promoted into the live path"
+        );
+        assert_eq!(
+            fs::read(live_dir.join(MANIFEST_FILENAME)).expect("read live manifest"),
+            b"{}",
+            "manifest should be promoted into the live path"
+        );
+        assert!(
+            !live_dir.join("metadata.json").exists(),
+            "archive metadata sidecar should not be promoted"
+        );
+        let published = events.snapshot();
+        assert_eq!(published.len(), 1);
+        match &published[0] {
+            DatasetEvent::Created(record) => assert_eq!(record.id, 11),
+            unexpected => panic!("unexpected event {unexpected:?}"),
+        }
     }
 
     #[test]
