@@ -17,7 +17,7 @@ use crate::{
     app::{AppHandle, CatalogAppError, IngestAppError, ReadAppError},
     dataset::{
         DatasetId, DatasetListQuery, DatasetUpdate, catalog::CatalogError, ingest::IngestError,
-        read::ReadError,
+        read::ReadError, semantics::ManifestError,
     },
     proto::{
         self, AddTagsRequest, AddTagsResponse, CreateRequest, CreateResponse, DeleteRequest,
@@ -154,6 +154,13 @@ impl From<IngestAppError> for Status {
                 DatasetTransportErrorCode::Internal,
                 error.to_string(),
             ),
+            IngestAppError::Domain(IngestError::Manifest(ManifestError::Validation(_))) => {
+                dataset_status(
+                    Code::InvalidArgument,
+                    DatasetTransportErrorCode::Internal,
+                    "invalid dataset manifest",
+                )
+            }
             IngestAppError::Domain(
                 IngestError::Dataset(_)
                 | IngestError::DatasetFs(_)
@@ -386,7 +393,11 @@ mod tests {
         app::{CatalogAppError, IngestAppError, ReadAppError},
         database::core::DatabaseError,
         dataset::{
-            catalog::CatalogError, ingest::IngestError, read::ReadError, schema::DatasetError,
+            catalog::CatalogError,
+            ingest::IngestError,
+            read::ReadError,
+            schema::DatasetError,
+            semantics::{ManifestError, ManifestValidationError},
         },
         transport::grpc::codec::CodecError,
     };
@@ -485,6 +496,21 @@ mod tests {
         )));
         assert_eq!(status.code(), Code::Internal);
         assert_eq!(status.message(), "dataset ingestion failed");
+        assert_eq!(
+            dataset_code(&status),
+            Some(DatasetTransportErrorCode::Internal.as_str())
+        );
+    }
+
+    #[test]
+    fn ingest_manifest_validation_failure_maps_to_invalid_argument() {
+        let status = Status::from(IngestAppError::Domain(IngestError::Manifest(
+            ManifestError::Validation(ManifestValidationError::ReservedUserColumn {
+                name: "__ds_user".to_string(),
+            }),
+        )));
+        assert_eq!(status.code(), Code::InvalidArgument);
+        assert_eq!(status.message(), "invalid dataset manifest");
         assert_eq!(
             dataset_code(&status),
             Some(DatasetTransportErrorCode::Internal.as_str())

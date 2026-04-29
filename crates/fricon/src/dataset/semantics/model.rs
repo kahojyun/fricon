@@ -245,8 +245,15 @@ impl DatasetDType {
         name: &str,
         data_type: &DataType,
     ) -> Result<Self, ManifestValidationError> {
-        if let Some(dtype) = try_trace_dtype(data_type)? {
-            return Ok(Self::trace(dtype));
+        match try_trace_dtype(data_type) {
+            Ok(Some(dtype)) => return Ok(Self::trace(dtype)),
+            Ok(None) => {}
+            Err(_) => {
+                return Err(ManifestValidationError::UnsupportedArrowType {
+                    name: name.to_string(),
+                    found: data_type.to_string(),
+                });
+            }
         }
         if *data_type == complex128_data_type() {
             return Ok(Self::Complex128);
@@ -804,6 +811,21 @@ mod tests {
                 found: "Int32".to_string()
             })
         );
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_reports_list_type_with_user_column_name() {
+        let schema = Schema::new(vec![Field::new(
+            "flags",
+            DataType::new_list(DataType::Boolean, false),
+            false,
+        )]);
+
+        assert!(matches!(
+            DatasetSemanticManifest::minimal_from_arrow_schema(&schema),
+            Err(ManifestValidationError::UnsupportedArrowType { name, found })
+                if name == "flags" && found.contains("Boolean")
+        ));
     }
 
     #[test]
