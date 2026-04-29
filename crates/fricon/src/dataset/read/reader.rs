@@ -1,11 +1,11 @@
-use std::{borrow::Cow, cmp::Ordering, ops::RangeBounds, path::PathBuf, sync::Arc};
+use std::{borrow::Cow, cmp::Ordering, ops::RangeBounds, path::Path, sync::Arc};
 
 use arrow_arith::boolean::and;
 use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar};
 use arrow_ord::{cmp::eq, ord::make_comparator};
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 
 use crate::dataset::{
     ingest::WriteSessionHandle,
@@ -14,7 +14,9 @@ use crate::dataset::{
     },
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
-    semantics::{ManifestError, read_manifest_optional},
+    semantics::{
+        DatasetSemanticManifest, ManifestError, is_hidden_system_column, read_manifest_optional,
+    },
     storage::ChunkReader,
 };
 
@@ -51,21 +53,29 @@ impl DatasetSource {
     fn select_data(
         &self,
         options: &SelectOptions,
+        output_schema: SchemaRef,
+        physical_columns: &[usize],
     ) -> Result<(SchemaRef, Vec<RecordBatch>), ReadError> {
         let index_filters = options.index_filters.as_ref();
-        let selected_columns = options.selected_columns.as_deref();
         match self {
             Self::WriteSession(handle) => {
                 let (schema, batches) =
                     handle.snapshot_range_with_schema((options.start, options.end));
-                select_data_owned(batches, &schema, index_filters, selected_columns)
-                    .map_err(Into::into)
+                select_data_owned(
+                    batches,
+                    &schema,
+                    index_filters,
+                    output_schema,
+                    physical_columns,
+                )
+                .map_err(Into::into)
             }
             Self::File(reader) => select_data(
                 reader.range((options.start, options.end)),
                 reader.schema().ok_or(ReadError::EmptyDataset)?,
                 index_filters,
-                selected_columns,
+                output_schema,
+                physical_columns,
             )
             .map_err(Into::into),
         }
@@ -75,8 +85,10 @@ impl DatasetSource {
 pub struct DatasetReader {
     source: DatasetSource,
     schema: Option<DatasetSchema>,
+    physical_arrow_schema: SchemaRef,
     arrow_schema: SchemaRef,
-    dataset_dir: Option<PathBuf>,
+    visible_columns: Vec<usize>,
+    manifest: Option<DatasetSemanticManifest>,
 }
 
 #[derive(Debug, Default)]
@@ -122,24 +134,13 @@ fn select_data<'a>(
     source: impl Iterator<Item = Cow<'a, RecordBatch>>,
     source_schema: &SchemaRef,
     index_filters: Option<&RecordBatch>,
-    selected_columns: Option<&[usize]>,
+    output_schema: SchemaRef,
+    selected_columns: &[usize],
 ) -> Result<(SchemaRef, Vec<RecordBatch>), DatasetError> {
     let filter = if let Some(filters) = index_filters {
         Filter::new(source_schema, filters)?
     } else {
         Filter::default()
-    };
-
-    let (output_schema, selected_columns) = if let Some(columns) = selected_columns {
-        (
-            Arc::new(source_schema.project(columns)?),
-            Either::Left(columns.iter().copied()),
-        )
-    } else {
-        (
-            source_schema.clone(),
-            Either::Right(0..source_schema.fields.len()),
-        )
     };
 
     let results = source
@@ -159,8 +160,8 @@ fn select_data<'a>(
                 Ok(None)
             } else {
                 let arrays = selected_columns
-                    .clone()
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .map(|column| {
                         let array = batch.column(column);
                         if let Some(predicate) = &predicate {
@@ -190,38 +191,106 @@ fn select_data_owned(
     batches: Vec<RecordBatch>,
     source_schema: &SchemaRef,
     index_filters: Option<&RecordBatch>,
-    selected_columns: Option<&[usize]>,
+    output_schema: SchemaRef,
+    selected_columns: &[usize],
 ) -> Result<(SchemaRef, Vec<RecordBatch>), DatasetError> {
     select_data(
         batches.into_iter().map(Cow::Owned),
         source_schema,
         index_filters,
+        output_schema,
         selected_columns,
     )
 }
 
+fn visible_projection_from_manifest(
+    physical_schema: &SchemaRef,
+    manifest: Option<&DatasetSemanticManifest>,
+) -> Result<(SchemaRef, Vec<usize>), DatasetError> {
+    let visible_columns: Vec<_> = physical_schema
+        .fields()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, field)| {
+            let manifest_column = manifest.and_then(|manifest| manifest.columns.get(field.name()));
+            (!is_hidden_system_column(field.name(), manifest_column)).then_some(index)
+        })
+        .collect();
+    let visible_schema = Arc::new(physical_schema.project(&visible_columns)?);
+    Ok((visible_schema, visible_columns))
+}
+
+fn visible_projection_legacy(
+    physical_schema: &SchemaRef,
+) -> Result<(SchemaRef, Vec<usize>), DatasetError> {
+    let visible_columns: Vec<_> = (0..physical_schema.fields().len()).collect();
+    let visible_schema = Arc::new(physical_schema.project(&visible_columns)?);
+    Ok((visible_schema, visible_columns))
+}
+
+fn project_batch(
+    batch: &RecordBatch,
+    output_schema: SchemaRef,
+    physical_columns: &[usize],
+) -> Result<RecordBatch, DatasetError> {
+    let arrays = physical_columns
+        .iter()
+        .map(|&index| batch.column(index).clone())
+        .collect();
+    Ok(RecordBatch::try_new_with_options(
+        output_schema,
+        arrays,
+        &RecordBatchOptions::new().with_row_count(Some(batch.num_rows())),
+    )?)
+}
+
 impl DatasetReader {
-    pub(crate) fn from_handle(source: WriteSessionHandle) -> Self {
-        let arrow_schema = source.schema();
+    pub(crate) fn from_handle(
+        source: WriteSessionHandle,
+        manifest: Option<DatasetSemanticManifest>,
+    ) -> Result<Self, ReadError> {
+        let physical_arrow_schema = source.schema();
+        if let Some(manifest) = manifest.as_ref() {
+            manifest
+                .validate_against_arrow_schema(physical_arrow_schema.as_ref())
+                .map_err(ManifestError::from)?;
+        }
+        let (arrow_schema, visible_columns) =
+            visible_projection_from_manifest(&physical_arrow_schema, manifest.as_ref())?;
         let schema = arrow_schema.as_ref().try_into().ok();
-        Self {
+        Ok(Self {
             source: DatasetSource::WriteSession(source),
             schema,
+            physical_arrow_schema,
             arrow_schema,
-            dataset_dir: None,
-        }
+            visible_columns,
+            manifest,
+        })
     }
 
-    pub(crate) fn open_dir(path: PathBuf) -> Result<Self, ReadError> {
-        let mut reader = ChunkReader::new(path.clone(), None);
+    pub(crate) fn open_dir(path: &Path) -> Result<Self, ReadError> {
+        let mut reader = ChunkReader::new(path.to_owned(), None);
         reader.read_all()?;
-        let arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
+        let physical_arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
+        let manifest = read_manifest_optional(path)?;
+        if let Some(manifest) = manifest.as_ref() {
+            manifest
+                .validate_against_arrow_schema(physical_arrow_schema.as_ref())
+                .map_err(ManifestError::from)?;
+        }
+        let (arrow_schema, visible_columns) = if manifest.is_some() {
+            visible_projection_from_manifest(&physical_arrow_schema, manifest.as_ref())?
+        } else {
+            visible_projection_legacy(&physical_arrow_schema)?
+        };
         let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::File(reader),
             schema,
+            physical_arrow_schema,
             arrow_schema,
-            dataset_dir: Some(path),
+            visible_columns,
+            manifest,
         })
     }
 
@@ -248,24 +317,53 @@ impl DatasetReader {
 
     #[must_use]
     pub fn batches(&self) -> Vec<RecordBatch> {
-        self.source.range(..)
+        self.source
+            .range(..)
+            .iter()
+            .map(|batch| {
+                project_batch(batch, self.arrow_schema.clone(), &self.visible_columns)
+                    .expect("visible dataset projection should be valid")
+            })
+            .collect()
     }
 
     pub fn select_data(
         &self,
         options: &SelectOptions,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), ReadError> {
-        self.source.select_data(options)
+        let visible_columns: Vec<_> = options.selected_columns.as_ref().map_or_else(
+            || (0..self.visible_columns.len()).collect(),
+            std::clone::Clone::clone,
+        );
+        let output_schema = Arc::new(
+            self.arrow_schema
+                .project(&visible_columns)
+                .map_err(DatasetError::from)?,
+        );
+        let physical_columns: Vec<usize> = visible_columns
+            .iter()
+            .map(|&index| {
+                self.visible_columns.get(index).copied().ok_or_else(|| {
+                    DatasetError::Arrow(arrow_schema::ArrowError::InvalidArgumentError(format!(
+                        "selected dataset column index out of bounds: {index}"
+                    )))
+                })
+            })
+            .try_collect()?;
+        self.source
+            .select_data(options, output_schema, &physical_columns)
     }
 
     pub fn interpret(&self) -> Result<DatasetInterpretation, ReadError> {
-        if let Some(dataset_dir) = &self.dataset_dir
-            && let Some(manifest) = read_manifest_optional(dataset_dir)?
-        {
+        if let Some(manifest) = &self.manifest {
             manifest
-                .validate_against_arrow_schema(self.arrow_schema.as_ref())
+                .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
-            return Ok(resolve_from_manifest(self.arrow_schema.as_ref(), &manifest));
+            return Ok(resolve_from_manifest(
+                self.physical_arrow_schema.as_ref(),
+                manifest,
+                &self.visible_columns,
+            ));
         }
 
         Ok(resolve_from_compatibility_inference(
@@ -284,9 +382,14 @@ impl DatasetReader {
         if self.source.num_rows() < 2 {
             Ok(None)
         } else {
-            let sample = self.source.range(..2);
+            let samples = self
+                .source
+                .range(..2)
+                .iter()
+                .map(|batch| project_batch(batch, self.arrow_schema.clone(), &self.visible_columns))
+                .try_collect::<_, Vec<_>, _>()?;
             let sample =
-                concat_batches(&sample[0].schema(), &sample).expect("Should have same schema");
+                concat_batches(&self.arrow_schema, &samples).expect("Should have same schema");
             let mut result = vec![];
             for (index, (sample_array, column_type)) in sample
                 .columns()

@@ -57,10 +57,10 @@ directory. A dataset is modeled as one logical Arrow table split across
 
 New datasets created through ingest also store `dataset_manifest.json` beside
 the chunk files. The manifest records v1 dataset semantic columns, realization
-defaults, and compatibility settings. During the transition before physical
-record-id materialization, the manifest may declare the Fricon-owned
-`__ds_record_id` system column even when the Arrow chunks do not yet contain
-that physical column.
+defaults, and compatibility settings. New semantic datasets physically
+materialize the Fricon-owned `__ds_record_id: uint64` system column as the
+first Arrow column. Earlier transition snapshots may contain manifests that
+declare `__ds_record_id` before the Arrow chunks materialized that column.
 
 The physical storage layout is an implementation detail. User-facing docs may
 mention Arrow-compatible tables, but should avoid promising exact file names,

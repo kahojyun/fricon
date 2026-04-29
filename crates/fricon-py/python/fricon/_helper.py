@@ -11,6 +11,7 @@ import polars as pl
 import pyarrow as pa
 
 _CHUNK_PATTERN = re.compile(r"data_chunk_(\d+)\.arrow$")
+_SYSTEM_COLUMN_PREFIX = "__ds_"
 
 
 def _collect_chunk_files(dir_path: str) -> list[Path]:
@@ -39,7 +40,13 @@ def read_arrow(dir_path: str) -> pa.Table:
     for f in files:
         with pa.memory_map(str(f), "rb") as source:
             tables.append(pa.ipc.open_file(source).read_all())
-    return pa.concat_tables(tables)
+    table = pa.concat_tables(tables)
+    visible_columns = [
+        name
+        for name in table.column_names
+        if not name.startswith(_SYSTEM_COLUMN_PREFIX)
+    ]
+    return table.select(visible_columns)
 
 
 def read_polars(dir_path: str) -> pl.LazyFrame:
@@ -47,4 +54,4 @@ def read_polars(dir_path: str) -> pl.LazyFrame:
     if not files:
         msg = f"no chunk files found in {dir_path}"
         raise FileNotFoundError(msg)
-    return pl.scan_ipc(files)
+    return pl.scan_ipc(files).select(pl.all().exclude("^__ds_.*$"))

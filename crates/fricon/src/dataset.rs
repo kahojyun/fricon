@@ -13,8 +13,8 @@ mod tag;
 pub use self::{
     events::DatasetEvent,
     interpret::{
-        ColumnMeaning, DatasetInterpretation, InterpretationSource, ResolvedColumn,
-        ResolvedDuplicatePolicy,
+        ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
+        ResolvedColumn, ResolvedDuplicatePolicy, VisibleColumnOrdinal,
     },
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,

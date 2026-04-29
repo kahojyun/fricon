@@ -3,12 +3,18 @@ use crate::dataset::semantics::DatasetDType;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetInterpretation {
     pub columns: Vec<ResolvedColumn>,
-    pub value_columns: Vec<usize>,
-    pub logical_index_columns: Vec<usize>,
-    pub chart_axis_candidate_columns: Vec<usize>,
+    pub value_columns: Vec<VisibleColumnOrdinal>,
+    pub logical_index_columns: Vec<VisibleColumnOrdinal>,
+    pub chart_axis_candidate_columns: Vec<VisibleColumnOrdinal>,
     pub duplicate_policy: ResolvedDuplicatePolicy,
     pub source: InterpretationSource,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PhysicalColumnOrdinal(pub usize);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct VisibleColumnOrdinal(pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[expect(
@@ -17,7 +23,8 @@ pub struct DatasetInterpretation {
 )]
 pub struct ResolvedColumn {
     pub name: String,
-    pub ordinal: usize,
+    pub physical_ordinal: PhysicalColumnOrdinal,
+    pub visible_ordinal: Option<VisibleColumnOrdinal>,
     pub dtype: DatasetDType,
     pub meaning: ColumnMeaning,
     pub is_index: bool,

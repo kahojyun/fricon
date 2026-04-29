@@ -120,7 +120,10 @@ class TestDatasetOperations:
 
             reopened = dm.open(dataset.id)
             expected_rows = 2
-            assert reopened.to_arrow().num_rows == expected_rows
+            table = reopened.to_arrow()
+            assert table.num_rows == expected_rows
+            assert "__ds_record_id" not in table.column_names
+            assert "__ds_record_id" not in reopened.to_polars().collect().columns
 
             server_handle.shutdown()
             assert not server_handle.is_running
