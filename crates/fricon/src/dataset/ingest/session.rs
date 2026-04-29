@@ -10,6 +10,7 @@ use arrow_schema::SchemaRef;
 
 use crate::dataset::{
     ingest::{IngestError, storage::InProgressTable},
+    schema::DatasetError,
     semantics::{materialize_record_ids, materialized_schema},
     storage::ChunkWriter,
 };
@@ -17,6 +18,7 @@ use crate::dataset::{
 pub(super) struct WriteSession {
     writer: ChunkWriter,
     in_progress_table: Arc<Mutex<InProgressTable>>,
+    user_schema: SchemaRef,
     storage_schema: SchemaRef,
     next_record_id: u64,
 }
@@ -30,12 +32,16 @@ impl WriteSession {
         Self {
             writer,
             in_progress_table,
+            user_schema: schema.clone(),
             storage_schema,
             next_record_id: 0,
         }
     }
 
     pub(super) fn write(&mut self, batch: &RecordBatch) -> Result<(), IngestError> {
+        if batch.schema() != self.user_schema {
+            return Err(IngestError::Dataset(DatasetError::SchemaMismatch));
+        }
         let (batch, next_record_id) =
             materialize_record_ids(self.storage_schema.clone(), batch, self.next_record_id)?;
         self.in_progress_table_mut().push(batch.clone())?;
@@ -111,7 +117,10 @@ mod tests {
     use tempfile::TempDir;
 
     use super::WriteSession;
-    use crate::dataset::{semantics::RECORD_ID_COLUMN, storage::ChunkReader};
+    use crate::dataset::{
+        ingest::IngestError, schema::DatasetError, semantics::RECORD_ID_COLUMN,
+        storage::ChunkReader,
+    };
 
     fn user_schema() -> Arc<Schema> {
         Arc::new(Schema::new(vec![Field::new(
@@ -175,5 +184,46 @@ mod tests {
             .expect("record ids");
 
         assert_eq!(record_ids.values(), &[0]);
+    }
+
+    #[test]
+    fn write_session_rejects_same_type_schema_mismatch_before_materializing_ids() {
+        let dir = TempDir::new().expect("temp dir");
+        let mut session = WriteSession::new(&user_schema(), dir.path().to_owned());
+        let mismatched_schema = Arc::new(Schema::new(vec![Field::new(
+            "renamed_signal",
+            DataType::Float64,
+            false,
+        )]));
+        let mismatched_batch = RecordBatch::try_new(
+            mismatched_schema,
+            vec![Arc::new(Float64Array::from(vec![99.0]))],
+        )
+        .expect("mismatched batch");
+
+        session.write(&batch(vec![10.0])).expect("first write");
+        let error = session
+            .write(&mismatched_batch)
+            .expect_err("schema mismatch should fail");
+        session.write(&batch(vec![20.0])).expect("second write");
+        session.finish().expect("finish");
+
+        assert!(matches!(
+            error,
+            IngestError::Dataset(DatasetError::SchemaMismatch)
+        ));
+        let mut reader = ChunkReader::new(dir.path().to_owned(), None);
+        reader.read_all().expect("read chunks");
+        let batches: Vec<_> = reader.range(..).map(std::borrow::Cow::into_owned).collect();
+        let stored =
+            arrow_select::concat::concat_batches(reader.schema().expect("schema"), &batches)
+                .expect("concat");
+        let record_ids = stored
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .expect("record ids");
+
+        assert_eq!(record_ids.values(), &[0, 1]);
     }
 }
