@@ -22,7 +22,7 @@ pub(super) struct WriteSession {
 }
 
 impl WriteSession {
-    pub(super) fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
+    pub(super) fn new(schema: &SchemaRef, dir_path: PathBuf) -> Self {
         let storage_schema = materialized_schema(schema.as_ref());
         let writer = ChunkWriter::new(storage_schema.clone(), dir_path.clone());
         let in_progress_table = InProgressTable::new(storage_schema.clone(), dir_path);
@@ -35,7 +35,7 @@ impl WriteSession {
         }
     }
 
-    pub(super) fn write(&mut self, batch: RecordBatch) -> Result<(), IngestError> {
+    pub(super) fn write(&mut self, batch: &RecordBatch) -> Result<(), IngestError> {
         let (batch, next_record_id) =
             materialize_record_ids(self.storage_schema.clone(), batch, self.next_record_id)?;
         self.in_progress_table_mut().push(batch.clone())?;
@@ -129,10 +129,12 @@ mod tests {
     #[test]
     fn write_session_materializes_monotonic_record_ids() {
         let dir = TempDir::new().expect("temp dir");
-        let mut session = WriteSession::new(user_schema(), dir.path().to_owned());
+        let mut session = WriteSession::new(&user_schema(), dir.path().to_owned());
 
-        session.write(batch(vec![10.0, 20.0])).expect("first write");
-        session.write(batch(vec![30.0])).expect("second write");
+        session
+            .write(&batch(vec![10.0, 20.0]))
+            .expect("first write");
+        session.write(&batch(vec![30.0])).expect("second write");
         session.finish().expect("finish");
 
         let mut reader = ChunkReader::new(dir.path().to_owned(), None);
@@ -154,10 +156,10 @@ mod tests {
     #[test]
     fn write_session_empty_batch_does_not_advance_record_ids() {
         let dir = TempDir::new().expect("temp dir");
-        let mut session = WriteSession::new(user_schema(), dir.path().to_owned());
+        let mut session = WriteSession::new(&user_schema(), dir.path().to_owned());
 
-        session.write(batch(Vec::new())).expect("empty write");
-        session.write(batch(vec![10.0])).expect("second write");
+        session.write(&batch(Vec::new())).expect("empty write");
+        session.write(&batch(vec![10.0])).expect("second write");
         session.finish().expect("finish");
 
         let mut reader = ChunkReader::new(dir.path().to_owned(), None);

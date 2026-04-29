@@ -97,10 +97,10 @@ where
                     write_sessions.start_session(
                         dataset_record.id,
                         dataset_path.clone(),
-                        batch.schema(),
+                        &batch.schema(),
                     )
                 });
-                if let Err(error) = session_ref.write_batch(batch) {
+                if let Err(error) = session_ref.write_batch(&batch) {
                     debug!(error = %error, "Failed to write batch into dataset session");
                     break CreateDatasetInput::Abort;
                 }

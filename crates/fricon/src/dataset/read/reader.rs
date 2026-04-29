@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::Ordering, ops::RangeBounds, path::PathBuf, sync::Arc};
+use std::{borrow::Cow, cmp::Ordering, ops::RangeBounds, path::Path, sync::Arc};
 
 use arrow_arith::boolean::and;
 use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar};
@@ -54,7 +54,7 @@ impl DatasetSource {
         &self,
         options: &SelectOptions,
         output_schema: SchemaRef,
-        physical_columns: Vec<usize>,
+        physical_columns: &[usize],
     ) -> Result<(SchemaRef, Vec<RecordBatch>), ReadError> {
         let index_filters = options.index_filters.as_ref();
         match self {
@@ -66,7 +66,7 @@ impl DatasetSource {
                     &schema,
                     index_filters,
                     output_schema,
-                    &physical_columns,
+                    physical_columns,
                 )
                 .map_err(Into::into)
             }
@@ -75,7 +75,7 @@ impl DatasetSource {
                 reader.schema().ok_or(ReadError::EmptyDataset)?,
                 index_filters,
                 output_schema,
-                &physical_columns,
+                physical_columns,
             )
             .map_err(Into::into),
         }
@@ -268,11 +268,11 @@ impl DatasetReader {
         })
     }
 
-    pub(crate) fn open_dir(path: PathBuf) -> Result<Self, ReadError> {
-        let mut reader = ChunkReader::new(path.clone(), None);
+    pub(crate) fn open_dir(path: &Path) -> Result<Self, ReadError> {
+        let mut reader = ChunkReader::new(path.to_owned(), None);
         reader.read_all()?;
         let physical_arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
-        let manifest = read_manifest_optional(&path)?;
+        let manifest = read_manifest_optional(path)?;
         if let Some(manifest) = manifest.as_ref() {
             manifest
                 .validate_against_arrow_schema(physical_arrow_schema.as_ref())
@@ -351,7 +351,7 @@ impl DatasetReader {
             })
             .try_collect()?;
         self.source
-            .select_data(options, output_schema, physical_columns)
+            .select_data(options, output_schema, &physical_columns)
     }
 
     pub fn interpret(&self) -> Result<DatasetInterpretation, ReadError> {
@@ -377,17 +377,18 @@ impl DatasetReader {
     }
 
     pub fn try_index_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
-        if self.visible_columns.len() != self.physical_arrow_schema.fields().len() {
-            return Ok(Some(Vec::new()));
-        }
-
         let schema = self.schema()?;
         if self.source.num_rows() < 2 {
             Ok(None)
         } else {
-            let sample = self.source.range(..2);
+            let samples = self
+                .source
+                .range(..2)
+                .iter()
+                .map(|batch| project_batch(batch, self.arrow_schema.clone(), &self.visible_columns))
+                .try_collect::<_, Vec<_>, _>()?;
             let sample =
-                concat_batches(&sample[0].schema(), &sample).expect("Should have same schema");
+                concat_batches(&self.arrow_schema, &samples).expect("Should have same schema");
             let mut result = vec![];
             for (index, (sample_array, column_type)) in sample
                 .columns()

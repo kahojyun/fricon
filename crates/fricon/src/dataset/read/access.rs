@@ -8,6 +8,7 @@ use crate::{
         ingest::WriteSessionRegistry,
         model::DatasetId,
         read::{DatasetReadRepository, DatasetReader, ReadError},
+        semantics::read_manifest_optional,
     },
     workspace::WorkspacePaths,
 };
@@ -33,9 +34,9 @@ pub(crate) fn get_dataset_reader(
     if let Some(handle) = write_sessions.get(dataset.id) {
         Ok(DatasetReader::from_handle(
             handle,
-            crate::dataset::semantics::read_manifest_optional(&path)?,
+            read_manifest_optional(&path)?,
         )?)
     } else {
-        Ok(DatasetReader::open_dir(path)?)
+        Ok(DatasetReader::open_dir(&path)?)
     }
 }

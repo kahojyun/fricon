@@ -25,7 +25,7 @@ pub(crate) fn materialized_schema(user_schema: &Schema) -> SchemaRef {
 
 pub(crate) fn materialize_record_ids(
     storage_schema: SchemaRef,
-    batch: RecordBatch,
+    batch: &RecordBatch,
     next_record_id: u64,
 ) -> Result<(RecordBatch, u64), DatasetError> {
     let row_count = u64::try_from(batch.num_rows()).map_err(|_| {
@@ -93,7 +93,7 @@ mod tests {
         )
         .expect("batch");
 
-        let (batch, next) = materialize_record_ids(storage_schema, batch, 7).expect("materialize");
+        let (batch, next) = materialize_record_ids(storage_schema, &batch, 7).expect("materialize");
 
         assert_eq!(next, 10);
         let record_ids = batch

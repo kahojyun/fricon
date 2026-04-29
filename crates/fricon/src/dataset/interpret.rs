@@ -152,6 +152,8 @@ mod tests {
         ColumnMeaning, InterpretationSource, ResolvedDuplicatePolicy, resolve_from_manifest,
     };
     use crate::dataset::{
+        DatasetReader,
+        ingest::WriteSessionRegistry,
         interpret::resolve_from_compatibility_inference,
         read::ReadError,
         schema::DatasetSchema,
@@ -258,6 +260,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let schema = Arc::new(Schema::new(vec![
             Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("run", DataType::Float64, false),
             Field::new("signal", DataType::Float64, false),
         ]));
         let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
@@ -267,6 +270,7 @@ mod tests {
                     schema,
                     vec![
                         Arc::new(UInt64Array::from(vec![0, 1])),
+                        Arc::new(Float64Array::from(vec![1.0, 1.0])),
                         Arc::new(Float64Array::from(vec![10.0, 20.0])),
                     ],
                 )
@@ -276,21 +280,26 @@ mod tests {
         writer.finish().expect("finish writer");
         write_manifest(
             dir.path(),
-            &DatasetSemanticManifest::minimal([(
-                "signal".to_string(),
-                ManifestColumn::new(DatasetDType::Float64),
-            )]),
+            &DatasetSemanticManifest::minimal([
+                (
+                    "run".to_string(),
+                    ManifestColumn::new(DatasetDType::Float64),
+                ),
+                (
+                    "signal".to_string(),
+                    ManifestColumn::new(DatasetDType::Float64),
+                ),
+            ]),
         )
         .expect("write manifest");
 
-        let reader =
-            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
-        assert_eq!(reader.schema().expect("visible schema").columns().len(), 1);
-        assert_eq!(reader.arrow_schema().fields().len(), 1);
-        assert_eq!(reader.batches()[0].num_columns(), 1);
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
+        assert_eq!(reader.schema().expect("visible schema").columns().len(), 2);
+        assert_eq!(reader.arrow_schema().fields().len(), 2);
+        assert_eq!(reader.batches()[0].num_columns(), 2);
         assert_eq!(
             reader.try_index_columns().expect("index columns"),
-            Some(Vec::new())
+            Some(vec![0, 1])
         );
         let interpretation = reader.interpret().expect("interpretation");
 
@@ -299,7 +308,7 @@ mod tests {
             interpretation.columns[0].meaning,
             ColumnMeaning::SystemRecordId
         );
-        assert_eq!(interpretation.value_columns, vec![1]);
+        assert_eq!(interpretation.value_columns, vec![1, 2]);
     }
 
     #[test]
@@ -314,18 +323,17 @@ mod tests {
             "signal".to_string(),
             ManifestColumn::new(DatasetDType::Float64),
         )]);
-        let registry = crate::dataset::ingest::WriteSessionRegistry::new();
-        let mut guard = registry.start_session(7, dir.path().to_owned(), user_schema.clone());
+        let registry = WriteSessionRegistry::new();
+        let mut guard = registry.start_session(7, dir.path().to_owned(), &user_schema);
         guard
             .write_batch(
-                RecordBatch::try_new(user_schema, vec![Arc::new(Float64Array::from(vec![10.0]))])
+                &RecordBatch::try_new(user_schema, vec![Arc::new(Float64Array::from(vec![10.0]))])
                     .expect("batch"),
             )
             .expect("write batch");
         let handle = registry.get(7).expect("active handle");
 
-        let reader =
-            crate::dataset::DatasetReader::from_handle(handle, Some(manifest)).expect("reader");
+        let reader = DatasetReader::from_handle(handle, Some(manifest)).expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
@@ -361,9 +369,8 @@ mod tests {
         )
         .expect("write manifest");
 
-        let error = match crate::dataset::DatasetReader::open_dir(dir.path().to_owned()) {
-            Ok(_) => panic!("reader should reject manifest-only record ids"),
-            Err(error) => error,
+        let Err(error) = DatasetReader::open_dir(dir.path()) else {
+            panic!("reader should reject manifest-only record ids");
         };
         assert!(matches!(error, ReadError::Manifest(_)));
     }
@@ -398,8 +405,7 @@ mod tests {
         )
         .expect("write manifest");
 
-        let reader =
-            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
@@ -438,9 +444,8 @@ mod tests {
         )
         .expect("write manifest");
 
-        let error = match crate::dataset::DatasetReader::open_dir(dir.path().to_owned()) {
-            Ok(_) => panic!("reader should reject manifest schema mismatch"),
-            Err(error) => error,
+        let Err(error) = DatasetReader::open_dir(dir.path()) else {
+            panic!("reader should reject manifest schema mismatch");
         };
 
         assert!(matches!(error, ReadError::Manifest(_)));
@@ -451,8 +456,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         write_legacy_numeric_dataset(dir.path(), vec![1.0, 1.0], vec![0.0, 1.0]);
 
-        let reader =
-            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(
@@ -478,8 +482,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         write_legacy_numeric_dataset(dir.path(), vec![1.0], vec![0.0]);
 
-        let reader =
-            crate::dataset::DatasetReader::open_dir(dir.path().to_owned()).expect("reader");
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(

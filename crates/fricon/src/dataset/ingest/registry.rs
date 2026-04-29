@@ -31,7 +31,7 @@ impl WriteSessionGuard {
 
     pub(crate) fn write_batch(
         &mut self,
-        batch: arrow_array::RecordBatch,
+        batch: &arrow_array::RecordBatch,
     ) -> Result<(), IngestError> {
         self.session_mut().write(batch)
     }
@@ -71,7 +71,7 @@ impl WriteSessionRegistry {
         &self,
         id: i32,
         path: PathBuf,
-        schema: SchemaRef,
+        schema: &SchemaRef,
     ) -> WriteSessionGuard {
         let session = WriteSession::new(schema, path);
         if let Ok(mut m) = self.inner.write() {
@@ -122,9 +122,9 @@ mod tests {
     fn finalized_session_persists_data() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
-        let mut guard = registry.start_session(1, dir.path().to_owned(), test_schema());
+        let mut guard = registry.start_session(1, dir.path().to_owned(), &test_schema());
 
-        guard.write_batch(test_batch(vec![1, 2, 3])).unwrap();
+        guard.write_batch(&test_batch(vec![1, 2, 3])).unwrap();
         let handle = registry.get(1).expect("handle exists during session");
         assert_eq!(handle.num_rows(), 3);
 
@@ -142,9 +142,9 @@ mod tests {
     fn dropped_session_finalizes_and_cleans_up_registry() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
-        let mut guard = registry.start_session(1, dir.path().to_owned(), test_schema());
+        let mut guard = registry.start_session(1, dir.path().to_owned(), &test_schema());
 
-        guard.write_batch(test_batch(vec![7])).unwrap();
+        guard.write_batch(&test_batch(vec![7])).unwrap();
         assert!(registry.get(1).is_some());
         drop(guard);
 
@@ -162,7 +162,7 @@ mod tests {
     fn empty_finalize_succeeds_with_no_persisted_data() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
-        let guard = registry.start_session(1, dir.path().to_owned(), test_schema());
+        let guard = registry.start_session(1, dir.path().to_owned(), &test_schema());
 
         guard.finalize_session().unwrap();
 
