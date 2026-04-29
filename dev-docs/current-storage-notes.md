@@ -75,6 +75,11 @@ description, favorite state, status, timestamps, and tags as represented by
 Dataset payload facts live in Arrow chunk files. Dataset semantic defaults and
 compatibility settings for new ingested datasets live in `dataset_manifest.json`.
 
+Dataset archives store catalog metadata in `metadata.json`, Arrow payload chunks
+under `data/data_chunk_<n>.arrow`, and `dataset_manifest.json` as an optional
+root sidecar when the source dataset has one. Archives without a manifest remain
+valid and are read through compatibility inference.
+
 ## Write Buffering
 
 Current Python dataset writes are buffered on the client and flushed
