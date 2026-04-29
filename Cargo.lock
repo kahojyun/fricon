@@ -1615,6 +1615,7 @@ dependencies = [
  "anyhow",
  "arrow-array",
  "arrow-buffer",
+ "arrow-ipc",
  "arrow-schema",
  "arrow-select",
  "base64 0.22.1",
