@@ -288,6 +288,10 @@ mod tests {
         assert_eq!(reader.schema().expect("visible schema").columns().len(), 1);
         assert_eq!(reader.arrow_schema().fields().len(), 1);
         assert_eq!(reader.batches()[0].num_columns(), 1);
+        assert_eq!(
+            reader.try_index_columns().expect("index columns"),
+            Some(Vec::new())
+        );
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);

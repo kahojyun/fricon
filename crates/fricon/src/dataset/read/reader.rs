@@ -370,6 +370,10 @@ impl DatasetReader {
     }
 
     pub fn try_index_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
+        if self.visible_columns.len() != self.physical_arrow_schema.fields().len() {
+            return Ok(Some(Vec::new()));
+        }
+
         let schema = self.schema()?;
         if self.source.num_rows() < 2 {
             Ok(None)
