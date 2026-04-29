@@ -245,20 +245,27 @@ fn project_batch(
 }
 
 impl DatasetReader {
-    pub(crate) fn from_handle(source: WriteSessionHandle) -> Self {
+    pub(crate) fn from_handle(
+        source: WriteSessionHandle,
+        manifest: Option<DatasetSemanticManifest>,
+    ) -> Result<Self, ReadError> {
         let physical_arrow_schema = source.schema();
+        if let Some(manifest) = manifest.as_ref() {
+            manifest
+                .validate_against_arrow_schema(physical_arrow_schema.as_ref())
+                .map_err(ManifestError::from)?;
+        }
         let (arrow_schema, visible_columns) =
-            visible_projection_from_manifest(&physical_arrow_schema, None)
-                .expect("write session schema projection should be valid");
+            visible_projection_from_manifest(&physical_arrow_schema, manifest.as_ref())?;
         let schema = arrow_schema.as_ref().try_into().ok();
-        Self {
+        Ok(Self {
             source: DatasetSource::WriteSession(source),
             schema,
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
-            manifest: None,
-        }
+            manifest,
+        })
     }
 
     pub(crate) fn open_dir(path: PathBuf) -> Result<Self, ReadError> {

@@ -104,7 +104,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::WriteSessionRegistry;
-    use crate::dataset::storage::ChunkReader;
+    use crate::dataset::{semantics::materialized_schema, storage::ChunkReader};
 
     fn test_schema() -> Arc<Schema> {
         Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]))
@@ -130,7 +130,10 @@ mod tests {
 
         guard.finalize_session().unwrap();
 
-        let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
+        let mut reader = ChunkReader::new(
+            dir.path().to_owned(),
+            Some(materialized_schema(test_schema().as_ref())),
+        );
         reader.read_all().unwrap();
         assert_eq!(reader.num_rows(), 3);
     }
@@ -147,7 +150,10 @@ mod tests {
 
         assert!(registry.get(1).is_none());
 
-        let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
+        let mut reader = ChunkReader::new(
+            dir.path().to_owned(),
+            Some(materialized_schema(test_schema().as_ref())),
+        );
         reader.read_all().unwrap();
         assert_eq!(reader.num_rows(), 1);
     }
@@ -160,7 +166,10 @@ mod tests {
 
         guard.finalize_session().unwrap();
 
-        let mut reader = ChunkReader::new(dir.path().to_owned(), Some(test_schema()));
+        let mut reader = ChunkReader::new(
+            dir.path().to_owned(),
+            Some(materialized_schema(test_schema().as_ref())),
+        );
         reader.read_all().unwrap();
         assert_eq!(reader.num_rows(), 0);
     }

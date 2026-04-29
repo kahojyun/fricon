@@ -303,6 +303,40 @@ mod tests {
     }
 
     #[test]
+    fn live_reader_interpretation_reads_manifest_when_present() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let user_schema = Arc::new(Schema::new(vec![Field::new(
+            "signal",
+            DataType::Float64,
+            false,
+        )]));
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )]);
+        let registry = crate::dataset::ingest::WriteSessionRegistry::new();
+        let mut guard = registry.start_session(7, dir.path().to_owned(), user_schema.clone());
+        guard
+            .write_batch(
+                RecordBatch::try_new(user_schema, vec![Arc::new(Float64Array::from(vec![10.0]))])
+                    .expect("batch"),
+            )
+            .expect("write batch");
+        let handle = registry.get(7).expect("active handle");
+
+        let reader =
+            crate::dataset::DatasetReader::from_handle(handle, Some(manifest)).expect("reader");
+        let interpretation = reader.interpret().expect("interpretation");
+
+        assert_eq!(interpretation.source, InterpretationSource::Manifest);
+        assert_eq!(
+            interpretation.columns[0].meaning,
+            ColumnMeaning::SystemRecordId
+        );
+        assert_eq!(interpretation.value_columns, vec![1]);
+    }
+
+    #[test]
     fn reader_interpretation_rejects_manifest_before_record_id_materialization() {
         let dir = tempfile::tempdir().expect("temp dir");
         let schema = Arc::new(Schema::new(vec![Field::new(
