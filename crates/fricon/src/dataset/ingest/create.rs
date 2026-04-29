@@ -115,12 +115,10 @@ where
 
     match terminal {
         CreateDatasetInput::Finish => {
-            if !manifest_written {
-                if let Err(error) = write_empty_manifest(&dataset_path) {
-                    debug!(error = %error, "Failed to write empty dataset semantic manifest");
-                    let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
-                    return Err(error);
-                }
+            if !manifest_written && let Err(error) = write_empty_manifest(&dataset_path) {
+                debug!(error = %error, "Failed to write empty dataset semantic manifest");
+                let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
+                return Err(error);
             }
             if let Some(session) = session.take()
                 && let Err(error) = session.finalize_session()
@@ -194,7 +192,10 @@ mod tests {
         dataset::{
             events::{DatasetEvent, test_utils::CollectEvents},
             model::{DatasetMetadata, DatasetStatus},
-            semantics::{DatasetDType, ManifestValidationError, RECORD_ID_COLUMN, read_manifest},
+            semantics::{
+                DatasetDType, ManifestError, ManifestValidationError, RECORD_ID_COLUMN,
+                read_manifest,
+            },
             storage::layout::manifest_path,
         },
         workspace::WorkspaceRoot,
@@ -493,7 +494,7 @@ mod tests {
         assert_eq!(repo.updated_statuses(), vec![DatasetStatus::Aborted]);
         assert!(matches!(
             error,
-            IngestError::Manifest(crate::dataset::semantics::ManifestError::Validation(
+            IngestError::Manifest(ManifestError::Validation(
                 ManifestValidationError::ReservedUserColumn { name }
             )) if name == "__ds_user"
         ));
