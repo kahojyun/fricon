@@ -155,7 +155,10 @@ impl From<IngestAppError> for Status {
                 error.to_string(),
             ),
             IngestAppError::Domain(
-                IngestError::Dataset(_) | IngestError::DatasetFs(_) | IngestError::Database(_),
+                IngestError::Dataset(_)
+                | IngestError::DatasetFs(_)
+                | IngestError::Manifest(_)
+                | IngestError::Database(_),
             ) => dataset_status(
                 Code::Internal,
                 DatasetTransportErrorCode::Internal,

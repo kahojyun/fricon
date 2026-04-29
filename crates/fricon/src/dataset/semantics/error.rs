@@ -42,4 +42,6 @@ pub enum ManifestValidationError {
         expected: String,
         found: String,
     },
+    #[error("Unsupported Arrow type for dataset semantic manifest column {name}: {found}")]
+    UnsupportedArrowType { name: String, found: String },
 }

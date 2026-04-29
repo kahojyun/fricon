@@ -65,6 +65,7 @@ where
     S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
 {
     let mut decoder = StreamDecoder::new();
+    let mut schema_sent = false;
 
     loop {
         tokio::select! {
@@ -74,6 +75,7 @@ where
                         match handle_stream_message(
                             request.create_message,
                             &mut decoder,
+                            &mut schema_sent,
                             &events_tx,
                         )
                         .await
@@ -139,10 +141,13 @@ async fn send_abort_and_error(
 async fn handle_stream_message(
     message: Option<CreateMessage>,
     decoder: &mut StreamDecoder,
+    schema_sent: &mut bool,
     events_tx: &mpsc::Sender<CreateDatasetInput>,
 ) -> Result<Option<CreateDatasetInput>, Status> {
     match message {
-        Some(CreateMessage::Payload(payload)) => decode_payload(payload, decoder, events_tx).await,
+        Some(CreateMessage::Payload(payload)) => {
+            decode_payload(payload, decoder, schema_sent, events_tx).await
+        }
         Some(CreateMessage::Metadata(_)) => {
             warn!("Unexpected metadata message after initial create metadata");
             Err(Status::invalid_argument(
@@ -171,18 +176,22 @@ async fn handle_stream_message(
 async fn decode_payload(
     payload: bytes::Bytes,
     decoder: &mut StreamDecoder,
+    schema_sent: &mut bool,
     events_tx: &mpsc::Sender<CreateDatasetInput>,
 ) -> Result<Option<CreateDatasetInput>, Status> {
     let mut buffer = Buffer::from(payload);
     while !buffer.is_empty() {
         match decoder.decode(&mut buffer) {
             Ok(Some(batch)) => {
+                send_schema_if_decoded(decoder, schema_sent, events_tx).await?;
                 events_tx
                     .send(CreateDatasetInput::Batch(batch))
                     .await
                     .map_err(|_| Status::internal("create ingest receiver dropped"))?;
             }
-            Ok(None) => {}
+            Ok(None) => {
+                send_schema_if_decoded(decoder, schema_sent, events_tx).await?;
+            }
             Err(error) => {
                 error!(error = %error, "Failed to decode Arrow payload");
                 return Err(Status::invalid_argument("failed to decode Arrow payload"));
@@ -190,6 +199,21 @@ async fn decode_payload(
         }
     }
     Ok(None)
+}
+
+async fn send_schema_if_decoded(
+    decoder: &StreamDecoder,
+    schema_sent: &mut bool,
+    events_tx: &mpsc::Sender<CreateDatasetInput>,
+) -> Result<(), Status> {
+    if !*schema_sent && let Some(schema) = decoder.schema() {
+        events_tx
+            .send(CreateDatasetInput::Schema(schema))
+            .await
+            .map_err(|_| Status::internal("create ingest receiver dropped"))?;
+        *schema_sent = true;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -267,6 +291,10 @@ mod tests {
         let (events, result) = collect_events(stream, CancellationToken::new()).await;
         assert!(result.is_ok());
 
+        assert!(matches!(
+            events.first(),
+            Some(CreateDatasetInput::Schema(_))
+        ));
         assert!(
             events
                 .iter()
