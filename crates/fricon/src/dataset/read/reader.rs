@@ -362,6 +362,7 @@ impl DatasetReader {
             return Ok(resolve_from_manifest(
                 self.physical_arrow_schema.as_ref(),
                 manifest,
+                &self.visible_columns,
             ));
         }
 

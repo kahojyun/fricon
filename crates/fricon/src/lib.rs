@@ -22,8 +22,9 @@ pub use self::{
         ColumnMeaning, DatasetArray, DatasetDataType, DatasetEvent, DatasetId,
         DatasetInterpretation, DatasetListQuery, DatasetMetadata, DatasetReader, DatasetRecord,
         DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus, DatasetUpdate,
-        FixedStepTrace, InterpretationSource, ResolvedColumn, ResolvedDuplicatePolicy, ScalarArray,
-        ScalarKind, SelectOptions, SortDirection, TraceKind, VariableStepTrace,
+        FixedStepTrace, InterpretationSource, PhysicalColumnOrdinal, ResolvedColumn,
+        ResolvedDuplicatePolicy, ScalarArray, ScalarKind, SelectOptions, SortDirection, TraceKind,
+        VariableStepTrace, VisibleColumnOrdinal,
     },
     workspace::{WorkspaceError, WorkspaceRoot, get_log_dir},
 };
