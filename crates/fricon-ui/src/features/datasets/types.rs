@@ -86,9 +86,13 @@ impl From<DatasetRecord> for DatasetInfo {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ColumnInfo {
     pub(crate) name: String,
+    pub(crate) label: Option<String>,
+    pub(crate) unit: Option<String>,
     pub(crate) is_complex: bool,
     pub(crate) is_trace: bool,
     pub(crate) is_index: bool,
+    pub(crate) hidden_by_default: bool,
+    pub(crate) is_chart_axis_candidate: bool,
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]

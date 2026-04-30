@@ -317,16 +317,33 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                 <TableHeader className="bg-muted/40 text-muted-foreground">
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Unit</TableHead>
                     <TableHead>Index</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Hints</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {detail.columns.map((column) => (
                     <TableRow key={column.name}>
-                      <TableCell>{column.name}</TableCell>
-                      <TableCell>{column.isIndex ? "✓" : ""}</TableCell>
-                      <TableCell>
+                      <TableCell className="max-w-40 truncate font-mono text-xs">
+                        {column.name}
+                      </TableCell>
+                      <TableCell className="max-w-40 truncate">
+                        {column.label ?? (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {column.unit ?? (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {column.isIndex ? "✓" : ""}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {column.isTrace ? (
                           <Badge variant="secondary">Trace</Badge>
                         ) : column.isComplex ? (
@@ -334,6 +351,20 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                         ) : (
                           <Badge variant="secondary">Scalar</Badge>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {column.hiddenByDefault ? (
+                            <Badge variant="outline">Hidden</Badge>
+                          ) : null}
+                          {column.isChartAxisCandidate ? (
+                            <Badge variant="secondary">Axis</Badge>
+                          ) : null}
+                          {!column.hiddenByDefault &&
+                          !column.isChartAxisCandidate ? (
+                            <span className="text-muted-foreground">-</span>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
