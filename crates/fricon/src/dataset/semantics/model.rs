@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use arrow_schema::{DataType, Field, Schema, TimeUnit};
 use serde::{Deserialize, Serialize};
@@ -57,9 +57,9 @@ impl DatasetSemanticManifest {
         &mut self,
         metadata: impl IntoIterator<Item = ColumnMetadata>,
     ) -> Result<(), ManifestValidationError> {
-        let mut seen = BTreeMap::new();
+        let mut seen = BTreeSet::new();
         for metadata in metadata {
-            if seen.insert(metadata.name.clone(), ()).is_some() {
+            if !seen.insert(metadata.name.clone()) {
                 return Err(ManifestValidationError::DuplicateColumnMetadata {
                     name: metadata.name,
                 });
@@ -256,6 +256,10 @@ impl ColumnMetadata {
     }
 }
 
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a predicate over a field reference"
+)]
 const fn is_false(value: &bool) -> bool {
     !*value
 }

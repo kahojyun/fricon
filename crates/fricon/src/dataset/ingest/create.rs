@@ -18,7 +18,9 @@ use crate::{
             WriteSessionRegistry,
         },
         model::{DatasetId, DatasetRecord, DatasetStatus},
-        semantics::{DatasetSemanticManifest, ManifestColumn, ManifestError, write_manifest},
+        semantics::{
+            ColumnMetadata, DatasetSemanticManifest, ManifestColumn, ManifestError, write_manifest,
+        },
         storage,
     },
     workspace::WorkspacePaths,
@@ -173,7 +175,7 @@ fn create_dataset_dir(paths: &WorkspacePaths, uid: Uuid) -> Result<PathBuf, Inge
 fn write_minimal_manifest(
     dataset_path: &std::path::Path,
     schema: &arrow_schema::Schema,
-    column_metadata: &[crate::dataset::semantics::ColumnMetadata],
+    column_metadata: &[ColumnMetadata],
 ) -> Result<(), IngestError> {
     let manifest = DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata(
         schema,
