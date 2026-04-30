@@ -84,6 +84,15 @@ Settled user-facing policies:
   entry points, not notebook conversion
 - Fricon should provide a guided extraction path from notebook or ad hoc script
   experiments to managed templates
+- default run names should use a template or script label plus timestamp
+- notes should be easy to add, but Fricon should not interrupt run start or
+  completion with required note prompts
+- interrupted partial datasets should default to `suspect` until the user
+  continues, validates, or invalidates them
+- run detail views should lead with produced datasets
+- provenance level should be shown as a plain label such as `Interactive` or
+  `Managed`, not as a numeric confidence score
+- generated snippets should prioritize reopening produced datasets from Python
 
 The next product discussion should be dataset semantics v1, especially the
 dataset facts needed to make retry append safe and explainable.
@@ -770,6 +779,90 @@ Runner concepts such as script runs should be shown as execution history or
 troubleshooting detail, not as a peer navigation object beside experiments and
 datasets in v1.
 
+## Quality Of Life Defaults
+
+Experiment-run UX should optimize for low-friction scientific work while still
+making provenance visible.
+
+### Naming
+
+Fricon should generate a useful default run name instead of requiring users to
+name every run.
+
+The default should combine a template or script label with a timestamp:
+
+```text
+cooldown_sweep 2026-04-30 14:32
+```
+
+Users should be able to rename the run later. Auto-generated names should be
+descriptive enough for recent-run lists without becoming a permanent source of
+scientific meaning.
+
+### Notes
+
+Notes should be optional and non-blocking.
+
+Fricon should not interrupt experiment start or completion with a required notes
+prompt. Users should be able to add or edit notes from the run detail view, and
+future UI can make notes easy to find without turning them into mandatory
+workflow steps.
+
+### Interrupted Partial Data
+
+When interruption leaves a partial dataset, Fricon should preserve the data and
+default the affected dataset or run quality to `suspect`.
+
+The recovery UI should make the next actions explicit:
+
+- continue same experiment
+- start new experiment
+- keep suspect
+- mark valid
+- invalidate
+
+This keeps failure visible without discarding useful partial data or implying
+that an interrupted dataset is fully trusted.
+
+### Run Detail Priority
+
+The top of the experiment-run detail view should lead with produced datasets.
+
+Recommended information order:
+
+```text
+datasets
+quality state
+parameter snapshot
+provenance level
+notes
+execution history
+```
+
+Users usually inspect outputs first. Parameter and execution provenance should
+be close enough to explain those outputs without making debugging details the
+primary browsing model.
+
+### Provenance Labels
+
+Runs should display a plain provenance label:
+
+```text
+Interactive
+Managed
+```
+
+Avoid numeric reproducibility or provenance scores. They imply precision Fricon
+cannot honestly provide, especially for notebook and ad hoc script workflows.
+
+### Python Snippets
+
+Generated snippets should first help users reopen produced datasets from Python.
+
+Re-run snippets, export/report snippets, and managed-template submission
+snippets are useful later, but read snippets best support the current
+dataset-first and Python-led route.
+
 ## Next Product Work
 
 The next product discussion should focus on dataset semantics v1 because
@@ -828,7 +921,6 @@ This proposal intentionally leaves the following to later focused designs:
 
 ## Open Questions
 
-- When should a partial dataset become `suspect`, `failed`, or still valid?
 - How should queue priority interact with already-running resource leases?
 - Should resource lease failures block a task, fail it, or leave it queued?
 - What facts must survive dataset archive export and import?
