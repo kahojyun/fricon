@@ -19,7 +19,8 @@ use crate::{
         },
         model::{DatasetId, DatasetRecord, DatasetStatus},
         semantics::{
-            ColumnMetadata, DatasetSemanticManifest, ManifestColumn, ManifestError, write_manifest,
+            ColumnMetadata, DatasetSemanticManifest, ManifestColumn, ManifestError, ScanPlan,
+            write_manifest,
         },
         storage,
     },
@@ -180,7 +181,7 @@ fn write_minimal_manifest(
     dataset_path: &std::path::Path,
     schema: &arrow_schema::Schema,
     column_metadata: &[ColumnMetadata],
-    scan_plan: Option<crate::dataset::semantics::ScanPlan>,
+    scan_plan: Option<ScanPlan>,
 ) -> Result<(), IngestError> {
     let manifest = DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata_and_scan(
         schema,
@@ -194,7 +195,7 @@ fn write_minimal_manifest(
 
 fn write_empty_manifest(
     dataset_path: &std::path::Path,
-    scan_plan: Option<crate::dataset::semantics::ScanPlan>,
+    scan_plan: Option<ScanPlan>,
 ) -> Result<(), IngestError> {
     let manifest = DatasetSemanticManifest::minimal(std::iter::empty::<(String, ManifestColumn)>())
         .with_scan_plan(scan_plan);

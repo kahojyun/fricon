@@ -177,7 +177,8 @@ pub(crate) fn resolve_logical_index_points(
                     let ScanAxisMode::Static { values } = &axis.mode else {
                         unreachable!("implicit axes handled earlier")
                     };
-                    values[*index as usize].clone()
+                    let index = usize::try_from(*index).expect("scan axis index should fit usize");
+                    values[index].clone()
                 })
                 .collect();
             ResolvedLogicalIndexPoint {

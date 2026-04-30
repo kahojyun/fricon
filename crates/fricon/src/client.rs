@@ -323,6 +323,10 @@ pub struct DatasetWriter {
 }
 
 impl DatasetWriter {
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "internal constructor mirrors dataset creation metadata plus runtime state"
+    )]
     fn new(
         client: Client,
         name: String,

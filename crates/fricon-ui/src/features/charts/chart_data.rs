@@ -699,6 +699,7 @@ mod tests {
                 vec![],
                 schema,
                 Vec::new(),
+                None,
             )
             .await?;
         for row in rows {
