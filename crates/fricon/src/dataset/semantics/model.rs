@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use arrow_schema::{DataType, Field, Schema, TimeUnit};
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,13 @@ impl DatasetSemanticManifest {
     }
 
     pub fn minimal_from_arrow_schema(schema: &Schema) -> Result<Self, ManifestValidationError> {
+        Self::minimal_from_arrow_schema_with_metadata(schema, std::iter::empty())
+    }
+
+    pub fn minimal_from_arrow_schema_with_metadata(
+        schema: &Schema,
+        metadata: impl IntoIterator<Item = ColumnMetadata>,
+    ) -> Result<Self, ManifestValidationError> {
         let columns = schema
             .fields()
             .iter()
@@ -40,9 +47,39 @@ impl DatasetSemanticManifest {
                 Ok((name, ManifestColumn::new(dtype)))
             })
             .collect::<Result<Vec<_>, ManifestValidationError>>()?;
-        let manifest = Self::minimal(columns);
+        let mut manifest = Self::minimal(columns);
+        manifest.apply_column_metadata(metadata)?;
         manifest.validate()?;
         Ok(manifest)
+    }
+
+    fn apply_column_metadata(
+        &mut self,
+        metadata: impl IntoIterator<Item = ColumnMetadata>,
+    ) -> Result<(), ManifestValidationError> {
+        let mut seen = BTreeSet::new();
+        for metadata in metadata {
+            if !seen.insert(metadata.name.clone()) {
+                return Err(ManifestValidationError::DuplicateColumnMetadata {
+                    name: metadata.name,
+                });
+            }
+            let column = self.columns.get_mut(&metadata.name).ok_or_else(|| {
+                ManifestValidationError::UnknownColumnMetadata {
+                    name: metadata.name.clone(),
+                }
+            })?;
+            if column.system.is_some() {
+                return Err(ManifestValidationError::InvalidSystemColumnMetadata {
+                    name: metadata.name,
+                });
+            }
+            column.unit = metadata.unit;
+            column.label = metadata.label;
+            column.hidden_by_default = metadata.hidden_by_default;
+            column.chart_axis = metadata.chart_axis;
+        }
+        Ok(())
     }
 
     pub fn validate(&self) -> Result<(), ManifestValidationError> {
@@ -130,6 +167,16 @@ impl DatasetSemanticManifest {
                         name: name.clone(),
                     });
                 }
+                Some(SystemColumn::RecordId)
+                    if column.unit.is_some()
+                        || column.label.is_some()
+                        || column.hidden_by_default
+                        || column.chart_axis =>
+                {
+                    return Err(ManifestValidationError::InvalidSystemColumnMetadata {
+                        name: name.clone(),
+                    });
+                }
                 None if name.starts_with(SYSTEM_COLUMN_PREFIX) => {
                     return Err(ManifestValidationError::ReservedUserColumn { name: name.clone() });
                 }
@@ -146,6 +193,14 @@ pub struct ManifestColumn {
     pub dtype: DatasetDType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub system: Option<SystemColumn>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub hidden_by_default: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub chart_axis: bool,
 }
 
 impl ManifestColumn {
@@ -154,6 +209,10 @@ impl ManifestColumn {
         Self {
             dtype,
             system: None,
+            unit: None,
+            label: None,
+            hidden_by_default: false,
+            chart_axis: false,
         }
     }
 
@@ -162,6 +221,10 @@ impl ManifestColumn {
         Self {
             dtype: DatasetDType::UInt64,
             system: Some(SystemColumn::RecordId),
+            unit: None,
+            label: None,
+            hidden_by_default: false,
+            chart_axis: false,
         }
     }
 
@@ -169,6 +232,36 @@ impl ManifestColumn {
     pub fn is_record_id(&self) -> bool {
         self.dtype == DatasetDType::UInt64 && self.system == Some(SystemColumn::RecordId)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnMetadata {
+    pub name: String,
+    pub unit: Option<String>,
+    pub label: Option<String>,
+    pub hidden_by_default: bool,
+    pub chart_axis: bool,
+}
+
+impl ColumnMetadata {
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            unit: None,
+            label: None,
+            hidden_by_default: false,
+            chart_axis: false,
+        }
+    }
+}
+
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a predicate over a field reference"
+)]
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -556,9 +649,10 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        Compatibility, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
-        IndexRealization, ManifestColumn, ManifestValidationError, RECORD_ID_COLUMN, Realization,
-        SystemColumn, TraceAxisDType, TraceDType, TraceLayout, TraceValueDType,
+        ColumnMetadata, Compatibility, DatasetDType, DatasetSemanticManifest,
+        DuplicateResolutionDefault, IndexRealization, ManifestColumn, ManifestValidationError,
+        RECORD_ID_COLUMN, Realization, SystemColumn, TraceAxisDType, TraceDType, TraceLayout,
+        TraceValueDType,
     };
 
     fn signal_columns() -> BTreeMap<String, ManifestColumn> {
@@ -650,6 +744,10 @@ mod tests {
             ManifestColumn {
                 dtype: DatasetDType::Int64,
                 system: Some(SystemColumn::RecordId),
+                unit: None,
+                label: None,
+                hidden_by_default: false,
+                chart_axis: false,
             },
         );
 
@@ -787,6 +885,72 @@ mod tests {
         assert_eq!(
             manifest.columns.get(RECORD_ID_COLUMN),
             Some(&ManifestColumn::record_id())
+        );
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_applies_column_metadata() {
+        let schema = Schema::new(vec![Field::new("signal", DataType::Float64, false)]);
+        let metadata = [ColumnMetadata {
+            name: "signal".to_string(),
+            unit: Some("V".to_string()),
+            label: Some("Voltage".to_string()),
+            hidden_by_default: true,
+            chart_axis: true,
+        }];
+
+        let manifest =
+            DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata(&schema, metadata)
+                .expect("manifest");
+        let signal = &manifest.columns["signal"];
+
+        assert_eq!(signal.unit.as_deref(), Some("V"));
+        assert_eq!(signal.label.as_deref(), Some("Voltage"));
+        assert!(signal.hidden_by_default);
+        assert!(signal.chart_axis);
+
+        let value = serde_json::to_value(&manifest).expect("serialize manifest");
+        assert_eq!(
+            value["columns"]["signal"],
+            json!({
+                "dtype": { "kind": "float64" },
+                "unit": "V",
+                "label": "Voltage",
+                "hidden_by_default": true,
+                "chart_axis": true
+            })
+        );
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_rejects_unknown_metadata_column() {
+        let schema = Schema::new(vec![Field::new("signal", DataType::Float64, false)]);
+
+        assert_eq!(
+            DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata(
+                &schema,
+                [ColumnMetadata::new("missing")]
+            ),
+            Err(ManifestValidationError::UnknownColumnMetadata {
+                name: "missing".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn validate_rejects_system_column_metadata() {
+        let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
+        manifest
+            .columns
+            .get_mut(RECORD_ID_COLUMN)
+            .expect("record id")
+            .label = Some("Record".to_string());
+
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestValidationError::InvalidSystemColumnMetadata {
+                name: RECORD_ID_COLUMN.to_string()
+            })
         );
     }
 

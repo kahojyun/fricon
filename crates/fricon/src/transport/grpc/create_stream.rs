@@ -7,8 +7,11 @@ use tonic::{Code, Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
-    dataset::{CreateDatasetInput, CreateDatasetRequest},
-    proto::{CreateMetadata, CreateRequest, create_request::CreateMessage},
+    dataset::{CreateDatasetInput, CreateDatasetRequest, semantics::ColumnMetadata},
+    proto::{
+        ColumnMetadata as ProtoColumnMetadata, CreateMetadata, CreateRequest,
+        create_request::CreateMessage,
+    },
 };
 
 pub(crate) struct CreateStreamParts {
@@ -34,6 +37,7 @@ pub(crate) async fn parse_create_stream(
         name,
         description,
         tags,
+        columns,
     })) = first_message.create_message
     else {
         warn!("First create stream message must be metadata");
@@ -50,10 +54,24 @@ pub(crate) async fn parse_create_stream(
             name,
             description,
             tags,
+            column_metadata: columns
+                .into_iter()
+                .map(column_metadata_from_proto)
+                .collect(),
         },
         events_rx,
         events_task,
     })
+}
+
+fn column_metadata_from_proto(value: ProtoColumnMetadata) -> ColumnMetadata {
+    ColumnMetadata {
+        name: value.name,
+        unit: value.unit,
+        label: value.label,
+        hidden_by_default: value.hidden_by_default,
+        chart_axis: value.chart_axis,
+    }
 }
 
 async fn produce_create_events<S>(
@@ -227,7 +245,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::proto::{CreateAbort, CreateFinish};
+    use crate::proto::{ColumnMetadata as ProtoColumnMetadata, CreateAbort, CreateFinish};
 
     fn payload_message(payload: bytes::Bytes) -> CreateRequest {
         CreateRequest {
@@ -253,6 +271,24 @@ mod tests {
                 name: "name".to_string(),
                 description: "desc".to_string(),
                 tags: vec![],
+                columns: vec![],
+            })),
+        }
+    }
+
+    fn metadata_message_with_columns() -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::Metadata(CreateMetadata {
+                name: "name".to_string(),
+                description: "desc".to_string(),
+                tags: vec![],
+                columns: vec![ProtoColumnMetadata {
+                    name: "signal".to_string(),
+                    unit: Some("V".to_string()),
+                    label: Some("Voltage".to_string()),
+                    hidden_by_default: true,
+                    chart_axis: true,
+                }],
             })),
         }
     }
@@ -301,6 +337,24 @@ mod tests {
                 .any(|event| matches!(event, CreateDatasetInput::Batch(_)))
         );
         assert!(matches!(events.last(), Some(CreateDatasetInput::Finish)));
+    }
+
+    #[test]
+    fn column_metadata_conversion_preserves_fields() {
+        let CreateMessage::Metadata(metadata) = metadata_message_with_columns()
+            .create_message
+            .expect("metadata message")
+        else {
+            panic!("expected metadata");
+        };
+        let column =
+            column_metadata_from_proto(metadata.columns.into_iter().next().expect("column"));
+
+        assert_eq!(column.name, "signal");
+        assert_eq!(column.unit.as_deref(), Some("V"));
+        assert_eq!(column.label.as_deref(), Some("Voltage"));
+        assert!(column.hidden_by_default);
+        assert!(column.chart_axis);
     }
 
     #[tokio::test]

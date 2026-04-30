@@ -206,6 +206,7 @@ mod tests {
                 String::new(),
                 vec!["test".to_string()],
                 schema,
+                Vec::new(),
             )
             .await?;
         for row in rows {

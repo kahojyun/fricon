@@ -496,6 +496,7 @@ impl AppHandle {
             name,
             description,
             tags,
+            column_metadata: Vec::new(),
         };
         self.run_ingest_task(
             "failed to join dataset create task",

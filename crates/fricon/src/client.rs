@@ -28,12 +28,14 @@ use crate::{
     dataset::{
         model::{DatasetRecord, DatasetStatus},
         schema::{DatasetArray, DatasetRow, DatasetSchema},
+        semantics::ColumnMetadata,
     },
     proto::{
-        AddTagsRequest, CreateAbort, CreateFinish, CreateMetadata, CreateRequest, CreateResponse,
-        GetRequest, RemoveTagsRequest, SearchRequest, UpdateRequest, VersionRequest,
-        create_request::CreateMessage, dataset_service_client::DatasetServiceClient,
-        fricon_service_client::FriconServiceClient, get_request::IdEnum,
+        AddTagsRequest, ColumnMetadata as ProtoColumnMetadata, CreateAbort, CreateFinish,
+        CreateMetadata, CreateRequest, CreateResponse, GetRequest, RemoveTagsRequest,
+        SearchRequest, UpdateRequest, VersionRequest, create_request::CreateMessage,
+        dataset_service_client::DatasetServiceClient, fricon_service_client::FriconServiceClient,
+        get_request::IdEnum,
     },
     transport::{
         grpc::{
@@ -180,6 +182,7 @@ impl Client {
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
+        column_metadata: Vec<ColumnMetadata>,
     ) -> Result<DatasetWriter, ClientError> {
         Ok(DatasetWriter::new(
             self.clone(),
@@ -187,6 +190,7 @@ impl Client {
             description,
             tags,
             schema,
+            column_metadata,
             tokio::runtime::Handle::current(),
         ))
     }
@@ -321,6 +325,7 @@ impl DatasetWriter {
         description: String,
         tags: Vec<String>,
         schema: DatasetSchema,
+        column_metadata: Vec<ColumnMetadata>,
         runtime: tokio::runtime::Handle,
     ) -> Self {
         let (tx, rx) = mpsc::channel::<StreamMessage>(16);
@@ -328,8 +333,14 @@ impl DatasetWriter {
         let arrow_schema = Arc::new(schema.to_arrow_schema());
         let connection_handle = runtime.spawn({
             let client = client.clone();
-            let request_stream =
-                build_request_stream(name, description, tags, arrow_schema.clone(), rx);
+            let request_stream = build_request_stream(
+                name,
+                description,
+                tags,
+                column_metadata,
+                arrow_schema.clone(),
+                rx,
+            );
             async move {
                 let request = Request::new(request_stream);
                 let response = client
@@ -482,10 +493,21 @@ fn finish_request() -> CreateRequest {
     }
 }
 
+fn column_metadata_to_proto(value: ColumnMetadata) -> ProtoColumnMetadata {
+    ProtoColumnMetadata {
+        name: value.name,
+        unit: value.unit,
+        label: value.label,
+        hidden_by_default: value.hidden_by_default,
+        chart_axis: value.chart_axis,
+    }
+}
+
 fn build_request_stream(
     name: String,
     description: String,
     tags: Vec<String>,
+    column_metadata: Vec<ColumnMetadata>,
     arrow_schema: SchemaRef,
     message_rx: mpsc::Receiver<StreamMessage>,
 ) -> impl Stream<Item = CreateRequest> {
@@ -495,6 +517,7 @@ fn build_request_stream(
                 name,
                 description,
                 tags,
+                columns: column_metadata.into_iter().map(column_metadata_to_proto).collect(),
             })),
         };
 
@@ -773,7 +796,8 @@ mod tests {
         split_payload_chunk,
     };
     use crate::{
-        APP_VERSION, IPC_PROTOCOL_VERSION, proto::create_request::CreateMessage,
+        APP_VERSION, IPC_PROTOCOL_VERSION, dataset::semantics::ColumnMetadata,
+        proto::create_request::CreateMessage,
         transport::grpc::dataset_service::DATASET_ERROR_CODE_METADATA_KEY,
     };
 
@@ -911,6 +935,7 @@ mod tests {
             "dataset".to_string(),
             "desc".to_string(),
             vec!["tag".to_string()],
+            Vec::new(),
             schema,
             message_rx,
         );
@@ -945,6 +970,7 @@ mod tests {
             "dataset".to_string(),
             "desc".to_string(),
             vec![],
+            Vec::new(),
             schema,
             message_rx,
         );
@@ -975,6 +1001,7 @@ mod tests {
             "dataset".to_string(),
             "desc".to_string(),
             vec![],
+            Vec::new(),
             schema,
             message_rx,
         );
@@ -990,6 +1017,42 @@ mod tests {
             messages[messages.len() - 1],
             CreateMessage::Abort(_)
         ));
+    }
+
+    #[tokio::test]
+    async fn build_request_stream_sends_column_metadata() {
+        let (message_tx, message_rx) = mpsc::channel(2);
+        drop(message_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec![],
+            vec![ColumnMetadata {
+                name: "x".to_string(),
+                unit: Some("V".to_string()),
+                label: Some("Voltage".to_string()),
+                hidden_by_default: true,
+                chart_axis: true,
+            }],
+            schema,
+            message_rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+        let CreateMessage::Metadata(metadata) = &messages[0] else {
+            panic!("first message should be metadata");
+        };
+
+        assert_eq!(metadata.columns.len(), 1);
+        assert_eq!(metadata.columns[0].name, "x");
+        assert_eq!(metadata.columns[0].unit.as_deref(), Some("V"));
+        assert_eq!(metadata.columns[0].label.as_deref(), Some("Voltage"));
+        assert!(metadata.columns[0].hidden_by_default);
+        assert!(metadata.columns[0].chart_axis);
     }
 
     #[test]

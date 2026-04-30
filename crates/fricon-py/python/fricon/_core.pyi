@@ -11,6 +11,7 @@ from numpy import floating
 from typing_extensions import Self
 
 __all__ = [
+    "Column",
     "Dataset",
     "DatasetManager",
     "DatasetWriter",
@@ -44,6 +45,32 @@ class Workspace:
     @property
     def dataset_manager(self) -> DatasetManager: ...
 
+_DeclaredColumnDType: TypeAlias = type[float] | type[complex] | type[Trace]
+
+@final
+class Column:
+    def __new__(
+        cls,
+        dtype: _DeclaredColumnDType | None = ...,
+        *,
+        unit: str | None = ...,
+        label: str | None = ...,
+        hidden_by_default: bool = ...,
+        chart_axis: bool = ...,
+    ) -> Self: ...
+    @property
+    def dtype(self) -> _DeclaredColumnDType | None: ...
+    @property
+    def unit(self) -> str | None: ...
+    @property
+    def label(self) -> str | None: ...
+    @property
+    def hidden_by_default(self) -> bool: ...
+    @property
+    def chart_axis(self) -> bool: ...
+
+_ColumnSpec: TypeAlias = _DeclaredColumnDType | Column
+
 @final
 class DatasetManager:
     def create(
@@ -52,6 +79,7 @@ class DatasetManager:
         *,
         description: str | None = ...,
         tags: Iterable[str] | None = ...,
+        columns: Mapping[str, _ColumnSpec] | None = ...,
     ) -> DatasetWriter: ...
     def open(
         self,

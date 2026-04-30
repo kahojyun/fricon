@@ -52,8 +52,10 @@ pub(crate) fn resolve_from_manifest(
                 },
                 is_index: false,
                 is_system: is_record_id,
-                hidden_by_default: is_record_id,
-                is_chart_axis_candidate: false,
+                hidden_by_default: is_record_id || column.hidden_by_default,
+                is_chart_axis_candidate: column.chart_axis,
+                unit: column.unit.clone(),
+                label: column.label.clone(),
             }
         })
         .collect();
@@ -63,12 +65,17 @@ pub(crate) fn resolve_from_manifest(
         .filter(|column| column.meaning == ColumnMeaning::UserValue)
         .filter_map(|column| column.visible_ordinal)
         .collect();
+    let chart_axis_candidate_columns = columns
+        .iter()
+        .filter(|column| column.is_chart_axis_candidate)
+        .filter_map(|column| column.visible_ordinal)
+        .collect();
 
     DatasetInterpretation {
         columns,
         value_columns,
         logical_index_columns: Vec::new(),
-        chart_axis_candidate_columns: Vec::new(),
+        chart_axis_candidate_columns,
         duplicate_policy: match manifest.realization.duplicate_resolution_default {
             DuplicateResolutionDefault::LatestByRecordId => {
                 ResolvedDuplicatePolicy::LatestByRecordIdPlaceholder
@@ -110,6 +117,8 @@ pub(crate) fn resolve_from_compatibility_inference(
                 is_system: false,
                 hidden_by_default: false,
                 is_chart_axis_candidate: is_index,
+                unit: None,
+                label: None,
             }
         })
         .collect();
@@ -230,6 +239,29 @@ mod tests {
         assert_eq!(signal.dtype, DatasetDType::Float64);
         assert!(!signal.is_system);
         assert!(!signal.hidden_by_default);
+    }
+
+    #[test]
+    fn manifest_interpretation_resolves_column_metadata() {
+        let mut signal = ManifestColumn::new(DatasetDType::Float64);
+        signal.unit = Some("V".to_string());
+        signal.label = Some("Voltage".to_string());
+        signal.hidden_by_default = true;
+        signal.chart_axis = true;
+        let manifest = DatasetSemanticManifest::minimal([("signal".to_string(), signal)]);
+        let schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]);
+
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
+        let signal = &interpretation.columns[1];
+
+        assert_eq!(signal.unit.as_deref(), Some("V"));
+        assert_eq!(signal.label.as_deref(), Some("Voltage"));
+        assert!(signal.hidden_by_default);
+        assert!(signal.is_chart_axis_candidate);
+        assert_eq!(interpretation.chart_axis_candidate_columns, visible(&[0]));
     }
 
     #[test]

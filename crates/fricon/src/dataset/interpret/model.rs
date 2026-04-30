@@ -31,6 +31,8 @@ pub struct ResolvedColumn {
     pub is_system: bool,
     pub hidden_by_default: bool,
     pub is_chart_axis_candidate: bool,
+    pub unit: Option<String>,
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

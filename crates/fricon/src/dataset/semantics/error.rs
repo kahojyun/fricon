@@ -30,8 +30,14 @@ pub enum ManifestValidationError {
     ReservedUserColumn { name: String },
     #[error("System column {name} is not valid in v1 dataset semantic manifests")]
     InvalidSystemColumn { name: String },
+    #[error("System column {name} cannot carry user column metadata")]
+    InvalidSystemColumnMetadata { name: String },
     #[error("Dataset semantic manifest v1 requires append_only=true")]
     AppendOnlyRequired,
+    #[error("Column metadata names a column that is not in the Arrow schema: {name}")]
+    UnknownColumnMetadata { name: String },
+    #[error("Column metadata was declared more than once: {name}")]
+    DuplicateColumnMetadata { name: String },
     #[error("Arrow schema is missing manifest column: {name}")]
     MissingArrowColumn { name: String },
     #[error("Arrow schema has a column not declared in the manifest: {name}")]

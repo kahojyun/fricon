@@ -27,8 +27,8 @@ mod convert;
 mod _core {
     #[pymodule_export]
     use super::{
-        Dataset, DatasetManager, DatasetWriter, FriconDatasetError, ServerHandle, Trace, Workspace,
-        serve_workspace,
+        Column, Dataset, DatasetManager, DatasetWriter, FriconDatasetError, ServerHandle, Trace,
+        Workspace, serve_workspace,
     };
     #[cfg(feature = "python-cli-entrypoints")]
     #[pymodule_export]
@@ -40,17 +40,17 @@ use std::{mem, path::PathBuf, time::Duration};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use fricon::{
-    Client, ClientError,
+    Client, ClientError, ColumnMetadata,
     app::AppManager,
     dataset::{
         model::{DatasetMetadata, DatasetRecord, DatasetStatus},
-        schema::{DatasetScalar, FixedStepTrace, VariableStepTrace},
+        schema::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace},
     },
 };
 use indexmap::IndexMap;
 use pyo3::{
     create_exception,
-    exceptions::{PyException, PyRuntimeError},
+    exceptions::{PyException, PyRuntimeError, PyTypeError, PyValueError},
     prelude::*,
     sync::PyOnceLock,
     types::{PyDict, PyList},
@@ -140,6 +140,198 @@ fn map_client_error(error: ClientError) -> PyErr {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeclaredDType {
+    Float,
+    Complex,
+    Trace,
+}
+
+#[derive(Clone)]
+struct ColumnDeclaration {
+    name: String,
+    dtype: Option<DeclaredDType>,
+    metadata: ColumnMetadata,
+}
+
+#[derive(Clone)]
+struct ColumnDeclarations(Vec<ColumnDeclaration>);
+
+impl ColumnDeclarations {
+    fn metadata(&self) -> Vec<ColumnMetadata> {
+        self.0
+            .iter()
+            .map(|declaration| declaration.metadata.clone())
+            .collect()
+    }
+}
+
+/// Stored column metadata for dataset creation.
+#[pyclass(module = "fricon._core")]
+pub struct Column {
+    dtype: Option<Py<PyAny>>,
+    unit: Option<String>,
+    label: Option<String>,
+    hidden_by_default: bool,
+    chart_axis: bool,
+}
+
+#[pymethods]
+impl Column {
+    #[new]
+    #[pyo3(signature=(dtype=None,*,unit=None,label=None,hidden_by_default=false,chart_axis=false))]
+    pub fn new(
+        dtype: Option<Py<PyAny>>,
+        unit: Option<String>,
+        label: Option<String>,
+        hidden_by_default: bool,
+        chart_axis: bool,
+    ) -> Self {
+        Self {
+            dtype,
+            unit,
+            label,
+            hidden_by_default,
+            chart_axis,
+        }
+    }
+
+    #[getter]
+    pub fn dtype(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.dtype.as_ref().map(|dtype| dtype.clone_ref(py))
+    }
+
+    #[getter]
+    pub fn unit(&self) -> Option<&str> {
+        self.unit.as_deref()
+    }
+
+    #[getter]
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_deref()
+    }
+
+    #[getter]
+    pub const fn hidden_by_default(&self) -> bool {
+        self.hidden_by_default
+    }
+
+    #[getter]
+    pub const fn chart_axis(&self) -> bool {
+        self.chart_axis
+    }
+}
+
+fn parse_declared_dtype(dtype: &Bound<'_, PyAny>) -> PyResult<DeclaredDType> {
+    let name: String = dtype.getattr("__name__")?.extract()?;
+    let module: String = dtype.getattr("__module__")?.extract()?;
+    match (module.as_str(), name.as_str()) {
+        ("builtins", "float") => Ok(DeclaredDType::Float),
+        ("builtins", "complex") => Ok(DeclaredDType::Complex),
+        ("fricon._core", "Trace") => Ok(DeclaredDType::Trace),
+        _ => Err(PyTypeError::new_err(format!(
+            "Unsupported column dtype {module}.{name}; expected float, complex, or Trace."
+        ))),
+    }
+}
+
+fn parse_column_spec(py: Python<'_>, name: String, spec: Py<PyAny>) -> PyResult<ColumnDeclaration> {
+    let bound = spec.bind(py);
+    if let Ok(column) = bound.extract::<PyRef<'_, Column>>() {
+        let dtype = column
+            .dtype
+            .as_ref()
+            .map(|dtype| parse_declared_dtype(dtype.bind(py)))
+            .transpose()?;
+        return Ok(ColumnDeclaration {
+            name: name.clone(),
+            dtype,
+            metadata: ColumnMetadata {
+                name,
+                unit: column.unit.clone(),
+                label: column.label.clone(),
+                hidden_by_default: column.hidden_by_default,
+                chart_axis: column.chart_axis,
+            },
+        });
+    }
+
+    Ok(ColumnDeclaration {
+        name: name.clone(),
+        dtype: Some(parse_declared_dtype(bound)?),
+        metadata: ColumnMetadata::new(name),
+    })
+}
+
+fn parse_column_declarations(
+    py: Python<'_>,
+    columns: Option<IndexMap<String, Py<PyAny>>>,
+) -> PyResult<Option<ColumnDeclarations>> {
+    let Some(columns) = columns else {
+        return Ok(None);
+    };
+    if columns.is_empty() {
+        return Err(PyValueError::new_err("columns must not be empty."));
+    }
+    let declarations = columns
+        .into_iter()
+        .map(|(name, spec)| parse_column_spec(py, name, spec))
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(Some(ColumnDeclarations(declarations)))
+}
+
+fn build_declared_row(
+    py: Python<'_>,
+    mut values: IndexMap<String, Py<PyAny>>,
+    declarations: &ColumnDeclarations,
+) -> PyResult<DatasetRow> {
+    let mut ordered = IndexMap::new();
+    for declaration in &declarations.0 {
+        let value = values.shift_remove(&declaration.name).ok_or_else(|| {
+            PyValueError::new_err(format!("Missing declared column '{}'.", declaration.name))
+        })?;
+        ordered.insert(declaration.name.clone(), value);
+    }
+    if let Some(extra) = values.keys().next() {
+        return Err(PyValueError::new_err(format!(
+            "Unexpected column '{extra}' was not declared."
+        )));
+    }
+
+    let row = convert::build_row(py, ordered)?;
+    for declaration in &declarations.0 {
+        if let Some(dtype) = declaration.dtype {
+            let scalar = &row.0[&declaration.name];
+            validate_declared_dtype(&declaration.name, dtype, scalar)?;
+        }
+    }
+    Ok(row)
+}
+
+fn validate_declared_dtype(
+    name: &str,
+    dtype: DeclaredDType,
+    scalar: &DatasetScalar,
+) -> PyResult<()> {
+    let matches = match dtype {
+        DeclaredDType::Float => matches!(scalar, DatasetScalar::Numeric(_)),
+        DeclaredDType::Complex => matches!(scalar, DatasetScalar::Complex(_)),
+        DeclaredDType::Trace => matches!(
+            scalar,
+            DatasetScalar::SimpleTrace(_)
+                | DatasetScalar::FixedStepTrace(_)
+                | DatasetScalar::VariableStepTrace(_)
+        ),
+    };
+    if matches {
+        Ok(())
+    } else {
+        Err(PyValueError::new_err(format!(
+            "Column '{name}' value does not match its declared dtype."
+        )))
+    }
+}
+
 /// A client of fricon workspace server.
 #[pyclass(module = "fricon._core", from_py_object)]
 #[derive(Clone)]
@@ -186,24 +378,29 @@ impl DatasetManager {
     ///     name: Name of the dataset.
     ///     description: Description of the dataset.
     ///     tags: Tags of the dataset. Duplicate tags will be added only once.
+    ///     columns: Optional stored column declarations and metadata.
     ///
     /// Returns:
     ///     A writer of the newly created dataset.
-    #[pyo3(signature = (name, *, description=None, tags=None))]
+    #[pyo3(signature = (name, *, description=None, tags=None, columns=None))]
     pub fn create(
         &self,
+        py: Python<'_>,
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
-    ) -> Result<DatasetWriter> {
+        columns: Option<IndexMap<String, Py<PyAny>>>,
+    ) -> PyResult<DatasetWriter> {
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
+        let columns = parse_column_declarations(py, columns)?;
 
         Ok(DatasetWriter::new(
             self.workspace.client.clone(),
             name,
             description,
             tags,
+            columns,
         ))
     }
 
@@ -553,8 +750,12 @@ enum WriterState {
         name: String,
         description: String,
         tags: Vec<String>,
+        columns: Option<ColumnDeclarations>,
     },
-    Writing(fricon::DatasetWriter),
+    Writing {
+        writer: fricon::DatasetWriter,
+        columns: Option<ColumnDeclarations>,
+    },
     Finished,
 }
 
@@ -569,13 +770,20 @@ pub struct DatasetWriter {
 }
 
 impl DatasetWriter {
-    const fn new(client: Client, name: String, description: String, tags: Vec<String>) -> Self {
+    fn new(
+        client: Client,
+        name: String,
+        description: String,
+        tags: Vec<String>,
+        columns: Option<ColumnDeclarations>,
+    ) -> Self {
         Self {
             state: WriterState::NotStarted {
                 client,
                 name,
                 description,
                 tags,
+                columns,
             },
             dataset: None,
         }
@@ -587,7 +795,7 @@ impl DatasetWriter {
         }
 
         match mem::replace(&mut self.state, WriterState::Finished) {
-            WriterState::Writing(writer) => {
+            WriterState::Writing { writer, .. } => {
                 let inner = if abort {
                     py.detach(|| get_runtime().block_on(writer.abort()))
                         .map_err(map_client_error)?
@@ -604,12 +812,14 @@ impl DatasetWriter {
                 name,
                 description,
                 tags,
+                columns,
             } => {
                 self.state = WriterState::NotStarted {
                     client,
                     name,
                     description,
                     tags,
+                    columns,
                 };
                 Err(generic_py_err("No data to finalize."))
             }
@@ -661,9 +871,17 @@ impl DatasetWriter {
                 name,
                 description,
                 tags,
+                columns,
             } => {
-                let row = convert::build_row(py, values)?;
+                let row = if let Some(columns) = columns.as_ref() {
+                    build_declared_row(py, values, columns)?
+                } else {
+                    convert::build_row(py, values)?
+                };
                 let schema = row.to_schema();
+                let column_metadata = columns
+                    .as_ref()
+                    .map_or_else(Vec::new, ColumnDeclarations::metadata);
                 let writer = py
                     .detach(|| -> std::result::Result<_, ClientError> {
                         let mut writer = get_runtime().block_on(client.create_dataset(
@@ -671,22 +889,30 @@ impl DatasetWriter {
                             description,
                             tags,
                             schema,
+                            column_metadata,
                         ))?;
                         get_runtime().block_on(writer.write(row))?;
                         Ok(writer)
                     })
                     .map_err(map_client_error)?;
-                self.state = WriterState::Writing(writer);
+                self.state = WriterState::Writing { writer, columns };
             }
-            WriterState::Writing(mut writer) => {
-                let row = convert::build_row(py, values)?;
+            WriterState::Writing {
+                mut writer,
+                columns,
+            } => {
+                let row = if let Some(columns) = columns.as_ref() {
+                    build_declared_row(py, values, columns)?
+                } else {
+                    convert::build_row(py, values)?
+                };
                 writer = py
                     .detach(|| -> std::result::Result<_, ClientError> {
                         get_runtime().block_on(writer.write(row))?;
                         Ok(writer)
                     })
                     .map_err(map_client_error)?;
-                self.state = WriterState::Writing(writer);
+                self.state = WriterState::Writing { writer, columns };
             }
             WriterState::Finished => {
                 return Err(generic_py_err("Writer closed."));
@@ -726,7 +952,7 @@ impl DatasetWriter {
             return Ok(());
         }
 
-        if matches!(self.state, WriterState::Writing(_)) {
+        if matches!(self.state, WriterState::Writing { .. }) {
             let _ = self.finish(py)?;
         } else {
             self.state = WriterState::Finished;
