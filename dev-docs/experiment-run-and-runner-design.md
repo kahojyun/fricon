@@ -23,9 +23,9 @@ The design should help users answer:
 - Which devices or local resources forced tasks to run sequentially?
 
 The proposal keeps the current route dataset-first, Python-led, and local-first.
-Python scripts remain the first execution entry point. The desktop UI may browse,
-inspect, enqueue, retry, and summarize work, but it should not become the primary
-experiment execution engine before the Python-led model is clear.
+Python scripts remain the first execution entry point. The desktop UI may
+browse, inspect, retry, continue, and summarize work, but it should not become
+the primary experiment execution engine before the Python-led model is clear.
 
 ## Classification
 
@@ -35,13 +35,52 @@ ADR need: create an ADR before implementation commits to durable identifiers,
 storage shape, retry/resume semantics, dataset append provenance, runner
 contracts, or resource lease behavior.
 
-This proposal depends on:
+The record-centric first slice depends on:
 
 - durable dataset semantics and append-order identity
 - minimal parameter snapshot binding
 - a policy for immutable facts versus correction or audit events
+
+Future runner implementation also depends on:
+
 - a local execution service that can coordinate workspace state and script
   processes
+
+## Settled PO Decisions For V1
+
+The first experiment-run product slice should be record-centric.
+
+V1 should promise:
+
+- record a scientific experiment attempt
+- bind one immutable effective parameter snapshot
+- link produced datasets
+- expose notes, quality state, and retry or continuation history
+- keep script execution details available as debugging context
+
+V1 should not promise a full generic runner implementation. The queue, script
+run, resource requirement, and resource lease model should be documented now so
+the experiment model does not block future execution work, but implementation
+can start with run records and dataset provenance.
+
+Settled user-facing policies:
+
+- every real experiment attempt gets a new `experiment_run_id`
+- interrupted continuation may reuse an existing `experiment_run_id`
+- continuation should require explicit user or API intent
+- every execution retry gets a new `script_run_id` when script-run records
+  exist
+- retry may append to an existing dataset only through explicit continuation
+  and compatibility checks
+- runner details are secondary UI information under execution history or
+  troubleshooting
+- analysis scripts are future derived-dataset provenance, not core
+  `ExperimentRun` v1 behavior
+- code and environment reproducibility should start as passive summary metadata,
+  not managed Git, `uv`, or `pixi` history
+
+The next product discussion should be dataset semantics v1, especially the
+dataset facts needed to make retry append safe and explainable.
 
 ## Product Goals
 
@@ -78,10 +117,10 @@ Retries should preserve enough context to explain what failed, what continued,
 which dataset records were appended, and whether the final output should be
 trusted.
 
-### Keep Scheduling Simple In V1
+### Keep Scheduling Simple For The Future Runner
 
-The first runner should use a global task queue with priority and local resource
-leases. It should not become a general workflow DAG engine.
+The future runner should use a global task queue with priority and local
+resource leases. It should not become a general workflow DAG engine.
 
 Future workflow, calibration, optimization, benchmark, and AI-assisted systems
 can define dependencies and approval checkpoints above the runner. The runner
@@ -101,6 +140,8 @@ This design should not introduce:
 - multi-user scheduling, permissions, accounts, or hosted workers
 - distributed locks or cluster execution
 - a full DAG scheduler in the runner layer
+- a requirement to implement the generic runner in the first experiment-run
+  slice
 - a broad hardware driver framework
 - desktop-first experiment execution as the primary product model
 - automatic parameter mutation after calibration
@@ -119,7 +160,7 @@ Experiment layer
   Dataset relationship
   DatasetWriteSession provenance
 
-Execution layer
+Future execution layer
   TaskQueueEntry
   ScriptRun
   ResourceRequirement
@@ -134,8 +175,8 @@ Future orchestration layer
   automation decisions
 ```
 
-The execution layer should remain generic. Higher layers may attach domain
-meaning to tasks and script runs.
+The execution layer should remain generic when it is implemented. Higher layers
+may attach domain meaning to tasks and script runs.
 
 ### Terms
 
@@ -186,7 +227,15 @@ or more script runs through write sessions.
 
 ## Relationships
 
-The preferred v1 relationship model is:
+The record-centric v1 subset is:
+
+```text
+ExperimentRun 1 -> many Dataset
+ExperimentRun 1 -> 1 EffectiveParameterSnapshot
+ExperimentRun 1 -> many DatasetWriteSession
+```
+
+When the generic runner is implemented, the fuller relationship model becomes:
 
 ```text
 ExperimentRun 1 -> many Dataset
@@ -205,6 +254,8 @@ Notes:
 - A script run may fail before writing any dataset records.
 - A dataset may have multiple write sessions when retry or continuation appends
   to the same logical dataset.
+- Before generic runner implementation, a write session may record only passive
+  execution metadata instead of a durable `script_run_id`.
 - Imported, processed, or simulation datasets may have different owning
   provenance in future designs.
 
@@ -236,21 +287,23 @@ Notes:
 
 ### Lifecycle
 
-Candidate states:
+The user-facing v1 outcome and quality vocabulary should stay small:
 
 ```text
-planned
-running
 completed
 failed
 aborted
-continued
+suspect
 invalidated
 ```
 
-State names should be narrowed before implementation. The key policy is that
-completed scientific facts should not be silently rewritten. Later changes
-should use correction, invalidation, or audit records.
+`completed`, `failed`, and `aborted` describe run outcome. `suspect` and
+`invalidated` describe later quality or trust decisions. Transient internal
+states such as `planned` or `running` may exist if needed, but they should not
+grow into a large user-facing status taxonomy.
+
+The key policy is that completed scientific facts should not be silently
+rewritten. Later changes should use correction, invalidation, or audit records.
 
 ## Parameter Snapshot Binding
 
@@ -279,7 +332,10 @@ the v1 user model.
 
 ## TaskQueueEntry
 
-`TaskQueueEntry` is the scheduler-facing record for work that may run.
+`TaskQueueEntry` is the future scheduler-facing record for work that may run.
+
+It is design guidance for the runner layer, not required for the first
+record-centric experiment-run implementation.
 
 Candidate fields:
 
@@ -320,6 +376,10 @@ runnable.
 
 `ScriptRun` records one execution attempt after a queued task starts.
 
+It should exist when Fricon owns script execution through a runner or queue.
+Before that layer exists, `ExperimentRun` and `DatasetWriteSession` may keep a
+passive execution summary for user-run Python scripts.
+
 Candidate fields:
 
 - `script_run_id`
@@ -353,6 +413,18 @@ lost
 calibration records, but the runner should not need to interpret those links to
 execute a script.
 
+Passive execution summary for the record-centric v1 slice may include:
+
+- script path or display name
+- arguments when known and safe to record
+- current working directory summary
+- Python version
+- Fricon package version
+- optional lock-file, script hash, or code reference when easy to capture
+
+This passive summary should not imply that Fricon manages Git history,
+environments, `uv`, or `pixi`.
+
 ## DatasetWriteSession
 
 `DatasetWriteSession` is the provenance bridge between script execution and
@@ -371,7 +443,7 @@ Candidate fields:
 
 - `dataset_write_session_id`
 - `dataset_id`
-- `script_run_id`
+- optional `script_run_id`
 - optional `experiment_run_id`
 - `status`
 - `started_at`
@@ -396,8 +468,8 @@ superseded
 
 Retry may append to an existing dataset only when:
 
-- the retry belongs to the same experiment run or is explicitly declared as a
-  continuation
+- the retry belongs to the same experiment run
+- the user or Python API explicitly declares continuation
 - the dataset schema is already frozen and unchanged
 - the dataset semantics and manifest are unchanged
 - append order is preserved by durable record identity
@@ -416,6 +488,10 @@ Retry should create a new dataset when:
 
 Device and execution conflicts should be expressed as named local resources
 rather than hard-coded device concepts.
+
+This section belongs to the future runner implementation. It should shape the
+model now, but resource leases do not need to ship with record-centric
+`ExperimentRun` v1.
 
 Candidate resource requirement fields:
 
@@ -442,8 +518,8 @@ device:lockin_1
 workspace:python-env
 ```
 
-V1 can implement leases with local workspace server coordination and SQLite
-transactions. It should not require distributed locks.
+The first runner implementation can implement leases with local workspace server
+coordination and SQLite transactions. It should not require distributed locks.
 
 The scheduler should start a task only after all required leases can be acquired
 or reserved according to the local policy.
@@ -452,8 +528,8 @@ or reserved according to the local policy.
 
 Retry rules:
 
-- every retry creates a new task queue entry
-- every retry execution creates a new script run
+- when the runner exists, every retry creates a new task queue entry
+- when script-run records exist, every retry execution creates a new script run
 - the new script run records `retry_of_script_run_id` or
   `continuation_of_script_run_id`
 - continuation may append to an existing dataset through a new write session
@@ -471,13 +547,13 @@ Start new experiment:
   changed
 ```
 
-The desktop UI may eventually ask the user to confirm whether a retry should
-continue an existing experiment run or start a new one when the answer is not
-obvious.
+The desktop UI or Python API should require explicit user intent before a retry
+continues an existing experiment run. The system may suggest continuation when
+state is compatible, but it should not silently infer it.
 
 ## Scheduling Model
 
-The v1 runner should use:
+When the runner is implemented, it should use:
 
 ```text
 global task queue + priority + resource leases
@@ -540,7 +616,8 @@ Runner-managed execution can be introduced separately:
 task = ws.queue_script("measure.py", args=["--sample", "A"])
 ```
 
-The exact API should be designed after storage and lifecycle policy are settled.
+Runner-managed execution should remain future scope until the record-centric
+experiment model is stable.
 
 ### Desktop UI
 
@@ -556,10 +633,49 @@ Desktop views should emphasize:
 Execution details should be available without becoming the primary concept users
 must understand to browse experiment results.
 
+Runner concepts such as script runs should be shown as execution history or
+troubleshooting detail, not as a peer navigation object beside experiments and
+datasets in v1.
+
+## Next Product Work
+
+The next product discussion should focus on dataset semantics v1 because
+experiment retry and dataset continuation depend on stable dataset facts.
+
+Questions to settle there:
+
+- durable append-order identity
+- dataset finalized versus continuable state
+- schema and manifest compatibility checks for continuation
+- column roles, axes, scan semantics, units, labels, and display hints
+- how partial writes and failed write sessions affect dataset quality state
+
+After that, the next product slices should be:
+
+- experiment run detail view
+- parameter snapshot binding and display
+- retry or continue UX
+- run notes and quality flags
+
+## Tech Lead Discussion Items
+
+Before implementation, discuss:
+
+- whether current dataset storage can safely support continuation append
+- how `DatasetWriteSession` state stays consistent with chunk writes
+- crash recovery when the server, Python script, or device communication dies
+- atomicity across experiment-run state, dataset state, and write-session state
+- which passive code and environment fields can be captured reliably
+- whether to reserve storage for future `TaskQueueEntry` and `ScriptRun` now or
+  defer it until runner implementation
+- which states are user-facing contracts and which remain internal storage
+  states
+
 ## Future Scope
 
 This proposal intentionally leaves the following to later focused designs:
 
+- generic runner, task queue, script-run, and resource-lease implementation
 - workflow definitions, workflow runs, and step dependency semantics
 - calibration proposal, validation, and promotion flows
 - analysis run taxonomy for derived datasets
@@ -570,15 +686,7 @@ This proposal intentionally leaves the following to later focused designs:
 
 ## Open Questions
 
-- Which lifecycle state names should become durable public or storage-facing
-  terms?
-- Should continuation of an experiment run require explicit user confirmation?
 - When should a partial dataset become `suspect`, `failed`, or still valid?
-- What minimal code reference should be captured without surprising users or
-  turning Fricon into a Git client?
-- Which environment facts should be captured by default?
-- Should analysis scripts attach to an existing experiment run, create separate
-  analysis runs, or both?
 - How should queue priority interact with already-running resource leases?
 - Should resource lease failures block a task, fail it, or leave it queued?
 - What facts must survive dataset archive export and import?
