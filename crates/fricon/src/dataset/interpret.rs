@@ -21,7 +21,6 @@ pub(crate) fn resolve_from_manifest(
     arrow_schema: &Schema,
     manifest: &DatasetSemanticManifest,
     visible_columns: &[usize],
-    record_ids: &[u64],
 ) -> DatasetInterpretation {
     let visible_ordinals: HashMap<_, _> = visible_columns
         .iter()
@@ -73,7 +72,6 @@ pub(crate) fn resolve_from_manifest(
         .filter_map(|column| column.visible_ordinal)
         .collect();
     let scan_axes = resolve_scan_axes(manifest);
-    let logical_index_points = resolve_logical_index_points(manifest, record_ids);
 
     DatasetInterpretation {
         columns,
@@ -90,7 +88,7 @@ pub(crate) fn resolve_from_manifest(
             IndexRealization::Implicit => ResolvedIndexRealization::Implicit,
         },
         scan_axes,
-        logical_index_points,
+        logical_index_points: Vec::new(),
         source: InterpretationSource::Manifest,
     }
 }
@@ -117,7 +115,7 @@ fn resolve_scan_axes(manifest: &DatasetSemanticManifest) -> Vec<ResolvedScanAxis
         })
 }
 
-fn resolve_logical_index_points(
+pub(crate) fn resolve_logical_index_points(
     manifest: &DatasetSemanticManifest,
     record_ids: &[u64],
 ) -> Vec<ResolvedLogicalIndexPoint> {
@@ -153,8 +151,10 @@ fn resolve_logical_index_points(
             ScanAxisMode::ImplicitIndex => 0,
         })
         .collect();
-    let planned_len = shapes.iter().copied().product::<u64>();
-    if planned_len == 0 {
+    let planned_len = shapes
+        .iter()
+        .try_fold(1_u64, |acc, len| acc.checked_mul(*len));
+    if planned_len == Some(0) {
         return Vec::new();
     }
 
@@ -162,7 +162,8 @@ fn resolve_logical_index_points(
         .iter()
         .copied()
         .map(|record_id| {
-            let mut remainder = record_id % planned_len;
+            let mut remainder =
+                planned_len.map_or(record_id, |planned_len| record_id % planned_len);
             let mut indices = vec![0; shapes.len()];
             for axis_index in (0..shapes.len()).rev() {
                 let len = shapes[axis_index];
@@ -282,7 +283,7 @@ mod tests {
     use super::{
         ColumnMeaning, InterpretationSource, PhysicalColumnOrdinal, ResolvedDuplicatePolicy,
         ResolvedIndexRealization, ResolvedLogicalIndexPoint, ResolvedScanAxisMode,
-        VisibleColumnOrdinal, resolve_from_manifest,
+        VisibleColumnOrdinal, resolve_from_manifest, resolve_logical_index_points,
     };
     use crate::dataset::{
         DatasetReader,
@@ -312,7 +313,7 @@ mod tests {
             Field::new("signal", DataType::Float64, false),
         ]);
 
-        let interpretation = resolve_from_manifest(&schema, &manifest, &[1], &[]);
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
@@ -362,7 +363,7 @@ mod tests {
             Field::new("signal", DataType::Float64, false),
         ]);
 
-        let interpretation = resolve_from_manifest(&schema, &manifest, &[1], &[]);
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
         let signal = &interpretation.columns[1];
 
         assert_eq!(signal.unit.as_deref(), Some("V"));
@@ -390,7 +391,7 @@ mod tests {
             Field::new("signal", DataType::Float64, false),
         ]);
 
-        let interpretation = resolve_from_manifest(&schema, &manifest, &[1], &[0, 1, 2, 3, 4]);
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
 
         assert_eq!(
             interpretation.index_realization,
@@ -401,8 +402,10 @@ mod tests {
             interpretation.scan_axes[0].mode,
             ResolvedScanAxisMode::Static { .. }
         ));
+        assert_eq!(interpretation.logical_index_points, Vec::new());
+        let logical_index_points = resolve_logical_index_points(&manifest, &[0, 1, 2, 3, 4]);
         assert_eq!(
-            interpretation.logical_index_points,
+            logical_index_points,
             vec![
                 ResolvedLogicalIndexPoint {
                     record_id: 0,
@@ -434,6 +437,28 @@ mod tests {
     }
 
     #[test]
+    fn implicit_scan_index_derivation_handles_shape_larger_than_u64() {
+        let axes = (0..64)
+            .map(|index| {
+                ScanAxis::static_values(
+                    format!("axis_{index}"),
+                    vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)],
+                )
+            })
+            .collect();
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(axes)));
+
+        let points = resolve_logical_index_points(&manifest, &[u64::MAX]);
+
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].indices, vec![1; 64]);
+    }
+
+    #[test]
     fn manifest_interpretation_derives_unknown_length_index_from_record_ids() {
         let manifest = DatasetSemanticManifest::minimal([(
             "loss".to_string(),
@@ -447,15 +472,17 @@ mod tests {
             Field::new("loss", DataType::Float64, false),
         ]);
 
-        let interpretation = resolve_from_manifest(&schema, &manifest, &[1], &[0, 1, 2]);
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
 
         assert_eq!(interpretation.scan_axes[0].name, "step");
         assert!(matches!(
             interpretation.scan_axes[0].mode,
             ResolvedScanAxisMode::ImplicitIndex
         ));
+        assert_eq!(interpretation.logical_index_points, Vec::new());
+        let logical_index_points = resolve_logical_index_points(&manifest, &[0, 1, 2]);
         assert_eq!(
-            interpretation.logical_index_points,
+            logical_index_points,
             vec![
                 ResolvedLogicalIndexPoint {
                     record_id: 0,
@@ -656,9 +683,10 @@ mod tests {
             interpretation.duplicate_policy,
             ResolvedDuplicatePolicy::LatestByRecordId
         );
+        assert_eq!(interpretation.logical_index_points, Vec::new());
+        let logical_index_points = reader.logical_index_points().expect("logical index points");
         assert_eq!(
-            interpretation
-                .logical_index_points
+            logical_index_points
                 .iter()
                 .map(|point| point.indices.clone())
                 .collect::<Vec<_>>(),
@@ -699,9 +727,10 @@ mod tests {
         let reader = DatasetReader::open_dir(dir.path()).expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
+        assert_eq!(interpretation.logical_index_points, Vec::new());
+        let logical_index_points = reader.logical_index_points().expect("logical index points");
         assert_eq!(
-            interpretation
-                .logical_index_points
+            logical_index_points
                 .iter()
                 .map(|point| point.coordinates.clone())
                 .collect::<Vec<_>>(),

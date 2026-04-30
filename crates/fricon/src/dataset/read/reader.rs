@@ -10,7 +10,8 @@ use itertools::Itertools;
 use crate::dataset::{
     ingest::WriteSessionHandle,
     interpret::{
-        DatasetInterpretation, resolve_from_compatibility_inference, resolve_from_manifest,
+        DatasetInterpretation, ResolvedLogicalIndexPoint, resolve_from_compatibility_inference,
+        resolve_from_manifest, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
@@ -360,16 +361,10 @@ impl DatasetReader {
             manifest
                 .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
-            let record_ids = if manifest.scan_plan.is_some() {
-                self.record_ids()?
-            } else {
-                Vec::new()
-            };
             return Ok(resolve_from_manifest(
                 self.physical_arrow_schema.as_ref(),
                 manifest,
                 &self.visible_columns,
-                &record_ids,
             ));
         }
 
@@ -377,6 +372,19 @@ impl DatasetReader {
             self.schema()?,
             self.try_index_columns()?,
         ))
+    }
+
+    pub fn logical_index_points(&self) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
+        let Some(manifest) = &self.manifest else {
+            return Ok(Vec::new());
+        };
+        manifest
+            .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
+            .map_err(ManifestError::from)?;
+        if manifest.scan_plan.is_none() {
+            return Ok(Vec::new());
+        }
+        Ok(resolve_logical_index_points(manifest, &self.record_ids()?))
     }
 
     fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
