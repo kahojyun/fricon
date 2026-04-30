@@ -34,6 +34,8 @@ pub enum ManifestValidationError {
     InvalidSystemColumnMetadata { name: String },
     #[error("Dataset semantic manifest v1 requires append_only=true")]
     AppendOnlyRequired,
+    #[error("Dataset semantic manifest scan plan must contain at least one axis")]
+    EmptyScanPlan,
     #[error("Dataset semantic manifest scan axis name must not be empty")]
     EmptyScanAxisName,
     #[error("Dataset semantic manifest scan axis {name} uses reserved system prefix")]

@@ -246,7 +246,7 @@ impl ScanPlan {
 
     pub fn validate(&self) -> Result<(), ManifestValidationError> {
         if self.axes.is_empty() {
-            return Err(ManifestValidationError::EmptyScanAxisName);
+            return Err(ManifestValidationError::EmptyScanPlan);
         }
 
         let mut seen = BTreeSet::new();
@@ -956,6 +956,13 @@ mod tests {
 
     #[test]
     fn validate_scan_plan_rejects_unsupported_v1_shapes() {
+        let empty_plan = DatasetSemanticManifest::minimal(signal_columns())
+            .with_scan_plan(Some(ScanPlan::new(vec![])));
+        assert_eq!(
+            empty_plan.validate(),
+            Err(ManifestValidationError::EmptyScanPlan)
+        );
+
         let mixed = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
             ScanPlan::new(vec![
                 ScanAxis::static_values("gate", vec![ScanAxisValue::Float(0.0)]),
