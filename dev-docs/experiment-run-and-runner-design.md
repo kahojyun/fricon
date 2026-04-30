@@ -65,6 +65,8 @@ can start with run records and dataset provenance.
 
 Settled user-facing policies:
 
+- experiment submission should support two product modes:
+  interactive runs and managed submitted runs
 - every real experiment attempt gets a new `experiment_run_id`
 - interrupted continuation may reuse an existing `experiment_run_id`
 - continuation should require explicit user or API intent
@@ -78,6 +80,10 @@ Settled user-facing policies:
   `ExperimentRun` v1 behavior
 - code and environment reproducibility should start as passive summary metadata,
   not managed Git, `uv`, or `pixi` history
+- managed submitted runs should start from importable Python functions or module
+  entry points, not notebook conversion
+- Fricon should provide a guided extraction path from notebook or ad hoc script
+  experiments to managed templates
 
 The next product discussion should be dataset semantics v1, especially the
 dataset facts needed to make retry append safe and explainable.
@@ -594,6 +600,123 @@ Actions that likely need durable audit or event records:
 Audit records should summarize user-visible mutations without exposing internal
 storage paths or protocol details as the user model.
 
+## Experiment Submission UX And Provenance Levels
+
+Fricon should support two experiment submission modes with different provenance
+promises.
+
+This split reflects common scientific Python practice:
+
+- users often start in ad hoc notebooks or scripts because iteration is fast
+- repeated measurements are later extracted into reusable Python functions or
+  modules
+- old approaches often pass save paths, experiment names, and local parameter
+  values manually, then store important parameters in dataset metadata
+- Fricon should improve traceability without making early exploration
+  cumbersome
+
+The two modes should share the same experiment and dataset concepts, but they
+should not pretend to provide the same reproducibility guarantees.
+
+### Interactive Run
+
+Interactive runs are user-controlled runs from notebooks, REPL sessions, or ad
+hoc scripts.
+
+Use this mode for:
+
+- exploratory measurement
+- fast iteration and debugging
+- one-off experiments
+- gradual migration from existing notebooks or local scripts
+
+In this mode, the user script controls the experiment lifecycle directly through
+the Python API.
+
+Fricon should record:
+
+- `ExperimentRun`
+- effective parameter snapshot or user-provided parameter summary
+- produced datasets
+- dataset write sessions when datasets are appended
+- notes, quality state, and explicit continuation decisions
+- passive code and environment summary when available
+
+Fricon should not over-promise:
+
+- complete notebook state capture
+- complete imported code history
+- automatic retry
+- resource leases
+- queue priority
+- complete stdout or stderr capture
+- replayable execution entry point
+
+This mode is still a first-class product path. It should make lightweight
+experiment records useful without forcing users to adopt a runner before their
+experiment has stabilized.
+
+### Managed Submitted Run
+
+Managed submitted runs are system-executed runs from an importable Python
+function or module entry point.
+
+Use this mode for:
+
+- repeated measurements
+- important data collection
+- experiments that need stronger provenance
+- runs that need retry or continuation support
+- future resource leases, queueing, workflow, calibration, or automation
+
+The first managed template contract should be an importable Python function or
+module entry point that receives a Fricon execution context and resolved
+parameters. The exact decorator, context object, and submission API should be
+designed later.
+
+When the runner exists, Fricon can own:
+
+- task queue entry
+- script run record
+- resolved immutable parameter snapshot
+- logs, exit status, and failure reason
+- resource requirements and leases
+- retry and continuation records
+- dataset write sessions
+- stronger code and environment references
+
+Managed submitted runs are the bridge toward future workflow and calibration
+automation, but they should not require a full workflow engine.
+
+### Guided Extraction Path
+
+Fricon should help users move from interactive exploration to managed submitted
+runs without treating notebooks as a mistake.
+
+The product should favor guided extraction over automatic conversion:
+
+```text
+notebook or ad hoc script
+  -> interactive experiment run
+  -> reusable Python function or module
+  -> managed submitted run
+  -> future workflow or calibration template
+```
+
+Possible aids:
+
+- generated Python snippets from an interactive run
+- template skeletons that use the same dataset and parameter APIs
+- desktop links from a run detail view back to relevant Python snippets
+- validation that important parameters are captured as run parameters or
+  parameter snapshots instead of dataset metadata
+- warnings when a managed template writes important experiment context only into
+  dataset-local metadata
+
+Important experiment facts should move toward run records, parameter snapshots,
+and provenance links. Dataset metadata should remain focused on dataset-local
+semantics such as columns, axes, units, display hints, and scan interpretation.
+
 ## UI And Python API Direction
 
 ### Python API
@@ -602,7 +725,7 @@ The first public API should keep simple data collection scripts ergonomic.
 Users should not need to construct raw runner records for common measurement
 workflows.
 
-Possible future shape:
+Possible interactive shape:
 
 ```python
 with ws.experiment_run("cooldown sweep", params="main") as run:
@@ -610,10 +733,18 @@ with ws.experiment_run("cooldown sweep", params="main") as run:
         ds.write(freq=..., s21=...)
 ```
 
-Runner-managed execution can be introduced separately:
+Possible managed template shape:
 
 ```python
-task = ws.queue_script("measure.py", args=["--sample", "A"])
+def cooldown_sweep(ctx, params):
+    with ctx.dataset("s21") as ds:
+        ds.write(freq=..., s21=...)
+```
+
+Managed execution can be introduced separately:
+
+```python
+task = ws.submit_experiment(cooldown_sweep, params="main")
 ```
 
 Runner-managed execution should remain future scope until the record-centric
@@ -626,9 +757,11 @@ Desktop views should emphasize:
 - experiment outputs and quality state
 - produced datasets
 - parameter snapshot used by the experiment
+- provenance level: interactive or managed
 - script execution history for debugging
 - retry or continue actions when safe
 - resource conflicts and queue status when tasks are managed by Fricon
+- guided extraction from interactive runs to reusable templates
 
 Execution details should be available without becoming the primary concept users
 must understand to browse experiment results.
@@ -655,6 +788,8 @@ After that, the next product slices should be:
 - experiment run detail view
 - parameter snapshot binding and display
 - retry or continue UX
+- interactive versus managed provenance indicators
+- guided extraction from notebook or ad hoc script to importable template
 - run notes and quality flags
 
 ## Tech Lead Discussion Items
@@ -670,12 +805,19 @@ Before implementation, discuss:
   defer it until runner implementation
 - which states are user-facing contracts and which remain internal storage
   states
+- what can be passively captured from notebooks or ad hoc scripts without
+  creating false reproducibility claims
+- how an importable function template should be loaded, invoked, and isolated
+  when managed submission is implemented
+- how to validate that managed templates record important experiment context in
+  run or parameter records rather than dataset-local metadata
 
 ## Future Scope
 
 This proposal intentionally leaves the following to later focused designs:
 
 - generic runner, task queue, script-run, and resource-lease implementation
+- managed submitted run execution and template registry behavior
 - workflow definitions, workflow runs, and step dependency semantics
 - calibration proposal, validation, and promotion flows
 - analysis run taxonomy for derived datasets
