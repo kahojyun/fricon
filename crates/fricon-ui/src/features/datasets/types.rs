@@ -83,6 +83,10 @@ impl From<DatasetRecord> for DatasetInfo {
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "dataset detail columns are serialized UI-facing flag projections"
+)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ColumnInfo {
     pub(crate) name: String,
