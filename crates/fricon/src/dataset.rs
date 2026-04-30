@@ -26,6 +26,7 @@ pub use self::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
+    semantics::ColumnMetadata,
 };
 pub(crate) use self::{
     ingest::{CreateDatasetInput, CreateDatasetRequest},

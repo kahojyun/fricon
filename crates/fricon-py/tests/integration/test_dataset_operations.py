@@ -5,6 +5,7 @@ Integration tests for dataset operations.
 from __future__ import annotations
 
 import gc
+import json
 import tempfile
 import time
 from pathlib import Path
@@ -62,6 +63,86 @@ class TestDatasetOperations:
             assert datasets.iloc[0]["name"] == "context_test"
 
             # Explicitly shutdown the server
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_column_metadata_round_trips_to_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            with dm.create(
+                "column_metadata",
+                columns={
+                    "voltage": fricon.Column(
+                        float,
+                        unit="V",
+                        label="Voltage",
+                        hidden_by_default=True,
+                        chart_axis=True,
+                    ),
+                    "measurement": complex,
+                },
+            ) as writer:
+                writer.write(measurement=1.0 + 2.0j, voltage=0.25)
+                dataset = writer.finish()
+
+            manifest_path = Path(dataset.path) / "dataset_manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            voltage = manifest["columns"]["voltage"]
+            assert voltage["dtype"] == {"kind": "float64"}
+            assert voltage["unit"] == "V"
+            assert voltage["label"] == "Voltage"
+            assert voltage["hidden_by_default"] is True
+            assert voltage["chart_axis"] is True
+            assert manifest["columns"]["measurement"]["dtype"] == {"kind": "complex128"}
+            assert dataset.to_arrow().column_names == ["voltage", "measurement"]
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_column_metadata_can_infer_dtype(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            with dm.create(
+                "metadata_only",
+                columns={"phase": fricon.Column(unit="rad")},
+            ) as writer:
+                writer.write(phase=1.5)
+                dataset = writer.finish()
+
+            manifest = json.loads(
+                (Path(dataset.path) / "dataset_manifest.json").read_text()
+            )
+            phase = manifest["columns"]["phase"]
+            assert phase["dtype"] == {"kind": "float64"}
+            assert phase["unit"] == "rad"
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_declared_columns_require_exact_first_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            writer = dm.create("missing_column", columns={"voltage": float})
+            with pytest.raises(ValueError, match="Missing declared column 'voltage'"):
+                writer.write(current=1.0)
+
+            writer = dm.create("extra_column", columns={"voltage": float})
+            with pytest.raises(ValueError, match="Unexpected column 'current'"):
+                writer.write(voltage=1.0, current=2.0)
+
+            writer = dm.create("wrong_dtype", columns={"measurement": complex})
+            with pytest.raises(ValueError, match="declared dtype"):
+                writer.write(measurement=1.0)
+
             server_handle.shutdown()
             assert not server_handle.is_running
 

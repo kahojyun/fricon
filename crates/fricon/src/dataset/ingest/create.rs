@@ -76,7 +76,11 @@ where
         match event {
             CreateDatasetInput::Schema(schema) => {
                 if !manifest_written {
-                    if let Err(error) = write_minimal_manifest(&dataset_path, schema.as_ref()) {
+                    if let Err(error) = write_minimal_manifest(
+                        &dataset_path,
+                        schema.as_ref(),
+                        &request.column_metadata,
+                    ) {
                         debug!(error = %error, "Failed to write dataset semantic manifest");
                         let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
                         return Err(error);
@@ -86,7 +90,11 @@ where
             }
             CreateDatasetInput::Batch(batch) => {
                 if !manifest_written {
-                    if let Err(error) = write_minimal_manifest(&dataset_path, batch.schema_ref()) {
+                    if let Err(error) = write_minimal_manifest(
+                        &dataset_path,
+                        batch.schema_ref(),
+                        &request.column_metadata,
+                    ) {
                         debug!(error = %error, "Failed to write dataset semantic manifest");
                         let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
                         return Err(error);
@@ -165,9 +173,13 @@ fn create_dataset_dir(paths: &WorkspacePaths, uid: Uuid) -> Result<PathBuf, Inge
 fn write_minimal_manifest(
     dataset_path: &std::path::Path,
     schema: &arrow_schema::Schema,
+    column_metadata: &[crate::dataset::semantics::ColumnMetadata],
 ) -> Result<(), IngestError> {
-    let manifest =
-        DatasetSemanticManifest::minimal_from_arrow_schema(schema).map_err(ManifestError::from)?;
+    let manifest = DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata(
+        schema,
+        column_metadata.iter().cloned(),
+    )
+    .map_err(ManifestError::from)?;
     write_manifest(dataset_path, &manifest)?;
     Ok(())
 }
@@ -193,8 +205,8 @@ mod tests {
             events::{DatasetEvent, test_utils::CollectEvents},
             model::{DatasetMetadata, DatasetStatus},
             semantics::{
-                DatasetDType, ManifestError, ManifestValidationError, RECORD_ID_COLUMN,
-                read_manifest,
+                ColumnMetadata, DatasetDType, ManifestError, ManifestValidationError,
+                RECORD_ID_COLUMN, read_manifest,
             },
             storage::layout::manifest_path,
         },
@@ -288,6 +300,7 @@ mod tests {
             name: "dataset".to_string(),
             description: "desc".to_string(),
             tags: vec!["tag".to_string()],
+            column_metadata: Vec::new(),
         }
     }
 
@@ -426,6 +439,43 @@ mod tests {
         assert_eq!(manifest.columns["id"].dtype, DatasetDType::Float64);
         assert!(manifest.realization.append_only);
         assert!(manifest.compatibility.allow_inference);
+    }
+
+    #[test]
+    fn schema_write_persists_column_metadata() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
+        let paths = workspace.paths().clone();
+        let repo = FakeRepo::new();
+        let events = CollectEvents::default();
+        let write_sessions = WriteSessionRegistry::new();
+        let mut request = create_request();
+        request.column_metadata = vec![ColumnMetadata {
+            name: "id".to_string(),
+            unit: Some("V".to_string()),
+            label: Some("Voltage".to_string()),
+            hidden_by_default: true,
+            chart_axis: true,
+        }];
+        let mut inputs = VecDeque::from(vec![
+            CreateDatasetInput::Schema(one_col_schema()),
+            CreateDatasetInput::Finish,
+        ]);
+
+        create_dataset_with(&repo, &paths, &events, &write_sessions, &request, || {
+            inputs.pop_front()
+        })
+        .expect("create dataset");
+
+        let manifest = read_manifest(manifest_path(
+            &paths.dataset_path_from_uid(repo.created_uid()),
+        ))
+        .expect("read manifest");
+        let id = &manifest.columns["id"];
+        assert_eq!(id.unit.as_deref(), Some("V"));
+        assert_eq!(id.label.as_deref(), Some("Voltage"));
+        assert!(id.hidden_by_default);
+        assert!(id.chart_axis);
     }
 
     #[test]
