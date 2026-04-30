@@ -1,7 +1,7 @@
 use std::{borrow::Cow, cmp::Ordering, ops::RangeBounds, path::Path, sync::Arc};
 
 use arrow_arith::boolean::and;
-use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar};
+use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar, UInt64Array};
 use arrow_ord::{cmp::eq, ord::make_comparator};
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -15,7 +15,8 @@ use crate::dataset::{
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
     semantics::{
-        DatasetSemanticManifest, ManifestError, is_hidden_system_column, read_manifest_optional,
+        DatasetSemanticManifest, ManifestError, RECORD_ID_COLUMN, is_hidden_system_column,
+        read_manifest_optional,
     },
     storage::ChunkReader,
 };
@@ -359,10 +360,16 @@ impl DatasetReader {
             manifest
                 .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
+            let record_ids = if manifest.scan_plan.is_some() {
+                self.record_ids()?
+            } else {
+                Vec::new()
+            };
             return Ok(resolve_from_manifest(
                 self.physical_arrow_schema.as_ref(),
                 manifest,
                 &self.visible_columns,
+                &record_ids,
             ));
         }
 
@@ -370,6 +377,28 @@ impl DatasetReader {
             self.schema()?,
             self.try_index_columns()?,
         ))
+    }
+
+    fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
+        let record_id_index = self
+            .physical_arrow_schema
+            .column_with_name(RECORD_ID_COLUMN)
+            .ok_or_else(|| {
+                DatasetError::Arrow(arrow_schema::ArrowError::SchemaError(format!(
+                    "missing record id column {RECORD_ID_COLUMN}"
+                )))
+            })?
+            .0;
+        let mut record_ids = Vec::new();
+        for batch in self.source.range(..) {
+            let column = batch
+                .column(record_id_index)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .ok_or(DatasetError::IncompatibleType)?;
+            record_ids.extend(column.values().iter().copied());
+        }
+        Ok(record_ids)
     }
 
     #[must_use]

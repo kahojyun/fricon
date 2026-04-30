@@ -130,6 +130,85 @@ class TestDatasetOperations:
             server_handle.shutdown()
             assert not server_handle.is_running
 
+    def test_dataset_scan_metadata_round_trips_to_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            with dm.create(
+                "scan_metadata",
+                scan={
+                    "gate": [-0.2, -0.1],
+                    "bias": [0, 1],
+                },
+            ) as writer:
+                writer.write(signal=1.0)
+                dataset = writer.finish()
+
+            manifest = cast(
+                "dict[str, object]",
+                json.loads((Path(dataset.path) / "dataset_manifest.json").read_text()),
+            )
+            scan_plan = cast("dict[str, object]", manifest["scan_plan"])
+            axes = cast("list[dict[str, object]]", scan_plan["axes"])
+            assert axes[0]["name"] == "gate"
+            assert axes[1]["name"] == "bias"
+            assert cast("dict[str, object]", manifest["realization"])[
+                "index_realization"
+            ] == {"kind": "implicit"}
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_scan_index_axis_round_trips_to_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            with dm.create(
+                "index_scan",
+                scan={"step": fricon.IndexAxis(label="Step")},
+            ) as writer:
+                writer.write(loss=1.0)
+                dataset = writer.finish()
+
+            manifest = cast(
+                "dict[str, object]",
+                json.loads((Path(dataset.path) / "dataset_manifest.json").read_text()),
+            )
+            scan_plan = cast("dict[str, object]", manifest["scan_plan"])
+            axes = cast("list[dict[str, object]]", scan_plan["axes"])
+            assert axes == [
+                {
+                    "name": "step",
+                    "label": "Step",
+                    "mode": {"kind": "implicit_index"},
+                }
+            ]
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_scan_validation_rejects_invalid_specs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            with pytest.raises(ValueError, match="scan must not be empty"):
+                dm.create("empty_scan", scan={})
+            with pytest.raises(ValueError, match="static scan axis gate"):
+                dm.create("empty_axis", scan={"gate": []})
+            with pytest.raises(ValueError, match="mixed static and unknown"):
+                dm.create("mixed_axis", scan={"gate": [0.0], "step": None})
+            with pytest.raises(ValueError, match="reserved system prefix"):
+                dm.create("reserved_axis", scan={"__ds_step": [0]})
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_dataset_declared_columns_require_exact_first_row(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"

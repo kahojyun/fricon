@@ -12,7 +12,7 @@ pub use self::{
     model::{
         ColumnMetadata, Compatibility, DatasetDType, DatasetSemanticManifest,
         DuplicateResolutionDefault, IndexRealization, MANIFEST_VERSION_V1, ManifestColumn,
-        RECORD_ID_COLUMN, Realization, SystemColumn, TraceAxisDType, TraceDType, TraceLayout,
-        TraceValueDType,
+        RECORD_ID_COLUMN, Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan,
+        SystemColumn, TraceAxisDType, TraceDType, TraceLayout, TraceValueDType,
     },
 };

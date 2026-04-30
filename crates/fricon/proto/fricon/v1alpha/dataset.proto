@@ -50,6 +50,7 @@ message CreateMetadata {
   string description = 2;
   repeated string tags = 3;
   repeated ColumnMetadata columns = 4;
+  repeated ScanAxisMetadata scan_axes = 5;
 }
 
 message ColumnMetadata {
@@ -58,6 +59,30 @@ message ColumnMetadata {
   optional string label = 3;
   bool hidden_by_default = 4;
   bool chart_axis = 5;
+}
+
+message ScanAxisMetadata {
+  string name = 1;
+  optional string label = 2;
+  oneof axis {
+    StaticScanAxis static_axis = 3;
+    IndexScanAxis index_axis = 4;
+  }
+}
+
+message StaticScanAxis {
+  repeated ScanAxisValue values = 1;
+}
+
+message IndexScanAxis {}
+
+message ScanAxisValue {
+  oneof value {
+    int64 int_value = 1;
+    double float_value = 2;
+    bool bool_value = 3;
+    string string_value = 4;
+  }
 }
 
 message CreateAbort {}

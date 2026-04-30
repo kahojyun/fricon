@@ -28,14 +28,16 @@ use crate::{
     dataset::{
         model::{DatasetRecord, DatasetStatus},
         schema::{DatasetArray, DatasetRow, DatasetSchema},
-        semantics::ColumnMetadata,
+        semantics::{ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan},
     },
     proto::{
         AddTagsRequest, ColumnMetadata as ProtoColumnMetadata, CreateAbort, CreateFinish,
-        CreateMetadata, CreateRequest, CreateResponse, GetRequest, RemoveTagsRequest,
-        SearchRequest, UpdateRequest, VersionRequest, create_request::CreateMessage,
+        CreateMetadata, CreateRequest, CreateResponse, GetRequest, IndexScanAxis,
+        RemoveTagsRequest, ScanAxisMetadata as ProtoScanAxisMetadata,
+        ScanAxisValue as ProtoScanAxisValue, SearchRequest, StaticScanAxis, UpdateRequest,
+        VersionRequest, create_request::CreateMessage,
         dataset_service_client::DatasetServiceClient, fricon_service_client::FriconServiceClient,
-        get_request::IdEnum,
+        get_request::IdEnum, scan_axis_metadata, scan_axis_value,
     },
     transport::{
         grpc::{
@@ -183,6 +185,7 @@ impl Client {
         tags: Vec<String>,
         schema: DatasetSchema,
         column_metadata: Vec<ColumnMetadata>,
+        scan_plan: Option<ScanPlan>,
     ) -> Result<DatasetWriter, ClientError> {
         Ok(DatasetWriter::new(
             self.clone(),
@@ -191,6 +194,7 @@ impl Client {
             tags,
             schema,
             column_metadata,
+            scan_plan,
             tokio::runtime::Handle::current(),
         ))
     }
@@ -326,6 +330,7 @@ impl DatasetWriter {
         tags: Vec<String>,
         schema: DatasetSchema,
         column_metadata: Vec<ColumnMetadata>,
+        scan_plan: Option<ScanPlan>,
         runtime: tokio::runtime::Handle,
     ) -> Self {
         let (tx, rx) = mpsc::channel::<StreamMessage>(16);
@@ -338,6 +343,7 @@ impl DatasetWriter {
                 description,
                 tags,
                 column_metadata,
+                scan_plan,
                 arrow_schema.clone(),
                 rx,
             );
@@ -503,11 +509,40 @@ fn column_metadata_to_proto(value: ColumnMetadata) -> ProtoColumnMetadata {
     }
 }
 
+fn scan_plan_to_proto(value: ScanPlan) -> Vec<ProtoScanAxisMetadata> {
+    value.axes.into_iter().map(scan_axis_to_proto).collect()
+}
+
+fn scan_axis_to_proto(value: ScanAxis) -> ProtoScanAxisMetadata {
+    let axis = match value.mode {
+        ScanAxisMode::Static { values } => scan_axis_metadata::Axis::StaticAxis(StaticScanAxis {
+            values: values.into_iter().map(scan_axis_value_to_proto).collect(),
+        }),
+        ScanAxisMode::ImplicitIndex => scan_axis_metadata::Axis::IndexAxis(IndexScanAxis {}),
+    };
+    ProtoScanAxisMetadata {
+        name: value.name,
+        label: value.label,
+        axis: Some(axis),
+    }
+}
+
+fn scan_axis_value_to_proto(value: ScanAxisValue) -> ProtoScanAxisValue {
+    let value = match value {
+        ScanAxisValue::Int(value) => scan_axis_value::Value::IntValue(value),
+        ScanAxisValue::Float(value) => scan_axis_value::Value::FloatValue(value),
+        ScanAxisValue::Bool(value) => scan_axis_value::Value::BoolValue(value),
+        ScanAxisValue::String(value) => scan_axis_value::Value::StringValue(value),
+    };
+    ProtoScanAxisValue { value: Some(value) }
+}
+
 fn build_request_stream(
     name: String,
     description: String,
     tags: Vec<String>,
     column_metadata: Vec<ColumnMetadata>,
+    scan_plan: Option<ScanPlan>,
     arrow_schema: SchemaRef,
     message_rx: mpsc::Receiver<StreamMessage>,
 ) -> impl Stream<Item = CreateRequest> {
@@ -518,6 +553,7 @@ fn build_request_stream(
                 description,
                 tags,
                 columns: column_metadata.into_iter().map(column_metadata_to_proto).collect(),
+                scan_axes: scan_plan.map_or_else(Vec::new, scan_plan_to_proto),
             })),
         };
 
@@ -796,7 +832,8 @@ mod tests {
         split_payload_chunk,
     };
     use crate::{
-        APP_VERSION, IPC_PROTOCOL_VERSION, dataset::semantics::ColumnMetadata,
+        APP_VERSION, IPC_PROTOCOL_VERSION,
+        dataset::semantics::{ColumnMetadata, ScanAxis, ScanAxisValue, ScanPlan},
         proto::create_request::CreateMessage,
         transport::grpc::dataset_service::DATASET_ERROR_CODE_METADATA_KEY,
     };
@@ -936,6 +973,7 @@ mod tests {
             "desc".to_string(),
             vec!["tag".to_string()],
             Vec::new(),
+            None,
             schema,
             message_rx,
         );
@@ -971,6 +1009,7 @@ mod tests {
             "desc".to_string(),
             vec![],
             Vec::new(),
+            None,
             schema,
             message_rx,
         );
@@ -1002,6 +1041,7 @@ mod tests {
             "desc".to_string(),
             vec![],
             Vec::new(),
+            None,
             schema,
             message_rx,
         );
@@ -1035,6 +1075,7 @@ mod tests {
                 hidden_by_default: true,
                 chart_axis: true,
             }],
+            None,
             schema,
             message_rx,
         );
@@ -1053,6 +1094,44 @@ mod tests {
         assert_eq!(metadata.columns[0].label.as_deref(), Some("Voltage"));
         assert!(metadata.columns[0].hidden_by_default);
         assert!(metadata.columns[0].chart_axis);
+    }
+
+    #[tokio::test]
+    async fn build_request_stream_sends_scan_metadata() {
+        let (message_tx, message_rx) = mpsc::channel(2);
+        drop(message_tx);
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "signal",
+            DataType::Int64,
+            false,
+        )]));
+        let stream = build_request_stream(
+            "dataset".to_string(),
+            "desc".to_string(),
+            vec![],
+            Vec::new(),
+            Some(ScanPlan::new(vec![
+                ScanAxis::static_values(
+                    "gate",
+                    vec![ScanAxisValue::Float(-0.2), ScanAxisValue::Float(-0.1)],
+                ),
+                ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
+            ])),
+            schema,
+            message_rx,
+        );
+
+        let messages: Vec<_> = stream
+            .map(|req| req.create_message.expect("message"))
+            .collect()
+            .await;
+        let CreateMessage::Metadata(metadata) = &messages[0] else {
+            panic!("first message should be metadata");
+        };
+
+        assert_eq!(metadata.scan_axes.len(), 2);
+        assert_eq!(metadata.scan_axes[0].name, "gate");
+        assert_eq!(metadata.scan_axes[1].name, "bias");
     }
 
     #[test]

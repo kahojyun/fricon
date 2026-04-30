@@ -723,6 +723,7 @@ mod tests {
             description: "existing dataset".to_string(),
             tags: vec!["old".to_string(), "stale".to_string()],
             column_metadata: Vec::new(),
+            scan_plan: None,
         };
         let existing = DatasetIngestRepository::create_dataset_record(&fixture.repo, &request, uid)
             .expect("create dataset");

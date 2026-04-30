@@ -16,6 +16,7 @@ __all__ = [
     "DatasetManager",
     "DatasetWriter",
     "FriconDatasetError",
+    "IndexAxis",
     "ServerHandle",
     "Trace",
     "Workspace",
@@ -70,6 +71,15 @@ class Column:
     def chart_axis(self) -> bool: ...
 
 _ColumnSpec: TypeAlias = _DeclaredColumnDType | Column
+_ScanAxisValue: TypeAlias = int | float | bool | str
+
+@final
+class IndexAxis:
+    def __new__(cls, *, label: str | None = ...) -> Self: ...
+    @property
+    def label(self) -> str | None: ...
+
+_ScanAxisSpec: TypeAlias = Sequence[_ScanAxisValue] | IndexAxis | None
 
 @final
 class DatasetManager:
@@ -80,6 +90,7 @@ class DatasetManager:
         description: str | None = ...,
         tags: Iterable[str] | None = ...,
         columns: Mapping[str, _ColumnSpec] | None = ...,
+        scan: Mapping[str, _ScanAxisSpec] | None = ...,
     ) -> DatasetWriter: ...
     def open(
         self,

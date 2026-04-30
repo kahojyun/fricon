@@ -9,10 +9,12 @@ pub const MANIFEST_VERSION_V1: u32 = 1;
 pub const RECORD_ID_COLUMN: &str = "__ds_record_id";
 const SYSTEM_COLUMN_PREFIX: &str = "__ds_";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DatasetSemanticManifest {
     pub manifest_version: u32,
     pub columns: BTreeMap<String, ManifestColumn>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scan_plan: Option<ScanPlan>,
     pub realization: Realization,
     pub compatibility: Compatibility,
 }
@@ -25,6 +27,7 @@ impl DatasetSemanticManifest {
         Self {
             manifest_version: MANIFEST_VERSION_V1,
             columns,
+            scan_plan: None,
             realization: Realization::default(),
             compatibility: Compatibility::default(),
         }
@@ -38,6 +41,14 @@ impl DatasetSemanticManifest {
         schema: &Schema,
         metadata: impl IntoIterator<Item = ColumnMetadata>,
     ) -> Result<Self, ManifestValidationError> {
+        Self::minimal_from_arrow_schema_with_metadata_and_scan(schema, metadata, None)
+    }
+
+    pub fn minimal_from_arrow_schema_with_metadata_and_scan(
+        schema: &Schema,
+        metadata: impl IntoIterator<Item = ColumnMetadata>,
+        scan_plan: Option<ScanPlan>,
+    ) -> Result<Self, ManifestValidationError> {
         let columns = schema
             .fields()
             .iter()
@@ -49,8 +60,24 @@ impl DatasetSemanticManifest {
             .collect::<Result<Vec<_>, ManifestValidationError>>()?;
         let mut manifest = Self::minimal(columns);
         manifest.apply_column_metadata(metadata)?;
+        manifest.apply_scan_plan(scan_plan);
         manifest.validate()?;
         Ok(manifest)
+    }
+
+    #[must_use]
+    pub fn with_scan_plan(mut self, scan_plan: Option<ScanPlan>) -> Self {
+        self.apply_scan_plan(scan_plan);
+        self
+    }
+
+    fn apply_scan_plan(&mut self, scan_plan: Option<ScanPlan>) {
+        self.scan_plan = scan_plan;
+        self.realization.index_realization = if self.scan_plan.is_some() {
+            IndexRealization::Implicit
+        } else {
+            IndexRealization::None
+        };
     }
 
     fn apply_column_metadata(
@@ -100,6 +127,7 @@ impl DatasetSemanticManifest {
         if !self.realization.append_only {
             return Err(ManifestValidationError::AppendOnlyRequired);
         }
+        self.validate_scan_plan()?;
         self.validate_columns()
     }
 
@@ -186,6 +214,134 @@ impl DatasetSemanticManifest {
 
         Ok(())
     }
+
+    fn validate_scan_plan(&self) -> Result<(), ManifestValidationError> {
+        match (&self.scan_plan, &self.realization.index_realization) {
+            (Some(_), IndexRealization::Implicit) | (None, IndexRealization::None) => {}
+            (Some(_), IndexRealization::None) => {
+                return Err(ManifestValidationError::ScanPlanRequiresImplicitRealization);
+            }
+            (None, IndexRealization::Implicit) => {
+                return Err(ManifestValidationError::ImplicitRealizationRequiresScanPlan);
+            }
+        }
+
+        let Some(scan_plan) = &self.scan_plan else {
+            return Ok(());
+        };
+        scan_plan.validate()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScanPlan {
+    pub axes: Vec<ScanAxis>,
+}
+
+impl ScanPlan {
+    #[must_use]
+    pub fn new(axes: Vec<ScanAxis>) -> Self {
+        Self { axes }
+    }
+
+    pub fn validate(&self) -> Result<(), ManifestValidationError> {
+        if self.axes.is_empty() {
+            return Err(ManifestValidationError::EmptyScanAxisName);
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut static_count = 0;
+        let mut implicit_count = 0;
+        for axis in &self.axes {
+            axis.validate()?;
+            if !seen.insert(axis.name.clone()) {
+                return Err(ManifestValidationError::DuplicateScanAxis {
+                    name: axis.name.clone(),
+                });
+            }
+            match &axis.mode {
+                ScanAxisMode::Static { .. } => static_count += 1,
+                ScanAxisMode::ImplicitIndex => implicit_count += 1,
+            }
+        }
+
+        if implicit_count > 1 {
+            return Err(ManifestValidationError::MultipleUnknownScanAxes);
+        }
+        if implicit_count > 0 && static_count > 0 {
+            return Err(ManifestValidationError::MixedStaticAndUnknownScanAxes);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScanAxis {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub mode: ScanAxisMode,
+}
+
+impl ScanAxis {
+    #[must_use]
+    pub fn static_values(name: impl Into<String>, values: Vec<ScanAxisValue>) -> Self {
+        Self {
+            name: name.into(),
+            label: None,
+            mode: ScanAxisMode::Static { values },
+        }
+    }
+
+    #[must_use]
+    pub fn implicit_index(name: impl Into<String>, label: Option<String>) -> Self {
+        Self {
+            name: name.into(),
+            label,
+            mode: ScanAxisMode::ImplicitIndex,
+        }
+    }
+
+    fn validate(&self) -> Result<(), ManifestValidationError> {
+        if self.name.is_empty() {
+            return Err(ManifestValidationError::EmptyScanAxisName);
+        }
+        if self.name.starts_with(SYSTEM_COLUMN_PREFIX) {
+            return Err(ManifestValidationError::ReservedScanAxisName {
+                name: self.name.clone(),
+            });
+        }
+        match &self.mode {
+            ScanAxisMode::Static { values } if values.is_empty() => {
+                Err(ManifestValidationError::EmptyStaticScanAxis {
+                    name: self.name.clone(),
+                })
+            }
+            ScanAxisMode::Static { .. } | ScanAxisMode::ImplicitIndex => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum ScanAxisMode {
+    #[serde(rename = "static")]
+    Static { values: Vec<ScanAxisValue> },
+    #[serde(rename = "implicit_index")]
+    ImplicitIndex,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value")]
+pub enum ScanAxisValue {
+    #[serde(rename = "int")]
+    Int(i64),
+    #[serde(rename = "float")]
+    Float(f64),
+    #[serde(rename = "bool")]
+    Bool(bool),
+    #[serde(rename = "string")]
+    String(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -465,6 +621,8 @@ pub enum IndexRealization {
     #[default]
     #[serde(rename = "none")]
     None,
+    #[serde(rename = "implicit")]
+    Implicit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -651,8 +809,8 @@ mod tests {
     use super::{
         ColumnMetadata, Compatibility, DatasetDType, DatasetSemanticManifest,
         DuplicateResolutionDefault, IndexRealization, ManifestColumn, ManifestValidationError,
-        RECORD_ID_COLUMN, Realization, SystemColumn, TraceAxisDType, TraceDType, TraceLayout,
-        TraceValueDType,
+        RECORD_ID_COLUMN, Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan,
+        SystemColumn, TraceAxisDType, TraceDType, TraceLayout, TraceValueDType,
     };
 
     fn signal_columns() -> BTreeMap<String, ManifestColumn> {
@@ -711,6 +869,141 @@ mod tests {
     }
 
     #[test]
+    fn scan_plan_serializes_static_axes_with_implicit_realization() {
+        let manifest = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![
+                ScanAxis::static_values(
+                    "gate",
+                    vec![ScanAxisValue::Float(-0.2), ScanAxisValue::Float(-0.1)],
+                ),
+                ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
+            ]),
+        ));
+        let value = serde_json::to_value(&manifest).expect("serialize manifest");
+
+        assert_eq!(
+            value["scan_plan"],
+            json!({
+                "axes": [
+                    {
+                        "name": "gate",
+                        "mode": {
+                            "kind": "static",
+                            "values": [
+                                { "kind": "float", "value": -0.2 },
+                                { "kind": "float", "value": -0.1 }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "bias",
+                        "mode": {
+                            "kind": "static",
+                            "values": [
+                                { "kind": "int", "value": 0 },
+                                { "kind": "int", "value": 1 }
+                            ]
+                        }
+                    }
+                ]
+            })
+        );
+        assert_eq!(
+            value["realization"]["index_realization"],
+            json!({ "kind": "implicit" })
+        );
+
+        let parsed: DatasetSemanticManifest =
+            serde_json::from_value(value).expect("deserialize manifest");
+        assert_eq!(parsed, manifest);
+        parsed.validate().expect("manifest should be valid");
+    }
+
+    #[test]
+    fn scan_plan_serializes_unknown_length_index_axis() {
+        let manifest =
+            DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(ScanPlan::new(
+                vec![ScanAxis::implicit_index("step", Some("Step".to_string()))],
+            )));
+        let value = serde_json::to_value(&manifest).expect("serialize manifest");
+
+        assert_eq!(
+            value["scan_plan"],
+            json!({
+                "axes": [
+                    {
+                        "name": "step",
+                        "label": "Step",
+                        "mode": { "kind": "implicit_index" }
+                    }
+                ]
+            })
+        );
+        manifest.validate().expect("manifest should be valid");
+    }
+
+    #[test]
+    fn validate_scan_plan_rejects_unsupported_v1_shapes() {
+        let mixed = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![
+                ScanAxis::static_values("gate", vec![ScanAxisValue::Float(0.0)]),
+                ScanAxis::implicit_index("step", None),
+            ]),
+        ));
+        assert_eq!(
+            mixed.validate(),
+            Err(ManifestValidationError::MixedStaticAndUnknownScanAxes)
+        );
+
+        let duplicate = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![
+                ScanAxis::static_values("gate", vec![ScanAxisValue::Float(0.0)]),
+                ScanAxis::static_values("gate", vec![ScanAxisValue::Float(1.0)]),
+            ]),
+        ));
+        assert_eq!(
+            duplicate.validate(),
+            Err(ManifestValidationError::DuplicateScanAxis {
+                name: "gate".to_string()
+            })
+        );
+
+        let empty = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![ScanAxis {
+                name: "gate".to_string(),
+                label: None,
+                mode: ScanAxisMode::Static { values: vec![] },
+            }]),
+        ));
+        assert_eq!(
+            empty.validate(),
+            Err(ManifestValidationError::EmptyStaticScanAxis {
+                name: "gate".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn validate_scan_plan_requires_matching_index_realization() {
+        let mut missing_implicit = DatasetSemanticManifest::minimal(signal_columns());
+        missing_implicit.scan_plan = Some(ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![ScanAxisValue::Float(0.0)],
+        )]));
+        assert_eq!(
+            missing_implicit.validate(),
+            Err(ManifestValidationError::ScanPlanRequiresImplicitRealization)
+        );
+
+        let mut missing_scan = DatasetSemanticManifest::minimal(signal_columns());
+        missing_scan.realization.index_realization = IndexRealization::Implicit;
+        assert_eq!(
+            missing_scan.validate(),
+            Err(ManifestValidationError::ImplicitRealizationRequiresScanPlan)
+        );
+    }
+
+    #[test]
     fn validate_rejects_invalid_version() {
         let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
         manifest.manifest_version = 2;
@@ -726,6 +1019,7 @@ mod tests {
         let manifest = DatasetSemanticManifest {
             manifest_version: 1,
             columns: signal_columns(),
+            scan_plan: None,
             realization: Realization::default(),
             compatibility: Compatibility::default(),
         };

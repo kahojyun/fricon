@@ -10,6 +10,7 @@ from ._core import (
     DatasetManager,
     DatasetWriter,
     FriconDatasetError,
+    IndexAxis,
     Trace,
     Workspace,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "DatasetManager",
     "DatasetWriter",
     "FriconDatasetError",
+    "IndexAxis",
     "Trace",
     "Workspace",
     "__version__",
