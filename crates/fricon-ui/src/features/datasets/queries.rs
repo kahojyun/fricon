@@ -1,5 +1,5 @@
 use fricon::{
-    DatasetListQuery, ReadAppError, ResolvedColumn,
+    DatasetListQuery, InterpretationSource, ReadAppError, ResolvedColumn,
     dataset::{
         model::DatasetId,
         semantics::{DatasetDType, TraceValueDType},
@@ -54,12 +54,12 @@ pub(crate) async fn get_dataset_detail(
     let payload_available = record.metadata.deleted_at.is_none();
     let columns = if payload_available {
         let reader = session.dataset(id).await?;
-        reader
-            .interpret()
-            .map_err(ReadAppError::from)?
+        let interpretation = reader.interpret().map_err(ReadAppError::from)?;
+        let expose_manifest_hints = interpretation.source == InterpretationSource::Manifest;
+        interpretation
             .columns
             .iter()
-            .filter_map(column_info_from_resolved_column)
+            .filter_map(|column| column_info_from_resolved_column(column, expose_manifest_hints))
             .collect()
     } else {
         Vec::new()
@@ -80,13 +80,20 @@ pub(crate) async fn get_dataset_detail(
     })
 }
 
-fn column_info_from_resolved_column(column: &ResolvedColumn) -> Option<ColumnInfo> {
+fn column_info_from_resolved_column(
+    column: &ResolvedColumn,
+    expose_manifest_hints: bool,
+) -> Option<ColumnInfo> {
     column.visible_ordinal?;
     Some(ColumnInfo {
         name: column.name.clone(),
+        label: column.label.clone(),
+        unit: column.unit.clone(),
         is_complex: dtype_is_complex(&column.dtype),
         is_trace: matches!(column.dtype, DatasetDType::Trace { .. }),
         is_index: column.is_index,
+        hidden_by_default: column.hidden_by_default,
+        is_chart_axis_candidate: expose_manifest_hints && column.is_chart_axis_candidate,
     })
 }
 
@@ -119,7 +126,7 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use fricon::{
         AppManager, Client, DatasetRow, DatasetScalar, ScalarArray, WorkspaceRoot,
-        workspace::WorkspacePaths,
+        dataset::semantics::ColumnMetadata, workspace::WorkspacePaths,
     };
     use indexmap::IndexMap;
     use num::complex::Complex64;
@@ -144,17 +151,29 @@ mod tests {
 
         assert_eq!(detail.columns.len(), 3);
         assert_eq!(detail.columns[0].name, "signal");
+        assert_eq!(detail.columns[0].label.as_deref(), Some("Signal"));
+        assert_eq!(detail.columns[0].unit.as_deref(), Some("V"));
         assert!(!detail.columns[0].is_index);
         assert!(!detail.columns[0].is_trace);
         assert!(!detail.columns[0].is_complex);
+        assert!(detail.columns[0].hidden_by_default);
+        assert!(detail.columns[0].is_chart_axis_candidate);
         assert_eq!(detail.columns[1].name, "trace");
+        assert_eq!(detail.columns[1].label, None);
+        assert_eq!(detail.columns[1].unit, None);
         assert!(!detail.columns[1].is_index);
         assert!(detail.columns[1].is_trace);
         assert!(!detail.columns[1].is_complex);
+        assert!(!detail.columns[1].hidden_by_default);
+        assert!(!detail.columns[1].is_chart_axis_candidate);
         assert_eq!(detail.columns[2].name, "complex");
+        assert_eq!(detail.columns[2].label, None);
+        assert_eq!(detail.columns[2].unit, None);
         assert!(!detail.columns[2].is_index);
         assert!(!detail.columns[2].is_trace);
         assert!(detail.columns[2].is_complex);
+        assert!(!detail.columns[2].hidden_by_default);
+        assert!(!detail.columns[2].is_chart_axis_candidate);
         assert!(
             !detail
                 .columns
@@ -174,17 +193,29 @@ mod tests {
 
         assert_eq!(detail.columns.len(), 3);
         assert_eq!(detail.columns[0].name, "run");
+        assert_eq!(detail.columns[0].label, None);
+        assert_eq!(detail.columns[0].unit, None);
         assert!(detail.columns[0].is_index);
         assert!(!detail.columns[0].is_trace);
         assert!(!detail.columns[0].is_complex);
+        assert!(!detail.columns[0].hidden_by_default);
+        assert!(!detail.columns[0].is_chart_axis_candidate);
         assert_eq!(detail.columns[1].name, "step");
+        assert_eq!(detail.columns[1].label, None);
+        assert_eq!(detail.columns[1].unit, None);
         assert!(detail.columns[1].is_index);
         assert!(!detail.columns[1].is_trace);
         assert!(!detail.columns[1].is_complex);
+        assert!(!detail.columns[1].hidden_by_default);
+        assert!(!detail.columns[1].is_chart_axis_candidate);
         assert_eq!(detail.columns[2].name, "value");
+        assert_eq!(detail.columns[2].label, None);
+        assert_eq!(detail.columns[2].unit, None);
         assert!(!detail.columns[2].is_index);
         assert!(!detail.columns[2].is_trace);
         assert!(!detail.columns[2].is_complex);
+        assert!(!detail.columns[2].hidden_by_default);
+        assert!(!detail.columns[2].is_chart_axis_candidate);
 
         Ok(())
     }
@@ -206,7 +237,13 @@ mod tests {
                 String::new(),
                 vec!["test".to_string()],
                 schema,
-                Vec::new(),
+                vec![ColumnMetadata {
+                    name: "signal".to_string(),
+                    label: Some("Signal".to_string()),
+                    unit: Some("V".to_string()),
+                    hidden_by_default: true,
+                    chart_axis: true,
+                }],
             )
             .await?;
         for row in rows {

@@ -89,7 +89,18 @@ describe("dataset client", () => {
         trashedAt: "2026-01-03T04:05:06Z",
         deletedAt: null,
         payloadAvailable: true,
-        columns: [],
+        columns: [
+          {
+            name: "signal",
+            label: "Signal",
+            unit: "V",
+            isComplex: false,
+            isTrace: false,
+            isIndex: false,
+            hiddenByDefault: true,
+            isChartAxisCandidate: true,
+          },
+        ],
       },
     });
 
@@ -102,6 +113,18 @@ describe("dataset client", () => {
     expect(result.trashedAt?.toISOString()).toBe("2026-01-03T04:05:06.000Z");
     expect(result.deletedAt).toBeNull();
     expect(result.payloadAvailable).toBe(true);
+    expect(result.columns).toEqual([
+      {
+        name: "signal",
+        label: "Signal",
+        unit: "V",
+        isComplex: false,
+        isTrace: false,
+        isIndex: false,
+        hiddenByDefault: true,
+        isChartAxisCandidate: true,
+      },
+    ]);
   });
 
   it("propagates dataset command error envelopes", async () => {

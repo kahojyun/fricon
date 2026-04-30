@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -280,5 +281,52 @@ describe("DatasetPropertiesPanel", () => {
 
     expect(await screen.findByLabelText("Name")).toHaveValue("a::b");
     expect(screen.getByLabelText("Description")).toHaveValue("c");
+  });
+
+  it("shows resolved column metadata in the columns table", async () => {
+    const { wrapper } = createWrapper();
+
+    render(
+      <DatasetPropertiesPanel
+        datasetId={1}
+        detail={makeDetail({
+          columns: [
+            {
+              name: "signal",
+              label: "Signal",
+              unit: "V",
+              isIndex: false,
+              isTrace: false,
+              isComplex: false,
+              hiddenByDefault: true,
+              isChartAxisCandidate: true,
+            },
+            {
+              name: "trace",
+              label: null,
+              unit: null,
+              isIndex: false,
+              isTrace: true,
+              isComplex: false,
+              hiddenByDefault: false,
+              isChartAxisCandidate: false,
+            },
+          ],
+        })}
+        isLoading={false}
+        loadErrorMessage={null}
+      />,
+      { wrapper },
+    );
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("columnheader", { name: "Label" })).toBeVisible();
+    expect(table.getByRole("columnheader", { name: "Unit" })).toBeVisible();
+    expect(table.getByRole("columnheader", { name: "Hints" })).toBeVisible();
+    expect(table.getByText("Signal")).toBeVisible();
+    expect(table.getByText("V")).toBeVisible();
+    expect(table.getByText("Hidden")).toBeVisible();
+    expect(table.getByText("Axis")).toBeVisible();
+    expect(table.getByText("Trace")).toBeVisible();
   });
 });
