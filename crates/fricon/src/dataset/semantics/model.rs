@@ -317,7 +317,19 @@ impl ScanAxis {
                     name: self.name.clone(),
                 })
             }
-            ScanAxisMode::Static { .. } | ScanAxisMode::ImplicitIndex => Ok(()),
+            ScanAxisMode::Static { values } => {
+                if values
+                    .iter()
+                    .any(|value| matches!(value, ScanAxisValue::Float(value) if !value.is_finite()))
+                {
+                    Err(ManifestValidationError::NonFiniteScanAxisValue {
+                        name: self.name.clone(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+            ScanAxisMode::ImplicitIndex => Ok(()),
         }
     }
 }
@@ -978,6 +990,19 @@ mod tests {
         assert_eq!(
             empty.validate(),
             Err(ManifestValidationError::EmptyStaticScanAxis {
+                name: "gate".to_string()
+            })
+        );
+
+        let non_finite = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![ScanAxis::static_values(
+                "gate",
+                vec![ScanAxisValue::Float(f64::NAN)],
+            )]),
+        ));
+        assert_eq!(
+            non_finite.validate(),
+            Err(ManifestValidationError::NonFiniteScanAxisValue {
                 name: "gate".to_string()
             })
         );

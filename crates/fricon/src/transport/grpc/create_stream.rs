@@ -51,6 +51,8 @@ pub(crate) async fn parse_create_stream(
         ));
     };
 
+    let scan_plan = scan_plan_from_proto(scan_axes)?;
+
     let (events_tx, events_rx) = mpsc::channel(16);
     let events_task = tokio::spawn(produce_create_events(stream, shutdown_token, events_tx));
 
@@ -63,7 +65,7 @@ pub(crate) async fn parse_create_stream(
                 .into_iter()
                 .map(column_metadata_from_proto)
                 .collect(),
-            scan_plan: scan_plan_from_proto(scan_axes)?,
+            scan_plan,
         },
         events_rx,
         events_task,

@@ -42,6 +42,8 @@ pub enum ManifestValidationError {
     DuplicateScanAxis { name: String },
     #[error("Dataset semantic manifest static scan axis {name} must contain at least one value")]
     EmptyStaticScanAxis { name: String },
+    #[error("Dataset semantic manifest static scan axis {name} contains a non-finite float value")]
+    NonFiniteScanAxisValue { name: String },
     #[error("Dataset semantic manifest v1 supports only one unknown-length scan axis")]
     MultipleUnknownScanAxes,
     #[error("Dataset semantic manifest v1 does not support mixed static and unknown scan axes")]
