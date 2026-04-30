@@ -9,6 +9,7 @@ import json
 import tempfile
 import time
 from pathlib import Path
+from typing import cast
 
 import fricon
 import fricon._core
@@ -89,14 +90,16 @@ class TestDatasetOperations:
                 dataset = writer.finish()
 
             manifest_path = Path(dataset.path) / "dataset_manifest.json"
-            manifest = json.loads(manifest_path.read_text())
-            voltage = manifest["columns"]["voltage"]
+            manifest = cast("dict[str, object]", json.loads(manifest_path.read_text()))
+            columns = cast("dict[str, object]", manifest["columns"])
+            voltage = cast("dict[str, object]", columns["voltage"])
             assert voltage["dtype"] == {"kind": "float64"}
             assert voltage["unit"] == "V"
             assert voltage["label"] == "Voltage"
             assert voltage["hidden_by_default"] is True
             assert voltage["chart_axis"] is True
-            assert manifest["columns"]["measurement"]["dtype"] == {"kind": "complex128"}
+            measurement = cast("dict[str, object]", columns["measurement"])
+            assert measurement["dtype"] == {"kind": "complex128"}
             assert dataset.to_arrow().column_names == ["voltage", "measurement"]
 
             server_handle.shutdown()
@@ -115,10 +118,12 @@ class TestDatasetOperations:
                 writer.write(phase=1.5)
                 dataset = writer.finish()
 
-            manifest = json.loads(
-                (Path(dataset.path) / "dataset_manifest.json").read_text()
+            manifest = cast(
+                "dict[str, object]",
+                json.loads((Path(dataset.path) / "dataset_manifest.json").read_text()),
             )
-            phase = manifest["columns"]["phase"]
+            columns = cast("dict[str, object]", manifest["columns"])
+            phase = cast("dict[str, object]", columns["phase"])
             assert phase["dtype"] == {"kind": "float64"}
             assert phase["unit"] == "rad"
 
