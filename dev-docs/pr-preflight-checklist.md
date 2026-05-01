@@ -34,8 +34,9 @@ Use the result to choose changed areas:
 - Rust IPC/gRPC compatibility: `crates/fricon/proto/**`,
   `crates/fricon/src/client.rs`, `crates/fricon/src/transport/**`
 - Release notes: `.changeset/**`
-- Docs-only: `docs/**`, `dev-docs/**`, and Markdown-only changes outside
-  `.changeset/`
+- Public docs: `docs/**`
+- Developer docs-only: `dev-docs/**`, and Markdown-only changes outside
+  `.changeset/` that are not public docs
 
 ## Quick Profile
 
@@ -109,11 +110,17 @@ Use the normal Rust test gate for coverage, then apply the IPC/gRPC checklist in
 git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 ```
 
-### Docs-Only
+### Public Docs
 
 ```bash
 pnpm run format:check
 uv run --group docs mkdocs build -s -v
+```
+
+### Developer Docs-Only
+
+```bash
+pnpm run format:check
 ```
 
 ### Release Notes
@@ -196,11 +203,17 @@ in `dev-docs/maintenance-checklist.md`.
 Use the normal Rust test gate for coverage, then apply the IPC/gRPC checklist in
 `dev-docs/maintenance-checklist.md`.
 
-### Docs
+### Public Docs
 
 ```bash
 pnpm run format:check
 uv run --group docs mkdocs build -s -v
+```
+
+### Developer Docs-Only
+
+```bash
+pnpm run format:check
 ```
 
 ## Environment Notes

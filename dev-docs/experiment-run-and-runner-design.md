@@ -206,15 +206,15 @@ may attach domain meaning to tasks and script runs.
 
 ### Terms
 
-| Term                  | Meaning                                                                 |
-| --------------------- | ----------------------------------------------------------------------- |
-| `ExperimentRun`       | One scientific experiment attempt.                                      |
-| `TaskQueueEntry`      | One queued executable unit before it starts.                            |
-| `ScriptRun`           | One actual script execution attempt.                                    |
-| `Dataset`             | One data artifact with dataset-local semantics.                         |
-| `DatasetWriteSession` | One append contribution from a script run to a dataset.                 |
-| `ResourceRequirement` | A declared need for a named local resource before execution can start.  |
-| `ResourceLease`       | A granted shared or exclusive hold on a named local resource.           |
+| Term                  | Meaning                                                                |
+| --------------------- | ---------------------------------------------------------------------- |
+| `ExperimentRun`       | One scientific experiment attempt.                                     |
+| `TaskQueueEntry`      | One queued executable unit before it starts.                           |
+| `ScriptRun`           | One actual script execution attempt.                                   |
+| `Dataset`             | One data artifact with dataset-local semantics.                        |
+| `DatasetWriteSession` | One append contribution from a script run to a dataset.                |
+| `ResourceRequirement` | A declared need for a named local resource before execution can start. |
+| `ResourceLease`       | A granted shared or exclusive hold on a named local resource.          |
 
 ## Identifier Rules
 
