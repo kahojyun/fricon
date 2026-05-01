@@ -66,6 +66,10 @@ Open questions:
 
 Status: future concept, ADR needed later.
 
+Focused proposal:
+
+- `experiment-run-and-runner-design.md`
+
 Why it matters:
 
 - Fricon needs explicit run records before parameter snapshots, code versions,
