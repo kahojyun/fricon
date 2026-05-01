@@ -46,7 +46,7 @@
   "devDependencies": {
     "@babel/core": "7.29.0",
     "@vitest/browser-playwright": "4.1.4",
-    "@rolldown/plugin-babel": "0.2.2",
+    "@rolldown/plugin-babel": "0.2.3",
     "@tailwindcss/vite": "4.2.2",
     "@tanstack/react-query-devtools": "5.97.0",
     "@tanstack/react-router-devtools": "1.166.11",
