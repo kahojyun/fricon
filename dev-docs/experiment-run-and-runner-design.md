@@ -640,13 +640,16 @@ storage paths or protocol details as the user model.
 Fricon should support two experiment submission modes with different provenance
 promises.
 
-This split reflects common scientific Python practice:
+This split reflects common scientific Python practice and migration from
+external experiment record systems such as LabRAD Data Vault, lab-local data
+vaults, ad hoc HDF5/JSON/CSV folders, and notebook-managed output directories:
 
 - users often start in ad hoc notebooks or scripts because iteration is fast
 - repeated measurements are later extracted into reusable Python functions or
   modules
-- old approaches often pass save paths, experiment names, and local parameter
-  values manually, then store important parameters in dataset metadata
+- existing tools often pass save paths, experiment names, and local parameter
+  values manually, then store important experiment context on the recorded data
+  object
 - Fricon should improve traceability without making early exploration
   cumbersome
 
@@ -902,6 +905,191 @@ Re-run snippets, export/report snippets, and managed-template submission
 snippets are useful later, but read snippets best support the current
 dataset-first and Python-led route.
 
+## High-Value User Stories
+
+### Record An Interactive Experiment From A Notebook
+
+As a researcher iterating in a notebook, I want to create an interactive
+experiment run with a small amount of Python code so that Fricon records the
+datasets, notes, quality state, and basic context for my exploratory
+measurement.
+
+Acceptance notes:
+
+- parameter snapshot is optional
+- user-provided JSON metadata can preserve local parameter dictionaries or
+  legacy context
+- attachments can reference supporting files or artifacts
+- produced datasets are linked to the run
+- provenance label is `Interactive`
+
+### Migrate From An External Data Vault
+
+As a user with an existing LabRAD Data Vault, lab-local data vault, or ad hoc
+file-based experiment logger, I want to bring experiment-level context into
+Fricon without immediately adopting the parameter registry or managed runner so
+that migration can start with low risk.
+
+Acceptance notes:
+
+- run metadata can store legacy JSON context
+- attachments can preserve external configuration files, screenshots, or logs
+- datasets remain readable as outputs of the run
+- Fricon does not treat arbitrary JSON metadata as structured parameter history
+- users can gradually move stable concepts into parameter snapshots, run
+  fields, or future sample/device records
+
+### Recover From An Interrupted Measurement
+
+As a user whose measurement was interrupted by a device communication failure, I
+want Fricon to preserve the partial data and offer an explicit continuation path
+so that I can recover useful data without hiding the interruption.
+
+Acceptance notes:
+
+- partial datasets default to `suspect`
+- the recovery UI offers continue same experiment and start new experiment
+- continuing requires explicit user or API intent
+- continuation creates a new dataset write session
+- users can later keep suspect, mark valid, or invalidate the result
+
+### Inspect A Run By Its Outputs
+
+As a user analyzing results, I want the experiment-run detail page to lead with
+produced datasets so that I can quickly reopen data while still seeing
+parameters, metadata, notes, and execution history nearby.
+
+Acceptance notes:
+
+- produced datasets are the primary detail-view content
+- Python read snippets are available for datasets
+- run quality state is visible
+- provenance label is visible
+- parameter snapshot or migration metadata summary is visible
+- execution details remain secondary debugging context
+
+### Extract A Managed Template From Repeated Interactive Work
+
+As a user who has repeated a notebook or ad hoc script several times, I want
+guidance for extracting the stable measurement into an importable Python
+function so that future runs can use stronger managed provenance.
+
+Acceptance notes:
+
+- Fricon provides snippets or skeletons that use the same run and dataset APIs
+- Fricon does not attempt automatic notebook conversion
+- the guidance points out metadata that is still arbitrary JSON
+- the user can move repeated parameters toward parameter snapshots
+- the resulting template can become a managed submitted run later
+
+### Submit A Managed Experiment For Stronger Provenance
+
+As a user running an important repeated measurement, I want to submit an
+importable Python function to Fricon so that the system can eventually own logs,
+status, retry, resource leases, and stronger code/environment references.
+
+Acceptance notes:
+
+- managed runs use an importable function or module entry point
+- parameter-aware managed runs resolve an immutable parameter snapshot
+- provenance label is `Managed`
+- future runner implementation can create task and script-run records
+- produced datasets are linked through dataset write sessions
+
+## Future Boundary Discussion: Dataset Vs Experiment Metadata
+
+This proposal intentionally leaves a follow-up boundary discussion around
+metadata ownership.
+
+Fricon's current dataset model includes user organization concepts that may
+overlap with future experiment-run behavior. As experiment runs become
+first-class, some user actions may be more natural on runs than on individual
+datasets.
+
+Likely ownership direction:
+
+```text
+ExperimentRun metadata
+  run-level tags
+  run-level favorite or pin state
+  run-level quality state
+  notes about the scientific attempt
+  sample/context references
+  migration JSON metadata
+  attachments
+
+Dataset metadata
+  dataset-local semantics
+  column roles, axes, units, labels, and display hints
+  output-specific notes or labels
+  per-output quality when a single dataset differs from the whole run
+```
+
+Questions to settle later:
+
+- Which current dataset tags, favorites, notes, or quality fields should move
+  to runs?
+- Which fields should exist on both runs and datasets?
+- How should dataset list views behave when most organization happens at the
+  experiment-run level?
+- How should imports from external data vaults map legacy metadata into run
+  metadata versus dataset metadata?
+- Should run-level quality propagate to produced datasets, or should the two
+  remain independent?
+
+## Future Boundary Discussion: Experiment-First User Model
+
+Interactive experiment runs may change the primary user object from dataset to
+experiment.
+
+The current Fricon user flow is dataset-first:
+
+```python
+with ws.dataset("s21") as ds:
+    ds.write(...)
+```
+
+After interactive experiment runs exist, the more natural measurement flow may
+be experiment-first:
+
+```python
+with ws.experiment("cooldown sweep") as exp:
+    with exp.dataset("s21") as ds:
+        ds.write(...)
+```
+
+This proposal does not require removing dataset-only creation. Dataset-only
+paths remain useful for imports, quick table capture, tests, low-level API
+work, and data that is not naturally part of a measurement attempt. But product
+documentation, examples, and desktop navigation may need to move toward
+experiment-first workflows once runs are first-class.
+
+Likely long-term shape:
+
+```text
+Experiment-first path
+  recommended path for scientific measurement
+  workspace -> experiment run -> dataset outputs
+
+Dataset-only path
+  lower-level path for imports, standalone tables, and transitional workflows
+  workspace -> dataset
+```
+
+Questions to settle later:
+
+- Should new user-facing tutorials start from `ExperimentRun` instead of
+  dataset creation once the run API exists?
+- Should `ws.dataset(...)` remain a first-class public convenience path, or be
+  positioned as a lower-level dataset-only path?
+- How should dataset writers discover or inherit the current experiment context?
+- Should every measured dataset eventually have an owning experiment run?
+- Should imported or legacy datasets create synthetic import runs, remain
+  dataset-only, or support both?
+- Should the desktop home view be run-first, dataset-first, or split by task?
+- How should search, tags, favorites, quality, and recent activity behave when
+  users primarily act on experiment runs?
+
 ## Next Product Work
 
 The next product discussion should focus on dataset semantics v1 because
@@ -923,6 +1111,8 @@ After that, the next product slices should be:
 - interactive versus managed provenance indicators
 - guided extraction from notebook or ad hoc script to importable template
 - run notes and quality flags
+- dataset versus experiment-run metadata ownership
+- experiment-first user model and dataset-only fallback path
 
 ## Tech Lead Discussion Items
 
@@ -943,6 +1133,10 @@ Before implementation, discuss:
   when managed submission is implemented
 - how to validate that managed templates record important experiment context in
   run or parameter records rather than dataset-local metadata
+- how an experiment context manager should coordinate dataset writer ownership,
+  lifetime, and error handling
+- whether top-level dataset writer APIs should create unowned datasets, attach
+  to ambient experiment context, or require explicit ownership
 
 ## Future Scope
 
