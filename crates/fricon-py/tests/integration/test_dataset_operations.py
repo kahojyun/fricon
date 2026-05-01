@@ -205,6 +205,12 @@ class TestDatasetOperations:
                 _ = dm.create("mixed_axis", scan={"gate": [0.0], "step": None})
             with pytest.raises(ValueError, match="reserved system prefix"):
                 _ = dm.create("reserved_axis", scan={"__ds_step": [0]})
+            mapping_axis = cast("list[int]", cast("object", {"k": 1}))
+            with pytest.raises(ValueError, match="must be a sequence"):
+                _ = dm.create("mapping_axis", scan={"axis": mapping_axis})
+            set_axis = cast("list[int]", cast("object", {1, 2}))
+            with pytest.raises(ValueError, match="must be a sequence"):
+                _ = dm.create("set_axis", scan={"axis": set_axis})
 
             server_handle.shutdown()
             assert not server_handle.is_running

@@ -53,7 +53,7 @@ use pyo3::{
     exceptions::{PyException, PyRuntimeError, PyTypeError, PyValueError},
     prelude::*,
     sync::PyOnceLock,
-    types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyString},
+    types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PySequence, PyString},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
 
@@ -337,11 +337,12 @@ fn parse_scan_axis(py: Python<'_>, name: String, spec: Py<PyAny>) -> PyResult<Sc
         )));
     }
 
-    let iter = bound.try_iter().map_err(|_| {
+    let sequence = bound.cast::<PySequence>().map_err(|_| {
         PyValueError::new_err(format!(
             "Scan axis '{name}' must be a sequence of scalar values, IndexAxis, or None."
         ))
     })?;
+    let iter = sequence.try_iter()?;
     let values = iter
         .map(|item| parse_scan_axis_value(&item?))
         .collect::<PyResult<Vec<_>>>()?;
