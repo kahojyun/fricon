@@ -28,6 +28,7 @@ use crate::dataset::{
     },
     storage::{
         ChunkReader,
+        error::DatasetFsError,
         logical_index::{
             logical_index_column, logical_index_record_ids, read_logical_index_batches,
         },
@@ -400,13 +401,14 @@ impl DatasetReader {
             return Ok(Vec::new());
         }
         let record_ids = self.record_ids()?;
-        if manifest.realization.index_realization == IndexRealization::Sidecar
-            && let Some(path) = &self.dataset_path
-        {
-            let points = Self::sidecar_logical_index_points(path, manifest, &record_ids)?;
-            if !points.is_empty() {
-                return Ok(points);
+        if manifest.realization.index_realization == IndexRealization::Sidecar {
+            if record_ids.is_empty() {
+                return Ok(Vec::new());
             }
+            let Some(path) = &self.dataset_path else {
+                return Err(ReadError::DatasetFs(DatasetFsError::ChunkNotFound));
+            };
+            return Self::sidecar_logical_index_points(path, manifest, &record_ids);
         }
         Ok(resolve_logical_index_points(manifest, &record_ids))
     }
@@ -421,7 +423,11 @@ impl DatasetReader {
             .as_ref()
             .expect("sidecar realization should require scan plan");
         let batches = read_logical_index_batches(path, scan_plan)?;
+        if batches.is_empty() {
+            return Err(ReadError::DatasetFs(DatasetFsError::ChunkNotFound));
+        }
         let record_id_set = record_ids.iter().copied().collect::<HashSet<_>>();
+        let mut matched_record_ids = HashSet::new();
         let mut latest_by_indices: HashMap<Vec<u64>, ResolvedLogicalIndexPoint> = HashMap::new();
         for batch in &batches {
             let record_ids = logical_index_record_ids(batch)?;
@@ -433,6 +439,7 @@ impl DatasetReader {
                 if !record_id_set.contains(&record_id) {
                     continue;
                 }
+                matched_record_ids.insert(record_id);
                 let indices = axis_columns
                     .iter()
                     .map(|column| column.value(row))
@@ -468,6 +475,9 @@ impl DatasetReader {
                     })
                     .or_insert(point);
             }
+        }
+        if matched_record_ids != record_id_set {
+            return Err(ReadError::Dataset(DatasetError::SchemaMismatch));
         }
         let mut points = latest_by_indices.into_values().collect::<Vec<_>>();
         points.sort_by_key(|point| point.record_id);
