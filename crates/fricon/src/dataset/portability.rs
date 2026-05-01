@@ -28,6 +28,7 @@
 //! dataset_manifest.json     <- optional semantic manifest sidecar
 //! data/data_chunk_0.arrow   <- Arrow IPC chunk files
 //! data/data_chunk_1.arrow
+//! logical_index/logical_index_chunk_0.arrow <- optional logical-index chunks
 //! …
 //! ```
 //!
@@ -36,9 +37,9 @@
 //! - Adding a metadata field to [`ExportedMetadata`] requires updating
 //!   [`compute_diffs`] and the repository import methods in
 //!   `database::dataset`.
-//! - The archive extraction allowlist in [`extract_archive`] only unpacks the
-//!   exact root `dataset_manifest.json` sidecar and `data/data_chunk_*.arrow`
-//!   entries. New file types need an explicit entry in the allowlist.
+//! - The archive extraction allowlist in [`extract_archive`] only unpacks known
+//!   dataset sidecars and chunk entries. New file types need an explicit entry
+//!   in the allowlist.
 
 use std::{
     fs::{self, File},
@@ -62,7 +63,9 @@ const METADATA_ENTRY: &str = "metadata.json";
 const MANIFEST_ENTRY: &str = MANIFEST_FILENAME;
 /// Prefix used for data chunk files inside the archive.
 const DATA_PREFIX: &str = "data/";
-const CURRENT_ARCHIVE_VERSION: u32 = 1;
+/// Prefix used for logical-index sidecar chunk files inside the archive.
+const LOGICAL_INDEX_PREFIX: &str = "logical_index/";
+const CURRENT_ARCHIVE_VERSION: u32 = 2;
 const MAX_ARCHIVE_NAME_CHARS: usize = 64;
 const FALLBACK_ARCHIVE_NAME: &str = "dataset";
 
@@ -214,15 +217,10 @@ pub fn export_dataset(
     if dataset_dir.is_dir() {
         let mut entries = fs::read_dir(dataset_dir)?.collect::<Result<Vec<_>, _>>()?;
         entries.retain(|e| {
-            let path = e.path();
-            let is_data_chunk = path
+            e.path()
                 .file_name()
                 .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("data_chunk_"));
-            let is_arrow = path
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
-            is_data_chunk && is_arrow
+                .is_some_and(is_safe_dataset_chunk_name)
         });
         // Sort for deterministic archive order.
         entries.sort_by_key(std::fs::DirEntry::file_name);
@@ -230,7 +228,13 @@ pub fn export_dataset(
         for entry in entries {
             let entry_path = entry.path();
             let file_name = entry.file_name();
-            let archive_entry_name = format!("{}{}", DATA_PREFIX, file_name.to_string_lossy());
+            let file_name = file_name.to_string_lossy();
+            let prefix = if file_name.starts_with("logical_index_chunk_") {
+                LOGICAL_INDEX_PREFIX
+            } else {
+                DATA_PREFIX
+            };
+            let archive_entry_name = format!("{prefix}{file_name}");
             tar.append_path_with_name(&entry_path, &archive_entry_name)?;
         }
     }
@@ -537,22 +541,39 @@ fn archive_entry_destination(path_str: &str, dest_dir: &Path) -> Option<PathBuf>
         return Some(dest_dir.join(MANIFEST_FILENAME));
     }
 
-    let file_name = path_str.strip_prefix(DATA_PREFIX)?;
-    is_safe_archive_chunk_name(file_name).then(|| dest_dir.join(file_name))
+    if let Some(file_name) = path_str.strip_prefix(DATA_PREFIX) {
+        return is_safe_data_chunk_name(file_name).then(|| dest_dir.join(file_name));
+    }
+
+    let file_name = path_str.strip_prefix(LOGICAL_INDEX_PREFIX)?;
+    is_safe_logical_index_chunk_name(file_name).then(|| dest_dir.join(file_name))
 }
 
 /// Validate that a data chunk filename is safe to extract.
 ///
 /// Guards against path traversal: only `data_chunk_*.arrow` basenames
 /// without path separators are allowed.
-fn is_safe_archive_chunk_name(file_name: &str) -> bool {
+fn is_safe_dataset_chunk_name(file_name: &str) -> bool {
+    is_safe_data_chunk_name(file_name) || is_safe_logical_index_chunk_name(file_name)
+}
+
+fn is_safe_data_chunk_name(file_name: &str) -> bool {
     let is_data_chunk = file_name.starts_with("data_chunk_");
+    is_safe_chunk_name_with_prefix(file_name, is_data_chunk)
+}
+
+fn is_safe_logical_index_chunk_name(file_name: &str) -> bool {
+    let is_logical_index_chunk = file_name.starts_with("logical_index_chunk_");
+    is_safe_chunk_name_with_prefix(file_name, is_logical_index_chunk)
+}
+
+fn is_safe_chunk_name_with_prefix(file_name: &str, has_expected_prefix: bool) -> bool {
     let is_arrow = Path::new(file_name)
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("arrow"));
     let has_path_separators = file_name.contains('/') || file_name.contains('\\');
 
-    is_data_chunk && is_arrow && !has_path_separators
+    has_expected_prefix && is_arrow && !has_path_separators
 }
 
 /// Compute field-level diffs between `existing` and `incoming` metadata.
@@ -637,6 +658,11 @@ mod tests {
     fn dummy_chunk_file(dir: &Path) {
         let chunk_path = dir.join("data_chunk_0.arrow");
         fs::write(chunk_path, b"ARROW_DUMMY_DATA").expect("write chunk");
+    }
+
+    fn dummy_logical_index_chunk_file(dir: &Path) {
+        let chunk_path = dir.join("logical_index_chunk_0.arrow");
+        fs::write(chunk_path, b"LOGICAL_INDEX_DUMMY_DATA").expect("write logical index chunk");
     }
 
     fn dummy_manifest_file(dir: &Path) {
@@ -790,6 +816,25 @@ mod tests {
         );
     }
 
+    #[test]
+    fn export_includes_logical_index_sidecar_chunks_when_present() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+        dummy_logical_index_chunk_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "with-logical-index");
+        let output_dir = tmp.path().join("exports");
+
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+        let entries = archive_entry_names(&archive);
+
+        assert!(entries.contains(&"data/data_chunk_0.arrow".to_string()));
+        assert!(entries.contains(&"logical_index/logical_index_chunk_0.arrow".to_string()));
+    }
+
     // ── preview ───────────────────────────────────────────────────────────────
 
     #[test]
@@ -938,6 +983,31 @@ mod tests {
         assert!(
             !staged.staging_dir.join(METADATA_ENTRY).exists(),
             "archive metadata should not be extracted into staging"
+        );
+    }
+
+    #[test]
+    fn stage_import_extracts_logical_index_sidecar_chunks() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+        dummy_logical_index_chunk_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "with-logical-index");
+        let output_dir = tmp.path().join("exports");
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+
+        let dest = tmp.path().join("aa").join(uid.to_string());
+        let staged = stage_import(&archive, &dest).expect("stage import");
+
+        assert!(
+            staged
+                .staging_dir
+                .join("logical_index_chunk_0.arrow")
+                .exists(),
+            "logical-index sidecar chunk should be extracted to staging"
         );
     }
 

@@ -245,6 +245,7 @@ mod tests {
                     chart_axis: true,
                 }],
                 None,
+                false,
             )
             .await?;
         for row in rows {

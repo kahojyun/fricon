@@ -35,6 +35,7 @@ pub(crate) fn get_dataset_reader(
         Ok(DatasetReader::from_handle(
             handle,
             read_manifest_optional(&path)?,
+            Some(path),
         )?)
     } else {
         Ok(DatasetReader::open_dir(&path)?)

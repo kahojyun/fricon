@@ -10,7 +10,10 @@ use arrow_select::concat::concat_batches;
 use tempfile::NamedTempFile;
 use tracing::{error, warn};
 
-use crate::dataset::storage::{error::DatasetFsError, layout::chunk_path};
+use crate::dataset::storage::{
+    error::DatasetFsError,
+    layout::{ChunkKind, chunk_path_for},
+};
 
 const MAX_BATCH_BYTE_SIZE: usize = 64 * 1024 * 1024;
 const MAX_CHUNK_BYTE_SIZE: u64 = 256 * 1024 * 1024;
@@ -18,15 +21,21 @@ const MAX_CHUNK_BYTE_SIZE: u64 = 256 * 1024 * 1024;
 pub(crate) struct ChunkWriter {
     dir_path: PathBuf,
     schema: SchemaRef,
+    kind: ChunkKind,
     next_chunk_index: usize,
     current_writer: Option<InnerWriter>,
 }
 
 impl ChunkWriter {
     pub(crate) fn new(schema: SchemaRef, dir_path: PathBuf) -> Self {
+        Self::new_with_kind(schema, dir_path, ChunkKind::Data)
+    }
+
+    pub(crate) fn new_with_kind(schema: SchemaRef, dir_path: PathBuf, kind: ChunkKind) -> Self {
         Self {
             dir_path,
             schema,
+            kind,
             next_chunk_index: 0,
             current_writer: None,
         }
@@ -56,7 +65,12 @@ impl ChunkWriter {
     }
 
     fn create_writer(&mut self) -> Result<InnerWriter, DatasetFsError> {
-        let writer = InnerWriter::new(&self.dir_path, self.next_chunk_index, &self.schema)?;
+        let writer = InnerWriter::new(
+            &self.dir_path,
+            self.kind,
+            self.next_chunk_index,
+            &self.schema,
+        )?;
         self.next_chunk_index += 1;
         Ok(writer)
     }
@@ -91,6 +105,7 @@ struct InnerWriter {
 impl InnerWriter {
     fn new(
         dir_path: &Path,
+        kind: ChunkKind,
         chunk_index: usize,
         schema: &Schema,
     ) -> Result<InnerWriter, DatasetFsError> {
@@ -101,7 +116,7 @@ impl InnerWriter {
             buffered_batches: vec![],
             buffered_size: 0,
             written_size: 0,
-            final_path: chunk_path(dir_path, chunk_index),
+            final_path: chunk_path_for(dir_path, kind, chunk_index),
         })
     }
 

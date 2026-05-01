@@ -86,6 +86,7 @@ pub(crate) fn resolve_from_manifest(
         index_realization: match manifest.realization.index_realization {
             IndexRealization::None => ResolvedIndexRealization::None,
             IndexRealization::Implicit => ResolvedIndexRealization::Implicit,
+            IndexRealization::Sidecar => ResolvedIndexRealization::Sidecar,
         },
         scan_axes,
         source: InterpretationSource::Manifest,
@@ -291,10 +292,10 @@ mod tests {
         read::{ReadError, SelectOptions},
         schema::DatasetSchema,
         semantics::{
-            DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, ScanAxis,
-            ScanAxisValue, ScanPlan, write_manifest,
+            DatasetDType, DatasetSemanticManifest, IndexRealization, ManifestColumn,
+            RECORD_ID_COLUMN, ScanAxis, ScanAxisValue, ScanPlan, write_manifest,
         },
-        storage::ChunkWriter,
+        storage::{ChunkWriter, layout::ChunkKind, logical_index::logical_index_schema},
     };
 
     fn visible(indices: &[usize]) -> Vec<VisibleColumnOrdinal> {
@@ -739,6 +740,196 @@ mod tests {
     }
 
     #[test]
+    fn reader_interpretation_resolves_sidecar_indices_and_latest_duplicates() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(
+                    schema,
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1, 2])),
+                        Arc::new(Float64Array::from(vec![10.0, 20.0, 30.0])),
+                    ],
+                )
+                .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        let scan_plan = ScanPlan::new(vec![
+            ScanAxis::static_values(
+                "gate",
+                vec![
+                    ScanAxisValue::String("low".to_string()),
+                    ScanAxisValue::String("high".to_string()),
+                ],
+            ),
+            ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
+        ]);
+        let mut manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(scan_plan.clone()));
+        manifest.realization.index_realization = IndexRealization::Sidecar;
+        write_manifest(dir.path(), &manifest).expect("write manifest");
+
+        let mut sidecar_writer = ChunkWriter::new_with_kind(
+            logical_index_schema(&scan_plan),
+            dir.path().to_owned(),
+            ChunkKind::LogicalIndex,
+        );
+        sidecar_writer
+            .write(
+                RecordBatch::try_new(
+                    logical_index_schema(&scan_plan),
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1, 2])),
+                        Arc::new(UInt64Array::from(vec![1, 0, 1])),
+                        Arc::new(UInt64Array::from(vec![0, 1, 0])),
+                    ],
+                )
+                .expect("sidecar batch"),
+            )
+            .expect("write sidecar");
+        sidecar_writer.finish().expect("finish sidecar");
+
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
+        let interpretation = reader.interpret().expect("interpretation");
+        assert_eq!(
+            interpretation.index_realization,
+            ResolvedIndexRealization::Sidecar
+        );
+
+        let logical_index_points = reader.logical_index_points().expect("logical index points");
+        assert_eq!(
+            logical_index_points
+                .iter()
+                .map(|point| (point.record_id, point.indices.clone()))
+                .collect::<Vec<_>>(),
+            vec![(1, vec![0, 1]), (2, vec![1, 0])]
+        );
+        assert_eq!(
+            logical_index_points[1].coordinates,
+            vec![
+                ScanAxisValue::String("high".to_string()),
+                ScanAxisValue::Int(0)
+            ]
+        );
+    }
+
+    #[test]
+    fn reader_interpretation_rejects_missing_sidecar_indices() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(
+                    schema,
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1])),
+                        Arc::new(Float64Array::from(vec![10.0, 20.0])),
+                    ],
+                )
+                .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        let scan_plan = ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![
+                ScanAxisValue::String("low".to_string()),
+                ScanAxisValue::String("high".to_string()),
+            ],
+        )]);
+        let mut manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(scan_plan));
+        manifest.realization.index_realization = IndexRealization::Sidecar;
+        write_manifest(dir.path(), &manifest).expect("write manifest");
+
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
+        let error = reader
+            .logical_index_points()
+            .expect_err("missing sidecar chunks should fail");
+
+        assert!(matches!(error, ReadError::DatasetFs(_)));
+    }
+
+    #[test]
+    fn reader_interpretation_rejects_partial_sidecar_record_ids() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(
+                    schema,
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1, 2])),
+                        Arc::new(Float64Array::from(vec![10.0, 20.0, 30.0])),
+                    ],
+                )
+                .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        let scan_plan = ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![
+                ScanAxisValue::String("low".to_string()),
+                ScanAxisValue::String("high".to_string()),
+            ],
+        )]);
+        let mut manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(scan_plan.clone()));
+        manifest.realization.index_realization = IndexRealization::Sidecar;
+        write_manifest(dir.path(), &manifest).expect("write manifest");
+
+        let mut sidecar_writer = ChunkWriter::new_with_kind(
+            logical_index_schema(&scan_plan),
+            dir.path().to_owned(),
+            ChunkKind::LogicalIndex,
+        );
+        sidecar_writer
+            .write(
+                RecordBatch::try_new(
+                    logical_index_schema(&scan_plan),
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 2])),
+                        Arc::new(UInt64Array::from(vec![0, 1])),
+                    ],
+                )
+                .expect("sidecar batch"),
+            )
+            .expect("write sidecar");
+        sidecar_writer.finish().expect("finish sidecar");
+
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
+        let error = reader
+            .logical_index_points()
+            .expect_err("partial sidecar rows should fail");
+
+        assert!(matches!(error, ReadError::Dataset(_)));
+    }
+
+    #[test]
     fn live_reader_interpretation_reads_manifest_when_present() {
         let dir = tempfile::tempdir().expect("temp dir");
         let user_schema = Arc::new(Schema::new(vec![Field::new(
@@ -751,16 +942,19 @@ mod tests {
             ManifestColumn::new(DatasetDType::Float64),
         )]);
         let registry = WriteSessionRegistry::new();
-        let mut guard = registry.start_session(7, dir.path().to_owned(), &user_schema);
+        let mut guard = registry.start_session(7, dir.path().to_owned(), &user_schema, None, false);
         guard
             .write_batch(
                 &RecordBatch::try_new(user_schema, vec![Arc::new(Float64Array::from(vec![10.0]))])
                     .expect("batch"),
+                None,
             )
             .expect("write batch");
         let handle = registry.get(7).expect("active handle");
 
-        let reader = DatasetReader::from_handle(handle, Some(manifest)).expect("reader");
+        let reader =
+            DatasetReader::from_handle(handle, Some(manifest), Some(dir.path().to_owned()))
+                .expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);

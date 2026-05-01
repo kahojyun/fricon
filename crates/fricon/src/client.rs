@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use arrow_array::RecordBatch;
+use arrow_array::{RecordBatch, UInt64Array};
 use arrow_ipc::writer::StreamWriter;
 use arrow_schema::{ArrowError, SchemaRef};
 use arrow_select::concat::concat_batches;
@@ -15,6 +15,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::prelude::*;
 use hyper_util::rt::TokioIo;
+use indexmap::IndexMap;
 use thiserror::Error;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_stream::wrappers::ReceiverStream;
@@ -29,6 +30,7 @@ use crate::{
         model::{DatasetRecord, DatasetStatus},
         schema::{DatasetArray, DatasetRow, DatasetSchema},
         semantics::{ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan},
+        storage::logical_index::logical_index_values_schema,
     },
     proto::{
         AddTagsRequest, ColumnMetadata as ProtoColumnMetadata, CreateAbort, CreateFinish,
@@ -178,6 +180,10 @@ impl Client {
         clippy::unused_async,
         reason = "The async constructor is the intended public API after the refactor"
     )]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "client create API mirrors the dataset create metadata carried over IPC"
+    )]
     pub async fn create_dataset(
         &self,
         name: String,
@@ -186,6 +192,7 @@ impl Client {
         schema: DatasetSchema,
         column_metadata: Vec<ColumnMetadata>,
         scan_plan: Option<ScanPlan>,
+        logical_index_sidecar: bool,
     ) -> Result<DatasetWriter, ClientError> {
         Ok(DatasetWriter::new(
             self.clone(),
@@ -195,6 +202,7 @@ impl Client {
             schema,
             column_metadata,
             scan_plan,
+            logical_index_sidecar,
             tokio::runtime::Handle::current(),
         ))
     }
@@ -308,7 +316,10 @@ fn dataset_status_to_client_error(status: Status) -> ClientError {
 
 #[derive(Debug)]
 enum StreamMessage {
-    Batch(RecordBatch),
+    Batch {
+        data: RecordBatch,
+        logical_indices: Option<RecordBatch>,
+    },
     Finish,
     Abort,
 }
@@ -316,6 +327,8 @@ enum StreamMessage {
 pub struct DatasetWriter {
     schema: DatasetSchema,
     arrow_schema: SchemaRef,
+    scan_plan: Option<ScanPlan>,
+    logical_index_sidecar: bool,
     tx: Option<mpsc::Sender<StreamMessage>>,
     connection_handle: Option<JoinHandle<Result<CreateResponse, ClientError>>>,
     runtime: tokio::runtime::Handle,
@@ -335,6 +348,7 @@ impl DatasetWriter {
         schema: DatasetSchema,
         column_metadata: Vec<ColumnMetadata>,
         scan_plan: Option<ScanPlan>,
+        logical_index_sidecar: bool,
         runtime: tokio::runtime::Handle,
     ) -> Self {
         let (tx, rx) = mpsc::channel::<StreamMessage>(16);
@@ -347,7 +361,8 @@ impl DatasetWriter {
                 description,
                 tags,
                 column_metadata,
-                scan_plan,
+                scan_plan.clone(),
+                logical_index_sidecar,
                 arrow_schema.clone(),
                 rx,
             );
@@ -364,6 +379,8 @@ impl DatasetWriter {
         Self {
             schema,
             arrow_schema,
+            scan_plan,
+            logical_index_sidecar,
             tx: Some(tx),
             connection_handle: Some(connection_handle),
             runtime,
@@ -372,9 +389,22 @@ impl DatasetWriter {
     }
 
     pub async fn write(&mut self, row: DatasetRow) -> Result<(), ClientError> {
-        let Some(tx) = self.tx.as_mut() else {
-            return Err(ClientError::WriterClosed);
-        };
+        self.write_batch(row, None).await
+    }
+
+    pub async fn write_with_logical_indices(
+        &mut self,
+        row: DatasetRow,
+        logical_indices: Option<IndexMap<String, u64>>,
+    ) -> Result<(), ClientError> {
+        self.write_batch(row, logical_indices).await
+    }
+
+    async fn write_batch(
+        &mut self,
+        row: DatasetRow,
+        logical_indices: Option<IndexMap<String, u64>>,
+    ) -> Result<(), ClientError> {
         let row_schema = row.to_schema();
         if row_schema != self.schema {
             return Err(ClientError::SchemaMismatch {
@@ -389,7 +419,18 @@ impl DatasetWriter {
             .map(|(name, _)| DatasetArray::from(row.0[name].clone()).into())
             .collect();
         let batch = RecordBatch::try_new(self.arrow_schema.clone(), columns)?;
-        if tx.send(StreamMessage::Batch(batch)).await.is_ok() {
+        let logical_indices = self.logical_indices_batch(logical_indices, batch.num_rows())?;
+        let Some(tx) = self.tx.as_mut() else {
+            return Err(ClientError::WriterClosed);
+        };
+        if tx
+            .send(StreamMessage::Batch {
+                data: batch,
+                logical_indices,
+            })
+            .await
+            .is_ok()
+        {
             Ok(())
         } else {
             let connection_handle = self
@@ -402,6 +443,47 @@ impl DatasetWriter {
             connection_result?;
             Err(ClientError::WriterClosed)
         }
+    }
+
+    fn logical_indices_batch(
+        &self,
+        logical_indices: Option<IndexMap<String, u64>>,
+        row_count: usize,
+    ) -> Result<Option<RecordBatch>, ClientError> {
+        let Some(logical_indices) = logical_indices else {
+            return if self.logical_index_sidecar {
+                Err(ClientError::DatasetOperationFailed)
+            } else {
+                Ok(None)
+            };
+        };
+        if !self.logical_index_sidecar {
+            return Err(ClientError::DatasetOperationFailed);
+        }
+        let scan_plan = self
+            .scan_plan
+            .as_ref()
+            .ok_or(ClientError::DatasetOperationFailed)?;
+        if logical_indices.len() != scan_plan.axes.len()
+            || scan_plan
+                .axes
+                .iter()
+                .any(|axis| !logical_indices.contains_key(&axis.name))
+        {
+            return Err(ClientError::DatasetOperationFailed);
+        }
+        let arrays = scan_plan
+            .axes
+            .iter()
+            .map(|axis| {
+                let value = logical_indices[&axis.name];
+                Arc::new(UInt64Array::from(vec![value; row_count])) as _
+            })
+            .collect();
+        Ok(Some(RecordBatch::try_new(
+            logical_index_values_schema(scan_plan),
+            arrays,
+        )?))
     }
 
     #[instrument(skip(self))]
@@ -491,6 +573,12 @@ fn payload_request(chunk: Bytes) -> CreateRequest {
     }
 }
 
+fn logical_index_payload_request(chunk: Bytes) -> CreateRequest {
+    CreateRequest {
+        create_message: Some(CreateMessage::LogicalIndexPayload(chunk)),
+    }
+}
+
 fn abort_request() -> CreateRequest {
     CreateRequest {
         create_message: Some(CreateMessage::Abort(CreateAbort {})),
@@ -541,15 +629,25 @@ fn scan_axis_value_to_proto(value: ScanAxisValue) -> ProtoScanAxisValue {
     ProtoScanAxisValue { value: Some(value) }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "stream construction consumes the full create metadata envelope"
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "async-stream yield points keep create stream sequencing explicit"
+)]
 fn build_request_stream(
     name: String,
     description: String,
     tags: Vec<String>,
     column_metadata: Vec<ColumnMetadata>,
     scan_plan: Option<ScanPlan>,
+    logical_index_sidecar: bool,
     arrow_schema: SchemaRef,
     message_rx: mpsc::Receiver<StreamMessage>,
 ) -> impl Stream<Item = CreateRequest> {
+    let logical_index_schema = scan_plan.as_ref().map(logical_index_values_schema);
     stream! {
         yield CreateRequest {
             create_message: Some(CreateMessage::Metadata(CreateMetadata {
@@ -557,7 +655,8 @@ fn build_request_stream(
                 description,
                 tags,
                 columns: column_metadata.into_iter().map(column_metadata_to_proto).collect(),
-                scan_axes: scan_plan.map_or_else(Vec::new, scan_plan_to_proto),
+                scan_axes: scan_plan.clone().map_or_else(Vec::new, scan_plan_to_proto),
+                logical_index_sidecar,
             })),
         };
 
@@ -576,6 +675,32 @@ fn build_request_stream(
             yield payload_request(chunk);
         }
 
+        let mut logical_writer = if logical_index_sidecar {
+            let Some(logical_index_schema) = logical_index_schema else {
+                error!("Logical-index sidecar requested without a scan plan");
+                yield abort_request();
+                return;
+            };
+            let buffer_writer = BytesMut::with_capacity(1024).writer();
+            let writer = match StreamWriter::try_new(buffer_writer, &logical_index_schema) {
+                Ok(writer) => writer,
+                Err(e) => {
+                    error!(error = %e, "Failed to initialize logical-index stream writer");
+                    yield abort_request();
+                    return;
+                }
+            };
+            Some((writer, logical_index_schema))
+        } else {
+            None
+        };
+        if let Some((writer, _)) = logical_writer.as_mut() {
+            let schema_chunk = writer.get_mut().get_mut().split().freeze();
+            for chunk in split_payload_chunk(schema_chunk) {
+                yield logical_index_payload_request(chunk);
+            }
+        }
+
         let mut chunked = pin!(tokio_stream::StreamExt::chunks_timeout(
             ReceiverStream::new(message_rx),
             MAX_BATCH_ROWS,
@@ -584,10 +709,19 @@ fn build_request_stream(
 
         while let Some(messages) = chunked.next().await {
             let mut batches = Vec::new();
+            let mut logical_index_batches = Vec::new();
             let mut terminal = None;
             for msg in messages {
                 match msg {
-                    StreamMessage::Batch(batch) => batches.push(batch),
+                    StreamMessage::Batch {
+                        data,
+                        logical_indices,
+                    } => {
+                        batches.push(data);
+                        if let Some(logical_indices) = logical_indices {
+                            logical_index_batches.push(logical_indices);
+                        }
+                    }
                     other => {
                         terminal = Some(other);
                         break;
@@ -610,6 +744,30 @@ fn build_request_stream(
                     }
                     Err(_) => {}
                 }
+                if logical_index_sidecar {
+                    let Some((logical_writer, logical_schema)) = logical_writer.as_mut() else {
+                        yield abort_request();
+                        return;
+                    };
+                    if logical_index_batches.len() != batches.len() {
+                        error!("Missing logical-index batches for dataset stream");
+                        yield abort_request();
+                        return;
+                    }
+                    match flush_batches(logical_writer, &logical_index_batches, logical_schema) {
+                        Ok(chunk) => {
+                            for payload_chunk in split_payload_chunk(chunk) {
+                                yield logical_index_payload_request(payload_chunk);
+                            }
+                        }
+                        Err(e) if !best_effort => {
+                            error!(error = %e, "Failed to write logical-index batch to dataset stream");
+                            yield abort_request();
+                            return;
+                        }
+                        Err(_) => {}
+                    }
+                }
             }
 
             match terminal {
@@ -622,6 +780,17 @@ fn build_request_stream(
                     let eos_chunk = writer.get_mut().get_mut().split().freeze();
                     for chunk in split_payload_chunk(eos_chunk) {
                         yield payload_request(chunk);
+                    }
+                    if let Some((mut logical_writer, _)) = logical_writer.take() {
+                        if let Err(e) = logical_writer.finish() {
+                            error!(error = %e, "Failed to finish logical-index stream writer");
+                            yield abort_request();
+                            return;
+                        }
+                        let eos_chunk = logical_writer.get_mut().get_mut().split().freeze();
+                        for chunk in split_payload_chunk(eos_chunk) {
+                            yield logical_index_payload_request(chunk);
+                        }
                     }
                     yield finish_request();
                     return;
@@ -963,7 +1132,10 @@ mod tests {
     async fn build_request_stream_sends_finish_message_on_finish() {
         let (message_tx, message_rx) = mpsc::channel(2);
         message_tx
-            .send(StreamMessage::Batch(one_col_batch()))
+            .send(StreamMessage::Batch {
+                data: one_col_batch(),
+                logical_indices: None,
+            })
             .await
             .expect("send batch");
         message_tx
@@ -978,6 +1150,7 @@ mod tests {
             vec!["tag".to_string()],
             Vec::new(),
             None,
+            false,
             schema,
             message_rx,
         );
@@ -999,7 +1172,10 @@ mod tests {
     async fn build_request_stream_sends_abort_message_on_abort() {
         let (message_tx, message_rx) = mpsc::channel(2);
         message_tx
-            .send(StreamMessage::Batch(one_col_batch()))
+            .send(StreamMessage::Batch {
+                data: one_col_batch(),
+                logical_indices: None,
+            })
             .await
             .expect("send batch");
         message_tx
@@ -1014,6 +1190,7 @@ mod tests {
             vec![],
             Vec::new(),
             None,
+            false,
             schema,
             message_rx,
         );
@@ -1035,7 +1212,10 @@ mod tests {
     async fn build_request_stream_sends_abort_when_channel_closes_without_terminal() {
         let (message_tx, message_rx) = mpsc::channel(2);
         message_tx
-            .send(StreamMessage::Batch(one_col_batch()))
+            .send(StreamMessage::Batch {
+                data: one_col_batch(),
+                logical_indices: None,
+            })
             .await
             .expect("send batch");
         drop(message_tx);
@@ -1046,6 +1226,7 @@ mod tests {
             vec![],
             Vec::new(),
             None,
+            false,
             schema,
             message_rx,
         );
@@ -1080,6 +1261,7 @@ mod tests {
                 chart_axis: true,
             }],
             None,
+            false,
             schema,
             message_rx,
         );
@@ -1121,6 +1303,7 @@ mod tests {
                 ),
                 ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
             ])),
+            false,
             schema,
             message_rx,
         );

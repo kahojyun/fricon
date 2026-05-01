@@ -58,6 +58,7 @@ pub(crate) struct CreateDatasetRequest {
     pub(crate) tags: Vec<String>,
     pub(crate) column_metadata: Vec<ColumnMetadata>,
     pub(crate) scan_plan: Option<ScanPlan>,
+    pub(crate) logical_index_sidecar: bool,
 }
 
 /// Stream input driving a dataset ingest session.
@@ -68,7 +69,10 @@ pub(crate) struct CreateDatasetRequest {
 #[derive(Debug)]
 pub(crate) enum CreateDatasetInput {
     Schema(SchemaRef),
-    Batch(RecordBatch),
+    Batch {
+        data: RecordBatch,
+        logical_indices: Option<RecordBatch>,
+    },
     Finish,
     Abort,
 }

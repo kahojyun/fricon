@@ -48,6 +48,11 @@ use crate::{
     skip(repo, paths, events, write_sessions, next_input, request),
     fields(dataset.name = %request.name, tags.count = request.tags.len())
 )]
+#[expect(
+    clippy::too_many_lines,
+    reason = "ingest orchestration keeps status, events, manifest, and write session sequencing \
+              together"
+)]
 pub(super) fn create_dataset_with<R, E, F>(
     repo: &R,
     paths: &WorkspacePaths,
@@ -84,6 +89,7 @@ where
                         schema.as_ref(),
                         &request.column_metadata,
                         request.scan_plan.clone(),
+                        request.logical_index_sidecar,
                     ) {
                         debug!(error = %error, "Failed to write dataset semantic manifest");
                         let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
@@ -92,13 +98,17 @@ where
                     manifest_written = true;
                 }
             }
-            CreateDatasetInput::Batch(batch) => {
+            CreateDatasetInput::Batch {
+                data,
+                logical_indices,
+            } => {
                 if !manifest_written {
                     if let Err(error) = write_minimal_manifest(
                         &dataset_path,
-                        batch.schema_ref(),
+                        data.schema_ref(),
                         &request.column_metadata,
                         request.scan_plan.clone(),
+                        request.logical_index_sidecar,
                     ) {
                         debug!(error = %error, "Failed to write dataset semantic manifest");
                         let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
@@ -110,10 +120,12 @@ where
                     write_sessions.start_session(
                         dataset_record.id,
                         dataset_path.clone(),
-                        &batch.schema(),
+                        &data.schema(),
+                        request.scan_plan.clone(),
+                        request.logical_index_sidecar,
                     )
                 });
-                if let Err(error) = session_ref.write_batch(&batch) {
+                if let Err(error) = session_ref.write_batch(&data, logical_indices.as_ref()) {
                     debug!(error = %error, "Failed to write batch into dataset session");
                     break CreateDatasetInput::Abort;
                 }
@@ -160,7 +172,7 @@ where
             events.publish(DatasetEvent::StatusChanged(record.clone()));
             Ok(record)
         }
-        CreateDatasetInput::Schema(_) | CreateDatasetInput::Batch(_) => {
+        CreateDatasetInput::Schema(_) | CreateDatasetInput::Batch { .. } => {
             unreachable!("non-terminal input cannot terminate dataset creation")
         }
     }
@@ -182,13 +194,16 @@ fn write_minimal_manifest(
     schema: &arrow_schema::Schema,
     column_metadata: &[ColumnMetadata],
     scan_plan: Option<ScanPlan>,
+    logical_index_sidecar: bool,
 ) -> Result<(), IngestError> {
-    let manifest = DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata_and_scan(
-        schema,
-        column_metadata.iter().cloned(),
-        scan_plan,
-    )
-    .map_err(ManifestError::from)?;
+    let manifest =
+        DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata_scan_and_realization(
+            schema,
+            column_metadata.iter().cloned(),
+            scan_plan,
+            logical_index_sidecar,
+        )
+        .map_err(ManifestError::from)?;
     write_manifest(dataset_path, &manifest)?;
     Ok(())
 }
@@ -315,6 +330,7 @@ mod tests {
             tags: vec!["tag".to_string()],
             column_metadata: Vec::new(),
             scan_plan: None,
+            logical_index_sidecar: false,
         }
     }
 
@@ -415,7 +431,10 @@ mod tests {
         let events = CollectEvents::default();
         let write_sessions = WriteSessionRegistry::new();
         let mut inputs = VecDeque::from(vec![
-            CreateDatasetInput::Batch(one_col_batch()),
+            CreateDatasetInput::Batch {
+                data: one_col_batch(),
+                logical_indices: None,
+            },
             CreateDatasetInput::Finish,
         ]);
 
@@ -584,7 +603,10 @@ mod tests {
             || {
                 if !sent_batch {
                     sent_batch = true;
-                    Some(CreateDatasetInput::Batch(one_col_batch()))
+                    Some(CreateDatasetInput::Batch {
+                        data: one_col_batch(),
+                        logical_indices: None,
+                    })
                 } else if !removed_dir {
                     removed_dir = true;
                     let dataset_path = paths.dataset_path_from_uid(repo.created_uid());

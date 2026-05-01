@@ -225,6 +225,7 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
             test_schema.clone(),
             Vec::new(),
             None,
+            false,
         )
         .await?;
 
@@ -339,6 +340,7 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
             test_schema,
             Vec::new(),
             None,
+            false,
         )
         .await?;
 
@@ -402,6 +404,7 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
             test_schema.clone(),
             Vec::new(),
             None,
+            false,
         )
         .await?;
 
@@ -563,6 +566,7 @@ async fn test_deleted_dataset_returns_typed_deleted_error() -> anyhow::Result<()
             test_schema,
             Vec::new(),
             None,
+            false,
         )
         .await?;
     writer.write(create_test_rows().remove(0)).await?;

@@ -7,7 +7,10 @@ use std::{
 use arrow_schema::SchemaRef;
 use tracing::debug;
 
-use crate::dataset::ingest::{IngestError, WriteSessionHandle, session::WriteSession};
+use crate::dataset::{
+    ingest::{IngestError, WriteSessionHandle, session::WriteSession},
+    semantics::ScanPlan,
+};
 
 #[derive(Clone, Default)]
 pub(crate) struct WriteSessionRegistry {
@@ -32,8 +35,9 @@ impl WriteSessionGuard {
     pub(crate) fn write_batch(
         &mut self,
         batch: &arrow_array::RecordBatch,
+        logical_indices: Option<&arrow_array::RecordBatch>,
     ) -> Result<(), IngestError> {
-        self.session_mut().write(batch)
+        self.session_mut().write(batch, logical_indices)
     }
 
     pub(crate) fn num_rows(&self) -> usize {
@@ -72,8 +76,10 @@ impl WriteSessionRegistry {
         id: i32,
         path: PathBuf,
         schema: &SchemaRef,
+        scan_plan: Option<ScanPlan>,
+        logical_index_sidecar: bool,
     ) -> WriteSessionGuard {
-        let session = WriteSession::new(schema, path);
+        let session = WriteSession::new(schema, path, scan_plan, logical_index_sidecar);
         if let Ok(mut m) = self.inner.write() {
             m.insert(id, session.handle());
         }
@@ -122,9 +128,10 @@ mod tests {
     fn finalized_session_persists_data() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
-        let mut guard = registry.start_session(1, dir.path().to_owned(), &test_schema());
+        let mut guard =
+            registry.start_session(1, dir.path().to_owned(), &test_schema(), None, false);
 
-        guard.write_batch(&test_batch(vec![1, 2, 3])).unwrap();
+        guard.write_batch(&test_batch(vec![1, 2, 3]), None).unwrap();
         let handle = registry.get(1).expect("handle exists during session");
         assert_eq!(handle.num_rows(), 3);
 
@@ -142,9 +149,10 @@ mod tests {
     fn dropped_session_finalizes_and_cleans_up_registry() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
-        let mut guard = registry.start_session(1, dir.path().to_owned(), &test_schema());
+        let mut guard =
+            registry.start_session(1, dir.path().to_owned(), &test_schema(), None, false);
 
-        guard.write_batch(&test_batch(vec![7])).unwrap();
+        guard.write_batch(&test_batch(vec![7]), None).unwrap();
         assert!(registry.get(1).is_some());
         drop(guard);
 
@@ -162,7 +170,7 @@ mod tests {
     fn empty_finalize_succeeds_with_no_persisted_data() {
         let dir = setup_session_dir();
         let registry = WriteSessionRegistry::new();
-        let guard = registry.start_session(1, dir.path().to_owned(), &test_schema());
+        let guard = registry.start_session(1, dir.path().to_owned(), &test_schema(), None, false);
 
         guard.finalize_session().unwrap();
 
