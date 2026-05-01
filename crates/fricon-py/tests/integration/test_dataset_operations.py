@@ -191,6 +191,55 @@ class TestDatasetOperations:
             server_handle.shutdown()
             assert not server_handle.is_running
 
+    def test_dataset_write_dict_persists_logical_index_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            with dm.create(
+                "sidecar_scan",
+                scan={"gate": ["low", "high"], "bias": [0, 1]},
+            ) as writer:
+                writer.write_dict(
+                    {"signal": 1.0},
+                    logical_indices={"gate": 1, "bias": 0},
+                )
+                writer.write_dict(
+                    {"signal": 2.0},
+                    logical_indices={"gate": 0, "bias": 1},
+                )
+                dataset = writer.finish()
+
+            dataset_path = Path(dataset.path)
+            manifest = cast(
+                "dict[str, object]",
+                json.loads((dataset_path / "dataset_manifest.json").read_text()),
+            )
+            assert cast("dict[str, object]", manifest["realization"])[
+                "index_realization"
+            ] == {"kind": "sidecar"}
+            assert (dataset_path / "logical_index_chunk_0.arrow").exists()
+            assert "__ds_record_id" not in dataset.to_polars().collect().columns
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_write_dict_rejects_logical_indices_without_scan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            writer = dm.create("sidecar_without_scan")
+            with pytest.raises(
+                fricon.FriconDatasetError, match="Dataset operation failed"
+            ):
+                writer.write_dict({"signal": 1.0}, logical_indices={"step": 0})
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
     def test_dataset_scan_validation_rejects_invalid_specs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace_path = Path(tmpdir) / "test_workspace"

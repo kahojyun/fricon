@@ -34,6 +34,8 @@ message CreateRequest {
   // The streaming sequence for CreateRequest:
   // 1. The client must first send a CreateMetadata message to initiate dataset creation.
   // 2. The client can then send one or more payload messages containing dataset data.
+  //    When logical_index_sidecar is true, matching logical_index_payload
+  //    messages must provide per-row logical indices.
   // 3. The client must end the stream with either CreateFinish or CreateAbort.
   // If the stream is closed without a terminal message, the creation is considered aborted.
   // Only one of these fields should be set per message.
@@ -42,6 +44,7 @@ message CreateRequest {
     bytes payload = 2;
     CreateAbort abort = 3;
     CreateFinish finish = 4;
+    bytes logical_index_payload = 5;
   }
 }
 
@@ -51,6 +54,7 @@ message CreateMetadata {
   repeated string tags = 3;
   repeated ColumnMetadata columns = 4;
   repeated ScanAxisMetadata scan_axes = 5;
+  bool logical_index_sidecar = 6;
 }
 
 message ColumnMetadata {

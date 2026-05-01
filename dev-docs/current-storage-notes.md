@@ -32,6 +32,7 @@ workspace/
         dataset_manifest.json
         data_chunk_0.arrow
         data_chunk_1.arrow
+        logical_index_chunk_0.arrow
   backup/
   log/
 ```
@@ -62,6 +63,11 @@ physically materialize the Fricon-owned `__ds_record_id: uint64` system column
 as the first Arrow column. Earlier transition snapshots may contain manifests
 that declare `__ds_record_id` before the Arrow chunks materialized that column.
 
+Datasets written with explicit logical scan indices store those indices in
+append-only `logical_index_chunk_<n>.arrow` sidecar files. Logical-index chunks
+are keyed by `__ds_record_id` and then contain one `uint64` column per scan
+axis. These sidecars are not part of the visible user payload.
+
 The physical storage layout is an implementation detail. User-facing docs may
 mention Arrow-compatible tables, but should avoid promising exact file names,
 chunking behavior, or directory structure.
@@ -77,9 +83,11 @@ optional scan plans, and compatibility settings for new ingested datasets live
 in `dataset_manifest.json`.
 
 Dataset archives store catalog metadata in `metadata.json`, Arrow payload chunks
-under `data/data_chunk_<n>.arrow`, and `dataset_manifest.json` as an optional
-root sidecar when the source dataset has one. Archives without a manifest remain
-valid and are read through compatibility inference.
+under `data/data_chunk_<n>.arrow`, logical-index chunks under
+`logical_index/logical_index_chunk_<n>.arrow` when present, and
+`dataset_manifest.json` as an optional root sidecar when the source dataset has
+one. Archives without a manifest remain valid and are read through
+compatibility inference.
 
 ## Write Buffering
 

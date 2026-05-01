@@ -700,6 +700,7 @@ mod tests {
                 schema,
                 Vec::new(),
                 None,
+                false,
             )
             .await?;
         for row in rows {

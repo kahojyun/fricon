@@ -16,6 +16,7 @@
 
 pub(crate) mod error;
 pub(crate) mod layout;
+pub(crate) mod logical_index;
 mod reader;
 mod writer;
 

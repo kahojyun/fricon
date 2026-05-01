@@ -82,6 +82,7 @@ async fn seed_workspace(workspace: PathBuf) -> Result<()> {
             schema,
             Vec::new(),
             None,
+            false,
         )
         .await
         .context("failed to create smoke dataset writer")?;

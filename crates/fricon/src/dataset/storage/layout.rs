@@ -2,14 +2,21 @@ use std::path::{Path, PathBuf};
 
 pub(crate) const MANIFEST_FILENAME: &str = "dataset_manifest.json";
 
-/// Generate a chunk filename for the given chunk index.
-pub(crate) fn chunk_filename(chunk_index: usize) -> String {
-    format!("data_chunk_{chunk_index}.arrow")
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ChunkKind {
+    Data,
+    LogicalIndex,
 }
 
-/// Get the chunk path by joining the base path with the chunk filename.
-pub(crate) fn chunk_path(dir_path: &Path, chunk_index: usize) -> PathBuf {
-    dir_path.join(chunk_filename(chunk_index))
+pub(crate) fn chunk_filename_for(kind: ChunkKind, chunk_index: usize) -> String {
+    match kind {
+        ChunkKind::Data => format!("data_chunk_{chunk_index}.arrow"),
+        ChunkKind::LogicalIndex => format!("logical_index_chunk_{chunk_index}.arrow"),
+    }
+}
+
+pub(crate) fn chunk_path_for(dir_path: &Path, kind: ChunkKind, chunk_index: usize) -> PathBuf {
+    dir_path.join(chunk_filename_for(kind, chunk_index))
 }
 
 pub(crate) fn manifest_path(dir_path: &Path) -> PathBuf {

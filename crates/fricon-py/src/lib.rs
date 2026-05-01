@@ -945,7 +945,7 @@ impl DatasetWriter {
         let Some(values) = kwargs else {
             return Err(generic_py_err("No data to write."));
         };
-        self.write_dict(py, values)
+        self.write_dict(py, values, None)
     }
 
     /// Write a row of values to the dataset.
@@ -955,10 +955,12 @@ impl DatasetWriter {
     ///
     /// Parameters:
     ///     values: A dictionary of names and values in the row.
+    #[pyo3(signature = (values, *, logical_indices = None))]
     pub fn write_dict(
         &mut self,
         py: Python<'_>,
         values: IndexMap<String, Py<PyAny>>,
+        logical_indices: Option<IndexMap<String, u64>>,
     ) -> PyResult<()> {
         if values.is_empty() {
             return Err(generic_py_err("No data to write."));
@@ -991,8 +993,10 @@ impl DatasetWriter {
                             schema,
                             column_metadata,
                             scan_plan,
+                            logical_indices.is_some(),
                         ))?;
-                        get_runtime().block_on(writer.write(row))?;
+                        get_runtime()
+                            .block_on(writer.write_with_logical_indices(row, logical_indices))?;
                         Ok(writer)
                     })
                     .map_err(map_client_error)?;
@@ -1009,7 +1013,8 @@ impl DatasetWriter {
                 };
                 writer = py
                     .detach(|| -> std::result::Result<_, ClientError> {
-                        get_runtime().block_on(writer.write(row))?;
+                        get_runtime()
+                            .block_on(writer.write_with_logical_indices(row, logical_indices))?;
                         Ok(writer)
                     })
                     .map_err(map_client_error)?;

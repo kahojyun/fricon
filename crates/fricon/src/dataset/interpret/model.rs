@@ -48,6 +48,7 @@ pub enum ColumnMeaning {
 pub enum ResolvedIndexRealization {
     None,
     Implicit,
+    Sidecar,
 }
 
 #[derive(Debug, Clone, PartialEq)]
