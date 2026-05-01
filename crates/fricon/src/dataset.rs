@@ -14,7 +14,8 @@ pub use self::{
     events::DatasetEvent,
     interpret::{
         ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
-        ResolvedColumn, ResolvedDuplicatePolicy, VisibleColumnOrdinal,
+        ResolvedColumn, ResolvedDuplicatePolicy, ResolvedIndexRealization,
+        ResolvedLogicalIndexPoint, ResolvedScanAxis, ResolvedScanAxisMode, VisibleColumnOrdinal,
     },
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
@@ -26,7 +27,7 @@ pub use self::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
-    semantics::ColumnMetadata,
+    semantics::{ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan},
 };
 pub(crate) use self::{
     ingest::{CreateDatasetInput, CreateDatasetRequest},

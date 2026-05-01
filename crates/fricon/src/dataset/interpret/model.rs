@@ -1,12 +1,14 @@
-use crate::dataset::semantics::DatasetDType;
+use crate::dataset::semantics::{DatasetDType, ScanAxisValue};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DatasetInterpretation {
     pub columns: Vec<ResolvedColumn>,
     pub value_columns: Vec<VisibleColumnOrdinal>,
     pub logical_index_columns: Vec<VisibleColumnOrdinal>,
     pub chart_axis_candidate_columns: Vec<VisibleColumnOrdinal>,
     pub duplicate_policy: ResolvedDuplicatePolicy,
+    pub index_realization: ResolvedIndexRealization,
+    pub scan_axes: Vec<ResolvedScanAxis>,
     pub source: InterpretationSource,
 }
 
@@ -43,6 +45,32 @@ pub enum ColumnMeaning {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolvedIndexRealization {
+    None,
+    Implicit,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedScanAxis {
+    pub name: String,
+    pub label: Option<String>,
+    pub mode: ResolvedScanAxisMode,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ResolvedScanAxisMode {
+    Static { values: Vec<ScanAxisValue> },
+    ImplicitIndex,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedLogicalIndexPoint {
+    pub record_id: u64,
+    pub indices: Vec<u64>,
+    pub coordinates: Vec<ScanAxisValue>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InterpretationSource {
     Manifest,
     CompatibilityInference,
@@ -50,6 +78,6 @@ pub enum InterpretationSource {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolvedDuplicatePolicy {
-    LatestByRecordIdPlaceholder,
+    LatestByRecordId,
     CompatibilityRowOrderPlaceholder,
 }

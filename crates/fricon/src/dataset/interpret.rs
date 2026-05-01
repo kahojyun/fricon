@@ -6,13 +6,14 @@ use arrow_schema::Schema;
 
 pub use self::model::{
     ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
-    ResolvedColumn, ResolvedDuplicatePolicy, VisibleColumnOrdinal,
+    ResolvedColumn, ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
+    ResolvedScanAxis, ResolvedScanAxisMode, VisibleColumnOrdinal,
 };
 use crate::dataset::{
     schema::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
     semantics::{
-        DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault, SystemColumn,
-        TraceAxisDType, TraceLayout, TraceValueDType,
+        DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault, IndexRealization,
+        ScanAxisMode, ScanAxisValue, SystemColumn, TraceAxisDType, TraceLayout, TraceValueDType,
     },
 };
 
@@ -70,6 +71,7 @@ pub(crate) fn resolve_from_manifest(
         .filter(|column| column.is_chart_axis_candidate)
         .filter_map(|column| column.visible_ordinal)
         .collect();
+    let scan_axes = resolve_scan_axes(manifest);
 
     DatasetInterpretation {
         columns,
@@ -78,11 +80,113 @@ pub(crate) fn resolve_from_manifest(
         chart_axis_candidate_columns,
         duplicate_policy: match manifest.realization.duplicate_resolution_default {
             DuplicateResolutionDefault::LatestByRecordId => {
-                ResolvedDuplicatePolicy::LatestByRecordIdPlaceholder
+                ResolvedDuplicatePolicy::LatestByRecordId
             }
         },
+        index_realization: match manifest.realization.index_realization {
+            IndexRealization::None => ResolvedIndexRealization::None,
+            IndexRealization::Implicit => ResolvedIndexRealization::Implicit,
+        },
+        scan_axes,
         source: InterpretationSource::Manifest,
     }
+}
+
+fn resolve_scan_axes(manifest: &DatasetSemanticManifest) -> Vec<ResolvedScanAxis> {
+    manifest
+        .scan_plan
+        .as_ref()
+        .map_or_else(Vec::new, |scan_plan| {
+            scan_plan
+                .axes
+                .iter()
+                .map(|axis| ResolvedScanAxis {
+                    name: axis.name.clone(),
+                    label: axis.label.clone(),
+                    mode: match &axis.mode {
+                        ScanAxisMode::Static { values } => ResolvedScanAxisMode::Static {
+                            values: values.clone(),
+                        },
+                        ScanAxisMode::ImplicitIndex => ResolvedScanAxisMode::ImplicitIndex,
+                    },
+                })
+                .collect()
+        })
+}
+
+pub(crate) fn resolve_logical_index_points(
+    manifest: &DatasetSemanticManifest,
+    record_ids: &[u64],
+) -> Vec<ResolvedLogicalIndexPoint> {
+    let Some(scan_plan) = &manifest.scan_plan else {
+        return Vec::new();
+    };
+    if scan_plan.axes.is_empty() {
+        return Vec::new();
+    }
+    if scan_plan
+        .axes
+        .iter()
+        .any(|axis| matches!(axis.mode, ScanAxisMode::ImplicitIndex))
+    {
+        return record_ids
+            .iter()
+            .copied()
+            .map(|record_id| ResolvedLogicalIndexPoint {
+                record_id,
+                indices: vec![record_id],
+                coordinates: vec![ScanAxisValue::Int(
+                    i64::try_from(record_id).unwrap_or(i64::MAX),
+                )],
+            })
+            .collect();
+    }
+
+    let shapes: Vec<_> = scan_plan
+        .axes
+        .iter()
+        .map(|axis| match &axis.mode {
+            ScanAxisMode::Static { values } => values.len() as u64,
+            ScanAxisMode::ImplicitIndex => 0,
+        })
+        .collect();
+    let planned_len = shapes
+        .iter()
+        .try_fold(1_u64, |acc, len| acc.checked_mul(*len));
+    if planned_len == Some(0) {
+        return Vec::new();
+    }
+
+    record_ids
+        .iter()
+        .copied()
+        .map(|record_id| {
+            let mut remainder =
+                planned_len.map_or(record_id, |planned_len| record_id % planned_len);
+            let mut indices = vec![0; shapes.len()];
+            for axis_index in (0..shapes.len()).rev() {
+                let len = shapes[axis_index];
+                indices[axis_index] = remainder % len;
+                remainder /= len;
+            }
+            let coordinates = indices
+                .iter()
+                .zip(&scan_plan.axes)
+                .map(|(index, axis)| {
+                    let ScanAxisMode::Static { values } = &axis.mode else {
+                        unreachable!("implicit axes handled earlier")
+                    };
+                    let index = usize::try_from(*index).expect("scan axis index should fit usize");
+                    values[index].clone()
+                })
+                .collect();
+            ResolvedLogicalIndexPoint {
+                record_id,
+                indices,
+                coordinates,
+            }
+        })
+        .collect()
 }
 
 pub(crate) fn resolve_from_compatibility_inference(
@@ -135,6 +239,8 @@ pub(crate) fn resolve_from_compatibility_inference(
         logical_index_columns: index_columns.clone(),
         chart_axis_candidate_columns: index_columns,
         duplicate_policy: ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder,
+        index_realization: ResolvedIndexRealization::None,
+        scan_axes: Vec::new(),
         source: InterpretationSource::CompatibilityInference,
     }
 }
@@ -175,7 +281,8 @@ mod tests {
 
     use super::{
         ColumnMeaning, InterpretationSource, PhysicalColumnOrdinal, ResolvedDuplicatePolicy,
-        VisibleColumnOrdinal, resolve_from_manifest,
+        ResolvedIndexRealization, ResolvedLogicalIndexPoint, ResolvedScanAxisMode,
+        VisibleColumnOrdinal, resolve_from_manifest, resolve_logical_index_points,
     };
     use crate::dataset::{
         DatasetReader,
@@ -184,7 +291,8 @@ mod tests {
         read::{ReadError, SelectOptions},
         schema::DatasetSchema,
         semantics::{
-            DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, write_manifest,
+            DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, ScanAxis,
+            ScanAxisValue, ScanPlan, write_manifest,
         },
         storage::ChunkWriter,
     };
@@ -209,7 +317,7 @@ mod tests {
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
             interpretation.duplicate_policy,
-            ResolvedDuplicatePolicy::LatestByRecordIdPlaceholder
+            ResolvedDuplicatePolicy::LatestByRecordId
         );
         assert_eq!(interpretation.value_columns, visible(&[0]));
         assert_eq!(
@@ -262,6 +370,134 @@ mod tests {
         assert!(signal.hidden_by_default);
         assert!(signal.is_chart_axis_candidate);
         assert_eq!(interpretation.chart_axis_candidate_columns, visible(&[0]));
+    }
+
+    #[test]
+    fn manifest_interpretation_derives_regular_scan_indices_from_record_ids() {
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![
+            ScanAxis::static_values(
+                "gate",
+                vec![ScanAxisValue::Float(-0.2), ScanAxisValue::Float(-0.1)],
+            ),
+            ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
+        ])));
+        let schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]);
+
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
+
+        assert_eq!(
+            interpretation.index_realization,
+            ResolvedIndexRealization::Implicit
+        );
+        assert_eq!(interpretation.scan_axes.len(), 2);
+        assert!(matches!(
+            interpretation.scan_axes[0].mode,
+            ResolvedScanAxisMode::Static { .. }
+        ));
+        let logical_index_points = resolve_logical_index_points(&manifest, &[0, 1, 2, 3, 4]);
+        assert_eq!(
+            logical_index_points,
+            vec![
+                ResolvedLogicalIndexPoint {
+                    record_id: 0,
+                    indices: vec![0, 0],
+                    coordinates: vec![ScanAxisValue::Float(-0.2), ScanAxisValue::Int(0)],
+                },
+                ResolvedLogicalIndexPoint {
+                    record_id: 1,
+                    indices: vec![0, 1],
+                    coordinates: vec![ScanAxisValue::Float(-0.2), ScanAxisValue::Int(1)],
+                },
+                ResolvedLogicalIndexPoint {
+                    record_id: 2,
+                    indices: vec![1, 0],
+                    coordinates: vec![ScanAxisValue::Float(-0.1), ScanAxisValue::Int(0)],
+                },
+                ResolvedLogicalIndexPoint {
+                    record_id: 3,
+                    indices: vec![1, 1],
+                    coordinates: vec![ScanAxisValue::Float(-0.1), ScanAxisValue::Int(1)],
+                },
+                ResolvedLogicalIndexPoint {
+                    record_id: 4,
+                    indices: vec![0, 0],
+                    coordinates: vec![ScanAxisValue::Float(-0.2), ScanAxisValue::Int(0)],
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn implicit_scan_index_derivation_handles_shape_larger_than_u64() {
+        let axes = (0..64)
+            .map(|index| {
+                ScanAxis::static_values(
+                    format!("axis_{index}"),
+                    vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)],
+                )
+            })
+            .collect();
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(axes)));
+
+        let points = resolve_logical_index_points(&manifest, &[u64::MAX]);
+
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].indices, vec![1; 64]);
+    }
+
+    #[test]
+    fn manifest_interpretation_derives_unknown_length_index_from_record_ids() {
+        let manifest = DatasetSemanticManifest::minimal([(
+            "loss".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![ScanAxis::implicit_index(
+            "step", None,
+        )])));
+        let schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("loss", DataType::Float64, false),
+        ]);
+
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
+
+        assert_eq!(interpretation.scan_axes[0].name, "step");
+        assert!(matches!(
+            interpretation.scan_axes[0].mode,
+            ResolvedScanAxisMode::ImplicitIndex
+        ));
+        let logical_index_points = resolve_logical_index_points(&manifest, &[0, 1, 2]);
+        assert_eq!(
+            logical_index_points,
+            vec![
+                ResolvedLogicalIndexPoint {
+                    record_id: 0,
+                    indices: vec![0],
+                    coordinates: vec![ScanAxisValue::Int(0)],
+                },
+                ResolvedLogicalIndexPoint {
+                    record_id: 1,
+                    indices: vec![1],
+                    coordinates: vec![ScanAxisValue::Int(1)],
+                },
+                ResolvedLogicalIndexPoint {
+                    record_id: 2,
+                    indices: vec![2],
+                    coordinates: vec![ScanAxisValue::Int(2)],
+                },
+            ]
+        );
     }
 
     #[test]
@@ -398,6 +634,108 @@ mod tests {
             .expect("select value columns from interpretation");
         assert_eq!(selected_schema.fields().len(), 2);
         assert_eq!(selected_batches[0].num_columns(), 2);
+    }
+
+    #[test]
+    fn reader_interpretation_resolves_implicit_regular_scan_after_reopen() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(
+                    schema,
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1, 2, 3, 4])),
+                        Arc::new(Float64Array::from(vec![10.0, 20.0, 30.0, 40.0, 50.0])),
+                    ],
+                )
+                .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![
+            ScanAxis::static_values(
+                "gate",
+                vec![
+                    ScanAxisValue::String("low".to_string()),
+                    ScanAxisValue::String("high".to_string()),
+                ],
+            ),
+            ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
+        ])));
+        write_manifest(dir.path(), &manifest).expect("write manifest");
+
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
+        let interpretation = reader.interpret().expect("interpretation");
+
+        assert_eq!(
+            interpretation.duplicate_policy,
+            ResolvedDuplicatePolicy::LatestByRecordId
+        );
+        let logical_index_points = reader.logical_index_points().expect("logical index points");
+        assert_eq!(
+            logical_index_points
+                .iter()
+                .map(|point| point.indices.clone())
+                .collect::<Vec<_>>(),
+            vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1], vec![0, 0]]
+        );
+    }
+
+    #[test]
+    fn reader_interpretation_resolves_unknown_length_scan_after_reopen() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("loss", DataType::Float64, false),
+        ]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(
+                    schema,
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1, 2])),
+                        Arc::new(Float64Array::from(vec![3.0, 2.0, 1.0])),
+                    ],
+                )
+                .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        let manifest = DatasetSemanticManifest::minimal([(
+            "loss".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![ScanAxis::implicit_index(
+            "step", None,
+        )])));
+        write_manifest(dir.path(), &manifest).expect("write manifest");
+
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
+        let interpretation = reader.interpret().expect("interpretation");
+
+        assert_eq!(interpretation.scan_axes[0].name, "step");
+        let logical_index_points = reader.logical_index_points().expect("logical index points");
+        assert_eq!(
+            logical_index_points
+                .iter()
+                .map(|point| point.coordinates.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                vec![ScanAxisValue::Int(0)],
+                vec![ScanAxisValue::Int(1)],
+                vec![ScanAxisValue::Int(2)]
+            ]
+        );
     }
 
     #[test]

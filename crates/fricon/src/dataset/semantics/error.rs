@@ -34,6 +34,26 @@ pub enum ManifestValidationError {
     InvalidSystemColumnMetadata { name: String },
     #[error("Dataset semantic manifest v1 requires append_only=true")]
     AppendOnlyRequired,
+    #[error("Dataset semantic manifest scan plan must contain at least one axis")]
+    EmptyScanPlan,
+    #[error("Dataset semantic manifest scan axis name must not be empty")]
+    EmptyScanAxisName,
+    #[error("Dataset semantic manifest scan axis {name} uses reserved system prefix")]
+    ReservedScanAxisName { name: String },
+    #[error("Dataset semantic manifest contains duplicate scan axis: {name}")]
+    DuplicateScanAxis { name: String },
+    #[error("Dataset semantic manifest static scan axis {name} must contain at least one value")]
+    EmptyStaticScanAxis { name: String },
+    #[error("Dataset semantic manifest static scan axis {name} contains a non-finite float value")]
+    NonFiniteScanAxisValue { name: String },
+    #[error("Dataset semantic manifest v1 supports only one unknown-length scan axis")]
+    MultipleUnknownScanAxes,
+    #[error("Dataset semantic manifest v1 does not support mixed static and unknown scan axes")]
+    MixedStaticAndUnknownScanAxes,
+    #[error("Dataset semantic manifest scan plan requires implicit index realization")]
+    ScanPlanRequiresImplicitRealization,
+    #[error("Dataset semantic manifest implicit index realization requires a scan plan")]
+    ImplicitRealizationRequiresScanPlan,
     #[error("Column metadata names a column that is not in the Arrow schema: {name}")]
     UnknownColumnMetadata { name: String },
     #[error("Column metadata was declared more than once: {name}")]

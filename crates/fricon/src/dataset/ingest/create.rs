@@ -19,7 +19,8 @@ use crate::{
         },
         model::{DatasetId, DatasetRecord, DatasetStatus},
         semantics::{
-            ColumnMetadata, DatasetSemanticManifest, ManifestColumn, ManifestError, write_manifest,
+            ColumnMetadata, DatasetSemanticManifest, ManifestColumn, ManifestError, ScanPlan,
+            write_manifest,
         },
         storage,
     },
@@ -82,6 +83,7 @@ where
                         &dataset_path,
                         schema.as_ref(),
                         &request.column_metadata,
+                        request.scan_plan.clone(),
                     ) {
                         debug!(error = %error, "Failed to write dataset semantic manifest");
                         let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
@@ -96,6 +98,7 @@ where
                         &dataset_path,
                         batch.schema_ref(),
                         &request.column_metadata,
+                        request.scan_plan.clone(),
                     ) {
                         debug!(error = %error, "Failed to write dataset semantic manifest");
                         let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
@@ -125,7 +128,9 @@ where
 
     match terminal {
         CreateDatasetInput::Finish => {
-            if !manifest_written && let Err(error) = write_empty_manifest(&dataset_path) {
+            if !manifest_written
+                && let Err(error) = write_empty_manifest(&dataset_path, request.scan_plan.clone())
+            {
                 debug!(error = %error, "Failed to write empty dataset semantic manifest");
                 let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
                 return Err(error);
@@ -176,18 +181,24 @@ fn write_minimal_manifest(
     dataset_path: &std::path::Path,
     schema: &arrow_schema::Schema,
     column_metadata: &[ColumnMetadata],
+    scan_plan: Option<ScanPlan>,
 ) -> Result<(), IngestError> {
-    let manifest = DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata(
+    let manifest = DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata_and_scan(
         schema,
         column_metadata.iter().cloned(),
+        scan_plan,
     )
     .map_err(ManifestError::from)?;
     write_manifest(dataset_path, &manifest)?;
     Ok(())
 }
 
-fn write_empty_manifest(dataset_path: &std::path::Path) -> Result<(), IngestError> {
-    let manifest = DatasetSemanticManifest::minimal(std::iter::empty::<(String, ManifestColumn)>());
+fn write_empty_manifest(
+    dataset_path: &std::path::Path,
+    scan_plan: Option<ScanPlan>,
+) -> Result<(), IngestError> {
+    let manifest = DatasetSemanticManifest::minimal(std::iter::empty::<(String, ManifestColumn)>())
+        .with_scan_plan(scan_plan);
     write_manifest(dataset_path, &manifest)?;
     Ok(())
 }
@@ -303,6 +314,7 @@ mod tests {
             description: "desc".to_string(),
             tags: vec!["tag".to_string()],
             column_metadata: Vec::new(),
+            scan_plan: None,
         }
     }
 

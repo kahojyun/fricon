@@ -57,10 +57,10 @@ directory. A dataset is modeled as one logical Arrow table split across
 
 New datasets created through ingest also store `dataset_manifest.json` beside
 the chunk files. The manifest records v1 dataset semantic columns, realization
-defaults, and compatibility settings. New semantic datasets physically
-materialize the Fricon-owned `__ds_record_id: uint64` system column as the
-first Arrow column. Earlier transition snapshots may contain manifests that
-declare `__ds_record_id` before the Arrow chunks materialized that column.
+defaults, optional scan plans, and compatibility settings. New semantic datasets
+physically materialize the Fricon-owned `__ds_record_id: uint64` system column
+as the first Arrow column. Earlier transition snapshots may contain manifests
+that declare `__ds_record_id` before the Arrow chunks materialized that column.
 
 The physical storage layout is an implementation detail. User-facing docs may
 mention Arrow-compatible tables, but should avoid promising exact file names,
@@ -72,8 +72,9 @@ Current dataset catalog metadata lives in SQLite. This includes dataset name,
 description, favorite state, status, timestamps, and tags as represented by
 `DatasetRecord` / `DatasetMetadata`.
 
-Dataset payload facts live in Arrow chunk files. Dataset semantic defaults and
-compatibility settings for new ingested datasets live in `dataset_manifest.json`.
+Dataset payload facts live in Arrow chunk files. Dataset semantic defaults,
+optional scan plans, and compatibility settings for new ingested datasets live
+in `dataset_manifest.json`.
 
 Dataset archives store catalog metadata in `metadata.json`, Arrow payload chunks
 under `data/data_chunk_<n>.arrow`, and `dataset_manifest.json` as an optional

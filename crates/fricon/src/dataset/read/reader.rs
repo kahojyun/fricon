@@ -1,7 +1,7 @@
 use std::{borrow::Cow, cmp::Ordering, ops::RangeBounds, path::Path, sync::Arc};
 
 use arrow_arith::boolean::and;
-use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar};
+use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar, UInt64Array};
 use arrow_ord::{cmp::eq, ord::make_comparator};
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -10,12 +10,14 @@ use itertools::Itertools;
 use crate::dataset::{
     ingest::WriteSessionHandle,
     interpret::{
-        DatasetInterpretation, resolve_from_compatibility_inference, resolve_from_manifest,
+        DatasetInterpretation, ResolvedLogicalIndexPoint, resolve_from_compatibility_inference,
+        resolve_from_manifest, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
     semantics::{
-        DatasetSemanticManifest, ManifestError, is_hidden_system_column, read_manifest_optional,
+        DatasetSemanticManifest, ManifestError, RECORD_ID_COLUMN, is_hidden_system_column,
+        read_manifest_optional,
     },
     storage::ChunkReader,
 };
@@ -370,6 +372,41 @@ impl DatasetReader {
             self.schema()?,
             self.try_index_columns()?,
         ))
+    }
+
+    pub fn logical_index_points(&self) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
+        let Some(manifest) = &self.manifest else {
+            return Ok(Vec::new());
+        };
+        manifest
+            .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
+            .map_err(ManifestError::from)?;
+        if manifest.scan_plan.is_none() {
+            return Ok(Vec::new());
+        }
+        Ok(resolve_logical_index_points(manifest, &self.record_ids()?))
+    }
+
+    fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
+        let record_id_index = self
+            .physical_arrow_schema
+            .column_with_name(RECORD_ID_COLUMN)
+            .ok_or_else(|| {
+                DatasetError::Arrow(arrow_schema::ArrowError::SchemaError(format!(
+                    "missing record id column {RECORD_ID_COLUMN}"
+                )))
+            })?
+            .0;
+        let mut record_ids = Vec::new();
+        for batch in self.source.range(..) {
+            let column = batch
+                .column(record_id_index)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .ok_or(DatasetError::IncompatibleType)?;
+            record_ids.extend(column.values().iter().copied());
+        }
+        Ok(record_ids)
     }
 
     #[must_use]

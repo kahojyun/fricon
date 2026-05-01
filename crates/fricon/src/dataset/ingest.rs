@@ -22,7 +22,7 @@ pub(crate) use self::{
 };
 use crate::dataset::{
     model::{DatasetId, DatasetRecord, DatasetStatus},
-    semantics::ColumnMetadata,
+    semantics::{ColumnMetadata, ScanPlan},
 };
 
 /// Persistence port for ingest-time dataset creation and status updates.
@@ -57,6 +57,7 @@ pub(crate) struct CreateDatasetRequest {
     pub(crate) description: String,
     pub(crate) tags: Vec<String>,
     pub(crate) column_metadata: Vec<ColumnMetadata>,
+    pub(crate) scan_plan: Option<ScanPlan>,
 }
 
 /// Stream input driving a dataset ingest session.

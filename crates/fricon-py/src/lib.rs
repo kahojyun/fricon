@@ -27,8 +27,8 @@ mod convert;
 mod _core {
     #[pymodule_export]
     use super::{
-        Column, Dataset, DatasetManager, DatasetWriter, FriconDatasetError, ServerHandle, Trace,
-        Workspace, serve_workspace,
+        Column, Dataset, DatasetManager, DatasetWriter, FriconDatasetError, IndexAxis,
+        ServerHandle, Trace, Workspace, serve_workspace,
     };
     #[cfg(feature = "python-cli-entrypoints")]
     #[pymodule_export]
@@ -40,7 +40,7 @@ use std::{mem, path::PathBuf, time::Duration};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use fricon::{
-    Client, ClientError, ColumnMetadata,
+    Client, ClientError, ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan,
     app::AppManager,
     dataset::{
         model::{DatasetMetadata, DatasetRecord, DatasetStatus},
@@ -53,7 +53,7 @@ use pyo3::{
     exceptions::{PyException, PyRuntimeError, PyTypeError, PyValueError},
     prelude::*,
     sync::PyOnceLock,
-    types::{PyDict, PyList},
+    types::{PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PySequence, PyString},
 };
 use pyo3_async_runtimes::tokio::get_runtime;
 
@@ -163,6 +163,27 @@ impl ColumnDeclarations {
             .iter()
             .map(|declaration| declaration.metadata.clone())
             .collect()
+    }
+}
+
+/// Unknown-length integer scan axis for dataset creation.
+#[pyclass(module = "fricon._core", skip_from_py_object)]
+#[derive(Clone)]
+pub struct IndexAxis {
+    label: Option<String>,
+}
+
+#[pymethods]
+impl IndexAxis {
+    #[new]
+    #[pyo3(signature=(*, label=None))]
+    pub fn new(label: Option<String>) -> Self {
+        Self { label }
+    }
+
+    #[getter]
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_deref()
     }
 }
 
@@ -280,6 +301,76 @@ fn parse_column_declarations(
     Ok(Some(ColumnDeclarations(declarations)))
 }
 
+fn parse_scan_plan(
+    py: Python<'_>,
+    scan: Option<IndexMap<String, Py<PyAny>>>,
+) -> PyResult<Option<ScanPlan>> {
+    let Some(scan) = scan else {
+        return Ok(None);
+    };
+    if scan.is_empty() {
+        return Err(PyValueError::new_err("scan must not be empty."));
+    }
+
+    let axes = scan
+        .into_iter()
+        .map(|(name, spec)| parse_scan_axis(py, name, spec))
+        .collect::<PyResult<Vec<_>>>()?;
+    let scan_plan = ScanPlan::new(axes);
+    scan_plan
+        .validate()
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    Ok(Some(scan_plan))
+}
+
+fn parse_scan_axis(py: Python<'_>, name: String, spec: Py<PyAny>) -> PyResult<ScanAxis> {
+    let bound = spec.bind(py);
+    if bound.is_none() {
+        return Ok(ScanAxis::implicit_index(name, None));
+    }
+    if let Ok(axis) = bound.extract::<PyRef<'_, IndexAxis>>() {
+        return Ok(ScanAxis::implicit_index(name, axis.label.clone()));
+    }
+    if bound.is_instance_of::<PyString>() || bound.is_instance_of::<PyBytes>() {
+        return Err(PyValueError::new_err(format!(
+            "Scan axis '{name}' must be a sequence of scalar values, IndexAxis, or None."
+        )));
+    }
+
+    let sequence = bound.cast::<PySequence>().map_err(|_| {
+        PyValueError::new_err(format!(
+            "Scan axis '{name}' must be a sequence of scalar values, IndexAxis, or None."
+        ))
+    })?;
+    let iter = sequence.try_iter()?;
+    let values = iter
+        .map(|item| parse_scan_axis_value(&item?))
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(ScanAxis {
+        name,
+        label: None,
+        mode: ScanAxisMode::Static { values },
+    })
+}
+
+fn parse_scan_axis_value(value: &Bound<'_, PyAny>) -> PyResult<ScanAxisValue> {
+    if value.is_instance_of::<PyBool>() {
+        return Ok(ScanAxisValue::Bool(value.extract()?));
+    }
+    if value.is_instance_of::<PyInt>() {
+        return Ok(ScanAxisValue::Int(value.extract()?));
+    }
+    if value.is_instance_of::<PyFloat>() {
+        return Ok(ScanAxisValue::Float(value.extract()?));
+    }
+    if value.is_instance_of::<PyString>() {
+        return Ok(ScanAxisValue::String(value.extract()?));
+    }
+    Err(PyValueError::new_err(
+        "Scan axis values must be int, float, bool, or str.",
+    ))
+}
+
 fn build_declared_row(
     py: Python<'_>,
     mut values: IndexMap<String, Py<PyAny>>,
@@ -382,7 +473,7 @@ impl DatasetManager {
     ///
     /// Returns:
     ///     A writer of the newly created dataset.
-    #[pyo3(signature = (name, *, description=None, tags=None, columns=None))]
+    #[pyo3(signature = (name, *, description=None, tags=None, columns=None, scan=None))]
     pub fn create(
         &self,
         py: Python<'_>,
@@ -390,10 +481,12 @@ impl DatasetManager {
         description: Option<String>,
         tags: Option<Vec<String>>,
         columns: Option<IndexMap<String, Py<PyAny>>>,
+        scan: Option<IndexMap<String, Py<PyAny>>>,
     ) -> PyResult<DatasetWriter> {
         let description = description.unwrap_or_default();
         let tags = tags.unwrap_or_default();
         let columns = parse_column_declarations(py, columns)?;
+        let scan_plan = parse_scan_plan(py, scan)?;
 
         Ok(DatasetWriter::new(
             self.workspace.client.clone(),
@@ -401,6 +494,7 @@ impl DatasetManager {
             description,
             tags,
             columns,
+            scan_plan,
         ))
     }
 
@@ -751,6 +845,7 @@ enum WriterState {
         description: String,
         tags: Vec<String>,
         columns: Option<ColumnDeclarations>,
+        scan_plan: Option<ScanPlan>,
     },
     Writing {
         writer: fricon::DatasetWriter,
@@ -776,6 +871,7 @@ impl DatasetWriter {
         description: String,
         tags: Vec<String>,
         columns: Option<ColumnDeclarations>,
+        scan_plan: Option<ScanPlan>,
     ) -> Self {
         Self {
             state: WriterState::NotStarted {
@@ -784,6 +880,7 @@ impl DatasetWriter {
                 description,
                 tags,
                 columns,
+                scan_plan,
             },
             dataset: None,
         }
@@ -813,6 +910,7 @@ impl DatasetWriter {
                 description,
                 tags,
                 columns,
+                scan_plan,
             } => {
                 self.state = WriterState::NotStarted {
                     client,
@@ -820,6 +918,7 @@ impl DatasetWriter {
                     description,
                     tags,
                     columns,
+                    scan_plan,
                 };
                 Err(generic_py_err("No data to finalize."))
             }
@@ -872,6 +971,7 @@ impl DatasetWriter {
                 description,
                 tags,
                 columns,
+                scan_plan,
             } => {
                 let row = if let Some(columns) = columns.as_ref() {
                     build_declared_row(py, values, columns)?
@@ -890,6 +990,7 @@ impl DatasetWriter {
                             tags,
                             schema,
                             column_metadata,
+                            scan_plan,
                         ))?;
                         get_runtime().block_on(writer.write(row))?;
                         Ok(writer)

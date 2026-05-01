@@ -244,6 +244,7 @@ mod tests {
                     hidden_by_default: true,
                     chart_axis: true,
                 }],
+                None,
             )
             .await?;
         for row in rows {
