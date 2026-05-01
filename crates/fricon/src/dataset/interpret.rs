@@ -88,7 +88,6 @@ pub(crate) fn resolve_from_manifest(
             IndexRealization::Implicit => ResolvedIndexRealization::Implicit,
         },
         scan_axes,
-        logical_index_points: Vec::new(),
         source: InterpretationSource::Manifest,
     }
 }
@@ -242,7 +241,6 @@ pub(crate) fn resolve_from_compatibility_inference(
         duplicate_policy: ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder,
         index_realization: ResolvedIndexRealization::None,
         scan_axes: Vec::new(),
-        logical_index_points: Vec::new(),
         source: InterpretationSource::CompatibilityInference,
     }
 }
@@ -403,7 +401,6 @@ mod tests {
             interpretation.scan_axes[0].mode,
             ResolvedScanAxisMode::Static { .. }
         ));
-        assert_eq!(interpretation.logical_index_points, Vec::new());
         let logical_index_points = resolve_logical_index_points(&manifest, &[0, 1, 2, 3, 4]);
         assert_eq!(
             logical_index_points,
@@ -480,7 +477,6 @@ mod tests {
             interpretation.scan_axes[0].mode,
             ResolvedScanAxisMode::ImplicitIndex
         ));
-        assert_eq!(interpretation.logical_index_points, Vec::new());
         let logical_index_points = resolve_logical_index_points(&manifest, &[0, 1, 2]);
         assert_eq!(
             logical_index_points,
@@ -684,7 +680,6 @@ mod tests {
             interpretation.duplicate_policy,
             ResolvedDuplicatePolicy::LatestByRecordId
         );
-        assert_eq!(interpretation.logical_index_points, Vec::new());
         let logical_index_points = reader.logical_index_points().expect("logical index points");
         assert_eq!(
             logical_index_points
@@ -728,7 +723,7 @@ mod tests {
         let reader = DatasetReader::open_dir(dir.path()).expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
-        assert_eq!(interpretation.logical_index_points, Vec::new());
+        assert_eq!(interpretation.scan_axes[0].name, "step");
         let logical_index_points = reader.logical_index_points().expect("logical index points");
         assert_eq!(
             logical_index_points

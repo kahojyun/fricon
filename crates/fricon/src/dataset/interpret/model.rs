@@ -9,7 +9,6 @@ pub struct DatasetInterpretation {
     pub duplicate_policy: ResolvedDuplicatePolicy,
     pub index_realization: ResolvedIndexRealization,
     pub scan_axes: Vec<ResolvedScanAxis>,
-    pub logical_index_points: Vec<ResolvedLogicalIndexPoint>,
     pub source: InterpretationSource,
 }
 
