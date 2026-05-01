@@ -66,9 +66,13 @@ export type ChartCommonOptions = {
 
 export type ColumnInfo = {
 	name: string,
+	label: string | null,
+	unit: string | null,
 	isComplex: boolean,
 	isTrace: boolean,
 	isIndex: boolean,
+	hiddenByDefault: boolean,
+	isChartAxisCandidate: boolean,
 };
 
 export type ColumnUniqueValue = {

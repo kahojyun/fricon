@@ -1,11 +1,12 @@
 #![allow(clippy::pedantic, clippy::restriction)]
-use std::sync::Arc;
+use std::{fs::File, sync::Arc};
 
-use arrow_array::{Array, Float64Array, RecordBatch};
+use arrow_array::{Array, Float64Array, RecordBatch, UInt64Array};
+use arrow_ipc::reader::FileReader;
 use fricon::{
-    AppManager, Client, ClientError, DatasetId, DatasetListQuery, DatasetRow, DatasetScalar,
-    DatasetStatus, ExistingUiProbeResult, FixedStepTrace, ScalarArray, VariableStepTrace,
-    WorkspaceRoot, app::UiCommand,
+    AppManager, Client, ClientError, ColumnMeaning, DatasetId, DatasetListQuery, DatasetRow,
+    DatasetScalar, DatasetStatus, ExistingUiProbeResult, FixedStepTrace, ScalarArray,
+    VariableStepTrace, WorkspaceRoot, app::UiCommand, dataset::semantics::RECORD_ID_COLUMN,
 };
 use indexmap::IndexMap;
 use num::complex::Complex64;
@@ -222,6 +223,8 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
             "Test dataset for integration test".to_string(),
             vec!["test".to_string(), "integration".to_string()],
             test_schema.clone(),
+            Vec::new(),
+            None,
         )
         .await?;
 
@@ -238,11 +241,30 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
     assert_eq!(dataset.tags(), &["test", "integration"]);
     assert_eq!(dataset.status(), DatasetStatus::Completed);
 
+    let chunk = File::open(dataset.path().join("data_chunk_0.arrow"))?;
+    let mut physical_reader = FileReader::try_new(chunk, None)?;
+    let physical_batch = physical_reader
+        .next()
+        .expect("first physical batch should exist")?;
+    assert_eq!(physical_batch.schema().field(0).name(), RECORD_ID_COLUMN);
+    let record_ids = physical_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<UInt64Array>()
+        .expect("record ids");
+    assert_eq!(record_ids.values(), &[0, 1, 2]);
+
     // Load dataset using DatasetManager directly
     let reader = app_manager
         .handle()
         .get_dataset_reader(DatasetId::Id(dataset.id()))
         .await?;
+    let interpretation = reader.interpret()?;
+    assert_eq!(
+        interpretation.columns[0].meaning,
+        ColumnMeaning::SystemRecordId
+    );
+    assert!(interpretation.columns[0].hidden_by_default);
     let loaded_batches: Vec<RecordBatch> = reader.batches();
 
     // Verify loaded data matches original
@@ -315,6 +337,8 @@ async fn test_dataset_create_abort_returns_aborted_metadata() -> anyhow::Result<
             "This dataset is aborted explicitly".to_string(),
             vec!["test".to_string(), "abort".to_string()],
             test_schema,
+            Vec::new(),
+            None,
         )
         .await?;
 
@@ -376,6 +400,8 @@ async fn test_dataset_create_without_finish_is_aborted() -> anyhow::Result<()> {
             "This dataset will be aborted".to_string(),
             vec!["test".to_string(), "abort".to_string()],
             test_schema.clone(),
+            Vec::new(),
+            None,
         )
         .await?;
 
@@ -535,6 +561,8 @@ async fn test_deleted_dataset_returns_typed_deleted_error() -> anyhow::Result<()
             "Dataset that will be deleted".to_string(),
             vec!["test".to_string()],
             test_schema,
+            Vec::new(),
+            None,
         )
         .await?;
     writer.write(create_test_rows().remove(0)).await?;

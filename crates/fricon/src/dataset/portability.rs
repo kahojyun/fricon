@@ -2,9 +2,10 @@
 //!
 //! # Ownership
 //!
-//! This module owns the archive format (tar+zstd with `metadata.json` +
-//! `data/data_chunk_*.arrow` entries) and the filesystem-side import
-//! workflow. Database writes and event publishing stay in higher layers
+//! This module owns the archive format (tar+zstd with `metadata.json`, optional
+//! `dataset_manifest.json`, and `data/data_chunk_*.arrow` entries) and the
+//! filesystem-side import workflow. Database writes and event publishing stay
+//! in higher layers
 //! ([`DatasetCatalogService`](super::catalog::DatasetCatalogService)).
 //!
 //! # Import workflow (caller-driven)
@@ -23,8 +24,9 @@
 //! # Archive format
 //!
 //! ```text
-//! metadata.json            <- ExportedMetadata (JSON, includes archive version)
-//! data/data_chunk_0.arrow  <- Arrow IPC chunk files
+//! metadata.json             <- ExportedMetadata (JSON, includes archive version)
+//! dataset_manifest.json     <- optional semantic manifest sidecar
+//! data/data_chunk_0.arrow   <- Arrow IPC chunk files
 //! data/data_chunk_1.arrow
 //! …
 //! ```
@@ -34,9 +36,9 @@
 //! - Adding a metadata field to [`ExportedMetadata`] requires updating
 //!   [`compute_diffs`] and the repository import methods in
 //!   `database::dataset`.
-//! - The archive extraction allowlist in [`extract_archive`] only unpacks
-//!   `data/data_chunk_*.arrow` entries. New file types need an explicit entry
-//!   in the allowlist.
+//! - The archive extraction allowlist in [`extract_archive`] only unpacks the
+//!   exact root `dataset_manifest.json` sidecar and `data/data_chunk_*.arrow`
+//!   entries. New file types need an explicit entry in the allowlist.
 
 use std::{
     fs::{self, File},
@@ -49,10 +51,15 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::dataset::model::{DatasetMetadata, DatasetStatus};
+use crate::dataset::{
+    model::{DatasetMetadata, DatasetStatus},
+    storage::layout::MANIFEST_FILENAME,
+};
 
 /// Entry name for the metadata file inside the archive.
 const METADATA_ENTRY: &str = "metadata.json";
+/// Entry name for the semantic manifest sidecar inside the archive.
+const MANIFEST_ENTRY: &str = MANIFEST_FILENAME;
 /// Prefix used for data chunk files inside the archive.
 const DATA_PREFIX: &str = "data/";
 const CURRENT_ARCHIVE_VERSION: u32 = 1;
@@ -167,8 +174,8 @@ pub struct StagedImport {
 
 /// Export a single dataset to a `.tar.zst` archive inside `output_dir`.
 ///
-/// The archive contains `metadata.json` plus `data_chunk_*.arrow` files copied
-/// from `dataset_dir`.
+/// The archive contains `metadata.json`, optional `dataset_manifest.json`, and
+/// `data_chunk_*.arrow` files copied from `dataset_dir`.
 ///
 /// The archive name is `{created_at:%Y%m%d_%H%M%S}_{sanitized_name}.tar.zst`.
 ///
@@ -196,6 +203,12 @@ pub fn export_dataset(
     header.set_mode(0o644);
     header.set_cksum();
     tar.append_data(&mut header, METADATA_ENTRY, json_bytes.as_slice())?;
+
+    // --- dataset_manifest.json ---
+    let manifest_path = dataset_dir.join(MANIFEST_FILENAME);
+    if manifest_path.is_file() {
+        tar.append_path_with_name(&manifest_path, MANIFEST_ENTRY)?;
+    }
 
     // --- data chunk files ---
     if dataset_dir.is_dir() {
@@ -493,7 +506,8 @@ fn read_metadata_from_archive(archive_path: &Path) -> Result<ExportedMetadata, P
 
 /// Extract all entries from a tar+zstd archive into `dest_dir`.
 ///
-/// Only `data/data_chunk_*.arrow` entries are extracted.
+/// Only exact root `dataset_manifest.json` and `data/data_chunk_*.arrow`
+/// entries are extracted.
 fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), PortabilityError> {
     let file = File::open(archive_path)?;
     let reader = BufReader::new(file);
@@ -507,13 +521,7 @@ fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), Portabili
             continue;
         };
 
-        let dest_file_path = if let Some(file_name) = path_str.strip_prefix(DATA_PREFIX) {
-            if is_safe_archive_chunk_name(file_name) {
-                dest_dir.join(file_name)
-            } else {
-                continue;
-            }
-        } else {
+        let Some(dest_file_path) = archive_entry_destination(path_str, dest_dir) else {
             continue;
         };
 
@@ -522,6 +530,15 @@ fn extract_archive(archive_path: &Path, dest_dir: &Path) -> Result<(), Portabili
     }
 
     Ok(())
+}
+
+fn archive_entry_destination(path_str: &str, dest_dir: &Path) -> Option<PathBuf> {
+    if path_str == MANIFEST_ENTRY {
+        return Some(dest_dir.join(MANIFEST_FILENAME));
+    }
+
+    let file_name = path_str.strip_prefix(DATA_PREFIX)?;
+    is_safe_archive_chunk_name(file_name).then(|| dest_dir.join(file_name))
 }
 
 /// Validate that a data chunk filename is safe to extract.
@@ -622,6 +639,28 @@ mod tests {
         fs::write(chunk_path, b"ARROW_DUMMY_DATA").expect("write chunk");
     }
 
+    fn dummy_manifest_file(dir: &Path) {
+        fs::write(dir.join(MANIFEST_FILENAME), b"{\"manifest_version\":1}")
+            .expect("write manifest");
+    }
+
+    fn archive_entry_names(archive: &Path) -> Vec<String> {
+        let file = fs::File::open(archive).expect("open archive");
+        let decoder = zstd::Decoder::new(std::io::BufReader::new(file)).expect("decoder");
+        let mut tar = tar::Archive::new(decoder);
+        tar.entries()
+            .expect("entries")
+            .map(|entry| {
+                entry
+                    .expect("entry")
+                    .path()
+                    .expect("path")
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect()
+    }
+
     // ── export ────────────────────────────────────────────────────────────────
 
     #[test]
@@ -703,6 +742,52 @@ mod tests {
             }
         }
         panic!("metadata.json not found in archive");
+    }
+
+    #[test]
+    fn export_includes_manifest_sidecar_when_present() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "with-manifest");
+        let output_dir = tmp.path().join("exports");
+
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+        let entries = archive_entry_names(&archive);
+
+        assert_eq!(
+            entries,
+            vec![
+                METADATA_ENTRY.to_string(),
+                MANIFEST_ENTRY.to_string(),
+                "data/data_chunk_0.arrow".to_string(),
+            ],
+            "manifest should be exported after metadata and before chunks"
+        );
+    }
+
+    #[test]
+    fn export_omits_manifest_sidecar_when_absent() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "without-manifest");
+        let output_dir = tmp.path().join("exports");
+
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+        let entries = archive_entry_names(&archive);
+
+        assert!(
+            !entries.iter().any(|entry| entry == MANIFEST_ENTRY),
+            "manifest should not be exported when missing"
+        );
     }
 
     // ── preview ───────────────────────────────────────────────────────────────
@@ -816,8 +901,43 @@ mod tests {
             "metadata file should not be extracted into staging"
         );
         assert!(
+            !staged.staging_dir.join(MANIFEST_FILENAME).exists(),
+            "missing manifest should not be synthesized during staging"
+        );
+        assert!(
             !dest.exists(),
             "live dataset directory should not be created during staging"
+        );
+    }
+
+    #[test]
+    fn stage_import_extracts_manifest_sidecar_to_staging_dir() {
+        let tmp = TempDir::new().expect("temp dir");
+        let ds_dir = tmp.path().join("dataset");
+        fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
+
+        let uid = Uuid::new_v4();
+        let meta = make_metadata(uid, "manifest-import");
+        let output_dir = tmp.path().join("exports");
+        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
+
+        let dest = tmp.path().join("aa").join(uid.to_string());
+        let staged = stage_import(&archive, &dest).expect("stage import");
+
+        assert!(
+            staged.staging_dir.join("data_chunk_0.arrow").exists(),
+            "chunk file should be extracted to staging"
+        );
+        assert_eq!(
+            fs::read(staged.staging_dir.join(MANIFEST_FILENAME)).expect("read manifest"),
+            b"{\"manifest_version\":1}",
+            "manifest sidecar should be extracted to staging"
+        );
+        assert!(
+            !staged.staging_dir.join(METADATA_ENTRY).exists(),
+            "archive metadata should not be extracted into staging"
         );
     }
 
@@ -885,6 +1005,71 @@ mod tests {
         assert!(
             !staged.staging_dir.join("evil.arrow").exists(),
             "nested chunk path should be ignored"
+        );
+    }
+
+    #[test]
+    fn stage_import_only_extracts_exact_root_manifest_entry() {
+        let tmp = TempDir::new().expect("temp dir");
+        let archive = tmp.path().join("manifest-allowlist.tar.zst");
+        let exported = ExportedMetadata {
+            archive_version: CURRENT_ARCHIVE_VERSION,
+            uid: Uuid::new_v4(),
+            name: "manifest-allowlist".to_string(),
+            description: "manifest allowlist".to_string(),
+            favorite: false,
+            status: DatasetStatus::Completed,
+            created_at: Utc::now(),
+            tags: Vec::new(),
+        };
+
+        let out_file = File::create(&archive).expect("archive file");
+        let zstd_encoder = zstd::Encoder::new(out_file, 0).expect("encoder");
+        let mut tar = tar::Builder::new(zstd_encoder);
+
+        let json_bytes = serde_json::to_vec_pretty(&exported).expect("metadata");
+        let mut metadata_header = tar::Header::new_gnu();
+        metadata_header.set_size(json_bytes.len() as u64);
+        metadata_header.set_mode(0o644);
+        metadata_header.set_cksum();
+        tar.append_data(&mut metadata_header, METADATA_ENTRY, json_bytes.as_slice())
+            .expect("metadata entry");
+
+        for (entry_name, contents) in [
+            (MANIFEST_ENTRY, b"GOOD".as_slice()),
+            ("data/dataset_manifest.json", b"DATA_PREFIX_BAD".as_slice()),
+            ("nested/dataset_manifest.json", b"NESTED_BAD".as_slice()),
+        ] {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(contents.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar.append_data(&mut header, entry_name, contents)
+                .expect("manifest-like entry");
+        }
+
+        let zstd_encoder = tar.into_inner().expect("tar finalize");
+        zstd_encoder.finish().expect("zstd finish");
+
+        let dest = tmp.path().join("dd").join(exported.uid.to_string());
+        let staged = stage_import(&archive, &dest).expect("stage import");
+
+        assert_eq!(
+            fs::read(staged.staging_dir.join(MANIFEST_FILENAME)).expect("read manifest"),
+            b"GOOD",
+            "only the exact root manifest entry should be extracted"
+        );
+        assert!(
+            !staged.staging_dir.join("data").exists(),
+            "prefixed manifest path should not create a data directory"
+        );
+        assert!(
+            !staged.staging_dir.join("nested").exists(),
+            "nested manifest path should not be extracted"
+        );
+        assert!(
+            archive_entry_destination("../dataset_manifest.json", &staged.staging_dir).is_none(),
+            "traversal manifest path should not be allowlisted"
         );
     }
 

@@ -1,6 +1,5 @@
 import type {
   ColumnUniqueValue,
-  ColumnInfo,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
@@ -16,13 +15,19 @@ import type {
 } from "@/shared/lib/chartTypes";
 
 export type {
-  ColumnInfo,
   ColumnUniqueValue,
   DatasetStatus,
   DatasetWriteStatus,
   FilterTableOptions,
   FilterTableRow,
 };
+
+export interface ColumnInfo {
+  name: string;
+  isComplex: boolean;
+  isTrace: boolean;
+  isIndex: boolean;
+}
 
 export interface DatasetDetail {
   status: DatasetStatus;

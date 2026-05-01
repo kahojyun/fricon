@@ -1,5 +1,5 @@
 import type {
-  ColumnInfo,
+  ColumnInfo as WireColumnInfo,
   DatasetDeleteResult,
   DatasetOperationError,
   DatasetTagBatchResult,
@@ -28,17 +28,30 @@ export type DatasetInfo = Omit<
 
 export type DatasetDetail = Omit<
   WireDatasetDetail,
-  "createdAt" | "trashedAt" | "deletedAt"
+  "createdAt" | "trashedAt" | "deletedAt" | "columns"
 > & {
   createdAt: Date;
   trashedAt: Date | null;
   deletedAt: Date | null;
+  columns: DatasetColumnInfo[];
 };
 
 export const DATASET_PAGE_SIZE = 200;
 
+export interface DatasetColumnInfo {
+  name: string;
+  label: string | null;
+  unit: string | null;
+  isComplex: boolean;
+  isTrace: boolean;
+  isIndex: boolean;
+  hiddenByDefault: boolean;
+  isChartAxisCandidate: boolean;
+}
+
+export type ColumnInfo = DatasetColumnInfo;
+
 export type {
-  ColumnInfo,
   DatasetDeleteResult,
   DatasetOperationError,
   DatasetInfoUpdate,
@@ -74,5 +87,22 @@ export function normalizeDataset(value: WireDatasetInfo): DatasetInfo {
 export function normalizeDatasetDetail(
   value: WireDatasetDetail,
 ): DatasetDetail {
-  return normalizeDatasetDates(value);
+  const normalized = normalizeDatasetDates(value);
+  return {
+    ...normalized,
+    columns: value.columns.map(normalizeDatasetColumnInfo),
+  };
+}
+
+function normalizeDatasetColumnInfo(value: WireColumnInfo): DatasetColumnInfo {
+  return {
+    name: value.name,
+    label: value.label,
+    unit: value.unit,
+    isComplex: value.isComplex,
+    isTrace: value.isTrace,
+    isIndex: value.isIndex,
+    hiddenByDefault: value.hiddenByDefault,
+    isChartAxisCandidate: value.isChartAxisCandidate,
+  };
 }

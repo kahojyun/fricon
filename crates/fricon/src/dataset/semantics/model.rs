@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use arrow_schema::{DataType, Field, Schema, TimeUnit};
 use serde::{Deserialize, Serialize};
@@ -9,10 +9,12 @@ pub const MANIFEST_VERSION_V1: u32 = 1;
 pub const RECORD_ID_COLUMN: &str = "__ds_record_id";
 const SYSTEM_COLUMN_PREFIX: &str = "__ds_";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DatasetSemanticManifest {
     pub manifest_version: u32,
     pub columns: BTreeMap<String, ManifestColumn>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scan_plan: Option<ScanPlan>,
     pub realization: Realization,
     pub compatibility: Compatibility,
 }
@@ -25,12 +27,28 @@ impl DatasetSemanticManifest {
         Self {
             manifest_version: MANIFEST_VERSION_V1,
             columns,
+            scan_plan: None,
             realization: Realization::default(),
             compatibility: Compatibility::default(),
         }
     }
 
     pub fn minimal_from_arrow_schema(schema: &Schema) -> Result<Self, ManifestValidationError> {
+        Self::minimal_from_arrow_schema_with_metadata(schema, std::iter::empty())
+    }
+
+    pub fn minimal_from_arrow_schema_with_metadata(
+        schema: &Schema,
+        metadata: impl IntoIterator<Item = ColumnMetadata>,
+    ) -> Result<Self, ManifestValidationError> {
+        Self::minimal_from_arrow_schema_with_metadata_and_scan(schema, metadata, None)
+    }
+
+    pub fn minimal_from_arrow_schema_with_metadata_and_scan(
+        schema: &Schema,
+        metadata: impl IntoIterator<Item = ColumnMetadata>,
+        scan_plan: Option<ScanPlan>,
+    ) -> Result<Self, ManifestValidationError> {
         let columns = schema
             .fields()
             .iter()
@@ -40,9 +58,55 @@ impl DatasetSemanticManifest {
                 Ok((name, ManifestColumn::new(dtype)))
             })
             .collect::<Result<Vec<_>, ManifestValidationError>>()?;
-        let manifest = Self::minimal(columns);
+        let mut manifest = Self::minimal(columns);
+        manifest.apply_column_metadata(metadata)?;
+        manifest.apply_scan_plan(scan_plan);
         manifest.validate()?;
         Ok(manifest)
+    }
+
+    #[must_use]
+    pub fn with_scan_plan(mut self, scan_plan: Option<ScanPlan>) -> Self {
+        self.apply_scan_plan(scan_plan);
+        self
+    }
+
+    fn apply_scan_plan(&mut self, scan_plan: Option<ScanPlan>) {
+        self.scan_plan = scan_plan;
+        self.realization.index_realization = if self.scan_plan.is_some() {
+            IndexRealization::Implicit
+        } else {
+            IndexRealization::None
+        };
+    }
+
+    fn apply_column_metadata(
+        &mut self,
+        metadata: impl IntoIterator<Item = ColumnMetadata>,
+    ) -> Result<(), ManifestValidationError> {
+        let mut seen = BTreeSet::new();
+        for metadata in metadata {
+            if !seen.insert(metadata.name.clone()) {
+                return Err(ManifestValidationError::DuplicateColumnMetadata {
+                    name: metadata.name,
+                });
+            }
+            let column = self.columns.get_mut(&metadata.name).ok_or_else(|| {
+                ManifestValidationError::UnknownColumnMetadata {
+                    name: metadata.name.clone(),
+                }
+            })?;
+            if column.system.is_some() {
+                return Err(ManifestValidationError::InvalidSystemColumnMetadata {
+                    name: metadata.name,
+                });
+            }
+            column.unit = metadata.unit;
+            column.label = metadata.label;
+            column.hidden_by_default = metadata.hidden_by_default;
+            column.chart_axis = metadata.chart_axis;
+        }
+        Ok(())
     }
 
     pub fn validate(&self) -> Result<(), ManifestValidationError> {
@@ -63,6 +127,7 @@ impl DatasetSemanticManifest {
         if !self.realization.append_only {
             return Err(ManifestValidationError::AppendOnlyRequired);
         }
+        self.validate_scan_plan()?;
         self.validate_columns()
     }
 
@@ -73,30 +138,32 @@ impl DatasetSemanticManifest {
         self.validate()?;
 
         for (name, column) in &self.columns {
-            if column.system == Some(SystemColumn::RecordId)
-                && name == RECORD_ID_COLUMN
-                && schema.field_with_name(name).is_err()
-            {
-                // Temporary compatibility for manifest-only record IDs. Issue
-                // #478 will materialize this column into Arrow payloads.
-                continue;
-            }
             let field = schema
                 .field_with_name(name)
                 .map_err(|_| ManifestValidationError::MissingArrowColumn { name: name.clone() })?;
             let expected = column.dtype.physical_data_type();
-            if field.data_type() != &expected {
-                return Err(ManifestValidationError::ArrowTypeMismatch {
-                    name: name.clone(),
-                    expected: expected.to_string(),
-                    found: field.data_type().to_string(),
-                });
-            }
             if field.is_nullable() {
                 return Err(ManifestValidationError::ArrowTypeMismatch {
                     name: name.clone(),
                     expected: format!("non-null {expected}"),
                     found: format!("nullable {}", field.data_type()),
+                });
+            }
+            if column.system == Some(SystemColumn::RecordId) {
+                if field.data_type() != &expected {
+                    return Err(ManifestValidationError::ArrowTypeMismatch {
+                        name: name.clone(),
+                        expected: expected.to_string(),
+                        found: field.data_type().to_string(),
+                    });
+                }
+            } else if DatasetDType::try_from_arrow_data_type(field.name(), field.data_type())?
+                != column.dtype
+            {
+                return Err(ManifestValidationError::ArrowTypeMismatch {
+                    name: name.clone(),
+                    expected: expected.to_string(),
+                    found: field.data_type().to_string(),
                 });
             }
         }
@@ -128,6 +195,16 @@ impl DatasetSemanticManifest {
                         name: name.clone(),
                     });
                 }
+                Some(SystemColumn::RecordId)
+                    if column.unit.is_some()
+                        || column.label.is_some()
+                        || column.hidden_by_default
+                        || column.chart_axis =>
+                {
+                    return Err(ManifestValidationError::InvalidSystemColumnMetadata {
+                        name: name.clone(),
+                    });
+                }
                 None if name.starts_with(SYSTEM_COLUMN_PREFIX) => {
                     return Err(ManifestValidationError::ReservedUserColumn { name: name.clone() });
                 }
@@ -137,6 +214,146 @@ impl DatasetSemanticManifest {
 
         Ok(())
     }
+
+    fn validate_scan_plan(&self) -> Result<(), ManifestValidationError> {
+        match (&self.scan_plan, &self.realization.index_realization) {
+            (Some(_), IndexRealization::Implicit) | (None, IndexRealization::None) => {}
+            (Some(_), IndexRealization::None) => {
+                return Err(ManifestValidationError::ScanPlanRequiresImplicitRealization);
+            }
+            (None, IndexRealization::Implicit) => {
+                return Err(ManifestValidationError::ImplicitRealizationRequiresScanPlan);
+            }
+        }
+
+        let Some(scan_plan) = &self.scan_plan else {
+            return Ok(());
+        };
+        scan_plan.validate()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScanPlan {
+    pub axes: Vec<ScanAxis>,
+}
+
+impl ScanPlan {
+    #[must_use]
+    pub fn new(axes: Vec<ScanAxis>) -> Self {
+        Self { axes }
+    }
+
+    pub fn validate(&self) -> Result<(), ManifestValidationError> {
+        if self.axes.is_empty() {
+            return Err(ManifestValidationError::EmptyScanPlan);
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut static_count = 0;
+        let mut implicit_count = 0;
+        for axis in &self.axes {
+            axis.validate()?;
+            if !seen.insert(axis.name.clone()) {
+                return Err(ManifestValidationError::DuplicateScanAxis {
+                    name: axis.name.clone(),
+                });
+            }
+            match &axis.mode {
+                ScanAxisMode::Static { .. } => static_count += 1,
+                ScanAxisMode::ImplicitIndex => implicit_count += 1,
+            }
+        }
+
+        if implicit_count > 1 {
+            return Err(ManifestValidationError::MultipleUnknownScanAxes);
+        }
+        if implicit_count > 0 && static_count > 0 {
+            return Err(ManifestValidationError::MixedStaticAndUnknownScanAxes);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScanAxis {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub mode: ScanAxisMode,
+}
+
+impl ScanAxis {
+    #[must_use]
+    pub fn static_values(name: impl Into<String>, values: Vec<ScanAxisValue>) -> Self {
+        Self {
+            name: name.into(),
+            label: None,
+            mode: ScanAxisMode::Static { values },
+        }
+    }
+
+    #[must_use]
+    pub fn implicit_index(name: impl Into<String>, label: Option<String>) -> Self {
+        Self {
+            name: name.into(),
+            label,
+            mode: ScanAxisMode::ImplicitIndex,
+        }
+    }
+
+    fn validate(&self) -> Result<(), ManifestValidationError> {
+        if self.name.is_empty() {
+            return Err(ManifestValidationError::EmptyScanAxisName);
+        }
+        if self.name.starts_with(SYSTEM_COLUMN_PREFIX) {
+            return Err(ManifestValidationError::ReservedScanAxisName {
+                name: self.name.clone(),
+            });
+        }
+        match &self.mode {
+            ScanAxisMode::Static { values } if values.is_empty() => {
+                Err(ManifestValidationError::EmptyStaticScanAxis {
+                    name: self.name.clone(),
+                })
+            }
+            ScanAxisMode::Static { values } => {
+                if values
+                    .iter()
+                    .any(|value| matches!(value, ScanAxisValue::Float(value) if !value.is_finite()))
+                {
+                    Err(ManifestValidationError::NonFiniteScanAxisValue {
+                        name: self.name.clone(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+            ScanAxisMode::ImplicitIndex => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum ScanAxisMode {
+    #[serde(rename = "static")]
+    Static { values: Vec<ScanAxisValue> },
+    #[serde(rename = "implicit_index")]
+    ImplicitIndex,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value")]
+pub enum ScanAxisValue {
+    #[serde(rename = "int")]
+    Int(i64),
+    #[serde(rename = "float")]
+    Float(f64),
+    #[serde(rename = "bool")]
+    Bool(bool),
+    #[serde(rename = "string")]
+    String(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -144,6 +361,14 @@ pub struct ManifestColumn {
     pub dtype: DatasetDType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub system: Option<SystemColumn>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub hidden_by_default: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub chart_axis: bool,
 }
 
 impl ManifestColumn {
@@ -152,6 +377,10 @@ impl ManifestColumn {
         Self {
             dtype,
             system: None,
+            unit: None,
+            label: None,
+            hidden_by_default: false,
+            chart_axis: false,
         }
     }
 
@@ -160,6 +389,10 @@ impl ManifestColumn {
         Self {
             dtype: DatasetDType::UInt64,
             system: Some(SystemColumn::RecordId),
+            unit: None,
+            label: None,
+            hidden_by_default: false,
+            chart_axis: false,
         }
     }
 
@@ -167,6 +400,36 @@ impl ManifestColumn {
     pub fn is_record_id(&self) -> bool {
         self.dtype == DatasetDType::UInt64 && self.system == Some(SystemColumn::RecordId)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnMetadata {
+    pub name: String,
+    pub unit: Option<String>,
+    pub label: Option<String>,
+    pub hidden_by_default: bool,
+    pub chart_axis: bool,
+}
+
+impl ColumnMetadata {
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            unit: None,
+            label: None,
+            hidden_by_default: false,
+            chart_axis: false,
+        }
+    }
+}
+
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a predicate over a field reference"
+)]
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -370,6 +633,8 @@ pub enum IndexRealization {
     #[default]
     #[serde(rename = "none")]
     None,
+    #[serde(rename = "implicit")]
+    Implicit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -554,8 +819,9 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        Compatibility, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
-        IndexRealization, ManifestColumn, ManifestValidationError, RECORD_ID_COLUMN, Realization,
+        ColumnMetadata, Compatibility, DatasetDType, DatasetSemanticManifest,
+        DuplicateResolutionDefault, IndexRealization, ManifestColumn, ManifestValidationError,
+        RECORD_ID_COLUMN, Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan,
         SystemColumn, TraceAxisDType, TraceDType, TraceLayout, TraceValueDType,
     };
 
@@ -615,6 +881,161 @@ mod tests {
     }
 
     #[test]
+    fn scan_plan_serializes_static_axes_with_implicit_realization() {
+        let manifest = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![
+                ScanAxis::static_values(
+                    "gate",
+                    vec![ScanAxisValue::Float(-0.2), ScanAxisValue::Float(-0.1)],
+                ),
+                ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
+            ]),
+        ));
+        let value = serde_json::to_value(&manifest).expect("serialize manifest");
+
+        assert_eq!(
+            value["scan_plan"],
+            json!({
+                "axes": [
+                    {
+                        "name": "gate",
+                        "mode": {
+                            "kind": "static",
+                            "values": [
+                                { "kind": "float", "value": -0.2 },
+                                { "kind": "float", "value": -0.1 }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "bias",
+                        "mode": {
+                            "kind": "static",
+                            "values": [
+                                { "kind": "int", "value": 0 },
+                                { "kind": "int", "value": 1 }
+                            ]
+                        }
+                    }
+                ]
+            })
+        );
+        assert_eq!(
+            value["realization"]["index_realization"],
+            json!({ "kind": "implicit" })
+        );
+
+        let parsed: DatasetSemanticManifest =
+            serde_json::from_value(value).expect("deserialize manifest");
+        assert_eq!(parsed, manifest);
+        parsed.validate().expect("manifest should be valid");
+    }
+
+    #[test]
+    fn scan_plan_serializes_unknown_length_index_axis() {
+        let manifest =
+            DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(ScanPlan::new(
+                vec![ScanAxis::implicit_index("step", Some("Step".to_string()))],
+            )));
+        let value = serde_json::to_value(&manifest).expect("serialize manifest");
+
+        assert_eq!(
+            value["scan_plan"],
+            json!({
+                "axes": [
+                    {
+                        "name": "step",
+                        "label": "Step",
+                        "mode": { "kind": "implicit_index" }
+                    }
+                ]
+            })
+        );
+        manifest.validate().expect("manifest should be valid");
+    }
+
+    #[test]
+    fn validate_scan_plan_rejects_unsupported_v1_shapes() {
+        let empty_plan = DatasetSemanticManifest::minimal(signal_columns())
+            .with_scan_plan(Some(ScanPlan::new(vec![])));
+        assert_eq!(
+            empty_plan.validate(),
+            Err(ManifestValidationError::EmptyScanPlan)
+        );
+
+        let mixed = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![
+                ScanAxis::static_values("gate", vec![ScanAxisValue::Float(0.0)]),
+                ScanAxis::implicit_index("step", None),
+            ]),
+        ));
+        assert_eq!(
+            mixed.validate(),
+            Err(ManifestValidationError::MixedStaticAndUnknownScanAxes)
+        );
+
+        let duplicate = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![
+                ScanAxis::static_values("gate", vec![ScanAxisValue::Float(0.0)]),
+                ScanAxis::static_values("gate", vec![ScanAxisValue::Float(1.0)]),
+            ]),
+        ));
+        assert_eq!(
+            duplicate.validate(),
+            Err(ManifestValidationError::DuplicateScanAxis {
+                name: "gate".to_string()
+            })
+        );
+
+        let empty = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![ScanAxis {
+                name: "gate".to_string(),
+                label: None,
+                mode: ScanAxisMode::Static { values: vec![] },
+            }]),
+        ));
+        assert_eq!(
+            empty.validate(),
+            Err(ManifestValidationError::EmptyStaticScanAxis {
+                name: "gate".to_string()
+            })
+        );
+
+        let non_finite = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
+            ScanPlan::new(vec![ScanAxis::static_values(
+                "gate",
+                vec![ScanAxisValue::Float(f64::NAN)],
+            )]),
+        ));
+        assert_eq!(
+            non_finite.validate(),
+            Err(ManifestValidationError::NonFiniteScanAxisValue {
+                name: "gate".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn validate_scan_plan_requires_matching_index_realization() {
+        let mut missing_implicit = DatasetSemanticManifest::minimal(signal_columns());
+        missing_implicit.scan_plan = Some(ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![ScanAxisValue::Float(0.0)],
+        )]));
+        assert_eq!(
+            missing_implicit.validate(),
+            Err(ManifestValidationError::ScanPlanRequiresImplicitRealization)
+        );
+
+        let mut missing_scan = DatasetSemanticManifest::minimal(signal_columns());
+        missing_scan.realization.index_realization = IndexRealization::Implicit;
+        assert_eq!(
+            missing_scan.validate(),
+            Err(ManifestValidationError::ImplicitRealizationRequiresScanPlan)
+        );
+    }
+
+    #[test]
     fn validate_rejects_invalid_version() {
         let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
         manifest.manifest_version = 2;
@@ -630,6 +1051,7 @@ mod tests {
         let manifest = DatasetSemanticManifest {
             manifest_version: 1,
             columns: signal_columns(),
+            scan_plan: None,
             realization: Realization::default(),
             compatibility: Compatibility::default(),
         };
@@ -648,6 +1070,10 @@ mod tests {
             ManifestColumn {
                 dtype: DatasetDType::Int64,
                 system: Some(SystemColumn::RecordId),
+                unit: None,
+                label: None,
+                hidden_by_default: false,
+                chart_axis: false,
             },
         );
 
@@ -789,6 +1215,72 @@ mod tests {
     }
 
     #[test]
+    fn minimal_from_arrow_schema_applies_column_metadata() {
+        let schema = Schema::new(vec![Field::new("signal", DataType::Float64, false)]);
+        let metadata = [ColumnMetadata {
+            name: "signal".to_string(),
+            unit: Some("V".to_string()),
+            label: Some("Voltage".to_string()),
+            hidden_by_default: true,
+            chart_axis: true,
+        }];
+
+        let manifest =
+            DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata(&schema, metadata)
+                .expect("manifest");
+        let signal = &manifest.columns["signal"];
+
+        assert_eq!(signal.unit.as_deref(), Some("V"));
+        assert_eq!(signal.label.as_deref(), Some("Voltage"));
+        assert!(signal.hidden_by_default);
+        assert!(signal.chart_axis);
+
+        let value = serde_json::to_value(&manifest).expect("serialize manifest");
+        assert_eq!(
+            value["columns"]["signal"],
+            json!({
+                "dtype": { "kind": "float64" },
+                "unit": "V",
+                "label": "Voltage",
+                "hidden_by_default": true,
+                "chart_axis": true
+            })
+        );
+    }
+
+    #[test]
+    fn minimal_from_arrow_schema_rejects_unknown_metadata_column() {
+        let schema = Schema::new(vec![Field::new("signal", DataType::Float64, false)]);
+
+        assert_eq!(
+            DatasetSemanticManifest::minimal_from_arrow_schema_with_metadata(
+                &schema,
+                [ColumnMetadata::new("missing")]
+            ),
+            Err(ManifestValidationError::UnknownColumnMetadata {
+                name: "missing".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn validate_rejects_system_column_metadata() {
+        let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
+        manifest
+            .columns
+            .get_mut(RECORD_ID_COLUMN)
+            .expect("record id")
+            .label = Some("Record".to_string());
+
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestValidationError::InvalidSystemColumnMetadata {
+                name: RECORD_ID_COLUMN.to_string()
+            })
+        );
+    }
+
+    #[test]
     fn minimal_from_arrow_schema_rejects_reserved_user_prefix() {
         let schema = Schema::new(vec![Field::new("__ds_user", DataType::Float64, false)]);
 
@@ -829,13 +1321,15 @@ mod tests {
     }
 
     #[test]
-    fn validate_against_arrow_schema_allows_temporarily_missing_record_id() {
+    fn validate_against_arrow_schema_rejects_missing_record_id() {
         let manifest = DatasetSemanticManifest::minimal(signal_columns());
         let schema = Schema::new(vec![Field::new("signal", DataType::Float64, false)]);
 
-        manifest
-            .validate_against_arrow_schema(&schema)
-            .expect("record id is manifest-only until materialization lands");
+        assert!(matches!(
+            manifest.validate_against_arrow_schema(&schema),
+            Err(ManifestValidationError::MissingArrowColumn { name })
+                if name == RECORD_ID_COLUMN
+        ));
     }
 
     #[test]

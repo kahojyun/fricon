@@ -7,8 +7,15 @@ use tonic::{Code, Status, Streaming};
 use tracing::{error, instrument, warn};
 
 use crate::{
-    dataset::{CreateDatasetInput, CreateDatasetRequest},
-    proto::{CreateMetadata, CreateRequest, create_request::CreateMessage},
+    dataset::{
+        CreateDatasetInput, CreateDatasetRequest,
+        semantics::{ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan},
+    },
+    proto::{
+        ColumnMetadata as ProtoColumnMetadata, CreateMetadata, CreateRequest,
+        ScanAxisMetadata as ProtoScanAxisMetadata, ScanAxisValue as ProtoScanAxisValue,
+        create_request::CreateMessage, scan_axis_metadata, scan_axis_value,
+    },
 };
 
 pub(crate) struct CreateStreamParts {
@@ -34,6 +41,8 @@ pub(crate) async fn parse_create_stream(
         name,
         description,
         tags,
+        columns,
+        scan_axes,
     })) = first_message.create_message
     else {
         warn!("First create stream message must be metadata");
@@ -41,6 +50,8 @@ pub(crate) async fn parse_create_stream(
             "first message must be CreateMetadata",
         ));
     };
+
+    let scan_plan = scan_plan_from_proto(scan_axes)?;
 
     let (events_tx, events_rx) = mpsc::channel(16);
     let events_task = tokio::spawn(produce_create_events(stream, shutdown_token, events_tx));
@@ -50,10 +61,72 @@ pub(crate) async fn parse_create_stream(
             name,
             description,
             tags,
+            column_metadata: columns
+                .into_iter()
+                .map(column_metadata_from_proto)
+                .collect(),
+            scan_plan,
         },
         events_rx,
         events_task,
     })
+}
+
+fn scan_plan_from_proto(axes: Vec<ProtoScanAxisMetadata>) -> Result<Option<ScanPlan>, Status> {
+    if axes.is_empty() {
+        return Ok(None);
+    }
+    let axes = axes
+        .into_iter()
+        .map(scan_axis_from_proto)
+        .collect::<Result<Vec<_>, _>>()?;
+    let scan_plan = ScanPlan::new(axes);
+    scan_plan
+        .validate()
+        .map_err(|error| Status::invalid_argument(error.to_string()))?;
+    Ok(Some(scan_plan))
+}
+
+fn scan_axis_from_proto(value: ProtoScanAxisMetadata) -> Result<ScanAxis, Status> {
+    let mode = match value.axis.ok_or_else(|| {
+        Status::invalid_argument(format!("scan axis {} is missing a mode", value.name))
+    })? {
+        scan_axis_metadata::Axis::StaticAxis(axis) => {
+            let values = axis
+                .values
+                .into_iter()
+                .map(scan_axis_value_from_proto)
+                .collect::<Result<Vec<_>, _>>()?;
+            ScanAxisMode::Static { values }
+        }
+        scan_axis_metadata::Axis::IndexAxis(_) => ScanAxisMode::ImplicitIndex,
+    };
+    Ok(ScanAxis {
+        name: value.name,
+        label: value.label,
+        mode,
+    })
+}
+
+fn scan_axis_value_from_proto(value: ProtoScanAxisValue) -> Result<ScanAxisValue, Status> {
+    match value.value.ok_or_else(|| {
+        Status::invalid_argument("scan axis static value is missing a scalar value")
+    })? {
+        scan_axis_value::Value::IntValue(value) => Ok(ScanAxisValue::Int(value)),
+        scan_axis_value::Value::FloatValue(value) => Ok(ScanAxisValue::Float(value)),
+        scan_axis_value::Value::BoolValue(value) => Ok(ScanAxisValue::Bool(value)),
+        scan_axis_value::Value::StringValue(value) => Ok(ScanAxisValue::String(value)),
+    }
+}
+
+fn column_metadata_from_proto(value: ProtoColumnMetadata) -> ColumnMetadata {
+    ColumnMetadata {
+        name: value.name,
+        unit: value.unit,
+        label: value.label,
+        hidden_by_default: value.hidden_by_default,
+        chart_axis: value.chart_axis,
+    }
 }
 
 async fn produce_create_events<S>(
@@ -227,7 +300,9 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::proto::{CreateAbort, CreateFinish};
+    use crate::proto::{
+        ColumnMetadata as ProtoColumnMetadata, CreateAbort, CreateFinish, StaticScanAxis,
+    };
 
     fn payload_message(payload: bytes::Bytes) -> CreateRequest {
         CreateRequest {
@@ -253,6 +328,51 @@ mod tests {
                 name: "name".to_string(),
                 description: "desc".to_string(),
                 tags: vec![],
+                columns: vec![],
+                scan_axes: vec![],
+            })),
+        }
+    }
+
+    fn metadata_message_with_columns() -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::Metadata(CreateMetadata {
+                name: "name".to_string(),
+                description: "desc".to_string(),
+                tags: vec![],
+                columns: vec![ProtoColumnMetadata {
+                    name: "signal".to_string(),
+                    unit: Some("V".to_string()),
+                    label: Some("Voltage".to_string()),
+                    hidden_by_default: true,
+                    chart_axis: true,
+                }],
+                scan_axes: vec![],
+            })),
+        }
+    }
+
+    fn metadata_message_with_scan() -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::Metadata(CreateMetadata {
+                name: "name".to_string(),
+                description: "desc".to_string(),
+                tags: vec![],
+                columns: vec![],
+                scan_axes: vec![ProtoScanAxisMetadata {
+                    name: "gate".to_string(),
+                    label: None,
+                    axis: Some(scan_axis_metadata::Axis::StaticAxis(StaticScanAxis {
+                        values: vec![
+                            ProtoScanAxisValue {
+                                value: Some(scan_axis_value::Value::FloatValue(-0.2)),
+                            },
+                            ProtoScanAxisValue {
+                                value: Some(scan_axis_value::Value::FloatValue(-0.1)),
+                            },
+                        ],
+                    })),
+                }],
             })),
         }
     }
@@ -301,6 +421,47 @@ mod tests {
                 .any(|event| matches!(event, CreateDatasetInput::Batch(_)))
         );
         assert!(matches!(events.last(), Some(CreateDatasetInput::Finish)));
+    }
+
+    #[test]
+    fn column_metadata_conversion_preserves_fields() {
+        let CreateMessage::Metadata(metadata) = metadata_message_with_columns()
+            .create_message
+            .expect("metadata message")
+        else {
+            panic!("expected metadata");
+        };
+        let column =
+            column_metadata_from_proto(metadata.columns.into_iter().next().expect("column"));
+
+        assert_eq!(column.name, "signal");
+        assert_eq!(column.unit.as_deref(), Some("V"));
+        assert_eq!(column.label.as_deref(), Some("Voltage"));
+        assert!(column.hidden_by_default);
+        assert!(column.chart_axis);
+    }
+
+    #[test]
+    fn scan_metadata_conversion_preserves_fields() {
+        let CreateMessage::Metadata(metadata) = metadata_message_with_scan()
+            .create_message
+            .expect("metadata message")
+        else {
+            panic!("expected metadata");
+        };
+        let scan_plan = scan_plan_from_proto(metadata.scan_axes)
+            .expect("scan conversion")
+            .expect("scan plan");
+
+        assert_eq!(scan_plan.axes.len(), 1);
+        assert_eq!(scan_plan.axes[0].name, "gate");
+        let ScanAxisMode::Static { values } = &scan_plan.axes[0].mode else {
+            panic!("expected static axis");
+        };
+        assert_eq!(
+            values,
+            &[ScanAxisValue::Float(-0.2), ScanAxisValue::Float(-0.1)]
+        );
     }
 
     #[tokio::test]

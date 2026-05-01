@@ -80,6 +80,8 @@ async fn seed_workspace(workspace: PathBuf) -> Result<()> {
             "Small scalar dataset for Tauri desktop smoke coverage".to_string(),
             vec!["smoke".to_string(), "desktop".to_string()],
             schema,
+            Vec::new(),
+            None,
         )
         .await
         .context("failed to create smoke dataset writer")?;

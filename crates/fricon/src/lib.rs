@@ -19,11 +19,14 @@ pub use self::{
     app::{AppHandle, AppManager, CatalogAppError, IngestAppError, ReadAppError},
     client::{Client, ClientError, Dataset, DatasetWriter, ExistingUiProbeResult},
     dataset::{
-        ColumnMeaning, DatasetArray, DatasetDataType, DatasetEvent, DatasetId,
+        ColumnMeaning, ColumnMetadata, DatasetArray, DatasetDataType, DatasetEvent, DatasetId,
         DatasetInterpretation, DatasetListQuery, DatasetMetadata, DatasetReader, DatasetRecord,
         DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus, DatasetUpdate,
-        FixedStepTrace, InterpretationSource, ResolvedColumn, ResolvedDuplicatePolicy, ScalarArray,
-        ScalarKind, SelectOptions, SortDirection, TraceKind, VariableStepTrace,
+        FixedStepTrace, InterpretationSource, PhysicalColumnOrdinal, ResolvedColumn,
+        ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
+        ResolvedScanAxis, ResolvedScanAxisMode, ScalarArray, ScalarKind, ScanAxis, ScanAxisMode,
+        ScanAxisValue, ScanPlan, SelectOptions, SortDirection, TraceKind, VariableStepTrace,
+        VisibleColumnOrdinal,
     },
     workspace::{WorkspaceError, WorkspaceRoot, get_log_dir},
 };
@@ -34,4 +37,4 @@ const DEFAULT_DATASET_LIST_LIMIT: i64 = 200;
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Version of the IPC/gRPC protocol between clients and the workspace server.
-const IPC_PROTOCOL_VERSION: u32 = 1;
+const IPC_PROTOCOL_VERSION: u32 = 3;

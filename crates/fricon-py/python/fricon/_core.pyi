@@ -11,10 +11,12 @@ from numpy import floating
 from typing_extensions import Self
 
 __all__ = [
+    "Column",
     "Dataset",
     "DatasetManager",
     "DatasetWriter",
     "FriconDatasetError",
+    "IndexAxis",
     "ServerHandle",
     "Trace",
     "Workspace",
@@ -44,6 +46,41 @@ class Workspace:
     @property
     def dataset_manager(self) -> DatasetManager: ...
 
+_DeclaredColumnDType: TypeAlias = type[float] | type[complex] | type[Trace]
+
+@final
+class Column:
+    def __new__(
+        cls,
+        dtype: _DeclaredColumnDType | None = ...,
+        *,
+        unit: str | None = ...,
+        label: str | None = ...,
+        hidden_by_default: bool = ...,
+        chart_axis: bool = ...,
+    ) -> Self: ...
+    @property
+    def dtype(self) -> _DeclaredColumnDType | None: ...
+    @property
+    def unit(self) -> str | None: ...
+    @property
+    def label(self) -> str | None: ...
+    @property
+    def hidden_by_default(self) -> bool: ...
+    @property
+    def chart_axis(self) -> bool: ...
+
+_ColumnSpec: TypeAlias = _DeclaredColumnDType | Column
+_ScanAxisValue: TypeAlias = int | float | bool | str
+
+@final
+class IndexAxis:
+    def __new__(cls, *, label: str | None = ...) -> Self: ...
+    @property
+    def label(self) -> str | None: ...
+
+_ScanAxisSpec: TypeAlias = Sequence[_ScanAxisValue] | IndexAxis | None
+
 @final
 class DatasetManager:
     def create(
@@ -52,6 +89,8 @@ class DatasetManager:
         *,
         description: str | None = ...,
         tags: Iterable[str] | None = ...,
+        columns: Mapping[str, _ColumnSpec] | None = ...,
+        scan: Mapping[str, _ScanAxisSpec] | None = ...,
     ) -> DatasetWriter: ...
     def open(
         self,

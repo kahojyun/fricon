@@ -8,6 +8,7 @@ use crate::{
         ingest::WriteSessionRegistry,
         model::DatasetId,
         read::{DatasetReadRepository, DatasetReader, ReadError},
+        semantics::read_manifest_optional,
     },
     workspace::WorkspacePaths,
 };
@@ -26,12 +27,16 @@ pub(crate) fn get_dataset_reader(
 ) -> Result<DatasetReader, ReadError> {
     let dataset = repository.resolve_dataset(id)?;
 
+    let path = paths.dataset_path_from_uid(dataset.uid);
+
     // Prefer the active write session so reads observe in-progress data for a
     // dataset that has not yet been finalized to disk.
     if let Some(handle) = write_sessions.get(dataset.id) {
-        Ok(DatasetReader::from_handle(handle))
+        Ok(DatasetReader::from_handle(
+            handle,
+            read_manifest_optional(&path)?,
+        )?)
     } else {
-        let path = paths.dataset_path_from_uid(dataset.uid);
-        Ok(DatasetReader::open_dir(path)?)
+        Ok(DatasetReader::open_dir(&path)?)
     }
 }

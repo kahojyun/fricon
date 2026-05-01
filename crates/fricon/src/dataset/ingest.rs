@@ -20,7 +20,10 @@ pub use self::error::IngestError;
 pub(crate) use self::{
     registry::WriteSessionRegistry, service::DatasetIngestService, session::WriteSessionHandle,
 };
-use crate::dataset::model::{DatasetId, DatasetRecord, DatasetStatus};
+use crate::dataset::{
+    model::{DatasetId, DatasetRecord, DatasetStatus},
+    semantics::{ColumnMetadata, ScanPlan},
+};
 
 /// Persistence port for ingest-time dataset creation and status updates.
 ///
@@ -53,6 +56,8 @@ pub(crate) struct CreateDatasetRequest {
     pub(crate) name: String,
     pub(crate) description: String,
     pub(crate) tags: Vec<String>,
+    pub(crate) column_metadata: Vec<ColumnMetadata>,
+    pub(crate) scan_plan: Option<ScanPlan>,
 }
 
 /// Stream input driving a dataset ingest session.
