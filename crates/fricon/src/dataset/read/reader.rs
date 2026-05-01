@@ -1,4 +1,11 @@
-use std::{borrow::Cow, cmp::Ordering, ops::RangeBounds, path::Path, sync::Arc};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    ops::RangeBounds,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use arrow_arith::boolean::and;
 use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar, UInt64Array};
@@ -16,10 +23,15 @@ use crate::dataset::{
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
     semantics::{
-        DatasetSemanticManifest, ManifestError, RECORD_ID_COLUMN, is_hidden_system_column,
-        read_manifest_optional,
+        DatasetSemanticManifest, IndexRealization, ManifestError, RECORD_ID_COLUMN, ScanAxisMode,
+        ScanAxisValue, is_hidden_system_column, read_manifest_optional,
     },
-    storage::ChunkReader,
+    storage::{
+        ChunkReader,
+        logical_index::{
+            logical_index_column, logical_index_record_ids, read_logical_index_batches,
+        },
+    },
 };
 
 enum DatasetSource {
@@ -91,6 +103,7 @@ pub struct DatasetReader {
     arrow_schema: SchemaRef,
     visible_columns: Vec<usize>,
     manifest: Option<DatasetSemanticManifest>,
+    dataset_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Default)]
@@ -267,6 +280,7 @@ impl DatasetReader {
             arrow_schema,
             visible_columns,
             manifest,
+            dataset_path: None,
         })
     }
 
@@ -293,6 +307,7 @@ impl DatasetReader {
             arrow_schema,
             visible_columns,
             manifest,
+            dataset_path: Some(path.to_owned()),
         })
     }
 
@@ -384,7 +399,80 @@ impl DatasetReader {
         if manifest.scan_plan.is_none() {
             return Ok(Vec::new());
         }
-        Ok(resolve_logical_index_points(manifest, &self.record_ids()?))
+        let record_ids = self.record_ids()?;
+        if manifest.realization.index_realization == IndexRealization::Sidecar
+            && let Some(path) = &self.dataset_path
+        {
+            let points = self.sidecar_logical_index_points(path, manifest, &record_ids)?;
+            if !points.is_empty() {
+                return Ok(points);
+            }
+        }
+        Ok(resolve_logical_index_points(manifest, &record_ids))
+    }
+
+    fn sidecar_logical_index_points(
+        &self,
+        path: &Path,
+        manifest: &DatasetSemanticManifest,
+        record_ids: &[u64],
+    ) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
+        let scan_plan = manifest
+            .scan_plan
+            .as_ref()
+            .expect("sidecar realization should require scan plan");
+        let batches = read_logical_index_batches(path, scan_plan)?;
+        let record_id_set = record_ids.iter().copied().collect::<HashSet<_>>();
+        let mut latest_by_indices: HashMap<Vec<u64>, ResolvedLogicalIndexPoint> = HashMap::new();
+        for batch in &batches {
+            let record_ids = logical_index_record_ids(batch)?;
+            let axis_columns = (0..scan_plan.axes.len())
+                .map(|ordinal| logical_index_column(batch, ordinal))
+                .collect::<Result<Vec<_>, _>>()?;
+            for row in 0..batch.num_rows() {
+                let record_id = record_ids.value(row);
+                if !record_id_set.contains(&record_id) {
+                    continue;
+                }
+                let indices = axis_columns
+                    .iter()
+                    .map(|column| column.value(row))
+                    .collect::<Vec<_>>();
+                let coordinates = indices
+                    .iter()
+                    .zip(&scan_plan.axes)
+                    .map(|(index, axis)| match &axis.mode {
+                        ScanAxisMode::Static { values } => {
+                            let index =
+                                usize::try_from(*index).map_err(|_| DatasetError::InvalidFilter)?;
+                            values
+                                .get(index)
+                                .cloned()
+                                .ok_or(DatasetError::InvalidFilter)
+                        }
+                        ScanAxisMode::ImplicitIndex => Ok(ScanAxisValue::Int(
+                            i64::try_from(*index).unwrap_or(i64::MAX),
+                        )),
+                    })
+                    .collect::<Result<Vec<_>, DatasetError>>()?;
+                let point = ResolvedLogicalIndexPoint {
+                    record_id,
+                    indices: indices.clone(),
+                    coordinates,
+                };
+                latest_by_indices
+                    .entry(indices)
+                    .and_modify(|current| {
+                        if record_id > current.record_id {
+                            *current = point.clone();
+                        }
+                    })
+                    .or_insert(point);
+            }
+        }
+        let mut points = latest_by_indices.into_values().collect::<Vec<_>>();
+        points.sort_by_key(|point| point.record_id);
+        Ok(points)
     }
 
     fn record_ids(&self) -> Result<Vec<u64>, ReadError> {

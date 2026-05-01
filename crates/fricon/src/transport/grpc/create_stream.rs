@@ -43,6 +43,7 @@ pub(crate) async fn parse_create_stream(
         tags,
         columns,
         scan_axes,
+        logical_index_sidecar,
     })) = first_message.create_message
     else {
         warn!("First create stream message must be metadata");
@@ -52,9 +53,19 @@ pub(crate) async fn parse_create_stream(
     };
 
     let scan_plan = scan_plan_from_proto(scan_axes)?;
+    if logical_index_sidecar && scan_plan.is_none() {
+        return Err(Status::invalid_argument(
+            "logical-index sidecar requires scan axes",
+        ));
+    }
 
     let (events_tx, events_rx) = mpsc::channel(16);
-    let events_task = tokio::spawn(produce_create_events(stream, shutdown_token, events_tx));
+    let events_task = tokio::spawn(produce_create_events(
+        stream,
+        shutdown_token,
+        events_tx,
+        logical_index_sidecar,
+    ));
 
     Ok(CreateStreamParts {
         request: CreateDatasetRequest {
@@ -66,6 +77,7 @@ pub(crate) async fn parse_create_stream(
                 .map(column_metadata_from_proto)
                 .collect(),
             scan_plan,
+            logical_index_sidecar,
         },
         events_rx,
         events_task,
@@ -133,12 +145,12 @@ async fn produce_create_events<S>(
     mut stream: S,
     shutdown_token: CancellationToken,
     events_tx: mpsc::Sender<CreateDatasetInput>,
+    logical_index_sidecar: bool,
 ) -> Result<(), Status>
 where
     S: Stream<Item = Result<CreateRequest, Status>> + Unpin,
 {
-    let mut decoder = StreamDecoder::new();
-    let mut schema_sent = false;
+    let mut state = CreateStreamDecodeState::new(logical_index_sidecar);
 
     loop {
         tokio::select! {
@@ -147,8 +159,7 @@ where
                     Some(Ok(request)) => {
                         match handle_stream_message(
                             request.create_message,
-                            &mut decoder,
-                            &mut schema_sent,
+                            &mut state,
                             &events_tx,
                         )
                         .await
@@ -200,6 +211,32 @@ where
     }
 }
 
+struct CreateStreamDecodeState {
+    data_decoder: StreamDecoder,
+    logical_index_decoder: StreamDecoder,
+    schema_sent: bool,
+    logical_index_sidecar: bool,
+    pending_data: std::collections::VecDeque<arrow_array::RecordBatch>,
+    pending_logical_indices: std::collections::VecDeque<arrow_array::RecordBatch>,
+}
+
+impl CreateStreamDecodeState {
+    fn new(logical_index_sidecar: bool) -> Self {
+        Self {
+            data_decoder: StreamDecoder::new(),
+            logical_index_decoder: StreamDecoder::new(),
+            schema_sent: false,
+            logical_index_sidecar,
+            pending_data: std::collections::VecDeque::new(),
+            pending_logical_indices: std::collections::VecDeque::new(),
+        }
+    }
+
+    fn has_unpaired_batches(&self) -> bool {
+        !self.pending_data.is_empty() || !self.pending_logical_indices.is_empty()
+    }
+}
+
 async fn send_abort_and_error(
     events_tx: &mpsc::Sender<CreateDatasetInput>,
     status: Status,
@@ -213,13 +250,13 @@ async fn send_abort_and_error(
 
 async fn handle_stream_message(
     message: Option<CreateMessage>,
-    decoder: &mut StreamDecoder,
-    schema_sent: &mut bool,
+    state: &mut CreateStreamDecodeState,
     events_tx: &mpsc::Sender<CreateDatasetInput>,
 ) -> Result<Option<CreateDatasetInput>, Status> {
     match message {
-        Some(CreateMessage::Payload(payload)) => {
-            decode_payload(payload, decoder, schema_sent, events_tx).await
+        Some(CreateMessage::Payload(payload)) => decode_payload(payload, state, events_tx).await,
+        Some(CreateMessage::LogicalIndexPayload(payload)) => {
+            decode_logical_index_payload(payload, state, events_tx).await
         }
         Some(CreateMessage::Metadata(_)) => {
             warn!("Unexpected metadata message after initial create metadata");
@@ -227,15 +264,32 @@ async fn handle_stream_message(
                 "unexpected metadata message after initial create metadata",
             ))
         }
-        Some(CreateMessage::Finish(_)) => match decoder.finish() {
-            Ok(()) => Ok(Some(CreateDatasetInput::Finish)),
-            Err(error) => {
-                error!(error = %error, "Failed to finalize Arrow stream on CreateFinish");
-                Err(Status::invalid_argument(
-                    "invalid Arrow stream at create finish",
-                ))
+        Some(CreateMessage::Finish(_)) => {
+            match state.data_decoder.finish() {
+                Ok(()) => {}
+                Err(error) => {
+                    error!(error = %error, "Failed to finalize Arrow stream on CreateFinish");
+                    return Err(Status::invalid_argument(
+                        "invalid Arrow stream at create finish",
+                    ));
+                }
             }
-        },
+            if state.logical_index_sidecar {
+                if let Err(error) = state.logical_index_decoder.finish() {
+                    error!(error = %error, "Failed to finalize logical-index stream on CreateFinish");
+                    return Err(Status::invalid_argument(
+                        "invalid logical-index stream at create finish",
+                    ));
+                }
+                flush_paired_batches(state, events_tx).await?;
+                if state.has_unpaired_batches() {
+                    return Err(Status::invalid_argument(
+                        "logical-index sidecar batches do not match data batches",
+                    ));
+                }
+            }
+            Ok(Some(CreateDatasetInput::Finish))
+        }
         Some(CreateMessage::Abort(_)) => Ok(Some(CreateDatasetInput::Abort)),
         None => {
             warn!("Received empty CreateRequest message");
@@ -248,22 +302,29 @@ async fn handle_stream_message(
 
 async fn decode_payload(
     payload: bytes::Bytes,
-    decoder: &mut StreamDecoder,
-    schema_sent: &mut bool,
+    state: &mut CreateStreamDecodeState,
     events_tx: &mpsc::Sender<CreateDatasetInput>,
 ) -> Result<Option<CreateDatasetInput>, Status> {
     let mut buffer = Buffer::from(payload);
     while !buffer.is_empty() {
-        match decoder.decode(&mut buffer) {
+        match state.data_decoder.decode(&mut buffer) {
             Ok(Some(batch)) => {
-                send_schema_if_decoded(decoder, schema_sent, events_tx).await?;
-                events_tx
-                    .send(CreateDatasetInput::Batch(batch))
-                    .await
-                    .map_err(|_| Status::internal("create ingest receiver dropped"))?;
+                send_schema_if_decoded(state, events_tx).await?;
+                if state.logical_index_sidecar {
+                    state.pending_data.push_back(batch);
+                    flush_paired_batches(state, events_tx).await?;
+                } else {
+                    events_tx
+                        .send(CreateDatasetInput::Batch {
+                            data: batch,
+                            logical_indices: None,
+                        })
+                        .await
+                        .map_err(|_| Status::internal("create ingest receiver dropped"))?;
+                }
             }
             Ok(None) => {
-                send_schema_if_decoded(decoder, schema_sent, events_tx).await?;
+                send_schema_if_decoded(state, events_tx).await?;
             }
             Err(error) => {
                 error!(error = %error, "Failed to decode Arrow payload");
@@ -274,17 +335,71 @@ async fn decode_payload(
     Ok(None)
 }
 
-async fn send_schema_if_decoded(
-    decoder: &StreamDecoder,
-    schema_sent: &mut bool,
+async fn decode_logical_index_payload(
+    payload: bytes::Bytes,
+    state: &mut CreateStreamDecodeState,
+    events_tx: &mpsc::Sender<CreateDatasetInput>,
+) -> Result<Option<CreateDatasetInput>, Status> {
+    if !state.logical_index_sidecar {
+        return Err(Status::invalid_argument(
+            "unexpected logical-index payload without sidecar metadata",
+        ));
+    }
+    let mut buffer = Buffer::from(payload);
+    while !buffer.is_empty() {
+        match state.logical_index_decoder.decode(&mut buffer) {
+            Ok(Some(batch)) => {
+                state.pending_logical_indices.push_back(batch);
+                flush_paired_batches(state, events_tx).await?;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                error!(error = %error, "Failed to decode logical-index payload");
+                return Err(Status::invalid_argument(
+                    "failed to decode logical-index payload",
+                ));
+            }
+        }
+    }
+    Ok(None)
+}
+
+async fn flush_paired_batches(
+    state: &mut CreateStreamDecodeState,
     events_tx: &mpsc::Sender<CreateDatasetInput>,
 ) -> Result<(), Status> {
-    if !*schema_sent && let Some(schema) = decoder.schema() {
+    while !state.pending_data.is_empty() && !state.pending_logical_indices.is_empty() {
+        let data = state
+            .pending_data
+            .pop_front()
+            .expect("pending data should be present");
+        let logical_indices = state
+            .pending_logical_indices
+            .pop_front()
+            .expect("pending logical indices should be present");
+        events_tx
+            .send(CreateDatasetInput::Batch {
+                data,
+                logical_indices: Some(logical_indices),
+            })
+            .await
+            .map_err(|_| Status::internal("create ingest receiver dropped"))?;
+    }
+    Ok(())
+}
+
+async fn send_schema_if_decoded(
+    state: &mut CreateStreamDecodeState,
+    events_tx: &mpsc::Sender<CreateDatasetInput>,
+) -> Result<(), Status> {
+    if !state.schema_sent
+        && let Some(schema) = state.data_decoder.schema()
+    {
         events_tx
             .send(CreateDatasetInput::Schema(schema))
             .await
             .map_err(|_| Status::internal("create ingest receiver dropped"))?;
-        *schema_sent = true;
+        state.schema_sent = true;
     }
     Ok(())
 }
@@ -310,6 +425,12 @@ mod tests {
         }
     }
 
+    fn logical_index_payload_message(payload: bytes::Bytes) -> CreateRequest {
+        CreateRequest {
+            create_message: Some(CreateMessage::LogicalIndexPayload(payload)),
+        }
+    }
+
     fn finish_message() -> CreateRequest {
         CreateRequest {
             create_message: Some(CreateMessage::Finish(CreateFinish {})),
@@ -330,6 +451,7 @@ mod tests {
                 tags: vec![],
                 columns: vec![],
                 scan_axes: vec![],
+                logical_index_sidecar: false,
             })),
         }
     }
@@ -348,6 +470,7 @@ mod tests {
                     chart_axis: true,
                 }],
                 scan_axes: vec![],
+                logical_index_sidecar: false,
             })),
         }
     }
@@ -373,6 +496,7 @@ mod tests {
                         ],
                     })),
                 }],
+                logical_index_sidecar: false,
             })),
         }
     }
@@ -391,12 +515,43 @@ mod tests {
         bytes::Bytes::from(bytes)
     }
 
+    fn build_logical_index_payload_bytes() -> bytes::Bytes {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "step",
+            DataType::UInt64,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(arrow_array::UInt64Array::from(vec![2, 0, 1]))],
+        )
+        .expect("logical batch");
+        let mut bytes = vec![];
+        let mut writer = StreamWriter::try_new(&mut bytes, &schema).expect("stream writer");
+        writer.write(&batch).expect("write logical batch");
+        writer.finish().expect("finish logical stream writer");
+        bytes::Bytes::from(bytes)
+    }
+
     async fn collect_events(
         stream: impl Stream<Item = Result<CreateRequest, Status>> + Unpin,
         shutdown_token: CancellationToken,
     ) -> (Vec<CreateDatasetInput>, Result<(), Status>) {
         let (tx, mut rx) = mpsc::channel(16);
-        let result = produce_create_events(stream, shutdown_token, tx).await;
+        let result = produce_create_events(stream, shutdown_token, tx, false).await;
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+        (events, result)
+    }
+
+    async fn collect_events_with_sidecar(
+        stream: impl Stream<Item = Result<CreateRequest, Status>> + Unpin,
+        shutdown_token: CancellationToken,
+    ) -> (Vec<CreateDatasetInput>, Result<(), Status>) {
+        let (tx, mut rx) = mpsc::channel(16);
+        let result = produce_create_events(stream, shutdown_token, tx, true).await;
         let mut events = Vec::new();
         while let Some(event) = rx.recv().await {
             events.push(event);
@@ -418,8 +573,40 @@ mod tests {
         assert!(
             events
                 .iter()
-                .any(|event| matches!(event, CreateDatasetInput::Batch(_)))
+                .any(|event| matches!(event, CreateDatasetInput::Batch { .. }))
         );
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Finish)));
+    }
+
+    #[tokio::test]
+    async fn sidecar_payloads_are_paired_with_data_batches() {
+        let payload = build_payload_bytes();
+        let logical_payload = build_logical_index_payload_bytes();
+        let stream = stream::iter(vec![
+            Ok(payload_message(payload)),
+            Ok(logical_index_payload_message(logical_payload)),
+            Ok(finish_message()),
+        ]);
+        let (events, result) = collect_events_with_sidecar(stream, CancellationToken::new()).await;
+        assert!(result.is_ok());
+
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, CreateDatasetInput::Schema(_)))
+        );
+        let batch = events
+            .iter()
+            .find_map(|event| match event {
+                CreateDatasetInput::Batch {
+                    data,
+                    logical_indices: Some(logical_indices),
+                } => Some((data, logical_indices)),
+                _ => None,
+            })
+            .expect("paired batch");
+        assert_eq!(batch.0.num_rows(), 3);
+        assert_eq!(batch.1.num_rows(), 3);
         assert!(matches!(events.last(), Some(CreateDatasetInput::Finish)));
     }
 
@@ -547,7 +734,7 @@ mod tests {
 
         let result = tokio::time::timeout(
             std::time::Duration::from_millis(100),
-            produce_create_events(stream, CancellationToken::new(), tx),
+            produce_create_events(stream, CancellationToken::new(), tx, false),
         )
         .await;
 

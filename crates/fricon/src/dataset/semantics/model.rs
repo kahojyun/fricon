@@ -49,6 +49,17 @@ impl DatasetSemanticManifest {
         metadata: impl IntoIterator<Item = ColumnMetadata>,
         scan_plan: Option<ScanPlan>,
     ) -> Result<Self, ManifestValidationError> {
+        Self::minimal_from_arrow_schema_with_metadata_scan_and_realization(
+            schema, metadata, scan_plan, false,
+        )
+    }
+
+    pub fn minimal_from_arrow_schema_with_metadata_scan_and_realization(
+        schema: &Schema,
+        metadata: impl IntoIterator<Item = ColumnMetadata>,
+        scan_plan: Option<ScanPlan>,
+        sidecar_index_realization: bool,
+    ) -> Result<Self, ManifestValidationError> {
         let columns = schema
             .fields()
             .iter()
@@ -60,7 +71,7 @@ impl DatasetSemanticManifest {
             .collect::<Result<Vec<_>, ManifestValidationError>>()?;
         let mut manifest = Self::minimal(columns);
         manifest.apply_column_metadata(metadata)?;
-        manifest.apply_scan_plan(scan_plan);
+        manifest.apply_scan_plan_with_realization(scan_plan, sidecar_index_realization);
         manifest.validate()?;
         Ok(manifest)
     }
@@ -72,8 +83,18 @@ impl DatasetSemanticManifest {
     }
 
     fn apply_scan_plan(&mut self, scan_plan: Option<ScanPlan>) {
+        self.apply_scan_plan_with_realization(scan_plan, false);
+    }
+
+    fn apply_scan_plan_with_realization(
+        &mut self,
+        scan_plan: Option<ScanPlan>,
+        sidecar_index_realization: bool,
+    ) {
         self.scan_plan = scan_plan;
-        self.realization.index_realization = if self.scan_plan.is_some() {
+        self.realization.index_realization = if sidecar_index_realization {
+            IndexRealization::Sidecar
+        } else if self.scan_plan.is_some() {
             IndexRealization::Implicit
         } else {
             IndexRealization::None
@@ -217,11 +238,12 @@ impl DatasetSemanticManifest {
 
     fn validate_scan_plan(&self) -> Result<(), ManifestValidationError> {
         match (&self.scan_plan, &self.realization.index_realization) {
-            (Some(_), IndexRealization::Implicit) | (None, IndexRealization::None) => {}
+            (Some(_), IndexRealization::Implicit | IndexRealization::Sidecar)
+            | (None, IndexRealization::None) => {}
             (Some(_), IndexRealization::None) => {
                 return Err(ManifestValidationError::ScanPlanRequiresImplicitRealization);
             }
-            (None, IndexRealization::Implicit) => {
+            (None, IndexRealization::Implicit | IndexRealization::Sidecar) => {
                 return Err(ManifestValidationError::ImplicitRealizationRequiresScanPlan);
             }
         }
@@ -635,6 +657,8 @@ pub enum IndexRealization {
     None,
     #[serde(rename = "implicit")]
     Implicit,
+    #[serde(rename = "sidecar")]
+    Sidecar,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

@@ -20,20 +20,33 @@ use itertools::Itertools;
 
 use crate::dataset::{
     schema::ChunkedTable,
-    storage::{error::DatasetFsError, layout::chunk_path},
+    storage::{
+        error::DatasetFsError,
+        layout::{ChunkKind, chunk_path_for},
+    },
 };
 
 #[derive(Debug)]
 pub(crate) struct ChunkReader {
     dir_path: PathBuf,
+    kind: ChunkKind,
     current_chunk: usize,
     batches: Option<ChunkedTable>,
 }
 
 impl ChunkReader {
     pub(crate) fn new(dir_path: PathBuf, schema: Option<SchemaRef>) -> Self {
+        Self::new_with_kind(dir_path, schema, ChunkKind::Data)
+    }
+
+    pub(crate) fn new_with_kind(
+        dir_path: PathBuf,
+        schema: Option<SchemaRef>,
+        kind: ChunkKind,
+    ) -> Self {
         Self {
             dir_path,
+            kind,
             current_chunk: 0,
             batches: schema.map(ChunkedTable::new),
         }
@@ -44,7 +57,7 @@ impl ChunkReader {
     }
 
     pub(crate) fn read_next(&mut self) -> Result<bool, DatasetFsError> {
-        let chunk_path = chunk_path(&self.dir_path, self.current_chunk);
+        let chunk_path = chunk_path_for(&self.dir_path, self.kind, self.current_chunk);
         let chunk_batches = match read_ipc_file_mmap(&chunk_path) {
             Ok(batches) => batches,
             Err(DatasetFsError::ChunkNotFound) => {
