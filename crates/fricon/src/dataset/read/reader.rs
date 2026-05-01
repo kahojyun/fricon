@@ -264,6 +264,7 @@ impl DatasetReader {
     pub(crate) fn from_handle(
         source: WriteSessionHandle,
         manifest: Option<DatasetSemanticManifest>,
+        dataset_path: Option<PathBuf>,
     ) -> Result<Self, ReadError> {
         let physical_arrow_schema = source.schema();
         if let Some(manifest) = manifest.as_ref() {
@@ -281,7 +282,7 @@ impl DatasetReader {
             arrow_schema,
             visible_columns,
             manifest,
-            dataset_path: None,
+            dataset_path,
         })
     }
 

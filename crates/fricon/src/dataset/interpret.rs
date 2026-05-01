@@ -952,7 +952,9 @@ mod tests {
             .expect("write batch");
         let handle = registry.get(7).expect("active handle");
 
-        let reader = DatasetReader::from_handle(handle, Some(manifest)).expect("reader");
+        let reader =
+            DatasetReader::from_handle(handle, Some(manifest), Some(dir.path().to_owned()))
+                .expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);

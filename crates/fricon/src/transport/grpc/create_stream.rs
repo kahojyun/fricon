@@ -18,6 +18,8 @@ use crate::{
     },
 };
 
+const MAX_UNPAIRED_SIDECAR_BATCHES: usize = 1;
+
 pub(crate) struct CreateStreamParts {
     pub request: CreateDatasetRequest,
     pub events_rx: mpsc::Receiver<CreateDatasetInput>,
@@ -235,6 +237,17 @@ impl CreateStreamDecodeState {
     fn has_unpaired_batches(&self) -> bool {
         !self.pending_data.is_empty() || !self.pending_logical_indices.is_empty()
     }
+
+    fn reject_if_unpaired_limit_exceeded(&self) -> Result<(), Status> {
+        if self.pending_data.len() > MAX_UNPAIRED_SIDECAR_BATCHES
+            || self.pending_logical_indices.len() > MAX_UNPAIRED_SIDECAR_BATCHES
+        {
+            return Err(Status::invalid_argument(
+                "logical-index sidecar batches must be paired with data batches",
+            ));
+        }
+        Ok(())
+    }
 }
 
 async fn send_abort_and_error(
@@ -313,6 +326,7 @@ async fn decode_payload(
                 if state.logical_index_sidecar {
                     state.pending_data.push_back(batch);
                     flush_paired_batches(state, events_tx).await?;
+                    state.reject_if_unpaired_limit_exceeded()?;
                 } else {
                     events_tx
                         .send(CreateDatasetInput::Batch {
@@ -351,6 +365,7 @@ async fn decode_logical_index_payload(
             Ok(Some(batch)) => {
                 state.pending_logical_indices.push_back(batch);
                 flush_paired_batches(state, events_tx).await?;
+                state.reject_if_unpaired_limit_exceeded()?;
             }
             Ok(None) => {}
             Err(error) => {
@@ -515,6 +530,22 @@ mod tests {
         bytes::Bytes::from(bytes)
     }
 
+    fn build_two_data_batch_payload_bytes() -> bytes::Bytes {
+        let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
+        let first_batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1]))])
+                .expect("first batch");
+        let second_batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![2]))])
+                .expect("second batch");
+        let mut bytes = vec![];
+        let mut writer = StreamWriter::try_new(&mut bytes, &schema).expect("stream writer");
+        writer.write(&first_batch).expect("write first batch");
+        writer.write(&second_batch).expect("write second batch");
+        writer.finish().expect("finish stream writer");
+        bytes::Bytes::from(bytes)
+    }
+
     fn build_logical_index_payload_bytes() -> bytes::Bytes {
         let schema = Arc::new(Schema::new(vec![Field::new(
             "step",
@@ -529,6 +560,34 @@ mod tests {
         let mut bytes = vec![];
         let mut writer = StreamWriter::try_new(&mut bytes, &schema).expect("stream writer");
         writer.write(&batch).expect("write logical batch");
+        writer.finish().expect("finish logical stream writer");
+        bytes::Bytes::from(bytes)
+    }
+
+    fn build_two_logical_index_batch_payload_bytes() -> bytes::Bytes {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "step",
+            DataType::UInt64,
+            false,
+        )]));
+        let first_batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(arrow_array::UInt64Array::from(vec![0]))],
+        )
+        .expect("first logical batch");
+        let second_batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(arrow_array::UInt64Array::from(vec![1]))],
+        )
+        .expect("second logical batch");
+        let mut bytes = vec![];
+        let mut writer = StreamWriter::try_new(&mut bytes, &schema).expect("stream writer");
+        writer
+            .write(&first_batch)
+            .expect("write first logical batch");
+        writer
+            .write(&second_batch)
+            .expect("write second logical batch");
         writer.finish().expect("finish logical stream writer");
         bytes::Bytes::from(bytes)
     }
@@ -608,6 +667,36 @@ mod tests {
         assert_eq!(batch.0.num_rows(), 3);
         assert_eq!(batch.1.num_rows(), 3);
         assert!(matches!(events.last(), Some(CreateDatasetInput::Finish)));
+    }
+
+    #[tokio::test]
+    async fn sidecar_rejects_multiple_unpaired_data_batches() {
+        let payload = build_two_data_batch_payload_bytes();
+        let stream = stream::iter(vec![Ok(payload_message(payload))]);
+        let (events, result) = collect_events_with_sidecar(stream, CancellationToken::new()).await;
+
+        assert_eq!(
+            result
+                .expect_err("unpaired data batches should fail")
+                .code(),
+            Code::InvalidArgument
+        );
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Abort)));
+    }
+
+    #[tokio::test]
+    async fn sidecar_rejects_multiple_unpaired_logical_index_batches() {
+        let logical_payload = build_two_logical_index_batch_payload_bytes();
+        let stream = stream::iter(vec![Ok(logical_index_payload_message(logical_payload))]);
+        let (events, result) = collect_events_with_sidecar(stream, CancellationToken::new()).await;
+
+        assert_eq!(
+            result
+                .expect_err("unpaired logical-index batches should fail")
+                .code(),
+            Code::InvalidArgument
+        );
+        assert!(matches!(events.last(), Some(CreateDatasetInput::Abort)));
     }
 
     #[test]
