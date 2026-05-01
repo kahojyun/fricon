@@ -750,6 +750,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fricon.IndexAxis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IndexAxis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" IndexAxis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fricon.IndexAxis.label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;label
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fricon.Trace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1303,6 +1331,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fricon.IndexAxis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;IndexAxis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" IndexAxis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fricon.IndexAxis.label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;label
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fricon.Trace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1467,6 +1523,14 @@
             <td>
               <div class="doc-md-description">
                 
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            IndexAxis (fricon.IndexAxis)" href="#fricon.IndexAxis">IndexAxis</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Unknown-length integer scan axis for dataset creation.</p>
               </div>
             </td>
           </tr>
@@ -2384,7 +2448,7 @@
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            create(name, *, description=None, tags=None, columns=None)
+              <td><code><a class="autorefs autorefs-internal" title="            create(name, *, description=None, tags=None, columns=None, scan=None)
 
   
       method descriptor
@@ -2442,7 +2506,7 @@
 
 
 <h3 id="fricon.DatasetManager.create" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">create</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scan</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-method descriptor"><code>method descriptor</code></small>
@@ -2778,7 +2842,7 @@
 
         <p>Writer for newly created dataset.</p>
 <p>Writers are constructed by calling
-<a class="autorefs autorefs-internal" title="            create(name, *, description=None, tags=None, columns=None)
+<a class="autorefs autorefs-internal" title="            create(name, *, description=None, tags=None, columns=None, scan=None)
 
   
       method descriptor
@@ -3180,6 +3244,106 @@ once 16 rows have accumulated.</p>
 
 
 
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="fricon.IndexAxis" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>IndexAxis</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Unknown-length integer scan axis for dataset creation.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            label
+
+  
+      property
+   (fricon.IndexAxis.label)" href="#fricon.IndexAxis.label">label</a></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="fricon.IndexAxis.label" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">label</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
 
 
 
