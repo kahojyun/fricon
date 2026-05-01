@@ -171,6 +171,7 @@ After the dataset foundation is durable, product work should move toward:
 
 Relevant future design note:
 
+- `experiment-run-and-runner-design.md`
 - `parameter-management-design.md`
 
 This phase should avoid turning experiment support into a desktop-first

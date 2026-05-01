@@ -38,8 +38,11 @@ contracts, or resource lease behavior.
 The record-centric first slice depends on:
 
 - durable dataset semantics and append-order identity
-- minimal parameter snapshot binding
 - a policy for immutable facts versus correction or audit events
+
+Parameter-aware runs also depend on:
+
+- minimal parameter snapshot binding
 
 Future runner implementation also depends on:
 
@@ -53,7 +56,11 @@ The first experiment-run product slice should be record-centric.
 V1 should promise:
 
 - record a scientific experiment attempt
-- bind one immutable effective parameter snapshot
+- optionally link an immutable effective parameter snapshot when available
+- preserve user-provided JSON metadata for migration from existing experiment
+  code
+- attach supporting files or artifacts when users have no structured Fricon
+  concept for that information yet
 - link produced datasets
 - expose notes, quality state, and retry or continuation history
 - keep script execution details available as debugging context
@@ -78,6 +85,10 @@ Settled user-facing policies:
   troubleshooting
 - analysis scripts are future derived-dataset provenance, not core
   `ExperimentRun` v1 behavior
+- interactive experiment parameter snapshots are optional; user-provided
+  metadata can bridge existing code until the parameter system is adopted
+- managed or parameter-aware runs should require a resolved immutable parameter
+  snapshot when they claim strong reproducibility
 - code and environment reproducibility should start as passive summary metadata,
   not managed Git, `uv`, or `pixi` history
 - managed submitted runs should start from importable Python functions or module
@@ -215,8 +226,11 @@ the script, parameters, sample, device, and expected outputs are identical.
 Reuse an existing `experiment_run_id` only for an interrupted continuation or
 retry that the user or system treats as the same scientific attempt.
 
-Parameter changes should normally require a new experiment run because the
-effective parameter snapshot is part of the experiment-run facts.
+For parameter-aware runs, parameter changes should normally require a new
+experiment run because the resolved parameter snapshot is part of the
+experiment-run facts. Interactive migration runs may instead preserve
+user-provided parameter metadata until the experiment adopts Fricon parameter
+snapshots.
 
 ### Script Run Identity
 
@@ -246,7 +260,7 @@ The record-centric v1 subset is:
 
 ```text
 ExperimentRun 1 -> many Dataset
-ExperimentRun 1 -> 1 EffectiveParameterSnapshot
+ExperimentRun 0/1 -> 1 EffectiveParameterSnapshot
 ExperimentRun 1 -> many DatasetWriteSession
 ```
 
@@ -256,7 +270,7 @@ When the generic runner is implemented, the fuller relationship model becomes:
 ExperimentRun 1 -> many Dataset
 ExperimentRun 1 -> many TaskQueueEntry
 ExperimentRun 1 -> many ScriptRun
-ExperimentRun 1 -> 1 EffectiveParameterSnapshot
+ExperimentRun 0/1 -> 1 EffectiveParameterSnapshot
 
 TaskQueueEntry 1   -> 0/1 ScriptRun
 ScriptRun      1   -> many DatasetWriteSession
@@ -282,7 +296,9 @@ Notes:
 
 - identity and display label
 - lifecycle state
-- effective parameter snapshot reference
+- optional effective parameter snapshot reference
+- user-provided metadata for migration and workflow-specific context
+- attachment references for supporting files or artifacts
 - optional parameter source ref used to resolve the snapshot
 - optional sample or specimen reference in future work
 - expected or produced dataset links
@@ -322,18 +338,28 @@ rewritten. Later changes should use correction, invalidation, or audit records.
 
 ## Parameter Snapshot Binding
 
-V1 should use one effective immutable parameter snapshot per experiment run:
+Interactive experiment runs should not require parameter management adoption.
+They may record a user-provided parameter summary or custom metadata when the
+experiment has not yet moved to Fricon's parameter snapshot model.
+
+Parameter-aware and managed submitted runs should use one effective immutable
+parameter snapshot per experiment run:
 
 ```text
-ExperimentRun -> EffectiveParameterSnapshot
+ExperimentRun 0/1 -> EffectiveParameterSnapshot
 ```
 
 If the user starts from a mutable profile or ref, Fricon should resolve it before
-the experiment starts and record the resolved snapshot ID.
+the parameter-aware experiment starts and record the resolved snapshot ID.
 
 Retry or continuation within the same experiment run should reuse the same
 snapshot. If parameter values change, the user should normally start a new
 experiment run.
+
+User-provided metadata is a migration bridge, not a replacement for durable
+parameter snapshots. It should be searchable and visible enough to help users
+migrate existing experiment code, but Fricon should not treat arbitrary metadata
+as structured parameter history.
 
 Future systems may introduce parameter bindings with roles:
 
@@ -646,6 +672,8 @@ Fricon should record:
 
 - `ExperimentRun`
 - effective parameter snapshot or user-provided parameter summary
+- custom JSON metadata for migration from existing scripts
+- attachment references for supporting files or artifacts
 - produced datasets
 - dataset write sessions when datasets are appended
 - notes, quality state, and explicit continuation decisions
@@ -664,6 +692,17 @@ Fricon should not over-promise:
 This mode is still a first-class product path. It should make lightweight
 experiment records useful without forcing users to adopt a runner before their
 experiment has stabilized.
+
+Existing systems often store experiment-level context on individual datasets.
+Interactive runs should provide a better landing point for that context:
+
+- experiment-level labels, tags, and quality state should live on the run when
+  they describe the whole attempt
+- dataset metadata should remain for dataset-local semantics and per-output
+  details
+- arbitrary JSON metadata and attachments can preserve legacy context while
+  users gradually move stable concepts into parameter snapshots, run fields, or
+  future sample/device records
 
 ### Managed Submitted Run
 
