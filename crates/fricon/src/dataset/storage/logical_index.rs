@@ -5,7 +5,7 @@ use arrow_schema::{DataType, Field, Schema, SchemaRef};
 
 use crate::dataset::{
     schema::DatasetError,
-    semantics::{RECORD_ID_COLUMN, ScanPlan},
+    semantics::{RECORD_ID_COLUMN, ScanAxisMode, ScanPlan},
     storage::{ChunkReader, error::DatasetFsError, layout::ChunkKind},
 };
 
@@ -42,6 +42,7 @@ pub(crate) fn build_logical_index_batch(
     {
         return Err(DatasetError::SchemaMismatch);
     }
+    validate_logical_index_bounds(scan_plan, logical_indices)?;
 
     let record_id_index = storage_batch
         .schema()
@@ -60,6 +61,27 @@ pub(crate) fn build_logical_index_batch(
         logical_index_schema(scan_plan),
         arrays,
     )?)
+}
+
+fn validate_logical_index_bounds(
+    scan_plan: &ScanPlan,
+    logical_indices: &RecordBatch,
+) -> Result<(), DatasetError> {
+    for (axis_ordinal, axis) in scan_plan.axes.iter().enumerate() {
+        let ScanAxisMode::Static { values } = &axis.mode else {
+            continue;
+        };
+        let len = u64::try_from(values.len()).map_err(|_| DatasetError::IncompatibleType)?;
+        let column = logical_indices
+            .column(axis_ordinal)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .ok_or(DatasetError::IncompatibleType)?;
+        if column.values().iter().any(|index| *index >= len) {
+            return Err(DatasetError::InvalidFilter);
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn read_logical_index_batches(

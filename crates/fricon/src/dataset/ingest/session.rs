@@ -380,4 +380,28 @@ mod tests {
             IngestError::Dataset(DatasetError::SchemaMismatch)
         ));
     }
+
+    #[test]
+    fn write_session_rejects_out_of_range_static_logical_index() {
+        let dir = TempDir::new().expect("temp dir");
+        let scan_plan = scan_plan();
+        let mut session = WriteSession::new(
+            &user_schema(),
+            dir.path().to_owned(),
+            Some(scan_plan.clone()),
+            true,
+        );
+
+        let error = session
+            .write(
+                &batch(vec![10.0]),
+                Some(&logical_batch(&scan_plan, vec![2], vec![0])),
+            )
+            .expect_err("out-of-range logical index should fail");
+
+        assert!(matches!(
+            error,
+            IngestError::Dataset(DatasetError::InvalidFilter)
+        ));
+    }
 }
