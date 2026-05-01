@@ -48,6 +48,11 @@ use crate::{
     skip(repo, paths, events, write_sessions, next_input, request),
     fields(dataset.name = %request.name, tags.count = request.tags.len())
 )]
+#[expect(
+    clippy::too_many_lines,
+    reason = "ingest orchestration keeps status, events, manifest, and write session sequencing \
+              together"
+)]
 pub(super) fn create_dataset_with<R, E, F>(
     repo: &R,
     paths: &WorkspacePaths,

@@ -180,6 +180,10 @@ impl Client {
         clippy::unused_async,
         reason = "The async constructor is the intended public API after the refactor"
     )]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "client create API mirrors the dataset create metadata carried over IPC"
+    )]
     pub async fn create_dataset(
         &self,
         name: String,
@@ -625,6 +629,14 @@ fn scan_axis_value_to_proto(value: ScanAxisValue) -> ProtoScanAxisValue {
     ProtoScanAxisValue { value: Some(value) }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "stream construction consumes the full create metadata envelope"
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "async-stream yield points keep create stream sequencing explicit"
+)]
 fn build_request_stream(
     name: String,
     description: String,

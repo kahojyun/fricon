@@ -403,7 +403,7 @@ impl DatasetReader {
         if manifest.realization.index_realization == IndexRealization::Sidecar
             && let Some(path) = &self.dataset_path
         {
-            let points = self.sidecar_logical_index_points(path, manifest, &record_ids)?;
+            let points = Self::sidecar_logical_index_points(path, manifest, &record_ids)?;
             if !points.is_empty() {
                 return Ok(points);
             }
@@ -412,7 +412,6 @@ impl DatasetReader {
     }
 
     fn sidecar_logical_index_points(
-        &self,
         path: &Path,
         manifest: &DatasetSemanticManifest,
         record_ids: &[u64],
