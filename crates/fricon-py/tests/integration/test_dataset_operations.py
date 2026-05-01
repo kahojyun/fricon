@@ -198,13 +198,13 @@ class TestDatasetOperations:
             dm = workspace.dataset_manager
 
             with pytest.raises(ValueError, match="scan must not be empty"):
-                dm.create("empty_scan", scan={})
+                _ = dm.create("empty_scan", scan={})
             with pytest.raises(ValueError, match="static scan axis gate"):
-                dm.create("empty_axis", scan={"gate": []})
+                _ = dm.create("empty_axis", scan={"gate": []})
             with pytest.raises(ValueError, match="mixed static and unknown"):
-                dm.create("mixed_axis", scan={"gate": [0.0], "step": None})
+                _ = dm.create("mixed_axis", scan={"gate": [0.0], "step": None})
             with pytest.raises(ValueError, match="reserved system prefix"):
-                dm.create("reserved_axis", scan={"__ds_step": [0]})
+                _ = dm.create("reserved_axis", scan={"__ds_step": [0]})
 
             server_handle.shutdown()
             assert not server_handle.is_running
