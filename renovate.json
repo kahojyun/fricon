@@ -9,9 +9,7 @@
     ":approveMajorUpdates",
     ":enablePreCommit",
     "helpers:pinGitHubActionDigestsToSemver",
-    "customManagers:githubActionsVersions",
-    "schedule:weekends",
-    ":timezone(Asia/Shanghai)"
+    "customManagers:githubActionsVersions"
   ],
   "packageRules": [
     {
