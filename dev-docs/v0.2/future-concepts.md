@@ -13,8 +13,8 @@ ideas that remain less narrowed than the canonical v0.2 design.
 
 ## Purpose
 
-Fricon has several future product areas that depend on the current
-dataset-first implementation baseline and the proposed v0.2 data-library reset,
+Fricon has several future product areas that depend on the current dataset-first
+baseline and the proposed v0.2 data-library reset,
 but are not ready for implementation design. This ledger keeps their boundaries
 visible so later dataset, run, parameter, workspace/data-library, and UI work
 can avoid decisions that would make those areas harder.

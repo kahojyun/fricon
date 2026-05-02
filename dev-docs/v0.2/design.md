@@ -55,7 +55,7 @@ v0.2 should not optimize for:
 - lab-wide administration
 - full multi-user permission management
 - a generic workflow DAG engine
-- a broad hardware driver framework in the first implementation
+- a broad hardware driver framework in the initial v0.2 implementation
 
 ## User-Visible Concept Budget
 
@@ -162,10 +162,11 @@ Public naming policy:
 Favorites, notes, tags, and lifecycle/status flags should attach to the level
 where users naturally make decisions.
 
-V1 should lead with favorites or pins as the main manual signal. This matches
-how experimentalists often mark important data without maintaining a taxonomy.
-Tags and notes should be easy to add from an optional drawer or detail view, but
-they should not become required ceremony in the measurement happy path.
+v0.2 should lead with favorites or pins as the main manual signal. This
+matches how experimentalists often mark important data without maintaining a
+taxonomy. Tags and notes should be easy to add from an optional drawer or
+detail view, but they should not become required ceremony in the measurement
+happy path.
 
 Quality-like state should mostly come from lifecycle or system-managed facts:
 incomplete, interrupted, calibration/test, invalidated, or superseded. Broad
@@ -195,24 +196,24 @@ data-taking work.
 Use this checklist before writing durable v0.2 storage, API, IPC, or UI
 contracts.
 
-Settled current-PR product decisions:
+Settled v0.2 product decisions:
 
-- V1 replaces simple LabRAD Grapher/Data Vault style logging for new
+- v0.2 replaces simple LabRAD Grapher/Data Vault style logging for new
   measurements. Full legacy import and browsing remain follow-up migration
   work.
 - v0.2 may break the old model freely when compatibility would preserve the
   wrong workspace/dataset-first API, storage, or UI assumptions.
-- The first user-facing slice should stay minimal: Data Library, Measurement,
+- The v0.2 user-facing slice should stay minimal: Data Library, Measurement,
   Dataset, and optional Sample/Sample Session. Parameter, analysis,
   calibration, actor, and provenance concepts may be recorded or reserved, but
   should not become peer navigation concepts before the measurement loop is
   ergonomic.
-- V1 should not add first-class Project or Campaign as required grouping
+- v0.2 should not add first-class Project or Campaign as required grouping
   objects. Organize work through samples, sessions, measurements, favorites,
   search, saved views, and optional tags.
 - Favorites or pins are the primary manual signal for important measurements.
   Tags and notes should be available but secondary.
-- V1 quality/status should emphasize system lifecycle flags such as
+- v0.2 status should emphasize system lifecycle flags such as
   incomplete, interrupted, calibration/test, invalidated, and superseded.
   Avoid making broad manual good/suspect/failed classification part of the
   happy path.
@@ -220,7 +221,7 @@ Settled current-PR product decisions:
   remain a lower-level option; arbitrary library-subset export is later scope.
 - Analysis provenance should be reserved in the model, but Analysis should not
   be a peer navigation concept in the first measurement-facing UI.
-- Managed/declarative measurement remains a future path. V1 UX should stay
+- Managed/declarative measurement remains a future path. v0.2 UX should stay
   ordinary Python measurement code.
 - Shared lab computers should use a lightweight actor label or token for
   mutating actions. Do not add accounts, teams, roles, or permissions UI.
@@ -267,7 +268,7 @@ Keep future-only until a narrower design proves the need:
 
 - full multi-user administration, roles, and permission matrices
 - hosted SaaS or distributed database operation
-- full legacy LabRAD/Data Vault import as a V1 requirement
+- full legacy LabRAD/Data Vault import or browsing
 - broad hardware driver framework
 - generic workflow DAG engine
 - automatic notebook state capture
@@ -634,7 +635,7 @@ Do not build the full driver framework first. Reserve a minimal boundary now:
 - Readback: what hardware reported after apply
 - ResourceLease: minimal guard for devices that cannot be used concurrently
 
-The first implementation can record only summaries, placeholders, or a very
+The initial v0.2 implementation can record only summaries, placeholders, or a very
 thin adapter contract. The important decisions are:
 
 - device state belongs to managed execution provenance, not dataset metadata
@@ -738,7 +739,7 @@ Likely reusable areas:
 
 ## First Engineering Slice
 
-The first slice should prove the new model end to end:
+The initial v0.2 engineering slice should prove the new model end to end:
 
 1. Create or open one data library.
 2. Create or select a sample/session when known, or explicitly run without one.

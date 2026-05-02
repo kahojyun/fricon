@@ -35,7 +35,7 @@ The redesign should establish the durable model before implementation hardens:
 
 - what a dataset is
 - what a run-like producer or consumer record is
-- what users see in V1
+- what users see in v0.2
 - what remains internal provenance or debug detail
 - which breaking dataset changes are acceptable now
 - how future automatic calibration can build on measured data, analysis
@@ -43,7 +43,7 @@ The redesign should establish the durable model before implementation hardens:
 
 ## Primary User Mental Model
 
-V1 should optimize for this simple mental model:
+v0.2 should optimize for this simple mental model:
 
 ```text
 I ran a measurement.
@@ -76,7 +76,7 @@ be explicitly finished or aborted earlier when a multi-output measurement needs
 per-output control.
 
 Nested dataset context managers may remain available for advanced explicit
-lifecycle control, but public V1 examples should prefer the flatter
+lifecycle control, but public v0.2 examples should prefer the flatter
 measurement-scoped writer form when it is sufficient.
 
 Quick measurements without sample context and the lower-level dataset-only path
@@ -99,7 +99,7 @@ silently create measurement records.
 
 ## User-Visible Concepts
 
-Keep the V1 user model small:
+Keep the v0.2 user model small:
 
 - `Data Library`
 - optional active `Sample` and `Sample Session`
@@ -138,7 +138,7 @@ Default rule:
 Put notes, tags, and quality on the highest meaningful work record.
 ```
 
-For V1 this usually means the measurement record:
+For v0.2 this usually means the measurement record:
 
 - measurement-level labels, notes, tags, pin or favorite state, and quality live
   on `Measurement`
@@ -253,7 +253,7 @@ Charts, heatmaps, live views, and grid readers should consume resolved
 interpretation, not infer meaning from row adjacency or field order.
 
 Duplicate logical positions should be resolved in one projection layer. The
-default v1 policy can remain `latest_by_record_id`.
+initial v0.2 policy can remain `latest_by_record_id`.
 
 ## Run-Like Records And Provenance
 
@@ -281,7 +281,7 @@ CalibrationRun or WorkflowRun
 ```
 
 Implementation can share provenance edge tables such as `RunInput` and
-`RunOutput`, but those should not become primary V1 user concepts.
+`RunOutput`, but those should not become primary v0.2 user concepts.
 
 `Artifact` should be the general provenance concept. `Dataset` is the primary
 artifact subtype needed for the first LabRAD-style replacement slice. Future
@@ -330,9 +330,9 @@ long-term ambiguity:
 Do not use breaking-change freedom to make simple measurement scripts heavy.
 The low-friction write path must survive.
 
-## V1 Scope
+## v0.2 Scope
 
-V1 should expose:
+v0.2 should expose:
 
 - local data library
 - data library UUID and user-editable display name for source provenance
@@ -352,7 +352,7 @@ V1 should expose:
 - interrupted-data recovery with explicit continuation, validation, or
   invalidation
 
-V1 should not require:
+v0.2 should not require:
 
 - full legacy LabRAD/Data Vault import
 - generic workflow DAG execution
@@ -382,7 +382,7 @@ Suggested staged path:
    - Link produced datasets through provenance, not ownership.
    - Keep dataset-only creation as unassigned.
 
-4. Desktop V1 replacement flow
+4. Desktop v0.2 replacement flow
    - Run-first measurement browsing.
    - Dataset table/chart/detail views.
    - Run notes/tags/quality and output-specific dataset exceptions.
@@ -402,7 +402,7 @@ Suggested staged path:
 - Which dataset `kind` values are required in the first schema?
 - Should unassigned datasets be first-class in the desktop UI or mostly visible
   through dataset search and debugging views?
-- How much provenance should dataset archives include in V1?
+- How much provenance should dataset archives include in v0.2?
 - What should the first portable measurement export bundle format include beyond
   source data library identity, measurement metadata, dataset artifacts, selected
   non-table artifacts, provenance summaries, and checksums?

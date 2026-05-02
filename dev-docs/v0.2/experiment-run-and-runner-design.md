@@ -49,7 +49,7 @@ ADR need: create an ADR before implementation commits to durable identifiers,
 storage shape, retry/resume semantics, dataset append provenance, runner
 contracts, or resource lease behavior.
 
-The record-centric first slice depends on:
+The record-centric v0.2 slice depends on:
 
 - durable dataset semantics and append-order identity
 - a policy for immutable facts versus correction or audit events
@@ -63,11 +63,11 @@ Future runner implementation also depends on:
 - a local execution service that can coordinate data-library state and script
   processes
 
-## Settled PO Decisions For V1
+## Settled PO Decisions For v0.2
 
 The first experiment-run product slice should be record-centric.
 
-V1 should promise:
+v0.2 should promise:
 
 - record a scientific experiment attempt
 - optionally link an immutable effective parameter snapshot when available
@@ -79,18 +79,18 @@ V1 should promise:
 - expose notes, quality state, and retry or continuation history
 - keep script execution details available as debugging context
 
-V1 should not promise a full generic runner implementation. The queue, script
+v0.2 should not promise a full generic runner implementation. The queue, script
 run, resource requirement, and resource lease model should be documented now so
 the experiment model does not block future execution work, but implementation
 can start with run records and dataset provenance.
 
-V1 should also be sufficient to replace a simple LabRAD Grapher/Data Vault style
-experiment logger for new measurement work. This means users can record new
-experiments into Fricon, inspect the resulting datasets in the desktop UI, keep
-run-level context beside the data, and reopen outputs from Python without
+v0.2 should also be sufficient to replace a simple LabRAD Grapher/Data Vault
+style measurement logger for new measurement work. This means users can record
+new measurements into Fricon, inspect the resulting datasets in the desktop UI,
+keep run-level context beside the data, and reopen outputs from Python without
 continuing to depend on the old logger.
 
-V1 LabRAD-style replacement does not include bulk migration or full browsing of
+v0.2 LabRAD-style replacement does not include bulk migration or full browsing of
 legacy LabRAD/Data Vault history. Importing old history can be a follow-up
 migration feature once the new run, dataset, and metadata boundaries are stable.
 
@@ -107,8 +107,8 @@ Settled user-facing policies:
   and compatibility checks
 - runner details are secondary UI information under execution history or
   troubleshooting
-- analysis scripts are future derived-dataset provenance, not core
-  `ExperimentRun` v1 behavior
+- analysis scripts are future derived-dataset provenance, not core v0.2
+  behavior
 - dataset-only creation remains valid and should create unassigned datasets
   unless the caller explicitly supplies an experiment context
 - sample/session context is encouraged but optional; users can set active
@@ -142,7 +142,7 @@ Settled user-facing policies:
   `Managed`, not as a numeric confidence score
 - generated snippets should prioritize reopening produced datasets from Python
 
-The next product discussion should be dataset semantics v1, especially the
+The next product discussion should be the dataset semantics baseline, especially the
 dataset facts needed to make retry append safe and explainable.
 
 ## Product Goals
@@ -224,7 +224,7 @@ should execute tasks that are already eligible to run.
 Resource keys and execution records should be able to reference future device
 identity, instrument snapshots, workflow steps, calibration steps, and audit
 events. They should not require a broad hardware driver framework or workflow
-engine in the first implementation.
+engine in the initial v0.2 implementation.
 
 ## Non-Goals
 
@@ -343,7 +343,7 @@ producer record.
 
 ## Relationships
 
-The record-centric v1 subset is:
+The record-centric v0.2 subset is:
 
 ```text
 ExperimentRun 1 -> many produced Dataset links
@@ -415,7 +415,7 @@ Notes:
 
 ### Lifecycle
 
-The user-facing v1 outcome and quality vocabulary should stay small:
+The user-facing v0.2 outcome and lifecycle vocabulary should stay small:
 
 ```text
 completed
@@ -466,7 +466,7 @@ ExperimentRun -> ParameterBinding -> ParameterSnapshot
 
 That future shape can support measurement parameters, analysis parameters,
 device configuration snapshots, and multi-stage workflows without complicating
-the v1 user model.
+the v0.2 user model.
 
 ## TaskQueueEntry
 
@@ -551,7 +551,7 @@ lost
 calibration records, but the runner should not need to interpret those links to
 execute a script.
 
-Passive execution summary for the record-centric v1 slice may include:
+Passive execution summary for the record-centric v0.2 slice may include:
 
 - script path or display name
 - arguments when known and safe to record
@@ -629,7 +629,7 @@ rather than hard-coded device concepts.
 
 This section belongs to the future runner implementation. It should shape the
 model now, but resource leases do not need to ship with record-centric
-`ExperimentRun` v1.
+measurement records in v0.2.
 
 Candidate resource requirement fields:
 
@@ -716,7 +716,7 @@ resource availability.
 
 ## Provenance And Audit Boundary
 
-The first implementation does not need a full data-library event timeline, but
+The initial v0.2 implementation does not need a full data-library event timeline, but
 the model should preserve room for it.
 
 Actions that likely need durable audit or event records:
@@ -922,7 +922,7 @@ with lib.measurement("cooldown sweep", params="main") as meas:
         s21.write(freq=..., s21=...)
 ```
 
-Public V1 examples should prefer the flatter measurement-scoped writer form when
+Public v0.2 examples should prefer the flatter measurement-scoped writer form when
 it is sufficient.
 
 Possible managed template shape:
@@ -962,7 +962,7 @@ must understand to browse experiment results.
 
 Runner concepts such as script runs should be shown as execution history or
 troubleshooting detail, not as a peer navigation object beside experiments and
-datasets in v1.
+datasets in v0.2.
 
 ## Quality Of Life Defaults
 
@@ -1076,7 +1076,7 @@ that migration can start with low risk.
 
 Acceptance notes:
 
-- V1 migration means new work can move to Fricon without depending on the old
+- v0.2 migration means new work can move to Fricon without depending on the old
   logger
 - run metadata can store legacy JSON context
 - attachments can preserve external configuration files, screenshots, or logs
@@ -1144,14 +1144,14 @@ Acceptance notes:
 - future runner implementation can create task and script-run records
 - produced datasets are linked through dataset write sessions
 
-## Settled V1 Boundary: Dataset Vs Experiment Metadata
+## Settled v0.2 Boundary: Dataset Vs Experiment Metadata
 
-This proposal settles the default V1 ownership boundary for new interactive
+This proposal settles the default v0.2 ownership boundary for new interactive
 experiment workflows. Experiment-level organization should live on the run, not
 be duplicated onto every produced dataset. Dataset metadata remains available
 for output-specific meaning and exceptions.
 
-V1 ownership direction:
+v0.2 ownership direction:
 
 ```text
 ExperimentRun metadata
@@ -1242,7 +1242,7 @@ Questions to settle later:
 
 ## Next Product Work
 
-The next product discussion should focus on dataset semantics v1 because
+The next product discussion should focus on the dataset semantics baseline because
 experiment retry and dataset continuation depend on stable dataset facts.
 
 Questions to settle there:

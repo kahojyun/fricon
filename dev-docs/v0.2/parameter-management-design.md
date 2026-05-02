@@ -1012,7 +1012,7 @@ compatibility checks when following mutable refs.
 
 This proposal does not choose a storage implementation.
 
-A first implementation should optimize for correctness, history, diff,
+A first parameter implementation should optimize for correctness, history, diff,
 validation, and human review rather than high write throughput. SQLite-backed
 metadata and value tables may be sufficient for early parameter snapshots.
 

@@ -43,6 +43,29 @@ It produced datasets.
 Fricon helps me inspect, annotate, recover, analyze, and calibrate from them.
 ```
 
+## v0.x Milestone Language
+
+Use v0.x milestone names in v0.2 planning docs. Avoid separate pre-1.0 release
+aliases that make the roadmap look like it has a second versioning scheme.
+
+- v0.2: first usable LabRAD Grapher/Data Vault replacement slice for new
+  measurements. It should record measurement metadata and produced datasets,
+  keep datasets directly inspectable and reopenable, support optional
+  sample/session context, preserve partial/interrupted data, and keep the user
+  model minimal.
+- v0.3: candidate product-assistance slice after the v0.2 measurement loop is
+  usable. Likely areas include richer sample fields and 2D sample maps,
+  comparison views, saved views, portable export viewer polish, attach/correct
+  context UX, and better passive code/environment summaries.
+- v0.4: candidate automation-foundation slice after measurement history is
+  trustworthy. Likely areas include parameter snapshots and proposals, analysis
+  provenance UI, calibration workflow history, managed measurement plans, and
+  early device-adapter boundaries.
+
+The exact v0.3/v0.4 contents should be decided after v0.2 proves the core
+measurement flow. Treat them as sequencing hints, not current implementation
+commitments.
+
 ## Reading Order
 
 Start here for v0.2 planning:
@@ -96,7 +119,7 @@ Prefer rewriting or replacing current domain boundaries when the existing shape
 would preserve the wrong user model. Preserve reusable infrastructure where it
 does not lock the product into workspace/dataset-first assumptions.
 
-Current PR decision: prefer a clean v0.2 model over compatibility with old
+Settled v0.2 decision: prefer a clean model over compatibility with old
 workspace/dataset-first APIs and storage assumptions. Keep useful
 infrastructure, but do not preserve compatibility just to avoid breaking
 pre-adoption local test workspaces.
@@ -151,7 +174,7 @@ Non-goals:
 - account/team administration
 - distributed database semantics
 - broad device-driver framework
-- generic workflow DAG engine in the first implementation
+- generic workflow DAG engine in the initial v0.2 implementation
 - automatic notebook state capture
 - mandatory parameter schema design before exploratory measurement
 

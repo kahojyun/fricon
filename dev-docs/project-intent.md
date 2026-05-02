@@ -56,14 +56,15 @@ scientific measurement datasets. Dataset semantics should be explicit enough
 that later measurement, parameter, and device concepts do not have to be hidden
 inside dataset names, incidental metadata, or chart heuristics.
 
-The first adoption milestone is replacing a simple LabRAD Grapher/Data Vault
-style measurement logger for new measurement work. V1 should let users record
-new measurements from Python, inspect datasets in the desktop UI, keep run-level
-context beside produced data, and reopen outputs from Python without depending
-on the old logger. Importing or fully browsing legacy LabRAD/Data Vault history
-is a follow-up migration concern, not a V1 requirement.
+The first adoption milestone is the v0.2 replacement slice: replacing a simple
+LabRAD Grapher/Data Vault style measurement logger for new measurement work.
+v0.2 should let users record new measurements from Python, inspect datasets in
+the desktop UI, keep run-level context beside produced data, and reopen outputs
+from Python without depending on the old logger. Importing or fully browsing
+legacy LabRAD/Data Vault history is a follow-up migration concern, not a v0.2
+requirement.
 
-The primary V1 user mental model is:
+The primary v0.2 user mental model is:
 
 ```text
 I ran a measurement.

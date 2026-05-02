@@ -26,10 +26,11 @@ It should help experimentalists:
 Fricon should not make users operate a complex LIMS, hosted service, or
 multi-user lab administration system before they can collect data.
 
-Current V1 replacement target: new measurement work only. Users should be able
-to stop using a simple LabRAD Grapher/Data Vault style logger for new
-measurements. Importing or fully browsing legacy LabRAD/Data Vault history is a
-later migration workflow, not a V1 requirement.
+Current v0.2 replacement target: record measurement metadata and produced
+datasets for new measurement work. Users should be able to stop using a simple
+LabRAD Grapher/Data Vault style logger for new measurements. Importing or fully
+browsing legacy LabRAD/Data Vault history is a later migration workflow, not a
+v0.2 requirement.
 
 ## Main User Pain
 
@@ -113,7 +114,7 @@ Samples, sessions, measurements, favorites, search, saved views, and optional
 tags should organize the library without encouraging users to split data and
 copied code into many long-lived roots.
 
-Do not make `Project` or `Campaign` a first-class required V1 grouping. If
+Do not make `Project` or `Campaign` a first-class required v0.2 grouping. If
 those ideas prove useful, introduce them later as lightweight grouping or saved
 view concepts rather than as a required hierarchy.
 
@@ -225,8 +226,8 @@ Do not make v0.2 a full Git client or environment manager.
 
 Sample visualization should be treated as a first-class product need.
 
-V1 should design the sample model so custom fields and 2D visualization fit
-cleanly, even if the first implementation ships after the minimal measurement
+v0.2 should design the sample model so custom fields and 2D visualization fit
+cleanly, even if the initial implementation ships after the minimal measurement
 loop.
 
 User story:
@@ -315,16 +316,27 @@ Acceptance notes:
 - importing the bundle into another data library is optional, not required for
   analysis
 
-### Track Parameter Evolution
-
-As an experimentalist, I want parameter snapshots, diffs, and proposals so that
-large parameter sets do not drift through untracked JSON edits.
-
 ### Avoid Code Directory Copies
 
 As an experimentalist, I want Fricon to record code and environment summaries
 for runs so that I do not copy measurement code directories just to preserve
 history.
+
+Acceptance notes:
+
+- v0.2 starts with passive summaries such as script path, Git/hash state,
+  Python/Fricon versions, and environment hints when available
+- managed code history and environment snapshots remain v0.3+ candidates
+
+## v0.3/v0.4 Candidate User Stories
+
+These stories are important for the long-term product, but they are not v0.2
+replacement requirements. v0.2 should avoid blocking them in the data model.
+
+### Track Parameter Evolution
+
+As an experimentalist, I want parameter snapshots, diffs, and proposals so that
+large parameter sets do not drift through untracked JSON edits.
 
 ### Visualize Sample Parameters
 
@@ -337,7 +349,11 @@ As an experimentalist, I want scheduled or repeated calibration to produce
 analysis results and parameter proposals so that tedious updates are automated
 without silently mutating important parameter profiles.
 
-## Additional V1 User Stories To Design For
+## v0.2 Design-Covered Edge Stories
+
+These stories do not all need full UI workflows in v0.2. The v0.2 data model
+should still avoid blocking them, because they are natural follow-ups for
+v0.3/v0.4 once the basic measurement loop is usable.
 
 ### Attach Or Correct Context Later
 
@@ -453,7 +469,7 @@ able to record interactive runs and datasets, but advanced retry, resume,
 dry-run, and automatic calibration behavior may require the managed
 declarative API.
 
-## Later User Stories
+## Other v0.3+ Candidate User Stories
 
 - Remote monitoring from another machine.
 - Managed submitted measurements with queue and resource leases.

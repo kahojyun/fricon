@@ -55,7 +55,7 @@ behind the v0.2 reset:
 
 - `v0.2/measurement-system-foundation-redesign.md` defines the proposed breaking
   redesign direction for dataset artifacts, run-like producer/consumer
-  provenance, the V1 measurement-first mental model, and future calibration
+  provenance, the v0.2 measurement-first mental model, and future calibration
   foundations. Treat historical `ExperimentRun` wording there as supporting
   proposal terminology unless reconciled by ADR. Treat it as proposed design
   guidance, not current implementation fact.
@@ -125,10 +125,10 @@ user review and durable audit records.
 - AI-assisted automation with explicit review and auditability
 - Later device identity and configuration foundations
 
-## V1 Replacement Target
+## v0.2 Replacement Target
 
-The first version should be able to replace a simple LabRAD Grapher/Data Vault
-style measurement logger for new measurement work.
+v0.2 should be able to replace a simple LabRAD Grapher/Data Vault style
+measurement logger for new measurement work.
 
 Replacement means a researcher can stop using the old simple logger for new
 measurements and use Fricon instead to:
@@ -153,7 +153,7 @@ measurements and use Fricon instead to:
 - preserve interrupted partial data and make continuation, validation, or
   invalidation explicit
 
-V1 replacement does not require:
+v0.2 replacement does not require:
 
 - importing or fully browsing legacy LabRAD/Data Vault history
 - multi-user LabRAD server semantics or hosted collaboration
@@ -164,7 +164,7 @@ V1 replacement does not require:
 
 ## Primary User Mental Model
 
-V1 should optimize the user-facing product around interactive measurement
+v0.2 should optimize the user-facing product around interactive measurement
 records:
 
 ```text
@@ -182,9 +182,34 @@ Do not model datasets as owned exclusively by measurements. A dataset may be:
 - consumed by later analysis or calibration work
 - temporarily unassigned when created through lower-level dataset-only APIs
 
-This keeps the V1 LabRAD-style workflow simple while leaving room for a later
+This keeps the v0.2 LabRAD-style workflow simple while leaving room for later
 provenance graph where activity records consume and produce datasets, artifacts,
 analysis results, and parameter proposals.
+
+## v0.3/v0.4 Candidate Direction
+
+After v0.2 proves the core measurement loop, v0.3 and v0.4 should add product
+help in small slices rather than reopening the foundation each time.
+
+Likely v0.3 candidates:
+
+- richer sample fields and 2D sample maps
+- attach/correct context UX polish
+- comparison and saved-view workflows
+- portable export viewer polish
+- passive code/environment summary improvements
+- better lifecycle/favorite filtering
+
+Likely v0.4 candidates:
+
+- parameter snapshot/proposal UI
+- analysis provenance UI
+- calibration workflow history
+- managed measurement plans for repeated scans
+- early device adapter and readback boundaries
+
+These are candidate directions, not release commitments. Convert them into
+focused issues or ADRs after the v0.2 replacement slice is usable.
 
 ## Now
 
