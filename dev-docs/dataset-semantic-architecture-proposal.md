@@ -13,6 +13,11 @@ This is not current behavior. Do not implement or document behavior from this
 proposal without checking current code, `dev-docs/current-storage-notes.md`, and
 the relevant checklist in `dev-docs/maintenance-checklist.md`.
 
+Before implementing this proposal, read
+`dev-docs/measurement-system-foundation-redesign.md`. That broader redesign
+note may revise the dataset artifact, run provenance, and breaking-change
+direction that this dataset-specific proposal assumes.
+
 This note revises the earlier append-only dataset idea for the actual Fricon
 codebase and assumes the product is still pre-adoption, so breaking internal
 changes are acceptable when they produce a cleaner long-term architecture.

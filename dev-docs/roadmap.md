@@ -31,14 +31,21 @@ This roadmap includes future product direction and should not be used as proof
 that experiment, parameter, workflow, device, provenance, AI automation, or
 semantic-manifest behavior has already landed.
 
-The existing dataset semantics proposal is the bridge between current dataset
-behavior and the next product phase:
+The pre-adoption measurement-system redesign note is the broad foundation
+proposal for the next product phase:
 
-- `dataset-semantic-architecture-proposal.md` defines the proposed direction:
-  explicit dataset semantics, durable manifests, resolved interpretation, and a
-  shaped feature sequence that keeps the foundation separate from later scan
-  and chart migration work. Treat it as proposed design guidance, not current
+- `measurement-system-foundation-redesign.md` defines the proposed breaking
+  redesign direction for dataset artifacts, run-like producer/consumer
+  provenance, the V1 experiment-first mental model, and future calibration
+  foundations. Treat it as proposed design guidance, not current
   implementation fact.
+- `dataset-semantic-architecture-proposal.md` defines the detailed dataset
+  semantic direction: explicit dataset semantics, durable manifests, resolved
+  interpretation, and a shaped feature sequence that keeps the foundation
+  separate from later scan and chart migration work. Treat it as proposed
+  design guidance, not current implementation fact, and reconcile it with the
+  broader redesign before implementation.
+
 - `parameter-management-design.md` defines proposed long-term parameter
   registry direction after dataset semantics and minimal run records exist.
   Treat it as future design guidance, not current implementation fact.

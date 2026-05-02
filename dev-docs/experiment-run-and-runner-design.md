@@ -860,16 +860,40 @@ Possible interactive shape:
 
 ```python
 with ws.experiment_run("cooldown sweep", params="main") as run:
-    with run.dataset("s21") as ds:
-        ds.write(freq=..., s21=...)
+    s21 = run.dataset("s21")
+    noise = run.dataset("noise")
+
+    for freq in freqs:
+        s21.write(freq=freq, s21=measure_s21(freq))
+        noise.write(freq=freq, noise=measure_noise(freq))
 ```
+
+The experiment context should own default dataset writer finalization for
+datasets opened through the run. On normal run exit, open produced datasets are
+finished. On exceptional run exit, open produced datasets are aborted or marked
+suspect according to the settled lifecycle policy. A dataset writer may still
+offer explicit `finish()` or `abort()` for multi-output runs where one output
+ends earlier or fails independently.
+
+Nested dataset context managers may remain available for advanced explicit
+lifecycle control:
+
+```python
+with ws.experiment_run("cooldown sweep", params="main") as run:
+    with run.dataset("s21") as s21:
+        s21.write(freq=..., s21=...)
+```
+
+Public V1 examples should prefer the flatter experiment-scoped writer form when
+it is sufficient.
 
 Possible managed template shape:
 
 ```python
 def cooldown_sweep(ctx, params):
-    with ctx.dataset("s21") as ds:
-        ds.write(freq=..., s21=...)
+    s21 = ctx.dataset("s21")
+    for freq in freqs:
+        s21.write(freq=freq, s21=measure_s21(freq))
 ```
 
 Managed execution can be introduced separately:
@@ -1131,8 +1155,8 @@ be experiment-first:
 
 ```python
 with ws.experiment("cooldown sweep") as exp:
-    with exp.dataset("s21") as ds:
-        ds.write(...)
+    s21 = exp.dataset("s21")
+    s21.write(...)
 ```
 
 This proposal does not require removing dataset-only creation. Dataset-only
@@ -1212,7 +1236,7 @@ Before implementation, discuss:
 - how to validate that managed templates record important experiment context in
   run or parameter records rather than dataset-local metadata
 - how an experiment context manager should coordinate dataset writer ownership,
-  lifetime, and error handling
+  default finalization, early per-output finish or abort, and error handling
 - how top-level dataset writer APIs represent unassigned datasets and optional
   explicit run ownership
 

@@ -33,6 +33,7 @@ every canonical document.
 | Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Public docs unless behavior is user-visible                            |
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
 | Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
+| Measurement-system foundation redesign      | `measurement-system-foundation-redesign.md` | `project-intent.md`, `roadmap.md`, `dataset-semantic-architecture-proposal.md`, `experiment-run-and-runner-design.md`, `adr/README.md` | Treating redesign proposal content as current behavior                 |
 | Parameter management product planning       | `parameter-management-design.md`         | `project-intent.md`, `roadmap.md`, `adr/README.md`                                                | Treating proposal content as current behavior                          |
 | Future concept capture                      | `future-concepts.md`                     | `project-intent.md`, `roadmap.md`                                                                 | Creating implementation issues before the concept is narrowed          |
 | Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
@@ -83,6 +84,9 @@ checklist, policy, or guideline.
 This file describes proposed future direction. Do not treat it as current
 implementation fact unless the implementation has already landed.
 
+- `measurement-system-foundation-redesign.md` - proposed pre-adoption breaking
+  redesign direction for dataset artifacts, run-like provenance, V1 mental
+  model, and future calibration foundations
 - `dataset-semantic-architecture-proposal.md`
 - `experiment-run-and-runner-design.md` - proposed experiment run, generic
   runner, retry/resume, resource lease, and dataset write provenance model
