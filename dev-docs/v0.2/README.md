@@ -138,6 +138,8 @@ to rewrite every line of code. v0.2 may intentionally break:
 - distribution and client/server compatibility assumptions that make the
   Fricon Desktop, CLI, Python SDK, or local service drift without an explicit
   compatibility envelope
+- protocol assumptions that keep Python SDK on a separate gRPC public contract
+  while Fricon Desktop moves to HTTP/WebSocket service APIs
 - installation/update assumptions that require a separate server install,
   update an active service, or silently migrate a data library on launch
 - GUI/runtime assumptions that make Fricon Desktop own the data backend or make
@@ -165,7 +167,8 @@ Good candidates to redesign:
 - dataset catalog schema and metadata ownership
 - Python dataset creation API
 - desktop dataset-first navigation
-- IPC/protobuf contracts
+- IPC/protobuf contracts and public gRPC assumptions
+- HTTP/WebSocket service API, event stream, and binary dataset payload contract
 - service sidecar packaging, startup, and update lifecycle
 - archive/import/export format
 - run, sample, parameter, code, and provenance boundaries

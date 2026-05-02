@@ -305,6 +305,12 @@ Acceptance notes:
 - newer capabilities are feature-negotiated rather than required by old scripts
 - clients and the service negotiate protocol, API capability, and data-library
   format compatibility before writes
+- Fricon Desktop, CLI, and Python SDK should use one public service API
+  contract; do not keep Python on a separate gRPC public protocol while the UI
+  moves to HTTP/WebSocket
+- dataset writes should use explicit write sessions and binary Arrow-compatible
+  payload chunks rather than row-by-row JSON or gRPC message-size-driven
+  client complexity
 - incompatible clients fail with a clear message and recovery path rather than
   partially writing data
 - data-library format upgrades require explicit confirmation, no active

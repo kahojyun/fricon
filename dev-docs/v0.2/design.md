@@ -731,6 +731,14 @@ be pinned by virtual environments or lockfiles, v0.2 should make the core v0.x
 Python SDK measurement-write and dataset-read path compatible with later v0.x
 local services. Newer features should use explicit capability negotiation.
 
+The preferred v0.2 public client protocol is HTTP/WebSocket plus explicit
+binary dataset payload endpoints, not the current gRPC transport. Fricon
+Desktop, CLI, and Python SDK should share one service API contract. The current
+gRPC implementation uses mostly unary calls plus a client-streaming dataset
+create path, and dataset writes already require manual Arrow IPC chunking, so
+preserving gRPC as a separate public Python SDK protocol would add compatibility
+surface without solving the main dataset-transfer problem.
+
 ## Future Remote And Auth Boundary
 
 Remote access should be planned early, but v0.2 should not ship remote mode or

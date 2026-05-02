@@ -26,7 +26,7 @@ Classify the boundary before deciding which checklist applies:
 | Dataset payload files, chunking, durable dataset-side metadata, or dataset payload schema rules                    | Dataset payload layout changes        |
 | Dataset archive metadata, archive entry allowlist, import/export semantics, or archive version                     | Dataset archive import/export changes |
 | SQLite tables, Diesel migrations, generated Diesel schema, or database row models                                  | Database schema changes               |
-| `crates/fricon/proto/**`, `crates/fricon/src/transport/**`, IPC/gRPC request or response semantics                 | Rust IPC / gRPC contract changes      |
+| HTTP routes, event streams, binary payload endpoints, protocol files, transport modules, or IPC/gRPC semantics     | Service API / transport changes       |
 | Tauri command/event DTOs, Specta exports, generated frontend bindings, or frontend-only adapter DTOs               | Tauri / frontend binding changes      |
 
 ## Workspace Format Changes
@@ -116,16 +116,24 @@ For database fields exposed through Python, use
 - Run targeted Rust tests for the affected database slice when present.
 - Rebuild Python bindings before Python tests if exported behavior changed.
 
-## Rust IPC / gRPC Contract Changes
+## Service API / Transport Contract Changes
 
-Use this when changing protobuf files, transport request or response shapes,
-client/server IPC behavior, or protocol compatibility semantics.
+Use this when changing HTTP routes, event streams, binary payload endpoints,
+protobuf files, transport request or response shapes, client/server IPC
+behavior, or protocol compatibility semantics.
+
+The current implementation includes Rust IPC/gRPC transport. The v0.2 direction
+is to converge public Fricon clients on a browser-capable HTTP/WebSocket service
+API with explicit binary dataset payload endpoints. Keep this checklist focused
+on the public service contract even when the implementation still has gRPC
+pieces during migration.
 
 - Update the relevant files under `crates/fricon/proto/**` or
-  `crates/fricon/src/transport/**`.
-- Update explicit IPC protocol compatibility logic in both client and server
-  where applicable.
-- Decide whether `IPC_PROTOCOL_VERSION` must change.
+  `crates/fricon/src/transport/**`, or the future HTTP/service API modules.
+- Update explicit service API/protocol compatibility logic in both client and
+  server where applicable.
+- Decide whether `IPC_PROTOCOL_VERSION`, service API version, or capability
+  declarations must change.
 - Regenerate affected bindings.
 - Update Rust, Python, or frontend callers affected by the contract change.
 - Update maintainer-facing docs when the protocol workflow or compatibility
@@ -134,19 +142,25 @@ client/server IPC behavior, or protocol compatibility semantics.
 
 Decision guide:
 
-| Change                                                                                  | `IPC_PROTOCOL_VERSION` decision                                     |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Add a backward-compatible optional response field and all current clients can ignore it | Usually no bump; add tests for old/default handling where practical |
-| Add a required request field or require clients to send new data                        | Bump                                                                |
-| Remove, rename, renumber, or change the meaning/type of a protobuf field                | Bump                                                                |
-| Change protocol handshake, stream sequencing, status semantics, or error meaning        | Bump                                                                |
-| Internal Rust struct refactor with no wire/protobuf/semantic contract change            | No bump                                                             |
-| Tauri/Specta-only command shape change not used by Rust IPC/gRPC                        | No IPC protocol bump; follow the Tauri/frontend binding checklist   |
+| Change                                                                                      | Version/capability decision                                        |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Add a backward-compatible optional response field and all current clients can ignore it     | Usually no bump; add tests for old/default handling where practical |
+| Add a new optional capability behind negotiation                                             | Add capability; usually no required-version bump                    |
+| Add a required request field or require clients to send new data                            | Bump or require a new capability                                    |
+| Remove, rename, renumber, or change the meaning/type of a public field                      | Bump                                                               |
+| Change protocol handshake, stream sequencing, status semantics, or error meaning            | Bump                                                               |
+| Change dataset binary payload framing, Arrow IPC expectations, or write-session sequencing  | Bump or require a new capability                                    |
+| Internal Rust struct refactor with no wire/protobuf/HTTP/semantic contract change           | No bump                                                            |
+| Tauri/Specta-only command shape change not used by the public service API                   | No service API bump; follow the Tauri/frontend binding checklist    |
 
 Examples:
 
 - Add an optional protobuf response field that existing clients can ignore:
   usually no bump.
+- Add a new HTTP endpoint that old clients never call: usually add a capability
+  or document as a new optional feature.
+- Change Arrow chunk framing or write-session finish/abort behavior: bump or
+  require a new capability.
 - Rename a response field or change an error/status meaning: bump.
 
 Generated protobuf Rust code is produced by `crates/fricon/build.rs` during

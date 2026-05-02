@@ -192,12 +192,57 @@ updates within v0.x.
 The local service protocol is a technical contract, but the compatibility
 experience is product-visible.
 
+v0.2 should converge public Fricon clients on one browser-capable service
+contract:
+
+```text
+Fricon Desktop frontend
+  -> HTTP control/metadata API
+  -> WebSocket or SSE live events
+  -> binary dataset payload endpoints
+
+Python SDK
+  -> same HTTP control/metadata API
+  -> same binary dataset write/read endpoints
+  -> optional WebSocket or SSE subscriptions
+
+CLI
+  -> same service API
+```
+
+The current gRPC transport is implementation background, not the preferred
+durable v0.2 public protocol. Fricon currently uses mostly unary gRPC calls plus
+one client-streaming dataset create path. Dataset writes already require manual
+Arrow IPC payload chunking to avoid large per-message payloads, so gRPC is not
+removing the main transfer complexity. Keeping Python on gRPC while moving the
+GUI to HTTP/WebSocket would create two public protocol stacks and a harder
+compatibility matrix.
+
+Prefer a service contract shaped around:
+
+- JSON HTTP for metadata, control, compatibility negotiation, update status,
+  and ordinary mutations
+- WebSocket or Server-Sent Events for live measurement, dataset, and service
+  status events
+- explicit dataset write sessions with create, append, finish, and abort
+  operations
+- binary Arrow IPC or Arrow-compatible chunk payloads for dataset reads and
+  writes
+- server-side paging, summaries, and downsampling for UI reads instead of
+  row-by-row JSON transfer
+
+gRPC may remain temporarily during migration or reappear later as an internal
+or high-performance transport, but v0.2 should not make it the public Python SDK
+contract unless an ADR proves the benefit outweighs the extra browser and
+compatibility cost.
+
 v0.2 should decide:
 
 - how clients discover the running local service
 - how Fricon Desktop, CLI, and Python SDK launch or request launch of the
   bundled local service when it is not running
-- how Fricon Desktop, CLI, and Python SDK report their client protocol version
+- how Fricon Desktop, CLI, and Python SDK report their service API and client
+  capability versions
 - how the service reports its protocol and data-library format version
 - how capability negotiation distinguishes read, write, measurement creation,
   export, and migration operations
@@ -208,16 +253,14 @@ v0.2 should decide:
 - which operations are read-only-safe during a compatibility mismatch
 - how migration or upgrade prompts are surfaced
 
-The exact IPC, HTTP, websocket, or gRPC shape should be an ADR before durable
-implementation. The important behavior is that v0.2-era Python SDKs keep
-working for ordinary measurement recording and dataset reads against later v0.x
-services, while incompatible clients fail before writes and tell the user what
-to update.
+The exact HTTP route shape, event transport, binary payload format, and
+compatibility envelope should be an ADR before durable implementation. The
+important behavior is that v0.2-era Python SDKs keep working for ordinary
+measurement recording and dataset reads against later v0.x services, while
+incompatible clients fail before writes and tell the user what to update.
 
-Do not choose a Tauri-only IPC path for core business data. HTTP/WebSocket is
-the likely GUI service API direction because it can support Fricon Desktop and
-future browser clients with one contract, but the transport decision still
-belongs in the protocol ADR.
+Do not choose a Tauri-only IPC path for core business data. Do not preserve gRPC
+as a separate public Python SDK path just because it is the current transport.
 
 ## Fricon Desktop And Future Web UI
 

@@ -152,6 +152,8 @@ measurements and use Fricon instead to:
   local-service protocol
 - stage service/Desktop updates and apply them only when active measurements,
   open writers, imports, exports, and migrations are idle
+- move public Fricon clients toward one HTTP/WebSocket service API with binary
+  dataset payload endpoints instead of separate UI and Python gRPC contracts
 - keep the core v0.x Python SDK measurement-write and dataset-read path working
   across later v0.x desktop or local-service updates, with newer features
   negotiated explicitly
@@ -486,7 +488,8 @@ be rediscovered or relitigated later. Good ADR candidates include:
 - workspace and storage format compatibility
 - dataset semantic model commitments
 - distribution surfaces, installer/update policy, and release compatibility
-- IPC or gRPC compatibility policy, including the core v0.x Python SDK
+- service API transport and compatibility policy, including the HTTP/WebSocket
+  direction, binary dataset payload endpoints, and the core v0.x Python SDK
   compatibility promise for locked lab environments
 - Python API contract decisions
 - desktop/runtime architecture decisions
