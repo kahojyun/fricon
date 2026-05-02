@@ -7,8 +7,8 @@ Canonical planning entry point for the proposed v0.2 reset.
 This directory describes the intended v0.2 product and architecture direction.
 It is not current behavior. Do not document v0.2 behavior in public user docs
 or implement durable storage/API contracts from these notes until the relevant
-ADR, schema, IPC, Python SDK, desktop UI, migration, and release decisions have
-landed.
+ADR, schema, IPC, Python SDK, Fricon Desktop, migration, and release decisions
+have landed.
 
 ## v0.2 Thesis
 
@@ -52,11 +52,13 @@ aliases that make the roadmap look like it has a second versioning scheme.
   measurements. It should record measurement metadata and produced datasets,
   keep datasets directly inspectable and reopenable, support optional
   sample/session context, preserve partial/interrupted data, and keep the user
-  model minimal.
+  model minimal. It is local-only: Fricon Desktop, the CLI, and the Python SDK
+  operate through one local service and one local data library.
 - v0.3: candidate product-assistance slice after the v0.2 measurement loop is
   usable. Likely areas include richer sample fields and 2D sample maps,
-  comparison views, saved views, portable export viewer polish, attach/correct
-  context UX, and better passive code/environment summaries.
+  comparison views, saved views, portable export viewer polish, read-only LAN
+  viewing, attach/correct context UX, and better passive code/environment
+  summaries.
 - v0.4: candidate automation-foundation slice after measurement history is
   trustworthy. Likely areas include parameter snapshots and proposals, analysis
   provenance UI, calibration workflow history, managed measurement plans, and
@@ -134,8 +136,11 @@ to rewrite every line of code. v0.2 may intentionally break:
 - archive, import, and export formats that cannot carry data-library,
   measurement, sample/session, and provenance context
 - distribution and client/server compatibility assumptions that make the
-  desktop GUI, CLI, Python SDK, or local service drift without an explicit
+  Fricon Desktop, CLI, Python SDK, or local service drift without an explicit
   compatibility envelope
+- GUI/runtime assumptions that make Fricon Desktop own the data backend or make
+  remote clients depend on shared-folder access to a database-backed data
+  library
 - metadata ownership rules that put measurement, sample, parameter, or code
   meaning inside dataset-local metadata
 

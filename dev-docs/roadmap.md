@@ -47,8 +47,8 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
   dataset artifacts, parameter history, code summaries, and calibration
   history.
 - `v0.2/technical-direction.md` defines the proposed distribution surfaces,
-  data-library service model, desktop/web UI direction, remote/auth boundary,
-  and rewrite strategy.
+  data-library service model, Fricon Desktop shell direction, local-only v0.2
+  scope, future remote/auth boundary, and rewrite strategy.
 
 The pre-adoption measurement-system redesign note remains supporting background
 behind the v0.2 reset:
@@ -93,8 +93,13 @@ boundaries. `Experiment`
 can remain an informal scientific term or a future grouping/template concept,
 but v0.2 should prefer `Measurement` as the user-facing acquisition record.
 
+v0.2 is local-only. Fricon Desktop, the CLI, and the Python SDK should talk to
+one local service that owns one local data library. Remote mode,
+browser-served UI, and PWA-like access are future product surfaces that should
+shape the service/API boundary, but they are not shipped v0.2 requirements.
+
 Initial measurement support should lean on Python scripts as the execution
-entry point. The desktop UI should inspect, browse, and eventually assist those
+entry point. Fricon Desktop should inspect, browse, and eventually assist those
 workflows, but it should not become the primary measurement execution engine
 before the Python-led model is clear.
 
@@ -137,9 +142,9 @@ measurements and use Fricon instead to:
 - select or create a lightweight sample and sample-session context when the
   measured object matters, without blocking quick measurements when context is
   not yet known
-- see newly produced datasets in the desktop UI without manual file handling
+- see newly produced datasets in Fricon Desktop without manual file handling
 - inspect recent and historical datasets through table and chart views
-- install and launch the desktop GUI, CLI, Python SDK, and local service as a
+- install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
   coherent Fricon release rather than assembling mismatched components manually
 - update Fricon with clear compatibility checks for the data library and
   local-service protocol
@@ -170,6 +175,9 @@ v0.2 replacement does not require:
 - automatic Git, `uv`, or `pixi` environment management
 - a long-term third-party client protocol stability promise
 - a complex auto-update system before the first replacement workflow is proven
+- remote mode, browser-served UI, or PWA distribution as shipped v0.2 features
+- opening the same database-backed data library directly from multiple
+  computers through a shared folder
 
 ## Primary User Mental Model
 
@@ -207,6 +215,7 @@ Likely v0.3 candidates:
 - comparison and saved-view workflows
 - portable export viewer polish
 - smoother installer/update polish after the v0.2 release shape is proven
+- read-only LAN viewing from another computer through the service API
 - passive code/environment summary improvements
 - better lifecycle/favorite filtering
 

@@ -57,7 +57,7 @@ Treat the v0.2 rewrite as a domain-model reset, not a full repository rewrite.
 v0.2 should define three public surfaces:
 
 ```text
-fricon desktop GUI
+Fricon Desktop
 fricon CLI
 fricon Python SDK
 ```
@@ -69,15 +69,20 @@ Fricon Data Library
   local service / daemon
   storage
   API
-  desktop GUI or browser UI
+  Fricon Desktop
   CLI
   Python SDK
 ```
 
 The Python SDK remains a first-class surface for measurement scripts and
-analysis notebooks. The desktop GUI is the primary browsing, inspection,
+analysis notebooks. Fricon Desktop is the primary browsing, inspection,
 sample, and calibration-monitoring surface. The CLI should handle setup,
 library management, import/export, diagnostics, and service control.
+
+v0.2 is local-only. The shipped GUI should be Fricon Desktop in local mode,
+backed by the local service. Remote mode, browser-served UI, and static
+PWA-style distribution are future compatibility targets, not v0.2 release
+requirements.
 
 ## Installation And Update Experience
 
@@ -88,18 +93,19 @@ The product-level requirement is:
 
 ```text
 Fricon distribution
-  -> desktop GUI and local service can update together
+  -> Fricon Desktop and local service can update together
   -> fricon CLI follows the installed service contract
   -> Python SDK may be pinned in lab environments
   -> data-library format upgrades are explicit
 ```
 
 Users should be able to install Fricon, create or open a data library, launch
-the desktop UI, and connect from Python without understanding service internals.
+Fricon Desktop, and connect from Python without understanding service
+internals.
 
 The technical policy should account for different update cadences:
 
-- document the supported desktop GUI, CLI, Python SDK, local-service, and
+- document the supported Fricon Desktop, CLI, Python SDK, local-service, and
   data-library compatibility envelope
 - keep the core v0.x Python SDK measurement-write and dataset-read APIs
   compatible with later v0.x local services after v0.2 lands
@@ -125,7 +131,7 @@ experience is product-visible.
 v0.2 should decide:
 
 - how clients discover the running local service
-- how the desktop GUI, CLI, and Python SDK report their client protocol version
+- how Fricon Desktop, CLI, and Python SDK report their client protocol version
 - how the service reports its protocol and data-library format version
 - how capability negotiation distinguishes read, write, measurement creation,
   export, and migration operations
@@ -140,34 +146,50 @@ working for ordinary measurement recording and dataset reads against later v0.x
 services, while incompatible clients fail before writes and tell the user what
 to update.
 
-## Desktop GUI And Web UI
+Do not choose a Tauri-only IPC path for core business data. HTTP/WebSocket is
+the likely GUI service API direction because it can support Fricon Desktop and
+future browser clients with one contract, but the transport decision still
+belongs in the protocol ADR.
 
-Build the UI as a web application that can be packaged as desktop.
+## Fricon Desktop And Future Web UI
+
+Build the core UI as a web application that can be packaged as desktop.
 
 Preferred direction:
 
-- keep a Tauri desktop package for local use
-- make the frontend able to run against HTTP/websocket APIs when served in a
-  browser
-- avoid Tauri-only assumptions in feature code where practical
-- keep desktop-specific file dialogs, launch behavior, and local service
-  management behind adapters
+- make Fricon Desktop the primary v0.2 GUI
+- bundle the frontend assets in the Tauri desktop app for normal local use
+- use the local service API for core data access instead of routing dataset
+  queries through Tauri commands
+- avoid Tauri-only assumptions in measurement, dataset, sample/session, notes,
+  tags, and live-chart feature code
+- keep desktop-specific file dialogs, offline bundle file association, launch
+  behavior, updater, diagnostics, and local service management behind shell
+  adapters
+- keep the frontend browser-capable enough that a future service-served remote
+  viewer or PWA-like mode can reuse the core UI
 
-This keeps the normal user experience local and desktop-friendly while leaving
-a clean path to remote monitoring and browser access.
+This keeps the v0.2 user experience local and desktop-friendly while leaving a
+clean path to remote monitoring and browser access. It does not require v0.2 to
+ship remote mode or a browser/PWA distribution.
 
 ## Local-First Service Model
 
 The default deployment is local-first:
 
 ```text
-desktop GUI / Python SDK / CLI
+Fricon Desktop / Python SDK / CLI
   -> local Fricon service
   -> one Fricon data library
 ```
 
 The service owns coordinated access to storage, live events, dataset writes,
 run records, parameter snapshots, and future automation.
+
+The local service is the authoritative data backend. The desktop app may launch
+or supervise it, but core reads and writes should go through the service API so
+future CLI, Python SDK, desktop remote mode, and browser clients share one
+compatibility boundary.
 
 The data library should be the user-facing concept. `WorkspaceRoot` or similar
 names may remain internal implementation details, but public docs and UI should
@@ -178,11 +200,12 @@ creation time. Exported measurements and audit summaries should include this
 identity, plus an optional source computer label, so researchers can tell where
 portable data came from.
 
-## Remote Access
+## Future Remote Access
 
-Plan for remote access early, but do not make v0.2 a multi-user hosted system.
+Plan for remote access early, but do not make v0.2 ship remote mode or become a
+multi-user hosted system.
 
-Remote access should support:
+Future remote access should support:
 
 - viewing live measurement progress from another machine
 - browsing historical runs and datasets
@@ -197,6 +220,11 @@ Remote access should not require:
 - account management
 - distributed database behavior
 
+Do not support direct multi-machine access by opening a database-backed Fricon
+data library from a shared folder. A lab machine should own the data library
+through the Fricon service, and other machines should connect as clients when
+remote access is implemented.
+
 ## Authentication And Actor Boundary
 
 Do not build full multi-user authorization now. Do create an early connection
@@ -205,10 +233,10 @@ and actor boundary so remote access and auditability are not retrofitted later.
 Recommended v0.2 policy:
 
 - local loopback access may use implicit local trust or a generated local token
-- remote access must require token or pairing
 - every mutating operation can record an actor
 - the first authorization model is single-owner: authenticated clients can act
   as the library owner
+- future remote access must require token or pairing
 - roles and fine-grained permissions remain future scope
 
 Suggested internal actor shape:
@@ -284,7 +312,7 @@ Lower-level datasets are unassigned unless explicitly linked to a producer
 record.
 
 The active-context idea should be available from both Python prelude code and
-the desktop UI because existing lab notebooks often set a save path near the
+Fricon Desktop because existing lab notebooks often set a save path near the
 top of the file.
 
 ## Portable Export Direction
@@ -308,7 +336,7 @@ The exact syntax is unsettled. The contract is:
 
 - export bundles are read-only portable artifacts
 - Python can open bundles directly
-- the desktop GUI can open bundles in a dedicated export viewer mode
+- Fricon Desktop can open bundles in a dedicated export viewer mode
 - importing into another data library is optional and separate
 - source data library UUID, display name, source computer label, export UUID,
   format version, original record IDs, checksums, and Fricon version travel in
@@ -455,7 +483,7 @@ Likely ADRs:
 - active sample/session context and attach-later correction policy
 - general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
-- authentication/actor boundary for local and remote access
+- authentication/actor boundary for local access and future remote access
 - client/server protocol compatibility, version negotiation, and core v0.x
   Python SDK compatibility policy
 - public naming policy for Measurement versus Experiment
@@ -463,7 +491,8 @@ Likely ADRs:
 - minimal device adapter and capability boundary for future LabRAD replacement
 - optional managed measurement plan and desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
-- desktop web architecture and remote UI access
+- Fricon Desktop shell boundary, local service ownership, and future
+  remote/browser UI access
 
 ## First Engineering Slice
 
@@ -473,11 +502,11 @@ foundation:
 1. Create/open one data library.
 2. Create or select sample/session context when known, or explicitly leave it
    unset.
-3. Set active sample/session context from Python prelude or desktop UI when
+3. Set active sample/session context from Python prelude or Fricon Desktop when
    appropriate.
 4. Start an interactive measurement from Python.
 5. Write one or more dataset artifacts through measurement-scoped handles.
-6. Browse the run and datasets in the desktop/web UI.
+6. Browse the run and datasets in Fricon Desktop.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
 9. Record actor, code summary, run note, quality, and sample/session links.

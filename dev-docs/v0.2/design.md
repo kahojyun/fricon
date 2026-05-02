@@ -42,7 +42,7 @@ v0.2 should optimize for these user outcomes:
 - record sample and cooldown/session context beside measurements
 - let users set active sample/session context from a notebook prelude or UI
   without making sample setup a hard requirement for quick measurements
-- inspect live and historical datasets through desktop UI and Python
+- inspect live and historical datasets through Fricon Desktop and Python
 - preserve parameter, code, environment, favorite, and lifecycle context for
   each measurement
 - visualize sample/device parameters on a 2D map when the lab model needs it
@@ -395,8 +395,8 @@ The common write path should share the measurement lifecycle.
 
 In notebooks, the library handle should be created once in a prelude and reused
 across cells. It should not be a context manager in normal examples; service
-lifecycle and cleanup belong to the local Fricon service, CLI, or desktop UI,
-not to every notebook cell.
+lifecycle and cleanup belong to the local Fricon service, CLI, or Fricon
+Desktop, not to every notebook cell.
 
 Prefer this shape for normal measurements:
 
@@ -416,8 +416,8 @@ with lib.measurement("rabi q3") as meas:
         chevron.write(freq=freq, amp=amp, signal=measure(freq, amp))
 ```
 
-The active context may be set from a notebook prelude, CLI, desktop UI, or an
-explicit Python object. It should behave like a helpful default, not hidden
+The active context may be set from a notebook prelude, CLI, Fricon Desktop, or
+an explicit Python object. It should behave like a helpful default, not hidden
 provenance. Each measurement should record the resolved sample/session IDs or
 record that no sample context was selected.
 
@@ -491,7 +491,7 @@ meas = bundle.measurement("rabi q3")
 rabi = meas.dataset("rabi").to_pyarrow()
 ```
 
-The desktop GUI should also have a read-only export viewer mode. The viewer
+Fricon Desktop should also have a read-only export viewer mode. The viewer
 should open exported bundles directly, show measurement context and produced
 artifacts, and offer read snippets without requiring import into the user's own
 data library.
@@ -676,24 +676,35 @@ history inside the broader measurement/sample context.
 
 v0.2 should expose three public surfaces:
 
-- desktop GUI
+- Fricon Desktop
 - `fricon` CLI
 - Python SDK
 
 They should operate against one local data library and one local service:
 
 ```text
-desktop GUI / CLI / Python SDK
+Fricon Desktop / CLI / Python SDK
   -> local Fricon service
   -> Fricon data library
 ```
 
-The desktop GUI may be implemented as a web application packaged with Tauri.
-Feature code should avoid unnecessary Tauri-only assumptions so the same UI can
-support remote monitoring or browser access later.
+Fricon Desktop may be implemented as a web application packaged with Tauri.
+For v0.2, Fricon Desktop is the shipped GUI and runs in local mode. Remote
+mode, browser-served UI, and PWA-style access are future targets.
+
+The desktop app may launch or supervise the local service, but the service is
+the authoritative data backend. Core measurement, dataset, sample/session,
+note/tag, and live-chart features should use the service API rather than Tauri
+commands so future desktop remote mode or browser clients can reuse the same UI
+and compatibility boundary.
+
+Feature code should avoid unnecessary Tauri-only assumptions. Tauri-specific
+capabilities should stay at the shell boundary: file pickers, offline bundle
+file association, updater, diagnostics, window management, and local service
+launch.
 
 Installation and update are product-visible v0.2 concerns. Users should get one
-coherent Fricon release shape for the desktop GUI, CLI, Python SDK, and local
+coherent Fricon release shape for Fricon Desktop, CLI, Python SDK, and local
 service, with clear compatibility checks before any client mutates a data
 library.
 
@@ -703,21 +714,25 @@ be pinned by virtual environments or lockfiles, v0.2 should make the core v0.x
 Python SDK measurement-write and dataset-read path compatible with later v0.x
 local services. Newer features should use explicit capability negotiation.
 
-## Remote And Auth Boundary
+## Future Remote And Auth Boundary
 
-Remote access should be planned early, but v0.2 should not become a multi-user
-system.
+Remote access should be planned early, but v0.2 should not ship remote mode or
+become a multi-user system.
 
 The recommended boundary is:
 
 - local loopback access can use implicit local trust or a generated local token
-- remote access requires token or pairing
 - mutating operations record an actor
 - the first authorization model is single-owner
+- future remote access requires token or pairing
 - roles, teams, and permission matrices remain future scope
 
 Auth is hard to retrofit when APIs and audit logs have no actor field. Add the
 actor boundary early; defer full multi-user product complexity.
+
+Do not support shared-folder multi-machine access to the same database-backed
+data library. Future remote viewing should connect to the Fricon service that
+owns the library.
 
 ## Rewrite Strategy
 
@@ -754,11 +769,11 @@ The initial v0.2 engineering slice should prove the new model end to end:
 
 1. Create or open one data library.
 2. Create or select a sample/session when known, or explicitly run without one.
-3. Set active sample/session context from the desktop UI or Python prelude when
+3. Set active sample/session context from Fricon Desktop or Python prelude when
    appropriate.
 4. Start an interactive measurement from Python.
 5. Write one or more dataset artifacts through measurement-scoped handles.
-6. Browse the measurement and datasets in the desktop/web UI.
+6. Browse the measurement and datasets in Fricon Desktop.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
 9. Record actor, passive code summary, favorite/pin state, run note, lifecycle
@@ -780,17 +795,18 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - public naming policy for Measurement versus Experiment
 - measurement-scoped dataset writer lifecycle
 - minimal device adapter/capability boundary for future LabRAD replacement
-- actor/auth boundary for local and remote access
+- actor/auth boundary for local access and future remote access
 - client/server protocol compatibility, version negotiation, and core v0.x
   Python SDK compatibility policy
 - optional managed measurement desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
-- desktop web architecture and remote UI access
+- Fricon Desktop shell boundary, local service ownership, and future
+  remote/browser UI access
 
 ## Design Constraints
 
 - Keep the Python measurement path simple.
-- Keep datasets directly openable from Python and the desktop UI.
+- Keep datasets directly openable from Python and Fricon Desktop.
 - Keep sample/session context easy to set as an active default, but do not block
   quick measurements when the context is unknown.
 - Keep dataset semantics dataset-local.
@@ -799,5 +815,5 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
   session, measurement, analysis, and calibration records.
 - Keep advanced execution concepts optional until users need retry, resume,
   dry-run, or calibration automation.
-- Keep local-first and single-owner assumptions in the product, while leaving
-  actor and remote-access hooks in the architecture.
+- Keep v0.2 local-only and single-owner in the product, while leaving actor,
+  service API, and future remote-access hooks in the architecture.

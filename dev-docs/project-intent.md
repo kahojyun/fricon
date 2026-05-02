@@ -66,7 +66,7 @@ inside dataset names, incidental metadata, or chart heuristics.
 The first adoption milestone is the v0.2 replacement slice: replacing a simple
 LabRAD Grapher/Data Vault style measurement logger for new measurement work.
 v0.2 should let users record new measurements from Python, inspect datasets in
-the desktop UI, keep run-level context beside produced data, and reopen outputs
+Fricon Desktop, keep run-level context beside produced data, and reopen outputs
 from Python without depending on the old logger. Importing or fully browsing
 legacy LabRAD/Data Vault history is a follow-up migration concern, not a v0.2
 requirement.
@@ -87,7 +87,7 @@ consume existing datasets and produce new datasets, results, reports, or
 parameter proposals.
 
 Initial measurement support should lean on Python scripts as the execution
-entry point. The desktop UI should browse, inspect, and eventually assist those
+entry point. Fricon Desktop should browse, inspect, and eventually assist those
 workflows, but should not become the primary measurement execution engine before
 the Python-led model is clear.
 
@@ -114,19 +114,24 @@ calibration, parameter snapshots, code summaries, and auditability.
 
 ## Runtime Model
 
-Fricon is local-first. The main supported runtime model is:
+Fricon is local-first. The v0.2 supported runtime model is local-only:
 
 - data lives on the user's local computer
-- the desktop UI and Python API operate against a local data library or current
-  workspace
-- the local server process coordinates data-library or workspace operations
+- Fricon Desktop and the Python API operate against one local data library
+- the local service coordinates data-library operations and owns database
+  access
+- the desktop app may launch, supervise, and configure the local service, but
+  should not be the durable data backend
 
-A remote client may be considered in the future, but it should build on the
-local-first model rather than forcing the project into a hosted service shape.
+Remote clients, browser-served UI, and remote viewing may be considered after
+the local replacement workflow is proven. They should build on the same local
+service/API boundary rather than forcing the project into a hosted service
+shape or encouraging multiple machines to open the same data library through a
+shared folder.
 
 Distribution shape and client/server compatibility have technical
 implementation details, but their user impact belongs in product planning.
-v0.2 should define the supported compatibility envelope for the desktop GUI,
+v0.2 should define the supported compatibility envelope for Fricon Desktop,
 CLI, Python SDK, local service, and data-library format. Once v0.2 lands, the
 core v0.x Python SDK path for measurement writes and dataset reads should
 remain compatible with later v0.x local services. Newer capabilities should be
@@ -143,6 +148,9 @@ Fricon does not currently aim to support:
 - centralized lab administration
 - distributed database semantics
 - web-first deployment as the primary experience
+- direct multi-machine access to the same database-backed data library through
+  a shared folder
+- remote mode or browser/PWA distribution in the v0.2 replacement slice
 
 These may become integration concerns someday, but they should not drive the
 core architecture now.

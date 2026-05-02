@@ -142,7 +142,7 @@ lightweight but real.
 Sample selection should be low-friction. Many existing notebooks set a
 `data_dir` or similar global variable near the top of the file. Fricon should
 support an equivalent active sample/session context in a notebook prelude and
-in the desktop UI. Quick measurements may run without sample context and attach
+in Fricon Desktop. Quick measurements may run without sample context and attach
 or correct it later.
 
 ### Sample Session / Cooldown
@@ -185,7 +185,7 @@ Do not make `ExperimentRun` the first public noun for the v0.2 API.
 A dataset is a data artifact produced or consumed by work. It can be measured,
 processed, imported, or simulated.
 
-Datasets must remain directly openable from Python and the desktop UI, but they
+Datasets must remain directly openable from Python and Fricon Desktop, but they
 should not be the only organizing object.
 
 Reserve `Artifact` as the broader provenance concept. `DatasetArtifact` is the
@@ -254,19 +254,22 @@ This is likely as important as generic dataset browsing for many labs.
 ### Install And Launch Fricon
 
 As an experimentalist, I want one clear way to install and launch Fricon on a
-lab computer so that I can open the desktop UI, run the CLI, and use the Python
-SDK without assembling incompatible pieces by hand.
+lab computer so that I can open Fricon Desktop, run the CLI, and use the Python
+SDK against a local data library without assembling incompatible pieces by hand.
 
 Acceptance notes:
 
-- the supported v0.2 distribution shape is documented as desktop GUI, `fricon`
-  CLI, Python SDK, and local service
+- the supported v0.2 distribution shape is documented as Fricon Desktop,
+  `fricon` CLI, Python SDK, and local service
+- Fricon Desktop starts in local mode for v0.2
 - first-run setup creates or opens the default data library without requiring
   users to understand server internals
 - notebook and script examples show how to connect to the same local data
-  library used by the desktop UI
+  library used by Fricon Desktop
 - users get a clear diagnostic when the local service is not running or cannot
   open the data library
+- remote mode, browser-served UI, and PWA distribution are future-ready
+  architecture targets, not v0.2 shipped workflows
 
 ### Update Without Breaking Measurement Work
 
@@ -290,6 +293,8 @@ Acceptance notes:
   decision before implementation
 - long-term third-party protocol stability and polished auto-update UX are
   follow-up topics, not v0.2 replacement requirements
+- remote clients should never bypass the service by opening the same
+  database-backed data library from a shared folder
 
 ### Create A Local Data Library
 
@@ -322,8 +327,8 @@ make missing context visible and fixable later.
 
 ### Watch And Inspect Data
 
-As an experimentalist, I want live and historical table/chart views so that I
-can decide whether a measurement is working.
+As an experimentalist, I want local live and historical table/chart views so
+that I can decide whether a measurement is working.
 
 ### Annotate Once At The Right Level
 
@@ -352,7 +357,7 @@ Acceptance notes:
   computer label, export UUID, format version, checksums, and original record
   IDs
 - Python can open the bundle directly through a portable read API
-- the desktop GUI can open the bundle in a read-only export viewer mode
+- Fricon Desktop can open the bundle in a read-only export viewer mode
 - importing the bundle into another data library is optional, not required for
   analysis
 
@@ -388,6 +393,21 @@ so that I can choose devices/regions and compare behavior across sessions.
 As an experimentalist, I want scheduled or repeated calibration to produce
 analysis results and parameter proposals so that tedious updates are automated
 without silently mutating important parameter profiles.
+
+### View Measurements From Another Computer
+
+As an experimentalist, I want to view live and historical measurements from a
+second lab computer so that another workstation can monitor data without
+opening the data library through a shared folder.
+
+Acceptance notes:
+
+- this is a v0.3+ candidate, not a v0.2 replacement requirement
+- future remote viewing should connect to the Fricon service that owns the data
+  library
+- Fricon Desktop remote mode may provide the most consistent app experience
+- a browser-served read-only viewer may remain useful for quick access or
+  troubleshooting
 
 ## v0.2 Design-Covered Edge Stories
 
@@ -511,7 +531,6 @@ declarative API.
 
 ## Other v0.3+ Candidate User Stories
 
-- Remote monitoring from another machine.
 - Managed submitted measurements with queue and resource leases.
 - Analysis-run UI for derived datasets and reports.
 - Calibration workflow templates and history views.
@@ -528,3 +547,5 @@ declarative API.
 - Automatic code rewrite or environment management.
 - Broad hardware driver framework.
 - Generic workflow DAG engine as the first automation layer.
+- Remote mode, browser-served UI, or PWA distribution.
+- Shared-folder multi-machine access to the same database-backed data library.
