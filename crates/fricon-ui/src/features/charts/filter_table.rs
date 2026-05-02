@@ -170,7 +170,13 @@ pub(crate) fn process_filter_rows(
 
 #[cfg(test)]
 mod tests {
+    use fricon::{
+        AppManager, Client, DatasetRow, DatasetScalar, ScanAxis, ScanAxisValue, ScanPlan,
+        WorkspaceRoot,
+    };
+    use indexmap::IndexMap;
     use serde_json::json;
+    use tempfile::TempDir;
 
     use super::*;
 
@@ -209,5 +215,69 @@ mod tests {
         );
         assert_eq!(processed.unique_rows[0].value_indices, vec![0]);
         assert_eq!(processed.unique_rows[1].value_indices, vec![1]);
+    }
+
+    #[tokio::test]
+    async fn filter_data_includes_nonnumeric_logical_scan_axes() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let rows = [10.0, 20.0, 30.0, 40.0]
+            .into_iter()
+            .map(|signal| {
+                DatasetRow(IndexMap::from([(
+                    "signal".to_string(),
+                    DatasetScalar::Numeric(signal),
+                )]))
+            })
+            .collect::<Vec<_>>();
+        let scan_plan = ScanPlan::new(vec![
+            ScanAxis::static_values(
+                "gate",
+                vec![
+                    ScanAxisValue::String("low".to_string()),
+                    ScanAxisValue::String("high".to_string()),
+                ],
+            ),
+            ScanAxis::static_values("bias", vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)]),
+        ]);
+        let mut writer = client
+            .create_dataset(
+                "scan-filter-test".to_string(),
+                String::new(),
+                vec![],
+                rows[0].to_schema(),
+                Vec::new(),
+                Some(scan_plan),
+                false,
+            )
+            .await?;
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let data = load_filter_data(&session, dataset.id(), None).await?;
+
+        assert_eq!(data.fields, vec!["logicalIndex:gate", "logicalIndex:bias"]);
+        assert_eq!(
+            data.unique_rows
+                .iter()
+                .map(|row| row.display_values.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                vec!["low".to_string(), "0.0".to_string()],
+                vec!["low".to_string(), "1.0".to_string()],
+                vec!["high".to_string(), "0.0".to_string()],
+                vec!["high".to_string(), "1.0".to_string()],
+            ]
+        );
+
+        app_manager.shutdown().await;
+        Ok(())
     }
 }

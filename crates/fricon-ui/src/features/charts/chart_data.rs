@@ -1,18 +1,17 @@
 use anyhow::Context;
 use arrow_array::RecordBatch;
-use fricon::DatasetSchema;
+use fricon::{DatasetDataType, DatasetSchema};
 use tracing::{debug, error, instrument};
 
 use super::{
     filter_table::build_semantic_filters, semantic_source, types::DatasetChartDataOptions,
 };
-#[cfg(test)]
-use crate::features::charts::transform::compute_group_starts;
 use crate::{
     desktop_runtime::session::WorkspaceSession,
     features::charts::{
         transform::{
             build_heatmap_series, build_live_heatmap_series, build_live_xy_series, build_xy_series,
+            compute_group_starts, resolve_xy_trace_roles,
         },
         types::{
             ChartCommonOptions, ChartSnapshot, FlatSeries, FlatXYSeries, HeatmapChartDataOptions,
@@ -23,7 +22,6 @@ use crate::{
     },
 };
 
-#[cfg(test)]
 fn recent_group_starts_in_scan_batch(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -38,7 +36,6 @@ fn recent_group_starts_in_scan_batch(
         .collect()
 }
 
-#[cfg(test)]
 fn resolve_group_tail_start_in_scan_batch(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -55,6 +52,150 @@ fn resolve_group_tail_start_in_scan_batch(
         range_start,
     );
     (starts.len() >= required_groups).then(|| starts[starts.len() - required_groups])
+}
+
+async fn prepare_live_range(
+    session: &WorkspaceSession,
+    id: i32,
+    start: usize,
+    end: usize,
+) -> anyhow::Result<semantic_source::PreparedChartData> {
+    let common = ChartCommonOptions {
+        start: Some(start),
+        end: Some(end),
+        index_filters: None,
+        exclude_columns: None,
+    };
+    semantic_source::prepare_chart_data(session, id, &common, &[]).await
+}
+
+async fn resolve_group_tail_start(
+    session: &WorkspaceSession,
+    id: i32,
+    grouping_index_columns: &[usize],
+    total_rows: usize,
+    required_groups: usize,
+) -> anyhow::Result<usize> {
+    if total_rows == 0 || required_groups == 0 {
+        return Ok(0);
+    }
+
+    let mut window_rows = required_groups.max(1);
+    loop {
+        let range_start = total_rows.saturating_sub(window_rows);
+        let scan_start = range_start.saturating_sub(1);
+        let prepared = prepare_live_range(session, id, scan_start, total_rows).await?;
+
+        if let Some(start) = resolve_group_tail_start_in_scan_batch(
+            &prepared.batch,
+            &prepared.schema,
+            grouping_index_columns,
+            scan_start,
+            range_start,
+            required_groups,
+        ) {
+            return Ok(start);
+        }
+
+        if range_start == 0 {
+            return Ok(0);
+        }
+
+        window_rows = window_rows.saturating_mul(2).min(total_rows);
+    }
+}
+
+fn plot_mode_is_trace(
+    schema: &DatasetSchema,
+    plot_mode: &XYPlotModeOptions,
+) -> anyhow::Result<bool> {
+    match plot_mode {
+        XYPlotModeOptions::QuantityVsSweep { quantity, .. }
+        | XYPlotModeOptions::ComplexPlane { quantity } => Ok(matches!(
+            schema.columns().get(quantity).context("Column not found")?,
+            DatasetDataType::Trace(_, _)
+        )),
+        XYPlotModeOptions::Xy { x_column, y_column } => {
+            let x_type = *schema
+                .columns()
+                .get(x_column)
+                .context("X column not found")?;
+            let y_type = *schema
+                .columns()
+                .get(y_column)
+                .context("Y column not found")?;
+            Ok(matches!(x_type, DatasetDataType::Trace(_, _))
+                && matches!(y_type, DatasetDataType::Trace(_, _)))
+        }
+    }
+}
+
+async fn resolve_live_row_start(
+    session: &WorkspaceSession,
+    id: i32,
+    total_rows: usize,
+    options: &LiveChartDataOptions,
+) -> anyhow::Result<usize> {
+    if total_rows == 0 {
+        return Ok(0);
+    }
+
+    let prepared = prepare_live_range(session, id, 0, 0).await?;
+    let schema = &prepared.schema;
+    let index_columns = prepared.index_columns.as_deref();
+    match options {
+        LiveChartDataOptions::Xy(opts) => {
+            let tail_count = opts.tail_count.max(1);
+            if plot_mode_is_trace(schema, &opts.plot_mode)? {
+                return Ok(total_rows.saturating_sub(tail_count));
+            }
+
+            let roles =
+                resolve_xy_trace_roles(schema, index_columns, &opts.trace_roles, opts.draw_style)?;
+            if roles.trace_group.is_empty() {
+                Ok(total_rows.saturating_sub(tail_count))
+            } else {
+                resolve_group_tail_start(session, id, &roles.trace_group, total_rows, tail_count)
+                    .await
+            }
+        }
+        LiveChartDataOptions::Heatmap(opts) => {
+            let data_type = *schema
+                .columns()
+                .get(&opts.quantity)
+                .context("Column not found")?;
+            if matches!(data_type, DatasetDataType::Trace(_, _)) {
+                match index_columns {
+                    Some(idx_cols) if idx_cols.len() >= 2 => {
+                        resolve_group_tail_start(
+                            session,
+                            id,
+                            &idx_cols[..idx_cols.len() - 1],
+                            total_rows,
+                            1,
+                        )
+                        .await
+                    }
+                    _ => Ok(total_rows.saturating_sub(1)),
+                }
+            } else if let Some(idx_cols) = index_columns {
+                if idx_cols.len() >= 3 {
+                    resolve_group_tail_start(
+                        session,
+                        id,
+                        &idx_cols[..idx_cols.len() - 2],
+                        total_rows,
+                        1,
+                    )
+                    .await
+                } else {
+                    Ok(0)
+                }
+            } else {
+                Ok(0)
+            }
+        }
+    }
 }
 
 #[instrument(level = "debug", skip(session, options), fields(dataset_id = id))]
@@ -115,16 +256,11 @@ pub(crate) async fn dataset_live_chart_data(
     let dataset = session.dataset(id).await?;
     let total_rows = dataset.num_rows();
     let resolved_options = resolve_live_chart_options(options);
-    let current_common = ChartCommonOptions {
-        start: Some(0),
-        end: Some(total_rows),
-        index_filters: None,
-        exclude_columns: None,
-    };
-    let prepared = semantic_source::prepare_chart_data(session, id, &current_common, &[]).await?;
+    let start = resolve_live_row_start(session, id, total_rows, &resolved_options).await?;
+    let prepared = prepare_live_range(session, id, start, total_rows).await?;
     debug!(
         dataset_id = id,
-        start = 0,
+        start,
         end = total_rows,
         rows = prepared.batch.num_rows(),
         cols = prepared.batch.num_columns(),
@@ -135,7 +271,7 @@ pub(crate) async fn dataset_live_chart_data(
         &prepared.batch,
         &prepared.schema,
         prepared.index_columns.as_deref(),
-        0,
+        start,
         &resolved_options,
     );
     if let Err(err) = &snapshot {
@@ -169,19 +305,22 @@ pub(crate) async fn dataset_live_chart_data(
         });
     }
 
-    let previous_common = ChartCommonOptions {
-        start: Some(0),
-        end: Some(known_row_count),
-        index_filters: None,
-        exclude_columns: None,
-    };
+    let previous_start =
+        resolve_live_row_start(session, id, known_row_count, &resolved_options).await?;
+    if previous_start != start {
+        return Ok(LiveChartDataResponse::Reset {
+            row_count: total_rows,
+            snapshot,
+        });
+    }
+
     let previous_prepared =
-        semantic_source::prepare_chart_data(session, id, &previous_common, &[]).await?;
+        prepare_live_range(session, id, previous_start, known_row_count).await?;
     let previous_snapshot = build_live_snapshot(
         &previous_prepared.batch,
         &previous_prepared.schema,
         previous_prepared.index_columns.as_deref(),
-        0,
+        previous_start,
         &resolved_options,
     )?;
 

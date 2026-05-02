@@ -106,7 +106,7 @@ pub(crate) async fn load_axis_rows(
         end,
         &[],
     )?;
-    let fields = axis_fields(&interpretation, &prepared.schema)
+    let fields = axis_fields(&interpretation, &prepared.batch)
         .into_iter()
         .filter(|field| !exclude_fields.iter().any(|excluded| excluded == &field.id))
         .collect::<Vec<_>>();
@@ -187,16 +187,6 @@ fn append_logical_axes(
         return Ok(batch);
     }
 
-    let logical_axes = interpretation
-        .scan_axes
-        .iter()
-        .enumerate()
-        .filter(|(_, axis)| scan_axis_is_numeric(&axis.mode))
-        .collect::<Vec<_>>();
-    if logical_axes.is_empty() {
-        return Ok(batch);
-    }
-
     let point_by_record_id = dataset
         .logical_index_points()?
         .into_iter()
@@ -226,27 +216,40 @@ fn append_logical_axes(
     let mut fields = batch.schema().fields().iter().cloned().collect::<Vec<_>>();
     let mut arrays = batch.columns().to_vec();
     let mut columns = schema.columns().clone();
-    for (axis_index, axis) in logical_axes {
+    for (axis_index, axis) in interpretation
+        .scan_axes
+        .iter()
+        .enumerate()
+        .filter(|(_, axis)| scan_axis_is_numeric(&axis.mode))
+    {
         let id = logical_index_id(&axis.name);
-        let values = kept_record_ids
-            .iter()
-            .map(|record_id| {
-                point_by_record_id
-                    .get(record_id)
-                    .and_then(|point| numeric_coordinate(point, axis_index))
-            })
-            .collect::<Vec<_>>();
+        let values = logical_axis_values(&kept_record_ids, &point_by_record_id, axis_index);
         fields.push(Arc::new(Field::new(&id, DataType::Float64, true)));
-        arrays.push(Arc::new(Float64Array::from(values)) as ArrayRef);
+        arrays.push(numeric_axis_array(&values));
         columns.insert(id, DatasetDataType::Scalar(ScalarKind::Numeric));
     }
 
     *schema = DatasetSchema::new(columns);
+    for (axis_index, axis) in interpretation
+        .scan_axes
+        .iter()
+        .enumerate()
+        .filter(|(_, axis)| !scan_axis_is_numeric(&axis.mode))
+    {
+        let id = logical_index_id(&axis.name);
+        let values = logical_axis_values(&kept_record_ids, &point_by_record_id, axis_index);
+        fields.push(Arc::new(Field::new(
+            &id,
+            logical_axis_data_type(&axis.mode),
+            true,
+        )));
+        arrays.push(logical_axis_array(&axis.mode, &values));
+    }
     batch = RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays)?;
     Ok(batch)
 }
 
-fn axis_fields(interpretation: &DatasetInterpretation, schema: &DatasetSchema) -> Vec<AxisField> {
+fn axis_fields(interpretation: &DatasetInterpretation, batch: &RecordBatch) -> Vec<AxisField> {
     let mut fields = Vec::new();
     if interpretation.scan_axes.is_empty() {
         fields.extend(
@@ -268,7 +271,7 @@ fn axis_fields(interpretation: &DatasetInterpretation, schema: &DatasetSchema) -
     } else {
         fields.extend(interpretation.scan_axes.iter().filter_map(|axis| {
             let id = logical_index_id(&axis.name);
-            schema.columns().contains_key(&id).then(|| AxisField {
+            batch.schema().field_with_name(&id).ok().map(|_| AxisField {
                 id: id.clone(),
                 column_name: id,
                 label: axis.label.clone().unwrap_or_else(|| axis.name.clone()),
@@ -293,7 +296,11 @@ fn resolve_index_columns(
             indices.push(index);
         }
     }
-    for axis in &interpretation.scan_axes {
+    for axis in interpretation
+        .scan_axes
+        .iter()
+        .filter(|axis| scan_axis_is_numeric(&axis.mode))
+    {
         let id = logical_index_id(&axis.name);
         if let Some((index, _, _)) = schema.columns().get_full(&id) {
             indices.push(index);
@@ -315,11 +322,84 @@ fn scan_axis_is_numeric(mode: &ResolvedScanAxisMode) -> bool {
     }
 }
 
-fn numeric_coordinate(point: &ResolvedLogicalIndexPoint, axis_index: usize) -> Option<f64> {
-    match point.coordinates.get(axis_index)? {
-        ScanAxisValue::Int(value) => Some(*value as f64),
-        ScanAxisValue::Float(value) => Some(*value),
-        ScanAxisValue::Bool(_) | ScanAxisValue::String(_) => None,
+fn logical_axis_values(
+    record_ids: &[u64],
+    point_by_record_id: &HashMap<u64, ResolvedLogicalIndexPoint>,
+    axis_index: usize,
+) -> Vec<Option<ScanAxisValue>> {
+    record_ids
+        .iter()
+        .map(|record_id| {
+            point_by_record_id
+                .get(record_id)
+                .and_then(|point| point.coordinates.get(axis_index))
+                .cloned()
+        })
+        .collect()
+}
+
+fn logical_axis_data_type(mode: &ResolvedScanAxisMode) -> DataType {
+    match mode {
+        ResolvedScanAxisMode::ImplicitIndex => DataType::Float64,
+        ResolvedScanAxisMode::Static { values } => {
+            if values
+                .iter()
+                .all(|value| matches!(value, ScanAxisValue::Bool(_)))
+            {
+                DataType::Boolean
+            } else if values
+                .iter()
+                .all(|value| matches!(value, ScanAxisValue::Int(_) | ScanAxisValue::Float(_)))
+            {
+                DataType::Float64
+            } else {
+                DataType::Utf8
+            }
+        }
+    }
+}
+
+fn logical_axis_array(mode: &ResolvedScanAxisMode, values: &[Option<ScanAxisValue>]) -> ArrayRef {
+    match logical_axis_data_type(mode) {
+        DataType::Boolean => Arc::new(BooleanArray::from(
+            values
+                .iter()
+                .map(|value| match value {
+                    Some(ScanAxisValue::Bool(value)) => Some(*value),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+        )),
+        DataType::Float64 => numeric_axis_array(values),
+        DataType::Utf8 => Arc::new(StringArray::from(
+            values
+                .iter()
+                .map(|value| value.as_ref().map(scan_axis_value_to_string))
+                .collect::<Vec<_>>(),
+        )),
+        _ => unreachable!("logical scan axes only use bool, numeric, or string arrays"),
+    }
+}
+
+fn numeric_axis_array(values: &[Option<ScanAxisValue>]) -> ArrayRef {
+    Arc::new(Float64Array::from(
+        values
+            .iter()
+            .map(|value| match value.as_ref()? {
+                ScanAxisValue::Int(value) => Some(*value as f64),
+                ScanAxisValue::Float(value) => Some(*value),
+                ScanAxisValue::Bool(_) | ScanAxisValue::String(_) => None,
+            })
+            .collect::<Vec<_>>(),
+    ))
+}
+
+fn scan_axis_value_to_string(value: &ScanAxisValue) -> String {
+    match value {
+        ScanAxisValue::String(value) => value.clone(),
+        ScanAxisValue::Int(value) => value.to_string(),
+        ScanAxisValue::Float(value) => value.to_string(),
+        ScanAxisValue::Bool(value) => value.to_string(),
     }
 }
 
