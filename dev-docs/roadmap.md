@@ -31,8 +31,19 @@ This roadmap includes future product direction and should not be used as proof
 that experiment, parameter, workflow, device, provenance, AI automation, or
 semantic-manifest behavior has already landed.
 
-The pre-adoption measurement-system redesign note is the broad foundation
-proposal for the next product phase:
+The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
+
+- `v0.2/README.md` is the canonical entry point for v0.2 planning.
+- `v0.2/product-direction.md` repositions Fricon as a local lab data library
+  and automation foundation centered on samples, sessions, experiment runs,
+  dataset artifacts, parameter history, code summaries, and calibration
+  history.
+- `v0.2/technical-direction.md` defines the proposed distribution surfaces,
+  data-library service model, desktop/web UI direction, remote/auth boundary,
+  and rewrite strategy.
+
+The pre-adoption measurement-system redesign note remains the broad foundation
+proposal behind the v0.2 reset:
 
 - `measurement-system-foundation-redesign.md` defines the proposed breaking
   redesign direction for dataset artifacts, run-like producer/consumer

@@ -16,9 +16,10 @@ Start here when orienting a new human or AI contributor:
 
 1. `project-intent.md`
 2. `roadmap.md`
-3. `maintenance-checklist.md`
-4. `pr-preflight-checklist.md`
-5. The topic-specific note for the area being changed
+3. `v0.2/README.md` when working on the proposed v0.2 reset
+4. `maintenance-checklist.md`
+5. `pr-preflight-checklist.md`
+6. The topic-specific note for the area being changed
 
 For narrow tasks, prefer the task-specific starting points below over reading
 every canonical document.
@@ -33,6 +34,7 @@ every canonical document.
 | Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Public docs unless behavior is user-visible                            |
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
 | Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
+| v0.2 product or architecture reset          | `v0.2/README.md`                         | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `measurement-system-foundation-redesign.md`, `adr/README.md` | Treating v0.2 proposal content as current behavior                     |
 | Measurement-system foundation redesign      | `measurement-system-foundation-redesign.md` | `project-intent.md`, `roadmap.md`, `dataset-semantic-architecture-proposal.md`, `experiment-run-and-runner-design.md`, `adr/README.md` | Treating redesign proposal content as current behavior                 |
 | Parameter management product planning       | `parameter-management-design.md`         | `project-intent.md`, `roadmap.md`, `adr/README.md`                                                | Treating proposal content as current behavior                          |
 | Future concept capture                      | `future-concepts.md`                     | `project-intent.md`, `roadmap.md`                                                                 | Creating implementation issues before the concept is narrowed          |
@@ -84,6 +86,9 @@ checklist, policy, or guideline.
 This file describes proposed future direction. Do not treat it as current
 implementation fact unless the implementation has already landed.
 
+- `v0.2/` - canonical planning directory for the proposed v0.2 reset, including
+  the local data-library product direction, sample/session model, distribution
+  surfaces, remote/auth boundary, and rewrite strategy
 - `measurement-system-foundation-redesign.md` - proposed pre-adoption breaking
   redesign direction for dataset artifacts, run-like provenance, V1 mental
   model, and future calibration foundations
