@@ -94,7 +94,16 @@ function semanticAxisOptions(
   }
 
   const seen = new Set<string>();
-  return [...chartSemantics.chartAxisCandidates, ...chartSemantics.axes]
+  const semanticAxisById = new Map(
+    chartSemantics.axes.map((axis) => [axis.id, axis]),
+  );
+  const orderedAxes = [
+    ...chartSemantics.chartAxisCandidates.map(
+      (axis) => semanticAxisById.get(axis.id) ?? axis,
+    ),
+    ...chartSemantics.axes,
+  ];
+  return orderedAxes
     .filter((axis) => axis.numeric)
     .filter((axis) => {
       if (seen.has(axis.id)) return false;

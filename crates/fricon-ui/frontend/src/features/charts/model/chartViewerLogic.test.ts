@@ -417,4 +417,74 @@ describe("chartViewerLogic", () => {
       "column:physicalAxis",
     );
   });
+
+  it("keeps compatibility index axes available for sweep/group roles", () => {
+    const columns = [
+      makeColumn({ name: "run", isIndex: true }),
+      makeColumn({ name: "step", isIndex: true }),
+      makeColumn({ name: "signal" }),
+    ];
+    const derived = deriveChartViewerState(columns, makeState(), {
+      source: "compatibility_inference",
+      duplicatePolicy: "compatibility_row_order_placeholder",
+      indexRealization: "none",
+      axes: [
+        {
+          id: "column:run",
+          name: "run",
+          label: null,
+          kind: "column",
+          numeric: true,
+          isCompatibility: true,
+          physicalColumn: "run",
+        },
+        {
+          id: "column:step",
+          name: "step",
+          label: null,
+          kind: "column",
+          numeric: true,
+          isCompatibility: true,
+          physicalColumn: "step",
+        },
+      ],
+      valueColumns: [
+        {
+          id: "column:signal",
+          name: "signal",
+          label: null,
+          isComplex: false,
+          isTrace: false,
+          hiddenByDefault: false,
+        },
+      ],
+      chartAxisCandidates: [
+        {
+          id: "column:run",
+          name: "run",
+          label: null,
+          kind: "column",
+          numeric: true,
+          isCompatibility: false,
+          physicalColumn: "run",
+        },
+        {
+          id: "column:step",
+          name: "step",
+          label: null,
+          kind: "column",
+          numeric: true,
+          isCompatibility: false,
+          physicalColumn: "step",
+        },
+      ],
+    });
+
+    expect(derived.sweepAxisOptions.map((column) => column.name)).toEqual([
+      "column:run",
+      "column:step",
+    ]);
+    expect(derived.effectiveSweepIndexColumnName).toBe("column:step");
+    expect(derived.liveMonitorTraceGroupIndexColumnNames).toEqual(["column:run"]);
+  });
 });
