@@ -5,14 +5,17 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use arrow_array::{Array, ArrayRef, BooleanArray, Float64Array, RecordBatch, StringArray};
-use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use arrow_array::{
+    Array, ArrayRef, BooleanArray, Float64Array, RecordBatch, StringArray, StructArray,
+};
+use arrow_schema::{DataType, Field, Fields, Schema, SchemaRef};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
 use fricon::{
     DatasetDataType, DatasetInterpretation, DatasetReader, DatasetSchema, InterpretationSource,
     ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ScalarKind,
     SelectOptions, dataset::semantics::ScanAxisValue,
 };
+use indexmap::IndexMap;
 
 use super::types::ChartCommonOptions;
 use crate::desktop_runtime::session::WorkspaceSession;
@@ -62,21 +65,28 @@ pub(crate) async fn prepare_chart_data(
     id: i32,
     common: &ChartCommonOptions,
     filters: &[(String, serde_json::Value)],
+    selected_columns: Option<&[usize]>,
 ) -> Result<PreparedChartData> {
     let dataset = session.dataset(id).await?;
     let interpretation = dataset.interpret()?;
     let source_schema = dataset.schema()?.clone();
     let (start, end) = resolve_row_range(&dataset, common.start, common.end);
+    let selected_physical_columns =
+        selected_physical_columns(&source_schema, selected_columns, filters)?;
     let (output_schema, batches) = dataset.select_data(&SelectOptions {
         start: Bound::Included(start),
         end: Bound::Excluded(end),
         index_filters: None,
-        selected_columns: None,
+        selected_columns: selected_physical_columns.clone(),
     })?;
     let batch = concat_or_empty(output_schema, batches)?;
+    let selected_schema = selected_physical_columns.as_deref().map_or_else(
+        || Ok(source_schema.clone()),
+        |columns| project_schema(&source_schema, columns),
+    )?;
     prepare_batch_from_reader(
         &dataset,
-        &source_schema,
+        &selected_schema,
         &interpretation,
         batch,
         start,
@@ -172,7 +182,11 @@ fn prepare_batch_from_reader(
     batch = apply_semantic_filters(batch, filters)?;
     let index_columns = resolve_index_columns(interpretation, &schema).or_else(|| {
         fallback_to_inferred_index_columns(interpretation)
-            .then(|| dataset.try_index_columns().ok().flatten())
+            .then(|| {
+                let full_schema = dataset.schema().ok()?;
+                let indices = dataset.try_index_columns().ok().flatten()?;
+                Some(map_full_index_columns(full_schema, &schema, &indices))
+            })
             .flatten()
     });
     Ok(PreparedChartData {
@@ -186,6 +200,65 @@ fn fallback_to_inferred_index_columns(interpretation: &DatasetInterpretation) ->
     interpretation.source == InterpretationSource::CompatibilityInference
         || (interpretation.scan_axes.is_empty()
             && interpretation.chart_axis_candidate_columns.is_empty())
+}
+
+fn selected_physical_columns(
+    source_schema: &DatasetSchema,
+    selected_columns: Option<&[usize]>,
+    filters: &[(String, serde_json::Value)],
+) -> Result<Option<Vec<usize>>> {
+    let Some(selected_columns) = selected_columns else {
+        return Ok(None);
+    };
+
+    let mut physical_columns = Vec::new();
+    for &index in selected_columns {
+        if index < source_schema.columns().len() {
+            push_unique(&mut physical_columns, index);
+        }
+    }
+    for (field, _) in filters {
+        let column_name = resolve_axis_column_name(field);
+        if let Some((index, _, _)) = source_schema.columns().get_full(&column_name) {
+            push_unique(&mut physical_columns, index);
+        }
+    }
+    Ok(Some(physical_columns))
+}
+
+fn push_unique(columns: &mut Vec<usize>, index: usize) {
+    if !columns.contains(&index) {
+        columns.push(index);
+    }
+}
+
+fn project_schema(source_schema: &DatasetSchema, columns: &[usize]) -> Result<DatasetSchema> {
+    let mut projected = IndexMap::new();
+    for &index in columns {
+        let (name, dtype) = source_schema
+            .columns()
+            .get_index(index)
+            .with_context(|| format!("Selected dataset column index out of bounds: {index}"))?;
+        projected.insert(name.clone(), *dtype);
+    }
+    Ok(DatasetSchema::new(projected))
+}
+
+fn map_full_index_columns(
+    full_schema: &DatasetSchema,
+    selected_schema: &DatasetSchema,
+    indices: &[usize],
+) -> Vec<usize> {
+    indices
+        .iter()
+        .filter_map(|&index| {
+            let name = full_schema.columns().get_index(index)?.0;
+            selected_schema
+                .columns()
+                .get_full(name)
+                .map(|(selected_index, _, _)| selected_index)
+        })
+        .collect()
 }
 
 fn append_logical_axes(
@@ -460,8 +533,39 @@ fn json_value_at(array: &dyn Array, row: usize) -> Result<serde_json::Value> {
                 .context("Expected StringArray")?;
             Ok(serde_json::Value::from(array.value(row)))
         }
+        DataType::Struct(fields) if is_complex_fields(fields) => {
+            let array = array
+                .as_any()
+                .downcast_ref::<StructArray>()
+                .context("Expected complex StructArray")?;
+            let real = array
+                .column(0)
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .context("Expected complex real Float64Array")?
+                .value(row);
+            let imag = array
+                .column(1)
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .context("Expected complex imag Float64Array")?
+                .value(row);
+            Ok(serde_json::json!({
+                "real": real,
+                "imag": imag,
+            }))
+        }
         other => bail!("Unsupported semantic axis data type: {other}"),
     }
+}
+
+fn is_complex_fields(fields: &Fields) -> bool {
+    fields.as_ref().as_array::<2>().is_some_and(|[real, imag]| {
+        real.name() == "real"
+            && imag.name() == "imag"
+            && matches!(real.data_type(), DataType::Float64)
+            && matches!(imag.data_type(), DataType::Float64)
+    })
 }
 
 fn filter_batch(batch: &RecordBatch, mask: &[bool]) -> Result<RecordBatch> {
@@ -503,6 +607,8 @@ fn resolve_row_range(
 
 #[cfg(test)]
 mod tests {
+    use arrow_array::StructArray;
+
     use super::*;
 
     fn point(record_id: u64, indices: Vec<u64>) -> ResolvedLogicalIndexPoint {
@@ -538,5 +644,49 @@ mod tests {
 
         assert!(projected.contains_key(&0));
         assert!(projected.contains_key(&1));
+    }
+
+    #[test]
+    fn selected_physical_columns_keep_requested_payloads_and_filter_axes() {
+        let source_schema = DatasetSchema::new(IndexMap::from([
+            (
+                "quantity".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "axis".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+        ]));
+
+        let selected = selected_physical_columns(
+            &source_schema,
+            Some(&[0, 2]),
+            &[("column:axis".to_string(), serde_json::json!(1.0))],
+        )
+        .expect("selected columns");
+
+        assert_eq!(selected, Some(vec![0, 1]));
+    }
+
+    #[test]
+    fn json_value_at_serializes_complex_struct_axes() {
+        let array = StructArray::new(
+            vec![
+                Field::new("real", DataType::Float64, false),
+                Field::new("imag", DataType::Float64, false),
+            ]
+            .into(),
+            vec![
+                Arc::new(Float64Array::from(vec![1.0])) as ArrayRef,
+                Arc::new(Float64Array::from(vec![2.0])) as ArrayRef,
+            ],
+            None,
+        );
+
+        assert_eq!(
+            json_value_at(&array, 0).expect("complex value"),
+            serde_json::json!({"real": 1.0, "imag": 2.0})
+        );
     }
 }

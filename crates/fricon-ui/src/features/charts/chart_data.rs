@@ -11,7 +11,9 @@ use crate::{
     features::charts::{
         transform::{
             build_heatmap_series, build_live_heatmap_series, build_live_xy_series, build_xy_series,
-            compute_group_starts, resolve_xy_trace_roles,
+            compute_group_starts,
+            mapping::{build_chart_selected_columns, build_live_chart_selected_columns},
+            resolve_xy_trace_roles,
         },
         types::{
             ChartCommonOptions, ChartSnapshot, FlatSeries, FlatXYSeries, HeatmapChartDataOptions,
@@ -59,6 +61,7 @@ async fn prepare_live_range(
     id: i32,
     start: usize,
     end: usize,
+    selected_columns: Option<&[usize]>,
 ) -> anyhow::Result<semantic_source::PreparedChartData> {
     let common = ChartCommonOptions {
         start: Some(start),
@@ -66,12 +69,13 @@ async fn prepare_live_range(
         index_filters: None,
         exclude_columns: None,
     };
-    semantic_source::prepare_chart_data(session, id, &common, &[]).await
+    semantic_source::prepare_chart_data(session, id, &common, &[], selected_columns).await
 }
 
 async fn resolve_group_tail_start(
     session: &WorkspaceSession,
     id: i32,
+    schema: &DatasetSchema,
     grouping_index_columns: &[usize],
     total_rows: usize,
     required_groups: usize,
@@ -80,16 +84,26 @@ async fn resolve_group_tail_start(
         return Ok(0);
     }
 
+    let grouping_column_names = column_names(schema, grouping_index_columns)?;
     let mut window_rows = required_groups.max(1);
     loop {
         let range_start = total_rows.saturating_sub(window_rows);
         let scan_start = range_start.saturating_sub(1);
-        let prepared = prepare_live_range(session, id, scan_start, total_rows).await?;
+        let prepared = prepare_live_range(
+            session,
+            id,
+            scan_start,
+            total_rows,
+            Some(grouping_index_columns),
+        )
+        .await?;
+        let projected_grouping_index_columns =
+            column_indices(&prepared.schema, &grouping_column_names)?;
 
         if let Some(start) = resolve_group_tail_start_in_scan_batch(
             &prepared.batch,
             &prepared.schema,
-            grouping_index_columns,
+            &projected_grouping_index_columns,
             scan_start,
             range_start,
             required_groups,
@@ -103,6 +117,32 @@ async fn resolve_group_tail_start(
 
         window_rows = window_rows.saturating_mul(2).min(total_rows);
     }
+}
+
+fn column_names(schema: &DatasetSchema, columns: &[usize]) -> anyhow::Result<Vec<String>> {
+    columns
+        .iter()
+        .map(|&index| {
+            schema
+                .columns()
+                .get_index(index)
+                .map(|(name, _)| name.clone())
+                .with_context(|| format!("Column index '{index}' not found"))
+        })
+        .collect()
+}
+
+fn column_indices(schema: &DatasetSchema, columns: &[String]) -> anyhow::Result<Vec<usize>> {
+    columns
+        .iter()
+        .map(|name| {
+            schema
+                .columns()
+                .get_full(name)
+                .map(|(index, _, _)| index)
+                .with_context(|| format!("Column '{name}' not found"))
+        })
+        .collect()
 }
 
 fn plot_mode_is_trace(
@@ -140,7 +180,7 @@ async fn resolve_live_row_start(
         return Ok(0);
     }
 
-    let prepared = prepare_live_range(session, id, 0, 0).await?;
+    let prepared = prepare_live_range(session, id, 0, 0, None).await?;
     let schema = &prepared.schema;
     let index_columns = prepared.index_columns.as_deref();
     match options {
@@ -155,8 +195,15 @@ async fn resolve_live_row_start(
             if roles.trace_group.is_empty() {
                 Ok(total_rows.saturating_sub(tail_count))
             } else {
-                resolve_group_tail_start(session, id, &roles.trace_group, total_rows, tail_count)
-                    .await
+                resolve_group_tail_start(
+                    session,
+                    id,
+                    schema,
+                    &roles.trace_group,
+                    total_rows,
+                    tail_count,
+                )
+                .await
             }
         }
         LiveChartDataOptions::Heatmap(opts) => {
@@ -170,6 +217,7 @@ async fn resolve_live_row_start(
                         resolve_group_tail_start(
                             session,
                             id,
+                            schema,
                             &idx_cols[..idx_cols.len() - 1],
                             total_rows,
                             1,
@@ -183,6 +231,7 @@ async fn resolve_live_row_start(
                     resolve_group_tail_start(
                         session,
                         id,
+                        schema,
                         &idx_cols[..idx_cols.len() - 2],
                         total_rows,
                         1,
@@ -212,8 +261,16 @@ pub(crate) async fn dataset_chart_data(
     } else {
         Vec::new()
     };
-    let prepared = semantic_source::prepare_chart_data(session, id, common, &filters).await?;
     let resolved_options = resolve_dataset_chart_options(options);
+    let metadata = prepare_live_range(session, id, 0, 0, None).await?;
+    let selected_columns = build_chart_selected_columns(
+        &metadata.schema,
+        metadata.index_columns.as_deref(),
+        &resolved_options,
+    )?;
+    let prepared =
+        semantic_source::prepare_chart_data(session, id, common, &filters, Some(&selected_columns))
+            .await?;
     let chart_type = options.view_name();
     debug!(
         dataset_id = id,
@@ -257,7 +314,14 @@ pub(crate) async fn dataset_live_chart_data(
     let total_rows = dataset.num_rows();
     let resolved_options = resolve_live_chart_options(options);
     let start = resolve_live_row_start(session, id, total_rows, &resolved_options).await?;
-    let prepared = prepare_live_range(session, id, start, total_rows).await?;
+    let metadata = prepare_live_range(session, id, 0, 0, None).await?;
+    let selected_columns = build_live_chart_selected_columns(
+        &metadata.schema,
+        metadata.index_columns.as_deref(),
+        &resolved_options,
+    )?;
+    let prepared =
+        prepare_live_range(session, id, start, total_rows, Some(&selected_columns)).await?;
     debug!(
         dataset_id = id,
         start,
@@ -314,8 +378,14 @@ pub(crate) async fn dataset_live_chart_data(
         });
     }
 
-    let previous_prepared =
-        prepare_live_range(session, id, previous_start, known_row_count).await?;
+    let previous_prepared = prepare_live_range(
+        session,
+        id,
+        previous_start,
+        known_row_count,
+        Some(&selected_columns),
+    )
+    .await?;
     let previous_snapshot = build_live_snapshot(
         &previous_prepared.batch,
         &previous_prepared.schema,

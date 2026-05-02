@@ -194,10 +194,7 @@ fn column_axis(column: &ResolvedColumn, is_compatibility: bool) -> ChartSemantic
 }
 
 fn dtype_is_chart_axis_numeric(dtype: &DatasetDType) -> bool {
-    matches!(
-        dtype,
-        DatasetDType::Float64 | DatasetDType::Float32 | DatasetDType::Int64 | DatasetDType::UInt64
-    )
+    matches!(dtype, DatasetDType::Float64)
 }
 
 fn scan_axis_value_is_numeric(value: &ScanAxisValue) -> bool {
