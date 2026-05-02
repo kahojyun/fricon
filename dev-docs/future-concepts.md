@@ -190,6 +190,9 @@ Boundary:
 - Owns lineage links between datasets, runs, imports, exports, processing
   steps, simulations, source metadata, quality flags, invalidation or
   supersession records, correction links, review notes, and status summaries.
+- Owns producer/consumer provenance edges that connect concrete activity
+  records, such as experiment, analysis, import, simulation, and calibration
+  runs, to their input and output datasets or artifacts.
 - Does not own raw dataset payload layout, parameter registry history, or
   analysis algorithms.
 - Does not own Arrow payload facts, chart projection semantics, or parameter
@@ -201,6 +204,9 @@ Likely interfaces:
 - import/export workflows record source, destination, conversion, and checksum
   summaries
 - processed datasets link to input datasets and processing context
+- analysis, import, simulation, and calibration activity records use shared
+  input/output provenance edges instead of forcing all datasets to be owned by
+  experiment runs
 - dataset and run views expose lineage, quality/status badges, filters, and
   provenance summaries
 - corrections and invalidations are recorded as events instead of silent edits
@@ -220,13 +226,61 @@ Open questions:
 
 - Which dataset kinds should be first-class?
 - How much import/export provenance is needed for useful reproducibility?
-- Should simulation outputs use run records, processing records, or a distinct
-  simulation-run model?
 - How should lineage survive dataset archive export and import?
 - Which quality states apply to datasets, runs, or both?
 - Should invalidation block downstream use or only warn?
 - How should superseded datasets relate to processed replacements?
 - Which status changes require a reason, source, or audit event?
+
+## Analysis Runs And Derived Results
+
+Status: future concept, ADR needed later.
+
+Why it matters:
+
+- Analysis often consumes measured datasets and produces processed datasets,
+  figures, metrics, reports, or parameter update proposals.
+- Derived results should be connected to the measurement that produced their
+  inputs without being stored as children inside the experiment run.
+- Automatic calibration needs a clean analysis record before it can explain why
+  a parameter proposal was created.
+
+Boundary:
+
+- Owns analysis identity, input links, output links, analysis parameters,
+  result summaries, quality state, and links to generated datasets, artifacts,
+  reports, or parameter proposals.
+- Does not own experiment execution, raw dataset semantics, parameter registry
+  commits, workflow scheduling, or device application.
+
+Likely interfaces:
+
+- consumes datasets, experiment runs, parameter snapshots, or artifacts through
+  shared input provenance edges
+- produces processed datasets, analysis results, figures, reports, metrics, or
+  parameter proposals through output provenance edges
+- records enough source context for reproducibility without becoming a generic
+  notebook-state capture system
+- feeds calibration, optimization, benchmark, report, and AI-assistance
+  workflows
+
+Dependencies:
+
+- durable dataset semantics
+- experiment run model
+- shared run input/output provenance edges
+- parameter proposal flow for analysis-driven updates
+- event or audit log model for accepted corrections or promoted results
+
+Open questions:
+
+- Which analysis outputs should be first-class versus generic artifacts?
+- Should simple ad hoc analysis from notebooks create `AnalysisRun` records, or
+  should users opt in explicitly?
+- How much code and environment summary is useful for analysis without turning
+  Fricon into a full notebook or Git history manager?
+- How should the desktop UI present downstream analyses from an experiment run?
+- Which analysis results may drive automatic calibration proposals?
 
 ## Workspace Event And Audit Timeline
 
@@ -286,10 +340,27 @@ Why it matters:
   triggers, expected inputs, generated outputs, approval checkpoints, and
   failure records.
 - Calibration is an important workflow family that should connect old
-  parameters, runs, datasets, analysis results, proposed parameter changes,
-  validation, and promoted snapshots.
+  parameters, managed experiment runs, measured datasets, analysis runs,
+  analysis results, proposed parameter changes, validation, and promoted
+  snapshots.
 - Calibration should not silently mutate `main` or any recommended parameter
   profile during data collection.
+
+Clean automatic calibration should look like:
+
+```text
+CalibrationWorkflowDefinition
+  -> CalibrationWorkflowRun
+      -> ManagedExperimentRun produces measured Dataset
+      -> AnalysisRun consumes measured Dataset
+      -> AnalysisRun produces AnalysisResult and ParameterProposal
+      -> ValidationResult checks proposal
+      -> Approval or policy gate promotes snapshot to ParameterRef
+```
+
+The calibration workflow coordinates the chain. It should not make measured
+datasets children of the calibration record, and it should not embed analysis
+results inside the original experiment run.
 
 Boundary:
 
@@ -305,9 +376,9 @@ Boundary:
 
 Likely interfaces:
 
-- creates experiment runs or run plans
+- creates managed experiment runs or run plans
 - consumes parameter profiles or bindings
-- receives analysis results and parameter proposals
+- creates or receives analysis runs, analysis results, and parameter proposals
 - creates parameter proposals against a base parameter snapshot
 - requests promotion of a validated parameter snapshot to a profile/ref
 - may request human approval before mutating parameters, workflows, or devices
@@ -317,6 +388,8 @@ Likely interfaces:
 Dependencies:
 
 - experiment run model
+- analysis run and derived-result model
+- shared run input/output provenance edges
 - parameter proposal flow
 - analysis result records
 - event or audit log model

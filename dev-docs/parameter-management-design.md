@@ -561,8 +561,9 @@ Recommended flow:
 
 ```text
 old snapshot
-  -> run
-  -> dataset
+  -> experiment run
+  -> measured dataset
+  -> analysis run
   -> analysis result
   -> parameter update proposal
   -> draft
@@ -943,6 +944,12 @@ Analysis, calibration, optimizers, and future AI assistants should propose
 parameter changes as patches. The registry should store the proposal, preserve
 its source links, apply it to a draft, validate it, and commit it only through
 an explicit mutation path.
+
+Analysis should be represented as a producer/consumer activity when that model
+exists: it consumes datasets, runs, parameter snapshots, or artifacts and
+produces analysis results, processed datasets, reports, or parameter proposals.
+Calibration workflows should depend on those analysis outputs rather than
+embedding analysis results inside the original experiment run.
 
 ```python
 proposal = params.create_proposal(

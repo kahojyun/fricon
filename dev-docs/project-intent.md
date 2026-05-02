@@ -57,6 +57,28 @@ scientific measurement datasets. Dataset semantics should be explicit enough
 that later experiment, parameter, and device concepts do not have to be hidden
 inside dataset names, incidental metadata, or chart heuristics.
 
+The first adoption milestone is replacing a simple LabRAD Grapher/Data Vault
+style experiment logger for new measurement work. V1 should let users record new
+experiments from Python, inspect datasets in the desktop UI, keep run-level
+context beside produced data, and reopen outputs from Python without depending
+on the old logger. Importing or fully browsing legacy LabRAD/Data Vault history
+is a follow-up migration concern, not a V1 requirement.
+
+The primary V1 user mental model is:
+
+```text
+I ran an experiment.
+It produced datasets.
+Fricon helps me inspect, annotate, recover, and reopen them.
+```
+
+Interactive experiment runs should become the recommended path for measurement
+work once the run API exists. Datasets remain independently addressable data
+artifacts, not owned children that can only belong to experiments. This keeps
+room for future analysis, import, simulation, and calibration activities that
+consume existing datasets and produce new datasets, results, reports, or
+parameter proposals.
+
 Initial experiment support should lean on Python scripts as the execution
 entry point. The desktop UI should browse, inspect, and eventually assist those
 workflows, but should not become the primary experiment execution engine before

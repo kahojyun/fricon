@@ -16,6 +16,8 @@ and generic script execution in Fricon.
 The design should help users answer:
 
 - Which scientific experiment attempt produced these datasets?
+- Which later analysis, import, simulation, or calibration activity consumed or
+  produced these datasets?
 - Which immutable parameter state was used for that attempt?
 - Which script executions actually ran?
 - Which execution failed, retried, or continued a partial write?
@@ -70,6 +72,16 @@ run, resource requirement, and resource lease model should be documented now so
 the experiment model does not block future execution work, but implementation
 can start with run records and dataset provenance.
 
+V1 should also be sufficient to replace a simple LabRAD Grapher/Data Vault style
+experiment logger for new measurement work. This means users can record new
+experiments into Fricon, inspect the resulting datasets in the desktop UI, keep
+run-level context beside the data, and reopen outputs from Python without
+continuing to depend on the old logger.
+
+V1 LabRAD-style replacement does not include bulk migration or full browsing of
+legacy LabRAD/Data Vault history. Importing old history can be a follow-up
+migration feature once the new run, dataset, and metadata boundaries are stable.
+
 Settled user-facing policies:
 
 - experiment submission should support two product modes:
@@ -85,6 +97,10 @@ Settled user-facing policies:
   troubleshooting
 - analysis scripts are future derived-dataset provenance, not core
   `ExperimentRun` v1 behavior
+- dataset-only creation remains valid and should create unassigned datasets
+  unless the caller explicitly supplies an experiment context
+- datasets are independent artifacts that may later be produced by experiments,
+  analysis runs, import runs, simulation runs, or calibration workflows
 - interactive experiment parameter snapshots are optional; user-provided
   metadata can bridge existing code until the parameter system is adopted
 - managed or parameter-aware runs should require a resolved immutable parameter
@@ -98,6 +114,10 @@ Settled user-facing policies:
 - default run names should use a template or script label plus timestamp
 - notes should be easy to add, but Fricon should not interrupt run start or
   completion with required note prompts
+- experiment-level notes, tags, pin or favorite state, quality state, and legacy
+  JSON metadata should live on the run by default
+- dataset metadata should stay focused on output-local semantics, per-output
+  notes, and per-output quality exceptions
 - interrupted partial datasets should default to `suspect` until the user
   continues, validates, or invalidates them
 - run detail views should lead with produced datasets
@@ -125,12 +145,42 @@ higher layers that reference runner records.
 The user-facing scientific model should stay close to:
 
 ```text
-ExperimentRun -> Dataset
+ExperimentRun -> produced Dataset
 ```
 
-One experiment run can produce multiple datasets. Retry and resume details should
-not force users to understand execution internals when they only need to browse
-experiment outputs.
+One experiment run can produce multiple datasets. This is a link, not exclusive
+ownership: datasets remain independently addressable artifacts and future
+analysis, import, simulation, and calibration activities may also produce or
+consume datasets. Retry and resume details should not force users to understand
+execution internals when they only need to browse experiment outputs.
+
+Dataset-only creation should remain a lower-level path. It is useful for
+imports, standalone tables, tests, transitional scripts, and future derived
+outputs that are not naturally part of a measurement attempt. Dataset writers
+should link to an experiment run only through an explicit run context or
+ownership argument, not by silently creating synthetic experiments at the
+storage layer.
+
+### Keep Activity Provenance Graph-Shaped
+
+Future analysis, import, simulation, calibration, and workflow systems should
+share a producer/consumer provenance pattern:
+
+```text
+concrete run record consumes inputs and produces outputs
+```
+
+Concrete user-facing run types should remain meaningful:
+
+- `ExperimentRun` for measurement attempts
+- `AnalysisRun` for processing, fitting, summarizing, and derived outputs
+- `ImportRun` for external data ingestion
+- `SimulationRun` for generated data
+- `CalibrationRun` or `WorkflowRun` for coordinated multi-step automation
+
+The shared provenance model should connect these records to datasets,
+artifacts, parameter snapshots, analysis results, and parameter proposals
+without forcing all activity types into the experiment model.
 
 ### Make Retry And Resume Auditable
 
@@ -186,6 +236,15 @@ Experiment layer
   Dataset relationship
   DatasetWriteSession provenance
 
+Future activity provenance layer
+  AnalysisRun
+  ImportRun
+  SimulationRun
+  RunInput
+  RunOutput
+  AnalysisResult
+  ParameterProposal link
+
 Future execution layer
   TaskQueueEntry
   ScriptRun
@@ -209,6 +268,10 @@ may attach domain meaning to tasks and script runs.
 | Term                  | Meaning                                                                |
 | --------------------- | ---------------------------------------------------------------------- |
 | `ExperimentRun`       | One scientific experiment attempt.                                     |
+| `AnalysisRun`         | Future record for processing, fitting, summarizing, or deriving data.  |
+| `RunInput`            | Future provenance edge from a run to a consumed dataset, run, parameter snapshot, or artifact. |
+| `RunOutput`           | Future provenance edge from a run to a produced dataset, result, proposal, or artifact. |
+| `AnalysisResult`      | Future structured analysis outcome that may support reports, decisions, or parameter proposals. |
 | `TaskQueueEntry`      | One queued executable unit before it starts.                           |
 | `ScriptRun`           | One actual script execution attempt.                                   |
 | `Dataset`             | One data artifact with dataset-local semantics.                        |
@@ -250,16 +313,23 @@ Script run identity is about runtime facts:
 
 ### Dataset Identity
 
-Dataset identity remains dataset-local. A dataset is not owned by a script run.
-It may be produced under an experiment run and receive appended records from one
-or more script runs through write sessions.
+Dataset identity remains dataset-local. A dataset is not owned by a script run
+or by an experiment run. It may be produced under an experiment run and receive
+appended records from one or more script runs through write sessions. Future
+analysis, import, simulation, and calibration activities may also produce or
+consume datasets through provenance edges.
+
+The dataset layer should not silently create experiment records. A dataset may
+remain unassigned when created through a dataset-only API. Higher-level run,
+analysis, import, or workflow APIs own the decision to link a dataset to a
+producer record.
 
 ## Relationships
 
 The record-centric v1 subset is:
 
 ```text
-ExperimentRun 1 -> many Dataset
+ExperimentRun 1 -> many produced Dataset links
 ExperimentRun 0/1 -> 1 EffectiveParameterSnapshot
 ExperimentRun 1 -> many DatasetWriteSession
 ```
@@ -267,7 +337,7 @@ ExperimentRun 1 -> many DatasetWriteSession
 When the generic runner is implemented, the fuller relationship model becomes:
 
 ```text
-ExperimentRun 1 -> many Dataset
+ExperimentRun 1 -> many produced Dataset links
 ExperimentRun 1 -> many TaskQueueEntry
 ExperimentRun 1 -> many ScriptRun
 ExperimentRun 0/1 -> 1 EffectiveParameterSnapshot
@@ -275,6 +345,16 @@ ExperimentRun 0/1 -> 1 EffectiveParameterSnapshot
 TaskQueueEntry 1   -> 0/1 ScriptRun
 ScriptRun      1   -> many DatasetWriteSession
 Dataset        1   -> many DatasetWriteSession
+```
+
+Future derived-data provenance should extend the relationship model without
+changing dataset identity:
+
+```text
+AnalysisRun 1 -> many RunInput links
+AnalysisRun 1 -> many RunOutput links
+RunInput  -> Dataset | ExperimentRun | ParameterSnapshot | Artifact
+RunOutput -> Dataset | AnalysisResult | ParameterProposal | Artifact
 ```
 
 Notes:
@@ -285,8 +365,8 @@ Notes:
   to the same logical dataset.
 - Before generic runner implementation, a write session may record only passive
   execution metadata instead of a durable `script_run_id`.
-- Imported, processed, or simulation datasets may have different owning
-  provenance in future designs.
+- Imported, processed, or simulation datasets should use the same provenance
+  pattern rather than pretending every dataset is experiment-owned.
 
 ## ExperimentRun
 
@@ -932,12 +1012,15 @@ that migration can start with low risk.
 
 Acceptance notes:
 
+- V1 migration means new work can move to Fricon without depending on the old
+  logger
 - run metadata can store legacy JSON context
 - attachments can preserve external configuration files, screenshots, or logs
 - datasets remain readable as outputs of the run
 - Fricon does not treat arbitrary JSON metadata as structured parameter history
 - users can gradually move stable concepts into parameter snapshots, run
   fields, or future sample/device records
+- bulk import or full browsing of legacy data-vault history is future scope
 
 ### Recover From An Interrupted Measurement
 
@@ -996,17 +1079,14 @@ Acceptance notes:
 - future runner implementation can create task and script-run records
 - produced datasets are linked through dataset write sessions
 
-## Future Boundary Discussion: Dataset Vs Experiment Metadata
+## Settled V1 Boundary: Dataset Vs Experiment Metadata
 
-This proposal intentionally leaves a follow-up boundary discussion around
-metadata ownership.
+This proposal settles the default V1 ownership boundary for new interactive
+experiment workflows. Experiment-level organization should live on the run, not
+be duplicated onto every produced dataset. Dataset metadata remains available
+for output-specific meaning and exceptions.
 
-Fricon's current dataset model includes user organization concepts that may
-overlap with future experiment-run behavior. As experiment runs become
-first-class, some user actions may be more natural on runs than on individual
-datasets.
-
-Likely ownership direction:
+V1 ownership direction:
 
 ```text
 ExperimentRun metadata
@@ -1025,11 +1105,8 @@ Dataset metadata
   per-output quality when a single dataset differs from the whole run
 ```
 
-Questions to settle later:
+Remaining questions to settle later:
 
-- Which current dataset tags, favorites, notes, or quality fields should move
-  to runs?
-- Which fields should exist on both runs and datasets?
 - How should dataset list views behave when most organization happens at the
   experiment-run level?
 - How should imports from external data vaults map legacy metadata into run
@@ -1083,12 +1160,13 @@ Questions to settle later:
 - Should `ws.dataset(...)` remain a first-class public convenience path, or be
   positioned as a lower-level dataset-only path?
 - How should dataset writers discover or inherit the current experiment context?
-- Should every measured dataset eventually have an owning experiment run?
 - Should imported or legacy datasets create synthetic import runs, remain
   dataset-only, or support both?
 - Should the desktop home view be run-first, dataset-first, or split by task?
 - How should search, tags, favorites, quality, and recent activity behave when
   users primarily act on experiment runs?
+- How should unassigned datasets be surfaced so they are useful without
+  undermining the experiment-first measurement path?
 
 ## Next Product Work
 
@@ -1135,8 +1213,8 @@ Before implementation, discuss:
   run or parameter records rather than dataset-local metadata
 - how an experiment context manager should coordinate dataset writer ownership,
   lifetime, and error handling
-- whether top-level dataset writer APIs should create unowned datasets, attach
-  to ambient experiment context, or require explicit ownership
+- how top-level dataset writer APIs represent unassigned datasets and optional
+  explicit run ownership
 
 ## Future Scope
 
@@ -1146,7 +1224,7 @@ This proposal intentionally leaves the following to later focused designs:
 - managed submitted run execution and template registry behavior
 - workflow definitions, workflow runs, and step dependency semantics
 - calibration proposal, validation, and promotion flows
-- analysis run taxonomy for derived datasets
+- analysis run taxonomy and shared input/output provenance for derived datasets
 - device identity, apply plans, readback verification, and instrument snapshots
 - complete workspace event timeline and audit export behavior
 - AI-assisted suggestions, approvals, and accepted/rejected mutation records

@@ -90,6 +90,62 @@ user review and durable audit records.
 - AI-assisted automation with explicit review and auditability
 - Later device identity and configuration foundations
 
+## V1 Replacement Target
+
+The first version should be able to replace a simple LabRAD Grapher/Data Vault
+style experiment logger for new measurement work.
+
+Replacement means a researcher can stop using the old simple logger for new
+experiments and use Fricon instead to:
+
+- record table-shaped measurement datasets from Python scripts or notebooks
+- see newly produced datasets in the desktop UI without manual file handling
+- inspect recent and historical datasets through table and chart views
+- use explicit dataset semantics for column metadata, scan axes, chart defaults,
+  and live-view interpretation instead of relying on row-order heuristics
+- create a minimal interactive experiment record that groups produced datasets
+- store experiment-level names, notes, tags, pin or favorite state, quality
+  state, and legacy JSON metadata on the run
+- keep dataset metadata focused on output-local semantics and per-output
+  exceptions
+- reopen produced datasets from Python using generated read snippets or stable
+  workspace identifiers
+- preserve interrupted partial data and make continuation, validation, or
+  invalidation explicit
+
+V1 replacement does not require:
+
+- importing or fully browsing legacy LabRAD/Data Vault history
+- multi-user LabRAD server semantics or hosted collaboration
+- desktop-first experiment execution
+- a generic managed runner, queue, resource lease system, or workflow engine
+- a full parameter registry or device driver framework
+- automatic Git, `uv`, or `pixi` environment management
+
+## Primary User Mental Model
+
+V1 should optimize the user-facing product around interactive experiment
+records:
+
+```text
+interactive experiment run -> produced datasets -> inspection and analysis
+```
+
+For measurement work, examples and desktop navigation may become run-first once
+the run API exists. The dataset remains a first-class artifact with stable
+identity, dataset-local semantics, and direct Python access.
+
+Do not model datasets as owned exclusively by experiments. A dataset may be:
+
+- produced by an experiment run
+- produced by a future analysis, import, simulation, or calibration activity
+- consumed by later analysis or calibration work
+- temporarily unassigned when created through lower-level dataset-only APIs
+
+This keeps the V1 LabRAD-style workflow simple while leaving room for a later
+provenance graph where activity records consume and produce datasets, artifacts,
+analysis results, and parameter proposals.
+
 ## Now
 
 Current work should favor:
@@ -148,6 +204,8 @@ API, or UI rewrites later.
   as much as the device or parameter set
 - dataset kind and lineage, including measured, imported, processed, and
   simulation datasets
+- a shared producer/consumer provenance pattern for future experiment,
+  analysis, import, simulation, calibration, and workflow runs
 - workflow definition, workflow run, and experiment run as distinct concepts
 - local automation safety and approval boundaries for scheduler, optimizer, and
   AI-assisted actions
@@ -162,8 +220,10 @@ After the dataset foundation is durable, product work should move toward:
 - dataset read snippets that help users reopen or reproduce analysis from
   Python
 - dataset preview, export, and plotting snippets for common Python workflows
-- lightweight run notes, tags, favorites, and quality flags
-- Python-led experiment run records
+- minimal interactive experiment run records that make new simple measurement
+  workflows no longer depend on LabRAD Grapher/Data Vault style logging
+- run-level notes, tags, pin or favorite state, quality flags, and legacy JSON
+  metadata for migration from existing scripts
 - parameter snapshots, diffs, and display for recorded runs
 - a minimal model for connecting runs to datasets
 - basic run provenance links between datasets, parameters, code, environment,
