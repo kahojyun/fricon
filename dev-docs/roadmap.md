@@ -308,6 +308,11 @@ Dataset usability may include:
 - generated Python read snippets for each dataset
 - copyable examples for loading selected datasets by data-library-local ID or
   UID
+- experiment-centered portable export bundles for offline analysis on another
+  computer
+- direct Python APIs for opening exported bundles without creating or importing
+  into a local data library
+- a read-only desktop export viewer for exported experiment bundles
 - preview snippets for pandas, pyarrow, plotting, CSV export, and Parquet export
 - snippets that match the public Python API instead of exposing internal
   storage layout
@@ -344,6 +349,8 @@ Traceability and reproducibility may include:
   options
 - export provenance such as exported content, time, format, and destination
   summary
+- source data library UUID, display name, and optional source computer label in
+  exported experiment bundles
 - checksums for dataset chunks, exported bundles, code snapshots, and
   environment lock files
 - human-readable audit summaries for selected runs or data libraries

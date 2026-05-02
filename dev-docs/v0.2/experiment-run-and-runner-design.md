@@ -882,6 +882,7 @@ workflows.
 Possible interactive shape:
 
 ```python
+lib = fricon.library()
 lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
 with lib.experiment("cooldown sweep", params="main") as run:
@@ -909,6 +910,8 @@ Nested dataset context managers may remain available for advanced explicit
 lifecycle control:
 
 ```python
+lib = fricon.library()
+
 with lib.experiment("cooldown sweep", params="main") as run:
     with run.dataset("s21") as s21:
         s21.write(freq=..., s21=...)
@@ -929,6 +932,7 @@ def cooldown_sweep(ctx, params):
 Managed execution can be introduced separately:
 
 ```python
+lib = fricon.library()
 task = lib.submit_experiment(cooldown_sweep, params="main")
 ```
 
@@ -1035,9 +1039,10 @@ cannot honestly provide, especially for notebook and ad hoc script workflows.
 
 Generated snippets should first help users reopen produced datasets from Python.
 
-Re-run snippets, export/report snippets, and managed-template submission
-snippets are useful later, but read snippets best support the current
-Python-led route and the v0.2 goal of keeping datasets directly reopenable.
+Re-run snippets, report snippets, and managed-template submission snippets are
+useful later. Read snippets and experiment export snippets best support the
+current Python-led route and the v0.2 goal of keeping datasets directly
+reopenable, including outside the source data library.
 
 ## High-Value User Stories
 
@@ -1100,6 +1105,7 @@ Acceptance notes:
 
 - produced datasets are the primary detail-view content
 - Python read snippets are available for datasets
+- export snippets are available for experiment-centered portable bundles
 - run quality state is visible
 - provenance label is visible
 - parameter snapshot or migration metadata summary is visible
@@ -1296,6 +1302,8 @@ This proposal intentionally leaves the following to later focused designs:
 - How should queue priority interact with already-running resource leases?
 - Should resource lease failures block a task, fail it, or leave it queued?
 - What facts must survive dataset archive export and import?
+- What facts must survive experiment-centered portable export when the user
+  opens the bundle directly without importing it?
 
 ## Related Documents
 

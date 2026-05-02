@@ -163,6 +163,11 @@ changing the user's mental model. Good candidates include preview/export
 snippets, saved views, aliases, notes, tags, quality flags, compare views, and
 template experiments.
 
+Export workflows should support researchers who move data to another computer
+for analysis. Prefer experiment-centered portable exports that can be opened
+directly from Python or a read-only viewer over workflows that require creating
+and importing into a second local data library before analysis can begin.
+
 ### Preserve Provenance
 
 Scientific workflows need enough traceability to explain where a result came
@@ -170,6 +175,10 @@ from. Fricon should be able to connect runs, datasets, parameters, code
 versions, environments, device configuration, notes, imports, exports, and
 future workflow definitions without exposing internal storage details as the
 user model.
+
+Data libraries should have durable source identity, such as a generated UUID
+and user-editable display name, so exported experiments can record where they
+came from.
 
 When records need correction, prefer appended correction or event history over
 silent mutation of completed run facts.

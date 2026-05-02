@@ -51,6 +51,7 @@ exists. Sample/session context should be selectable as an active default, not a
 hard prerequisite for quick measurements:
 
 ```python
+lib = fricon.library()
 lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
 with lib.experiment("cooldown sweep") as run:
@@ -77,6 +78,8 @@ Quick experiments without sample context and the lower-level dataset-only path
 should remain valid:
 
 ```python
+lib = fricon.library()
+
 with lib.experiment("quick check") as run:
     ds = run.dataset("quick_table")
     ds.write(x=1.0, y=2.0)
@@ -327,6 +330,7 @@ The low-friction write path must survive.
 V1 should expose:
 
 - local data library
+- data library UUID and user-editable display name for source provenance
 - optional active sample/session context with attach-later correction
 - interactive experiment records
 - measured dataset artifacts as the first concrete artifact subtype
@@ -338,6 +342,8 @@ V1 should expose:
   metadata
 - dataset-local notes or quality only for output-specific exceptions
 - generated Python snippets or stable IDs for reopening data
+- experiment-centered export bundles that can be opened directly from Python
+  or a read-only GUI viewer without import into another data library
 - interrupted-data recovery with explicit continuation, validation, or
   invalidation
 
@@ -392,6 +398,9 @@ Suggested staged path:
 - Should unassigned datasets be first-class in the desktop UI or mostly visible
   through dataset search and debugging views?
 - How much provenance should dataset archives include in V1?
+- What should the first portable experiment export bundle format include beyond
+  source data library identity, experiment metadata, dataset artifacts, selected
+  non-table artifacts, provenance summaries, and checksums?
 - Should output-specific notes and quality state live directly on datasets, or
   on run-output link records?
 - How should dataset continuation interact with completed experiment runs?

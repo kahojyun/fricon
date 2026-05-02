@@ -30,6 +30,7 @@ one Fricon data library
   -> artifacts: datasets first, then results, reports, logs, attachments,
      device snapshots, and parameter proposals
   -> parameter snapshots, code summaries, notes, tags, and quality state
+  -> experiment-centered portable exports for offline analysis
 ```
 
 For normal users, the first mental model should stay simple:

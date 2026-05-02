@@ -90,6 +90,10 @@ Projects, campaigns, samples, sessions, tags, and saved views should organize
 the library without encouraging users to split data and copied code into many
 long-lived roots.
 
+Each data library should have a generated UUID and a user-editable display
+name. Exported experiments should include that source identity so users can
+tell which lab computer or data library produced the data.
+
 ### Sample
 
 A sample is the measured physical object, device under test, wafer, chip, batch,
@@ -253,6 +257,25 @@ or sample/session by default so that I do not have to annotate every dataset.
 
 As an analyst, I want stable IDs and read snippets so that I can reopen
 experiment outputs without knowing storage paths.
+
+### Export An Experiment For Offline Analysis
+
+As an experimentalist, I want to export a complete experiment bundle so that I
+can analyze it on another computer without setting up a Fricon data library or
+importing the data first.
+
+Acceptance notes:
+
+- export starts from an experiment by default
+- exported bundles include produced datasets, selected artifacts, notes, tags,
+  quality, sample/session context, parameter/code summaries, and provenance
+- exported bundles include source data library UUID, display name, optional
+  computer label, export UUID, format version, checksums, and original record
+  IDs
+- Python can open the bundle directly through a portable read API
+- the desktop GUI can open the bundle in a read-only export viewer mode
+- importing the bundle into another data library is optional, not required for
+  analysis
 
 ### Track Parameter Evolution
 

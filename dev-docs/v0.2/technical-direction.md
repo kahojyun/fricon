@@ -112,6 +112,11 @@ The data library should be the user-facing concept. `WorkspaceRoot` or similar
 names may remain internal implementation details, but public docs and UI should
 avoid encouraging many long-lived workspaces.
 
+Each data library should get a generated UUID and user-editable display name at
+creation time. Exported experiments and audit summaries should include this
+identity, plus an optional source computer label, so researchers can tell where
+portable data came from.
+
 ## Remote Access
 
 Plan for remote access early, but do not make v0.2 a multi-user hosted system.
@@ -187,14 +192,14 @@ waveform or configuration files, and future device snapshots.
 The ergonomic measurement path should be experiment-scoped:
 
 ```python
-with fricon.library() as lib:
-    # Optional active context, exact API unsettled.
-    lib.use_context(sample="qpu-017", session="cooldown-2026-05")
+# Notebook prelude, exact API unsettled.
+lib = fricon.library()
+lib.use_context(sample="qpu-017", session="cooldown-2026-05")
 
-    with lib.experiment("rabi q3") as run:
-        rabi = run.dataset("rabi")
-        for amp in amps:
-            rabi.write(amp=amp, signal=measure(amp))
+with lib.experiment("rabi q3") as run:
+    rabi = run.dataset("rabi")
+    for amp in amps:
+        rabi.write(amp=amp, signal=measure(amp))
 ```
 
 Sample/session context should be a resolved default, not an implicit hidden
@@ -202,9 +207,14 @@ global. The experiment record should store the resolved sample/session IDs when
 active context is used. If no context is selected, the run remains valid and
 the UI should make attach-later correction explicit.
 
+The library handle should be cheap to keep in a notebook variable and reuse
+across cells. It should not require context-manager cleanup in normal examples.
+
 Lower-level dataset creation remains useful:
 
 ```python
+lib = fricon.library()
+
 with lib.dataset("scratch") as ds:
     ds.write(x=1.0, y=2.0)
 ```
@@ -215,6 +225,37 @@ record.
 The active-context idea should be available from both Python prelude code and
 the desktop UI because existing lab notebooks often set a save path near the
 top of the file.
+
+## Portable Export Direction
+
+Exports should be experiment-centered and portable.
+
+The first export API should let users export an experiment run and read the
+result on another computer without creating or importing into a local data
+library:
+
+```python
+lib = fricon.library()
+run = lib.experiments.get("exp_123")
+bundle_path = run.export("rabi-q3.fricon-export")
+
+bundle = fricon.open_export(bundle_path)
+rabi = bundle.experiment("rabi q3").dataset("rabi").to_pyarrow()
+```
+
+The exact syntax is unsettled. The contract is:
+
+- export bundles are read-only portable artifacts
+- Python can open bundles directly
+- the desktop GUI can open bundles in a dedicated export viewer mode
+- importing into another data library is optional and separate
+- source data library UUID, display name, source computer label, export UUID,
+  format version, original record IDs, checksums, and Fricon version travel in
+  the bundle
+- experiment metadata, sample/session context, produced datasets, selected
+  non-table artifacts, parameter snapshot or legacy metadata, code/environment
+  summary, notes, tags, quality state, and provenance summaries travel with
+  the exported experiment
 
 ## Minimal Device Boundary
 

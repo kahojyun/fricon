@@ -182,6 +182,9 @@ Why it matters:
   and derived datasets when users compare results or trace conclusions.
 - Import and export operations should be explainable through source paths, file
   hashes, conversion options, destination summaries, and timestamps.
+- Experiment-centered export is a common analysis workflow: a researcher may
+  move one experiment bundle to another computer and open it directly without
+  creating or importing into another data library.
 - Dataset lineage should build on explicit dataset semantics and run records,
   not chart heuristics or file layout details.
 - Users need to mark datasets, runs, or outputs as good, suspect, failed,
@@ -206,8 +209,11 @@ Boundary:
 Likely interfaces:
 
 - dataset records expose kind and lineage references
-- import/export workflows record source, destination, conversion, and checksum
+- import/export workflows record source data library identity, destination,
+  conversion, original IDs, export UUIDs, format versions, and checksum
   summaries
+- portable experiment bundles can be opened through read-only Python APIs and a
+  dedicated GUI viewer without import
 - processed datasets link to input datasets and processing context
 - analysis, import, simulation, and calibration activity records use shared
   input/output provenance edges instead of forcing all datasets to be owned by
@@ -232,6 +238,8 @@ Open questions:
 - Which dataset kinds should be first-class?
 - How much import/export provenance is needed for useful reproducibility?
 - How should lineage survive dataset archive export and import?
+- What is the minimum portable experiment bundle that is useful for offline
+  analysis?
 - Which quality states apply to datasets, runs, or both?
 - Should invalidation block downstream use or only warn?
 - How should superseded datasets relate to processed replacements?

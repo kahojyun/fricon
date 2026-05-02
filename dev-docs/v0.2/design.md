@@ -95,6 +95,20 @@ Concepts that should mostly remain internal or advanced:
 This boundary matters. Users should not have to tag, note, or name every
 dataset write session, script run, scan point, or internal device record.
 
+## Data Library Identity
+
+A data library should have durable identity:
+
+- generated `data_library_uuid`
+- user-editable display name
+- optional source computer label for human recognition
+- schema/storage compatibility version
+
+This identity should travel with exports, audit summaries, and portable
+bundles. If a lab computer normally has one data library, the generated UUID and
+display name are enough to answer where an exported experiment came from
+without making users manage many roots.
+
 ## Notes, Tags, And Quality
 
 Notes, tags, favorites, and quality flags should attach to the level where
@@ -114,31 +128,43 @@ the experiment is the default annotation container for measurement work.
 
 ## Domain Model
 
-The clean v0.2 domain model is:
+The clean v0.2 domain model is a data library of records plus explicit links,
+not a strict containment tree:
 
 ```text
 DataLibrary
-  Sample
+  records:
+    Sample
     SampleSession
-      Experiment
-        Artifact
-          DatasetArtifact
-  Analysis
+    ActivityRun
+      kind: experiment | analysis | import | simulation | calibration
     Artifact
-      DatasetArtifact
-      AnalysisResult
-      ParameterProposal
-  CalibrationWorkflow
-    Experiment
-    Analysis
-    ParameterProposal
-    ParameterProfile update
+      kind: dataset | analysis_result | report | log | attachment |
+            parameter_proposal | device_snapshot
+    ParameterProfile
+    ParameterSnapshot
+    CodeSnapshot
+    Event/AuditRecord
+
+  links:
+    SampleSession -> Sample
+    Experiment -> optional SampleSession
+    ActivityRun -> consumes -> Artifact | ParameterSnapshot | ActivityRun
+    ActivityRun -> produces -> Artifact
+    CalibrationWorkflowRun -> coordinates -> Experiment + Analysis +
+                                      ParameterProposal
 ```
 
 More formally:
 
 ```text
 ActivityRun consumes inputs and produces artifacts.
+
+Sample/session context is an optional link on an experiment, not an owning
+parent.
+
+Calibration coordinates experiment, analysis, artifact, and parameter-proposal
+records. It does not make those records children of the calibration record.
 
 Experiment, Analysis, Import, Simulation, and Calibration are user-facing or
 workflow-facing activity types.
@@ -213,23 +239,27 @@ broader v0.2 data-library and provenance model.
 
 The common write path should share the experiment lifecycle.
 
+In notebooks, the library handle should be created once in a prelude and reused
+across cells. It should not be a context manager in normal examples; service
+lifecycle and cleanup belong to the local Fricon service, CLI, or desktop UI,
+not to every notebook cell.
+
 Prefer this shape for normal measurements:
 
 ```python
-with fricon.library() as lib:
-    # Optional prelude, similar to the old habit of setting data_dir at the
-    # top of a notebook. The exact API is not settled.
-    lib.use_context(sample="sample-a", session="cooldown-2026-05")
+# Notebook prelude. Exact API unsettled.
+lib = fricon.library()
+lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
-    with lib.experiment("rabi q3") as exp:
-        rabi = exp.dataset("rabi")
-        chevron = exp.dataset("chevron")
+with lib.experiment("rabi q3") as exp:
+    rabi = exp.dataset("rabi")
+    chevron = exp.dataset("chevron")
 
-        for amp in amps:
-            rabi.write(amp=amp, response=measure_rabi(amp))
+    for amp in amps:
+        rabi.write(amp=amp, response=measure_rabi(amp))
 
-        for freq, amp in points:
-            chevron.write(freq=freq, amp=amp, signal=measure(freq, amp))
+    for freq, amp in points:
+        chevron.write(freq=freq, amp=amp, signal=measure(freq, amp))
 ```
 
 The active context may be set from a notebook prelude, CLI, desktop UI, or an
@@ -240,10 +270,11 @@ record that no sample context was selected.
 Quick experiments should also be valid without sample context:
 
 ```python
-with fricon.library() as lib:
-    with lib.experiment("quick resonator check") as exp:
-        s21 = exp.dataset("s21")
-        s21.write(freq=7.1e9, signal=measure())
+lib = fricon.library()
+
+with lib.experiment("quick resonator check") as exp:
+    s21 = exp.dataset("s21")
+    s21.write(freq=7.1e9, signal=measure())
 ```
 
 Users should be able to attach or correct sample/session links later through an
@@ -257,11 +288,61 @@ lower-level or streaming APIs.
 Lower-level dataset creation remains useful:
 
 ```python
+lib = fricon.library()
+
 with lib.dataset("scratch") as ds:
     ds.write(x=1.0, y=2.0)
 ```
 
 Lower-level datasets are unassigned artifacts until linked to a producer.
+
+## Portable Experiment Export
+
+Export should be experiment-centered by default.
+
+The common workflow is:
+
+```text
+experiment run in lab data library
+  -> export portable experiment bundle
+  -> open bundle directly on another computer from Python or a viewer
+```
+
+Users should not need to create a new local data library, import the bundle, or
+understand Fricon storage internals before analyzing exported data.
+
+An experiment export should include:
+
+- export format version and export UUID
+- source data library UUID, display name, and optional source computer label
+- exported-at time, Fricon version, and actor summary when available
+- original experiment/run IDs and stable artifact IDs
+- experiment name, notes, tags, quality state, and correction summaries
+- optional sample/session context and attach-later correction history
+- produced dataset artifacts with facts, semantic manifests, and projections
+- non-table artifacts such as reports, figures, logs, attachments, code
+  summaries, and future device snapshots when selected
+- parameter snapshot or legacy parameter JSON used by the run when available
+- code and environment summary when available
+- provenance links needed to explain inputs, outputs, analysis, and calibration
+- checksums for payload files and manifest records
+- generated Python read snippets for the portable API
+
+Portable read APIs should be read-only and direct:
+
+```python
+bundle = fricon.open_export("rabi-q3.fricon-export")
+run = bundle.experiment("rabi q3")
+rabi = run.dataset("rabi").to_pyarrow()
+```
+
+The desktop GUI should also have a read-only export viewer mode. The viewer
+should open exported bundles directly, show experiment context and produced
+artifacts, and offer read snippets without requiring import into the user's own
+data library.
+
+Importing an export into another data library may be useful later, but it is a
+separate workflow from reading or viewing the exported experiment.
 
 ## Sample And Session Model
 
