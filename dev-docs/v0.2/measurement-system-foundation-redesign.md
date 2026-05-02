@@ -2,11 +2,15 @@
 
 ## Status
 
-Proposed pre-adoption redesign direction.
+Supporting pre-adoption redesign proposal for the v0.2 reset.
 
 This is not current behavior. Do not implement or document behavior from this
 note as user-facing functionality until the relevant ADR, storage, IPC, Python
 API, desktop UI, migration, and release decisions have landed.
+
+Read `README.md` and `design.md` first. This note preserves the broader
+reasoning behind the reset; `design.md` is the cleaner canonical synthesis for
+new planning.
 
 This note intentionally allows large breaking changes while Fricon has not yet
 entered real lab use. It may revise or supersede parts of

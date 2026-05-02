@@ -2,11 +2,15 @@
 
 ## Status
 
-Proposed future product direction.
+Supporting future experiment and runner proposal for the v0.2 reset.
 
 This is not current behavior. Do not implement or document behavior from this
 proposal as user-facing functionality until the relevant dataset semantic,
 parameter, storage, IPC, Python API, desktop UI, and migration work has landed.
+
+Read `README.md` and `design.md` first. This long proposal is supporting
+detail for experiment execution, retry/resume, and runner boundaries; it is not
+the canonical v0.2 entry point.
 
 ## Purpose
 
@@ -24,10 +28,13 @@ The design should help users answer:
 - Which records in a dataset were appended by which execution attempt?
 - Which devices or local resources forced tasks to run sequentially?
 
-The proposal keeps the current route dataset-first, Python-led, and local-first.
-Python scripts remain the first execution entry point. The desktop UI may
-browse, inspect, retry, continue, and summarize work, but it should not become
-the primary experiment execution engine before the Python-led model is clear.
+This proposal was written against the current dataset-first, Python-led, and
+local-first route. Under the v0.2 reset, reconcile the details here with the
+broader data-library, sample/session, and activity-provenance model in
+`design.md`. Python scripts remain the first execution entry point. The desktop
+UI may browse, inspect, retry, continue, and summarize work, but it should not
+become the primary experiment execution engine before the Python-led model is
+clear.
 
 ## Classification
 
@@ -1018,7 +1025,7 @@ Generated snippets should first help users reopen produced datasets from Python.
 
 Re-run snippets, export/report snippets, and managed-template submission
 snippets are useful later, but read snippets best support the current
-dataset-first and Python-led route.
+Python-led route and the v0.2 goal of keeping datasets directly reopenable.
 
 ## High-Value User Stories
 

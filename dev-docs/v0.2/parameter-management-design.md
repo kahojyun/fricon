@@ -2,11 +2,15 @@
 
 ## Status
 
-Proposed future product direction.
+Supporting future parameter-management proposal for the v0.2 reset.
 
 This is not current behavior. Do not implement or document behavior from this
 proposal as user-facing functionality until the relevant dataset, run,
 provenance, storage, IPC, Python API, and desktop UI work has landed.
+
+Read `README.md` and `design.md` first. This long proposal is supporting
+detail for parameter snapshots, profiles, diffs, proposals, and calibration
+integration; it is not the canonical v0.2 entry point.
 
 ## Purpose
 
@@ -36,7 +40,8 @@ ADR need: create an ADR before implementation commits to the durable parameter
 model, storage shape, Python API contract, desktop UI semantics, or run
 provenance integration.
 
-This proposal depends on the current dataset-first route:
+This proposal depends on the current dataset-semantic baseline and the proposed
+v0.2 data-library reset:
 
 - dataset semantics should land before higher-level parameter behavior depends
   on datasets as provenance anchors

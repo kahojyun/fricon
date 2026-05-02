@@ -2,10 +2,11 @@
 
 ## Status
 
-Proposed v0.2 product direction.
+Supporting v0.2 product direction.
 
-This is not current behavior. Use this document to align planning, ADRs, and
-implementation slices before changing public docs or API contracts.
+This is not current behavior. Read `design.md` first. Use this document for
+user pain, user stories, and product-level detail after the canonical v0.2
+model is clear.
 
 ## Product Positioning
 

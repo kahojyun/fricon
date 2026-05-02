@@ -13,10 +13,10 @@ This is not current behavior. Do not implement or document behavior from this
 proposal without checking current code, `dev-docs/current-storage-notes.md`, and
 the relevant checklist in `dev-docs/maintenance-checklist.md`.
 
-Before extending this proposal further, read
-`dev-docs/v0.2/measurement-system-foundation-redesign.md`. That broader v0.2
-redesign note may revise the dataset artifact, run provenance, and
-breaking-change direction that this dataset-specific proposal assumes.
+Before extending this proposal further, read `dev-docs/v0.2/design.md` and
+`dev-docs/v0.2/measurement-system-foundation-redesign.md`. The broader v0.2
+reset may revise the dataset artifact, run provenance, and breaking-change
+direction that this dataset-specific proposal assumes.
 
 This note revises the earlier append-only dataset idea for the actual Fricon
 codebase and assumes the product is still pre-adoption, so breaking internal
@@ -883,9 +883,9 @@ the dataset does not need to claim a rectangular `planned_shape`.
 ## Feature Shaping
 
 The architecture should land as shaped feature layers, not as one broad v1.
-This keeps the current route dataset-first while leaving clean attachment
-points for later experiment, parameter, provenance, workflow, AI, and device
-models.
+This keeps the dataset-semantic foundation narrow while leaving clean
+attachment points for the v0.2 experiment, parameter, provenance, workflow, AI,
+and device models.
 
 ### Feature 1: Durable Dataset Semantics Foundation
 

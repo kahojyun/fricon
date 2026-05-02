@@ -34,6 +34,12 @@ semantic-manifest behavior has already landed.
 The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
 
 - `v0.2/README.md` is the canonical entry point for v0.2 planning.
+- `v0.2/design.md` is the canonical v0.2 design synthesis. It defines the
+  clean reset model: one data library; samples and sessions; experiment,
+  analysis, simulation, import, and calibration activity records; dataset
+  artifacts; parameter snapshots and proposals; code summaries; actor/audit
+  boundaries; and the optional managed experiment path toward Fricon-managed
+  device communication.
 - `v0.2/product-direction.md` repositions Fricon as a local lab data library
   and automation foundation centered on samples, sessions, experiment runs,
   dataset artifacts, parameter history, code summaries, and calibration
@@ -42,8 +48,8 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
   data-library service model, desktop/web UI direction, remote/auth boundary,
   and rewrite strategy.
 
-The pre-adoption measurement-system redesign note remains the broad foundation
-proposal behind the v0.2 reset:
+The pre-adoption measurement-system redesign note remains supporting background
+behind the v0.2 reset:
 
 - `v0.2/measurement-system-foundation-redesign.md` defines the proposed breaking
   redesign direction for dataset artifacts, run-like producer/consumer
@@ -75,6 +81,12 @@ scientific measurement datasets. Experiment, parameter, and device concepts
 should build on that foundation instead of forcing the dataset layer to absorb
 higher-level workflow meaning implicitly.
 
+The proposed v0.2 reset keeps the Python-led and local-first constraints but
+expands the product model from a dataset catalog into a measurement record
+system. In that model, datasets remain first-class artifacts, while samples,
+sample sessions, experiments, analysis, calibration, parameter snapshots, code
+summaries, notes, tags, and quality state get explicit boundaries.
+
 Initial experiment support should lean on Python scripts as the execution
 entry point. The desktop UI should inspect, browse, and eventually assist those
 workflows, but it should not become the primary experiment execution engine
@@ -96,7 +108,7 @@ user review and durable audit records.
 
 ## Product Pillars
 
-- Workspace and dataset management
+- Data-library, sample, session, and dataset management
 - Dataset semantics and durable interpretation
 - Desktop dataset browsing, inspection, and charting
 - Python scripting API for data recording and automation
@@ -116,6 +128,8 @@ Replacement means a researcher can stop using the old simple logger for new
 experiments and use Fricon instead to:
 
 - record table-shaped measurement datasets from Python scripts or notebooks
+- select or create a lightweight sample and sample-session context when the
+  measured object matters
 - see newly produced datasets in the desktop UI without manual file handling
 - inspect recent and historical datasets through table and chart views
 - use explicit dataset semantics for column metadata, scan axes, chart defaults,
@@ -126,7 +140,7 @@ experiments and use Fricon instead to:
 - keep dataset metadata focused on output-local semantics and per-output
   exceptions
 - reopen produced datasets from Python using generated read snippets or stable
-  workspace identifiers
+  data-library identifiers
 - preserve interrupted partial data and make continuation, validation, or
   invalidation explicit
 

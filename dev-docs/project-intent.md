@@ -35,7 +35,7 @@ Fricon is expected to provide:
 - parameter management, including future snapshot, history, diff, and
   versioning workflows
 - device management
-- local experiment workspace management
+- local data-library or workspace management
 - a desktop UI for browsing, managing, and inspecting collected data
 - Python APIs for scripting and automation
 - reproducibility support for experiment code, environments, parameters, and
@@ -99,13 +99,20 @@ silent authority. AI may help draft snippets, summaries, reports, metadata
 cleanup, parameter comparisons, and workflow proposals, but mutating workspace
 state should remain explicit, reviewable, and auditable.
 
+The proposed v0.2 reset is captured in `v0.2/design.md`. It keeps the
+Python-led and local-first constraints while broadening the durable product
+model from a workspace/dataset catalog into a local data library centered on
+samples, sample sessions, experiment records, dataset artifacts, analysis,
+calibration, parameter snapshots, code summaries, and auditability.
+
 ## Runtime Model
 
 Fricon is local-first. The main supported runtime model is:
 
 - data lives on the user's local computer
-- the desktop UI and Python API operate against a local workspace
-- the local server process coordinates workspace operations
+- the desktop UI and Python API operate against a local data library or current
+  workspace
+- the local server process coordinates data-library or workspace operations
 
 A remote client may be considered in the future, but it should build on the
 local-first model rather than forcing the project into a hosted service shape.
@@ -128,10 +135,11 @@ core architecture now.
 
 ### Keep The User Model Simple
 
-Users should think in terms of workspaces, datasets, experiments, parameters,
-and devices. Internal concepts such as SQLite tables, Arrow chunk files, IPC
-protocol versions, and Rust module boundaries belong in developer notes, not in
-public user documentation.
+Users should think in terms of data libraries, samples, sessions, experiments,
+datasets, parameters, and devices as those product concepts land. Internal
+concepts such as SQLite tables, Arrow chunk files, IPC protocol versions, and
+Rust module boundaries belong in developer notes, not in public user
+documentation.
 
 ### Prefer Local Reliability Over Distributed Flexibility
 
@@ -217,8 +225,9 @@ This document is a constraint for AI-assisted changes:
 - Keep user-facing docs focused on workflows and stable product concepts.
 - Put implementation details, architectural notes, and maintenance rules in
   `dev-docs/`.
-- Preserve the dataset-first, Python-led product route unless a planning or ADR
-  document explicitly changes it.
+- Preserve the Python-led and local-first product route. Treat the dataset-first
+  route as the current implementation baseline, and treat `v0.2/design.md` as
+  the proposed planning reset when working on v0.2 scope.
 - Prefer feature-local changes that preserve clear ownership.
 - Treat Python API and desktop UI behavior as user-facing contracts.
 - Treat internal Rust module boundaries as changeable when doing so improves

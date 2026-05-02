@@ -2,10 +2,11 @@
 
 ## Status
 
-Proposed v0.2 technical direction.
+Supporting v0.2 technical direction.
 
-This is not an implementation plan. Use it to align architecture discussions,
-ADRs, and early spike work.
+This is not current behavior and not an implementation plan. Read `design.md`
+first. Use this document to align architecture discussions, ADRs, and early
+spike work after the canonical v0.2 model is clear.
 
 ## Rewrite Strategy
 

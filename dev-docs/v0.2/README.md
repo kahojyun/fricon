@@ -1,4 +1,4 @@
-# Fricon v0.2 Development Direction
+# Fricon v0.2 Reset
 
 ## Status
 
@@ -21,29 +21,39 @@ history, sample context, copied code folders, JSON parameters, calibration
 scripts, and measured data quietly diverge until they are hard to trust or
 maintain.
 
-The v0.2 direction is:
+The v0.2 product model is:
 
 ```text
 one Fricon data library
-  -> samples
-  -> sample sessions / cooldowns
-  -> experiment runs
-  -> dataset artifacts
-  -> analysis results
-  -> parameter snapshots and proposals
-  -> calibration workflow history
+  -> samples and sample sessions
+  -> experiment, analysis, simulation, import, and calibration activity records
+  -> dataset artifacts, results, reports, and parameter proposals
+  -> parameter snapshots, code summaries, notes, tags, and quality state
+```
+
+For normal users, the first mental model should stay simple:
+
+```text
+I selected a sample/session.
+I ran an experiment.
+It produced datasets.
+Fricon helps me inspect, annotate, recover, analyze, and calibrate from them.
 ```
 
 ## Reading Order
 
 Start here for v0.2 planning:
 
-1. `product-direction.md`
-2. `technical-direction.md`
-3. `measurement-system-foundation-redesign.md`
-4. `experiment-run-and-runner-design.md`
-5. `parameter-management-design.md`
-6. `future-concepts.md`
+1. `design.md` - canonical v0.2 product and architecture synthesis
+2. `product-direction.md` - supporting product stories and user pain
+3. `technical-direction.md` - supporting engineering posture and API/runtime
+   direction
+4. `measurement-system-foundation-redesign.md` - background redesign proposal
+   for dataset artifacts and run-like provenance
+5. `experiment-run-and-runner-design.md` - detailed future experiment/runner
+   proposal
+6. `parameter-management-design.md` - detailed future parameter proposal
+7. `future-concepts.md` - lower-confidence or less narrowed ideas
 
 Use current implementation notes only to understand what must be replaced or
 adapted:
@@ -56,15 +66,16 @@ adapted:
 ## Relationship To Older Docs
 
 The older project route was dataset-first, Python-led, and local-first. v0.2
-keeps the Python-led and local-first parts, but broadens the foundation from
-datasets to the full measurement record:
+keeps the Python-led and local-first parts, but broadens the foundation from a
+dataset catalog to a measurement record system:
 
 - data library instead of user-facing workspace
 - sample and session identity before experiment history gets fragmented
 - experiment runs as the default measurement work record
-- dataset artifacts as outputs, not the whole experiment record
+- datasets as artifacts, not the whole experiment record
 - parameter and code history as first-class provenance
-- calibration and analysis as future workflows over explicit records
+- analysis, simulation, import, and calibration as activity records that
+  consume and produce artifacts
 
 Older dataset semantics work remains useful, especially append-only facts,
 record IDs, manifests, and resolved interpretation. But v0.2 implementation
@@ -98,6 +109,10 @@ Good candidates to redesign:
 - IPC/protobuf contracts
 - archive/import/export format
 - run, sample, parameter, code, and provenance boundaries
+
+The reset should not make the user model bigger than necessary. Keep most
+internal provenance objects invisible unless the user is debugging automation,
+recovering an interrupted run, or configuring managed execution.
 
 ## v0.2 Non-Goals
 

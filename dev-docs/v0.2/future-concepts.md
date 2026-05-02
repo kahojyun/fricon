@@ -2,18 +2,22 @@
 
 ## Status
 
-Future concept ledger.
+Supporting future concept ledger for the v0.2 reset.
 
 This is not current behavior, not a task plan, and not an implementation
 commitment. Use this file to preserve useful product and architecture context
 that is too early for focused proposals, ADRs, or GitHub issues.
 
+Read `README.md` and `design.md` first. This file is only a holding area for
+ideas that remain less narrowed than the canonical v0.2 design.
+
 ## Purpose
 
 Fricon has several future product areas that depend on the current
-dataset-first, Python-led route but are not ready for implementation design.
-This ledger keeps their boundaries visible so later dataset, run, parameter,
-workspace, and UI work can avoid decisions that would make those areas harder.
+dataset-first implementation baseline and the proposed v0.2 data-library reset,
+but are not ready for implementation design. This ledger keeps their boundaries
+visible so later dataset, run, parameter, workspace/data-library, and UI work
+can avoid decisions that would make those areas harder.
 
 Use this file for short notes only. When a concept becomes active product work,
 promote it into a focused design proposal, ADR, or issue plan.
