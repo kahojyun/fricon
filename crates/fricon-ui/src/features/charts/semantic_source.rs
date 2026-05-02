@@ -6,8 +6,8 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use arrow_array::{
-    Array, ArrayRef, BooleanArray, Float64Array, RecordBatch, RecordBatchOptions, StringArray,
-    StructArray,
+    Array, ArrayRef, BooleanArray, Float32Array, Float64Array, Int64Array, RecordBatch,
+    RecordBatchOptions, StringArray, StructArray, UInt64Array,
 };
 use arrow_schema::{DataType, Field, Fields, Schema, SchemaRef};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -321,10 +321,73 @@ fn alias_physical_column_name(name: &str, alias_physical: bool) -> String {
 }
 
 fn rename_batch(batch: &RecordBatch, schema: &DatasetSchema) -> Result<RecordBatch> {
-    Ok(RecordBatch::try_new(
-        Arc::new(schema.to_arrow_schema()),
-        batch.columns().to_vec(),
-    )?)
+    let arrow_schema = Arc::new(schema.to_arrow_schema());
+    let columns = batch
+        .columns()
+        .iter()
+        .zip(arrow_schema.fields())
+        .map(|(column, field)| coerce_column_for_field(column, field))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(RecordBatch::try_new(arrow_schema, columns)?)
+}
+
+fn coerce_column_for_field(column: &ArrayRef, field: &Field) -> Result<ArrayRef> {
+    if column.data_type() == field.data_type() {
+        return Ok(column.clone());
+    }
+    if matches!(field.data_type(), DataType::Float64) {
+        return coerce_numeric_to_float64(column.as_ref());
+    }
+    Ok(column.clone())
+}
+
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "Chart transforms normalize supported numeric axis candidates to Float64"
+)]
+fn coerce_numeric_to_float64(column: &dyn Array) -> Result<ArrayRef> {
+    match column.data_type() {
+        DataType::Float32 => {
+            let array = column
+                .as_any()
+                .downcast_ref::<Float32Array>()
+                .context("Expected Float32Array")?;
+            Ok(Arc::new(
+                array
+                    .iter()
+                    .map(|value| value.map(f64::from))
+                    .collect::<Float64Array>(),
+            ))
+        }
+        DataType::Int64 => {
+            let array = column
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .context("Expected Int64Array")?;
+            Ok(Arc::new(
+                array
+                    .iter()
+                    .map(|value| value.map(|value| value as f64))
+                    .collect::<Float64Array>(),
+            ))
+        }
+        DataType::UInt64 => {
+            let array = column
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .context("Expected UInt64Array")?;
+            Ok(Arc::new(
+                array
+                    .iter()
+                    .map(|value| value.map(|value| value as f64))
+                    .collect::<Float64Array>(),
+            ))
+        }
+        _ => bail!(
+            "Cannot use {} column as a Float64 chart coordinate",
+            column.data_type()
+        ),
+    }
 }
 
 fn map_full_index_columns(
@@ -762,6 +825,33 @@ mod tests {
         .expect("selected columns");
 
         assert_eq!(selected, vec![0, 1]);
+    }
+
+    #[test]
+    fn rename_batch_normalizes_supported_numeric_columns_to_float64() {
+        let source_schema = Arc::new(Schema::new(vec![Field::new(
+            "axis",
+            DataType::Int64,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            source_schema,
+            vec![Arc::new(Int64Array::from(vec![1_i64, 2_i64])) as ArrayRef],
+        )
+        .expect("source batch");
+        let target_schema = DatasetSchema::new(IndexMap::from([(
+            "axis".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        )]));
+
+        let renamed = rename_batch(&batch, &target_schema).expect("renamed batch");
+        let axis = renamed
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .expect("Float64 chart axis");
+
+        assert_eq!(axis.values(), &[1.0, 2.0]);
     }
 
     #[test]
