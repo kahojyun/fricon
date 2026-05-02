@@ -98,6 +98,10 @@ one local service that owns one local data library. Remote mode,
 browser-served UI, and PWA-like access are future product surfaces that should
 shape the service/API boundary, but they are not shipped v0.2 requirements.
 
+The ordinary v0.2 model is one primary local data library per machine. Windows
+is the first-class lab-computer target; macOS remains supported for development
+and normal local use.
+
 Initial measurement support should lean on Python scripts as the execution
 entry point. Fricon Desktop should inspect, browse, and eventually assist those
 workflows, but it should not become the primary measurement execution engine
@@ -139,27 +143,35 @@ Replacement means a researcher can stop using the old simple logger for new
 measurements and use Fricon instead to:
 
 - record table-shaped measurement datasets from Python scripts or notebooks
+- run measurement scripts headlessly without opening Fricon Desktop first
 - select or create a lightweight sample and sample-session context when the
   measured object matters, without blocking quick measurements when context is
   not yet known
 - see newly produced datasets in Fricon Desktop without manual file handling
-- inspect recent and historical datasets through table and chart views
+- inspect live, recent, and historical measurements through table, line/scatter,
+  and basic 2D views
 - install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
   coherent Fricon release rather than assembling mismatched components manually
+- use the CLI primarily for setup, diagnostics, service control, and developer
+  workflows rather than as the normal experimenter workflow surface
 - install the local service as a bundled sidecar instead of requiring a
   separate server install for ordinary local use
+- ask for the data-library location on first run and remember it
+- use basic backup/restore, trash/recover, and explicit migration checkpoints as
+  user-visible safety paths
 - update Fricon with clear compatibility checks for the data library and
   local-service protocol
 - stage service/Desktop updates and apply them only when active measurements,
   open writers, imports, exports, and migrations are idle
 - move public Fricon clients toward one HTTP/WebSocket service API with binary
   dataset payload endpoints instead of separate UI and Python gRPC contracts
-- keep the core v0.x Python SDK measurement-write and dataset-read path working
-  across later v0.x desktop or local-service updates, with newer features
-  negotiated explicitly
+- protect recorded data across v0.x with explicit migrations and
+  fail-before-write diagnostics, while allowing SDK, CLI, UI, and protocol APIs
+  to break when necessary
 - use explicit dataset semantics for column metadata, scan axes, chart defaults,
   and live-view interpretation instead of relying on row-order heuristics
-- create a minimal interactive measurement record that groups produced datasets
+- create an explicit but low-ceremony measurement record that groups produced
+  datasets
 - reserve a general artifact model so reports, logs, figures, attachments, and
   future device snapshots do not have to masquerade as datasets
 - store measurement-level names, favorite or pin state, optional notes/tags,
@@ -168,16 +180,25 @@ measurements and use Fricon instead to:
   exceptions
 - reopen produced datasets from Python using generated read snippets or stable
   data-library identifiers
-- preserve interrupted partial data and make continuation, validation, or
-  invalidation explicit
+- preserve interrupted partial data; reruns create new linked measurements by
+  default, while continuation requires explicit intent and compatibility checks
+- export measurements as read-only portable bundles with practical common
+  tabular files and direct Python/Desktop offline-viewer access
+- include light measurement attachments such as small files, images, or logs
+  without building a full artifact management UI
 
 v0.2 replacement does not require:
 
 - importing or fully browsing legacy LabRAD/Data Vault history
+- a LabRAD Data Vault/Grapher compatibility layer for old scripts
 - multi-user LabRAD server semantics or hosted collaboration
 - desktop-first measurement execution
+- broad ordinary-user CLI workflows
 - a generic managed runner, queue, resource lease system, or workflow engine
 - a full parameter registry or device driver framework
+- Fricon-managed device communication
+- automatic calibration workflows
+- managed analysis records or analysis-run UI
 - automatic Git, `uv`, or `pixi` environment management
 - a long-term third-party client protocol stability promise
 - a complex auto-update system before the first replacement workflow is proven
@@ -191,7 +212,7 @@ v0.2 should optimize the user-facing product around interactive measurement
 records:
 
 ```text
-interactive measurement -> produced datasets -> inspection and analysis
+interactive measurement -> produced datasets -> inspection, export, and analysis
 ```
 
 For measurement work, examples and desktop navigation may become run-first once
@@ -214,14 +235,18 @@ analysis results, and parameter proposals.
 After v0.2 proves the core measurement loop, v0.3 and v0.4 should add product
 help in small slices rather than reopening the foundation each time.
 
+The leading v0.3 candidate is read-only LAN viewing from another computer,
+because it preserves the single-owner data-library model while covering an
+existing LabRAD Grapher usage pattern.
+
 Likely v0.3 candidates:
 
+- read-only LAN viewing from another computer through the service API
 - richer sample fields and 2D sample maps
 - attach/correct context UX polish
 - comparison and saved-view workflows
 - portable export viewer polish
 - smoother installer/update polish after the v0.2 release shape is proven
-- read-only LAN viewing from another computer through the service API
 - passive code/environment summary improvements
 - better lifecycle/favorite filtering
 
@@ -489,8 +514,8 @@ be rediscovered or relitigated later. Good ADR candidates include:
 - dataset semantic model commitments
 - distribution surfaces, installer/update policy, and release compatibility
 - service API transport and compatibility policy, including the HTTP/WebSocket
-  direction, binary dataset payload endpoints, and the core v0.x Python SDK
-  compatibility promise for locked lab environments
+  direction, binary dataset payload endpoints, and fail-before-write behavior
+  for locked lab environments when APIs or protocols break
 - Python API contract decisions
 - desktop/runtime architecture decisions
 - measurement, parameter, or device model foundations

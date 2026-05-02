@@ -42,11 +42,13 @@ v0.2 should optimize for these user outcomes:
 - record sample and cooldown/session context beside measurements
 - let users set active sample/session context from a notebook prelude or UI
   without making sample setup a hard requirement for quick measurements
+- run measurement scripts headlessly without first opening Fricon Desktop
 - inspect live and historical datasets through Fricon Desktop and Python
-- preserve parameter, code, environment, favorite, and lifecycle context for
-  each measurement
+- watch multiple active measurements through detachable data or plot windows
+- preserve flexible parameter snapshots, optional code/environment summaries,
+  favorite, note, attachment, and lifecycle context for each measurement
 - visualize sample/device parameters on a 2D map when the lab model needs it
-- automate repeated calibration without silent parameter mutation
+- leave room for repeated calibration without silent parameter mutation
 - leave a clean path to managed device communication after LabRAD is removed
 
 v0.2 should not optimize for:
@@ -70,6 +72,8 @@ User-visible concepts for the first v0.2 slice:
   can be selected as active context or attached after a run
 - Measurement: the normal record for data-taking work
 - Dataset: a table-shaped artifact produced or consumed by work
+- Operator Profile: an optional lightweight local label for mutating actions on
+  shared lab computers
 
 User-visible concepts to preserve for later v0.2 work:
 
@@ -203,53 +207,95 @@ Settled v0.2 product decisions:
   work.
 - v0.2 may break the old model freely when compatibility would preserve the
   wrong workspace/dataset-first API, storage, or UI assumptions.
+- After v0.2 is used for real lab data, recorded data durability and migration
+  paths matter more than preserving every v0.x SDK, CLI, UI, or protocol shape.
+  APIs may still break during v0.x, but incompatible clients must fail before
+  writes and explain the upgrade or migration path.
 - The v0.2 user-facing slice should stay minimal: Data Library, Measurement,
   Dataset, and optional Sample/Sample Session. Parameter, analysis,
   calibration, actor, and provenance concepts may be recorded or reserved, but
   should not become peer navigation concepts before the measurement loop is
   ergonomic.
+- Windows is the first-class lab-computer target for v0.2. macOS remains
+  supported for development and normal local use.
+- One primary local data library per machine is the normal user model.
+  First-run setup asks for the data-library location, creates a durable UUID
+  and editable display name, and remembers the choice.
+- Basic manual backup/restore belongs in the v0.2 data-library UX. Migrations
+  and repairs should create checkpoints where practical.
+- Fricon Desktop is the primary GUI, but measurement scripts must run
+  headlessly through the Python SDK. The bundled CLI is mainly for setup,
+  diagnostics, service control, and developer workflows.
+- The first Desktop screen is a measurement console, not a generic dataset
+  browser. v0.2 should support detachable measurement/plot/data windows from
+  that console rather than multiple independent full app instances.
+- The local service should allow multiple concurrent local measurement writers,
+  with each writer isolated as its own measurement record.
+- The local service uses a generated local token boundary and optional
+  lightweight operator profile for mutating actions. Do not add accounts,
+  teams, roles, or permissions UI.
 - v0.2 should not add first-class Project or Campaign as required grouping
   objects. Organize work through samples, sessions, measurements, favorites,
   search, saved views, and optional tags.
+- Sample records use flexible typed properties; sample sessions are generic
+  sessions with optional type labels such as cooldown, mount, treatment,
+  probing, or campaign.
+- Fricon Desktop should support inline sample/session creation, selection, and
+  basic editing during measurement setup. A full sample manager and rich 2D
+  sample-map editor can follow the minimal loop.
 - Favorites or pins are the primary manual signal for important measurements.
   Tags and notes should be available but secondary.
+- Users can add basic timestamped notes/markers during and after a measurement.
+  Important metadata and context corrections should leave change history.
 - v0.2 status should emphasize system lifecycle flags such as
   incomplete, interrupted, calibration/test, invalidated, and superseded.
   Avoid making broad manual good/suspect/failed classification part of the
   happy path.
+- Normal cleanup uses trash/recover, not hard delete.
 - Measurement-centered portable export is the default. Dataset-only export can
   remain a lower-level option; arbitrary library-subset export is later scope.
-- Analysis provenance should be reserved in the model, but Analysis should not
-  be a peer navigation concept in the first measurement-facing UI.
-- Managed/declarative measurement remains a future path. v0.2 UX should stay
-  ordinary Python measurement code.
-- Shared lab computers should use a lightweight actor label or token for
-  mutating actions. Do not add accounts, teams, roles, or permissions UI.
-- Sample custom fields and 2D visualization are first-class design
-  requirements, but implementation can follow the minimal measurement loop.
-- Code/environment provenance should start as passive summaries, not managed
-  code history or environment capture.
-
-Decide at the product level before implementation:
-
-- One data library is the normal user model. Saved views, optional tags,
-  samples, and sessions organize the library without encouraging many
-  long-lived roots.
+- Portable exports include a Fricon bundle plus common tabular files such as
+  CSV or Parquet when practical. They are read-only, open directly from Python
+  or the Desktop offline viewer without creating a local data library, and make
+  sensitive provenance opt-in or explicitly previewed.
 - `Measurement` is the first public acquisition noun. `Experiment` is informal
   scientific language or a possible future grouping/template concept.
 - Sample/session context is useful and visible, but optional. Quick
   measurements remain valid without it and can be corrected later.
-- Measurement-scoped dataset writers are the common Python path. Lower-level
-  dataset-only writes stay available for scratch tables, imports, tests, and
-  transitional code.
-- Portable exports start from a measurement by default and can be opened
-  directly from Python or a read-only viewer without creating a local data
-  library first.
-- Favorites, optional notes/tags, and lifecycle flags usually live on samples,
-  sessions, measurements, analysis, or calibration records; dataset
-  annotations are for output-local exceptions.
-- v0.2 may break workspace/dataset-first assumptions where they conflict with
-  the new model.
+- Measurement creation is explicit but short in the Python SDK.
+  Measurement-scoped dataset writers are the common path and share the
+  measurement lifecycle.
+- Dataset contents are appendable while the writer is active and immutable
+  after finish. Corrections produce derived artifacts or correction events.
+- Table-shaped datasets are the official v0.2 data shape. Optional column unit,
+  label, and display hints are enough for quick measurements without a required
+  schema.
+- v0.2 plot scope is live table, line/scatter, and basic 2D heatmap/image views
+  from tabular columns. Rich dashboards are later scope.
+- Structured history filters by time, measurement name/type, sample/session,
+  tags/favorites, lifecycle state, and dataset columns where practical are part
+  of the replacement bar.
+- v0.2 can support light measurement attachments such as small files, images,
+  and logs. Rich artifact management is later scope.
+- v0.2 code provenance is an optional summary, not mandatory source or
+  environment capture.
+- v0.2 parameter capture is an optional flexible snapshot, not a full parameter
+  registry or profile UI.
+- Analysis remains external through Python/export in v0.2. Analysis provenance
+  is reserved in the model, but Analysis is not a peer navigation concept in
+  the first measurement-facing UI.
+- Automatic calibration, managed/declarative measurement, and Fricon-managed
+  device communication are future paths. v0.2 UX stays ordinary Python
+  measurement code and record-only at the device boundary.
+- Existing LabRAD scripts should migrate through the Fricon SDK. Do not build a
+  Data Vault/Grapher compatibility layer in v0.2.
+- Remote access starts later as read-only LAN monitoring, browsing, and export
+  through the Fricon service. Remote acquisition writes and multi-user
+  semantics are later scope.
+- AI integration should initially read, summarize, and suggest. Mutating
+  actions require human or script confirmation and audit records.
+- Diagnostics are guided in Desktop. Support bundles are local and redacted by
+  default, with explicit user export.
 
 Defer to ADR or technical design before implementation:
 
@@ -439,6 +485,11 @@ unless the user explicitly aborts or detaches them. This avoids nested writer
 ceremony for the normal case while preserving explicit dataset lifecycle for
 lower-level or streaming APIs.
 
+If a measurement script crashes or is interrupted, the partial measurement
+should remain visible as partial or failed. A rerun should create a new linked
+measurement by default; resuming and appending to the same measurement requires
+explicit user or API intent and compatibility checks.
+
 Lower-level dataset creation remains useful:
 
 ```python
@@ -475,6 +526,7 @@ A measurement export should include:
   and correction summaries
 - optional sample/session context and attach-later correction history
 - produced dataset artifacts with facts, semantic manifests, and projections
+- common tabular payload files, such as CSV or Parquet when practical
 - non-table artifacts such as reports, figures, logs, attachments, code
   summaries, and future device snapshots when selected
 - parameter snapshot or legacy parameter JSON used by the run when available
@@ -482,6 +534,11 @@ A measurement export should include:
 - provenance links needed to explain inputs, outputs, analysis, and calibration
 - checksums for payload files and manifest records
 - generated Python read snippets for the portable API
+
+Default exports should be useful but not overly revealing. Sensitive provenance
+such as full local paths, detailed dirty Git state, full environment summaries,
+source computer label, and extensive sample metadata should be opt-in or
+previewed explicitly before export.
 
 Portable read APIs should be read-only and direct:
 
@@ -492,9 +549,9 @@ rabi = meas.dataset("rabi").to_pyarrow()
 ```
 
 Fricon Desktop should also have a read-only export viewer mode. The viewer
-should open exported bundles directly, show measurement context and produced
-artifacts, and offer read snippets without requiring import into the user's own
-data library.
+should open exported bundles directly without a running local Fricon service,
+show measurement context and produced artifacts, and offer read snippets
+without requiring import into the user's own data library.
 
 Importing an export into another data library may be useful later, but it is a
 separate workflow from reading or viewing the exported measurement.
@@ -535,8 +592,10 @@ edit JSON sample parameters and color a 2D graph by parameter or result.
 
 ## Parameter Model
 
-Large parameter sets should be explicit and versioned, but users should not
+Large parameter sets should become explicit and versioned, but users should not
 need to design a full parameter schema before collecting exploratory data.
+v0.2 may start with optional flexible parameter snapshots attached to
+measurements.
 
 The clean lifecycle is:
 
@@ -569,10 +628,10 @@ Rules:
 v0.2 should reduce code-directory copying without becoming a full Git or
 environment manager.
 
-Start with passive summaries:
+Start with optional passive summaries:
 
-- script path or module entry point
-- Git commit, dirty state, or file hash summary when available
+- user-provided code label and script path or module entry point when available
+- optional Git commit, dirty state, or file hash summary when available
 - Python version
 - Fricon version
 - lock file or environment summary when practical
@@ -620,7 +679,8 @@ managed API or explicit advanced hooks.
 ## Device Evolution Path
 
 v0.2 should be able to evolve toward Fricon-managed device communication and
-eventually remove LabRAD from the measurement stack.
+eventually remove LabRAD from the measurement stack, but v0.2 itself remains
+record-only at the device boundary.
 
 Do not build the full driver framework first. Reserve a minimal boundary now:
 
@@ -635,8 +695,9 @@ Do not build the full driver framework first. Reserve a minimal boundary now:
 - Readback: what hardware reported after apply
 - ResourceLease: minimal guard for devices that cannot be used concurrently
 
-The initial v0.2 implementation can record only summaries, placeholders, or a very
-thin adapter contract. The important decisions are:
+The initial v0.2 implementation can record summaries or placeholders, but
+should not ship a managed-device framework or LabRAD Data Vault/Grapher
+compatibility layer. The important decisions are:
 
 - device state belongs to managed execution provenance, not dataset metadata
 - Fricon should have a typed place for future device capabilities and readbacks
@@ -672,6 +733,10 @@ CalibrationWorkflowRun
 This keeps measurement outputs clean while still letting the UI show calibration
 history inside the broader measurement/sample context.
 
+v0.2 analysis remains external through Python/export. Automatic calibration,
+analysis-run UI, and calibration result records are model reservations for
+later versions, not first replacement-slice requirements.
+
 ## Distribution And Runtime
 
 v0.2 should expose three public surfaces:
@@ -692,6 +757,10 @@ Fricon Desktop may be implemented as a web application packaged with Tauri.
 For v0.2, Fricon Desktop is the shipped GUI and runs in local mode. Remote
 mode, browser-served UI, and PWA-style access are future targets.
 
+Windows is the first-class v0.2 lab-computer target. macOS remains supported
+for development and normal local use. The first-run flow asks where the data
+library should live and remembers that location.
+
 The desktop app may launch or supervise the local service, but the service is
 the authoritative data backend. Core measurement, dataset, sample/session,
 note/tag, and live-chart features should use the service API rather than Tauri
@@ -702,6 +771,10 @@ Feature code should avoid unnecessary Tauri-only assumptions. Tauri-specific
 capabilities should stay at the shell boundary: file pickers, offline bundle
 file association, updater, diagnostics, window management, and local service
 launch.
+
+The first Desktop view should be a measurement console. Multi-window support in
+v0.2 means detachable measurement, plot, or data windows from that console, not
+multiple fully independent app instances.
 
 Installation and update are product-visible v0.2 concerns. Users should get one
 coherent Fricon release shape for Fricon Desktop, CLI, Python SDK, and local
@@ -715,21 +788,30 @@ version, while service API, data-library format, export format, and feature
 capabilities remain explicit internal compatibility versions. The Python SDK may
 have a different package version because lab scripts often pin it.
 
+The bundled CLI is not a broad ordinary user workflow surface in v0.2. It
+exists mainly for setup, diagnostics, service control, and developer workflows.
+Normal acquisition and browsing should be Python SDK plus Fricon Desktop.
+Python measurement scripts should still run headlessly without opening Desktop;
+the SDK can discover, start, or connect to the local service where practical.
+
 Updates should be staged and applied only when the local service reports that
-it is safe to stop. Do not update or migrate while measurements, open dataset
-writers, imports, exports, or data-library migrations are active. If work is
-active, offer "install when idle" or "remind later"; the service may enter a
-draining state where existing work finishes and new long-running writes are
-blocked or warned.
+it is safe to stop. Update checks are prompted, not silent auto-installs. Do
+not update or migrate while measurements, open dataset writers, imports,
+exports, or data-library migrations are active. If work is active, offer
+"install when idle" or "remind later"; the service may enter a draining state
+where existing work finishes and new long-running writes are blocked or warned.
 
 Data-library format upgrades require explicit user confirmation and recovery
-guidance. Do not silently migrate a data library during app launch.
+guidance. Do not silently migrate a data library during app launch. v0.2 should
+include basic manual backup/restore UX, and migrations or repairs should create
+checkpoints where practical.
 
 The exact protocol can remain a technical ADR, but v0.2 should not leave
 client/server mismatch behavior undefined. Because Python measurement code may
-be pinned by virtual environments or lockfiles, v0.2 should make the core v0.x
-Python SDK measurement-write and dataset-read path compatible with later v0.x
-local services. Newer features should use explicit capability negotiation.
+be pinned by virtual environments or lockfiles, Fricon should fail before
+writes when a client, service, or data-library format is incompatible. The v0.x
+promise is durable recorded data and clear migrations, not strict API or
+protocol stability.
 
 The preferred v0.2 public client protocol is HTTP/WebSocket plus explicit
 binary dataset payload endpoints, not the current gRPC transport. Fricon
@@ -746,8 +828,10 @@ become a multi-user system.
 
 The recommended boundary is:
 
-- local loopback access can use implicit local trust or a generated local token
-- mutating operations record an actor
+- local access uses a generated local token, not unauthenticated open loopback
+  writes
+- mutating operations record an actor, including an optional local operator
+  profile when configured
 - the first authorization model is single-owner
 - future remote access requires token or pairing
 - roles, teams, and permission matrices remain future scope
@@ -757,7 +841,8 @@ actor boundary early; defer full multi-user product complexity.
 
 Do not support shared-folder multi-machine access to the same database-backed
 data library. Future remote viewing should connect to the Fricon service that
-owns the library.
+owns the library. The first remote phase should be read-only monitoring,
+browsing, and export; remote acquisition writes remain later scope.
 
 ## Rewrite Strategy
 
@@ -796,13 +881,17 @@ The initial v0.2 engineering slice should prove the new model end to end:
 2. Create or select a sample/session when known, or explicitly run without one.
 3. Set active sample/session context from Fricon Desktop or Python prelude when
    appropriate.
-4. Start an interactive measurement from Python.
+4. Start an explicit measurement from Python, including headless script use.
 5. Write one or more dataset artifacts through measurement-scoped handles.
-6. Browse the measurement and datasets in Fricon Desktop.
+6. Browse the measurement and datasets in the Fricon Desktop measurement
+   console, with detachable data or plot windows for live monitoring.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
 9. Record actor, passive code summary, favorite/pin state, run note, lifecycle
    flags, and sample/session links.
+10. Export a read-only measurement bundle with common tabular files and direct
+    Python/Desktop offline-viewer access.
+11. Exercise backup/restore and trash/recover as user-visible safety paths.
 
 This slice intentionally breaks old workspace/dataset assumptions where they
 conflict with the v0.2 model.
@@ -813,6 +902,8 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 
 - data library versus workspace public model
 - supported distribution surfaces and install/update policy
+- v0.x data durability, API/protocol break policy, and compatibility
+  diagnostics
 - sample and sample-session identity
 - active sample/session context and attach-later correction policy
 - general Artifact versus DatasetArtifact boundary
@@ -821,19 +912,20 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - measurement-scoped dataset writer lifecycle
 - minimal device adapter/capability boundary for future LabRAD replacement
 - actor/auth boundary for local access and future remote access
-- client/server protocol compatibility, version negotiation, and core v0.x
-  Python SDK compatibility policy
+- client/server protocol compatibility, version negotiation, and
+  fail-before-write diagnostics for incompatible clients
 - optional managed measurement desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - Fricon Desktop shell boundary, local service ownership, and future
   remote/browser UI access
 - service sidecar packaging, optional login startup, update-safe/draining
-  lifecycle, and data-library migration gating
+  lifecycle, data-library migration gating, and backup/restore policy
 
 ## Design Constraints
 
 - Keep the Python measurement path simple.
 - Keep datasets directly openable from Python and Fricon Desktop.
+- Keep dataset contents appendable while active and immutable after finish.
 - Keep sample/session context easy to set as an active default, but do not block
   quick measurements when the context is unknown.
 - Keep dataset semantics dataset-local.
@@ -842,5 +934,7 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
   session, measurement, analysis, and calibration records.
 - Keep advanced execution concepts optional until users need retry, resume,
   dry-run, or calibration automation.
+- Keep v0.2 record-only for device communication and external-only for
+  analysis execution.
 - Keep v0.2 local-only and single-owner in the product, while leaving actor,
   service API, and future remote-access hooks in the architecture.

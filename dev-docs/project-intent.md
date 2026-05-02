@@ -29,6 +29,8 @@ Assumptions:
 - They can install Python packages and run Python scripts or notebooks.
 - They are comfortable with basic tabular or array-like data concepts.
 - They may not be software engineers.
+- Their lab computers may be Windows machines; macOS should remain supported
+  for development and normal local use.
 - They should not need to understand Fricon's internal Rust, IPC, database, or
   file-layout implementation details.
 
@@ -71,12 +73,17 @@ from Python without depending on the old logger. Importing or fully browsing
 legacy LabRAD/Data Vault history is a follow-up migration concern, not a v0.2
 requirement.
 
+v0.2 is allowed to make broad breaking changes while Fricon is still
+pre-adoption. Once real lab data is recorded, the project should protect data
+durability and provide explicit migrations or recovery paths even if v0.x SDK,
+CLI, UI, or service API shapes continue to change.
+
 The primary v0.2 user mental model is:
 
 ```text
 I ran a measurement.
 It produced datasets.
-Fricon helps me inspect, annotate, recover, and reopen them.
+Fricon helps me inspect, annotate, recover, reopen, and export them.
 ```
 
 Interactive measurements should become the recommended path for measurement
@@ -104,7 +111,9 @@ snapshots, provenance, and human approval boundaries.
 AI-assisted workflows should be designed as assistive automation rather than
 silent authority. AI may help draft snippets, summaries, reports, metadata
 cleanup, parameter comparisons, and workflow proposals, but mutating workspace
-state should remain explicit, reviewable, and auditable.
+state should remain explicit, reviewable, and auditable. The initial AI posture
+is read and suggest; AI-written annotations, analysis records, calibration
+actions, and device or acquisition control require later product decisions.
 
 The proposed v0.2 reset is captured in `v0.2/design.md`. It keeps the
 Python-led and local-first constraints while broadening the durable product
@@ -112,16 +121,28 @@ model from a workspace/dataset catalog into a local data library centered on
 samples, sample sessions, measurement records, dataset artifacts, analysis,
 calibration, parameter snapshots, code summaries, and auditability.
 
+The first v0.2 shipped slice should remain narrower than that full model:
+record-only measurement history, table-shaped datasets, optional
+sample/session context, light attachments, optional parameter/code summaries,
+guided diagnostics, trash/recover, backup/restore, and measurement-centered
+exports. Analysis records, automatic calibration, managed device communication,
+and declarative managed measurement remain later layers.
+
 ## Runtime Model
 
 Fricon is local-first. The v0.2 supported runtime model is local-only:
 
 - data lives on the user's local computer
-- Fricon Desktop and the Python API operate against one local data library
+- Fricon Desktop and the Python API operate against one primary local data
+  library
 - the local service coordinates data-library operations and owns database
   access
 - the desktop app may launch, supervise, and configure the local service, but
   should not be the durable data backend
+- Python measurement scripts can run headlessly without first opening Fricon
+  Desktop
+- first-run setup asks where the data library should live and remembers it
+- the local service uses a generated local token boundary for mutating access
 
 Remote clients, browser-served UI, and remote viewing may be considered after
 the local replacement workflow is proven. They should build on the same local
@@ -132,11 +153,9 @@ shared folder.
 Distribution shape and client/server compatibility have technical
 implementation details, but their user impact belongs in product planning.
 v0.2 should define the supported compatibility envelope for Fricon Desktop,
-CLI, Python SDK, local service, and data-library format. Once v0.2 lands, the
-core v0.x Python SDK path for measurement writes and dataset reads should
-remain compatible with later v0.x local services. Newer capabilities should be
-feature-negotiated, and incompatible clients should fail clearly before writes
-when they cannot safely work with the running service or data library.
+CLI, Python SDK, local service, and data-library format. The v0.x promise is
+durable recorded data, explicit migrations, and fail-before-write diagnostics
+for incompatible clients, not strict API or protocol stability.
 Fricon Desktop should install with a compatible local service sidecar for the
 normal local workflow. Updates should be staged and applied only when the
 service reports that measurements, dataset writers, imports, exports, and
@@ -282,12 +301,13 @@ These questions are intentionally unresolved:
   implementation?
 - How should parameter history, diff, and selected apply workflows be exposed in
   the Python API and desktop UI?
-- What unit and display metadata belongs on dataset columns, parameters, or
-  both?
-- How should sample or specimen identity be represented without overbuilding a
-  lab inventory system?
-- Which run facts should be immutable, and which should allow correction
-  events?
+- Beyond v0.2 optional column unit, label, and display hints, what unit and
+  display metadata belongs on dataset columns, parameters, or both?
+- Beyond v0.2 flexible sample properties and generic sample sessions, how much
+  sample/specimen structure is worth adding without overbuilding a lab
+  inventory system?
+- Which additional run facts beyond v0.2 metadata corrections need immutable
+  event history?
 - How much dataset lineage is needed for measured, processed, simulation, and
   imported datasets?
 - How should measurement code history be captured without surprising users or
@@ -298,14 +318,14 @@ These questions are intentionally unresolved:
   parameters, schedules, approval checkpoints, and expected outputs?
 - Which calibration, optimization, and benchmark tasks should be first-class
   workflow types?
-- Which AI actions should be suggestion-only, which may mutate workspace or
-  data-library state, and what approval or audit metadata should each class
-  require?
+- Beyond the initial read-and-suggest AI posture, which AI actions may mutate
+  workspace or data-library state, and what approval or audit metadata should
+  each class require?
 - What AI model/provider/version and prompt-summary metadata is needed for
   reproducibility without storing unnecessary sensitive context?
 - What level of device abstraction is useful without overbuilding a hardware
   framework?
-- Which data formats and array shapes should be first-class beyond the current
-  dataset model?
-- What remote-client use cases are worth supporting without introducing
-  multi-user product complexity?
+- Which data formats and array shapes should be first-class beyond the v0.2
+  table-shaped dataset model?
+- After read-only LAN viewing, what remote-client use cases are worth
+  supporting without introducing multi-user product complexity?

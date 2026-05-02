@@ -17,10 +17,11 @@ It should help experimentalists:
 
 - explore quickly from Python scripts and notebooks
 - record measurement history without manual folder discipline
-- track samples, cooldowns, parameters, code, and datasets together
+- track samples, sessions/cooldowns, parameters, code, and datasets together
 - visualize sample parameters and measurement results
 - maintain large parameter sets without silent drift
-- run repetitive calibration work with explicit proposals and history
+- leave room for repetitive calibration work with explicit proposals and
+  history
 - recover historical context when data, code, or parameters have evolved
 
 Fricon should not make users operate a complex LIMS, hosted service, or
@@ -61,6 +62,11 @@ one Fricon data library
   -> analysis and calibration history
 ```
 
+The first v0.2 implementation should not try to deliver every item in that
+target model. v0.2 should prove recording new measurements and datasets first;
+analysis records, automatic calibration, and managed device communication are
+later layers that the model must not block.
+
 ## Reference-System Lessons
 
 The useful lesson from LabRAD Data Vault/Grapher is speed: users can create
@@ -88,8 +94,8 @@ set active sample/session context when known
 run measurement from Python
 watch produced datasets
 favorite important runs and review lifecycle flags
-analyze in Python or UI
-promote useful calibration results through parameter proposals
+analyze in Python or exported bundles
+later promote useful calibration results through parameter proposals
 ```
 
 The first-screen product should eventually be organized around current lab work:
@@ -98,7 +104,7 @@ The first-screen product should eventually be organized around current lab work:
 - recent measurements
 - live datasets
 - favorites, pins, and lifecycle flags
-- parameter/calibration status
+- later parameter/calibration status
 
 Dataset browsing remains important, but datasets are outputs inside a broader
 measurement history.
@@ -122,6 +128,11 @@ Each data library should have a generated UUID and a user-editable display
 name. Exported measurements should include that source identity so users can
 tell which lab computer or data library produced the data.
 
+The ordinary v0.2 experience should optimize for one primary local data library
+per machine. Opening or switching to another library can exist as an advanced
+or diagnostic workflow, but frequent project-style library switching should not
+be the default model.
+
 ### Sample
 
 A sample is the measured physical object, device under test, wafer, chip, batch,
@@ -131,7 +142,7 @@ Samples need:
 
 - stable identity
 - display name and aliases
-- structured custom fields
+- flexible typed custom fields
 - favorites, notes, optional tags, and lifecycle state
 - links to sample sessions, measurements, datasets, and parameter history
 - optional 2D layout or coordinate map
@@ -159,6 +170,10 @@ The same sample may have multiple sessions. Parameter drift across cooldowns
 belongs on sessions and parameter history, not usually on separate sample
 identities.
 
+Use a generic `Sample Session` or `Use Session` concept with an optional session
+type such as cooldown, mounting, treatment, probing, or campaign. Do not make
+`Cooldown` the only first-class session noun.
+
 Create a new sample only when the physical identity has meaningfully changed.
 If processing creates a new object, record lineage from the old sample to the
 new one rather than hiding the change in names or folders.
@@ -173,12 +188,17 @@ It should link:
 - parameter snapshot or legacy parameter JSON
 - code and environment summary
 - produced datasets
-- favorite or pin state, notes, optional tags, lifecycle flags, and attachments
+- favorite or pin state, timestamped notes/markers, optional tags, lifecycle
+  flags, and light attachments
 - continuation or recovery decisions
 
 Use `Experiment` for informal scientific discussion, or later for a broader
 campaign/template/grouping if an ADR proves that users need that extra layer.
 Do not make `ExperimentRun` the first public noun for the v0.2 API.
+
+Python SDK examples should create measurements explicitly but with little
+ceremony. Dataset writers should share the measurement lifecycle so users do
+not have to nest a separate writer context for every output dataset.
 
 ### Dataset Artifact
 
@@ -187,6 +207,11 @@ processed, imported, or simulated.
 
 Datasets must remain directly openable from Python and Fricon Desktop, but they
 should not be the only organizing object.
+
+Dataset contents should be appendable while their writer is active and
+immutable after the producing measurement finishes. Corrections should create
+derived artifacts or correction records rather than silently editing completed
+dataset facts in place.
 
 Reserve `Artifact` as the broader provenance concept. `DatasetArtifact` is the
 primary v0.2 artifact because measured tables and live plots are the LabRAD
@@ -197,6 +222,10 @@ as datasets.
 ### Parameter Profile And Snapshot
 
 Large parameter sets should be versioned explicitly.
+
+v0.2 may start with an optional flexible parameter snapshot, such as JSON-like
+metadata attached to a measurement. A full global parameter registry, profile
+editing UI, and calibration promotion workflow are later scope.
 
 Fricon should support:
 
@@ -215,8 +244,8 @@ context changes.
 
 Start with passive summaries:
 
-- entry point or script path
-- Git commit, dirty state, or file hash summary when available
+- user-provided code label and entry point or script path when available
+- optional Git commit, dirty state, or file hash summary when available
 - Python/fricon versions
 - lock file or environment summary when practical
 
@@ -254,13 +283,18 @@ This is likely as important as generic dataset browsing for many labs.
 ### Install And Launch Fricon
 
 As an experimentalist, I want one clear way to install and launch Fricon on a
-lab computer so that I can open Fricon Desktop, run the CLI, and use the Python
-SDK against a local data library without assembling incompatible pieces by hand.
+lab computer so that I can open Fricon Desktop and use the Python SDK against a
+local data library without assembling incompatible pieces by hand.
 
 Acceptance notes:
 
+- Windows is a first-class v0.2 target because lab computers are expected to be
+  Windows machines
+- macOS is also supported for development and normal local use
 - the supported v0.2 distribution shape is documented as Fricon Desktop,
   `fricon` CLI, Python SDK, and local service
+- the CLI is bundled for setup, diagnostics, service control, and developer
+  workflows; normal experimental workflows should rely on Desktop and Python
 - Fricon Desktop installs with a compatible local service sidecar; users should
   not install a separate server package for the normal local workflow
 - Fricon Desktop, the bundled service, and the bundled CLI share one visible
@@ -268,15 +302,22 @@ Acceptance notes:
 - Fricon Desktop starts in local mode for v0.2
 - first-run setup creates or opens the default data library without requiring
   users to understand server internals
+- first-run setup asks for the data-library location and remembers it
 - the local service starts on demand from Fricon Desktop, CLI, or Python SDK
   where practical
 - fixed lab computers may optionally enable a per-user "start Fricon service at
   login" mode, but root/system service registration is not required for
   ordinary v0.2 use
+- the local service uses a generated local token boundary instead of relying on
+  unauthenticated open loopback writes
 - notebook and script examples show how to connect to the same local data
   library used by Fricon Desktop
+- the recommended Python SDK setup is normal lab-environment installation, such
+  as `uv` or `pip`, plus service discovery/startup diagnostics
 - users get a clear diagnostic when the local service is not running or cannot
   open the data library
+- Python measurement scripts can run headlessly without first opening Fricon
+  Desktop
 - remote mode, browser-served UI, and PWA distribution are future-ready
   architecture targets, not v0.2 shipped workflows
 
@@ -293,6 +334,8 @@ Acceptance notes:
   virtual environments or lockfiles
 - Fricon Desktop can stage an update, but the local service reports whether it
   is safe to stop and replace
+- update checks are prompted; users choose when to install instead of Fricon
+  silently replacing the running measurement environment
 - updates are not applied while measurements, open dataset writers, imports,
   exports, or data-library migrations are active
 - users can choose "install when idle" or "remind later" when an update is ready
@@ -300,9 +343,12 @@ Acceptance notes:
 - "install when idle" may put the service into a draining state where existing
   work finishes, new long-running writes are blocked or warned, and read-only
   browsing continues where practical
-- after v0.2 lands, the core v0.x Python SDK path for measurement writes and
-  dataset reads should remain compatible with later v0.x local services
-- newer capabilities are feature-negotiated rather than required by old scripts
+- after v0.2 lands, recorded data durability matters more than preserving every
+  v0.x SDK, CLI, UI, or protocol API shape
+- v0.x APIs and protocol details may break when needed, but incompatible
+  clients must fail before writes with clear upgrade or migration guidance
+- newer capabilities are feature-negotiated when practical rather than failing
+  ambiguously in old scripts
 - clients and the service negotiate protocol, API capability, and data-library
   format compatibility before writes
 - Fricon Desktop, CLI, and Python SDK should use one public service API
@@ -315,6 +361,8 @@ Acceptance notes:
   partially writing data
 - data-library format upgrades require explicit confirmation, no active
   measurements, and backup/checkpoint or recovery guidance where practical
+- v0.2 includes a basic built-in backup/restore path for the local data library;
+  migration and repair create checkpoints where practical before making changes
 - long-term third-party protocol stability and polished auto-update UX are
   follow-up topics, not v0.2 replacement requirements
 - remote clients should never bypass the service by opening the same
@@ -326,10 +374,31 @@ As an experimentalist, I want one Fricon data library so that data, sample
 records, parameters, code summaries, and run history do not fragment into many
 folders.
 
+Acceptance notes:
+
+- first-run setup asks where the data library should live and remembers the
+  choice
+- Fricon should not silently choose a hidden app-data path for experimental
+  data unless the user explicitly accepts it
+- data libraries have generated UUIDs and user-editable display names
+- basic manual backup/restore is part of the data-library UX, not only an
+  internal migration safety step
+- migration or repair requires the service to be idle and should create a
+  backup/checkpoint where practical
+
 ### Register A Sample
 
 As an experimentalist, I want to create a lightweight sample record with custom
 fields so that measurement data is tied to the object I measured.
+
+Acceptance notes:
+
+- sample fields are flexible and typed where useful, not a strict lab-wide
+  inventory schema
+- Fricon Desktop supports inline creation, selection, and basic editing during
+  measurement setup
+- a full sample database manager and rich sample-map editor can follow after
+  the minimal measurement loop
 
 ### Start A Sample Session
 
@@ -340,6 +409,12 @@ cooldown is a new sample.
 The sample/session context should be selectable as an active default, not a
 required modal step before every quick measurement.
 
+Acceptance notes:
+
+- use a generic sample session with an optional type label such as cooldown,
+  mount, treatment, probing, or campaign
+- users can attach or correct sample/session context later with change history
+
 ### Run An Exploratory Measurement
 
 As an experimentalist, I want to run a measurement from Python with minimal
@@ -349,10 +424,60 @@ and basic provenance.
 If no sample/session is selected, Fricon should still record the measurement and
 make missing context visible and fixable later.
 
+Acceptance notes:
+
+- the Python SDK uses an explicit but short measurement-creation call
+- measurement-scoped dataset writers finalize with the measurement lifecycle
+- optional flexible parameter snapshots can be attached without a global
+  parameter registry
+- multiple local measurement writers may be active concurrently through the
+  service, each isolated as its own measurement
+- when a script crashes, the partial measurement remains visible as partial or
+  failed; a rerun creates a new linked measurement by default instead of
+  silently appending to the old one
+- v0.2 targets Grapher-plus scale: comfortably beyond simple LabRAD Grapher
+  replacement workloads, with storage and API choices ready for larger later
+  versions
+
 ### Watch And Inspect Data
 
 As an experimentalist, I want local live and historical table/chart views so
 that I can decide whether a measurement is working.
+
+Acceptance notes:
+
+- the first screen should be a measurement console, not a generic dataset
+  browser
+- the console centers active and recent measurements, active sample/session
+  context, produced datasets, and live status
+- replacing LabRAD Grapher requires both live monitoring and historical
+  browsing/recovery
+- v0.2 should support live table and plot views for table-shaped measurement
+  datasets
+- core plot scope is table, line/scatter, and basic 2D heatmap/image views from
+  tabular columns; richer dashboards wait for later versions
+- interrupted or partial measurements remain visible and recoverable
+- users can detach measurement or plot windows from the main console to watch
+  multiple active runs without creating multiple full app instances
+- history views support structured filters by time, measurement name/type,
+  sample/session, tags/favorites, lifecycle state, and dataset columns where
+  practical
+
+### Diagnose Local Setup Problems
+
+As an experimentalist, I want Fricon Desktop to explain setup and connection
+problems so that I can fix common lab-computer issues without reading raw logs.
+
+Acceptance notes:
+
+- diagnostics cover stopped service, missing service, wrong data-library
+  location, locked data library, old Python SDK, incompatible service, pending
+  update, and migration-required states
+- diagnostics provide user-facing next steps before pointing to logs
+- support bundles are local and redacted by default; users explicitly choose
+  when to export diagnostic details
+- CLI diagnostics may exist for power users, but Desktop diagnostics are the
+  primary v0.2 support surface
 
 ### Annotate Once At The Right Level
 
@@ -360,10 +485,27 @@ As an experimentalist, I want to favorite important measurements and add notes
 or optional tags at the measurement or sample/session level so that I do not
 have to annotate every dataset.
 
+Acceptance notes:
+
+- users can add basic timestamped notes or markers during and after a
+  measurement
+- metadata, sample/session links, notes, tags, and lifecycle flags are
+  correctable with history for important changes
+- a lightweight optional local operator profile can label mutating actions
+- tags and notes remain optional; favorites/pins are the primary manual signal
+
 ### Reopen Data From Python
 
 As an analyst, I want stable IDs and read snippets so that I can reopen
 measurement outputs without knowing storage paths.
+
+Acceptance notes:
+
+- snippets use the public Python SDK, not internal storage paths
+- examples assume the SDK was installed in the user's lab Python environment
+  through `uv`, `pip`, or equivalent environment tooling
+- connection discovery should find or start the local service where practical
+  and fail with guided diagnostics otherwise
 
 ### Export A Measurement For Offline Analysis
 
@@ -375,15 +517,34 @@ Acceptance notes:
 
 - export starts from a measurement by default
 - exported bundles include produced datasets, selected artifacts, favorites,
-  notes, optional tags, lifecycle flags, sample/session context,
-  parameter/code summaries, and provenance
-- exported bundles include source data library UUID, display name, optional
-  computer label, export UUID, format version, checksums, and original record
-  IDs
+  notes, optional tags, lifecycle flags, sample/session labels, source data
+  library UUID/display name, export UUID, format version, checksums, original
+  record IDs, and Fricon versions by default
+- exports include convenient common tabular files, such as CSV or Parquet when
+  practical, in addition to the Fricon bundle manifest
+- sensitive provenance such as full code paths, dirty Git details, full
+  environment summaries, source computer label, and extensive sample metadata
+  should be opt-in or explicitly previewed before export
 - Python can open the bundle directly through a portable read API
-- Fricon Desktop can open the bundle in a read-only export viewer mode
+- Fricon Desktop can open the bundle in a read-only export viewer mode without
+  requiring a running local service
 - importing the bundle into another data library is optional, not required for
   analysis
+
+### Trash And Recover Data
+
+As an experimentalist, I want to move mistaken test measurements or datasets to
+trash so that ordinary cleanup does not permanently destroy scientific data.
+
+Acceptance notes:
+
+- v0.2 normal UX exposes trash/recover, not hard delete
+- completed measurements and datasets should remain recoverable from normal
+  cleanup actions
+- permanent deletion can remain an internal maintenance or future advanced
+  operation, not a primary v0.2 user workflow
+- correction, invalidation, and supersession should be represented as events
+  rather than destructive rewrites
 
 ### Avoid Code Directory Copies
 
@@ -395,12 +556,35 @@ Acceptance notes:
 
 - v0.2 starts with passive summaries such as script path, Git/hash state,
   Python/Fricon versions, and environment hints when available
+- code provenance is optional summary data, not a mandatory full source or
+  environment snapshot
 - managed code history and environment snapshots remain v0.3+ candidates
+
+### Write Table-Shaped Measurement Data
+
+As an experimentalist, I want v0.2 to reliably record table-shaped measurement
+data so that the replacement workflow is predictable before broader artifact
+types are added.
+
+Acceptance notes:
+
+- table-shaped datasets are the official v0.2 data shape
+- numeric and complex-valued measurement columns are in scope
+- column unit, label, and display hints are optional metadata
+- users should not be forced to define a full schema before quick exploratory
+  measurements
+- light measurement attachments such as small files, images, and logs are in
+  v0.2 scope; rich file/artifact management, dense arrays, waveform files,
+  reports, and broader artifact workflows can follow later
 
 ## v0.3/v0.4 Candidate User Stories
 
 These stories are important for the long-term product, but they are not v0.2
 replacement requirements. v0.2 should avoid blocking them in the data model.
+
+The first likely v0.3 product slice is read-only LAN viewing from another
+computer, because it matches an existing LabRAD Grapher usage pattern while
+preserving the single-owner data-library model.
 
 ### Track Parameter Evolution
 
@@ -429,6 +613,8 @@ Acceptance notes:
 - this is a v0.3+ candidate, not a v0.2 replacement requirement
 - future remote viewing should connect to the Fricon service that owns the data
   library
+- the first remote phase is read-only monitoring, browsing, and export; remote
+  acquisition writes remain later scope
 - Fricon Desktop remote mode may provide the most consistent app experience
 - a browser-served read-only viewer may remain useful for quick access or
   troubleshooting
@@ -507,6 +693,8 @@ Acceptance notes:
 - analysis is not stored as a child inside the original measurement
 - Analysis is reserved in the model but should not be a peer navigation concept
   in the first measurement-facing UI
+- v0.2 analysis remains external through Python/export; managed analysis records
+  and result UI are later scope
 
 ### Work On A Shared Lab Computer
 
@@ -570,6 +758,11 @@ declarative API.
 - Complete notebook state capture.
 - Automatic code rewrite or environment management.
 - Broad hardware driver framework.
+- Fricon-managed device communication.
+- Automatic calibration workflows.
+- Managed/declarative measurement framework.
+- LabRAD Data Vault/Grapher compatibility layer for old scripts.
+- Full legacy LabRAD/Data Vault import or browsing.
 - Generic workflow DAG engine as the first automation layer.
 - Remote mode, browser-served UI, or PWA distribution.
 - Shared-folder multi-machine access to the same database-backed data library.

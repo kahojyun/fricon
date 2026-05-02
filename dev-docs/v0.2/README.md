@@ -34,13 +34,18 @@ one Fricon data library
   -> measurement-centered portable exports for offline analysis
 ```
 
+The first v0.2 shipped slice should be narrower than the full target model:
+record new measurements and table-shaped datasets, preserve context and safety
+paths, and leave analysis, automatic calibration, managed device communication,
+and declarative managed measurement as later layers.
+
 For normal users, the first mental model should stay simple:
 
 ```text
 I selected an active sample/session when it mattered.
 I ran a measurement.
 It produced datasets.
-Fricon helps me inspect, annotate, recover, analyze, and calibrate from them.
+Fricon helps me inspect, annotate, recover, reopen, and export them.
 ```
 
 ## v0.x Milestone Language
@@ -51,14 +56,16 @@ aliases that make the roadmap look like it has a second versioning scheme.
 - v0.2: first usable LabRAD Grapher/Data Vault replacement slice for new
   measurements. It should record measurement metadata and produced datasets,
   keep datasets directly inspectable and reopenable, support optional
-  sample/session context, preserve partial/interrupted data, and keep the user
-  model minimal. It is local-only: Fricon Desktop, the CLI, and the Python SDK
-  operate through one local service and one local data library.
+  sample/session context, preserve partial/interrupted data, support basic
+  backup/restore and trash/recover, and keep the user model minimal. It is
+  local-only: Fricon Desktop and the Python SDK operate through one local
+  service and one primary local data library; the bundled CLI is mainly for
+  setup, diagnostics, service control, and developer workflows.
 - v0.3: candidate product-assistance slice after the v0.2 measurement loop is
-  usable. Likely areas include richer sample fields and 2D sample maps,
-  comparison views, saved views, portable export viewer polish, read-only LAN
-  viewing, attach/correct context UX, and better passive code/environment
-  summaries.
+  usable. The leading candidate is read-only LAN viewing from another computer.
+  Other likely areas include richer sample fields and 2D sample maps,
+  comparison views, saved views, portable export viewer polish, attach/correct
+  context UX, and better passive code/environment summaries.
 - v0.4: candidate automation-foundation slice after measurement history is
   trustworthy. Likely areas include parameter snapshots and proposals, analysis
   provenance UI, calibration workflow history, managed measurement plans, and
@@ -126,6 +133,11 @@ workspace/dataset-first APIs and storage assumptions. Keep useful
 infrastructure, but do not preserve compatibility just to avoid breaking
 pre-adoption local test workspaces.
 
+Once v0.2 records real lab data, preserve data durability and explicit
+migration/recovery paths even if v0.x SDK, CLI, UI, or service API shapes keep
+changing. The compatibility promise is fail-before-write diagnostics and
+recoverable data, not strict pre-1.0 API stability.
+
 The intended breaking scope is broad at the product boundary, but not a mandate
 to rewrite every line of code. v0.2 may intentionally break:
 
@@ -191,6 +203,10 @@ Non-goals:
 - generic workflow DAG engine in the initial v0.2 implementation
 - automatic notebook state capture
 - mandatory parameter schema design before exploratory measurement
+- LabRAD Data Vault/Grapher compatibility layer for old scripts
+- automatic calibration, managed analysis, or managed device communication in
+  the first replacement slice
+- remote mode or browser/PWA distribution as shipped v0.2 features
 
 Remote access, authentication boundaries, and actor/audit records should be
 planned early, but the first product should remain local-first and single-owner.
