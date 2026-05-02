@@ -819,6 +819,17 @@ When the runner exists, Fricon can own:
 Managed submitted runs are the bridge toward future workflow and calibration
 automation, but they should not require a full workflow engine.
 
+Future managed runs may use an optional declarative experiment plan model for
+experiments that need retry, resume, dry-run, dummy-device execution, device
+state preview, readback verification, or automatic calibration. In that model,
+the experiment code declares how parameter snapshots, run-local inputs, and
+scan points resolve into desired device state and dataset outputs.
+
+This should not become mandatory for simple interactive runs. Existing
+imperative Python code remains a valid way to record experiments and datasets;
+the tradeoff is that advanced managed features may require the declarative plan
+or explicit advanced lifecycle hooks.
+
 ### Guided Extraction Path
 
 Fricon should help users move from interactive exploration to managed submitted

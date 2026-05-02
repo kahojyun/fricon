@@ -258,6 +258,38 @@ As an experimentalist, I want scheduled or repeated calibration to produce
 analysis results and parameter proposals so that tedious updates are automated
 without silently mutating important parameter profiles.
 
+## Managed Experiment Framework Direction
+
+Simple experiments should remain ordinary Python. Users should not need to
+learn a declarative framework before they can collect data.
+
+For repeated or automation-heavy experiments, Fricon may provide an optional
+managed experiment framework where users declare how parameter snapshots,
+run-local inputs, and scan points resolve into desired device state and dataset
+outputs.
+
+User story:
+
+> As an experimentalist with a repeated scan, I want to declare the intended
+> device state for each scan point so that Fricon can preview the run, debug it
+> with dummy devices, resume after interruption, and attach post-processing or
+> calibration hooks.
+
+The managed framework should help with:
+
+- previewing the device state that will be applied before touching hardware
+- inspecting differences between current device state and requested state
+- using dummy or simulated devices for dry runs
+- restart and resume after an interrupted scan
+- explicit scan point identity and post-processing hooks
+- safer automatic calibration workflows
+- stronger provenance for device apply, readback, and output datasets
+
+This should be a recommended integration path for managed runs, not the only
+valid experiment style. Existing imperative experiment code should still be able
+to record interactive runs and datasets, but advanced retry, resume, dry-run,
+and automatic calibration behavior may require the managed declarative API.
+
 ## Later User Stories
 
 - Remote monitoring from another machine.

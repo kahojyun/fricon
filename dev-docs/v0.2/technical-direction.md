@@ -200,6 +200,67 @@ with lib.dataset("scratch") as ds:
 Lower-level datasets are unassigned unless explicitly linked to a producer
 record.
 
+## Managed Experiment Plan Direction
+
+Simple interactive experiments should remain imperative Python. Fricon should
+not require declarative experiment definitions for exploratory measurement.
+
+For repeated, retryable, or automation-heavy work, v0.2 should leave room for an
+optional managed experiment plan model:
+
+```text
+parameter snapshot
+  + run-local inputs
+  + scan point
+  -> desired device state
+  -> device apply plan
+  -> measurement step
+  -> dataset writes
+  -> post-processing hooks
+```
+
+This is similar in spirit to a declarative UI tree: the user describes the
+desired state for a point in the scan, and the managed runner reconciles that
+desired state with devices, datasets, and provenance.
+
+The managed plan model should enable:
+
+- previewing the device state before execution
+- diffing desired device state against current or last-applied state
+- dummy-device and dry-run execution
+- explicit scan point identity for resume and retry
+- post-processing hooks after a point, sweep, or dataset completes
+- safer automatic calibration workflows
+- readback verification and partial failure reporting
+
+The API should be optional. Existing imperative code can continue to create
+interactive runs and write datasets directly. Advanced managed features such as
+resume, retry, dry-run, resource leases, automatic calibration, and device
+readback may require the declarative plan or explicit advanced API hooks.
+
+Example shape for discussion, not settled API:
+
+```python
+@fricon.experiment_template
+def rabi(ctx, params, scan):
+    amp = scan.axis("amp")
+
+    signal = ctx.dataset("rabi")
+
+    for point in scan.points(amp=linspace(0.0, 1.0, 101)):
+        desired = {
+            "awg.q3.x90_amp": params["q3/x90/base_amp"] * point.amp,
+            "vna.if_bandwidth": params["devices/vna/if_bandwidth"],
+        }
+        with ctx.point(point, desired_device_state=desired) as p:
+            p.apply_devices()
+            signal.write(amp=point.amp, response=measure_response())
+```
+
+The important contract is not this exact syntax. The important contract is that
+Fricon can derive an inspectable desired device state from parameter snapshots
+and scan points before executing hardware mutations.
+
 ## Code And Environment Provenance
 
 v0.2 should avoid encouraging copied code directories.
@@ -233,7 +294,7 @@ Automatic calibration should be built as workflow over explicit records:
 
 ```text
 CalibrationWorkflowRun
-  -> managed experiment run
+  -> managed experiment plan/run
   -> measured dataset
   -> analysis result
   -> parameter proposal
@@ -255,6 +316,7 @@ Likely ADRs:
 - dataset artifact and provenance model
 - authentication/actor boundary for local and remote access
 - Python SDK surface and experiment-scoped dataset writer lifecycle
+- optional managed experiment plan and desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - desktop web architecture and remote UI access
 
