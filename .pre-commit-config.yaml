@@ -27,7 +27,7 @@ repos:
       - id: tombi-format
         args: ["--offline"]
   - repo: https://github.com/crate-ci/typos
-    rev: 02ea592e44b3a53c302f697cddca7641cd051c3d  # frozen: v1.45.0
+    rev: cf5f1c29a8ac336af8568821ec41919923b05a83  # frozen: v1.45.1
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
