@@ -187,10 +187,17 @@ fn column_axis(column: &ResolvedColumn, is_compatibility: bool) -> ChartSemantic
         name: column.name.clone(),
         label: column.label.clone(),
         kind: ChartSemanticAxisKind::Column,
-        numeric: true,
+        numeric: dtype_is_chart_axis_numeric(&column.dtype),
         is_compatibility,
         physical_column: Some(column.name.clone()),
     }
+}
+
+fn dtype_is_chart_axis_numeric(dtype: &DatasetDType) -> bool {
+    matches!(
+        dtype,
+        DatasetDType::Float64 | DatasetDType::Float32 | DatasetDType::Int64 | DatasetDType::UInt64
+    )
 }
 
 fn scan_axis_value_is_numeric(value: &ScanAxisValue) -> bool {
@@ -293,8 +300,9 @@ mod tests {
         ));
         assert_eq!(semantics.value_columns.len(), 3);
         assert_eq!(semantics.value_columns[0].id, "column:signal");
-        assert_eq!(semantics.chart_axis_candidates.len(), 1);
+        assert_eq!(semantics.chart_axis_candidates.len(), 2);
         assert_eq!(semantics.chart_axis_candidates[0].id, "column:signal");
+        assert!(semantics.chart_axis_candidates[0].numeric);
         assert_eq!(detail.columns[1].name, "trace");
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
@@ -302,7 +310,9 @@ mod tests {
         assert!(detail.columns[1].is_trace);
         assert!(!detail.columns[1].is_complex);
         assert!(!detail.columns[1].hidden_by_default);
-        assert!(!detail.columns[1].is_chart_axis_candidate);
+        assert!(detail.columns[1].is_chart_axis_candidate);
+        assert_eq!(semantics.chart_axis_candidates[1].id, "column:trace");
+        assert!(!semantics.chart_axis_candidates[1].numeric);
         assert_eq!(detail.columns[2].name, "complex");
         assert_eq!(detail.columns[2].label, None);
         assert_eq!(detail.columns[2].unit, None);
@@ -390,13 +400,22 @@ mod tests {
                 String::new(),
                 vec!["test".to_string()],
                 schema,
-                vec![ColumnMetadata {
-                    name: "signal".to_string(),
-                    label: Some("Signal".to_string()),
-                    unit: Some("V".to_string()),
-                    hidden_by_default: true,
-                    chart_axis: true,
-                }],
+                vec![
+                    ColumnMetadata {
+                        name: "signal".to_string(),
+                        label: Some("Signal".to_string()),
+                        unit: Some("V".to_string()),
+                        hidden_by_default: true,
+                        chart_axis: true,
+                    },
+                    ColumnMetadata {
+                        name: "trace".to_string(),
+                        label: None,
+                        unit: None,
+                        hidden_by_default: false,
+                        chart_axis: true,
+                    },
+                ],
                 None,
                 false,
             )

@@ -1,4 +1,8 @@
-use std::{collections::HashMap, ops::Bound, sync::Arc};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    ops::Bound,
+    sync::Arc,
+};
 
 use anyhow::{Context, Result, bail};
 use arrow_array::{Array, ArrayRef, BooleanArray, Float64Array, RecordBatch, StringArray};
@@ -196,15 +200,14 @@ fn append_logical_axes(
         return Ok(batch);
     }
 
-    let point_by_record_id = dataset
-        .logical_index_points()?
-        .into_iter()
-        .map(|point| (point.record_id, point))
-        .collect::<HashMap<_, _>>();
     let record_ids = dataset.record_ids_range((Bound::Included(start), Bound::Excluded(end)))?;
     if record_ids.len() != batch.num_rows() {
         bail!("Logical index rows do not match selected chart rows");
     }
+    let point_by_record_id = logical_points_by_record_id(
+        dataset.logical_index_points_for_record_ids(&record_ids)?,
+        interpretation.duplicate_policy,
+    );
 
     let keep_mask = if interpretation.duplicate_policy == ResolvedDuplicatePolicy::LatestByRecordId
     {
@@ -319,6 +322,35 @@ fn scan_axis_is_numeric(mode: &ResolvedScanAxisMode) -> bool {
             .iter()
             .all(|value| matches!(value, ScanAxisValue::Int(_) | ScanAxisValue::Float(_))),
     }
+}
+
+fn logical_points_by_record_id(
+    points: Vec<ResolvedLogicalIndexPoint>,
+    duplicate_policy: ResolvedDuplicatePolicy,
+) -> HashMap<u64, ResolvedLogicalIndexPoint> {
+    if duplicate_policy != ResolvedDuplicatePolicy::LatestByRecordId {
+        return points
+            .into_iter()
+            .map(|point| (point.record_id, point))
+            .collect();
+    }
+
+    let mut latest_by_indices: HashMap<Vec<u64>, ResolvedLogicalIndexPoint> = HashMap::new();
+    for point in points {
+        match latest_by_indices.entry(point.indices.clone()) {
+            Entry::Occupied(mut entry) if point.record_id > entry.get().record_id => {
+                entry.insert(point);
+            }
+            Entry::Occupied(_) => {}
+            Entry::Vacant(entry) => {
+                entry.insert(point);
+            }
+        }
+    }
+    latest_by_indices
+        .into_values()
+        .map(|point| (point.record_id, point))
+        .collect()
 }
 
 fn logical_axis_values(
@@ -467,4 +499,44 @@ fn resolve_row_range(
     let start = start.unwrap_or(0).min(total_rows);
     let end = end.unwrap_or(total_rows).min(total_rows).max(start);
     (start, end)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn point(record_id: u64, indices: Vec<u64>) -> ResolvedLogicalIndexPoint {
+        ResolvedLogicalIndexPoint {
+            record_id,
+            indices,
+            coordinates: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn latest_logical_points_are_projected_within_selected_points() {
+        let projected = logical_points_by_record_id(
+            vec![
+                point(0, vec![0, 0]),
+                point(1, vec![0, 1]),
+                point(2, vec![0, 0]),
+            ],
+            ResolvedDuplicatePolicy::LatestByRecordId,
+        );
+
+        assert!(!projected.contains_key(&0));
+        assert!(projected.contains_key(&1));
+        assert!(projected.contains_key(&2));
+    }
+
+    #[test]
+    fn bounded_logical_points_do_not_consider_later_replacements() {
+        let projected = logical_points_by_record_id(
+            vec![point(0, vec![0, 0]), point(1, vec![0, 1])],
+            ResolvedDuplicatePolicy::LatestByRecordId,
+        );
+
+        assert!(projected.contains_key(&0));
+        assert!(projected.contains_key(&1));
+    }
 }

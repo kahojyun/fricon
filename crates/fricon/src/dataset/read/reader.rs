@@ -392,6 +392,14 @@ impl DatasetReader {
     }
 
     pub fn logical_index_points(&self) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
+        let record_ids = self.record_ids()?;
+        self.logical_index_points_for_record_ids(&record_ids)
+    }
+
+    pub fn logical_index_points_for_record_ids(
+        &self,
+        record_ids: &[u64],
+    ) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
         let Some(manifest) = &self.manifest else {
             return Ok(Vec::new());
         };
@@ -401,7 +409,6 @@ impl DatasetReader {
         if manifest.scan_plan.is_none() {
             return Ok(Vec::new());
         }
-        let record_ids = self.record_ids()?;
         if manifest.realization.index_realization == IndexRealization::Sidecar {
             if record_ids.is_empty() {
                 return Ok(Vec::new());
@@ -409,9 +416,9 @@ impl DatasetReader {
             let Some(path) = &self.dataset_path else {
                 return Err(ReadError::DatasetFs(DatasetFsError::ChunkNotFound));
             };
-            return Self::sidecar_logical_index_points(path, manifest, &record_ids);
+            return Self::sidecar_logical_index_points(path, manifest, record_ids);
         }
-        Ok(resolve_logical_index_points(manifest, &record_ids))
+        Ok(resolve_logical_index_points(manifest, record_ids))
     }
 
     fn sidecar_logical_index_points(
