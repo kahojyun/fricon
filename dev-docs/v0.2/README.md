@@ -40,10 +40,10 @@ Start here for v0.2 planning:
 
 1. `product-direction.md`
 2. `technical-direction.md`
-3. `../measurement-system-foundation-redesign.md`
-4. `../experiment-run-and-runner-design.md`
-5. `../parameter-management-design.md`
-6. `../future-concepts.md`
+3. `measurement-system-foundation-redesign.md`
+4. `experiment-run-and-runner-design.md`
+5. `parameter-management-design.md`
+6. `future-concepts.md`
 
 Use current implementation notes only to understand what must be replaced or
 adapted:

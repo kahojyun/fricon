@@ -34,10 +34,10 @@ every canonical document.
 | Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Public docs unless behavior is user-visible                            |
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
 | Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
-| v0.2 product or architecture reset          | `v0.2/README.md`                         | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `measurement-system-foundation-redesign.md`, `adr/README.md` | Treating v0.2 proposal content as current behavior                     |
-| Measurement-system foundation redesign      | `measurement-system-foundation-redesign.md` | `project-intent.md`, `roadmap.md`, `dataset-semantic-architecture-proposal.md`, `experiment-run-and-runner-design.md`, `adr/README.md` | Treating redesign proposal content as current behavior                 |
-| Parameter management product planning       | `parameter-management-design.md`         | `project-intent.md`, `roadmap.md`, `adr/README.md`                                                | Treating proposal content as current behavior                          |
-| Future concept capture                      | `future-concepts.md`                     | `project-intent.md`, `roadmap.md`                                                                 | Creating implementation issues before the concept is narrowed          |
+| v0.2 product or architecture reset          | `v0.2/README.md`                         | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `v0.2/measurement-system-foundation-redesign.md`, `adr/README.md` | Treating v0.2 proposal content as current behavior                     |
+| Measurement-system foundation redesign      | `v0.2/measurement-system-foundation-redesign.md` | `project-intent.md`, `roadmap.md`, `dataset-semantic-architecture-proposal.md`, `v0.2/experiment-run-and-runner-design.md`, `adr/README.md` | Treating redesign proposal content as current behavior                 |
+| Parameter management product planning       | `v0.2/parameter-management-design.md`    | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `adr/README.md`                        | Treating proposal content as current behavior                          |
+| Future concept capture                      | `v0.2/future-concepts.md`                | `v0.2/product-direction.md`, `v0.2/technical-direction.md`                                         | Creating implementation issues before the concept is narrowed          |
 | Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
 
 ## Canonical Guidance
@@ -86,19 +86,14 @@ checklist, policy, or guideline.
 This file describes proposed future direction. Do not treat it as current
 implementation fact unless the implementation has already landed.
 
-- `v0.2/` - canonical planning directory for the proposed v0.2 reset, including
-  the local data-library product direction, sample/session model, distribution
-  surfaces, remote/auth boundary, and rewrite strategy
-- `measurement-system-foundation-redesign.md` - proposed pre-adoption breaking
-  redesign direction for dataset artifacts, run-like provenance, V1 mental
-  model, and future calibration foundations
-- `dataset-semantic-architecture-proposal.md`
-- `experiment-run-and-runner-design.md` - proposed experiment run, generic
-  runner, retry/resume, resource lease, and dataset write provenance model
-- `future-concepts.md` - lightweight ledger for useful but not-yet-designed
-  experiment, workflow, device, calibration, and AI concepts
-- `parameter-management-design.md` - proposed long-term versioned parameter
-  registry direction for measurement and simulation workflows
+- `v0.2/` - canonical planning directory for the proposed v0.2 reset. It now
+  owns the non-implemented proposal set, including the local data-library
+  product direction, sample/session model, measurement-system foundation
+  redesign, experiment/runner direction, parameter direction, future concepts,
+  distribution surfaces, remote/auth boundary, and rewrite strategy.
+- `dataset-semantic-architecture-proposal.md` - dataset-specific semantic
+  proposal that has active implementation work. Reconcile it with the broader
+  v0.2 direction before committing additional durable APIs or storage contracts.
 
 ## Maintenance Rules
 

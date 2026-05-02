@@ -229,7 +229,8 @@ This document is a constraint for AI-assisted changes:
 These questions are intentionally unresolved:
 
 - How should the proposed parameter snapshot model in
-  `parameter-management-design.md` be narrowed into a first implementation?
+  `v0.2/parameter-management-design.md` be narrowed into a first
+  implementation?
 - How should parameter history, diff, and selected apply workflows be exposed in
   the Python API and desktop UI?
 - What unit and display metadata belongs on dataset columns, parameters, or

@@ -1276,5 +1276,5 @@ This proposal intentionally leaves the following to later focused designs:
 - `dev-docs/project-intent.md`
 - `dev-docs/roadmap.md`
 - `dev-docs/dataset-semantic-architecture-proposal.md`
-- `dev-docs/parameter-management-design.md`
-- `dev-docs/future-concepts.md`
+- `dev-docs/v0.2/parameter-management-design.md`
+- `dev-docs/v0.2/future-concepts.md`

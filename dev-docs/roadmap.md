@@ -45,7 +45,7 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
 The pre-adoption measurement-system redesign note remains the broad foundation
 proposal behind the v0.2 reset:
 
-- `measurement-system-foundation-redesign.md` defines the proposed breaking
+- `v0.2/measurement-system-foundation-redesign.md` defines the proposed breaking
   redesign direction for dataset artifacts, run-like producer/consumer
   provenance, the V1 experiment-first mental model, and future calibration
   foundations. Treat it as proposed design guidance, not current
@@ -56,11 +56,10 @@ proposal behind the v0.2 reset:
   separate from later scan and chart migration work. Treat it as proposed
   design guidance, not current implementation fact, and reconcile it with the
   broader redesign before implementation.
-
-- `parameter-management-design.md` defines proposed long-term parameter
+- `v0.2/parameter-management-design.md` defines proposed long-term parameter
   registry direction after dataset semantics and minimal run records exist.
   Treat it as future design guidance, not current implementation fact.
-- `future-concepts.md` preserves lightweight notes for experiment run,
+- `v0.2/future-concepts.md` preserves lightweight notes for experiment run,
   workflow automation, calibration automation, device apply, and AI automation
   concepts that are not yet ready for focused design proposals.
 
@@ -249,8 +248,8 @@ After the dataset foundation is durable, product work should move toward:
 
 Relevant future design note:
 
-- `experiment-run-and-runner-design.md`
-- `parameter-management-design.md`
+- `v0.2/experiment-run-and-runner-design.md`
+- `v0.2/parameter-management-design.md`
 
 This phase should avoid turning experiment support into a desktop-first
 workflow engine too early. Python scripts should remain the first-class way to
@@ -262,8 +261,8 @@ These ideas are promising, but not current implementation commitments. Convert
 them into focused design notes, issues, or ADRs before implementation if the
 details affect storage, API contracts, or user workflows.
 
-Use `future-concepts.md` for lightweight notes that should be preserved but are
-too early for detailed design or issue planning.
+Use `v0.2/future-concepts.md` for lightweight notes that should be preserved
+but are too early for detailed design or issue planning.
 
 Parameter management may grow beyond static run metadata into:
 

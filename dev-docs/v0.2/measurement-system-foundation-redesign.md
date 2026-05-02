@@ -10,7 +10,8 @@ API, desktop UI, migration, and release decisions have landed.
 
 This note intentionally allows large breaking changes while Fricon has not yet
 entered real lab use. It may revise or supersede parts of
-`dataset-semantic-architecture-proposal.md` and ADR 0002 if the broader
+`../dataset-semantic-architecture-proposal.md` and
+`../adr/0002-decide-dataset-semantic-manifest-v1.md` if the broader
 measurement-system model requires a different foundation.
 
 ## Purpose
