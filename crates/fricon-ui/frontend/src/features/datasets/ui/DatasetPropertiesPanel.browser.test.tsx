@@ -91,6 +91,7 @@ function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
     trashedAt: null,
     deletedAt: null,
     payloadAvailable: true,
+    chartSemantics: null,
     columns: [],
     ...overrides,
   };

@@ -64,6 +64,42 @@ export type ChartCommonOptions = {
 	excludeColumns: string[] | null,
 };
 
+export type ChartDuplicatePolicy = "latest_by_record_id" | "compatibility_row_order_placeholder";
+
+export type ChartIndexRealization = "none" | "implicit" | "sidecar";
+
+export type ChartInterpretationSource = "manifest" | "compatibility_inference";
+
+export type ChartSemanticAxis = {
+	id: string,
+	name: string,
+	label: string | null,
+	kind: ChartSemanticAxisKind,
+	numeric: boolean,
+	isCompatibility: boolean,
+	physicalColumn: string | null,
+};
+
+export type ChartSemanticAxisKind = "logical_index" | "column";
+
+export type ChartSemanticColumn = {
+	id: string,
+	name: string,
+	label: string | null,
+	isComplex: boolean,
+	isTrace: boolean,
+	hiddenByDefault: boolean,
+};
+
+export type ChartSemantics = {
+	source: ChartInterpretationSource,
+	duplicatePolicy: ChartDuplicatePolicy,
+	indexRealization: ChartIndexRealization,
+	axes: ChartSemanticAxis[],
+	valueColumns: ChartSemanticColumn[],
+	chartAxisCandidates: ChartSemanticAxis[],
+};
+
 export type ColumnInfo = {
 	name: string,
 	label: string | null,
@@ -132,6 +168,7 @@ export type DatasetDetail = {
 	deletedAt: string | null,
 	payloadAvailable: boolean,
 	columns: ColumnInfo[],
+	chartSemantics: ChartSemantics | null,
 };
 
 export type DatasetFavoriteUpdate = {
@@ -223,6 +260,7 @@ export type Row = {
 
 export type TableData = {
 	fields: string[],
+	fieldLabels: { [key in string]: string },
 	rows: Row[],
 	columnUniqueValues: { [key in string]: ColumnUniqueValue[] },
 };

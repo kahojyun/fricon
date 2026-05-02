@@ -392,6 +392,14 @@ impl DatasetReader {
     }
 
     pub fn logical_index_points(&self) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
+        let record_ids = self.record_ids()?;
+        self.logical_index_points_for_record_ids(&record_ids)
+    }
+
+    pub fn logical_index_points_for_record_ids(
+        &self,
+        record_ids: &[u64],
+    ) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
         let Some(manifest) = &self.manifest else {
             return Ok(Vec::new());
         };
@@ -401,7 +409,6 @@ impl DatasetReader {
         if manifest.scan_plan.is_none() {
             return Ok(Vec::new());
         }
-        let record_ids = self.record_ids()?;
         if manifest.realization.index_realization == IndexRealization::Sidecar {
             if record_ids.is_empty() {
                 return Ok(Vec::new());
@@ -409,9 +416,9 @@ impl DatasetReader {
             let Some(path) = &self.dataset_path else {
                 return Err(ReadError::DatasetFs(DatasetFsError::ChunkNotFound));
             };
-            return Self::sidecar_logical_index_points(path, manifest, &record_ids);
+            return Self::sidecar_logical_index_points(path, manifest, record_ids);
         }
-        Ok(resolve_logical_index_points(manifest, &record_ids))
+        Ok(resolve_logical_index_points(manifest, record_ids))
     }
 
     fn sidecar_logical_index_points(
@@ -485,7 +492,14 @@ impl DatasetReader {
         Ok(points)
     }
 
-    fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
+    pub fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
+        self.record_ids_range(..)
+    }
+
+    pub fn record_ids_range<R>(&self, range: R) -> Result<Vec<u64>, ReadError>
+    where
+        R: RangeBounds<usize> + Copy,
+    {
         let record_id_index = self
             .physical_arrow_schema
             .column_with_name(RECORD_ID_COLUMN)
@@ -496,7 +510,7 @@ impl DatasetReader {
             })?
             .0;
         let mut record_ids = Vec::new();
-        for batch in self.source.range(..) {
+        for batch in self.source.range(range) {
             let column = batch
                 .column(record_id_index)
                 .as_any()

@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { ColumnInfo, DatasetStatus } from "../api/types";
+import type { DatasetStatus } from "../api/types";
 import {
+  columnOptionLabel,
   complexSeriesOptions,
   deriveChartViewerState,
   isComplexViewOption,
+  type ChartColumnOption,
 } from "../model/chartViewerLogic";
 import type {
   ChartViewerControlActions,
@@ -70,6 +72,14 @@ const numericLabelFormatLabels = {
 } as const;
 
 const liveWindowOptions = [1, 3, 5, 10, 20] as const;
+
+function selectedOptionLabel(
+  options: ChartColumnOption[],
+  selectedName: string | null,
+) {
+  const option = options.find((item) => item.name === selectedName);
+  return option ? columnOptionLabel(option) : undefined;
+}
 
 export function ChartViewerControls({
   derived,
@@ -224,15 +234,20 @@ export function ChartViewerControls({
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select quantity">
-                  {derived.effectiveSweepQuantityName ?? undefined}
+                  {selectedOptionLabel(
+                    derived.sweepQuantityOptions,
+                    derived.effectiveSweepQuantityName,
+                  )}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {derived.sweepQuantityOptions.map((option: ColumnInfo) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {option.name}
-                  </SelectItem>
-                ))}
+                {derived.sweepQuantityOptions.map(
+                  (option: ChartColumnOption) => (
+                    <SelectItem key={option.name} value={option.name}>
+                      {columnOptionLabel(option)}
+                    </SelectItem>
+                  ),
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -251,13 +266,16 @@ export function ChartViewerControls({
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select X">
-                    {derived.effectiveXYXName ?? undefined}
+                    {selectedOptionLabel(
+                      derived.xyXOptions,
+                      derived.effectiveXYXName,
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {derived.xyXOptions.map((option: ColumnInfo) => (
+                  {derived.xyXOptions.map((option: ChartColumnOption) => (
                     <SelectItem key={option.name} value={option.name}>
-                      {option.name}
+                      {columnOptionLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -273,13 +291,16 @@ export function ChartViewerControls({
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select Y">
-                    {derived.effectiveXYYName ?? undefined}
+                    {selectedOptionLabel(
+                      derived.xyYOptions,
+                      derived.effectiveXYYName,
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {derived.xyYOptions.map((option: ColumnInfo) => (
+                  {derived.xyYOptions.map((option: ChartColumnOption) => (
                     <SelectItem key={option.name} value={option.name}>
-                      {option.name}
+                      {columnOptionLabel(option)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -300,14 +321,17 @@ export function ChartViewerControls({
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select quantity">
-                  {derived.effectiveComplexPlaneQuantityName ?? undefined}
+                  {selectedOptionLabel(
+                    derived.complexPlaneQuantityOptions,
+                    derived.effectiveComplexPlaneQuantityName,
+                  )}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {derived.complexPlaneQuantityOptions.map(
-                  (option: ColumnInfo) => (
+                  (option: ChartColumnOption) => (
                     <SelectItem key={option.name} value={option.name}>
-                      {option.name}
+                      {columnOptionLabel(option)}
                     </SelectItem>
                   ),
                 )}
@@ -328,15 +352,20 @@ export function ChartViewerControls({
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select quantity">
-                    {derived.effectiveHeatmapQuantityName ?? undefined}
+                    {selectedOptionLabel(
+                      derived.heatmapQuantityOptions,
+                      derived.effectiveHeatmapQuantityName,
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {derived.heatmapQuantityOptions.map((option: ColumnInfo) => (
-                    <SelectItem key={option.name} value={option.name}>
-                      {option.name}
-                    </SelectItem>
-                  ))}
+                  {derived.heatmapQuantityOptions.map(
+                    (option: ChartColumnOption) => (
+                      <SelectItem key={option.name} value={option.name}>
+                        {columnOptionLabel(option)}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -362,17 +391,19 @@ export function ChartViewerControls({
                     allowEmptySweepAxis ? "No sweep axis" : "Select sweep axis"
                   }
                 >
-                  {derived.effectiveSweepIndexColumnName ??
-                    (allowEmptySweepAxis ? "None" : undefined)}
+                  {selectedOptionLabel(
+                    derived.sweepAxisOptions,
+                    derived.effectiveSweepIndexColumnName,
+                  ) ?? (allowEmptySweepAxis ? "None" : undefined)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {allowEmptySweepAxis ? (
                   <SelectItem value="__none__">None</SelectItem>
                 ) : null}
-                {derived.sweepAxisOptions.map((option: ColumnInfo) => (
+                {derived.sweepAxisOptions.map((option: ChartColumnOption) => (
                   <SelectItem key={option.name} value={option.name}>
-                    {option.name}
+                    {columnOptionLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -468,15 +499,20 @@ export function ChartViewerControls({
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select X index">
-                      {derived.effectiveHeatmapXName ?? undefined}
+                      {selectedOptionLabel(
+                        derived.heatmapXOptions,
+                        derived.effectiveHeatmapXName,
+                      )}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {derived.heatmapXOptions.map((option: ColumnInfo) => (
-                      <SelectItem key={option.name} value={option.name}>
-                        {option.name}
-                      </SelectItem>
-                    ))}
+                    {derived.heatmapXOptions.map(
+                      (option: ChartColumnOption) => (
+                        <SelectItem key={option.name} value={option.name}>
+                          {columnOptionLabel(option)}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -490,15 +526,20 @@ export function ChartViewerControls({
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Y index">
-                      {derived.effectiveHeatmapYName ?? undefined}
+                      {selectedOptionLabel(
+                        derived.heatmapYOptions,
+                        derived.effectiveHeatmapYName,
+                      )}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {derived.heatmapYOptions.map((option: ColumnInfo) => (
-                      <SelectItem key={option.name} value={option.name}>
-                        {option.name}
-                      </SelectItem>
-                    ))}
+                    {derived.heatmapYOptions.map(
+                      (option: ChartColumnOption) => (
+                        <SelectItem key={option.name} value={option.name}>
+                          {columnOptionLabel(option)}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -514,7 +555,7 @@ export function ChartViewerControls({
                     No remaining grouping axes
                   </span>
                 ) : (
-                  derived.traceGroupOptions.map((option: ColumnInfo) => {
+                  derived.traceGroupOptions.map((option: ChartColumnOption) => {
                     const checked =
                       derived.effectiveTraceGroupIndexColumnNames.includes(
                         option.name,
@@ -530,7 +571,7 @@ export function ChartViewerControls({
                             toggleTraceGroupIndexColumnName(option.name)
                           }
                         />
-                        <span>{option.name}</span>
+                        <span>{columnOptionLabel(option)}</span>
                       </label>
                     );
                   })
