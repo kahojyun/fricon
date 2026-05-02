@@ -35,7 +35,7 @@
     "@wdio/mocha-framework": "9.27.0",
     "@wdio/spec-reporter": "9.27.0",
     "dependency-cruiser": "17.3.10",
-    "eslint": "10.2.0",
+    "eslint": "10.2.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react-hooks": "7.0.1",
     "eslint-plugin-react-refresh": "0.5.2",
