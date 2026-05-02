@@ -6,8 +6,7 @@ Canonical project direction and AI-assisted development guardrails.
 
 ## Purpose
 
-Fricon aims to become an easy-to-use scientific experiment measurement
-management system.
+Fricon aims to become an easy-to-use scientific measurement management system.
 
 The project should help researchers record, organize, inspect, and eventually
 execute scientific measurement workflows on their own computers without requiring
@@ -164,7 +163,7 @@ storage paths.
 Quality-of-life features should make common scientific work faster without
 changing the user's mental model. Good candidates include preview/export
 snippets, saved views, aliases, notes, tags, quality flags, compare views, and
-template experiments.
+template measurements.
 
 Export workflows should support researchers who move data to another computer
 for analysis. Prefer measurement-centered portable exports that can be opened
@@ -196,7 +195,7 @@ automation approvals, and event or audit logs.
 
 ### Make Advanced Workflows Explicit
 
-Experiment execution, parameter management, and device management should become
+Measurement execution, parameter management, and device management should become
 explicit product concepts as they mature. Avoid hiding those semantics inside
 dataset naming conventions or incidental metadata.
 
@@ -265,7 +264,7 @@ These questions are intentionally unresolved:
 - How should measurement code history be captured without surprising users or
   turning Fricon into a general Git client?
 - What level of automatic `uv` or `pixi` environment management is useful
-  without making experiment setup opaque?
+  without making measurement setup opaque?
 - What should a workflow definition contain beyond a Python entry point,
   parameters, schedules, approval checkpoints, and expected outputs?
 - Which calibration, optimization, and benchmark tasks should be first-class

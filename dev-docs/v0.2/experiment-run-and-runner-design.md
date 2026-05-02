@@ -9,7 +9,7 @@ proposal as user-facing functionality until the relevant dataset semantic,
 parameter, storage, IPC, Python API, desktop UI, and migration work has landed.
 
 Read `README.md` and `design.md` first. This long proposal is supporting
-detail for experiment execution, retry/resume, and runner boundaries; it is not
+detail for measurement execution, retry/resume, and runner boundaries; it is not
 the canonical v0.2 entry point.
 
 Canonical v0.2 naming now prefers `Measurement` for the public data-taking
@@ -38,7 +38,7 @@ local-first route. Under the v0.2 reset, reconcile the details here with the
 broader data-library, sample/session, and activity-provenance model in
 `design.md`. Python scripts remain the first execution entry point. The desktop
 UI may browse, inspect, retry, continue, and summarize work, but it should not
-become the primary experiment execution engine before the Python-led model is
+become the primary measurement execution engine before the Python-led model is
 clear.
 
 ## Classification
@@ -236,7 +236,7 @@ This design should not introduce:
 - a requirement to implement the generic runner in the first experiment-run
   slice
 - a broad hardware driver framework
-- desktop-first experiment execution as the primary product model
+- desktop-first measurement execution as the primary product model
 - automatic parameter mutation after calibration
 - AI actions that mutate data-library state without review and auditability
 - rewriting or deleting completed measurement facts as the normal correction
@@ -1110,7 +1110,7 @@ Acceptance notes:
 
 - produced datasets are the primary detail-view content
 - Python read snippets are available for datasets
-- export snippets are available for experiment-centered portable bundles
+- export snippets are available for measurement-centered portable bundles
 - run quality state is visible
 - provenance label is visible
 - parameter snapshot or migration metadata summary is visible
@@ -1307,7 +1307,7 @@ This proposal intentionally leaves the following to later focused designs:
 - How should queue priority interact with already-running resource leases?
 - Should resource lease failures block a task, fail it, or leave it queued?
 - What facts must survive dataset archive export and import?
-- What facts must survive experiment-centered portable export when the user
+- What facts must survive measurement-centered portable export when the user
   opens the bundle directly without importing it?
 
 ## Related Documents

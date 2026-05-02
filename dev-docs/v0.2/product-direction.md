@@ -33,7 +33,7 @@ The current lab pattern Fricon should replace is:
 ```text
 new sample or setup
   -> create a new data-vault folder
-  -> sometimes copy an experiment code directory
+  -> sometimes copy a measurement code directory
   -> edit JSON parameters locally
   -> run scripts and save data
   -> later struggle to know which sample, cooldown, code, and parameters
@@ -54,6 +54,24 @@ one Fricon data library
   -> parameter snapshots and proposals
   -> analysis and calibration history
 ```
+
+## Reference-System Lessons
+
+The useful lesson from LabRAD Data Vault/Grapher is speed: users can create
+data, watch plots, and keep working without ceremony. Fricon should preserve
+that low-friction loop while replacing folder/path conventions with explicit
+data-library, sample/session, measurement, and provenance records.
+
+The useful lesson from QCoDeS is separation of concerns: measurement code,
+datasets, and broader experiment grouping are separate concepts. Fricon should
+keep Python-led acquisition ergonomic, but make active context and stored
+provenance visible so users are not surprised by hidden defaults.
+
+The useful lesson from Labber is workflow completeness: measurement setup,
+sweep structure, live/history browsing, comments, tags, and instrument-server
+boundaries all matter to experimentalists. Fricon should learn from those user
+flows without making `Log` the primary data noun or making a GUI-first runner
+the only valid way to collect data.
 
 ## Primary User Model
 
@@ -289,7 +307,7 @@ large parameter sets do not drift through untracked JSON edits.
 ### Avoid Code Directory Copies
 
 As an experimentalist, I want Fricon to record code and environment summaries
-for runs so that I do not copy experiment code directories just to preserve
+for runs so that I do not copy measurement code directories just to preserve
 history.
 
 ### Visualize Sample Parameters
@@ -302,6 +320,84 @@ so that I can choose devices/regions and compare behavior across sessions.
 As an experimentalist, I want scheduled or repeated calibration to produce
 analysis results and parameter proposals so that tedious updates are automated
 without silently mutating important parameter profiles.
+
+## Additional V1 User Stories To Design For
+
+### Attach Or Correct Context Later
+
+As an experimentalist, I want to attach or correct sample/session context after
+a measurement so that a forgotten active-context selection does not make the
+data unusable.
+
+Acceptance notes:
+
+- missing context is visible, not treated as an error
+- later attachment or correction records actor, time, old value, and reason
+- corrected context affects browsing and filtering without rewriting measured
+  dataset facts
+
+### Recover From An Interrupted Measurement
+
+As an experimentalist, I want an interrupted measurement to preserve partial
+data and offer explicit continuation, invalidation, or new-measurement choices
+so that failed hardware or script runs do not silently corrupt history.
+
+Acceptance notes:
+
+- partial datasets remain inspectable
+- continuation requires explicit user or API intent
+- continuation checks schema/semantic compatibility before appending
+- invalidation or suspect status records a reason
+
+### Compare Measurements And Sessions
+
+As an experimentalist, I want to compare measurements across samples,
+cooldowns, parameter snapshots, or code summaries so that drift and regressions
+are visible without manually reconstructing history from folders.
+
+Acceptance notes:
+
+- comparison can start from sample, session, measurement, or dataset views
+- parameter, code, quality, and sample/session differences are visible beside
+  plotted data
+- saved comparisons should not create another data-library root
+
+### Mark Quality And Supersession
+
+As an experimentalist, I want to mark measurements or datasets as good,
+suspect, failed, calibration, test, invalidated, or superseded so that later
+analysis and automation can avoid bad inputs.
+
+Acceptance notes:
+
+- measurement-level quality is the default
+- dataset-level quality is available for output-local exceptions
+- invalidation and supersession are events, not destructive rewrites
+
+### Link Analysis Back To Source Data
+
+As an analyst, I want analysis notebooks or scripts to record which
+measurements and datasets they consumed and what results they produced so that
+derived conclusions remain traceable.
+
+Acceptance notes:
+
+- analysis may produce derived datasets, reports, scalar results, or parameter
+  proposals
+- analysis outputs link to input datasets and measurements through provenance
+- analysis is not stored as a child inside the original measurement
+
+### Work On A Shared Lab Computer
+
+As an experimentalist using a shared lab computer, I want Fricon to record a
+lightweight actor label for mutating actions without forcing full account
+management so that later history can explain who ran or changed something.
+
+Acceptance notes:
+
+- local single-owner mode remains the default product model
+- actor labels/tokens are enough for audit summaries
+- roles and permission matrices remain future scope
 
 ## Managed Measurement Framework Direction
 

@@ -95,6 +95,22 @@ Prefer rewriting or replacing current domain boundaries when the existing shape
 would preserve the wrong user model. Preserve reusable infrastructure where it
 does not lock the product into workspace/dataset-first assumptions.
 
+The intended breaking scope is broad at the product boundary, but not a mandate
+to rewrite every line of code. v0.2 may intentionally break:
+
+- public workspace and dataset-first Python APIs
+- workspace/storage layout and compatibility assumptions
+- desktop navigation and IPC DTOs that assume datasets are the only organizing
+  object
+- archive, import, and export formats that cannot carry data-library,
+  measurement, sample/session, and provenance context
+- metadata ownership rules that put measurement, sample, parameter, or code
+  meaning inside dataset-local metadata
+
+Compatibility for existing local test workspaces should be an explicit
+storage/migration ADR decision. Until that ADR exists, do not optimize the v0.2
+model around preserving pre-v0.2 workspace behavior.
+
 Good candidates to keep or adapt:
 
 - Rust, Python binding, and frontend build infrastructure

@@ -28,7 +28,7 @@ Current implemented user-facing behavior is still centered on:
 Use `docs/concepts.md`, `docs/dataset.md`, and
 `dev-docs/current-storage-notes.md` as the source of truth for current behavior.
 This roadmap includes future product direction and should not be used as proof
-that experiment, parameter, workflow, device, provenance, AI automation, or
+that measurement, parameter, workflow, device, provenance, AI automation, or
 semantic-manifest behavior has already landed.
 
 The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
@@ -174,7 +174,7 @@ For measurement work, examples and desktop navigation may become run-first once
 the run API exists. The dataset remains a first-class artifact with stable
 identity, dataset-local semantics, and direct Python access.
 
-Do not model datasets as owned exclusively by experiments. A dataset may be:
+Do not model datasets as owned exclusively by measurements. A dataset may be:
 
 - produced by a measurement
 - produced by a future analysis, import, simulation, or calibration activity
@@ -214,7 +214,7 @@ then add progressive column metadata, explicit scan semantics, and desktop UI
 consumption of resolved dataset interpretation instead of rediscovering chart
 meaning from row heuristics.
 
-Do this before building higher-level experiment, workflow, automation, or AI
+Do this before building higher-level measurement, workflow, automation, or AI
 features. Those later features need explicit run and provenance models; they
 should not be smuggled into dataset naming conventions, incidental metadata, or
 chart-specific assumptions.
@@ -293,7 +293,7 @@ Parameter management may grow beyond static run metadata into:
 - mutable refs or profiles that resolve to immutable snapshots before a run
 - parameter history views
 - plotting parameter values across runs or time
-- parameter versioning for experiment and numerical simulation configurations
+- parameter versioning for measurement and numerical simulation configurations
 - structured tree and table diffs with selected apply-to-draft workflows
 - analysis-driven parameter update proposals for calibration workflows
 - links between parameter versions, runs, and generated datasets
@@ -327,14 +327,14 @@ Dataset usability may include:
 Scientific quality-of-life features may include:
 
 - run notes for manual observations and experimental context
-- sample or specimen records for experiments organized around a measured object,
+- sample or specimen records for measurements organized around a measured object,
   batch, preparation, condition, or source
 - quick tags, favorites, and filters for datasets, runs, and parameter sets
 - data quality flags such as good, suspect, failed, calibration, or test run
 - calibration records linked to runs, parameters, and device configuration
 - unit, label, precision, and display-scale metadata for parameters and dataset
   columns
-- template experiments that copy parameter structure, code entry points, and
+- template measurements that copy parameter structure, code entry points, and
   output dataset conventions from previous work
 
 Traceability and reproducibility may include:
@@ -354,7 +354,7 @@ Traceability and reproducibility may include:
 - export provenance such as exported content, time, format, and destination
   summary
 - source data library UUID, display name, and optional source computer label in
-  exported experiment bundles
+  exported measurement bundles
 - checksums for dataset chunks, exported bundles, code snapshots, and
   environment lock files
 - human-readable audit summaries for selected runs or data libraries
@@ -366,7 +366,7 @@ Workflow automation may include:
 - workflow versioning and workflow run history
 - scheduled or periodic workflows
 - automatic parameter calibration and optimization
-- periodic instrument or experiment benchmarks
+- periodic instrument or measurement benchmarks
 - benchmark history and trend plots
 - optimization objectives, constraints, chosen parameter changes, and rollback
   context
@@ -437,7 +437,7 @@ be rediscovered or relitigated later. Good ADR candidates include:
 - IPC or gRPC compatibility policy
 - Python API contract decisions
 - desktop/runtime architecture decisions
-- experiment, parameter, or device model foundations
+- measurement, parameter, or device model foundations
 - measurement code history and environment management foundations
 - run provenance and immutability foundations
 - workflow definition and scheduler foundations

@@ -174,6 +174,59 @@ Do not require users to annotate every dataset produced by a measurement.
 Dataset-level notes are useful when an output has a local issue or meaning, but
 the measurement is the default annotation container for data-taking work.
 
+## Product Decision Checklist
+
+Use this checklist before writing durable v0.2 storage, API, IPC, or UI
+contracts.
+
+Decide at the product level now:
+
+- V1 replaces simple LabRAD Grapher/Data Vault style logging for new
+  measurements. Full legacy import and browsing remain follow-up migration
+  work.
+- One data library is the normal user model. Projects, campaigns, saved views,
+  tags, samples, and sessions organize the library without encouraging many
+  long-lived roots.
+- `Measurement` is the first public acquisition noun. `Experiment` is informal
+  scientific language or a possible future grouping/template concept.
+- Sample/session context is useful and visible, but optional. Quick
+  measurements remain valid without it and can be corrected later.
+- Measurement-scoped dataset writers are the common Python path. Lower-level
+  dataset-only writes stay available for scratch tables, imports, tests, and
+  transitional code.
+- Portable exports start from a measurement by default and can be opened
+  directly from Python or a read-only viewer without creating a local data
+  library first.
+- Notes, tags, and quality state usually live on samples, sessions,
+  measurements, analysis, or calibration records; dataset annotations are for
+  output-local exceptions.
+- v0.2 may break workspace/dataset-first assumptions where they conflict with
+  the new model.
+
+Defer to ADR or technical design before implementation:
+
+- data-library storage layout and pre-v0.2 compatibility or migration policy
+- `MeasurementRun` table versus shared `ActivityRun` storage
+- dataset facts, semantic manifests, projections, and append invariants
+- measurement-scoped writer lifecycle, abort/finalize policy, and crash
+  recovery semantics
+- portable export bundle format, checksums, and direct-read API
+- actor/auth token model for local and remote access
+- minimal device adapter/capability boundary
+- parameter snapshot/profile/proposal storage and calibration promotion rules
+- managed measurement plan syntax, retry/resume behavior, and resource leases
+
+Keep future-only until a narrower design proves the need:
+
+- full multi-user administration, roles, and permission matrices
+- hosted SaaS or distributed database operation
+- full legacy LabRAD/Data Vault import as a V1 requirement
+- broad hardware driver framework
+- generic workflow DAG engine
+- automatic notebook state capture
+- full Git/environment management
+- AI-driven mutating automation without explicit approval and audit records
+
 ## Domain Model
 
 The clean v0.2 domain model is a data library of records plus explicit links,

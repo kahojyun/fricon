@@ -82,7 +82,7 @@ Why it matters:
 - Run records are the natural bridge between Python scripts and later desktop
   inspection, workflow automation, provenance, and AI assistance.
 - Runs should preserve reproducibility facts without making the desktop UI the
-  primary experiment execution engine too early.
+  primary measurement execution engine too early.
 - Code and environment tracking should be explicit run reproducibility context,
   not hidden side effects of dataset writes.
 
@@ -263,7 +263,7 @@ Boundary:
 - Owns analysis identity, input links, output links, analysis parameters,
   result summaries, quality state, and links to generated datasets, artifacts,
   reports, or parameter proposals.
-- Does not own experiment execution, raw dataset semantics, parameter registry
+- Does not own measurement execution, raw dataset semantics, parameter registry
   commits, workflow scheduling, or device application.
 
 Likely interfaces:
