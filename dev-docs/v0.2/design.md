@@ -20,7 +20,7 @@ cooldowns, code, parameters, calibration, and data do not quietly diverge.
 The first adoption target remains practical:
 
 ```text
-replace a simple LabRAD Grapher/Data Vault style logger for new experiments
+replace a simple LabRAD Grapher/Data Vault style logger for new measurements
 ```
 
 The long-term target is broader:
@@ -37,13 +37,14 @@ fast exploration
 
 v0.2 should optimize for these user outcomes:
 
-- run exploratory experiments from Python with little boilerplate
+- run exploratory measurements from Python with little boilerplate
 - keep one coherent local data library instead of many data/code folders
 - record sample and cooldown/session context beside measurements
 - let users set active sample/session context from a notebook prelude or UI
-  without making sample setup a hard requirement for quick experiments
+  without making sample setup a hard requirement for quick measurements
 - inspect live and historical datasets through desktop UI and Python
-- preserve parameter, code, environment, and quality context for each run
+- preserve parameter, code, environment, and quality context for each
+  measurement
 - visualize sample/device parameters on a 2D map when the lab model needs it
 - automate repeated calibration without silent parameter mutation
 - leave a clean path to managed device communication after LabRAD is removed
@@ -64,10 +65,10 @@ User-visible concepts for the first v0.2 slice:
 
 - Data Library: the local Fricon root and catalog
 - Sample: the physical object, device, chip, wafer, batch, or specimen; useful
-  when known, but not required before every quick experiment
+  when known, but not required before every quick measurement
 - Sample Session: a cooldown, mounting, wiring, probing, or campaign context;
   can be selected as active context or attached after a run
-- Experiment: the normal record for measurement work
+- Measurement: the normal record for data-taking work
 - Dataset: a table-shaped artifact produced or consumed by work
 
 User-visible concepts to preserve for later v0.2 work:
@@ -106,8 +107,55 @@ A data library should have durable identity:
 
 This identity should travel with exports, audit summaries, and portable
 bundles. If a lab computer normally has one data library, the generated UUID and
-display name are enough to answer where an exported experiment came from
+display name are enough to answer where an exported measurement came from
 without making users manage many roots.
+
+## Naming Direction
+
+v0.2 should use `Measurement` as the primary user-facing noun for a data-taking
+attempt.
+
+Useful reference patterns:
+
+- LabRAD Data Vault/Grapher keeps the fast path close to datasets and live
+  plotting. Fricon should keep that low-friction logging feel, but add explicit
+  sample, parameter, code, and provenance records instead of relying on folder
+  names.
+- QCoDeS separates `Measurement`, `DataSet`, and `Experiment`/container-like
+  grouping. Fricon should learn from that split: measurement is the acquisition
+  attempt, dataset is the table-shaped output, and experiment can remain a
+  broader scientific grouping if the product later needs it.
+- Labber presents measurement setup and log-browser concepts. Fricon should
+  use measurement for acquisition, but avoid making `Log` the primary data noun
+  because software/audit logs are also first-class provenance.
+
+Primary references:
+
+- LabRAD Data Vault/Grapher quick start:
+  https://sourceforge.net/p/labrad/wiki/QuickStartDataVaultAndGrapher/
+- QCoDeS measurement and dataset example:
+  https://microsoft.github.io/Qcodes/examples/DataSet/Performing-measurements-using-qcodes-parameters-and-dataset.html
+- QCoDeS experiment container example:
+  https://microsoft.github.io/Qcodes/examples/DataSet/The-Experiment-Container.html
+- Keysight Labber product page:
+  https://www.keysight.com/us/en/products/all-instrument-software/labber-software.html
+
+Public naming policy:
+
+- Use `Data Library`, `Sample`, `Sample Session`, `Measurement`, `Dataset`,
+  `Artifact`, `Parameter Profile`, `Parameter Snapshot`, `Analysis`, and
+  `Calibration` in user-facing docs and first APIs.
+- Use `Experiment` informally for the scientific activity, or later for a
+  broader campaign/template/grouping if an ADR proves that users need it.
+- Avoid `ExperimentRun` as the first public API/storage noun. If implementation
+  needs a durable lifecycle record, prefer `MeasurementRun` or keep the generic
+  `ActivityRun` internal.
+- Use `ActivityRun`, `DatasetWriteSession`, `ScriptRun`, `DeviceApplyPlan`, and
+  similar names as internal or advanced troubleshooting concepts.
+- Avoid `Station` as the main device/setup noun. Use `Device`, `Setup`,
+  `DeviceSnapshot`, or `DesiredDeviceState` depending on what is being modeled.
+- Avoid `Log` for measured data. Use `ExecutionLog`, `AuditLog`, or
+  `EventLog` only when the record is actually a log.
 
 ## Notes, Tags, And Quality
 
@@ -118,13 +166,13 @@ Default user-facing annotation levels:
 
 - sample: identity, preparation, layout, long-lived notes, aliases, tags
 - sample session: cooldown/setup context, wiring, drift notes, session quality
-- experiment: hypothesis, run notes, tags, quality, interruption decisions
+- measurement: intent, run notes, tags, quality, interruption decisions
 - analysis or calibration: conclusion, accepted/rejected proposals, audit note
 - dataset: output-local exceptions, display hints, or dataset-specific issues
 
-Do not require users to annotate every dataset produced by an experiment.
+Do not require users to annotate every dataset produced by a measurement.
 Dataset-level notes are useful when an output has a local issue or meaning, but
-the experiment is the default annotation container for measurement work.
+the measurement is the default annotation container for data-taking work.
 
 ## Domain Model
 
@@ -137,7 +185,7 @@ DataLibrary
     Sample
     SampleSession
     ActivityRun
-      kind: experiment | analysis | import | simulation | calibration
+      kind: measurement | analysis | import | simulation | calibration
     Artifact
       kind: dataset | analysis_result | report | log | attachment |
             parameter_proposal | device_snapshot
@@ -148,10 +196,10 @@ DataLibrary
 
   links:
     SampleSession -> Sample
-    Experiment -> optional SampleSession
+    Measurement -> optional SampleSession
     ActivityRun -> consumes -> Artifact | ParameterSnapshot | ActivityRun
     ActivityRun -> produces -> Artifact
-    CalibrationWorkflowRun -> coordinates -> Experiment + Analysis +
+    CalibrationWorkflowRun -> coordinates -> Measurement + Analysis +
                                       ParameterProposal
 ```
 
@@ -160,13 +208,13 @@ More formally:
 ```text
 ActivityRun consumes inputs and produces artifacts.
 
-Sample/session context is an optional link on an experiment, not an owning
+Sample/session context is an optional link on a measurement, not an owning
 parent.
 
-Calibration coordinates experiment, analysis, artifact, and parameter-proposal
+Calibration coordinates measurement, analysis, artifact, and parameter-proposal
 records. It does not make those records children of the calibration record.
 
-Experiment, Analysis, Import, Simulation, and Calibration are user-facing or
+Measurement, Analysis, Import, Simulation, and Calibration are user-facing or
 workflow-facing activity types.
 
 Artifact is the general output or input concept. DatasetArtifact is the primary
@@ -176,18 +224,23 @@ device snapshots should fit the same provenance pattern.
 ```
 
 The `ActivityRun` pattern should be an internal modeling tool, not the primary
-word users see in the UI. Users can still see Experiment, Analysis, Import,
-Simulation, and Calibration as concrete work types.
+word users see in the UI. Users should see Measurement, Analysis, Import,
+Simulation, and Calibration as concrete work types. `Experiment` remains
+available as informal scientific wording or as a future grouping if needed.
 
-## Experiment And Simulation
+## Measurement, Experiment, And Simulation
 
-Do not force experiment and simulation into completely separate foundations.
+Do not force measurement, experiment, and simulation into completely separate
+foundations.
 
 The clean distinction is:
 
-- Experiment: activity that usually measures the physical world or hardware
+- Measurement: one data-taking attempt against a physical system, hardware, or
+  sample
+- Experiment: an informal scientific activity label, or a future broader
+  grouping/template/campaign above measurements
 - Simulation: activity that computes synthetic or model-derived data
-- ActivityRun: shared internal provenance pattern for both
+- ActivityRun: shared internal provenance pattern for all of them
 - DatasetArtifact: table-shaped output artifact that can be measured,
   processed, imported, or simulated
 
@@ -211,11 +264,11 @@ such as:
 - waveform or configuration files
 - future device snapshots and readback summaries
 
-A dataset is an artifact, not the whole experiment record.
+A dataset is an artifact, not the whole measurement record.
 
 Dataset artifacts should have stable identity, table facts, dataset-local
 semantics, and direct Python access. They should not own sample identity,
-experiment intent, parameter history, code state, or calibration decisions.
+measurement intent, parameter history, code state, or calibration decisions.
 
 Keep the dataset stack split into:
 
@@ -235,9 +288,9 @@ append-only facts, manifests, and resolved interpretation. Before committing
 more durable dataset APIs or storage contracts, reconcile that work with this
 broader v0.2 data-library and provenance model.
 
-## Experiment-Scoped Writes
+## Measurement-Scoped Writes
 
-The common write path should share the experiment lifecycle.
+The common write path should share the measurement lifecycle.
 
 In notebooks, the library handle should be created once in a prelude and reused
 across cells. It should not be a context manager in normal examples; service
@@ -251,9 +304,9 @@ Prefer this shape for normal measurements:
 lib = fricon.library()
 lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
-with lib.experiment("rabi q3") as exp:
-    rabi = exp.dataset("rabi")
-    chevron = exp.dataset("chevron")
+with lib.measurement("rabi q3") as meas:
+    rabi = meas.dataset("rabi")
+    chevron = meas.dataset("chevron")
 
     for amp in amps:
         rabi.write(amp=amp, response=measure_rabi(amp))
@@ -264,23 +317,23 @@ with lib.experiment("rabi q3") as exp:
 
 The active context may be set from a notebook prelude, CLI, desktop UI, or an
 explicit Python object. It should behave like a helpful default, not hidden
-provenance. Each experiment should record the resolved sample/session IDs or
+provenance. Each measurement should record the resolved sample/session IDs or
 record that no sample context was selected.
 
-Quick experiments should also be valid without sample context:
+Quick measurements should also be valid without sample context:
 
 ```python
 lib = fricon.library()
 
-with lib.experiment("quick resonator check") as exp:
-    s21 = exp.dataset("s21")
+with lib.measurement("quick resonator check") as meas:
+    s21 = meas.dataset("s21")
     s21.write(freq=7.1e9, signal=measure())
 ```
 
 Users should be able to attach or correct sample/session links later through an
 auditable correction path.
 
-Dataset handles opened from an experiment should finalize with the experiment
+Dataset handles opened from a measurement should finalize with the measurement
 unless the user explicitly aborts or detaches them. This avoids nested writer
 ceremony for the normal case while preserving explicit dataset lifecycle for
 lower-level or streaming APIs.
@@ -296,28 +349,28 @@ with lib.dataset("scratch") as ds:
 
 Lower-level datasets are unassigned artifacts until linked to a producer.
 
-## Portable Experiment Export
+## Portable Measurement Export
 
-Export should be experiment-centered by default.
+Export should be measurement-centered by default.
 
 The common workflow is:
 
 ```text
-experiment run in lab data library
-  -> export portable experiment bundle
+measurement in lab data library
+  -> export portable measurement bundle
   -> open bundle directly on another computer from Python or a viewer
 ```
 
 Users should not need to create a new local data library, import the bundle, or
 understand Fricon storage internals before analyzing exported data.
 
-An experiment export should include:
+A measurement export should include:
 
 - export format version and export UUID
 - source data library UUID, display name, and optional source computer label
 - exported-at time, Fricon version, and actor summary when available
-- original experiment/run IDs and stable artifact IDs
-- experiment name, notes, tags, quality state, and correction summaries
+- original measurement/run IDs and stable artifact IDs
+- measurement name, notes, tags, quality state, and correction summaries
 - optional sample/session context and attach-later correction history
 - produced dataset artifacts with facts, semantic manifests, and projections
 - non-table artifacts such as reports, figures, logs, attachments, code
@@ -332,17 +385,17 @@ Portable read APIs should be read-only and direct:
 
 ```python
 bundle = fricon.open_export("rabi-q3.fricon-export")
-run = bundle.experiment("rabi q3")
-rabi = run.dataset("rabi").to_pyarrow()
+meas = bundle.measurement("rabi q3")
+rabi = meas.dataset("rabi").to_pyarrow()
 ```
 
 The desktop GUI should also have a read-only export viewer mode. The viewer
-should open exported bundles directly, show experiment context and produced
+should open exported bundles directly, show measurement context and produced
 artifacts, and offer read snippets without requiring import into the user's own
 data library.
 
 Importing an export into another data library may be useful later, but it is a
-separate workflow from reading or viewing the exported experiment.
+separate workflow from reading or viewing the exported measurement.
 
 ## Sample And Session Model
 
@@ -354,7 +407,7 @@ measurements. Many existing notebooks start with a small prelude such as
 `data_dir = ...`; Fricon should support an equivalent active sample/session
 prelude and a desktop active-context selector.
 
-An experiment may start with:
+A measurement may start with:
 
 - an explicit sample/session context
 - the current active sample/session context
@@ -401,13 +454,13 @@ Profile update
 
 Rules:
 
-- experiment facts should link to immutable snapshots, not mutable JSON files
+- measurement facts should link to immutable snapshots, not mutable JSON files
 - run-local overrides should be recorded on the run
 - analysis and calibration should produce proposals before profile updates
 - automatic calibration should not silently mutate important profiles during
   measurement
 - parameter display, diff, and search should be first-class UI concerns after
-  the minimal experiment and dataset foundation exists
+  the minimal measurement and dataset foundation exists
 
 ## Code And Environment Provenance
 
@@ -425,11 +478,11 @@ Start with passive summaries:
 The record should help a researcher answer what probably ran, while making
 clear when exact reproducibility is not guaranteed.
 
-## Managed Experiment Model
+## Managed Measurement Model
 
-Simple experiments should remain ordinary Python.
+Simple measurements should remain ordinary Python.
 
-Managed experiments should be an optional integration path for repeated,
+Managed measurement plans should be an optional integration path for repeated,
 retryable, automation-heavy, or calibration-critical work. The model should
 make the intended hardware state inspectable before execution:
 
@@ -458,7 +511,7 @@ The benefit is not abstraction for its own sake. The benefit is:
 - attach point/sweep/dataset post-processing hooks
 - build automatic calibration on auditable measurements and proposals
 
-Imperative experiment code remains valid. It just gets less automatic help with
+Imperative measurement code remains valid. It just gets less automatic help with
 retry, resume, dry-run, and device-state inspection unless it opts into the
 managed API or explicit advanced hooks.
 
@@ -493,7 +546,7 @@ thin adapter contract. The important decisions are:
 
 Analysis is a consumer and producer.
 
-It may consume experiment artifacts, usually datasets, and produce:
+It may consume measurement artifacts, usually datasets, and produce:
 
 - derived datasets
 - scalar or structured results
@@ -501,11 +554,11 @@ It may consume experiment artifacts, usually datasets, and produce:
 - quality decisions
 - parameter proposals
 
-Calibration is a workflow over experiment and analysis records:
+Calibration is a workflow over measurement and analysis records:
 
 ```text
 CalibrationWorkflowRun
-  -> experiment or managed experiment
+  -> measurement or managed measurement
   -> measured dataset
   -> analysis result
   -> parameter proposal
@@ -514,8 +567,8 @@ CalibrationWorkflowRun
   -> parameter profile update
 ```
 
-This keeps experiment outputs clean while still letting the UI show calibration
-history inside the broader experiment/sample context.
+This keeps measurement outputs clean while still letting the UI show calibration
+history inside the broader measurement/sample context.
 
 ## Distribution And Runtime
 
@@ -590,9 +643,9 @@ The first slice should prove the new model end to end:
 2. Create or select a sample/session when known, or explicitly run without one.
 3. Set active sample/session context from the desktop UI or Python prelude when
    appropriate.
-4. Start an interactive experiment from Python.
-5. Write one or more dataset artifacts through experiment-scoped handles.
-6. Browse the experiment and datasets in the desktop/web UI.
+4. Start an interactive measurement from Python.
+5. Write one or more dataset artifacts through measurement-scoped handles.
+6. Browse the measurement and datasets in the desktop/web UI.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
 9. Record actor, code summary, run note, quality, and sample/session links.
@@ -609,22 +662,23 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - active sample/session context and attach-later correction policy
 - general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
-- experiment-scoped dataset writer lifecycle
+- public naming policy for Measurement versus Experiment
+- measurement-scoped dataset writer lifecycle
 - minimal device adapter/capability boundary for future LabRAD replacement
 - actor/auth boundary for local and remote access
-- optional managed experiment desired-device-state boundary
+- optional managed measurement desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - desktop web architecture and remote UI access
 
 ## Design Constraints
 
-- Keep the Python experiment path simple.
+- Keep the Python measurement path simple.
 - Keep datasets directly openable from Python and the desktop UI.
 - Keep sample/session context easy to set as an active default, but do not block
-  quick experiments when the context is unknown.
+  quick measurements when the context is unknown.
 - Keep dataset semantics dataset-local.
 - Keep sample/session/run/parameter/provenance out of dataset names.
-- Keep notes and tags mostly on sample, session, experiment, analysis, and
+- Keep notes and tags mostly on sample, session, measurement, analysis, and
   calibration records.
 - Keep advanced execution concepts optional until users need retry, resume,
   dry-run, or calibration automation.

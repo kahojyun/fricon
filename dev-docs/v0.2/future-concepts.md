@@ -182,8 +182,8 @@ Why it matters:
   and derived datasets when users compare results or trace conclusions.
 - Import and export operations should be explainable through source paths, file
   hashes, conversion options, destination summaries, and timestamps.
-- Experiment-centered export is a common analysis workflow: a researcher may
-  move one experiment bundle to another computer and open it directly without
+- Measurement-centered export is a common analysis workflow: a researcher may
+  move one measurement bundle to another computer and open it directly without
   creating or importing into another data library.
 - Dataset lineage should build on explicit dataset semantics and run records,
   not chart heuristics or file layout details.
@@ -199,7 +199,7 @@ Boundary:
   steps, simulations, source metadata, quality flags, invalidation or
   supersession records, correction links, review notes, and status summaries.
 - Owns producer/consumer provenance edges that connect concrete activity
-  records, such as experiment, analysis, import, simulation, and calibration
+  records, such as measurement, analysis, import, simulation, and calibration
   runs, to their input and output datasets or artifacts.
 - Does not own raw dataset payload layout, parameter registry history, or
   analysis algorithms.
@@ -212,7 +212,7 @@ Likely interfaces:
 - import/export workflows record source data library identity, destination,
   conversion, original IDs, export UUIDs, format versions, and checksum
   summaries
-- portable experiment bundles can be opened through read-only Python APIs and a
+- portable measurement bundles can be opened through read-only Python APIs and a
   dedicated GUI viewer without import
 - processed datasets link to input datasets and processing context
 - analysis, import, simulation, and calibration activity records use shared
@@ -228,7 +228,7 @@ Dependencies:
 
 - durable dataset semantics
 - import/export compatibility policy
-- experiment run model for measured datasets
+- measurement record model for measured datasets
 - analysis or processing records for derived datasets
 - data-library event or correction model
 - UI conventions for flags, filters, and summaries
@@ -238,7 +238,7 @@ Open questions:
 - Which dataset kinds should be first-class?
 - How much import/export provenance is needed for useful reproducibility?
 - How should lineage survive dataset archive export and import?
-- What is the minimum portable experiment bundle that is useful for offline
+- What is the minimum portable measurement bundle that is useful for offline
   analysis?
 - Which quality states apply to datasets, runs, or both?
 - Should invalidation block downstream use or only warn?

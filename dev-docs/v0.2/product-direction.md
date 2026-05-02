@@ -16,7 +16,7 @@ experimental science.
 It should help experimentalists:
 
 - explore quickly from Python scripts and notebooks
-- record experiment history without manual folder discipline
+- record measurement history without manual folder discipline
 - track samples, cooldowns, parameters, code, and datasets together
 - visualize sample parameters and measurement results
 - maintain large parameter sets without silent drift
@@ -48,7 +48,7 @@ Fricon v0.2 should replace that pattern with:
 ```text
 one Fricon data library
   -> sample and session records
-  -> experiment runs
+  -> measurements
   -> dataset artifacts
   -> code and environment summaries
   -> parameter snapshots and proposals
@@ -61,7 +61,7 @@ The normal measurement flow should be:
 
 ```text
 set active sample/session context when known
-run experiment from Python
+run measurement from Python
 watch produced datasets
 annotate run and mark quality
 analyze in Python or UI
@@ -71,7 +71,7 @@ promote useful calibration results through parameter proposals
 The first-screen product should eventually be organized around current lab work:
 
 - active sample/session, with a visible "none selected" state
-- recent experiment runs
+- recent measurements
 - live datasets
 - important notes and quality state
 - parameter/calibration status
@@ -91,7 +91,7 @@ the library without encouraging users to split data and copied code into many
 long-lived roots.
 
 Each data library should have a generated UUID and a user-editable display
-name. Exported experiments should include that source identity so users can
+name. Exported measurements should include that source identity so users can
 tell which lab computer or data library produced the data.
 
 ### Sample
@@ -105,7 +105,7 @@ Samples need:
 - display name and aliases
 - structured custom fields
 - notes, tags, and lifecycle state
-- links to sample sessions, experiment runs, datasets, and parameter history
+- links to sample sessions, measurements, datasets, and parameter history
 - optional 2D layout or coordinate map
 
 Do not force all labs into a full inventory system. Sample records should be
@@ -114,7 +114,7 @@ lightweight but real.
 Sample selection should be low-friction. Many existing notebooks set a
 `data_dir` or similar global variable near the top of the file. Fricon should
 support an equivalent active sample/session context in a notebook prelude and
-in the desktop UI. Quick experiments may run without sample context and attach
+in the desktop UI. Quick measurements may run without sample context and attach
 or correct it later.
 
 ### Sample Session / Cooldown
@@ -135,9 +135,9 @@ Create a new sample only when the physical identity has meaningfully changed.
 If processing creates a new object, record lineage from the old sample to the
 new one rather than hiding the change in names or folders.
 
-### Experiment Run
+### Measurement
 
-An experiment run is the default record for measurement work.
+A measurement is the default record for data-taking work.
 
 It should link:
 
@@ -147,6 +147,10 @@ It should link:
 - produced datasets
 - notes, tags, quality, and attachments
 - continuation or recovery decisions
+
+Use `Experiment` for informal scientific discussion, or later for a broader
+campaign/template/grouping if an ADR proves that users need that extra layer.
+Do not make `ExperimentRun` the first public noun for the v0.2 API.
 
 ### Dataset Artifact
 
@@ -178,7 +182,7 @@ Calibration should not silently mutate important profiles during measurement.
 
 ### Code And Environment Summary
 
-Fricon should reduce the need to copy code directories when sample or experiment
+Fricon should reduce the need to copy code directories when sample or measurement
 context changes.
 
 Start with passive summaries:
@@ -206,7 +210,7 @@ Capabilities to design toward:
 - typed custom fields where useful
 - 2D coordinate map or layout
 - color by parameter, measurement result, quality, or calibration state
-- link plotted points to experiment runs and datasets
+- link plotted points to measurements and datasets
 - compare values across sessions/cooldowns
 - show drift or history for selected sample points
 
@@ -234,13 +238,13 @@ cooldown is a new sample.
 The sample/session context should be selectable as an active default, not a
 required modal step before every quick measurement.
 
-### Run An Exploratory Experiment
+### Run An Exploratory Measurement
 
 As an experimentalist, I want to run a measurement from Python with minimal
 boilerplate so that Fricon records the run, datasets, sample/session context,
 and basic provenance.
 
-If no sample/session is selected, Fricon should still record the experiment and
+If no sample/session is selected, Fricon should still record the measurement and
 make missing context visible and fixable later.
 
 ### Watch And Inspect Data
@@ -250,23 +254,23 @@ can decide whether a measurement is working.
 
 ### Annotate Once At The Right Level
 
-As an experimentalist, I want to put notes, tags, and quality on the experiment
+As an experimentalist, I want to put notes, tags, and quality on the measurement
 or sample/session by default so that I do not have to annotate every dataset.
 
 ### Reopen Data From Python
 
 As an analyst, I want stable IDs and read snippets so that I can reopen
-experiment outputs without knowing storage paths.
+measurement outputs without knowing storage paths.
 
-### Export An Experiment For Offline Analysis
+### Export A Measurement For Offline Analysis
 
-As an experimentalist, I want to export a complete experiment bundle so that I
+As an experimentalist, I want to export a complete measurement bundle so that I
 can analyze it on another computer without setting up a Fricon data library or
 importing the data first.
 
 Acceptance notes:
 
-- export starts from an experiment by default
+- export starts from a measurement by default
 - exported bundles include produced datasets, selected artifacts, notes, tags,
   quality, sample/session context, parameter/code summaries, and provenance
 - exported bundles include source data library UUID, display name, optional
@@ -299,13 +303,13 @@ As an experimentalist, I want scheduled or repeated calibration to produce
 analysis results and parameter proposals so that tedious updates are automated
 without silently mutating important parameter profiles.
 
-## Managed Experiment Framework Direction
+## Managed Measurement Framework Direction
 
-Simple experiments should remain ordinary Python. Users should not need to
+Simple measurements should remain ordinary Python. Users should not need to
 learn a declarative framework before they can collect data.
 
-For repeated or automation-heavy experiments, Fricon may provide an optional
-managed experiment framework where users declare how parameter snapshots,
+For repeated or automation-heavy measurements, Fricon may provide an optional
+managed measurement framework where users declare how parameter snapshots,
 run-local inputs, and scan points resolve into desired device state and dataset
 outputs.
 
@@ -327,14 +331,15 @@ The managed framework should help with:
 - stronger provenance for device apply, readback, and output datasets
 
 This should be a recommended integration path for managed runs, not the only
-valid experiment style. Existing imperative experiment code should still be able
-to record interactive runs and datasets, but advanced retry, resume, dry-run,
-and automatic calibration behavior may require the managed declarative API.
+valid measurement style. Existing imperative measurement code should still be
+able to record interactive runs and datasets, but advanced retry, resume,
+dry-run, and automatic calibration behavior may require the managed
+declarative API.
 
 ## Later User Stories
 
 - Remote monitoring from another machine.
-- Managed submitted experiments with queue and resource leases.
+- Managed submitted measurements with queue and resource leases.
 - Analysis-run UI for derived datasets and reports.
 - Calibration workflow templates and history views.
 - Import of legacy LabRAD/Data Vault history.

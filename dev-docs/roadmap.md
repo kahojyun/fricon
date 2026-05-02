@@ -35,14 +35,15 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
 
 - `v0.2/README.md` is the canonical entry point for v0.2 planning.
 - `v0.2/design.md` is the canonical v0.2 design synthesis. It defines the
-  clean reset model: one data library; samples and sessions; experiment,
+  clean reset model: one data library; samples and sessions; measurement,
   analysis, simulation, import, and calibration activity records; dataset
   artifacts as the first concrete artifact type; reserved general artifacts;
   parameter snapshots and proposals; code summaries; actor/audit boundaries;
-  optional active sample/session context; and the optional managed experiment
-  path toward Fricon-managed device communication.
+  optional active sample/session context; the public naming policy that prefers
+  `Measurement` over `ExperimentRun` for data-taking records; and an optional
+  managed measurement path toward Fricon-managed device communication.
 - `v0.2/product-direction.md` repositions Fricon as a local lab data library
-  and automation foundation centered on samples, sessions, experiment runs,
+  and automation foundation centered on samples, sessions, measurements,
   dataset artifacts, parameter history, code summaries, and calibration
   history.
 - `v0.2/technical-direction.md` defines the proposed distribution surfaces,
@@ -54,9 +55,10 @@ behind the v0.2 reset:
 
 - `v0.2/measurement-system-foundation-redesign.md` defines the proposed breaking
   redesign direction for dataset artifacts, run-like producer/consumer
-  provenance, the V1 experiment-first mental model, and future calibration
-  foundations. Treat it as proposed design guidance, not current
-  implementation fact.
+  provenance, the V1 measurement-first mental model, and future calibration
+  foundations. Treat historical `ExperimentRun` wording there as supporting
+  proposal terminology unless reconciled by ADR. Treat it as proposed design
+  guidance, not current implementation fact.
 - `dataset-semantic-architecture-proposal.md` defines the detailed dataset
   semantic direction: explicit dataset semantics, durable manifests, resolved
   interpretation, and a shaped feature sequence that keeps the foundation
@@ -66,7 +68,7 @@ behind the v0.2 reset:
 - `v0.2/parameter-management-design.md` defines proposed long-term parameter
   registry direction after dataset semantics and minimal run records exist.
   Treat it as future design guidance, not current implementation fact.
-- `v0.2/future-concepts.md` preserves lightweight notes for experiment run,
+- `v0.2/future-concepts.md` preserves lightweight notes for measurement run,
   workflow automation, calibration automation, device apply, and AI automation
   concepts that are not yet ready for focused design proposals.
 
@@ -78,26 +80,28 @@ docs before treating proposal content as current behavior.
 The current route is dataset-first, Python-led, and local-first.
 
 Fricon should first become reliable for recording, organizing, and inspecting
-scientific measurement datasets. Experiment, parameter, and device concepts
+scientific measurement datasets. Measurement, parameter, and device concepts
 should build on that foundation instead of forcing the dataset layer to absorb
 higher-level workflow meaning implicitly.
 
 The proposed v0.2 reset keeps the Python-led and local-first constraints but
 expands the product model from a dataset catalog into a measurement record
 system. In that model, datasets remain first-class artifacts, while samples,
-sample sessions, experiments, analysis, calibration, parameter snapshots, code
-summaries, notes, tags, and quality state get explicit boundaries.
+sample sessions, measurements, analysis, calibration, parameter snapshots, code
+summaries, notes, tags, and quality state get explicit boundaries. `Experiment`
+can remain an informal scientific term or a future grouping/template concept,
+but v0.2 should prefer `Measurement` as the user-facing acquisition record.
 
-Initial experiment support should lean on Python scripts as the execution
+Initial measurement support should lean on Python scripts as the execution
 entry point. The desktop UI should inspect, browse, and eventually assist those
-workflows, but it should not become the primary experiment execution engine
+workflows, but it should not become the primary measurement execution engine
 before the Python-led model is clear.
 
 Device management remains a later foundation. Near-term work may preserve space
 for device identity and configuration, but should not build a broad driver or
 hardware orchestration framework.
 
-Workflow definitions are a later layer above individual experiments. They may
+Workflow definitions are a later layer above individual measurements. They may
 eventually coordinate repeated runs, scheduled calibration, optimization, and
 benchmark tasks, but should build on run records, parameter snapshots, and
 provenance first.
@@ -113,8 +117,8 @@ user review and durable audit records.
 - Dataset semantics and durable interpretation
 - Desktop dataset browsing, inspection, and charting
 - Python scripting API for data recording and automation
-- Python-led experiment and parameter workflows
-- Reproducibility support for experiment code and environments
+- Python-led measurement and parameter workflows
+- Reproducibility support for measurement code and environments
 - Traceability across runs, datasets, parameters, code, and environments
 - Workflow definitions and scheduled automation
 - AI-assisted automation with explicit review and auditability
@@ -123,23 +127,23 @@ user review and durable audit records.
 ## V1 Replacement Target
 
 The first version should be able to replace a simple LabRAD Grapher/Data Vault
-style experiment logger for new measurement work.
+style measurement logger for new measurement work.
 
 Replacement means a researcher can stop using the old simple logger for new
-experiments and use Fricon instead to:
+measurements and use Fricon instead to:
 
 - record table-shaped measurement datasets from Python scripts or notebooks
 - select or create a lightweight sample and sample-session context when the
-  measured object matters, without blocking quick experiments when context is
+  measured object matters, without blocking quick measurements when context is
   not yet known
 - see newly produced datasets in the desktop UI without manual file handling
 - inspect recent and historical datasets through table and chart views
 - use explicit dataset semantics for column metadata, scan axes, chart defaults,
   and live-view interpretation instead of relying on row-order heuristics
-- create a minimal interactive experiment record that groups produced datasets
+- create a minimal interactive measurement record that groups produced datasets
 - reserve a general artifact model so reports, logs, figures, attachments, and
   future device snapshots do not have to masquerade as datasets
-- store experiment-level names, notes, tags, pin or favorite state, quality
+- store measurement-level names, notes, tags, pin or favorite state, quality
   state, and legacy JSON metadata on the run
 - keep dataset metadata focused on output-local semantics and per-output
   exceptions
@@ -152,18 +156,18 @@ V1 replacement does not require:
 
 - importing or fully browsing legacy LabRAD/Data Vault history
 - multi-user LabRAD server semantics or hosted collaboration
-- desktop-first experiment execution
+- desktop-first measurement execution
 - a generic managed runner, queue, resource lease system, or workflow engine
 - a full parameter registry or device driver framework
 - automatic Git, `uv`, or `pixi` environment management
 
 ## Primary User Mental Model
 
-V1 should optimize the user-facing product around interactive experiment
+V1 should optimize the user-facing product around interactive measurement
 records:
 
 ```text
-interactive experiment run -> produced datasets -> inspection and analysis
+interactive measurement -> produced datasets -> inspection and analysis
 ```
 
 For measurement work, examples and desktop navigation may become run-first once
@@ -172,7 +176,7 @@ identity, dataset-local semantics, and direct Python access.
 
 Do not model datasets as owned exclusively by experiments. A dataset may be:
 
-- produced by an experiment run
+- produced by a measurement
 - produced by a future analysis, import, simulation, or calibration activity
 - consumed by later analysis or calibration work
 - temporarily unassigned when created through lower-level dataset-only APIs
@@ -239,9 +243,9 @@ API, or UI rewrites later.
   as much as the device or parameter set
 - dataset kind and lineage, including measured, imported, processed, and
   simulation datasets
-- a shared producer/consumer provenance pattern for future experiment,
+- a shared producer/consumer provenance pattern for future measurement,
   analysis, import, simulation, calibration, and workflow runs
-- workflow definition, workflow run, and experiment run as distinct concepts
+- workflow definition, workflow run, and measurement run as distinct concepts
 - local automation safety and approval boundaries for scheduler, optimizer, and
   AI-assisted actions
 - event and audit log support for immutable records, corrections, manual
@@ -255,7 +259,7 @@ After the dataset foundation is durable, product work should move toward:
 - dataset read snippets that help users reopen or reproduce analysis from
   Python
 - dataset preview, export, and plotting snippets for common Python workflows
-- minimal interactive experiment run records that make new simple measurement
+- minimal interactive measurement records that make new simple measurement
   workflows no longer depend on LabRAD Grapher/Data Vault style logging
 - run-level notes, tags, pin or favorite state, quality flags, and legacy JSON
   metadata for migration from existing scripts
@@ -269,7 +273,7 @@ Relevant future design note:
 - `v0.2/experiment-run-and-runner-design.md`
 - `v0.2/parameter-management-design.md`
 
-This phase should avoid turning experiment support into a desktop-first
+This phase should avoid turning measurement support into a desktop-first
 workflow engine too early. Python scripts should remain the first-class way to
 run scientific measurement code.
 
@@ -294,9 +298,9 @@ Parameter management may grow beyond static run metadata into:
 - analysis-driven parameter update proposals for calibration workflows
 - links between parameter versions, runs, and generated datasets
 
-Experiment code management may support local reproducibility features such as:
+Measurement code management may support local reproducibility features such as:
 
-- automatic history tracking for experiment code
+- automatic history tracking for measurement code
 - Git-backed storage, possibly using a bare repository managed inside the
   workspace
 - automatic environment capture or setup using tools such as `uv` or `pixi`
@@ -308,11 +312,11 @@ Dataset usability may include:
 - generated Python read snippets for each dataset
 - copyable examples for loading selected datasets by data-library-local ID or
   UID
-- experiment-centered portable export bundles for offline analysis on another
+- measurement-centered portable export bundles for offline analysis on another
   computer
 - direct Python APIs for opening exported bundles without creating or importing
   into a local data library
-- a read-only desktop export viewer for exported experiment bundles
+- a read-only desktop export viewer for exported measurement bundles
 - preview snippets for pandas, pyarrow, plotting, CSV export, and Parquet export
 - snippets that match the public Python API instead of exposing internal
   storage layout
@@ -357,7 +361,7 @@ Traceability and reproducibility may include:
 
 Workflow automation may include:
 
-- workflow definitions above individual experiments
+- workflow definitions above individual measurements
 - reusable workflow templates
 - workflow versioning and workflow run history
 - scheduled or periodic workflows
@@ -385,10 +389,10 @@ AI-assisted automation may include:
 
 Longer-term product direction includes explicit concepts for:
 
-- UI-assisted experiment execution
+- UI-assisted measurement execution
 - richer parameter schemas and sweep definitions
 - parameter history and version comparison workflows
-- experiment code and environment history management
+- measurement code and environment history management
 - run provenance and audit reporting
 - workflow definitions and scheduled automation
 - automatic calibration, optimization, and benchmark workflows
@@ -434,7 +438,7 @@ be rediscovered or relitigated later. Good ADR candidates include:
 - Python API contract decisions
 - desktop/runtime architecture decisions
 - experiment, parameter, or device model foundations
-- experiment code history and environment management foundations
+- measurement code history and environment management foundations
 - run provenance and immutability foundations
 - workflow definition and scheduler foundations
 - AI action, approval, and auditability foundations

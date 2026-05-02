@@ -31,16 +31,16 @@ Assumptions:
 Fricon is expected to provide:
 
 - data recording
-- experiment execution
+- measurement execution
 - parameter management, including future snapshot, history, diff, and
   versioning workflows
 - device management
 - local data-library or workspace management
 - a desktop UI for browsing, managing, and inspecting collected data
 - Python APIs for scripting and automation
-- reproducibility support for experiment code, environments, parameters, and
+- reproducibility support for measurement code, environments, parameters, and
   generated datasets
-- workflow definitions above individual experiments for repeated calibration,
+- workflow definitions above individual measurements for repeated calibration,
   optimization, and benchmark tasks
 - AI-assisted automation for repetitive scientific data-management work, with
   explicit review and auditability for mutating actions
@@ -54,12 +54,12 @@ The current route is dataset-first, Python-led, and local-first.
 
 Fricon should first become reliable for recording, organizing, and inspecting
 scientific measurement datasets. Dataset semantics should be explicit enough
-that later experiment, parameter, and device concepts do not have to be hidden
+that later measurement, parameter, and device concepts do not have to be hidden
 inside dataset names, incidental metadata, or chart heuristics.
 
 The first adoption milestone is replacing a simple LabRAD Grapher/Data Vault
-style experiment logger for new measurement work. V1 should let users record new
-experiments from Python, inspect datasets in the desktop UI, keep run-level
+style measurement logger for new measurement work. V1 should let users record
+new measurements from Python, inspect datasets in the desktop UI, keep run-level
 context beside produced data, and reopen outputs from Python without depending
 on the old logger. Importing or fully browsing legacy LabRAD/Data Vault history
 is a follow-up migration concern, not a V1 requirement.
@@ -67,21 +67,21 @@ is a follow-up migration concern, not a V1 requirement.
 The primary V1 user mental model is:
 
 ```text
-I ran an experiment.
+I ran a measurement.
 It produced datasets.
 Fricon helps me inspect, annotate, recover, and reopen them.
 ```
 
-Interactive experiment runs should become the recommended path for measurement
+Interactive measurements should become the recommended path for measurement
 work once the run API exists. Datasets remain independently addressable data
-artifacts, not owned children that can only belong to experiments. This keeps
+artifacts, not owned children that can only belong to measurements. This keeps
 room for future analysis, import, simulation, and calibration activities that
 consume existing datasets and produce new datasets, results, reports, or
 parameter proposals.
 
-Initial experiment support should lean on Python scripts as the execution
+Initial measurement support should lean on Python scripts as the execution
 entry point. The desktop UI should browse, inspect, and eventually assist those
-workflows, but should not become the primary experiment execution engine before
+workflows, but should not become the primary measurement execution engine before
 the Python-led model is clear.
 
 Device management should remain a later foundation. Near-term design may keep
@@ -89,7 +89,7 @@ room for device identity and configuration, but should avoid building a broad
 driver framework or hardware orchestration layer before real workflows require
 one.
 
-Workflow automation should be treated as a layer above individual experiments.
+Workflow automation should be treated as a layer above individual measurements.
 It can eventually coordinate scheduled calibration, optimization, benchmark,
 and repeated measurement tasks, but should rely on clear run records, parameter
 snapshots, provenance, and human approval boundaries.
@@ -102,7 +102,7 @@ state should remain explicit, reviewable, and auditable.
 The proposed v0.2 reset is captured in `v0.2/design.md`. It keeps the
 Python-led and local-first constraints while broadening the durable product
 model from a workspace/dataset catalog into a local data library centered on
-samples, sample sessions, experiment records, dataset artifacts, analysis,
+samples, sample sessions, measurement records, dataset artifacts, analysis,
 calibration, parameter snapshots, code summaries, and auditability.
 
 ## Runtime Model
@@ -135,8 +135,11 @@ core architecture now.
 
 ### Keep The User Model Simple
 
-Users should think in terms of data libraries, samples, sessions, experiments,
-datasets, parameters, and devices as those product concepts land. Internal
+Users should think in terms of data libraries, samples, sessions, measurements,
+datasets, parameters, and devices as those product concepts land. `Experiment`
+may remain an informal scientific term or a future grouping/template concept
+above measurements, but it should not be the first public v0.2 acquisition
+record name. Internal
 concepts such as SQLite tables, Arrow chunk files, IPC protocol versions, and
 Rust module boundaries belong in developer notes, not in public user
 documentation.
@@ -164,7 +167,7 @@ snippets, saved views, aliases, notes, tags, quality flags, compare views, and
 template experiments.
 
 Export workflows should support researchers who move data to another computer
-for analysis. Prefer experiment-centered portable exports that can be opened
+for analysis. Prefer measurement-centered portable exports that can be opened
 directly from Python or a read-only viewer over workflows that require creating
 and importing into a second local data library before analysis can begin.
 
@@ -177,7 +180,7 @@ future workflow definitions without exposing internal storage details as the
 user model.
 
 Data libraries should have durable source identity, such as a generated UUID
-and user-editable display name, so exported experiments can record where they
+and user-editable display name, so exported measurements can record where they
 came from.
 
 When records need correction, prefer appended correction or event history over
@@ -197,18 +200,18 @@ Experiment execution, parameter management, and device management should become
 explicit product concepts as they mature. Avoid hiding those semantics inside
 dataset naming conventions or incidental metadata.
 
-The first explicit experiment model should be Python-led: user scripts perform
+The first explicit measurement model should be Python-led: user scripts perform
 measurement work while Fricon records datasets, run metadata, and parameters.
 UI-led execution can be introduced later if the Python-led workflow proves too
 limited.
 
-Experiment reproducibility may eventually include automatic code history and
+Measurement reproducibility may eventually include automatic code history and
 environment management. Git-backed code history, including a workspace-managed
 bare repository, and environment tools such as `uv` or `pixi` are plausible
 directions, but they should be designed as explicit product capabilities rather
 than hidden side effects of dataset writes.
 
-Workflow definitions may eventually orchestrate repeated experiment execution,
+Workflow definitions may eventually orchestrate repeated measurement execution,
 scheduled calibration, parameter optimization, and benchmark runs. These
 capabilities should record workflow versions, triggers, inputs, outputs,
 approval checkpoints, failures, and manual overrides.
@@ -259,7 +262,7 @@ These questions are intentionally unresolved:
   events?
 - How much dataset lineage is needed for measured, processed, simulation, and
   imported datasets?
-- How should experiment code history be captured without surprising users or
+- How should measurement code history be captured without surprising users or
   turning Fricon into a general Git client?
 - What level of automatic `uv` or `pixi` environment management is useful
   without making experiment setup opaque?

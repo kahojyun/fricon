@@ -12,6 +12,11 @@ Read `README.md` and `design.md` first. This note preserves the broader
 reasoning behind the reset; `design.md` is the cleaner canonical synthesis for
 new planning.
 
+Canonical v0.2 naming now prefers `Measurement` for the public data-taking
+record. Historical `Experiment` or `ExperimentRun` wording in this supporting
+note should be read as older proposal terminology unless a later ADR chooses a
+different public noun.
+
 This note intentionally allows large breaking changes while Fricon has not yet
 entered real lab use. It may revise or supersede parts of
 `../dataset-semantic-architecture-proposal.md` and
@@ -41,12 +46,12 @@ The redesign should establish the durable model before implementation hardens:
 V1 should optimize for this simple mental model:
 
 ```text
-I ran an experiment.
+I ran a measurement.
 It produced datasets.
 Fricon helps me inspect, annotate, recover, and reopen them.
 ```
 
-The recommended measurement path should be experiment-first once the run API
+The recommended measurement path should be measurement-first once the run API
 exists. Sample/session context should be selectable as an active default, not a
 hard prerequisite for quick measurements:
 
@@ -54,34 +59,34 @@ hard prerequisite for quick measurements:
 lib = fricon.library()
 lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
-with lib.experiment("cooldown sweep") as run:
-    s21 = run.dataset("s21")
-    noise = run.dataset("noise")
+with lib.measurement("cooldown sweep") as meas:
+    s21 = meas.dataset("s21")
+    noise = meas.dataset("noise")
 
     for freq in freqs:
         s21.write(freq=freq, signal=measure_s21(freq))
         noise.write(freq=freq, noise=measure_noise(freq))
 ```
 
-The experiment context should own default finalization for datasets opened
-through it. On normal experiment exit, open produced datasets are finished. On
-exceptional experiment exit, open produced datasets are aborted or marked
+The measurement context should own default finalization for datasets opened
+through it. On normal measurement exit, open produced datasets are finished. On
+exceptional measurement exit, open produced datasets are aborted or marked
 suspect according to the settled lifecycle policy. Individual datasets may still
-be explicitly finished or aborted earlier when a multi-output experiment needs
+be explicitly finished or aborted earlier when a multi-output measurement needs
 per-output control.
 
 Nested dataset context managers may remain available for advanced explicit
 lifecycle control, but public V1 examples should prefer the flatter
-experiment-scoped writer form when it is sufficient.
+measurement-scoped writer form when it is sufficient.
 
-Quick experiments without sample context and the lower-level dataset-only path
+Quick measurements without sample context and the lower-level dataset-only path
 should remain valid:
 
 ```python
 lib = fricon.library()
 
-with lib.experiment("quick check") as run:
-    ds = run.dataset("quick_table")
+with lib.measurement("quick check") as meas:
+    ds = meas.dataset("quick_table")
     ds.write(x=1.0, y=2.0)
 
 with lib.dataset("scratch_table") as ds:
@@ -90,7 +95,7 @@ with lib.dataset("scratch_table") as ds:
 
 Dataset-only creation should create an unassigned dataset unless the caller
 explicitly links it to a run-like record. The dataset storage layer should not
-silently create experiment records.
+silently create measurement records.
 
 ## User-Visible Concepts
 
@@ -98,7 +103,7 @@ Keep the V1 user model small:
 
 - `Data Library`
 - optional active `Sample` and `Sample Session`
-- `Experiment`
+- `Measurement`
 - `Dataset`
 - notes, tags, pin or favorite state, and quality state
 
@@ -120,7 +125,7 @@ Keep these mostly internal, advanced, or debug-facing:
 
 The implementation may use a shared internal shape for run-like records, but
 public docs should not lead with a generic `RunRecord` abstraction. Use concrete
-user terms when they matter: experiment, analysis, import, simulation, and
+user terms when they matter: measurement, analysis, import, simulation, and
 calibration.
 
 ## Notes, Tags, And Quality
@@ -133,18 +138,18 @@ Default rule:
 Put notes, tags, and quality on the highest meaningful work record.
 ```
 
-For V1 this usually means the experiment run:
+For V1 this usually means the measurement record:
 
-- experiment-level labels, notes, tags, pin or favorite state, and quality live
-  on `Experiment`
+- measurement-level labels, notes, tags, pin or favorite state, and quality live
+  on `Measurement`
 - datasets keep dataset-local semantics and output-specific exceptions
 - dataset notes or quality are useful when one output differs from the whole
   run
 
 Examples:
 
-- "cooldown sweep #12" belongs on the experiment
-- "publication candidate" usually belongs on the experiment
+- "cooldown sweep #12" belongs on the measurement
+- "publication candidate" usually belongs on the measurement
 - "the S21 output is good but the noise trace is bad" belongs on the affected
   dataset
 - future "fit used a bad initial guess" belongs on the analysis result or
@@ -157,7 +162,7 @@ Use this conceptual model:
 ```text
 DataLibrary
   -> concrete run records
-       kind: experiment | analysis | import | simulation | calibration
+       kind: measurement | analysis | import | simulation | calibration
        inputs
        outputs
        notes/tags/quality
@@ -176,15 +181,15 @@ Use `WorkspaceRoot` only as internal or legacy implementation terminology.
 The central rule is:
 
 ```text
-Dataset is not the experiment record.
+Dataset is not the measurement record.
 Dataset is a durable data artifact produced or consumed by run-like activities.
 ```
 
-An experiment may produce datasets. An analysis may consume measured datasets
+A measurement may produce datasets. An analysis may consume measured datasets
 and produce processed datasets, figures, reports, metrics, or parameter
 proposals. A calibration workflow may coordinate measurement, analysis,
 validation, and promotion. None of these require datasets to be owned
-exclusively by experiments.
+exclusively by measurements.
 
 ## Dataset Artifact
 
@@ -202,7 +207,7 @@ A dataset artifact should have stable identity and independent lifecycle:
 - archive/export compatibility metadata
 
 The dataset remains directly openable from Python and the desktop UI whether it
-is produced by an experiment, analysis, import, simulation, calibration
+is produced by a measurement, analysis, import, simulation, calibration
 workflow, or lower-level dataset-only code.
 
 ## Dataset Facts, Semantics, And Projections
@@ -239,7 +244,7 @@ Dataset semantics should describe dataset-local meaning:
 - duplicate-position policy
 - default view hints when appropriate
 
-Dataset semantics should not own experiment context, analysis context,
+Dataset semantics should not own measurement context, analysis context,
 parameter history, device driver state, or workflow state.
 
 ### Dataset Projections
@@ -255,11 +260,11 @@ default v1 policy can remain `latest_by_record_id`.
 Concrete run records should consume inputs and produce outputs:
 
 ```text
-ExperimentRun
+MeasurementRun
   outputs: measured Dataset
 
 AnalysisRun
-  inputs: measured Dataset | ExperimentRun | ParameterSnapshot | Artifact
+  inputs: measured Dataset | MeasurementRun | ParameterSnapshot | Artifact
   outputs: processed Dataset | AnalysisResult | Report | ParameterProposal
 
 ImportRun
@@ -272,7 +277,7 @@ SimulationRun
 
 CalibrationRun or WorkflowRun
   inputs: parameter profile/ref, workflow definition
-  outputs: experiment runs, analysis runs, parameter proposals, promoted refs
+  outputs: measurement runs, analysis runs, parameter proposals, promoted refs
 ```
 
 Implementation can share provenance edge tables such as `RunInput` and
@@ -290,7 +295,7 @@ Clean automatic calibration should be modeled as workflow over provenance:
 ```text
 CalibrationWorkflowDefinition
   -> CalibrationWorkflowRun
-      -> ManagedExperimentRun produces measured Dataset
+      -> ManagedMeasurementRun produces measured Dataset
       -> AnalysisRun consumes measured Dataset
       -> AnalysisRun produces AnalysisResult and ParameterProposal
       -> ValidationResult checks proposal
@@ -315,7 +320,7 @@ long-term ambiguity:
 - materialize record IDs and reserve system fields
 - replace inference-led chart semantics with resolved interpretation
 - add dataset `kind` and producer/consumer provenance affordances early
-- revise Python creation APIs to distinguish experiment-owned datasets from
+- revise Python creation APIs to distinguish measurement-produced datasets from
   unassigned datasets
 - change archive layout to include dataset semantics and provenance summaries
 - change desktop DTOs to expose resolved semantics and run links instead of
@@ -332,17 +337,17 @@ V1 should expose:
 - local data library
 - data library UUID and user-editable display name for source provenance
 - optional active sample/session context with attach-later correction
-- interactive experiment records
+- interactive measurement records
 - measured dataset artifacts as the first concrete artifact subtype
 - dataset table and chart inspection
 - explicit dataset semantics enough for robust scan/chart behavior
-- experiment-scoped dataset writer handles with default finalization tied to
-  the experiment context
+- measurement-scoped dataset writer handles with default finalization tied to
+  the measurement context
 - run-level notes, tags, pin/favorite state, quality state, and legacy JSON
   metadata
 - dataset-local notes or quality only for output-specific exceptions
 - generated Python snippets or stable IDs for reopening data
-- experiment-centered export bundles that can be opened directly from Python
+- measurement-centered export bundles that can be opened directly from Python
   or a read-only GUI viewer without import into another data library
 - interrupted-data recovery with explicit continuation, validation, or
   invalidation
@@ -372,8 +377,8 @@ Suggested staged path:
    - Implement durable record IDs, manifests, and resolved interpretation.
    - Preserve low-friction Python writes.
 
-3. Interactive experiment records
-   - Add explicit experiment context.
+3. Interactive measurement records
+   - Add explicit measurement context.
    - Link produced datasets through provenance, not ownership.
    - Keep dataset-only creation as unassigned.
 
@@ -398,12 +403,12 @@ Suggested staged path:
 - Should unassigned datasets be first-class in the desktop UI or mostly visible
   through dataset search and debugging views?
 - How much provenance should dataset archives include in V1?
-- What should the first portable experiment export bundle format include beyond
-  source data library identity, experiment metadata, dataset artifacts, selected
+- What should the first portable measurement export bundle format include beyond
+  source data library identity, measurement metadata, dataset artifacts, selected
   non-table artifacts, provenance summaries, and checksums?
 - Should output-specific notes and quality state live directly on datasets, or
   on run-output link records?
-- How should dataset continuation interact with completed experiment runs?
+- How should dataset continuation interact with completed measurement runs?
 - What compatibility promise, if any, should exist for pre-redesign local test
   workspaces?
 - Which decisions require a new ADR versus revising ADR 0002?

@@ -12,6 +12,11 @@ Read `README.md` and `design.md` first. This long proposal is supporting
 detail for experiment execution, retry/resume, and runner boundaries; it is not
 the canonical v0.2 entry point.
 
+Canonical v0.2 naming now prefers `Measurement` for the public data-taking
+record. Treat this proposal's `ExperimentRun` terminology as historical
+supporting detail until an ADR reconciles the storage/API names with the
+canonical naming policy.
+
 ## Purpose
 
 Define the first durable product boundary between scientific experiment records
@@ -885,9 +890,9 @@ Possible interactive shape:
 lib = fricon.library()
 lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
-with lib.experiment("cooldown sweep", params="main") as run:
-    s21 = run.dataset("s21")
-    noise = run.dataset("noise")
+with lib.measurement("cooldown sweep", params="main") as meas:
+    s21 = meas.dataset("s21")
+    noise = meas.dataset("noise")
 
     for freq in freqs:
         s21.write(freq=freq, s21=measure_s21(freq))
@@ -895,11 +900,11 @@ with lib.experiment("cooldown sweep", params="main") as run:
 ```
 
 The active sample/session context is a convenience for the common notebook
-prelude pattern, not a hidden global fact. The experiment record should store
-the resolved context IDs when present. A quick experiment without context should
-still be valid and visibly missing context.
+prelude pattern, not a hidden global fact. The measurement record should store
+the resolved context IDs when present. A quick measurement without context
+should still be valid and visibly missing context.
 
-The experiment context should own default dataset writer finalization for
+The measurement context should own default dataset writer finalization for
 datasets opened through the run. On normal run exit, open produced datasets are
 finished. On exceptional run exit, open produced datasets are aborted or marked
 suspect according to the settled lifecycle policy. A dataset writer may still
@@ -912,12 +917,12 @@ lifecycle control:
 ```python
 lib = fricon.library()
 
-with lib.experiment("cooldown sweep", params="main") as run:
-    with run.dataset("s21") as s21:
+with lib.measurement("cooldown sweep", params="main") as meas:
+    with meas.dataset("s21") as s21:
         s21.write(freq=..., s21=...)
 ```
 
-Public V1 examples should prefer the flatter experiment-scoped writer form when
+Public V1 examples should prefer the flatter measurement-scoped writer form when
 it is sufficient.
 
 Possible managed template shape:
@@ -933,7 +938,7 @@ Managed execution can be introduced separately:
 
 ```python
 lib = fricon.library()
-task = lib.submit_experiment(cooldown_sweep, params="main")
+task = lib.submit_measurement(cooldown_sweep, params="main")
 ```
 
 Runner-managed execution should remain future scope until the record-centric
@@ -1179,10 +1184,10 @@ Remaining questions to settle later:
 - Should run-level quality propagate to produced datasets, or should the two
   remain independent?
 
-## Future Boundary Discussion: Experiment-First User Model
+## Future Boundary Discussion: Measurement-First User Model
 
-Interactive experiment runs may change the primary user object from dataset to
-experiment.
+Interactive measurement records may change the primary user object from dataset
+to measurement.
 
 The current Fricon user flow is dataset-first:
 
@@ -1191,12 +1196,12 @@ with ws.dataset("s21") as ds:
     ds.write(...)
 ```
 
-After interactive experiment runs exist, the more natural measurement flow may
-be experiment-first:
+After interactive measurement records exist, the more natural measurement flow
+may be measurement-first:
 
 ```python
-with ws.experiment("cooldown sweep") as exp:
-    s21 = exp.dataset("s21")
+with ws.measurement("cooldown sweep") as meas:
+    s21 = meas.dataset("s21")
     s21.write(...)
 ```
 
@@ -1204,14 +1209,14 @@ This proposal does not require removing dataset-only creation. Dataset-only
 paths remain useful for imports, quick table capture, tests, low-level API
 work, and data that is not naturally part of a measurement attempt. But product
 documentation, examples, and desktop navigation may need to move toward
-experiment-first workflows once runs are first-class.
+measurement-first workflows once runs are first-class.
 
 Likely long-term shape:
 
 ```text
-Experiment-first path
+Measurement-first path
   recommended path for scientific measurement
-  data library -> experiment run -> artifact outputs
+  data library -> measurement -> artifact outputs
 
 Dataset-only path
   lower-level path for imports, standalone tables, and transitional workflows
@@ -1220,7 +1225,7 @@ Dataset-only path
 
 Questions to settle later:
 
-- Should new user-facing tutorials start from `ExperimentRun` instead of
+- Should new user-facing tutorials start from `Measurement` instead of
   dataset creation once the run API exists?
 - Should `ws.dataset(...)` remain a first-class public convenience path, or be
   positioned as a lower-level dataset-only path?

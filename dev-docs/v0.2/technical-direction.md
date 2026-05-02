@@ -74,7 +74,7 @@ Fricon Data Library
   Python SDK
 ```
 
-The Python SDK remains a first-class surface for experiment scripts and
+The Python SDK remains a first-class surface for measurement scripts and
 analysis notebooks. The desktop GUI is the primary browsing, inspection,
 sample, and calibration-monitoring surface. The CLI should handle setup,
 library management, import/export, diagnostics, and service control.
@@ -113,7 +113,7 @@ names may remain internal implementation details, but public docs and UI should
 avoid encouraging many long-lived workspaces.
 
 Each data library should get a generated UUID and user-editable display name at
-creation time. Exported experiments and audit summaries should include this
+creation time. Exported measurements and audit summaries should include this
 identity, plus an optional source computer label, so researchers can tell where
 portable data came from.
 
@@ -123,7 +123,7 @@ Plan for remote access early, but do not make v0.2 a multi-user hosted system.
 
 Remote access should support:
 
-- viewing live experiment progress from another machine
+- viewing live measurement progress from another machine
 - browsing historical runs and datasets
 - notebook analysis from a different workstation
 - monitoring scheduled calibration
@@ -168,7 +168,7 @@ Storage should support one data library with explicit domain records:
 DataLibrary
   Sample
   SampleSession
-  ExperimentRun
+  MeasurementRun
   Artifact
   DatasetArtifact
   AttachmentArtifact
@@ -189,23 +189,23 @@ waveform or configuration files, and future device snapshots.
 
 ## API Model Direction
 
-The ergonomic measurement path should be experiment-scoped:
+The ergonomic measurement path should be measurement-scoped:
 
 ```python
 # Notebook prelude, exact API unsettled.
 lib = fricon.library()
 lib.use_context(sample="qpu-017", session="cooldown-2026-05")
 
-with lib.experiment("rabi q3") as run:
-    rabi = run.dataset("rabi")
+with lib.measurement("rabi q3") as meas:
+    rabi = meas.dataset("rabi")
     for amp in amps:
         rabi.write(amp=amp, signal=measure(amp))
 ```
 
 Sample/session context should be a resolved default, not an implicit hidden
-global. The experiment record should store the resolved sample/session IDs when
-active context is used. If no context is selected, the run remains valid and
-the UI should make attach-later correction explicit.
+global. The measurement record should store the resolved sample/session IDs
+when active context is used. If no context is selected, the run remains valid
+and the UI should make attach-later correction explicit.
 
 The library handle should be cheap to keep in a notebook variable and reuse
 across cells. It should not require context-manager cleanup in normal examples.
@@ -228,19 +228,19 @@ top of the file.
 
 ## Portable Export Direction
 
-Exports should be experiment-centered and portable.
+Exports should be measurement-centered and portable.
 
-The first export API should let users export an experiment run and read the
+The first export API should let users export a measurement and read the
 result on another computer without creating or importing into a local data
 library:
 
 ```python
 lib = fricon.library()
-run = lib.experiments.get("exp_123")
-bundle_path = run.export("rabi-q3.fricon-export")
+meas = lib.measurements.get("meas_123")
+bundle_path = meas.export("rabi-q3.fricon-export")
 
 bundle = fricon.open_export(bundle_path)
-rabi = bundle.experiment("rabi q3").dataset("rabi").to_pyarrow()
+rabi = bundle.measurement("rabi q3").dataset("rabi").to_pyarrow()
 ```
 
 The exact syntax is unsettled. The contract is:
@@ -252,10 +252,10 @@ The exact syntax is unsettled. The contract is:
 - source data library UUID, display name, source computer label, export UUID,
   format version, original record IDs, checksums, and Fricon version travel in
   the bundle
-- experiment metadata, sample/session context, produced datasets, selected
+- measurement metadata, sample/session context, produced datasets, selected
   non-table artifacts, parameter snapshot or legacy metadata, code/environment
   summary, notes, tags, quality state, and provenance summaries travel with
-  the exported experiment
+  the exported measurement
 
 ## Minimal Device Boundary
 
@@ -277,13 +277,13 @@ ship a general-purpose hardware framework. If LabRAD is needed during
 migration, it should sit behind an adapter boundary rather than remain the
 conceptual model.
 
-## Managed Experiment Plan Direction
+## Managed Measurement Plan Direction
 
-Simple interactive experiments should remain imperative Python. Fricon should
-not require declarative experiment definitions for exploratory measurement.
+Simple interactive measurements should remain imperative Python. Fricon should
+not require declarative managed plans for exploratory measurement.
 
 For repeated, retryable, or automation-heavy work, v0.2 should leave room for an
-optional managed experiment plan model:
+optional managed measurement plan model:
 
 ```text
 parameter snapshot
@@ -318,7 +318,7 @@ readback may require the declarative plan or explicit advanced API hooks.
 Example shape for discussion, not settled API:
 
 ```python
-@fricon.experiment_template
+@fricon.measurement_template
 def rabi(ctx, params, scan):
     amp = scan.axis("amp")
 
@@ -371,7 +371,7 @@ Automatic calibration should be built as workflow over explicit records:
 
 ```text
 CalibrationWorkflowRun
-  -> managed experiment plan/run
+  -> managed measurement plan/run
   -> measured dataset
   -> analysis result
   -> parameter proposal
@@ -394,9 +394,10 @@ Likely ADRs:
 - general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
 - authentication/actor boundary for local and remote access
-- Python SDK surface and experiment-scoped dataset writer lifecycle
+- public naming policy for Measurement versus Experiment
+- Python SDK surface and measurement-scoped dataset writer lifecycle
 - minimal device adapter and capability boundary for future LabRAD replacement
-- optional managed experiment plan and desired-device-state boundary
+- optional managed measurement plan and desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - desktop web architecture and remote UI access
 
@@ -410,8 +411,8 @@ foundation:
    unset.
 3. Set active sample/session context from Python prelude or desktop UI when
    appropriate.
-4. Start an interactive experiment from Python.
-5. Write one or more dataset artifacts through experiment-scoped handles.
+4. Start an interactive measurement from Python.
+5. Write one or more dataset artifacts through measurement-scoped handles.
 6. Browse the run and datasets in the desktop/web UI.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.

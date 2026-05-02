@@ -12,13 +12,17 @@ Read `README.md` and `design.md` first. This long proposal is supporting
 detail for parameter snapshots, profiles, diffs, proposals, and calibration
 integration; it is not the canonical v0.2 entry point.
 
+Canonical v0.2 naming now prefers `Measurement` for the public data-taking
+record. Historical experiment wording in this supporting proposal should be
+reconciled with that naming policy before any storage or API ADR.
+
 ## Purpose
 
 Define a long-term parameter management direction for Fricon that fits the
 local-first, Python-led scientific workflow route.
 
 The proposed system is a versioned parameter registry for long-lived scientific
-experiment and numerical simulation parameters. It should help users answer:
+measurement and numerical simulation parameters. It should help users answer:
 
 - Which parameter state was used for this run?
 - Which mutable profile or ref did that state come from?
@@ -27,7 +31,7 @@ experiment and numerical simulation parameters. It should help users answer:
 - Which dataset, analysis step, or calibration proposal produced the change?
 - Which runs may be affected by an outdated or incorrect parameter value?
 
-The design should support measurement experiments, calibration workflows, and
+The design should support measurements, calibration workflows, and
 numerical simulation workflows without turning Fricon into a distributed version
 control system, a hardware driver framework, or a hosted lab information
 system.
@@ -154,7 +158,7 @@ control.
 | Concept              | Meaning                                                                    |
 | -------------------- | -------------------------------------------------------------------------- |
 | Parameter binding    | Result of resolving a profile/ref to an immutable snapshot ID and hash.    |
-| Run-local parameters | Inputs specific to one run, owned by the run or experiment system.         |
+| Run-local parameters | Inputs specific to one run, owned by the run or measurement system.        |
 | Runtime overrides    | Run-scoped temporary patch against a resolved parameter snapshot.          |
 | Effective run config | Run/execution-owned configuration derived from parameters and run inputs.  |
 | Parameter proposal   | Reviewable patch proposed by analysis, calibration, import, or automation. |
@@ -206,7 +210,7 @@ Measurement-oriented example:
 
 ```text
 tree:
-  experiment:
+  measurement:
     repetitions: 1000
     cooldown_s: 0.2
   devices:
@@ -560,13 +564,13 @@ status, or applied setpoints when future device integration exists.
 ## Analysis-Driven Updates
 
 Parameter updates should usually be proposed after data collection and analysis,
-not silently written by experiment scripts during execution.
+not silently written by measurement scripts during execution.
 
 Recommended flow:
 
 ```text
 old snapshot
-  -> experiment run
+  -> measurement run
   -> measured dataset
   -> analysis run
   -> analysis result
@@ -799,7 +803,7 @@ The registry may infer initial dtypes and mark them as inferred. Users can
 later refine units, constraints, descriptions, lifecycle status, table keys,
 and display metadata through normal drafts and commits.
 
-This keeps the standalone parameter system useful before experiment execution,
+This keeps the standalone parameter system useful before measurement execution,
 device management, or workflow automation exists.
 
 ### Snapshot Usage In Runs
@@ -851,7 +855,7 @@ sample
 cooldown
 campaign
 temperature_regime
-experiment_type
+measurement_type
 simulation_model
 ```
 
@@ -954,7 +958,7 @@ Analysis should be represented as a producer/consumer activity when that model
 exists: it consumes datasets, runs, parameter snapshots, or artifacts and
 produces analysis results, processed datasets, reports, or parameter proposals.
 Calibration workflows should depend on those analysis outputs rather than
-embedding analysis results inside the original experiment run.
+embedding analysis results inside the original measurement record.
 
 ```python
 proposal = params.create_proposal(
@@ -983,20 +987,22 @@ params.update_ref(
 )
 ```
 
-### Minimal Experiment Convenience
+### Minimal Measurement Convenience
 
-Higher-level experiment helpers may offer a compact API, but it should still
+Higher-level measurement helpers may offer a compact API, but it should still
 resolve refs before execution and store the resulting parameter binding:
 
 ```python
-with experiment.run(parameter_ref="main") as run:
+lib = fricon.library()
+
+with lib.measurement("rabi", params="main") as meas:
     # Fricon resolves main -> immutable snapshot before execution.
     # The run record stores both the source ref and resolved snapshot.
     ...
 ```
 
 This is convenience over the run integration boundary, not an invitation for
-the parameter registry to own experiment execution.
+the parameter registry to own measurement execution.
 
 Typed Python helper generation is a useful later enhancement, not an MVP
 blocker. Helpers should bind to a schema snapshot and include runtime

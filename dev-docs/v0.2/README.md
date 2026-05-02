@@ -26,18 +26,18 @@ The v0.2 product model is:
 ```text
 one Fricon data library
   -> samples and sample sessions
-  -> experiment, analysis, simulation, import, and calibration activity records
+  -> measurement, analysis, simulation, import, and calibration activity records
   -> artifacts: datasets first, then results, reports, logs, attachments,
      device snapshots, and parameter proposals
   -> parameter snapshots, code summaries, notes, tags, and quality state
-  -> experiment-centered portable exports for offline analysis
+  -> measurement-centered portable exports for offline analysis
 ```
 
 For normal users, the first mental model should stay simple:
 
 ```text
 I selected an active sample/session when it mattered.
-I ran an experiment.
+I ran a measurement.
 It produced datasets.
 Fricon helps me inspect, annotate, recover, analyze, and calibrate from them.
 ```
@@ -52,8 +52,9 @@ Start here for v0.2 planning:
    direction
 4. `measurement-system-foundation-redesign.md` - background redesign proposal
    for dataset artifacts and run-like provenance
-5. `experiment-run-and-runner-design.md` - detailed future experiment/runner
-   proposal
+5. `experiment-run-and-runner-design.md` - older detailed runner proposal;
+   reconcile its `ExperimentRun` terminology with the v0.2 `Measurement`
+   naming policy before implementation
 6. `parameter-management-design.md` - detailed future parameter proposal
 7. `future-concepts.md` - lower-confidence or less narrowed ideas
 
@@ -72,9 +73,9 @@ keeps the Python-led and local-first parts, but broadens the foundation from a
 dataset catalog to a measurement record system:
 
 - data library instead of user-facing workspace
-- optional active sample and session identity before experiment history gets
+- optional active sample and session identity before measurement history gets
   fragmented
-- experiment runs as the default measurement work record
+- measurements as the default data-taking work record
 - artifacts as outputs, with datasets as the primary table-shaped case
 - parameter and code history as first-class provenance
 - analysis, simulation, import, and calibration as activity records that
