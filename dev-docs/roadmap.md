@@ -139,6 +139,13 @@ measurements and use Fricon instead to:
   not yet known
 - see newly produced datasets in the desktop UI without manual file handling
 - inspect recent and historical datasets through table and chart views
+- install and launch the desktop GUI, CLI, Python SDK, and local service as a
+  coherent Fricon release rather than assembling mismatched components manually
+- update Fricon with clear compatibility checks for the data library and
+  local-service protocol
+- keep the core v0.x Python SDK measurement-write and dataset-read path working
+  across later v0.x desktop or local-service updates, with newer features
+  negotiated explicitly
 - use explicit dataset semantics for column metadata, scan axes, chart defaults,
   and live-view interpretation instead of relying on row-order heuristics
 - create a minimal interactive measurement record that groups produced datasets
@@ -161,6 +168,8 @@ v0.2 replacement does not require:
 - a generic managed runner, queue, resource lease system, or workflow engine
 - a full parameter registry or device driver framework
 - automatic Git, `uv`, or `pixi` environment management
+- a long-term third-party client protocol stability promise
+- a complex auto-update system before the first replacement workflow is proven
 
 ## Primary User Mental Model
 
@@ -197,6 +206,7 @@ Likely v0.3 candidates:
 - attach/correct context UX polish
 - comparison and saved-view workflows
 - portable export viewer polish
+- smoother installer/update polish after the v0.2 release shape is proven
 - passive code/environment summary improvements
 - better lifecycle/favorite filtering
 
@@ -462,7 +472,9 @@ be rediscovered or relitigated later. Good ADR candidates include:
 
 - workspace and storage format compatibility
 - dataset semantic model commitments
-- IPC or gRPC compatibility policy
+- distribution surfaces, installer/update policy, and release compatibility
+- IPC or gRPC compatibility policy, including the core v0.x Python SDK
+  compatibility promise for locked lab environments
 - Python API contract decisions
 - desktop/runtime architecture decisions
 - measurement, parameter, or device model foundations

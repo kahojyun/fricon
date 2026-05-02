@@ -12,6 +12,13 @@ The project should help researchers record, organize, inspect, and eventually
 execute scientific measurement workflows on their own computers without requiring
 them to operate a multi-user service or a complex lab information system.
 
+Installation, launch, and update workflows are part of that product promise.
+Researchers should not need to manually reason about mismatched desktop, CLI,
+Python SDK, and local-service versions before they can record data.
+Lab scripts and notebooks may be pinned by `uv.lock`, virtual environments, or
+shared lab setup, so the Python SDK cannot be assumed to update in lockstep
+with the desktop app or local service.
+
 ## Target Users
 
 The primary target users are researchers who have entry-level Python data
@@ -116,6 +123,15 @@ Fricon is local-first. The main supported runtime model is:
 
 A remote client may be considered in the future, but it should build on the
 local-first model rather than forcing the project into a hosted service shape.
+
+Distribution shape and client/server compatibility have technical
+implementation details, but their user impact belongs in product planning.
+v0.2 should define the supported compatibility envelope for the desktop GUI,
+CLI, Python SDK, local service, and data-library format. Once v0.2 lands, the
+core v0.x Python SDK path for measurement writes and dataset reads should
+remain compatible with later v0.x local services. Newer capabilities should be
+feature-negotiated, and incompatible clients should fail clearly before writes
+when they cannot safely work with the running service or data library.
 
 ## Non-Goals
 

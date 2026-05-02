@@ -692,6 +692,17 @@ The desktop GUI may be implemented as a web application packaged with Tauri.
 Feature code should avoid unnecessary Tauri-only assumptions so the same UI can
 support remote monitoring or browser access later.
 
+Installation and update are product-visible v0.2 concerns. Users should get one
+coherent Fricon release shape for the desktop GUI, CLI, Python SDK, and local
+service, with clear compatibility checks before any client mutates a data
+library.
+
+The exact protocol can remain a technical ADR, but v0.2 should not leave
+client/server mismatch behavior undefined. Because Python measurement code may
+be pinned by virtual environments or lockfiles, v0.2 should make the core v0.x
+Python SDK measurement-write and dataset-read path compatible with later v0.x
+local services. Newer features should use explicit capability negotiation.
+
 ## Remote And Auth Boundary
 
 Remote access should be planned early, but v0.2 should not become a multi-user
@@ -761,6 +772,7 @@ conflict with the v0.2 model.
 Create ADRs before committing durable storage, API, or IPC contracts for:
 
 - data library versus workspace public model
+- supported distribution surfaces and install/update policy
 - sample and sample-session identity
 - active sample/session context and attach-later correction policy
 - general Artifact versus DatasetArtifact boundary
@@ -769,6 +781,8 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - measurement-scoped dataset writer lifecycle
 - minimal device adapter/capability boundary for future LabRAD replacement
 - actor/auth boundary for local and remote access
+- client/server protocol compatibility, version negotiation, and core v0.x
+  Python SDK compatibility policy
 - optional managed measurement desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - desktop web architecture and remote UI access

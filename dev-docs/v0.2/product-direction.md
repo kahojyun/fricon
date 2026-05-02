@@ -251,6 +251,46 @@ This is likely as important as generic dataset browsing for many labs.
 
 ## v0.2 Must-Have User Stories
 
+### Install And Launch Fricon
+
+As an experimentalist, I want one clear way to install and launch Fricon on a
+lab computer so that I can open the desktop UI, run the CLI, and use the Python
+SDK without assembling incompatible pieces by hand.
+
+Acceptance notes:
+
+- the supported v0.2 distribution shape is documented as desktop GUI, `fricon`
+  CLI, Python SDK, and local service
+- first-run setup creates or opens the default data library without requiring
+  users to understand server internals
+- notebook and script examples show how to connect to the same local data
+  library used by the desktop UI
+- users get a clear diagnostic when the local service is not running or cannot
+  open the data library
+
+### Update Without Breaking Measurement Work
+
+As an experimentalist, I want Fricon updates to detect incompatible desktop,
+CLI, Python SDK, local-service, or data-library versions so that a routine
+update does not silently corrupt my measurement history.
+
+Acceptance notes:
+
+- the desktop app and local service may update together, but Python SDKs in
+  lab scripts and notebooks often update more slowly because they are pinned by
+  virtual environments or lockfiles
+- after v0.2 lands, the core v0.x Python SDK path for measurement writes and
+  dataset reads should remain compatible with later v0.x local services
+- newer capabilities are feature-negotiated rather than required by old scripts
+- clients and the service negotiate protocol, API capability, and data-library
+  format compatibility before writes
+- incompatible clients fail with a clear message and recovery path rather than
+  partially writing data
+- data-library format upgrades require an explicit compatibility or migration
+  decision before implementation
+- long-term third-party protocol stability and polished auto-update UX are
+  follow-up topics, not v0.2 replacement requirements
+
 ### Create A Local Data Library
 
 As an experimentalist, I want one Fricon data library so that data, sample

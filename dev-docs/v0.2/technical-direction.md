@@ -79,6 +79,67 @@ analysis notebooks. The desktop GUI is the primary browsing, inspection,
 sample, and calibration-monitoring surface. The CLI should handle setup,
 library management, import/export, diagnostics, and service control.
 
+## Installation And Update Experience
+
+Installation and update are user-facing v0.2 concerns, even though their
+implementation details are technical.
+
+The product-level requirement is:
+
+```text
+Fricon distribution
+  -> desktop GUI and local service can update together
+  -> fricon CLI follows the installed service contract
+  -> Python SDK may be pinned in lab environments
+  -> data-library format upgrades are explicit
+```
+
+Users should be able to install Fricon, create or open a data library, launch
+the desktop UI, and connect from Python without understanding service internals.
+
+The technical policy should account for different update cadences:
+
+- document the supported desktop GUI, CLI, Python SDK, local-service, and
+  data-library compatibility envelope
+- keep the core v0.x Python SDK measurement-write and dataset-read APIs
+  compatible with later v0.x local services after v0.2 lands
+- gate newer APIs behind explicit capability negotiation so old pinned scripts
+  can continue to run without seeing partially supported behavior
+- let newer clients discover older services and fail clearly when a required
+  capability is missing
+- perform startup compatibility checks before mutating a data library
+- show clear recovery guidance when a client, service, or data library is
+  incompatible
+- defer polished auto-update UX until the replacement workflow is proven
+
+Do not promise long-term third-party protocol stability in v0.2. Do define the
+internal Fricon client/service compatibility contract early enough that locked
+Python measurement environments are not broken by ordinary desktop or service
+updates within v0.x.
+
+## Client/Server Compatibility Boundary
+
+The local service protocol is a technical contract, but the compatibility
+experience is product-visible.
+
+v0.2 should decide:
+
+- how clients discover the running local service
+- how the desktop GUI, CLI, and Python SDK report their client protocol version
+- how the service reports its protocol and data-library format version
+- how capability negotiation distinguishes read, write, measurement creation,
+  export, and migration operations
+- the core v0.x compatibility promise for older Python SDKs used by locked lab
+  scripts and notebooks
+- which operations are read-only-safe during a compatibility mismatch
+- how migration or upgrade prompts are surfaced
+
+The exact IPC, HTTP, websocket, or gRPC shape should be an ADR before durable
+implementation. The important behavior is that v0.2-era Python SDKs keep
+working for ordinary measurement recording and dataset reads against later v0.x
+services, while incompatible clients fail before writes and tell the user what
+to update.
+
 ## Desktop GUI And Web UI
 
 Build the UI as a web application that can be packaged as desktop.
@@ -388,12 +449,15 @@ collection.
 Likely ADRs:
 
 - v0.2 product and data-library repositioning
+- supported distribution surfaces and install/update policy
 - data library versus workspace public model
 - sample and sample-session identity
 - active sample/session context and attach-later correction policy
 - general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
 - authentication/actor boundary for local and remote access
+- client/server protocol compatibility, version negotiation, and core v0.x
+  Python SDK compatibility policy
 - public naming policy for Measurement versus Experiment
 - Python SDK surface and measurement-scoped dataset writer lifecycle
 - minimal device adapter and capability boundary for future LabRAD replacement

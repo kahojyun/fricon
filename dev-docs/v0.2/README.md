@@ -133,6 +133,9 @@ to rewrite every line of code. v0.2 may intentionally break:
   object
 - archive, import, and export formats that cannot carry data-library,
   measurement, sample/session, and provenance context
+- distribution and client/server compatibility assumptions that make the
+  desktop GUI, CLI, Python SDK, or local service drift without an explicit
+  compatibility envelope
 - metadata ownership rules that put measurement, sample, parameter, or code
   meaning inside dataset-local metadata
 
