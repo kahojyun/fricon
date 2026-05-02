@@ -34,20 +34,7 @@ pub(super) fn resolve_xy_trace_roles(
     options: &XYTraceRoleOptions,
     draw_style: XYDrawStyle,
 ) -> Result<XYTraceRoles> {
-    let Some(index_columns) = index_columns else {
-        if options.sweep_index_column.is_some()
-            || options
-                .trace_group_index_columns
-                .as_ref()
-                .is_some_and(|columns| !columns.is_empty())
-        {
-            bail!("Trace roles require dataset index columns");
-        }
-        return Ok(XYTraceRoles {
-            trace_group: vec![],
-            sweep: None,
-        });
-    };
+    let index_columns = index_columns.unwrap_or(&[]);
 
     let trace_group = resolve_named_index_columns(
         schema,
@@ -415,6 +402,27 @@ mod tests {
 
         assert_eq!(roles.trace_group, vec![0]);
         assert_eq!(roles.sweep, Some(2));
+    }
+
+    #[test]
+    fn resolve_xy_trace_roles_allows_categorical_logical_group_without_numeric_indices() {
+        let schema = DatasetSchema::new(IndexMap::from([(
+            "logicalIndex:gate".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Complex),
+        )]));
+        let roles = resolve_xy_trace_roles(
+            &schema,
+            None,
+            &XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["logicalIndex:gate".to_string()]),
+                sweep_index_column: None,
+            },
+            XYDrawStyle::Line,
+        )
+        .unwrap();
+
+        assert_eq!(roles.trace_group, vec![0]);
+        assert_eq!(roles.sweep, None);
     }
 
     #[test]

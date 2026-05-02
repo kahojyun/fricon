@@ -48,10 +48,14 @@ pub(crate) fn logical_index_id(name: &str) -> String {
 }
 
 pub(crate) fn resolve_column_name(value: &str) -> String {
-    value
-        .strip_prefix(COLUMN_PREFIX)
-        .unwrap_or(value)
-        .to_string()
+    let Some(column_name) = value.strip_prefix(COLUMN_PREFIX) else {
+        return value.to_string();
+    };
+    if column_name.starts_with(LOGICAL_INDEX_PREFIX) || column_name.starts_with(COLUMN_PREFIX) {
+        value.to_string()
+    } else {
+        column_name.to_string()
+    }
 }
 
 pub(crate) fn resolve_axis_column_name(value: &str) -> String {
@@ -60,6 +64,13 @@ pub(crate) fn resolve_axis_column_name(value: &str) -> String {
     } else {
         resolve_column_name(value)
     }
+}
+
+fn resolve_source_column_name(value: &str) -> String {
+    value
+        .strip_prefix(COLUMN_PREFIX)
+        .unwrap_or(value)
+        .to_string()
 }
 
 pub(crate) async fn prepare_chart_data(
@@ -72,6 +83,7 @@ pub(crate) async fn prepare_chart_data(
     let dataset = session.dataset(id).await?;
     let interpretation = dataset.interpret()?;
     let source_schema = dataset.schema()?.clone();
+    let alias_physical_columns = !interpretation.scan_axes.is_empty();
     let (start, end) = resolve_row_range(&dataset, common.start, common.end);
     let selected_physical_columns =
         selected_physical_columns(&source_schema, selected_columns, filters)?;
@@ -83,9 +95,10 @@ pub(crate) async fn prepare_chart_data(
     })?;
     let batch = concat_or_empty(output_schema, batches)?;
     let selected_schema = selected_physical_columns.as_deref().map_or_else(
-        || Ok(source_schema.clone()),
-        |columns| project_schema(&source_schema, columns),
+        || project_all_schema(&source_schema, alias_physical_columns),
+        |columns| project_schema(&source_schema, columns, alias_physical_columns),
     )?;
+    let batch = rename_batch(batch, &selected_schema)?;
     prepare_batch_from_reader(
         &dataset,
         &selected_schema,
@@ -121,7 +134,7 @@ pub(crate) async fn load_axis_rows(
         })?;
         concat_or_empty(output_schema, batches)?
     };
-    let selected_schema = project_schema(&source_schema, &selected_columns)?;
+    let selected_schema = project_schema(&source_schema, &selected_columns, false)?;
     let prepared = prepare_batch_from_reader(
         &dataset,
         &selected_schema,
@@ -254,7 +267,7 @@ fn selected_physical_columns(
         }
     }
     for (field, _) in filters {
-        let column_name = resolve_axis_column_name(field);
+        let column_name = resolve_source_column_name(field);
         if let Some((index, _, _)) = source_schema.columns().get_full(&column_name) {
             push_unique(&mut physical_columns, index);
         }
@@ -276,16 +289,44 @@ fn push_unique(columns: &mut Vec<usize>, index: usize) {
     }
 }
 
-fn project_schema(source_schema: &DatasetSchema, columns: &[usize]) -> Result<DatasetSchema> {
+fn project_all_schema(
+    source_schema: &DatasetSchema,
+    alias_physical: bool,
+) -> Result<DatasetSchema> {
+    let columns = (0..source_schema.columns().len()).collect::<Vec<_>>();
+    project_schema(source_schema, &columns, alias_physical)
+}
+
+fn project_schema(
+    source_schema: &DatasetSchema,
+    columns: &[usize],
+    alias_physical: bool,
+) -> Result<DatasetSchema> {
     let mut projected = IndexMap::new();
     for &index in columns {
         let (name, dtype) = source_schema
             .columns()
             .get_index(index)
             .with_context(|| format!("Selected dataset column index out of bounds: {index}"))?;
-        projected.insert(name.clone(), *dtype);
+        projected.insert(alias_physical_column_name(name, alias_physical), *dtype);
     }
     Ok(DatasetSchema::new(projected))
+}
+
+fn alias_physical_column_name(name: &str, alias_physical: bool) -> String {
+    if alias_physical && (name.starts_with(LOGICAL_INDEX_PREFIX) || name.starts_with(COLUMN_PREFIX))
+    {
+        column_id(name)
+    } else {
+        name.to_string()
+    }
+}
+
+fn rename_batch(batch: RecordBatch, schema: &DatasetSchema) -> Result<RecordBatch> {
+    Ok(RecordBatch::try_new(
+        Arc::new(schema.to_arrow_schema()),
+        batch.columns().to_vec(),
+    )?)
 }
 
 fn map_full_index_columns(
@@ -714,6 +755,30 @@ mod tests {
         .expect("selected columns");
 
         assert_eq!(selected, Some(vec![0, 1]));
+    }
+
+    #[test]
+    fn prefixed_physical_columns_keep_column_namespace() {
+        assert_eq!(
+            resolve_column_name("column:logicalIndex:gate"),
+            "column:logicalIndex:gate"
+        );
+        assert_eq!(
+            resolve_axis_column_name("column:logicalIndex:gate"),
+            "column:logicalIndex:gate"
+        );
+        assert_eq!(
+            resolve_source_column_name("column:logicalIndex:gate"),
+            "logicalIndex:gate"
+        );
+
+        let source_schema = DatasetSchema::new(IndexMap::from([(
+            "logicalIndex:gate".to_string(),
+            DatasetDataType::Scalar(ScalarKind::Numeric),
+        )]));
+        let projected = project_schema(&source_schema, &[0], true).expect("project schema");
+
+        assert!(projected.columns().contains_key("column:logicalIndex:gate"));
     }
 
     #[test]
