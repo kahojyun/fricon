@@ -21,6 +21,7 @@ vi.mock("@tanstack/react-virtual", () => ({
 function makeData(): FilterTableData {
   return {
     fields: ["A", "B"],
+    fieldLabels: {},
     rows: [
       { index: 1, displayValues: ["A1", "B1"], valueIndices: [1, 1] },
       { index: 2, displayValues: ["A2", "B2"], valueIndices: [2, 2] },

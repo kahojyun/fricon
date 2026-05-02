@@ -8,6 +8,7 @@ import {
 
 const data: FilterTableData = {
   fields: ["A", "B"],
+  fieldLabels: {},
   rows: [
     { index: 1, displayValues: ["A1", "B1"], valueIndices: [1, 1] },
     { index: 2, displayValues: ["A2", "B1"], valueIndices: [2, 1] },

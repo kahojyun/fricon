@@ -24,21 +24,58 @@ export type {
 
 export interface ColumnInfo {
   name: string;
+  label?: string | null;
   isComplex: boolean;
   isTrace: boolean;
   isIndex: boolean;
+  hiddenByDefault?: boolean;
+  isChartAxisCandidate?: boolean;
+}
+
+export type ChartSemanticAxisKind = "logical_index" | "column";
+
+export interface ChartSemanticColumn {
+  id: string;
+  name: string;
+  label: string | null;
+  isComplex: boolean;
+  isTrace: boolean;
+  hiddenByDefault: boolean;
+}
+
+export interface ChartSemanticAxis {
+  id: string;
+  name: string;
+  label: string | null;
+  kind: ChartSemanticAxisKind;
+  numeric: boolean;
+  isCompatibility: boolean;
+  physicalColumn: string | null;
+}
+
+export interface ChartSemantics {
+  source: "manifest" | "compatibility_inference";
+  duplicatePolicy:
+    | "latest_by_record_id"
+    | "compatibility_row_order_placeholder";
+  indexRealization: "none" | "implicit" | "sidecar";
+  axes: ChartSemanticAxis[];
+  valueColumns: ChartSemanticColumn[];
+  chartAxisCandidates: ChartSemanticAxis[];
 }
 
 export interface DatasetDetail {
   status: DatasetStatus;
   payloadAvailable: boolean;
   columns: ColumnInfo[];
+  chartSemantics?: ChartSemantics | null;
 }
 
 export type ChartViewerAvailability = "loading" | "available" | "tombstone";
 
 export interface FilterTableData {
   fields: string[];
+  fieldLabels: Record<string, string>;
   rows: FilterTableRow[];
   columnUniqueValues: Record<string, ColumnUniqueValue[]>;
 }
@@ -198,6 +235,7 @@ export function normalizeFilterTableData(
   );
   return {
     fields: result.fields,
+    fieldLabels: result.fieldLabels ?? {},
     rows: result.rows,
     columnUniqueValues,
   };
