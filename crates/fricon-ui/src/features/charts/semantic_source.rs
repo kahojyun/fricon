@@ -234,8 +234,7 @@ fn prepare_batch_from_reader(
 
 fn fallback_to_inferred_index_columns(interpretation: &DatasetInterpretation) -> bool {
     interpretation.source == InterpretationSource::CompatibilityInference
-        || (interpretation.scan_axes.is_empty()
-            && interpretation.chart_axis_candidate_columns.is_empty())
+        || interpretation.scan_axes.is_empty()
 }
 
 fn axis_row_selected_columns(
@@ -802,6 +801,22 @@ mod tests {
 
         assert!(projected.contains_key(&0));
         assert!(projected.contains_key(&1));
+    }
+
+    #[test]
+    fn manifest_without_scan_axes_still_uses_inferred_index_fallback() {
+        let interpretation = DatasetInterpretation {
+            columns: Vec::new(),
+            value_columns: Vec::new(),
+            logical_index_columns: Vec::new(),
+            chart_axis_candidate_columns: vec![fricon::VisibleColumnOrdinal(0)],
+            duplicate_policy: ResolvedDuplicatePolicy::LatestByRecordId,
+            index_realization: fricon::ResolvedIndexRealization::None,
+            scan_axes: Vec::new(),
+            source: InterpretationSource::Manifest,
+        };
+
+        assert!(fallback_to_inferred_index_columns(&interpretation));
     }
 
     #[test]
