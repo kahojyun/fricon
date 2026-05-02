@@ -40,6 +40,7 @@ export interface ChartViewerSelectionState {
 export interface ChartColumnOption extends ColumnInfo {
   label: string | null;
   hiddenByDefault: boolean;
+  numeric: boolean;
 }
 
 export function columnOptionLabel(option: Pick<ChartColumnOption, "label" | "name">) {
@@ -61,6 +62,7 @@ function semanticValueOptions(
         ...column,
         label: column.label ?? null,
         hiddenByDefault: column.hiddenByDefault ?? false,
+        numeric: true,
       }));
   }
 
@@ -71,6 +73,7 @@ function semanticValueOptions(
     isTrace: column.isTrace,
     isIndex: false,
     hiddenByDefault: column.hiddenByDefault,
+    numeric: false,
   }));
   const visibleValues = values.filter((column) => !column.hiddenByDefault);
   const hiddenValues = values.filter((column) => column.hiddenByDefault);
@@ -90,6 +93,7 @@ function semanticAxisOptions(
         ...column,
         label: column.label ?? null,
         hiddenByDefault: column.hiddenByDefault ?? false,
+        numeric: true,
       }));
   }
 
@@ -104,7 +108,6 @@ function semanticAxisOptions(
     ...chartSemantics.axes,
   ];
   return orderedAxes
-    .filter((axis) => axis.numeric)
     .filter((axis) => {
       if (seen.has(axis.id)) return false;
       seen.add(axis.id);
@@ -118,6 +121,7 @@ function semanticAxisOptions(
       isIndex: true,
       hiddenByDefault: false,
       isChartAxisCandidate: axis.kind === "column" && !axis.isCompatibility,
+      numeric: axis.numeric,
     }));
 }
 
@@ -158,9 +162,13 @@ export function deriveChartViewerState(
   chartSemantics?: ChartSemantics | null,
 ) {
   const indexColumns = semanticAxisOptions(columns, chartSemantics);
+  const plottedIndexColumns = indexColumns.filter((column) => column.numeric);
   const roleIndexColumns = chartSemantics
     ? indexColumns.filter((column) => !column.isChartAxisCandidate)
     : indexColumns;
+  const sweepRoleIndexColumns = roleIndexColumns.filter(
+    (column) => column.numeric,
+  );
   const valueColumns = semanticValueOptions(columns, chartSemantics);
   const allColumns = [...valueColumns, ...indexColumns];
   const sweepQuantityOptions = valueColumns;
@@ -178,7 +186,7 @@ export function deriveChartViewerState(
   const availableViews = (() => {
     const views: ChartView[] = [];
     if (valueColumns.length > 0) views.push("xy");
-    if (valueColumns.length > 0 && indexColumns.length > 0)
+    if (valueColumns.length > 0 && plottedIndexColumns.length > 0)
       views.push("heatmap");
     return views;
   })();
@@ -252,8 +260,8 @@ export function deriveChartViewerState(
   );
   const xyYColumn = allColumns.find((column) => column.name === effectiveXYYName);
 
-  const heatmapXOptions = indexColumns;
-  const heatmapYOptions = indexColumns;
+  const heatmapXOptions = plottedIndexColumns;
+  const heatmapYOptions = plottedIndexColumns;
   const effectiveHeatmapXName = pickSelection(
     heatmapXOptions,
     state.heatmapXName,
@@ -294,11 +302,13 @@ export function deriveChartViewerState(
     activeXYSource !== undefined &&
     roleIndexColumns.length > 0;
   const liveMonitorSweepIndexColumnName = liveMonitorUsesForcedRoles
-    ? (roleIndexColumns[roleIndexColumns.length - 1]?.name ?? null)
+    ? (sweepRoleIndexColumns[sweepRoleIndexColumns.length - 1]?.name ?? null)
     : null;
   const liveMonitorTraceGroupIndexColumnNames =
     liveMonitorUsesForcedRoles && roleIndexColumns.length > 1
-      ? roleIndexColumns.slice(0, -1).map((column) => column.name)
+      ? roleIndexColumns
+          .filter((column) => column.name !== liveMonitorSweepIndexColumnName)
+          .map((column) => column.name)
       : [];
 
   const xyRoleControlsVisible =
@@ -308,7 +318,7 @@ export function deriveChartViewerState(
     activeXYSource !== undefined;
 
   const sweepAxisOptions = xyRoleControlsVisible
-    ? roleIndexColumns.filter(
+    ? sweepRoleIndexColumns.filter(
         (column) => !state.traceGroupIndexColumnNames.includes(column.name),
       )
     : [];

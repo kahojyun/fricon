@@ -36,6 +36,7 @@ pub(crate) struct PreparedChartData {
     pub(crate) batch: RecordBatch,
     pub(crate) schema: DatasetSchema,
     pub(crate) index_columns: Option<Vec<usize>>,
+    pub(crate) row_indices: Vec<usize>,
 }
 
 pub(crate) fn column_id(name: &str) -> String {
@@ -152,14 +153,13 @@ pub(crate) async fn load_axis_rows(
     Ok((fields, rows))
 }
 
-pub(crate) fn apply_semantic_filters(
-    batch: RecordBatch,
+fn semantic_filter_mask(
+    batch: &RecordBatch,
     filters: &[(String, serde_json::Value)],
-) -> Result<RecordBatch> {
+) -> Result<Option<Vec<bool>>> {
     if filters.is_empty() || batch.num_rows() == 0 {
-        return Ok(batch);
+        return Ok(None);
     }
-
     let mut mask = Vec::with_capacity(batch.num_rows());
     for row in 0..batch.num_rows() {
         let mut keep = true;
@@ -175,7 +175,7 @@ pub(crate) fn apply_semantic_filters(
         }
         mask.push(keep);
     }
-    filter_batch(&batch, &mask)
+    Ok(Some(mask))
 }
 
 fn prepare_batch_from_reader(
@@ -188,8 +188,20 @@ fn prepare_batch_from_reader(
     filters: &[(String, serde_json::Value)],
 ) -> Result<PreparedChartData> {
     let mut schema = source_schema.clone();
-    let mut batch = append_logical_axes(dataset, interpretation, &mut schema, batch, start, end)?;
-    batch = apply_semantic_filters(batch, filters)?;
+    let mut row_indices = (start..end).collect::<Vec<_>>();
+    let mut batch = append_logical_axes(
+        dataset,
+        interpretation,
+        &mut schema,
+        batch,
+        &mut row_indices,
+        start,
+        end,
+    )?;
+    if let Some(mask) = semantic_filter_mask(&batch, filters)? {
+        batch = filter_batch(&batch, &mask)?;
+        row_indices = filter_row_indices(&row_indices, &mask);
+    }
     let index_columns = resolve_index_columns(interpretation, &schema).or_else(|| {
         fallback_to_inferred_index_columns(interpretation)
             .then(|| {
@@ -203,6 +215,7 @@ fn prepare_batch_from_reader(
         batch,
         schema,
         index_columns,
+        row_indices,
     })
 }
 
@@ -297,6 +310,7 @@ fn append_logical_axes(
     interpretation: &DatasetInterpretation,
     schema: &mut DatasetSchema,
     batch: RecordBatch,
+    row_indices: &mut Vec<usize>,
     start: usize,
     end: usize,
 ) -> Result<RecordBatch> {
@@ -307,6 +321,9 @@ fn append_logical_axes(
     let record_ids = dataset.record_ids_range((Bound::Included(start), Bound::Excluded(end)))?;
     if record_ids.len() != batch.num_rows() {
         bail!("Logical index rows do not match selected chart rows");
+    }
+    if row_indices.len() != batch.num_rows() {
+        bail!("Logical row indices do not match selected chart rows");
     }
     let point_by_record_id = logical_points_by_record_id(
         dataset.logical_index_points_for_record_ids(&record_ids)?,
@@ -327,42 +344,41 @@ fn append_logical_axes(
         .zip(&keep_mask)
         .filter_map(|(record_id, keep)| (*keep).then_some(record_id))
         .collect::<Vec<_>>();
+    *row_indices = filter_row_indices(row_indices, &keep_mask);
     let mut batch = filter_batch(&batch, &keep_mask)?;
 
     let mut fields = batch.schema().fields().iter().cloned().collect::<Vec<_>>();
     let mut arrays = batch.columns().to_vec();
     let mut columns = schema.columns().clone();
-    for (axis_index, axis) in interpretation
-        .scan_axes
-        .iter()
-        .enumerate()
-        .filter(|(_, axis)| scan_axis_is_numeric(&axis.mode))
-    {
+    for (axis_index, axis) in interpretation.scan_axes.iter().enumerate() {
         let id = logical_index_id(&axis.name);
         let values = logical_axis_values(&kept_record_ids, &point_by_record_id, axis_index);
-        fields.push(Arc::new(Field::new(&id, DataType::Float64, true)));
-        arrays.push(numeric_axis_array(&values));
-        columns.insert(id, DatasetDataType::Scalar(ScalarKind::Numeric));
+        if scan_axis_is_numeric(&axis.mode) {
+            fields.push(Arc::new(Field::new(&id, DataType::Float64, true)));
+            arrays.push(numeric_axis_array(&values));
+            columns.insert(id, DatasetDataType::Scalar(ScalarKind::Numeric));
+        } else {
+            fields.push(Arc::new(Field::new(
+                &id,
+                logical_axis_data_type(&axis.mode),
+                true,
+            )));
+            arrays.push(logical_axis_array(&axis.mode, &values));
+            columns.insert(id, DatasetDataType::Scalar(ScalarKind::Complex));
+        }
     }
-
     *schema = DatasetSchema::new(columns);
-    for (axis_index, axis) in interpretation
-        .scan_axes
-        .iter()
-        .enumerate()
-        .filter(|(_, axis)| !scan_axis_is_numeric(&axis.mode))
-    {
-        let id = logical_index_id(&axis.name);
-        let values = logical_axis_values(&kept_record_ids, &point_by_record_id, axis_index);
-        fields.push(Arc::new(Field::new(
-            &id,
-            logical_axis_data_type(&axis.mode),
-            true,
-        )));
-        arrays.push(logical_axis_array(&axis.mode, &values));
-    }
     batch = RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays)?;
     Ok(batch)
+}
+
+fn filter_row_indices(row_indices: &[usize], mask: &[bool]) -> Vec<usize> {
+    row_indices
+        .iter()
+        .copied()
+        .zip(mask)
+        .filter_map(|(row, keep)| (*keep).then_some(row))
+        .collect()
 }
 
 fn axis_fields(interpretation: &DatasetInterpretation, batch: &RecordBatch) -> Vec<AxisField> {

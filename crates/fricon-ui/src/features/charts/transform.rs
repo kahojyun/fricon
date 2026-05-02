@@ -5,7 +5,8 @@ pub(crate) mod mapping;
 pub(crate) mod xy;
 
 use anyhow::{Context, Result, bail};
-use arrow_array::RecordBatch;
+use arrow_array::{Array, BooleanArray, Float64Array, RecordBatch, StringArray};
+use arrow_schema::DataType;
 use fricon::{DatasetArray, DatasetSchema};
 
 pub(crate) use self::{
@@ -94,26 +95,20 @@ pub(super) fn compute_group_starts(
     }
 
     let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
-    let group_values: Vec<Vec<f64>> = group_columns
+    let group_values: Vec<Vec<String>> = group_columns
         .iter()
         .map(|&idx| {
             let arr = batch
                 .column_by_name(column_names[idx])
                 .expect("group column present");
-            let ds: DatasetArray = arr.clone().try_into().expect("valid group column");
-            ds.as_numeric()
-                .expect("numeric group column")
-                .values()
-                .to_vec()
+            (0..num_rows)
+                .map(|row| group_value_at(arr.as_ref(), row))
+                .collect()
         })
         .collect();
 
     let mut group_starts = vec![0];
     for row in 1..num_rows {
-        #[expect(
-            clippy::float_cmp,
-            reason = "Index values are stored, not computed; exact comparison is correct"
-        )]
         if group_values.iter().any(|col| col[row] != col[row - 1]) {
             group_starts.push(row);
         }
@@ -194,9 +189,7 @@ pub(super) fn make_group_label(
         .map(|&idx| {
             let name = column_names[idx];
             let arr = batch.column_by_name(name).expect("group column present");
-            let ds: DatasetArray = arr.clone().try_into().expect("valid group column");
-            let value = ds.as_numeric().expect("numeric group column").values()[row];
-            format!("{name}={}", format_numeric_value(value))
+            format!("{name}={}", group_value_at(arr.as_ref(), row))
         })
         .collect::<Vec<_>>();
 
@@ -231,18 +224,28 @@ fn resolve_named_index_columns(
 ) -> Result<Vec<usize>> {
     let mut resolved = Vec::new();
     for name in names {
-        let index = resolve_named_index_column(schema, index_columns, name)?;
+        let index = resolve_named_group_column(schema, index_columns, name)?;
         if !resolved.contains(&index) {
             resolved.push(index);
         }
     }
-    resolved.sort_by_key(|index| {
-        index_columns
-            .iter()
-            .position(|candidate| candidate == index)
-            .expect("resolved index is present in index_columns")
-    });
+    resolved.sort_unstable();
     Ok(resolved)
+}
+
+fn resolve_named_group_column(
+    schema: &DatasetSchema,
+    index_columns: &[usize],
+    name: &str,
+) -> Result<usize> {
+    let (idx, _, _) = schema
+        .columns()
+        .get_full(name)
+        .with_context(|| format!("Column '{name}' not found"))?;
+    if index_columns.contains(&idx) || name.starts_with("logicalIndex:") {
+        return Ok(idx);
+    }
+    bail!("Column '{name}' is not an index column");
 }
 
 fn resolve_named_index_column(
@@ -258,6 +261,36 @@ fn resolve_named_index_column(
         bail!("Column '{name}' is not an index column");
     }
     Ok(idx)
+}
+
+fn group_value_at(array: &dyn Array, row: usize) -> String {
+    if array.is_null(row) {
+        return "null".to_string();
+    }
+    match array.data_type() {
+        DataType::Float64 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .expect("Float64 group column");
+            format_numeric_value(array.value(row))
+        }
+        DataType::Boolean => {
+            let array = array
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .expect("Boolean group column");
+            array.value(row).to_string()
+        }
+        DataType::Utf8 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("Utf8 group column");
+            array.value(row).to_string()
+        }
+        other => panic!("unsupported group column data type: {other}"),
+    }
 }
 
 #[cfg(test)]
@@ -294,6 +327,13 @@ pub(super) mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use arrow_array::{Float64Array, RecordBatch, StringArray};
+    use arrow_schema::{DataType, Field, Schema};
+    use fricon::{DatasetDataType, DatasetSchema, ScalarKind};
+    use indexmap::IndexMap;
+
     use super::{
         compute_group_starts, group_ranges, last_outer_group_start, resolve_xy_trace_roles,
         test_utils::{numeric_batch, numeric_schema},
@@ -320,6 +360,33 @@ mod tests {
         let batch = numeric_batch(&[("idx", &[1.0, 2.0, 3.0])]);
         let schema = numeric_schema(&["idx"]);
         assert_eq!(compute_group_starts(&batch, &schema, &[]), vec![0]);
+    }
+
+    #[test]
+    fn compute_group_starts_supports_string_logical_axes() {
+        let batch = RecordBatch::try_new(
+            Arc::new(Schema::new(vec![
+                Field::new("logicalIndex:gate", DataType::Utf8, false),
+                Field::new("sweep", DataType::Float64, false),
+            ])),
+            vec![
+                Arc::new(StringArray::from(vec!["low", "low", "high", "high"])),
+                Arc::new(Float64Array::from(vec![0.0, 1.0, 0.0, 1.0])),
+            ],
+        )
+        .unwrap();
+        let schema = DatasetSchema::new(IndexMap::from([
+            (
+                "logicalIndex:gate".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Complex),
+            ),
+            (
+                "sweep".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+        ]));
+
+        assert_eq!(compute_group_starts(&batch, &schema, &[0]), vec![0, 2]);
     }
 
     #[test]

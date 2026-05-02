@@ -28,12 +28,12 @@ fn recent_group_starts_in_scan_batch(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     grouping_index_columns: &[usize],
-    scan_start: usize,
+    row_indices: &[usize],
     range_start: usize,
 ) -> Vec<usize> {
     compute_group_starts(batch, schema, grouping_index_columns)
         .into_iter()
-        .map(|offset| scan_start + offset)
+        .filter_map(|offset| row_indices.get(offset).copied())
         .filter(|&row| row >= range_start)
         .collect()
 }
@@ -42,7 +42,7 @@ fn resolve_group_tail_start_in_scan_batch(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     grouping_index_columns: &[usize],
-    scan_start: usize,
+    row_indices: &[usize],
     range_start: usize,
     required_groups: usize,
 ) -> Option<usize> {
@@ -50,7 +50,7 @@ fn resolve_group_tail_start_in_scan_batch(
         batch,
         schema,
         grouping_index_columns,
-        scan_start,
+        row_indices,
         range_start,
     );
     (starts.len() >= required_groups).then(|| starts[starts.len() - required_groups])
@@ -104,7 +104,7 @@ async fn resolve_group_tail_start(
             &prepared.batch,
             &prepared.schema,
             &projected_grouping_index_columns,
-            scan_start,
+            &prepared.row_indices,
             range_start,
             required_groups,
         ) {
@@ -636,11 +636,12 @@ mod tests {
             ("freq", &[10.0, 20.0, 10.0, 20.0, 10.0, 20.0]),
         ]);
         let schema = numeric_schema(&["sweep", "freq"]);
+        let row_indices = (4..10).collect::<Vec<_>>();
 
-        let starts = recent_group_starts_in_scan_batch(&batch, &schema, &[0], 4, 5);
+        let starts = recent_group_starts_in_scan_batch(&batch, &schema, &[0], &row_indices, 5);
         assert_eq!(starts, vec![6, 8]);
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 4, 5, 2),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], &row_indices, 5, 2),
             Some(6)
         );
     }
@@ -652,10 +653,26 @@ mod tests {
             ("freq", &[10.0, 20.0, 10.0, 20.0]),
         ]);
         let schema = numeric_schema(&["sweep", "freq"]);
+        let row_indices = (5..9).collect::<Vec<_>>();
 
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 5, 6, 2),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], &row_indices, 6, 2),
             None
+        );
+    }
+
+    #[test]
+    fn resolve_group_tail_start_uses_original_rows_after_projection() {
+        let batch = numeric_batch(&[
+            ("sweep", &[1.0, 2.0, 2.0, 3.0]),
+            ("freq", &[10.0, 10.0, 20.0, 10.0]),
+        ]);
+        let schema = numeric_schema(&["sweep", "freq"]);
+        let row_indices = vec![4, 6, 7, 9];
+
+        assert_eq!(
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], &row_indices, 5, 2),
+            Some(6)
         );
     }
 
@@ -667,13 +684,14 @@ mod tests {
             ("x", &[0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0]),
         ]);
         let schema = numeric_schema(&["cycle", "y", "x"]);
+        let row_indices = (0..10).collect::<Vec<_>>();
 
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 0, 0, 1),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], &row_indices, 0, 1),
             Some(4)
         );
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], 0, 0, 1),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], &row_indices, 0, 1),
             Some(8)
         );
     }
@@ -685,13 +703,14 @@ mod tests {
             ("row", &[0.0, 1.0, 2.0, 0.0, 1.0, 2.0]),
         ]);
         let schema = numeric_schema(&["outer", "row"]);
+        let row_indices = (0..6).collect::<Vec<_>>();
 
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], 0, 0, 1),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0], &row_indices, 0, 1),
             Some(3)
         );
         assert_eq!(
-            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], 0, 0, 1),
+            resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], &row_indices, 0, 1),
             Some(5)
         );
     }

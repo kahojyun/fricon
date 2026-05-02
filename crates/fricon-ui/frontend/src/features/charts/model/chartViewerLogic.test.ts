@@ -418,6 +418,66 @@ describe("chartViewerLogic", () => {
     );
   });
 
+  it("keeps categorical logical axes available for grouping roles", () => {
+    const columns = [
+      makeColumn({ name: "gate" }),
+      makeColumn({ name: "signal" }),
+    ];
+    const derived = deriveChartViewerState(
+      columns,
+      makeState({
+        traceGroupIndexColumnNames: ["logicalIndex:gate"],
+      }),
+      {
+        source: "manifest",
+        duplicatePolicy: "latest_by_record_id",
+        indexRealization: "implicit",
+        axes: [
+          {
+            id: "logicalIndex:gate",
+            name: "gate",
+            label: "Gate",
+            kind: "logical_index",
+            numeric: false,
+            isCompatibility: false,
+            physicalColumn: null,
+          },
+          {
+            id: "logicalIndex:bias",
+            name: "bias",
+            label: "Bias",
+            kind: "logical_index",
+            numeric: true,
+            isCompatibility: false,
+            physicalColumn: null,
+          },
+        ],
+        valueColumns: [
+          {
+            id: "column:signal",
+            name: "signal",
+            label: "Signal",
+            isComplex: false,
+            isTrace: false,
+            hiddenByDefault: false,
+          },
+        ],
+        chartAxisCandidates: [],
+      },
+    );
+
+    expect(derived.heatmapXOptions.map((column) => column.name)).toEqual([
+      "logicalIndex:bias",
+    ]);
+    expect(derived.traceGroupOptions.map((column) => column.name)).toContain(
+      "logicalIndex:gate",
+    );
+    expect(derived.effectiveTraceGroupIndexColumnNames).toEqual([
+      "logicalIndex:gate",
+    ]);
+    expect(derived.effectiveSweepIndexColumnName).toBe("logicalIndex:bias");
+  });
+
   it("keeps compatibility index axes available for sweep/group roles", () => {
     const columns = [
       makeColumn({ name: "run", isIndex: true }),
