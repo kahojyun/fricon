@@ -83,7 +83,7 @@ pub(crate) async fn prepare_chart_data(
     let dataset = session.dataset(id).await?;
     let interpretation = dataset.interpret()?;
     let source_schema = dataset.schema()?.clone();
-    let alias_physical_columns = !interpretation.scan_axes.is_empty();
+    let alias_physical_columns = true;
     let (start, end) = resolve_row_range(&dataset, common.start, common.end);
     let selected_physical_columns =
         selected_physical_columns(&source_schema, selected_columns, filters)?;
@@ -341,6 +341,11 @@ fn map_full_index_columns(
             selected_schema
                 .columns()
                 .get_full(name)
+                .or_else(|| {
+                    selected_schema
+                        .columns()
+                        .get_full(&alias_physical_column_name(name, true))
+                })
                 .map(|(selected_index, _, _)| selected_index)
         })
         .collect()
@@ -779,6 +784,10 @@ mod tests {
         let projected = project_schema(&source_schema, &[0], true).expect("project schema");
 
         assert!(projected.columns().contains_key("column:logicalIndex:gate"));
+        assert_eq!(
+            map_full_index_columns(&source_schema, &projected, &[0]),
+            vec![0]
+        );
     }
 
     #[test]
