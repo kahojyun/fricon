@@ -15,6 +15,14 @@ pub(crate) use self::{
 };
 use crate::features::charts::types::{XYDrawStyle, XYTraceRoleOptions};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum GroupKey {
+    Null,
+    Float64(u64),
+    Boolean(bool),
+    Utf8(String),
+}
+
 pub(super) struct XYTraceRoles {
     pub(super) trace_group: Vec<usize>,
     pub(super) sweep: Option<usize>,
@@ -82,14 +90,14 @@ pub(super) fn compute_group_starts(
     }
 
     let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
-    let group_values: Vec<Vec<String>> = group_columns
+    let group_values: Vec<Vec<GroupKey>> = group_columns
         .iter()
         .map(|&idx| {
             let arr = batch
                 .column_by_name(column_names[idx])
                 .expect("group column present");
             (0..num_rows)
-                .map(|row| group_value_at(arr.as_ref(), row))
+                .map(|row| group_key_at(arr.as_ref(), row))
                 .collect()
         })
         .collect();
@@ -189,8 +197,21 @@ pub(super) fn make_group_id_suffix(
     group_columns: &[usize],
     row: usize,
 ) -> Option<String> {
-    make_group_label(batch, schema, group_columns, row)
-        .map(|label| label.replace(", ", "|").replace('=', ":"))
+    if group_columns.is_empty() {
+        return None;
+    }
+
+    let column_names: Vec<&str> = schema.columns().keys().map(String::as_str).collect();
+    let parts = group_columns
+        .iter()
+        .map(|&idx| {
+            let name = column_names[idx];
+            let arr = batch.column_by_name(name).expect("group column present");
+            format!("{name}:{}", group_key_id_at(arr.as_ref(), row))
+        })
+        .collect::<Vec<_>>();
+
+    Some(parts.join("|"))
 }
 
 pub(super) fn format_numeric_value(value: f64) -> String {
@@ -280,6 +301,45 @@ fn group_value_at(array: &dyn Array, row: usize) -> String {
     }
 }
 
+fn group_key_at(array: &dyn Array, row: usize) -> GroupKey {
+    if array.is_null(row) {
+        return GroupKey::Null;
+    }
+    match array.data_type() {
+        DataType::Float64 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .expect("Float64 group column");
+            GroupKey::Float64(array.value(row).to_bits())
+        }
+        DataType::Boolean => {
+            let array = array
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .expect("Boolean group column");
+            GroupKey::Boolean(array.value(row))
+        }
+        DataType::Utf8 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .expect("Utf8 group column");
+            GroupKey::Utf8(array.value(row).to_string())
+        }
+        other => panic!("unsupported group column data type: {other}"),
+    }
+}
+
+fn group_key_id_at(array: &dyn Array, row: usize) -> String {
+    match group_key_at(array, row) {
+        GroupKey::Null => "null".to_string(),
+        GroupKey::Float64(bits) => format!("f64:{bits:016x}"),
+        GroupKey::Boolean(value) => format!("bool:{value}"),
+        GroupKey::Utf8(value) => format!("utf8:{}:{value}", value.len()),
+    }
+}
+
 #[cfg(test)]
 pub(super) mod test_utils {
     use std::sync::Arc;
@@ -322,7 +382,8 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::{
-        compute_group_starts, group_ranges, last_outer_group_start, resolve_xy_trace_roles,
+        compute_group_starts, group_ranges, last_outer_group_start, make_group_id_suffix,
+        resolve_xy_trace_roles,
         test_utils::{numeric_batch, numeric_schema},
     };
     use crate::features::charts::types::{XYDrawStyle, XYTraceRoleOptions};
@@ -347,6 +408,18 @@ mod tests {
         let batch = numeric_batch(&[("idx", &[1.0, 2.0, 3.0])]);
         let schema = numeric_schema(&["idx"]);
         assert_eq!(compute_group_starts(&batch, &schema, &[]), vec![0]);
+    }
+
+    #[test]
+    fn compute_group_starts_compares_numeric_keys_without_display_rounding() {
+        let batch = numeric_batch(&[("idx", &[0.123_456_4, 0.123_456_5])]);
+        let schema = numeric_schema(&["idx"]);
+
+        assert_eq!(compute_group_starts(&batch, &schema, &[0]), vec![0, 1]);
+        assert_ne!(
+            make_group_id_suffix(&batch, &schema, &[0], 0),
+            make_group_id_suffix(&batch, &schema, &[0], 1)
+        );
     }
 
     #[test]
