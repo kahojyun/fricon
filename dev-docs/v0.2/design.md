@@ -179,11 +179,21 @@ the measurement is the default annotation container for data-taking work.
 Use this checklist before writing durable v0.2 storage, API, IPC, or UI
 contracts.
 
-Decide at the product level now:
+Settled current-PR product decisions:
 
 - V1 replaces simple LabRAD Grapher/Data Vault style logging for new
   measurements. Full legacy import and browsing remain follow-up migration
   work.
+- v0.2 may break the old model freely when compatibility would preserve the
+  wrong workspace/dataset-first API, storage, or UI assumptions.
+- The first user-facing slice should stay minimal: Data Library, Measurement,
+  Dataset, and optional Sample/Sample Session. Parameter, analysis,
+  calibration, actor, and provenance concepts may be recorded or reserved, but
+  should not become peer navigation concepts before the measurement loop is
+  ergonomic.
+
+Decide at the product level before implementation:
+
 - One data library is the normal user model. Projects, campaigns, saved views,
   tags, samples, and sessions organize the library without encouraging many
   long-lived roots.

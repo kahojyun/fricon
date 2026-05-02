@@ -95,6 +95,11 @@ Prefer rewriting or replacing current domain boundaries when the existing shape
 would preserve the wrong user model. Preserve reusable infrastructure where it
 does not lock the product into workspace/dataset-first assumptions.
 
+Current PR decision: prefer a clean v0.2 model over compatibility with old
+workspace/dataset-first APIs and storage assumptions. Keep useful
+infrastructure, but do not preserve compatibility just to avoid breaking
+pre-adoption local test workspaces.
+
 The intended breaking scope is broad at the product boundary, but not a mandate
 to rewrite every line of code. v0.2 may intentionally break:
 

@@ -26,6 +26,11 @@ It should help experimentalists:
 Fricon should not make users operate a complex LIMS, hosted service, or
 multi-user lab administration system before they can collect data.
 
+Current V1 replacement target: new measurement work only. Users should be able
+to stop using a simple LabRAD Grapher/Data Vault style logger for new
+measurements. Importing or fully browsing legacy LabRAD/Data Vault history is a
+later migration workflow, not a V1 requirement.
+
 ## Main User Pain
 
 The current lab pattern Fricon should replace is:
