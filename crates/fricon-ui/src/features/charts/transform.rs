@@ -1,6 +1,7 @@
 pub(crate) mod heatmap;
 pub(crate) mod live_heatmap;
 pub(crate) mod live_xy;
+#[cfg(test)]
 pub(crate) mod mapping;
 pub(crate) mod xy;
 

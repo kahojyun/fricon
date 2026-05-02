@@ -99,6 +99,69 @@ pub(crate) struct ColumnInfo {
     pub(crate) is_chart_axis_candidate: bool,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartInterpretationSource {
+    Manifest,
+    CompatibilityInference,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartDuplicatePolicy {
+    LatestByRecordId,
+    CompatibilityRowOrderPlaceholder,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartIndexRealization {
+    None,
+    Implicit,
+    Sidecar,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartSemanticAxisKind {
+    LogicalIndex,
+    Column,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartSemanticColumn {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) label: Option<String>,
+    pub(crate) is_complex: bool,
+    pub(crate) is_trace: bool,
+    pub(crate) hidden_by_default: bool,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartSemanticAxis {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) label: Option<String>,
+    pub(crate) kind: ChartSemanticAxisKind,
+    pub(crate) numeric: bool,
+    pub(crate) is_compatibility: bool,
+    pub(crate) physical_column: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartSemantics {
+    pub(crate) source: ChartInterpretationSource,
+    pub(crate) duplicate_policy: ChartDuplicatePolicy,
+    pub(crate) index_realization: ChartIndexRealization,
+    pub(crate) axes: Vec<ChartSemanticAxis>,
+    pub(crate) value_columns: Vec<ChartSemanticColumn>,
+    pub(crate) chart_axis_candidates: Vec<ChartSemanticAxis>,
+}
+
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DatasetDetail {
@@ -113,6 +176,7 @@ pub(crate) struct DatasetDetail {
     pub(crate) deleted_at: Option<DateTime<Utc>>,
     pub(crate) payload_available: bool,
     pub(crate) columns: Vec<ColumnInfo>,
+    pub(crate) chart_semantics: Option<ChartSemantics>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, specta::Type)]

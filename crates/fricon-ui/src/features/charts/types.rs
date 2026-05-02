@@ -220,6 +220,7 @@ pub(crate) struct ColumnUniqueValue {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TableData {
     pub(crate) fields: Vec<String>,
+    pub(crate) field_labels: HashMap<String, String>,
     pub(crate) rows: Vec<Row>,
     pub(crate) column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
 }

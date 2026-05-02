@@ -55,6 +55,7 @@ function makeDatasetDetail(columns: ColumnInfo[]): DatasetDetail {
 function makeFilterTableData(): FilterTableData {
   return {
     fields: ["idxA"],
+    fieldLabels: {},
     rows: [{ index: 1, displayValues: ["1"], valueIndices: [1] }],
     columnUniqueValues: {
       idxA: [{ index: 1, displayValue: "1" }],
@@ -267,5 +268,69 @@ describe("chartViewerLogic", () => {
       indexFilters: undefined,
       excludeColumns: [],
     });
+  });
+
+  it("uses resolved chart semantics for value and logical axis defaults", () => {
+    const columns = [
+      makeColumn({ name: "legacyGuess", isIndex: true }),
+      makeColumn({ name: "hiddenValue" }),
+      makeColumn({ name: "signal" }),
+    ];
+    const derived = deriveChartViewerState(
+      columns,
+      makeState({ view: "heatmap" }),
+      {
+        source: "manifest",
+        duplicatePolicy: "latest_by_record_id",
+        indexRealization: "implicit",
+        axes: [
+          {
+            id: "logicalIndex:gate",
+            name: "gate",
+            label: "Gate",
+            kind: "logical_index",
+            numeric: true,
+            isCompatibility: false,
+            physicalColumn: null,
+          },
+          {
+            id: "logicalIndex:bias",
+            name: "bias",
+            label: "Bias",
+            kind: "logical_index",
+            numeric: true,
+            isCompatibility: false,
+            physicalColumn: null,
+          },
+        ],
+        valueColumns: [
+          {
+            id: "column:hiddenValue",
+            name: "hiddenValue",
+            label: "Hidden",
+            isComplex: false,
+            isTrace: false,
+            hiddenByDefault: true,
+          },
+          {
+            id: "column:signal",
+            name: "signal",
+            label: "Signal",
+            isComplex: false,
+            isTrace: false,
+            hiddenByDefault: false,
+          },
+        ],
+        chartAxisCandidates: [],
+      },
+    );
+
+    expect(derived.effectiveHeatmapQuantityName).toBe("column:signal");
+    expect(derived.effectiveHeatmapXName).toBe("logicalIndex:bias");
+    expect(derived.effectiveHeatmapYName).toBe("logicalIndex:gate");
+    expect(derived.excludeColumns).toEqual([
+      "logicalIndex:bias",
+      "logicalIndex:gate",
+    ]);
   });
 });

@@ -485,7 +485,14 @@ impl DatasetReader {
         Ok(points)
     }
 
-    fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
+    pub fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
+        self.record_ids_range(..)
+    }
+
+    pub fn record_ids_range<R>(&self, range: R) -> Result<Vec<u64>, ReadError>
+    where
+        R: RangeBounds<usize> + Copy,
+    {
         let record_id_index = self
             .physical_arrow_schema
             .column_with_name(RECORD_ID_COLUMN)
@@ -496,7 +503,7 @@ impl DatasetReader {
             })?
             .0;
         let mut record_ids = Vec::new();
-        for batch in self.source.range(..) {
+        for batch in self.source.range(range) {
             let column = batch
                 .column(record_id_index)
                 .as_any()

@@ -1,20 +1,13 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Bound,
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context, Result, anyhow, bail};
-use arrow_array::{
-    Array, ArrayRef, Float64Array, RecordBatch, StructArray, cast::AsArray, types::Float64Type,
-};
-use arrow_buffer::NullBuffer;
-use arrow_schema::{DataType, Fields, SchemaRef};
-use fricon::{DatasetDataType, ScalarKind, SelectOptions};
+use anyhow::Result;
 
 use crate::{
     desktop_runtime::session::WorkspaceSession,
-    features::charts::types::{ColumnUniqueValue, Row, TableData},
+    features::charts::{
+        semantic_source,
+        types::{ColumnUniqueValue, Row, TableData},
+    },
 };
 
 pub(crate) struct ProcessedFilterRows {
@@ -25,6 +18,7 @@ pub(crate) struct ProcessedFilterRows {
 
 pub(crate) struct DataInternal {
     pub(crate) fields: Vec<String>,
+    pub(crate) field_labels: HashMap<String, String>,
     pub(crate) unique_rows: Vec<Row>,
     pub(crate) column_unique_values: HashMap<String, Vec<ColumnUniqueValue>>,
     pub(crate) column_raw_values: HashMap<String, Vec<serde_json::Value>>,
@@ -34,6 +28,7 @@ impl DataInternal {
     fn empty() -> Self {
         Self {
             fields: vec![],
+            field_labels: HashMap::new(),
             unique_rows: vec![],
             column_unique_values: HashMap::new(),
             column_raw_values: HashMap::new(),
@@ -49,167 +44,30 @@ pub(crate) fn format_json_value(value: &serde_json::Value) -> String {
     }
 }
 
-fn extract_scalar_value(
-    array: &dyn Array,
-    data_type: DatasetDataType,
-    row: usize,
-) -> Result<serde_json::Value> {
-    if array.is_null(row) {
-        return Ok(serde_json::Value::Null);
-    }
-
-    match data_type {
-        DatasetDataType::Scalar(ScalarKind::Numeric) => Ok(serde_json::Value::from(
-            array.as_primitive::<Float64Type>().value(row),
-        )),
-        DatasetDataType::Scalar(ScalarKind::Complex) => {
-            let array = array
-                .as_struct_opt()
-                .context("Complex filter columns must use Arrow struct arrays")?;
-            Ok(serde_json::json!({
-                "real": array.column(0).as_primitive::<Float64Type>().value(row),
-                "imag": array.column(1).as_primitive::<Float64Type>().value(row),
-            }))
-        }
-        DatasetDataType::Trace(_, _) => {
-            bail!("Filter table only supports scalar index columns")
-        }
-    }
-}
-
-fn collect_filter_rows(
-    batches: &[RecordBatch],
-    field_types: &[DatasetDataType],
-) -> Result<Vec<Vec<serde_json::Value>>> {
-    let mut rows = Vec::new();
-    for batch in batches {
-        for row_index in 0..batch.num_rows() {
-            let row = batch
-                .columns()
-                .iter()
-                .zip(field_types.iter().copied())
-                .map(|(column, data_type)| {
-                    extract_scalar_value(column.as_ref(), data_type, row_index)
-                })
-                .collect::<Result<Vec<_>>>()?;
-            rows.push(row);
-        }
-    }
-    Ok(rows)
-}
-
-fn build_float64_array(value: &serde_json::Value) -> Result<ArrayRef> {
-    let value = match value {
-        serde_json::Value::Null => None,
-        serde_json::Value::Number(number) => Some(
-            number
-                .as_f64()
-                .ok_or_else(|| anyhow!("Filter value is not a valid f64: {number}"))?,
-        ),
-        other => bail!("Expected numeric filter value, got {other}"),
-    };
-    Ok(Arc::new(Float64Array::from(vec![value])))
-}
-
-fn is_complex_fields(fields: &Fields) -> bool {
-    fields.as_ref().as_array::<2>().is_some_and(|[real, imag]| {
-        real.name() == "real"
-            && imag.name() == "imag"
-            && matches!(real.data_type(), DataType::Float64)
-            && matches!(imag.data_type(), DataType::Float64)
-    })
-}
-
-fn build_complex_array(fields: &Fields, value: &serde_json::Value) -> Result<ArrayRef> {
-    let (real, imag, nulls) = match value {
-        serde_json::Value::Null => (
-            Arc::new(Float64Array::from(vec![None])) as ArrayRef,
-            Arc::new(Float64Array::from(vec![None])) as ArrayRef,
-            Some(NullBuffer::from(vec![false])),
-        ),
-        serde_json::Value::Object(values) => {
-            let read_component = |name: &str| -> Result<f64> {
-                values
-                    .get(name)
-                    .and_then(serde_json::Value::as_f64)
-                    .ok_or_else(|| anyhow!("Complex filter value is missing '{name}'"))
-            };
-            (
-                Arc::new(Float64Array::from(vec![Some(read_component("real")?)])) as ArrayRef,
-                Arc::new(Float64Array::from(vec![Some(read_component("imag")?)])) as ArrayRef,
-                None,
-            )
-        }
-        other => bail!("Expected complex filter value object, got {other}"),
-    };
-
-    Ok(Arc::new(StructArray::new(
-        fields.clone(),
-        vec![real, imag],
-        nulls,
-    )))
-}
-
-fn build_filter_array(data_type: &DataType, value: &serde_json::Value) -> Result<ArrayRef> {
-    match data_type {
-        DataType::Float64 => build_float64_array(value),
-        DataType::Struct(fields) if is_complex_fields(fields) => build_complex_array(fields, value),
-        other => bail!("Unsupported filter data type: {other}"),
-    }
-}
-
 pub(crate) async fn load_filter_data(
     session: &WorkspaceSession,
     id: i32,
     exclude_columns: Option<Vec<String>>,
 ) -> Result<DataInternal> {
-    let dataset = session.dataset(id).await?;
-    let schema = dataset.schema()?;
-    let index_columns = dataset.try_index_columns()?;
-
-    let Some(index_col_indices) = index_columns else {
-        return Ok(DataInternal::empty());
-    };
-
-    let filtered_indices: Vec<usize> = index_col_indices
-        .iter()
-        .filter(|&&i| {
-            let col_name = schema.columns().keys().nth(i).map(String::as_str);
-            if let Some(exclude) = &exclude_columns {
-                col_name.is_none_or(|name| !exclude.iter().any(|e| e == name))
-            } else {
-                true
-            }
-        })
-        .copied()
-        .collect();
-
-    if filtered_indices.is_empty() {
+    let exclude_columns = exclude_columns.unwrap_or_default();
+    let (axis_fields, rows) =
+        semantic_source::load_axis_rows(session, id, &exclude_columns).await?;
+    if axis_fields.is_empty() {
         return Ok(DataInternal::empty());
     }
 
-    let fields: Vec<String> = filtered_indices
+    let fields = axis_fields
         .iter()
-        .filter_map(|&i| schema.columns().keys().nth(i).cloned())
-        .collect();
-    let field_types: Vec<DatasetDataType> = filtered_indices
-        .iter()
-        .filter_map(|&i| schema.columns().values().nth(i).copied())
-        .collect();
-
-    let (_, batches) = dataset
-        .select_data(&SelectOptions {
-            start: Bound::Unbounded,
-            end: Bound::Unbounded,
-            index_filters: None,
-            selected_columns: Some(filtered_indices),
-        })
-        .context("Failed to select index data")?;
-
-    let rows = collect_filter_rows(&batches, &field_types)?;
+        .map(|field| field.id.clone())
+        .collect::<Vec<_>>();
+    let field_labels = axis_fields
+        .into_iter()
+        .map(|field| (field.id, field.label))
+        .collect::<HashMap<_, _>>();
     let processed = process_filter_rows(&fields, rows);
     Ok(DataInternal {
         fields,
+        field_labels,
         unique_rows: processed.unique_rows,
         column_unique_values: processed.column_unique_values,
         column_raw_values: processed.column_raw_values,
@@ -224,20 +82,19 @@ pub(crate) async fn get_filter_table_data(
     let data = load_filter_data(session, id, exclude_columns).await?;
     Ok(TableData {
         fields: data.fields,
+        field_labels: data.field_labels,
         rows: data.unique_rows,
         column_unique_values: data.column_unique_values,
     })
 }
 
-pub(crate) async fn build_filter_batch(
+pub(crate) async fn build_semantic_filters(
     session: &WorkspaceSession,
     id: i32,
     exclude_columns: Option<Vec<String>>,
     indices: &[usize],
-    arrow_schema: SchemaRef,
-) -> Result<Option<RecordBatch>> {
+) -> Result<Vec<(String, serde_json::Value)>> {
     let filter_data = load_filter_data(session, id, exclude_columns).await?;
-
     let mut selected_filters = Vec::new();
     for (field_index, &value_index) in indices.iter().enumerate() {
         if let Some(field_name) = filter_data.fields.get(field_index)
@@ -246,37 +103,10 @@ pub(crate) async fn build_filter_batch(
                 .get(field_name)
                 .and_then(|values| values.get(value_index))
         {
-            selected_filters.push((field_name.as_str(), value));
+            selected_filters.push((field_name.clone(), value.clone()));
         }
     }
-
-    if selected_filters.is_empty() {
-        return Ok(None);
-    }
-
-    let projection_indices: Vec<usize> = selected_filters
-        .iter()
-        .map(|(field_name, _)| {
-            arrow_schema
-                .index_of(field_name)
-                .with_context(|| format!("Field '{field_name}' not found in schema"))
-        })
-        .collect::<Result<_>>()?;
-    let filter_schema = Arc::new(
-        arrow_schema
-            .project(&projection_indices)
-            .context("Failed to project filter schema")?,
-    );
-    let arrays = filter_schema
-        .fields()
-        .iter()
-        .zip(selected_filters)
-        .map(|(field, (_, value))| build_filter_array(field.data_type(), value))
-        .collect::<Result<Vec<_>>>()?;
-
-    Ok(Some(
-        RecordBatch::try_new(filter_schema, arrays).context("Failed to build filter batch")?,
-    ))
+    Ok(selected_filters)
 }
 
 pub(crate) fn process_filter_rows(

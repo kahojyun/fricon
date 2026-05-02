@@ -1,47 +1,29 @@
-use std::ops::Bound;
-
 use anyhow::Context;
 use arrow_array::RecordBatch;
-use arrow_select::concat::concat_batches;
-use fricon::{DatasetDataType, DatasetReader, DatasetSchema, SelectOptions};
+use fricon::DatasetSchema;
 use tracing::{debug, error, instrument};
 
-use super::{filter_table::build_filter_batch, types::DatasetChartDataOptions};
+use super::{
+    filter_table::build_semantic_filters, semantic_source, types::DatasetChartDataOptions,
+};
+#[cfg(test)]
+use crate::features::charts::transform::compute_group_starts;
 use crate::{
     desktop_runtime::session::WorkspaceSession,
     features::charts::{
         transform::{
             build_heatmap_series, build_live_heatmap_series, build_live_xy_series, build_xy_series,
-            compute_group_starts,
-            mapping::{build_chart_selected_columns, build_live_chart_selected_columns},
-            resolve_xy_trace_roles,
         },
         types::{
-            ChartSnapshot, FlatSeries, FlatXYSeries, HeatmapChartSnapshot,
-            LiveChartAppendOperation, LiveChartDataOptions, LiveChartDataResponse,
-            XYPlotModeOptions,
+            ChartCommonOptions, ChartSnapshot, FlatSeries, FlatXYSeries, HeatmapChartDataOptions,
+            HeatmapChartSnapshot, LiveChartAppendOperation, LiveChartDataOptions,
+            LiveChartDataResponse, LiveHeatmapOptions, LiveXYOptions, XYChartDataOptions,
+            XYPlotModeOptions, XYTraceRoleOptions,
         },
     },
 };
 
-fn select_live_range(
-    dataset: &DatasetReader,
-    start: usize,
-    end: usize,
-    selected_columns: Vec<usize>,
-) -> anyhow::Result<RecordBatch> {
-    let (output_schema, batches) = dataset
-        .select_data(&SelectOptions {
-            start: Bound::Included(start),
-            end: Bound::Excluded(end),
-            index_filters: None,
-            selected_columns: Some(selected_columns),
-        })
-        .context("Failed to select live data")?;
-
-    concat_batches(&output_schema, &batches).context("Failed to concat batches")
-}
-
+#[cfg(test)]
 fn recent_group_starts_in_scan_batch(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -56,6 +38,7 @@ fn recent_group_starts_in_scan_batch(
         .collect()
 }
 
+#[cfg(test)]
 fn resolve_group_tail_start_in_scan_batch(
     batch: &RecordBatch,
     schema: &DatasetSchema,
@@ -74,218 +57,48 @@ fn resolve_group_tail_start_in_scan_batch(
     (starts.len() >= required_groups).then(|| starts[starts.len() - required_groups])
 }
 
-fn resolve_group_tail_start(
-    dataset: &DatasetReader,
-    schema: &DatasetSchema,
-    grouping_index_columns: &[usize],
-    total_rows: usize,
-    required_groups: usize,
-) -> anyhow::Result<usize> {
-    if total_rows == 0 || required_groups == 0 {
-        return Ok(0);
-    }
-
-    let mut window_rows = required_groups.max(1);
-    loop {
-        let range_start = total_rows.saturating_sub(window_rows);
-        let scan_start = range_start.saturating_sub(1);
-        let batch = select_live_range(
-            dataset,
-            scan_start,
-            total_rows,
-            grouping_index_columns.to_vec(),
-        )?;
-
-        if let Some(start) = resolve_group_tail_start_in_scan_batch(
-            &batch,
-            schema,
-            grouping_index_columns,
-            scan_start,
-            range_start,
-            required_groups,
-        ) {
-            return Ok(start);
-        }
-
-        if range_start == 0 {
-            return Ok(0);
-        }
-
-        window_rows = window_rows.saturating_mul(2).min(total_rows);
-    }
-}
-
-fn plot_mode_is_trace(
-    schema: &DatasetSchema,
-    plot_mode: &XYPlotModeOptions,
-) -> anyhow::Result<bool> {
-    match plot_mode {
-        XYPlotModeOptions::QuantityVsSweep { quantity, .. }
-        | XYPlotModeOptions::ComplexPlane { quantity } => Ok(matches!(
-            schema.columns().get(quantity).context("Column not found")?,
-            DatasetDataType::Trace(_, _)
-        )),
-        XYPlotModeOptions::Xy { x_column, y_column } => {
-            let x_type = *schema
-                .columns()
-                .get(x_column)
-                .context("X column not found")?;
-            let y_type = *schema
-                .columns()
-                .get(y_column)
-                .context("Y column not found")?;
-            Ok(matches!(x_type, DatasetDataType::Trace(_, _))
-                && matches!(y_type, DatasetDataType::Trace(_, _)))
-        }
-    }
-}
-
-fn resolve_live_row_start(
-    dataset: &DatasetReader,
-    schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
-    total_rows: usize,
-    options: &LiveChartDataOptions,
-) -> anyhow::Result<usize> {
-    if total_rows == 0 {
-        return Ok(0);
-    }
-
-    match options {
-        LiveChartDataOptions::Xy(opts) => {
-            let tail_count = opts.tail_count.max(1);
-            if plot_mode_is_trace(schema, &opts.plot_mode)? {
-                return Ok(total_rows.saturating_sub(tail_count));
-            }
-
-            let roles =
-                resolve_xy_trace_roles(schema, index_columns, &opts.trace_roles, opts.draw_style)?;
-            if roles.trace_group.is_empty() {
-                Ok(total_rows.saturating_sub(tail_count))
-            } else {
-                resolve_group_tail_start(
-                    dataset,
-                    schema,
-                    &roles.trace_group,
-                    total_rows,
-                    tail_count,
-                )
-            }
-        }
-        LiveChartDataOptions::Heatmap(opts) => {
-            let data_type = *schema
-                .columns()
-                .get(&opts.quantity)
-                .context("Column not found")?;
-            if matches!(data_type, DatasetDataType::Trace(_, _)) {
-                match index_columns {
-                    Some(idx_cols) if idx_cols.len() >= 2 => resolve_group_tail_start(
-                        dataset,
-                        schema,
-                        &idx_cols[..idx_cols.len() - 1],
-                        total_rows,
-                        1,
-                    ),
-                    _ => Ok(total_rows.saturating_sub(1)),
-                }
-            } else if let Some(idx_cols) = index_columns {
-                if idx_cols.len() >= 3 {
-                    resolve_group_tail_start(
-                        dataset,
-                        schema,
-                        &idx_cols[..idx_cols.len() - 2],
-                        total_rows,
-                        1,
-                    )
-                } else {
-                    Ok(0)
-                }
-            } else {
-                Ok(0)
-            }
-        }
-    }
-}
-
 #[instrument(level = "debug", skip(session, options), fields(dataset_id = id))]
 pub(crate) async fn dataset_chart_data(
     session: &WorkspaceSession,
     id: i32,
     options: &DatasetChartDataOptions,
 ) -> anyhow::Result<ChartSnapshot> {
-    let dataset = session.dataset(id).await?;
-    let schema = dataset.schema()?;
-    let index_columns = dataset.try_index_columns()?;
     let common = options.common();
-    let start = common.start.map_or(Bound::Unbounded, Bound::Included);
-    let end = common.end.map_or(Bound::Unbounded, Bound::Excluded);
-    let index_filters = if let Some(indices) = common.index_filters.clone() {
-        build_filter_batch(
-            session,
-            id,
-            common.exclude_columns.clone(),
-            &indices,
-            dataset.arrow_schema().clone(),
-        )
-        .await
-        .context("Failed to build index filters")?
+    let filters = if let Some(indices) = common.index_filters.as_deref() {
+        build_semantic_filters(session, id, common.exclude_columns.clone(), indices)
+            .await
+            .context("Failed to build semantic index filters")?
     } else {
-        None
+        Vec::new()
     };
-
-    let selected_columns = build_chart_selected_columns(schema, index_columns.as_deref(), options)?;
+    let prepared = semantic_source::prepare_chart_data(session, id, common, &filters).await?;
+    let resolved_options = resolve_dataset_chart_options(options);
     let chart_type = options.view_name();
     debug!(
         dataset_id = id,
         chart_type,
-        ?selected_columns,
-        "Selecting chart source data"
-    );
-    let (output_schema, batches) = dataset
-        .select_data(&SelectOptions {
-            start,
-            end,
-            index_filters,
-            selected_columns: Some(selected_columns),
-        })
-        .inspect_err(|err| {
-            error!(
-                dataset_id = id,
-                chart_type,
-                error = %err,
-                "Failed to select chart source data"
-            );
-        })
-        .context("Failed to select data.")?;
-
-    let batch = concat_batches(&output_schema, &batches).inspect_err(|err| {
-        error!(
-            dataset_id = id,
-            chart_type,
-            error = %err,
-            "Failed to concat chart batches"
-        );
-    })?;
-    debug!(
-        dataset_id = id,
-        chart_type,
-        rows = batch.num_rows(),
-        cols = batch.num_columns(),
+        rows = prepared.batch.num_rows(),
+        cols = prepared.batch.num_columns(),
         "Building dataset chart data"
     );
 
-    let result = match options {
-        DatasetChartDataOptions::Xy(options) => {
-            build_xy_series(&batch, schema, index_columns.as_deref(), options)
+    let result = match &resolved_options {
+        DatasetChartDataOptions::Xy(options) => build_xy_series(
+            &prepared.batch,
+            &prepared.schema,
+            prepared.index_columns.as_deref(),
+            options,
+        ),
+        DatasetChartDataOptions::Heatmap(options) => {
+            build_heatmap_series(&prepared.batch, &prepared.schema, options)
         }
-        DatasetChartDataOptions::Heatmap(options) => build_heatmap_series(&batch, schema, options),
     };
     if let Err(err) = &result {
         error!(
             dataset_id = id,
             chart_type,
-            rows = batch.num_rows(),
-            cols = batch.num_columns(),
+            rows = prepared.batch.num_rows(),
+            cols = prepared.batch.num_columns(),
             error = %err,
             "Failed to build dataset chart data"
         );
@@ -300,34 +113,35 @@ pub(crate) async fn dataset_live_chart_data(
     options: &LiveChartDataOptions,
 ) -> anyhow::Result<LiveChartDataResponse> {
     let dataset = session.dataset(id).await?;
-    let schema = dataset.schema()?;
-    let index_columns = dataset.try_index_columns()?;
     let total_rows = dataset.num_rows();
-    let selected_columns =
-        build_live_chart_selected_columns(schema, index_columns.as_deref(), options)?;
-    let start = resolve_live_row_start(
-        &dataset,
-        schema,
-        index_columns.as_deref(),
-        total_rows,
-        options,
-    )?;
-
-    let batch = select_live_range(&dataset, start, total_rows, selected_columns.clone())?;
+    let resolved_options = resolve_live_chart_options(options);
+    let current_common = ChartCommonOptions {
+        start: Some(0),
+        end: Some(total_rows),
+        index_filters: None,
+        exclude_columns: None,
+    };
+    let prepared = semantic_source::prepare_chart_data(session, id, &current_common, &[]).await?;
     debug!(
         dataset_id = id,
-        start,
+        start = 0,
         end = total_rows,
-        rows = batch.num_rows(),
-        cols = batch.num_columns(),
+        rows = prepared.batch.num_rows(),
+        cols = prepared.batch.num_columns(),
         "Building live chart data"
     );
 
-    let snapshot = build_live_snapshot(&batch, schema, index_columns.as_deref(), start, options);
+    let snapshot = build_live_snapshot(
+        &prepared.batch,
+        &prepared.schema,
+        prepared.index_columns.as_deref(),
+        0,
+        &resolved_options,
+    );
     if let Err(err) = &snapshot {
         error!(
             dataset_id = id,
-            rows = batch.num_rows(),
+            rows = prepared.batch.num_rows(),
             error = %err,
             "Failed to build live chart data"
         );
@@ -355,28 +169,20 @@ pub(crate) async fn dataset_live_chart_data(
         });
     }
 
-    let previous_start = resolve_live_row_start(
-        &dataset,
-        schema,
-        index_columns.as_deref(),
-        known_row_count,
-        options,
-    )?;
-    if previous_start != start {
-        return Ok(LiveChartDataResponse::Reset {
-            row_count: total_rows,
-            snapshot,
-        });
-    }
-
-    let previous_batch =
-        select_live_range(&dataset, previous_start, known_row_count, selected_columns)?;
+    let previous_common = ChartCommonOptions {
+        start: Some(0),
+        end: Some(known_row_count),
+        index_filters: None,
+        exclude_columns: None,
+    };
+    let previous_prepared =
+        semantic_source::prepare_chart_data(session, id, &previous_common, &[]).await?;
     let previous_snapshot = build_live_snapshot(
-        &previous_batch,
-        schema,
-        index_columns.as_deref(),
-        previous_start,
-        options,
+        &previous_prepared.batch,
+        &previous_prepared.schema,
+        previous_prepared.index_columns.as_deref(),
+        0,
+        &resolved_options,
     )?;
 
     let Some(ops) = diff_live_snapshots(&previous_snapshot, &snapshot) else {
@@ -406,6 +212,88 @@ fn build_live_snapshot(
         LiveChartDataOptions::Heatmap(opts) => {
             build_live_heatmap_series(batch, schema, index_columns, opts)
         }
+    }
+}
+
+fn resolve_dataset_chart_options(options: &DatasetChartDataOptions) -> DatasetChartDataOptions {
+    match options {
+        DatasetChartDataOptions::Xy(options) => {
+            DatasetChartDataOptions::Xy(resolve_xy_chart_options(options))
+        }
+        DatasetChartDataOptions::Heatmap(options) => {
+            DatasetChartDataOptions::Heatmap(HeatmapChartDataOptions {
+                quantity: semantic_source::resolve_column_name(&options.quantity),
+                x_column: options
+                    .x_column
+                    .as_deref()
+                    .map(semantic_source::resolve_axis_column_name),
+                y_column: semantic_source::resolve_axis_column_name(&options.y_column),
+                complex_view_single: options.complex_view_single,
+                common: options.common.clone(),
+            })
+        }
+    }
+}
+
+fn resolve_live_chart_options(options: &LiveChartDataOptions) -> LiveChartDataOptions {
+    match options {
+        LiveChartDataOptions::Xy(options) => LiveChartDataOptions::Xy(LiveXYOptions {
+            draw_style: options.draw_style,
+            tail_count: options.tail_count,
+            known_row_count: options.known_row_count,
+            plot_mode: resolve_xy_plot_mode_options(&options.plot_mode),
+            trace_roles: resolve_trace_roles(&options.trace_roles),
+        }),
+        LiveChartDataOptions::Heatmap(options) => {
+            LiveChartDataOptions::Heatmap(LiveHeatmapOptions {
+                quantity: semantic_source::resolve_column_name(&options.quantity),
+                complex_view_single: options.complex_view_single,
+                known_row_count: options.known_row_count,
+            })
+        }
+    }
+}
+
+fn resolve_xy_chart_options(options: &XYChartDataOptions) -> XYChartDataOptions {
+    XYChartDataOptions {
+        draw_style: options.draw_style,
+        plot_mode: resolve_xy_plot_mode_options(&options.plot_mode),
+        trace_roles: resolve_trace_roles(&options.trace_roles),
+        common: options.common.clone(),
+    }
+}
+
+fn resolve_xy_plot_mode_options(options: &XYPlotModeOptions) -> XYPlotModeOptions {
+    match options {
+        XYPlotModeOptions::QuantityVsSweep {
+            quantity,
+            complex_views,
+        } => XYPlotModeOptions::QuantityVsSweep {
+            quantity: semantic_source::resolve_column_name(quantity),
+            complex_views: complex_views.clone(),
+        },
+        XYPlotModeOptions::Xy { x_column, y_column } => XYPlotModeOptions::Xy {
+            x_column: semantic_source::resolve_column_name(x_column),
+            y_column: semantic_source::resolve_column_name(y_column),
+        },
+        XYPlotModeOptions::ComplexPlane { quantity } => XYPlotModeOptions::ComplexPlane {
+            quantity: semantic_source::resolve_column_name(quantity),
+        },
+    }
+}
+
+fn resolve_trace_roles(options: &XYTraceRoleOptions) -> XYTraceRoleOptions {
+    XYTraceRoleOptions {
+        trace_group_index_columns: options.trace_group_index_columns.as_ref().map(|columns| {
+            columns
+                .iter()
+                .map(|column| semantic_source::resolve_axis_column_name(column))
+                .collect()
+        }),
+        sweep_index_column: options
+            .sweep_index_column
+            .as_deref()
+            .map(semantic_source::resolve_axis_column_name),
     }
 }
 

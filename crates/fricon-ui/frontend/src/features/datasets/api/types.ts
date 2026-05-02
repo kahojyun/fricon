@@ -28,12 +28,13 @@ export type DatasetInfo = Omit<
 
 export type DatasetDetail = Omit<
   WireDatasetDetail,
-  "createdAt" | "trashedAt" | "deletedAt" | "columns"
+  "createdAt" | "trashedAt" | "deletedAt" | "columns" | "chartSemantics"
 > & {
   createdAt: Date;
   trashedAt: Date | null;
   deletedAt: Date | null;
   columns: DatasetColumnInfo[];
+  chartSemantics: ChartSemantics | null;
 };
 
 export const DATASET_PAGE_SIZE = 200;
@@ -47,6 +48,43 @@ export interface DatasetColumnInfo {
   isIndex: boolean;
   hiddenByDefault: boolean;
   isChartAxisCandidate: boolean;
+}
+
+export type ChartInterpretationSource =
+  | "manifest"
+  | "compatibility_inference";
+export type ChartDuplicatePolicy =
+  | "latest_by_record_id"
+  | "compatibility_row_order_placeholder";
+export type ChartIndexRealization = "none" | "implicit" | "sidecar";
+export type ChartSemanticAxisKind = "logical_index" | "column";
+
+export interface ChartSemanticColumn {
+  id: string;
+  name: string;
+  label: string | null;
+  isComplex: boolean;
+  isTrace: boolean;
+  hiddenByDefault: boolean;
+}
+
+export interface ChartSemanticAxis {
+  id: string;
+  name: string;
+  label: string | null;
+  kind: ChartSemanticAxisKind;
+  numeric: boolean;
+  isCompatibility: boolean;
+  physicalColumn: string | null;
+}
+
+export interface ChartSemantics {
+  source: ChartInterpretationSource;
+  duplicatePolicy: ChartDuplicatePolicy;
+  indexRealization: ChartIndexRealization;
+  axes: ChartSemanticAxis[];
+  valueColumns: ChartSemanticColumn[];
+  chartAxisCandidates: ChartSemanticAxis[];
 }
 
 export type ColumnInfo = DatasetColumnInfo;
@@ -91,6 +129,7 @@ export function normalizeDatasetDetail(
   return {
     ...normalized,
     columns: value.columns.map(normalizeDatasetColumnInfo),
+    chartSemantics: value.chartSemantics ?? null,
   };
 }
 
