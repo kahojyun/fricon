@@ -258,8 +258,9 @@ These questions are intentionally unresolved:
   parameters, schedules, approval checkpoints, and expected outputs?
 - Which calibration, optimization, and benchmark tasks should be first-class
   workflow types?
-- Which AI actions should be suggestion-only, which may mutate workspace state,
-  and what approval or audit metadata should each class require?
+- Which AI actions should be suggestion-only, which may mutate workspace or
+  data-library state, and what approval or audit metadata should each class
+  require?
 - What AI model/provider/version and prompt-summary metadata is needed for
   reproducibility without storing unnecessary sensitive context?
 - What level of device abstraction is useful without overbuilding a hardware

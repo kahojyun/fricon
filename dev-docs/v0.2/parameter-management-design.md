@@ -124,7 +124,7 @@ stay small, while integration and internal terms can be more precise.
 
 | Concept            | Meaning                                                                           |
 | ------------------ | --------------------------------------------------------------------------------- |
-| Parameter registry | Workspace-local store of parameter snapshots, refs, tags, drafts, and history.    |
+| Parameter registry | Data-library-local store of parameter snapshots, refs, tags, drafts, and history. |
 | Parameter snapshot | Immutable full parameter state plus schema at one point in history.               |
 | Profile / ref      | Mutable pointer to a snapshot, such as `main`, `dev`, or `cooldown/2026-04/main`. |
 | Tree section       | Optional nested parameter structure for sparse and irregular values.              |

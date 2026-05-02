@@ -40,6 +40,8 @@ v0.2 should optimize for these user outcomes:
 - run exploratory experiments from Python with little boilerplate
 - keep one coherent local data library instead of many data/code folders
 - record sample and cooldown/session context beside measurements
+- let users set active sample/session context from a notebook prelude or UI
+  without making sample setup a hard requirement for quick experiments
 - inspect live and historical datasets through desktop UI and Python
 - preserve parameter, code, environment, and quality context for each run
 - visualize sample/device parameters on a 2D map when the lab model needs it
@@ -61,8 +63,10 @@ Fricon should not ask users to understand every internal provenance object.
 User-visible concepts for the first v0.2 slice:
 
 - Data Library: the local Fricon root and catalog
-- Sample: the physical object, device, chip, wafer, batch, or specimen
-- Sample Session: a cooldown, mounting, wiring, probing, or campaign context
+- Sample: the physical object, device, chip, wafer, batch, or specimen; useful
+  when known, but not required before every quick experiment
+- Sample Session: a cooldown, mounting, wiring, probing, or campaign context;
+  can be selected as active context or attached after a run
 - Experiment: the normal record for measurement work
 - Dataset: a table-shaped artifact produced or consumed by work
 
@@ -117,11 +121,13 @@ DataLibrary
   Sample
     SampleSession
       Experiment
-        DatasetArtifact
+        Artifact
+          DatasetArtifact
   Analysis
-    DatasetArtifact
-    AnalysisResult
-    ParameterProposal
+    Artifact
+      DatasetArtifact
+      AnalysisResult
+      ParameterProposal
   CalibrationWorkflow
     Experiment
     Analysis
@@ -137,7 +143,10 @@ ActivityRun consumes inputs and produces artifacts.
 Experiment, Analysis, Import, Simulation, and Calibration are user-facing or
 workflow-facing activity types.
 
-DatasetArtifact, AnalysisResult, Report, and ParameterProposal are artifacts.
+Artifact is the general output or input concept. DatasetArtifact is the primary
+table-shaped artifact for v0.2, while AnalysisResult, Report,
+ParameterProposal, file attachments, logs, figures, code summaries, and future
+device snapshots should fit the same provenance pattern.
 ```
 
 The `ActivityRun` pattern should be an internal modeling tool, not the primary
@@ -153,13 +162,28 @@ The clean distinction is:
 - Experiment: activity that usually measures the physical world or hardware
 - Simulation: activity that computes synthetic or model-derived data
 - ActivityRun: shared internal provenance pattern for both
-- DatasetArtifact: output artifact that can be measured, processed, imported,
-  or simulated
+- DatasetArtifact: table-shaped output artifact that can be measured,
+  processed, imported, or simulated
 
 This gives users familiar labels while keeping storage, lineage, and analysis
 code reusable.
 
-## Dataset Model
+## Artifact And Dataset Model
+
+An artifact is a durable output or input linked through provenance.
+
+The first v0.2 implementation should focus on `DatasetArtifact`, because
+LabRAD-style replacement needs table-shaped measured data, live plots, and
+Python reopening. The model should still reserve room for non-table artifacts
+such as:
+
+- reports
+- figures
+- logs
+- attachments
+- code and environment summaries
+- waveform or configuration files
+- future device snapshots and readback summaries
 
 A dataset is an artifact, not the whole experiment record.
 
@@ -193,10 +217,11 @@ Prefer this shape for normal measurements:
 
 ```python
 with fricon.library() as lib:
-    sample = lib.samples.get("sample-a")
-    session = sample.session("cooldown-2026-05")
+    # Optional prelude, similar to the old habit of setting data_dir at the
+    # top of a notebook. The exact API is not settled.
+    lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
-    with session.experiment("rabi q3") as exp:
+    with lib.experiment("rabi q3") as exp:
         rabi = exp.dataset("rabi")
         chevron = exp.dataset("chevron")
 
@@ -206,6 +231,23 @@ with fricon.library() as lib:
         for freq, amp in points:
             chevron.write(freq=freq, amp=amp, signal=measure(freq, amp))
 ```
+
+The active context may be set from a notebook prelude, CLI, desktop UI, or an
+explicit Python object. It should behave like a helpful default, not hidden
+provenance. Each experiment should record the resolved sample/session IDs or
+record that no sample context was selected.
+
+Quick experiments should also be valid without sample context:
+
+```python
+with fricon.library() as lib:
+    with lib.experiment("quick resonator check") as exp:
+        s21 = exp.dataset("s21")
+        s21.write(freq=7.1e9, signal=measure())
+```
+
+Users should be able to attach or correct sample/session links later through an
+auditable correction path.
 
 Dataset handles opened from an experiment should finalize with the experiment
 unless the user explicitly aborts or detaches them. This avoids nested writer
@@ -225,6 +267,17 @@ Lower-level datasets are unassigned artifacts until linked to a producer.
 
 The sample model should replace the old habit of using data-vault directories
 as sample boundaries.
+
+Sample/session context should be easy to set but not mandatory for quick
+measurements. Many existing notebooks start with a small prelude such as
+`data_dir = ...`; Fricon should support an equivalent active sample/session
+prelude and a desktop active-context selector.
+
+An experiment may start with:
+
+- an explicit sample/session context
+- the current active sample/session context
+- no sample/session context, with attach-later support
 
 Use one `Sample` when the physical object is the same object. Use multiple
 `SampleSession` records for cooldowns, mountings, wiring configurations,
@@ -333,24 +386,33 @@ managed API or explicit advanced hooks.
 v0.2 should be able to evolve toward Fricon-managed device communication and
 eventually remove LabRAD from the measurement stack.
 
-Do not build the full driver framework first. Reserve the model now:
+Do not build the full driver framework first. Reserve a minimal boundary now:
 
 - DeviceIdentity: stable logical device name and backend binding
+- DeviceCapability: declared operations, readable state, writable state, and
+  limits exposed by a device adapter
+- DeviceAdapter: local boundary that can later wrap LabRAD, direct Python
+  drivers, VISA, serial, vendor SDKs, or dummy devices
 - DeviceState: current or observed state
 - DesiredDeviceState: state requested by a managed scan point
 - ApplyPlan: ordered changes Fricon intends to send
 - Readback: what hardware reported after apply
 - ResourceLease: minimal guard for devices that cannot be used concurrently
 
-The first implementation can record only summaries or placeholders. The
-important decision is that device state belongs to managed execution
-provenance, not to dataset metadata.
+The first implementation can record only summaries, placeholders, or a very
+thin adapter contract. The important decisions are:
+
+- device state belongs to managed execution provenance, not dataset metadata
+- Fricon should have a typed place for future device capabilities and readbacks
+- dummy devices and dry runs should use the same boundary as real adapters
+- LabRAD compatibility, if needed during migration, should be an adapter behind
+  the boundary rather than the conceptual model
 
 ## Analysis And Calibration
 
 Analysis is a consumer and producer.
 
-It may consume experiment datasets and produce:
+It may consume experiment artifacts, usually datasets, and produce:
 
 - derived datasets
 - scalar or structured results
@@ -444,13 +506,15 @@ Likely reusable areas:
 The first slice should prove the new model end to end:
 
 1. Create or open one data library.
-2. Create a sample.
-3. Start a sample session.
+2. Create or select a sample/session when known, or explicitly run without one.
+3. Set active sample/session context from the desktop UI or Python prelude when
+   appropriate.
 4. Start an interactive experiment from Python.
 5. Write one or more dataset artifacts through experiment-scoped handles.
 6. Browse the experiment and datasets in the desktop/web UI.
 7. Reopen a dataset from Python by stable ID.
-8. Record actor, code summary, run note, quality, and sample/session links.
+8. Attach or correct sample/session context after the run when needed.
+9. Record actor, code summary, run note, quality, and sample/session links.
 
 This slice intentionally breaks old workspace/dataset assumptions where they
 conflict with the v0.2 model.
@@ -461,8 +525,11 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 
 - data library versus workspace public model
 - sample and sample-session identity
+- active sample/session context and attach-later correction policy
+- general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
 - experiment-scoped dataset writer lifecycle
+- minimal device adapter/capability boundary for future LabRAD replacement
 - actor/auth boundary for local and remote access
 - optional managed experiment desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
@@ -472,6 +539,8 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 
 - Keep the Python experiment path simple.
 - Keep datasets directly openable from Python and the desktop UI.
+- Keep sample/session context easy to set as an active default, but do not block
+  quick experiments when the context is unknown.
 - Keep dataset semantics dataset-local.
 - Keep sample/session/run/parameter/provenance out of dataset names.
 - Keep notes and tags mostly on sample, session, experiment, analysis, and

@@ -37,9 +37,10 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
 - `v0.2/design.md` is the canonical v0.2 design synthesis. It defines the
   clean reset model: one data library; samples and sessions; experiment,
   analysis, simulation, import, and calibration activity records; dataset
-  artifacts; parameter snapshots and proposals; code summaries; actor/audit
-  boundaries; and the optional managed experiment path toward Fricon-managed
-  device communication.
+  artifacts as the first concrete artifact type; reserved general artifacts;
+  parameter snapshots and proposals; code summaries; actor/audit boundaries;
+  optional active sample/session context; and the optional managed experiment
+  path toward Fricon-managed device communication.
 - `v0.2/product-direction.md` repositions Fricon as a local lab data library
   and automation foundation centered on samples, sessions, experiment runs,
   dataset artifacts, parameter history, code summaries, and calibration
@@ -108,7 +109,7 @@ user review and durable audit records.
 
 ## Product Pillars
 
-- Data-library, sample, session, and dataset management
+- Data-library, optional sample/session context, and artifact management
 - Dataset semantics and durable interpretation
 - Desktop dataset browsing, inspection, and charting
 - Python scripting API for data recording and automation
@@ -129,12 +130,15 @@ experiments and use Fricon instead to:
 
 - record table-shaped measurement datasets from Python scripts or notebooks
 - select or create a lightweight sample and sample-session context when the
-  measured object matters
+  measured object matters, without blocking quick experiments when context is
+  not yet known
 - see newly produced datasets in the desktop UI without manual file handling
 - inspect recent and historical datasets through table and chart views
 - use explicit dataset semantics for column metadata, scan axes, chart defaults,
   and live-view interpretation instead of relying on row-order heuristics
 - create a minimal interactive experiment record that groups produced datasets
+- reserve a general artifact model so reports, logs, figures, attachments, and
+  future device snapshots do not have to masquerade as datasets
 - store experiment-level names, notes, tags, pin or favorite state, quality
   state, and legacy JSON metadata on the run
 - keep dataset metadata focused on output-local semantics and per-output
@@ -302,7 +306,8 @@ Experiment code management may support local reproducibility features such as:
 Dataset usability may include:
 
 - generated Python read snippets for each dataset
-- copyable examples for loading selected datasets by workspace-local ID or UID
+- copyable examples for loading selected datasets by data-library-local ID or
+  UID
 - preview snippets for pandas, pyarrow, plotting, CSV export, and Parquet export
 - snippets that match the public Python API instead of exposing internal
   storage layout
@@ -328,8 +333,8 @@ Traceability and reproducibility may include:
 - a provenance graph from workflow to run, datasets, parameters, code version,
   environment, device configuration, notes, imports, and exports
 - immutable run records with later corrections recorded as appended events
-- a workspace event timeline for dataset, run, parameter, import, export, and
-  automation events
+- a data-library event timeline for dataset, run, parameter, import, export,
+  and automation events
 - parameter snapshots for each run and parameter diffs between runs
 - input lineage for derived datasets, including measured, processed,
   simulation, and imported dataset categories
@@ -341,7 +346,7 @@ Traceability and reproducibility may include:
   summary
 - checksums for dataset chunks, exported bundles, code snapshots, and
   environment lock files
-- human-readable audit summaries for selected runs or workspaces
+- human-readable audit summaries for selected runs or data libraries
 
 Workflow automation may include:
 

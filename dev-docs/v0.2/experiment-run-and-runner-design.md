@@ -55,7 +55,7 @@ Parameter-aware runs also depend on:
 
 Future runner implementation also depends on:
 
-- a local execution service that can coordinate workspace state and script
+- a local execution service that can coordinate data-library state and script
   processes
 
 ## Settled PO Decisions For V1
@@ -106,8 +106,13 @@ Settled user-facing policies:
   `ExperimentRun` v1 behavior
 - dataset-only creation remains valid and should create unassigned datasets
   unless the caller explicitly supplies an experiment context
+- sample/session context is encouraged but optional; users can set active
+  context from a notebook prelude or desktop UI, and attach or correct context
+  later through an auditable correction path
 - datasets are independent artifacts that may later be produced by experiments,
   analysis runs, import runs, simulation runs, or calibration workflows
+- `Artifact` is the general provenance output concept; `Dataset` is the first
+  concrete artifact subtype needed for measurement replacement
 - interactive experiment parameter snapshots are optional; user-provided
   metadata can bridge existing code until the parameter system is adopted
 - managed or parameter-aware runs should require a resolved immutable parameter
@@ -228,7 +233,7 @@ This design should not introduce:
 - a broad hardware driver framework
 - desktop-first experiment execution as the primary product model
 - automatic parameter mutation after calibration
-- AI actions that mutate workspace state without review and auditability
+- AI actions that mutate data-library state without review and auditability
 - rewriting or deleting completed measurement facts as the normal correction
   path
 
@@ -706,8 +711,8 @@ resource availability.
 
 ## Provenance And Audit Boundary
 
-The first implementation does not need a full workspace event timeline, but the
-model should preserve room for it.
+The first implementation does not need a full data-library event timeline, but
+the model should preserve room for it.
 
 Actions that likely need durable audit or event records:
 
@@ -877,7 +882,9 @@ workflows.
 Possible interactive shape:
 
 ```python
-with ws.experiment_run("cooldown sweep", params="main") as run:
+lib.use_context(sample="sample-a", session="cooldown-2026-05")
+
+with lib.experiment("cooldown sweep", params="main") as run:
     s21 = run.dataset("s21")
     noise = run.dataset("noise")
 
@@ -885,6 +892,11 @@ with ws.experiment_run("cooldown sweep", params="main") as run:
         s21.write(freq=freq, s21=measure_s21(freq))
         noise.write(freq=freq, noise=measure_noise(freq))
 ```
+
+The active sample/session context is a convenience for the common notebook
+prelude pattern, not a hidden global fact. The experiment record should store
+the resolved context IDs when present. A quick experiment without context should
+still be valid and visibly missing context.
 
 The experiment context should own default dataset writer finalization for
 datasets opened through the run. On normal run exit, open produced datasets are
@@ -897,7 +909,7 @@ Nested dataset context managers may remain available for advanced explicit
 lifecycle control:
 
 ```python
-with ws.experiment_run("cooldown sweep", params="main") as run:
+with lib.experiment("cooldown sweep", params="main") as run:
     with run.dataset("s21") as s21:
         s21.write(freq=..., s21=...)
 ```
@@ -917,7 +929,7 @@ def cooldown_sweep(ctx, params):
 Managed execution can be introduced separately:
 
 ```python
-task = ws.submit_experiment(cooldown_sweep, params="main")
+task = lib.submit_experiment(cooldown_sweep, params="main")
 ```
 
 Runner-managed execution should remain future scope until the record-centric
@@ -1147,6 +1159,11 @@ Dataset metadata
   per-output quality when a single dataset differs from the whole run
 ```
 
+Non-table outputs should be modeled as artifacts rather than squeezed into
+dataset metadata. Attachments, logs, reports, figures, code summaries, waveform
+files, and future device snapshots should share provenance links with datasets
+without pretending to be table-shaped data.
+
 Remaining questions to settle later:
 
 - How should dataset list views behave when most organization happens at the
@@ -1188,11 +1205,11 @@ Likely long-term shape:
 ```text
 Experiment-first path
   recommended path for scientific measurement
-  workspace -> experiment run -> dataset outputs
+  data library -> experiment run -> artifact outputs
 
 Dataset-only path
   lower-level path for imports, standalone tables, and transitional workflows
-  workspace -> dataset
+  data library -> dataset artifact
 ```
 
 Questions to settle later:
@@ -1202,6 +1219,8 @@ Questions to settle later:
 - Should `ws.dataset(...)` remain a first-class public convenience path, or be
   positioned as a lower-level dataset-only path?
 - How should dataset writers discover or inherit the current experiment context?
+- How should active sample/session context be displayed so users notice when it
+  is unset or stale?
 - Should imported or legacy datasets create synthetic import runs, remain
   dataset-only, or support both?
 - Should the desktop home view be run-first, dataset-first, or split by task?
@@ -1268,7 +1287,7 @@ This proposal intentionally leaves the following to later focused designs:
 - calibration proposal, validation, and promotion flows
 - analysis run taxonomy and shared input/output provenance for derived datasets
 - device identity, apply plans, readback verification, and instrument snapshots
-- complete workspace event timeline and audit export behavior
+- complete data-library event timeline and audit export behavior
 - AI-assisted suggestions, approvals, and accepted/rejected mutation records
 - distributed execution or remote clients
 

@@ -60,8 +60,7 @@ one Fricon data library
 The normal measurement flow should be:
 
 ```text
-select or create sample
-start or select sample session / cooldown
+set active sample/session context when known
 run experiment from Python
 watch produced datasets
 annotate run and mark quality
@@ -71,7 +70,7 @@ promote useful calibration results through parameter proposals
 
 The first-screen product should eventually be organized around current lab work:
 
-- active sample/session
+- active sample/session, with a visible "none selected" state
 - recent experiment runs
 - live datasets
 - important notes and quality state
@@ -107,6 +106,12 @@ Samples need:
 
 Do not force all labs into a full inventory system. Sample records should be
 lightweight but real.
+
+Sample selection should be low-friction. Many existing notebooks set a
+`data_dir` or similar global variable near the top of the file. Fricon should
+support an equivalent active sample/session context in a notebook prelude and
+in the desktop UI. Quick experiments may run without sample context and attach
+or correct it later.
 
 ### Sample Session / Cooldown
 
@@ -146,6 +151,12 @@ processed, imported, or simulated.
 
 Datasets must remain directly openable from Python and the desktop UI, but they
 should not be the only organizing object.
+
+Reserve `Artifact` as the broader provenance concept. `DatasetArtifact` is the
+primary v0.2 artifact because measured tables and live plots are the LabRAD
+replacement path. Reports, figures, logs, attachments, waveform/configuration
+files, code summaries, and future device snapshots should not have to masquerade
+as datasets.
 
 ### Parameter Profile And Snapshot
 
@@ -216,11 +227,17 @@ As an experimentalist, I want to record a cooldown or measurement session for a
 sample so that drift and context changes are tracked without pretending each
 cooldown is a new sample.
 
+The sample/session context should be selectable as an active default, not a
+required modal step before every quick measurement.
+
 ### Run An Exploratory Experiment
 
 As an experimentalist, I want to run a measurement from Python with minimal
 boilerplate so that Fricon records the run, datasets, sample/session context,
 and basic provenance.
+
+If no sample/session is selected, Fricon should still record the experiment and
+make missing context visible and fixable later.
 
 ### Watch And Inspect Data
 

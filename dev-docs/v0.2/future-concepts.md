@@ -152,7 +152,8 @@ Boundary:
 
 Likely interfaces:
 
-- run records may reference a sample or specimen
+- run records may reference a sample or specimen, either from explicit API
+  input, active sample/session context, or an attach-later correction
 - datasets may inherit sample context from a run
 - parameter snapshots or profiles may carry sample context without owning the
   sample record
@@ -167,7 +168,7 @@ Dependencies:
 Open questions:
 
 - What minimal sample fields should be first-class?
-- Should sample identity be workspace-local only?
+- Should sample identity be data-library-local only?
 - How should imported datasets with external sample identifiers be handled?
 - When is a sample concept unnecessary and a tag or note sufficient?
 
@@ -223,7 +224,7 @@ Dependencies:
 - import/export compatibility policy
 - experiment run model for measured datasets
 - analysis or processing records for derived datasets
-- workspace event or correction model
+- data-library event or correction model
 - UI conventions for flags, filters, and summaries
 
 Open questions:
@@ -286,7 +287,7 @@ Open questions:
 - How should the desktop UI present downstream analyses from an experiment run?
 - Which analysis results may drive automatic calibration proposals?
 
-## Workspace Event And Audit Timeline
+## Data Library Event And Audit Timeline
 
 Status: future concept, ADR needed later.
 
@@ -295,16 +296,16 @@ Why it matters:
 - Corrections, parameter proposals, automation actions, AI-assisted changes,
   imports, exports, run state transitions, and destructive operations all need
   durable audit context.
-- A workspace timeline can help users understand what changed without exposing
-  storage internals.
+- A data-library timeline can help users understand what changed without
+  exposing storage internals.
 - Event history is the preferred direction for correcting completed run facts
   instead of silent mutation.
 
 Boundary:
 
-- Owns append-only or event-like records for user-visible workspace mutations,
-  corrections, automation decisions, manual overrides, failed automation, and
-  AI-assisted changes.
+- Owns append-only or event-like records for user-visible data-library
+  mutations, corrections, automation decisions, manual overrides, failed
+  automation, and AI-assisted changes.
 - Does not own feature-specific business rules, dataset payload storage, or UI
   notification mechanics.
 
@@ -330,7 +331,8 @@ Open questions:
   summaries?
 - How should event records handle privacy-sensitive prompt, path, or note
   content?
-- What retention and export behavior is appropriate for local-first workspaces?
+- What retention and export behavior is appropriate for local-first data
+  libraries?
 
 ## Workflow And Calibration Automation
 
@@ -428,9 +430,9 @@ Why it matters:
 
 Boundary:
 
-- Owns device identity, connection metadata, command planning, dry runs,
-  application ordering, safety checks, readback verification, partial failure
-  handling, and instrument snapshots.
+- Owns device identity, declared capabilities, adapter binding, connection
+  metadata, command planning, dry runs, application ordering, safety checks,
+  readback verification, partial failure handling, and instrument snapshots.
 - Does not own parameter snapshot history, parameter diff UI, dataset payload
   storage, or analysis algorithms.
 
@@ -438,6 +440,8 @@ Likely interfaces:
 
 - consumes parameter snapshots or effective run configs
 - produces device apply plans and instrument snapshots
+- exposes a minimal adapter boundary that can wrap LabRAD, direct Python
+  drivers, VISA, serial, vendor SDKs, or dummy devices
 - returns readback and failure information to run provenance
 - may expose device configuration snapshots for future provenance views
 
@@ -492,7 +496,7 @@ Dependencies:
 Open questions:
 
 - Which AI actions are suggestion-only?
-- Which AI actions may mutate workspace state after explicit approval?
+- Which AI actions may mutate data-library state after explicit approval?
 - What model/provider/version metadata should be recorded for
   reproducibility?
 - How much prompt or task context can be summarized without storing sensitive

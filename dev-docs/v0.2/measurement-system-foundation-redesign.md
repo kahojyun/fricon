@@ -47,10 +47,13 @@ Fricon helps me inspect, annotate, recover, and reopen them.
 ```
 
 The recommended measurement path should be experiment-first once the run API
-exists:
+exists. Sample/session context should be selectable as an active default, not a
+hard prerequisite for quick measurements:
 
 ```python
-with ws.experiment("cooldown sweep") as run:
+lib.use_context(sample="sample-a", session="cooldown-2026-05")
+
+with lib.experiment("cooldown sweep") as run:
     s21 = run.dataset("s21")
     noise = run.dataset("noise")
 
@@ -70,10 +73,15 @@ Nested dataset context managers may remain available for advanced explicit
 lifecycle control, but public V1 examples should prefer the flatter
 experiment-scoped writer form when it is sufficient.
 
-The lower-level dataset-only path should remain valid:
+Quick experiments without sample context and the lower-level dataset-only path
+should remain valid:
 
 ```python
-with ws.dataset("quick_table") as ds:
+with lib.experiment("quick check") as run:
+    ds = run.dataset("quick_table")
+    ds.write(x=1.0, y=2.0)
+
+with lib.dataset("scratch_table") as ds:
     ds.write(x=1.0, y=2.0)
 ```
 
@@ -85,7 +93,8 @@ silently create experiment records.
 
 Keep the V1 user model small:
 
-- `Workspace`
+- `Data Library`
+- optional active `Sample` and `Sample Session`
 - `Experiment`
 - `Dataset`
 - notes, tags, pin or favorite state, and quality state
@@ -143,7 +152,7 @@ Examples:
 Use this conceptual model:
 
 ```text
-Workspace
+DataLibrary
   -> concrete run records
        kind: experiment | analysis | import | simulation | calibration
        inputs
@@ -158,6 +167,8 @@ Workspace
        projections
        provenance links
 ```
+
+Use `WorkspaceRoot` only as internal or legacy implementation terminology.
 
 The central rule is:
 
@@ -176,7 +187,7 @@ exclusively by experiments.
 
 A dataset artifact should have stable identity and independent lifecycle:
 
-- workspace-local integer ID
+- data-library-local integer ID
 - stable UID
 - name and optional description
 - `kind`: at least reserve `measured`, `processed`, `imported`, and
@@ -264,6 +275,11 @@ CalibrationRun or WorkflowRun
 Implementation can share provenance edge tables such as `RunInput` and
 `RunOutput`, but those should not become primary V1 user concepts.
 
+`Artifact` should be the general provenance concept. `Dataset` is the primary
+artifact subtype needed for the first LabRAD-style replacement slice. Future
+logs, reports, figures, attachments, code summaries, waveform/configuration
+files, and device snapshots should not be forced into dataset metadata.
+
 ## Automatic Calibration Shape
 
 Clean automatic calibration should be modeled as workflow over provenance:
@@ -310,9 +326,10 @@ The low-friction write path must survive.
 
 V1 should expose:
 
-- local workspace
+- local data library
+- optional active sample/session context with attach-later correction
 - interactive experiment records
-- measured dataset artifacts
+- measured dataset artifacts as the first concrete artifact subtype
 - dataset table and chart inspection
 - explicit dataset semantics enough for robust scan/chart behavior
 - experiment-scoped dataset writer handles with default finalization tied to

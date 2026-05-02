@@ -27,14 +27,15 @@ The v0.2 product model is:
 one Fricon data library
   -> samples and sample sessions
   -> experiment, analysis, simulation, import, and calibration activity records
-  -> dataset artifacts, results, reports, and parameter proposals
+  -> artifacts: datasets first, then results, reports, logs, attachments,
+     device snapshots, and parameter proposals
   -> parameter snapshots, code summaries, notes, tags, and quality state
 ```
 
 For normal users, the first mental model should stay simple:
 
 ```text
-I selected a sample/session.
+I selected an active sample/session when it mattered.
 I ran an experiment.
 It produced datasets.
 Fricon helps me inspect, annotate, recover, analyze, and calibrate from them.
@@ -70,9 +71,10 @@ keeps the Python-led and local-first parts, but broadens the foundation from a
 dataset catalog to a measurement record system:
 
 - data library instead of user-facing workspace
-- sample and session identity before experiment history gets fragmented
+- optional active sample and session identity before experiment history gets
+  fragmented
 - experiment runs as the default measurement work record
-- datasets as artifacts, not the whole experiment record
+- artifacts as outputs, with datasets as the primary table-shaped case
 - parameter and code history as first-class provenance
 - analysis, simulation, import, and calibration as activity records that
   consume and produce artifacts

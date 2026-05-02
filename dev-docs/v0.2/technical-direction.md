@@ -164,17 +164,23 @@ DataLibrary
   Sample
   SampleSession
   ExperimentRun
+  Artifact
   DatasetArtifact
+  AttachmentArtifact
   AnalysisResult
   ParameterSnapshot
   ParameterProposal
   CodeSnapshot
+  DeviceIdentity
   Event/AuditRecord
 ```
 
 Dataset payloads can continue to use Arrow chunk concepts where appropriate.
 The catalog and provenance model should be redesigned around the broader data
-library, not around dataset-only ownership.
+library, not around dataset-only ownership. `DatasetArtifact` should be the
+first concrete artifact type, but storage should reserve the general
+`Artifact` boundary for reports, figures, logs, attachments, code summaries,
+waveform or configuration files, and future device snapshots.
 
 ## API Model Direction
 
@@ -182,14 +188,19 @@ The ergonomic measurement path should be experiment-scoped:
 
 ```python
 with fricon.library() as lib:
-    sample = lib.samples.get("qpu-017")
-    session = sample.session("cooldown-2026-05")
+    # Optional active context, exact API unsettled.
+    lib.use_context(sample="qpu-017", session="cooldown-2026-05")
 
-    with session.experiment("rabi q3") as run:
+    with lib.experiment("rabi q3") as run:
         rabi = run.dataset("rabi")
         for amp in amps:
             rabi.write(amp=amp, signal=measure(amp))
 ```
+
+Sample/session context should be a resolved default, not an implicit hidden
+global. The experiment record should store the resolved sample/session IDs when
+active context is used. If no context is selected, the run remains valid and
+the UI should make attach-later correction explicit.
 
 Lower-level dataset creation remains useful:
 
@@ -200,6 +211,30 @@ with lib.dataset("scratch") as ds:
 
 Lower-level datasets are unassigned unless explicitly linked to a producer
 record.
+
+The active-context idea should be available from both Python prelude code and
+the desktop UI because existing lab notebooks often set a save path near the
+top of the file.
+
+## Minimal Device Boundary
+
+v0.2 should reserve a typed device boundary without implementing a broad driver
+framework.
+
+The boundary should include:
+
+- device identity and aliases
+- declared capabilities, including readable state, writable state, units,
+  limits, and safety hints
+- an adapter boundary that can later wrap LabRAD, direct Python drivers, VISA,
+  serial, vendor SDKs, or dummy devices
+- desired state, apply plan, readback, and partial failure summaries
+- resource keys for future leases
+
+This keeps a path toward complete LabRAD replacement without forcing v0.2 to
+ship a general-purpose hardware framework. If LabRAD is needed during
+migration, it should sit behind an adapter boundary rather than remain the
+conceptual model.
 
 ## Managed Experiment Plan Direction
 
@@ -314,9 +349,12 @@ Likely ADRs:
 - v0.2 product and data-library repositioning
 - data library versus workspace public model
 - sample and sample-session identity
+- active sample/session context and attach-later correction policy
+- general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
 - authentication/actor boundary for local and remote access
 - Python SDK surface and experiment-scoped dataset writer lifecycle
+- minimal device adapter and capability boundary for future LabRAD replacement
 - optional managed experiment plan and desired-device-state boundary
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - desktop web architecture and remote UI access
@@ -327,12 +365,16 @@ Before broad implementation, build a narrow vertical slice that proves the new
 foundation:
 
 1. Create/open one data library.
-2. Create sample and sample session.
-3. Start an interactive experiment from Python.
-4. Write one or more dataset artifacts through experiment-scoped handles.
-5. Browse the run and datasets in the desktop/web UI.
-6. Reopen a dataset from Python by stable ID.
-7. Record actor, code summary, run note, quality, and sample/session links.
+2. Create or select sample/session context when known, or explicitly leave it
+   unset.
+3. Set active sample/session context from Python prelude or desktop UI when
+   appropriate.
+4. Start an interactive experiment from Python.
+5. Write one or more dataset artifacts through experiment-scoped handles.
+6. Browse the run and datasets in the desktop/web UI.
+7. Reopen a dataset from Python by stable ID.
+8. Attach or correct sample/session context after the run when needed.
+9. Record actor, code summary, run note, quality, and sample/session links.
 
 This slice should intentionally break old workspace/dataset assumptions where
 they conflict with the v0.2 model.
