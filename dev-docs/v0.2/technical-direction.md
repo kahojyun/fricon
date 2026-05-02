@@ -286,6 +286,10 @@ Preferred direction:
 - make the measurement console the first screen
 - support detachable measurement, plot, or data windows for watching multiple
   runs without creating multiple independent full app instances
+- highlight newly started Python measurements in the console and live list
+  without stealing focus or opening windows automatically
+- provide default shortcuts for today, live/active, active sample/session,
+  favorites, partial/failed, trash, and text search
 - bundle the frontend assets in the Tauri desktop app for normal local use
 - use the local service API for core data access instead of routing dataset
   queries through Tauri commands
@@ -332,6 +336,10 @@ The service should coordinate multiple concurrent local measurement writers.
 Each active writer belongs to an isolated measurement record and reports live
 status to the console.
 
+Measurement list DTOs should provide a human-first display identity: name or
+title, start time, sample/session label when available, and stable record ID as
+secondary technical identity.
+
 ## Future Remote Access
 
 Plan for remote access early, but do not make v0.2 ship remote mode or become a
@@ -357,9 +365,9 @@ data library from a shared folder. A lab machine should own the data library
 through the Fricon service, and other machines should connect as clients when
 remote access is implemented.
 
-The first remote phase should be read-only LAN monitoring, browsing, and export.
-Remote acquisition writes, collaboration semantics, and multi-user
-administration remain later scope.
+The first remote phase should be strict read-only LAN monitoring, browsing, and
+export. Remote annotations, remote acquisition writes, collaboration semantics,
+and multi-user administration remain later scope.
 
 ## Authentication And Actor Boundary
 
@@ -372,6 +380,8 @@ Recommended v0.2 policy:
   writes
 - every mutating operation can record an actor, including an optional local
   operator profile when configured
+- operator/profile selection should be a machine or session default rather than
+  a per-measurement prompt
 - the first authorization model is single-owner: authenticated clients can act
   as the library owner
 - future remote access must require token or pairing
@@ -419,6 +429,17 @@ the concrete scope. Dataset contents should be appendable while their writer is
 active and immutable after finish; fixes should create derived artifacts or
 correction events.
 
+Measurement notes and markers should be stored as timestamped events in the
+measurement event timeline, beside lifecycle and system events, rather than as
+only one mutable text field.
+
+Datasets intended for live or historical plotting should require explicit scan
+schema at creation time. The schema should carry the acquisition code's own
+knowledge of independent columns, dependent columns, axis order or shape when
+known, units/labels, and enough role metadata for slicing and display. Scratch
+or unplotted lower-level tables may use a generated guessed schema, but guessed
+schema should not be the primary path for measurement data.
+
 ## API Model Direction
 
 The ergonomic measurement path should be measurement-scoped:
@@ -429,7 +450,10 @@ lib = fricon.library()
 lib.use_context(sample="qpu-017", session="cooldown-2026-05")
 
 with lib.measurement("rabi q3") as meas:
-    rabi = meas.dataset("rabi")
+    rabi = meas.dataset(
+        "rabi",
+        scan={"independent": "amp", "dependent": "signal"},
+    )
     for amp in amps:
         rabi.write(amp=amp, signal=measure(amp))
 ```
@@ -457,6 +481,10 @@ record.
 The active-context idea should be available from both Python prelude code and
 Fricon Desktop because existing lab notebooks often set a save path near the
 top of the file.
+
+Active context should remain visible, but Fricon should not depend on
+overconfident stale-context heuristics. The API and UI should make it cheap to
+bulk-correct sample/session context on recent measurements with event history.
 
 Measurement creation should be explicit but short. Do not hide automatic
 measurement creation behind low-level dataset writes in the normal SDK path.
@@ -492,6 +520,7 @@ The exact syntax is unsettled. The contract is:
   export UUID, format version, original record IDs, checksums, and Fricon
   version travel in the bundle
 - common tabular files such as CSV or Parquet should be included when practical
+- a simple human-readable manifest or index preview should be included
 - measurement metadata, sample/session context, produced datasets, selected
   non-table artifacts, parameter snapshot or legacy metadata, code/environment
   summary, notes, tags, lifecycle flags, and provenance summaries travel with
@@ -581,6 +610,10 @@ The important contract is not this exact syntax. The important contract is that
 Fricon can derive an inspectable desired device state from parameter snapshots
 and scan points before executing hardware mutations.
 
+Acquisition should remain Python-first. Do not plan a Labber-like visual sweep
+builder as a product goal before explicit scan schema and optional managed-plan
+previews prove that users need a visual authoring layer.
+
 ## Code And Environment Provenance
 
 v0.2 should avoid encouraging copied code directories.
@@ -643,6 +676,7 @@ Likely ADRs:
 - active sample/session context and attach-later correction policy
 - general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
+- plotted dataset scan schema contract and guessed-schema fallback
 - authentication/actor boundary for local access and future remote access
 - client/server protocol compatibility, version negotiation, and
   fail-before-write diagnostics for incompatible clients
@@ -667,14 +701,15 @@ foundation:
 3. Set active sample/session context from Python prelude or Fricon Desktop when
    appropriate.
 4. Start an explicit measurement from Python, including headless script use.
-5. Write one or more dataset artifacts through measurement-scoped handles.
+5. Write one or more dataset artifacts through measurement-scoped handles,
+   including explicit scan schema for datasets intended for plotting.
 6. Browse the run and datasets in the Fricon Desktop measurement console.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
 9. Record actor/operator label, code summary, run note, lifecycle flags, and
    sample/session links.
-10. Export a read-only measurement bundle with common tabular files and direct
-    Python/Desktop offline-viewer access.
+10. Export a read-only measurement bundle with common tabular files, a simple
+    manifest/index preview, and direct Python/Desktop offline-viewer access.
 11. Exercise backup/restore and trash/recover as user-visible safety paths.
 
 This slice should intentionally break old workspace/dataset assumptions where

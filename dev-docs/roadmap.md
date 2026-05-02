@@ -150,6 +150,11 @@ measurements and use Fricon instead to:
 - see newly produced datasets in Fricon Desktop without manual file handling
 - inspect live, recent, and historical measurements through table, line/scatter,
   and basic 2D views
+- provide explicit scan schema for datasets intended for live or historical
+  plotting, including independent/dependent roles and enough axis structure for
+  slicing and display
+- use measurement display identity based on name/title, start time, and
+  sample/session label, with stable IDs as secondary technical references
 - install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
   coherent Fricon release rather than assembling mismatched components manually
 - use the CLI primarily for setup, diagnostics, service control, and developer
@@ -172,6 +177,8 @@ measurements and use Fricon instead to:
   and live-view interpretation instead of relying on row-order heuristics
 - create an explicit but low-ceremony measurement record that groups produced
   datasets
+- highlight new live measurements in Desktop without stealing focus or opening
+  windows automatically
 - reserve a general artifact model so reports, logs, figures, attachments, and
   future device snapshots do not have to masquerade as datasets
 - store measurement-level names, favorite or pin state, optional notes/tags,
@@ -183,7 +190,8 @@ measurements and use Fricon instead to:
 - preserve interrupted partial data; reruns create new linked measurements by
   default, while continuation requires explicit intent and compatibility checks
 - export measurements as read-only portable bundles with practical common
-  tabular files and direct Python/Desktop offline-viewer access
+  tabular files, a simple manifest/index preview, and direct Python/Desktop
+  offline-viewer access
 - include light measurement attachments such as small files, images, or logs
   without building a full artifact management UI
 
@@ -196,6 +204,7 @@ v0.2 replacement does not require:
 - broad ordinary-user CLI workflows
 - a generic managed runner, queue, resource lease system, or workflow engine
 - a full parameter registry or device driver framework
+- post-hoc scan guessing as the primary path for plotted measurement data
 - Fricon-managed device communication
 - automatic calibration workflows
 - managed analysis records or analysis-run UI
@@ -203,6 +212,8 @@ v0.2 replacement does not require:
 - a long-term third-party client protocol stability promise
 - a complex auto-update system before the first replacement workflow is proven
 - remote mode, browser-served UI, or PWA distribution as shipped v0.2 features
+- remote annotations or remote acquisition writes
+- Labber-like visual sweep builder as a product goal
 - opening the same database-backed data library directly from multiple
   computers through a shared folder
 
@@ -245,6 +256,8 @@ Likely v0.3 candidates:
 - richer sample fields and 2D sample maps
 - attach/correct context UX polish
 - comparison and saved-view workflows
+- lightweight measurement templates for repeated names, scan schemas, and
+  display defaults
 - portable export viewer polish
 - smoother installer/update polish after the v0.2 release shape is proven
 - passive code/environment summary improvements

@@ -47,6 +47,9 @@ v0.2 should optimize for these user outcomes:
 - watch multiple active measurements through detachable data or plot windows
 - preserve flexible parameter snapshots, optional code/environment summaries,
   favorite, note, attachment, and lifecycle context for each measurement
+- require acquisition code to provide scan schema for datasets intended for
+  live or historical plotting, instead of reconstructing scan meaning from row
+  order after the fact
 - visualize sample/device parameters on a 2D map when the lab model needs it
 - leave room for repeated calibration without silent parameter mutation
 - leave a clean path to managed device communication after LabRAD is removed
@@ -113,6 +116,16 @@ This identity should travel with exports, audit summaries, and portable
 bundles. If a lab computer normally has one data library, the generated UUID and
 display name are enough to answer where an exported measurement came from
 without making users manage many roots.
+
+Measurement display identity should be human-first:
+
+- user-provided measurement name or title
+- start time
+- sample/session label when available
+- stable record ID as secondary technical identity
+
+This replaces the old habit of remembering data-vault folders or numeric files
+as the primary way to find data.
 
 ## Naming Direction
 
@@ -229,11 +242,15 @@ Settled v0.2 product decisions:
 - The first Desktop screen is a measurement console, not a generic dataset
   browser. v0.2 should support detachable measurement/plot/data windows from
   that console rather than multiple independent full app instances.
+- When a Python script starts a measurement, Desktop should highlight the new
+  live run in the console and live list without stealing focus or opening a
+  window automatically.
 - The local service should allow multiple concurrent local measurement writers,
   with each writer isolated as its own measurement record.
 - The local service uses a generated local token boundary and optional
-  lightweight operator profile for mutating actions. Do not add accounts,
-  teams, roles, or permissions UI.
+  lightweight operator profile for mutating actions. The operator/profile
+  label is a machine or session default, not a per-measurement prompt. Do not
+  add accounts, teams, roles, or permissions UI.
 - v0.2 should not add first-class Project or Campaign as required grouping
   objects. Organize work through samples, sessions, measurements, favorites,
   search, saved views, and optional tags.
@@ -243,10 +260,17 @@ Settled v0.2 product decisions:
 - Fricon Desktop should support inline sample/session creation, selection, and
   basic editing during measurement setup. A full sample manager and rich 2D
   sample-map editor can follow the minimal loop.
+- Active sample/session context should stay visible, but v0.2 should not rely
+  on unreliable stale-context guessing. Optimize for selecting recent
+  measurements and bulk-correcting sample/session context with history.
+- The sample map is an important secondary view and filter entry, not the
+  default home view for v0.2.
 - Favorites or pins are the primary manual signal for important measurements.
   Tags and notes should be available but secondary.
 - Users can add basic timestamped notes/markers during and after a measurement.
-  Important metadata and context corrections should leave change history.
+  They should appear in a measurement event timeline beside lifecycle and
+  system events. Important metadata and context corrections should leave change
+  history.
 - v0.2 status should emphasize system lifecycle flags such as
   incomplete, interrupted, calibration/test, invalidated, and superseded.
   Avoid making broad manual good/suspect/failed classification part of the
@@ -256,8 +280,9 @@ Settled v0.2 product decisions:
   remain a lower-level option; arbitrary library-subset export is later scope.
 - Portable exports include a Fricon bundle plus common tabular files such as
   CSV or Parquet when practical. They are read-only, open directly from Python
-  or the Desktop offline viewer without creating a local data library, and make
-  sensitive provenance opt-in or explicitly previewed.
+  or the Desktop offline viewer without creating a local data library, include
+  a simple human-readable manifest/index preview, and make sensitive provenance
+  opt-in or explicitly previewed.
 - `Measurement` is the first public acquisition noun. `Experiment` is informal
   scientific language or a possible future grouping/template concept.
 - Sample/session context is useful and visible, but optional. Quick
@@ -267,14 +292,19 @@ Settled v0.2 product decisions:
   measurement lifecycle.
 - Dataset contents are appendable while the writer is active and immutable
   after finish. Corrections produce derived artifacts or correction events.
-- Table-shaped datasets are the official v0.2 data shape. Optional column unit,
-  label, and display hints are enough for quick measurements without a required
-  schema.
+- Table-shaped datasets are the official v0.2 data shape. Column unit, label,
+  and display hints remain lightweight metadata, but plotted datasets need more
+  than row-order inference.
+- Datasets intended for live or historical plotting require explicit scan
+  schema at dataset creation, including independent/dependent roles and enough
+  scan-axis structure for slicing and display. Scratch or unplotted tables may
+  use a generated guessed schema.
 - v0.2 plot scope is live table, line/scatter, and basic 2D heatmap/image views
   from tabular columns. Rich dashboards are later scope.
-- Structured history filters by time, measurement name/type, sample/session,
-  tags/favorites, lifecycle state, and dataset columns where practical are part
-  of the replacement bar.
+- Default history shortcuts should cover today, live/active, active
+  sample/session, favorites, partial/failed, trash, and text search. Deeper
+  structured filters by measurement type, lifecycle state, and dataset columns
+  can exist behind the primary shortcuts where practical.
 - v0.2 can support light measurement attachments such as small files, images,
   and logs. Rich artifact management is later scope.
 - v0.2 code provenance is an optional summary, not mandatory source or
@@ -289,9 +319,13 @@ Settled v0.2 product decisions:
   measurement code and record-only at the device boundary.
 - Existing LabRAD scripts should migrate through the Fricon SDK. Do not build a
   Data Vault/Grapher compatibility layer in v0.2.
-- Remote access starts later as read-only LAN monitoring, browsing, and export
-  through the Fricon service. Remote acquisition writes and multi-user
-  semantics are later scope.
+- Remote access starts later as strict read-only LAN monitoring, browsing, and
+  export through the Fricon service. Remote annotations, remote acquisition
+  writes, and multi-user semantics are later scope.
+- Acquisition remains Python-first long term. Do not make a Labber-like visual
+  sweep builder a product goal before managed-plan previews prove a need.
+- Measurement templates are a v0.3/v0.4 candidate after explicit scan schema
+  and measurement records prove the workflow, not a v0.2 requirement.
 - AI integration should initially read, summarize, and suggest. Mutating
   actions require human or script confirmation and audit records.
 - Diagnostics are guided in Desktop. Support bundles are local and redacted by
@@ -430,6 +464,15 @@ dataset projections
   resolved grid/chart/live-view interpretation
 ```
 
+For datasets meant to appear in live or historical plots, scan schema is part
+of dataset semantics and should be provided by acquisition code at creation
+time. This is intentionally closer to LabRAD-style independent/dependent
+metadata than to a post-hoc chart guesser: the experiment code knows the scan
+values, measured values, axes, and intended shape best. When scan schema is
+missing, Fricon may generate a guessed schema for scratch or unplotted tables,
+but the guessed shape should not become the preferred path for measurement
+data that users expect to slice, plot, compare, or export reliably.
+
 The active dataset semantic proposal remains relevant for record IDs,
 append-only facts, manifests, and resolved interpretation. Before committing
 more durable dataset APIs or storage contracts, reconcile that work with this
@@ -452,8 +495,18 @@ lib = fricon.library()
 lib.use_context(sample="sample-a", session="cooldown-2026-05")
 
 with lib.measurement("rabi q3") as meas:
-    rabi = meas.dataset("rabi")
-    chevron = meas.dataset("chevron")
+    rabi = meas.dataset(
+        "rabi",
+        scan={"independent": "amp", "dependent": "response"},
+    )
+    chevron = meas.dataset(
+        "chevron",
+        scan={
+            "independent": ["freq", "amp"],
+            "dependent": "signal",
+            "shape": [len(freqs), len(amps)],
+        },
+    )
 
     for amp in amps:
         rabi.write(amp=amp, response=measure_rabi(amp))
@@ -473,7 +526,10 @@ Quick measurements should also be valid without sample context:
 lib = fricon.library()
 
 with lib.measurement("quick resonator check") as meas:
-    s21 = meas.dataset("s21")
+    s21 = meas.dataset(
+        "s21",
+        scan={"independent": "freq", "dependent": "signal"},
+    )
     s21.write(freq=7.1e9, signal=measure())
 ```
 
@@ -533,6 +589,7 @@ A measurement export should include:
 - code and environment summary when available
 - provenance links needed to explain inputs, outputs, analysis, and calibration
 - checksums for payload files and manifest records
+- simple human-readable manifest or index preview
 - generated Python read snippets for the portable API
 
 Default exports should be useful but not overly revealing. Sensitive provenance
@@ -841,8 +898,9 @@ actor boundary early; defer full multi-user product complexity.
 
 Do not support shared-folder multi-machine access to the same database-backed
 data library. Future remote viewing should connect to the Fricon service that
-owns the library. The first remote phase should be read-only monitoring,
-browsing, and export; remote acquisition writes remain later scope.
+owns the library. The first remote phase should be strict read-only monitoring,
+browsing, and export; remote annotations and remote acquisition writes remain
+later scope.
 
 ## Rewrite Strategy
 
@@ -882,15 +940,16 @@ The initial v0.2 engineering slice should prove the new model end to end:
 3. Set active sample/session context from Fricon Desktop or Python prelude when
    appropriate.
 4. Start an explicit measurement from Python, including headless script use.
-5. Write one or more dataset artifacts through measurement-scoped handles.
+5. Write one or more dataset artifacts through measurement-scoped handles,
+   including explicit scan schema for datasets intended for plotting.
 6. Browse the measurement and datasets in the Fricon Desktop measurement
    console, with detachable data or plot windows for live monitoring.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
 9. Record actor, passive code summary, favorite/pin state, run note, lifecycle
    flags, and sample/session links.
-10. Export a read-only measurement bundle with common tabular files and direct
-    Python/Desktop offline-viewer access.
+10. Export a read-only measurement bundle with common tabular files, a simple
+    manifest/index preview, and direct Python/Desktop offline-viewer access.
 11. Exercise backup/restore and trash/recover as user-visible safety paths.
 
 This slice intentionally breaks old workspace/dataset assumptions where they
@@ -908,6 +967,7 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - active sample/session context and attach-later correction policy
 - general Artifact versus DatasetArtifact boundary
 - dataset artifact and provenance model
+- plotted dataset scan schema contract and guessed-schema fallback
 - public naming policy for Measurement versus Experiment
 - measurement-scoped dataset writer lifecycle
 - minimal device adapter/capability boundary for future LabRAD replacement

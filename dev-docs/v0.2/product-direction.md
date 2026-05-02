@@ -109,6 +109,11 @@ The first-screen product should eventually be organized around current lab work:
 Dataset browsing remains important, but datasets are outputs inside a broader
 measurement history.
 
+Measurement identity in the UI should be easy to read without memorizing file
+paths or numeric data-vault folders. Use the measurement name/title, start time,
+and sample/session label when available as the primary display identity, with
+stable IDs available as secondary technical references.
+
 ## Core User-Visible Concepts
 
 ### Data Library
@@ -123,6 +128,10 @@ copied code into many long-lived roots.
 Do not make `Project` or `Campaign` a first-class required v0.2 grouping. If
 those ideas prove useful, introduce them later as lightweight grouping or saved
 view concepts rather than as a required hierarchy.
+
+The preferred path is saved views and tags first. Add `Project` or `Campaign`
+only if real workflows show that filters and views cannot carry the grouping
+need.
 
 Each data library should have a generated UUID and a user-editable display
 name. Exported measurements should include that source identity so users can
@@ -259,6 +268,9 @@ v0.2 should design the sample model so custom fields and 2D visualization fit
 cleanly, even if the initial implementation ships after the minimal measurement
 loop.
 
+The sample map should be a strong secondary view and filter entry, not the
+default v0.2 home screen. The measurement console remains the default home.
+
 User story:
 
 > As an experimentalist, I want to define sample parameters and visualize them
@@ -318,6 +330,9 @@ Acceptance notes:
   open the data library
 - Python measurement scripts can run headlessly without first opening Fricon
   Desktop
+- when a Python script starts a measurement, an already-open Desktop highlights
+  the new live run in the console without stealing focus or opening a window
+  automatically
 - remote mode, browser-served UI, and PWA distribution are future-ready
   architecture targets, not v0.2 shipped workflows
 
@@ -414,6 +429,10 @@ Acceptance notes:
 - use a generic sample session with an optional type label such as cooldown,
   mount, treatment, probing, or campaign
 - users can attach or correct sample/session context later with change history
+- Fricon keeps active context visible but does not rely on unreliable
+  stale-context warnings as the main safeguard
+- users can select recent measurements and bulk-correct sample/session context
+  with history when active context was wrong
 
 ### Run An Exploratory Measurement
 
@@ -459,9 +478,10 @@ Acceptance notes:
 - interrupted or partial measurements remain visible and recoverable
 - users can detach measurement or plot windows from the main console to watch
   multiple active runs without creating multiple full app instances
-- history views support structured filters by time, measurement name/type,
-  sample/session, tags/favorites, lifecycle state, and dataset columns where
-  practical
+- default shortcuts include today, live/active, active sample/session,
+  favorites, partial/failed, trash, and text search
+- deeper history views may support structured filters by measurement type,
+  lifecycle state, and dataset columns where practical
 
 ### Diagnose Local Setup Problems
 
@@ -489,9 +509,13 @@ Acceptance notes:
 
 - users can add basic timestamped notes or markers during and after a
   measurement
+- notes and markers appear in a measurement event timeline beside lifecycle and
+  system events, rather than only in one static note field
 - metadata, sample/session links, notes, tags, and lifecycle flags are
   correctable with history for important changes
 - a lightweight optional local operator profile can label mutating actions
+- the operator/profile label is a machine or session default, not a prompt for
+  every measurement
 - tags and notes remain optional; favorites/pins are the primary manual signal
 
 ### Reopen Data From Python
@@ -522,6 +546,8 @@ Acceptance notes:
   record IDs, and Fricon versions by default
 - exports include convenient common tabular files, such as CSV or Parquet when
   practical, in addition to the Fricon bundle manifest
+- exports include a simple human-readable manifest or index preview; do not
+  present this as a full analysis report
 - sensitive provenance such as full code paths, dirty Git details, full
   environment summaries, source computer label, and extensive sample metadata
   should be opt-in or explicitly previewed before export
@@ -570,9 +596,13 @@ Acceptance notes:
 
 - table-shaped datasets are the official v0.2 data shape
 - numeric and complex-valued measurement columns are in scope
-- column unit, label, and display hints are optional metadata
-- users should not be forced to define a full schema before quick exploratory
-  measurements
+- datasets intended for live or historical plotting require explicit scan
+  schema at creation time
+- scan schema should include independent/dependent roles and enough axis shape
+  or ordering metadata for slicing and display
+- scratch or unplotted tables may use a generated guessed schema
+- column unit, label, and display hints are lightweight metadata that complement
+  scan schema
 - light measurement attachments such as small files, images, and logs are in
   v0.2 scope; rich file/artifact management, dense arrays, waveform files,
   reports, and broader artifact workflows can follow later
@@ -596,6 +626,11 @@ large parameter sets do not drift through untracked JSON edits.
 As an experimentalist, I want a 2D sample map colored by parameters or results
 so that I can choose devices/regions and compare behavior across sessions.
 
+Acceptance notes:
+
+- sample map is a secondary view and filter entry, not the default home screen
+  in v0.2
+
 ### Calibrate With Reviewable Automation
 
 As an experimentalist, I want scheduled or repeated calibration to produce
@@ -613,8 +648,8 @@ Acceptance notes:
 - this is a v0.3+ candidate, not a v0.2 replacement requirement
 - future remote viewing should connect to the Fricon service that owns the data
   library
-- the first remote phase is read-only monitoring, browsing, and export; remote
-  acquisition writes remain later scope
+- the first remote phase is strict read-only monitoring, browsing, and export;
+  remote annotations and acquisition writes remain later scope
 - Fricon Desktop remote mode may provide the most consistent app experience
 - a browser-served read-only viewer may remain useful for quick access or
   troubleshooting
@@ -713,6 +748,10 @@ Acceptance notes:
 Simple measurements should remain ordinary Python. Users should not need to
 learn a declarative framework before they can collect data.
 
+Long-term acquisition remains Python-first. Fricon can add preview, inspect,
+and managed-plan helpers, but a Labber-like visual sweep builder is not a
+current product goal.
+
 For repeated or automation-heavy measurements, Fricon may later provide an
 optional managed measurement framework where users declare how parameter
 snapshots, run-local inputs, and scan points resolve into desired device state
@@ -746,6 +785,8 @@ declarative API.
 - Managed submitted measurements with queue and resource leases.
 - Analysis-run UI for derived datasets and reports.
 - Calibration workflow templates and history views.
+- Lightweight measurement templates for repeated names, scan schemas, and
+  display defaults after the explicit scan-schema path proves useful.
 - Import of legacy LabRAD/Data Vault history.
 - Device identity and readback verification.
 - AI-assisted metadata cleanup, reports, and calibration explanations.
@@ -761,6 +802,8 @@ declarative API.
 - Fricon-managed device communication.
 - Automatic calibration workflows.
 - Managed/declarative measurement framework.
+- Labber-like visual sweep builder as a product goal before managed-plan
+  previews prove a need.
 - LabRAD Data Vault/Grapher compatibility layer for old scripts.
 - Full legacy LabRAD/Data Vault import or browsing.
 - Generic workflow DAG engine as the first automation layer.

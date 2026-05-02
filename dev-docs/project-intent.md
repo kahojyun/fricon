@@ -145,10 +145,12 @@ Fricon is local-first. The v0.2 supported runtime model is local-only:
 - the local service uses a generated local token boundary for mutating access
 
 Remote clients, browser-served UI, and remote viewing may be considered after
-the local replacement workflow is proven. They should build on the same local
-service/API boundary rather than forcing the project into a hosted service
-shape or encouraging multiple machines to open the same data library through a
-shared folder.
+the local replacement workflow is proven. The first remote phase should be
+strict read-only monitoring, browsing, and export. Remote annotations and
+remote acquisition writes should wait for stronger auth, actor, and audit
+design. Remote access should build on the same local service/API boundary
+rather than forcing the project into a hosted service shape or encouraging
+multiple machines to open the same data library through a shared folder.
 
 Distribution shape and client/server compatibility have technical
 implementation details, but their user impact belongs in product planning.
@@ -201,7 +203,10 @@ distributed coordination patterns.
 
 The Python API is a primary user surface. It should support straightforward
 data collection scripts without forcing users to predefine every low-level
-schema detail.
+schema detail. For datasets intended for live or historical plotting, however,
+the acquisition code should provide explicit scan schema such as
+independent/dependent roles and enough axis structure for slicing and display;
+the code knows this better than a later chart guesser.
 
 Desktop and documentation workflows should help users get back to Python code.
 For example, dataset detail views may eventually provide Python read snippets
@@ -213,10 +218,16 @@ changing the user's mental model. Good candidates include preview/export
 snippets, saved views, aliases, favorites, optional notes/tags, lifecycle flags,
 compare views, and template measurements.
 
+Acquisition should remain Python-first. Visual sweep builders or full
+measurement-template systems should follow only if explicit scan schema and
+managed-plan previews show that users need an additional authoring layer.
+
 Export workflows should support researchers who move data to another computer
 for analysis. Prefer measurement-centered portable exports that can be opened
 directly from Python or a read-only viewer over workflows that require creating
-and importing into a second local data library before analysis can begin.
+and importing into a second local data library before analysis can begin. Include
+a simple human-readable manifest/index preview so exported bundles remain
+inspectable even before opening Fricon Desktop or Python.
 
 ### Preserve Provenance
 
