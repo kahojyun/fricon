@@ -29,7 +29,8 @@ one Fricon data library
   -> measurement, analysis, simulation, import, and calibration activity records
   -> artifacts: datasets first, then results, reports, logs, attachments,
      device snapshots, and parameter proposals
-  -> parameter snapshots, code summaries, notes, tags, and quality state
+  -> parameter snapshots, code summaries, favorites, optional notes/tags, and
+     lifecycle flags
   -> measurement-centered portable exports for offline analysis
 ```
 

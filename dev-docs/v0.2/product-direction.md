@@ -86,7 +86,7 @@ The normal measurement flow should be:
 set active sample/session context when known
 run measurement from Python
 watch produced datasets
-annotate run and mark quality
+favorite important runs and review lifecycle flags
 analyze in Python or UI
 promote useful calibration results through parameter proposals
 ```
@@ -96,7 +96,7 @@ The first-screen product should eventually be organized around current lab work:
 - active sample/session, with a visible "none selected" state
 - recent measurements
 - live datasets
-- important notes and quality state
+- favorites, pins, and lifecycle flags
 - parameter/calibration status
 
 Dataset browsing remains important, but datasets are outputs inside a broader
@@ -109,9 +109,13 @@ measurement history.
 The user should normally have one main Fricon data library, not many workspaces.
 The library is the local data root and catalog.
 
-Projects, campaigns, samples, sessions, tags, and saved views should organize
-the library without encouraging users to split data and copied code into many
-long-lived roots.
+Samples, sessions, measurements, favorites, search, saved views, and optional
+tags should organize the library without encouraging users to split data and
+copied code into many long-lived roots.
+
+Do not make `Project` or `Campaign` a first-class required V1 grouping. If
+those ideas prove useful, introduce them later as lightweight grouping or saved
+view concepts rather than as a required hierarchy.
 
 Each data library should have a generated UUID and a user-editable display
 name. Exported measurements should include that source identity so users can
@@ -127,7 +131,7 @@ Samples need:
 - stable identity
 - display name and aliases
 - structured custom fields
-- notes, tags, and lifecycle state
+- favorites, notes, optional tags, and lifecycle state
 - links to sample sessions, measurements, datasets, and parameter history
 - optional 2D layout or coordinate map
 
@@ -168,7 +172,7 @@ It should link:
 - parameter snapshot or legacy parameter JSON
 - code and environment summary
 - produced datasets
-- notes, tags, quality, and attachments
+- favorite or pin state, notes, optional tags, lifecycle flags, and attachments
 - continuation or recovery decisions
 
 Use `Experiment` for informal scientific discussion, or later for a broader
@@ -221,6 +225,10 @@ Do not make v0.2 a full Git client or environment manager.
 
 Sample visualization should be treated as a first-class product need.
 
+V1 should design the sample model so custom fields and 2D visualization fit
+cleanly, even if the first implementation ships after the minimal measurement
+loop.
+
 User story:
 
 > As an experimentalist, I want to define sample parameters and visualize them
@@ -232,7 +240,8 @@ Capabilities to design toward:
 - JSON/table editor for sample fields
 - typed custom fields where useful
 - 2D coordinate map or layout
-- color by parameter, measurement result, quality, or calibration state
+- color by parameter, measurement result, favorite/lifecycle state, or
+  calibration state
 - link plotted points to measurements and datasets
 - compare values across sessions/cooldowns
 - show drift or history for selected sample points
@@ -277,8 +286,9 @@ can decide whether a measurement is working.
 
 ### Annotate Once At The Right Level
 
-As an experimentalist, I want to put notes, tags, and quality on the measurement
-or sample/session by default so that I do not have to annotate every dataset.
+As an experimentalist, I want to favorite important measurements and add notes
+or optional tags at the measurement or sample/session level so that I do not
+have to annotate every dataset.
 
 ### Reopen Data From Python
 
@@ -294,8 +304,9 @@ importing the data first.
 Acceptance notes:
 
 - export starts from a measurement by default
-- exported bundles include produced datasets, selected artifacts, notes, tags,
-  quality, sample/session context, parameter/code summaries, and provenance
+- exported bundles include produced datasets, selected artifacts, favorites,
+  notes, optional tags, lifecycle flags, sample/session context,
+  parameter/code summaries, and provenance
 - exported bundles include source data library UUID, display name, optional
   computer label, export UUID, format version, checksums, and original record
   IDs
@@ -352,7 +363,7 @@ Acceptance notes:
 - partial datasets remain inspectable
 - continuation requires explicit user or API intent
 - continuation checks schema/semantic compatibility before appending
-- invalidation or suspect status records a reason
+- interruption, invalidation, or supersession records a reason
 
 ### Compare Measurements And Sessions
 
@@ -363,20 +374,23 @@ are visible without manually reconstructing history from folders.
 Acceptance notes:
 
 - comparison can start from sample, session, measurement, or dataset views
-- parameter, code, quality, and sample/session differences are visible beside
-  plotted data
+- parameter, code, favorite/lifecycle, and sample/session differences are
+  visible beside plotted data
 - saved comparisons should not create another data-library root
 
-### Mark Quality And Supersession
+### Favorite Important Results And Track Lifecycle
 
-As an experimentalist, I want to mark measurements or datasets as good,
-suspect, failed, calibration, test, invalidated, or superseded so that later
-analysis and automation can avoid bad inputs.
+As an experimentalist, I want favorites to highlight important results and
+system lifecycle flags to show incomplete, interrupted, calibration/test,
+invalidated, or superseded data so that later browsing and automation can avoid
+bad inputs without requiring manual classification.
 
 Acceptance notes:
 
-- measurement-level quality is the default
-- dataset-level quality is available for output-local exceptions
+- favorite/pin is the primary manual signal
+- lifecycle flags come from execution, calibration/test context, or explicit
+  invalidation/supersession actions
+- optional notes/tags can explain unusual cases
 - invalidation and supersession are events, not destructive rewrites
 
 ### Link Analysis Back To Source Data
@@ -391,6 +405,8 @@ Acceptance notes:
   proposals
 - analysis outputs link to input datasets and measurements through provenance
 - analysis is not stored as a child inside the original measurement
+- Analysis is reserved in the model but should not be a peer navigation concept
+  in the first measurement-facing UI
 
 ### Work On A Shared Lab Computer
 
@@ -409,10 +425,10 @@ Acceptance notes:
 Simple measurements should remain ordinary Python. Users should not need to
 learn a declarative framework before they can collect data.
 
-For repeated or automation-heavy measurements, Fricon may provide an optional
-managed measurement framework where users declare how parameter snapshots,
-run-local inputs, and scan points resolve into desired device state and dataset
-outputs.
+For repeated or automation-heavy measurements, Fricon may later provide an
+optional managed measurement framework where users declare how parameter
+snapshots, run-local inputs, and scan points resolve into desired device state
+and dataset outputs.
 
 User story:
 

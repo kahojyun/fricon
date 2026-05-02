@@ -88,7 +88,8 @@ The proposed v0.2 reset keeps the Python-led and local-first constraints but
 expands the product model from a dataset catalog into a measurement record
 system. In that model, datasets remain first-class artifacts, while samples,
 sample sessions, measurements, analysis, calibration, parameter snapshots, code
-summaries, notes, tags, and quality state get explicit boundaries. `Experiment`
+summaries, favorites, optional notes/tags, and lifecycle flags get explicit
+boundaries. `Experiment`
 can remain an informal scientific term or a future grouping/template concept,
 but v0.2 should prefer `Measurement` as the user-facing acquisition record.
 
@@ -143,8 +144,8 @@ measurements and use Fricon instead to:
 - create a minimal interactive measurement record that groups produced datasets
 - reserve a general artifact model so reports, logs, figures, attachments, and
   future device snapshots do not have to masquerade as datasets
-- store measurement-level names, notes, tags, pin or favorite state, quality
-  state, and legacy JSON metadata on the run
+- store measurement-level names, favorite or pin state, optional notes/tags,
+  lifecycle flags, and legacy JSON metadata on the run
 - keep dataset metadata focused on output-local semantics and per-output
   exceptions
 - reopen produced datasets from Python using generated read snippets or stable
@@ -261,8 +262,8 @@ After the dataset foundation is durable, product work should move toward:
 - dataset preview, export, and plotting snippets for common Python workflows
 - minimal interactive measurement records that make new simple measurement
   workflows no longer depend on LabRAD Grapher/Data Vault style logging
-- run-level notes, tags, pin or favorite state, quality flags, and legacy JSON
-  metadata for migration from existing scripts
+- run-level favorite or pin state, optional notes/tags, lifecycle flags, and
+  legacy JSON metadata for migration from existing scripts
 - parameter snapshots, diffs, and display for recorded runs
 - a minimal model for connecting runs to datasets
 - basic run provenance links between datasets, parameters, code, environment,
@@ -329,8 +330,10 @@ Scientific quality-of-life features may include:
 - run notes for manual observations and experimental context
 - sample or specimen records for measurements organized around a measured object,
   batch, preparation, condition, or source
-- quick tags, favorites, and filters for datasets, runs, and parameter sets
-- data quality flags such as good, suspect, failed, calibration, or test run
+- favorites, saved filters, and optional tags for datasets, runs, and
+  parameter sets
+- lifecycle flags such as incomplete, interrupted, calibration, test,
+  invalidated, or superseded
 - calibration records linked to runs, parameters, and device configuration
 - unit, label, precision, and display-scale metadata for parameters and dataset
   columns

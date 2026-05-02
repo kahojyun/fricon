@@ -43,8 +43,8 @@ v0.2 should optimize for these user outcomes:
 - let users set active sample/session context from a notebook prelude or UI
   without making sample setup a hard requirement for quick measurements
 - inspect live and historical datasets through desktop UI and Python
-- preserve parameter, code, environment, and quality context for each
-  measurement
+- preserve parameter, code, environment, favorite, and lifecycle context for
+  each measurement
 - visualize sample/device parameters on a 2D map when the lab model needs it
 - automate repeated calibration without silent parameter mutation
 - leave a clean path to managed device communication after LabRAD is removed
@@ -157,22 +157,38 @@ Public naming policy:
 - Avoid `Log` for measured data. Use `ExecutionLog`, `AuditLog`, or
   `EventLog` only when the record is actually a log.
 
-## Notes, Tags, And Quality
+## Favorites, Notes, Tags, And Lifecycle
 
-Notes, tags, favorites, and quality flags should attach to the level where
-users naturally make decisions.
+Favorites, notes, tags, and lifecycle/status flags should attach to the level
+where users naturally make decisions.
+
+V1 should lead with favorites or pins as the main manual signal. This matches
+how experimentalists often mark important data without maintaining a taxonomy.
+Tags and notes should be easy to add from an optional drawer or detail view, but
+they should not become required ceremony in the measurement happy path.
+
+Quality-like state should mostly come from lifecycle or system-managed facts:
+incomplete, interrupted, calibration/test, invalidated, or superseded. Broad
+manual labels such as good, suspect, or failed can be represented by optional
+notes/tags or later customization if real users need them.
 
 Default user-facing annotation levels:
 
-- sample: identity, preparation, layout, long-lived notes, aliases, tags
-- sample session: cooldown/setup context, wiring, drift notes, session quality
-- measurement: intent, run notes, tags, quality, interruption decisions
-- analysis or calibration: conclusion, accepted/rejected proposals, audit note
-- dataset: output-local exceptions, display hints, or dataset-specific issues
+- sample: favorite/pin, identity, preparation, layout, long-lived notes,
+  aliases, optional tags
+- sample session: favorite/pin, cooldown/setup context, wiring, drift notes,
+  optional tags
+- measurement: favorite/pin, intent, run notes, optional tags, lifecycle flags,
+  interruption decisions
+- analysis or calibration: conclusion, accepted/rejected proposals, audit note,
+  lifecycle flags
+- dataset: output-local exceptions, display hints, or dataset-specific
+  lifecycle issues
 
 Do not require users to annotate every dataset produced by a measurement.
-Dataset-level notes are useful when an output has a local issue or meaning, but
-the measurement is the default annotation container for data-taking work.
+Dataset-level notes or flags are useful when an output has a local issue or
+meaning, but the measurement is the default annotation container for
+data-taking work.
 
 ## Product Decision Checklist
 
@@ -191,11 +207,32 @@ Settled current-PR product decisions:
   calibration, actor, and provenance concepts may be recorded or reserved, but
   should not become peer navigation concepts before the measurement loop is
   ergonomic.
+- V1 should not add first-class Project or Campaign as required grouping
+  objects. Organize work through samples, sessions, measurements, favorites,
+  search, saved views, and optional tags.
+- Favorites or pins are the primary manual signal for important measurements.
+  Tags and notes should be available but secondary.
+- V1 quality/status should emphasize system lifecycle flags such as
+  incomplete, interrupted, calibration/test, invalidated, and superseded.
+  Avoid making broad manual good/suspect/failed classification part of the
+  happy path.
+- Measurement-centered portable export is the default. Dataset-only export can
+  remain a lower-level option; arbitrary library-subset export is later scope.
+- Analysis provenance should be reserved in the model, but Analysis should not
+  be a peer navigation concept in the first measurement-facing UI.
+- Managed/declarative measurement remains a future path. V1 UX should stay
+  ordinary Python measurement code.
+- Shared lab computers should use a lightweight actor label or token for
+  mutating actions. Do not add accounts, teams, roles, or permissions UI.
+- Sample custom fields and 2D visualization are first-class design
+  requirements, but implementation can follow the minimal measurement loop.
+- Code/environment provenance should start as passive summaries, not managed
+  code history or environment capture.
 
 Decide at the product level before implementation:
 
-- One data library is the normal user model. Projects, campaigns, saved views,
-  tags, samples, and sessions organize the library without encouraging many
+- One data library is the normal user model. Saved views, optional tags,
+  samples, and sessions organize the library without encouraging many
   long-lived roots.
 - `Measurement` is the first public acquisition noun. `Experiment` is informal
   scientific language or a possible future grouping/template concept.
@@ -207,9 +244,9 @@ Decide at the product level before implementation:
 - Portable exports start from a measurement by default and can be opened
   directly from Python or a read-only viewer without creating a local data
   library first.
-- Notes, tags, and quality state usually live on samples, sessions,
-  measurements, analysis, or calibration records; dataset annotations are for
-  output-local exceptions.
+- Favorites, optional notes/tags, and lifecycle flags usually live on samples,
+  sessions, measurements, analysis, or calibration records; dataset
+  annotations are for output-local exceptions.
 - v0.2 may break workspace/dataset-first assumptions where they conflict with
   the new model.
 
@@ -433,7 +470,8 @@ A measurement export should include:
 - source data library UUID, display name, and optional source computer label
 - exported-at time, Fricon version, and actor summary when available
 - original measurement/run IDs and stable artifact IDs
-- measurement name, notes, tags, quality state, and correction summaries
+- measurement name, favorite/pin state, notes, optional tags, lifecycle flags,
+  and correction summaries
 - optional sample/session context and attach-later correction history
 - produced dataset artifacts with facts, semantic manifests, and projections
 - non-table artifacts such as reports, figures, logs, attachments, code
@@ -545,7 +583,7 @@ clear when exact reproducibility is not guaranteed.
 
 Simple measurements should remain ordinary Python.
 
-Managed measurement plans should be an optional integration path for repeated,
+Managed measurement plans should be a future optional integration path for repeated,
 retryable, automation-heavy, or calibration-critical work. The model should
 make the intended hardware state inspectable before execution:
 
@@ -711,7 +749,8 @@ The first slice should prove the new model end to end:
 6. Browse the measurement and datasets in the desktop/web UI.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
-9. Record actor, code summary, run note, quality, and sample/session links.
+9. Record actor, passive code summary, favorite/pin state, run note, lifecycle
+   flags, and sample/session links.
 
 This slice intentionally breaks old workspace/dataset assumptions where they
 conflict with the v0.2 model.
@@ -741,8 +780,8 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
   quick measurements when the context is unknown.
 - Keep dataset semantics dataset-local.
 - Keep sample/session/run/parameter/provenance out of dataset names.
-- Keep notes and tags mostly on sample, session, measurement, analysis, and
-  calibration records.
+- Keep favorites, optional notes/tags, and lifecycle flags mostly on sample,
+  session, measurement, analysis, and calibration records.
 - Keep advanced execution concepts optional until users need retry, resume,
   dry-run, or calibration automation.
 - Keep local-first and single-owner assumptions in the product, while leaving

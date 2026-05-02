@@ -162,8 +162,8 @@ storage paths.
 
 Quality-of-life features should make common scientific work faster without
 changing the user's mental model. Good candidates include preview/export
-snippets, saved views, aliases, notes, tags, quality flags, compare views, and
-template measurements.
+snippets, saved views, aliases, favorites, optional notes/tags, lifecycle flags,
+compare views, and template measurements.
 
 Export workflows should support researchers who move data to another computer
 for analysis. Prefer measurement-centered portable exports that can be opened
