@@ -50,9 +50,7 @@ export interface DatasetColumnInfo {
   isChartAxisCandidate: boolean;
 }
 
-export type ChartInterpretationSource =
-  | "manifest"
-  | "compatibility_inference";
+export type ChartInterpretationSource = "manifest" | "compatibility_inference";
 export type ChartDuplicatePolicy =
   | "latest_by_record_id"
   | "compatibility_row_order_placeholder";

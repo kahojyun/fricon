@@ -43,7 +43,9 @@ export interface ChartColumnOption extends ColumnInfo {
   numeric: boolean;
 }
 
-export function columnOptionLabel(option: Pick<ChartColumnOption, "label" | "name">) {
+export function columnOptionLabel(
+  option: Pick<ChartColumnOption, "label" | "name">,
+) {
   return option.label ?? stripSemanticPrefix(option.name);
 }
 
@@ -250,7 +252,9 @@ export function deriveChartViewerState(
         ? scalarXYColumnOptions
         : traceXYColumnOptions;
   const effectiveXYXName = pickSelection(xyXOptions, state.xyXName);
-  const xyXColumn = allColumns.find((column) => column.name === effectiveXYXName);
+  const xyXColumn = allColumns.find(
+    (column) => column.name === effectiveXYXName,
+  );
   const xyYOptions = xyXColumn?.isTrace
     ? traceXYColumnOptions
     : scalarXYColumnOptions;
@@ -258,7 +262,9 @@ export function deriveChartViewerState(
     xyYOptions.filter((column) => column.name !== effectiveXYXName),
     state.xyYName,
   );
-  const xyYColumn = allColumns.find((column) => column.name === effectiveXYYName);
+  const xyYColumn = allColumns.find(
+    (column) => column.name === effectiveXYYName,
+  );
 
   const heatmapXOptions = plottedIndexColumns;
   const heatmapYOptions = plottedIndexColumns;

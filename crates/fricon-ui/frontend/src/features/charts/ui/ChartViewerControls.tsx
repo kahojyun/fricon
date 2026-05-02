@@ -241,11 +241,13 @@ export function ChartViewerControls({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {derived.sweepQuantityOptions.map((option: ChartColumnOption) => (
-                  <SelectItem key={option.name} value={option.name}>
-                    {columnOptionLabel(option)}
-                  </SelectItem>
-                ))}
+                {derived.sweepQuantityOptions.map(
+                  (option: ChartColumnOption) => (
+                    <SelectItem key={option.name} value={option.name}>
+                      {columnOptionLabel(option)}
+                    </SelectItem>
+                  ),
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -263,12 +265,12 @@ export function ChartViewerControls({
                 }
               >
                 <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select X">
+                  <SelectValue placeholder="Select X">
                     {selectedOptionLabel(
                       derived.xyXOptions,
                       derived.effectiveXYXName,
                     )}
-                </SelectValue>
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {derived.xyXOptions.map((option: ChartColumnOption) => (
@@ -288,12 +290,12 @@ export function ChartViewerControls({
                 }
               >
                 <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Y">
+                  <SelectValue placeholder="Select Y">
                     {selectedOptionLabel(
                       derived.xyYOptions,
                       derived.effectiveXYYName,
                     )}
-                </SelectValue>
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {derived.xyYOptions.map((option: ChartColumnOption) => (
@@ -357,11 +359,13 @@ export function ChartViewerControls({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {derived.heatmapQuantityOptions.map((option: ChartColumnOption) => (
-                    <SelectItem key={option.name} value={option.name}>
-                      {columnOptionLabel(option)}
-                    </SelectItem>
-                  ))}
+                  {derived.heatmapQuantityOptions.map(
+                    (option: ChartColumnOption) => (
+                      <SelectItem key={option.name} value={option.name}>
+                        {columnOptionLabel(option)}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -502,11 +506,13 @@ export function ChartViewerControls({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {derived.heatmapXOptions.map((option: ChartColumnOption) => (
-                      <SelectItem key={option.name} value={option.name}>
-                        {columnOptionLabel(option)}
-                      </SelectItem>
-                    ))}
+                    {derived.heatmapXOptions.map(
+                      (option: ChartColumnOption) => (
+                        <SelectItem key={option.name} value={option.name}>
+                          {columnOptionLabel(option)}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -527,11 +533,13 @@ export function ChartViewerControls({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {derived.heatmapYOptions.map((option: ChartColumnOption) => (
-                      <SelectItem key={option.name} value={option.name}>
-                        {columnOptionLabel(option)}
-                      </SelectItem>
-                    ))}
+                    {derived.heatmapYOptions.map(
+                      (option: ChartColumnOption) => (
+                        <SelectItem key={option.name} value={option.name}>
+                          {columnOptionLabel(option)}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>

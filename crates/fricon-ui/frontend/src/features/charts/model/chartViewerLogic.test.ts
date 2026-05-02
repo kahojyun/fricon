@@ -336,10 +336,9 @@ describe("chartViewerLogic", () => {
     );
 
     expect(derived.effectiveHeatmapQuantityName).toBe("column:signal");
-    expect(derived.heatmapQuantityOptions.map((column) => column.name)).toEqual([
-      "column:signal",
-      "column:hiddenValue",
-    ]);
+    expect(derived.heatmapQuantityOptions.map((column) => column.name)).toEqual(
+      ["column:signal", "column:hiddenValue"],
+    );
     expect(derived.heatmapXOptions.map((column) => column.name)).toEqual([
       "column:physicalAxis",
       "logicalIndex:gate",
@@ -545,6 +544,8 @@ describe("chartViewerLogic", () => {
       "column:step",
     ]);
     expect(derived.effectiveSweepIndexColumnName).toBe("column:step");
-    expect(derived.liveMonitorTraceGroupIndexColumnNames).toEqual(["column:run"]);
+    expect(derived.liveMonitorTraceGroupIndexColumnNames).toEqual([
+      "column:run",
+    ]);
   });
 });

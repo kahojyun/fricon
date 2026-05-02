@@ -86,19 +86,19 @@ pub(crate) async fn prepare_chart_data(
     let alias_physical_columns = true;
     let (start, end) = resolve_row_range(&dataset, common.start, common.end);
     let selected_physical_columns =
-        selected_physical_columns(&source_schema, selected_columns, filters)?;
+        selected_physical_columns(&source_schema, selected_columns, filters);
     let (output_schema, batches) = dataset.select_data(&SelectOptions {
         start: Bound::Included(start),
         end: Bound::Excluded(end),
         index_filters: None,
         selected_columns: selected_physical_columns.clone(),
     })?;
-    let batch = concat_or_empty(output_schema, batches)?;
+    let batch = concat_or_empty(output_schema, &batches)?;
     let selected_schema = selected_physical_columns.as_deref().map_or_else(
         || project_all_schema(&source_schema, alias_physical_columns),
         |columns| project_schema(&source_schema, columns, alias_physical_columns),
     )?;
-    let batch = rename_batch(batch, &selected_schema)?;
+    let batch = rename_batch(&batch, &selected_schema)?;
     prepare_batch_from_reader(
         &dataset,
         &selected_schema,
@@ -132,7 +132,7 @@ pub(crate) async fn load_axis_rows(
             index_filters: None,
             selected_columns: Some(selected_columns.clone()),
         })?;
-        concat_or_empty(output_schema, batches)?
+        concat_or_empty(output_schema, &batches)?
     };
     let selected_schema = project_schema(&source_schema, &selected_columns, false)?;
     let prepared = prepare_batch_from_reader(
@@ -255,10 +255,8 @@ fn selected_physical_columns(
     source_schema: &DatasetSchema,
     selected_columns: Option<&[usize]>,
     filters: &[(String, serde_json::Value)],
-) -> Result<Option<Vec<usize>>> {
-    let Some(selected_columns) = selected_columns else {
-        return Ok(None);
-    };
+) -> Option<Vec<usize>> {
+    let selected_columns = selected_columns?;
 
     let mut physical_columns = Vec::new();
     for &index in selected_columns {
@@ -272,7 +270,7 @@ fn selected_physical_columns(
             push_unique(&mut physical_columns, index);
         }
     }
-    Ok(Some(physical_columns))
+    Some(physical_columns)
 }
 
 fn empty_row_count_batch(row_count: usize) -> Result<RecordBatch> {
@@ -322,7 +320,7 @@ fn alias_physical_column_name(name: &str, alias_physical: bool) -> String {
     }
 }
 
-fn rename_batch(batch: RecordBatch, schema: &DatasetSchema) -> Result<RecordBatch> {
+fn rename_batch(batch: &RecordBatch, schema: &DatasetSchema) -> Result<RecordBatch> {
     Ok(RecordBatch::try_new(
         Arc::new(schema.to_arrow_schema()),
         batch.columns().to_vec(),
@@ -578,6 +576,10 @@ fn logical_axis_array(mode: &ResolvedScanAxisMode, values: &[Option<ScanAxisValu
     }
 }
 
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "Logical integer scan coordinates are plotted on Float64 chart axes"
+)]
 fn numeric_axis_array(values: &[Option<ScanAxisValue>]) -> ArrayRef {
     Arc::new(Float64Array::from(
         values
@@ -679,11 +681,11 @@ fn filter_batch(batch: &RecordBatch, mask: &[bool]) -> Result<RecordBatch> {
     Ok(RecordBatch::try_new(batch.schema(), arrays)?)
 }
 
-fn concat_or_empty(schema: SchemaRef, batches: Vec<RecordBatch>) -> Result<RecordBatch> {
+fn concat_or_empty(schema: SchemaRef, batches: &[RecordBatch]) -> Result<RecordBatch> {
     if batches.is_empty() {
         Ok(RecordBatch::new_empty(schema))
     } else {
-        concat_batches(&schema, &batches).context("Failed to concat chart batches")
+        concat_batches(&schema, batches).context("Failed to concat chart batches")
     }
 }
 
@@ -759,7 +761,7 @@ mod tests {
         )
         .expect("selected columns");
 
-        assert_eq!(selected, Some(vec![0, 1]));
+        assert_eq!(selected, vec![0, 1]);
     }
 
     #[test]
