@@ -261,9 +261,18 @@ Acceptance notes:
 
 - the supported v0.2 distribution shape is documented as Fricon Desktop,
   `fricon` CLI, Python SDK, and local service
+- Fricon Desktop installs with a compatible local service sidecar; users should
+  not install a separate server package for the normal local workflow
+- Fricon Desktop, the bundled service, and the bundled CLI share one visible
+  product release version
 - Fricon Desktop starts in local mode for v0.2
 - first-run setup creates or opens the default data library without requiring
   users to understand server internals
+- the local service starts on demand from Fricon Desktop, CLI, or Python SDK
+  where practical
+- fixed lab computers may optionally enable a per-user "start Fricon service at
+  login" mode, but root/system service registration is not required for
+  ordinary v0.2 use
 - notebook and script examples show how to connect to the same local data
   library used by Fricon Desktop
 - users get a clear diagnostic when the local service is not running or cannot
@@ -282,6 +291,15 @@ Acceptance notes:
 - the desktop app and local service may update together, but Python SDKs in
   lab scripts and notebooks often update more slowly because they are pinned by
   virtual environments or lockfiles
+- Fricon Desktop can stage an update, but the local service reports whether it
+  is safe to stop and replace
+- updates are not applied while measurements, open dataset writers, imports,
+  exports, or data-library migrations are active
+- users can choose "install when idle" or "remind later" when an update is ready
+  during active work
+- "install when idle" may put the service into a draining state where existing
+  work finishes, new long-running writes are blocked or warned, and read-only
+  browsing continues where practical
 - after v0.2 lands, the core v0.x Python SDK path for measurement writes and
   dataset reads should remain compatible with later v0.x local services
 - newer capabilities are feature-negotiated rather than required by old scripts
@@ -289,8 +307,8 @@ Acceptance notes:
   format compatibility before writes
 - incompatible clients fail with a clear message and recovery path rather than
   partially writing data
-- data-library format upgrades require an explicit compatibility or migration
-  decision before implementation
+- data-library format upgrades require explicit confirmation, no active
+  measurements, and backup/checkpoint or recovery guidance where practical
 - long-term third-party protocol stability and polished auto-update UX are
   follow-up topics, not v0.2 replacement requirements
 - remote clients should never bypass the service by opening the same

@@ -146,8 +146,12 @@ measurements and use Fricon instead to:
 - inspect recent and historical datasets through table and chart views
 - install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
   coherent Fricon release rather than assembling mismatched components manually
+- install the local service as a bundled sidecar instead of requiring a
+  separate server install for ordinary local use
 - update Fricon with clear compatibility checks for the data library and
   local-service protocol
+- stage service/Desktop updates and apply them only when active measurements,
+  open writers, imports, exports, and migrations are idle
 - keep the core v0.x Python SDK measurement-write and dataset-read path working
   across later v0.x desktop or local-service updates, with newer features
   negotiated explicitly

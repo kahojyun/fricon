@@ -137,6 +137,10 @@ core v0.x Python SDK path for measurement writes and dataset reads should
 remain compatible with later v0.x local services. Newer capabilities should be
 feature-negotiated, and incompatible clients should fail clearly before writes
 when they cannot safely work with the running service or data library.
+Fricon Desktop should install with a compatible local service sidecar for the
+normal local workflow. Updates should be staged and applied only when the
+service reports that measurements, dataset writers, imports, exports, and
+migrations are idle.
 
 ## Non-Goals
 

@@ -708,6 +708,23 @@ coherent Fricon release shape for Fricon Desktop, CLI, Python SDK, and local
 service, with clear compatibility checks before any client mutates a data
 library.
 
+For ordinary v0.2 use, Fricon Desktop should install with a compatible local
+service sidecar and bundled CLI. Users should not need a separate server
+installer. Desktop, service, and bundled CLI share one visible product release
+version, while service API, data-library format, export format, and feature
+capabilities remain explicit internal compatibility versions. The Python SDK may
+have a different package version because lab scripts often pin it.
+
+Updates should be staged and applied only when the local service reports that
+it is safe to stop. Do not update or migrate while measurements, open dataset
+writers, imports, exports, or data-library migrations are active. If work is
+active, offer "install when idle" or "remind later"; the service may enter a
+draining state where existing work finishes and new long-running writes are
+blocked or warned.
+
+Data-library format upgrades require explicit user confirmation and recovery
+guidance. Do not silently migrate a data library during app launch.
+
 The exact protocol can remain a technical ADR, but v0.2 should not leave
 client/server mismatch behavior undefined. Because Python measurement code may
 be pinned by virtual environments or lockfiles, v0.2 should make the core v0.x
@@ -802,6 +819,8 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - Fricon Desktop shell boundary, local service ownership, and future
   remote/browser UI access
+- service sidecar packaging, optional login startup, update-safe/draining
+  lifecycle, and data-library migration gating
 
 ## Design Constraints
 

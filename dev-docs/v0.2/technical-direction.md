@@ -93,8 +93,8 @@ The product-level requirement is:
 
 ```text
 Fricon distribution
-  -> Fricon Desktop and local service can update together
-  -> fricon CLI follows the installed service contract
+  -> Fricon Desktop installer bundles the local service sidecar
+  -> Fricon Desktop, local service, and bundled CLI share one product release
   -> Python SDK may be pinned in lab environments
   -> data-library format upgrades are explicit
 ```
@@ -102,6 +102,70 @@ Fricon distribution
 Users should be able to install Fricon, create or open a data library, launch
 Fricon Desktop, and connect from Python without understanding service
 internals.
+
+Do not make users install the GUI and server separately in the default v0.2
+flow. Fricon Desktop should ship with a compatible local service binary and a
+compatible CLI. The service may be launched on demand by Fricon Desktop, the
+CLI, or the Python SDK. A fixed lab computer may optionally enable a per-user
+"start Fricon service at login" mode, but v0.2 should not require root/system
+service registration for ordinary use.
+
+Use one visible product version for the bundled desktop/service/CLI release:
+
+```text
+Fricon Desktop 0.2.3
+  bundles local service 0.2.3
+  bundles compatible CLI 0.2.3
+```
+
+Keep separate internal compatibility versions where they matter:
+
+- service API or protocol version
+- data-library format version
+- export bundle format version
+- feature capabilities
+
+The Python SDK package version may differ because lab scripts and notebooks can
+pin it through virtual environments or lockfiles. Compatibility must be checked
+through API/protocol/capability negotiation, not by requiring exact package
+version equality.
+
+Updates should be staged and applied only when the local service says it is
+safe. Fricon Desktop may drive the user prompt and installer, but the service
+owns the busy/idle state.
+
+Safe update flow:
+
+```text
+update available
+  -> download or stage update
+  -> ask service: safe_to_update?
+  -> if idle: stop service, replace bundle, run required checks, restart
+  -> if busy: offer "install when idle" or "remind later"
+```
+
+When users choose "install when idle", the service may enter a draining state:
+
+- existing measurement writers, imports, exports, or maintenance jobs may
+  finish
+- new long-running writes or tasks are blocked or warned
+- read-only browsing can continue where practical
+- when no blockers remain, Fricon Desktop can restart the service and apply the
+  update
+
+v0.2 should track enough service activity to avoid unsafe updates:
+
+- active measurement records
+- open dataset writers
+- active import or export work
+- active data-library migration or repair
+- future managed tasks, calibration jobs, and resource leases
+
+Data-library format upgrades must be explicit. Do not silently migrate a data
+library during app launch or while measurements are active. If an update
+requires a data-library upgrade, Fricon should explain the change, require user
+confirmation, block new writes, create a backup/checkpoint where practical, and
+run the migration with clear failure recovery.
 
 The technical policy should account for different update cadences:
 
@@ -131,12 +195,16 @@ experience is product-visible.
 v0.2 should decide:
 
 - how clients discover the running local service
+- how Fricon Desktop, CLI, and Python SDK launch or request launch of the
+  bundled local service when it is not running
 - how Fricon Desktop, CLI, and Python SDK report their client protocol version
 - how the service reports its protocol and data-library format version
 - how capability negotiation distinguishes read, write, measurement creation,
   export, and migration operations
 - the core v0.x compatibility promise for older Python SDKs used by locked lab
   scripts and notebooks
+- how the service reports active blockers, draining state, and update-safe
+  status
 - which operations are read-only-safe during a compatibility mismatch
 - how migration or upgrade prompts are surfaced
 
@@ -493,6 +561,8 @@ Likely ADRs:
 - storage compatibility and migration policy for pre-v0.2 workspaces
 - Fricon Desktop shell boundary, local service ownership, and future
   remote/browser UI access
+- service sidecar packaging, optional login startup, update-safe/draining
+  lifecycle, and data-library migration gating
 
 ## First Engineering Slice
 
