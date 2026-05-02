@@ -321,16 +321,100 @@ describe("chartViewerLogic", () => {
             hiddenByDefault: false,
           },
         ],
-        chartAxisCandidates: [],
+        chartAxisCandidates: [
+          {
+            id: "column:physicalAxis",
+            name: "physicalAxis",
+            label: "Physical Axis",
+            kind: "column",
+            numeric: true,
+            isCompatibility: false,
+            physicalColumn: "physicalAxis",
+          },
+        ],
       },
     );
 
     expect(derived.effectiveHeatmapQuantityName).toBe("column:signal");
+    expect(derived.heatmapQuantityOptions.map((column) => column.name)).toEqual([
+      "column:signal",
+      "column:hiddenValue",
+    ]);
+    expect(derived.heatmapXOptions.map((column) => column.name)).toEqual([
+      "column:physicalAxis",
+      "logicalIndex:gate",
+      "logicalIndex:bias",
+    ]);
     expect(derived.effectiveHeatmapXName).toBe("logicalIndex:bias");
     expect(derived.effectiveHeatmapYName).toBe("logicalIndex:gate");
     expect(derived.excludeColumns).toEqual([
       "logicalIndex:bias",
       "logicalIndex:gate",
     ]);
+  });
+
+  it("excludes physical chart-axis candidates from sweep/group roles", () => {
+    const columns = [
+      makeColumn({ name: "physicalAxis" }),
+      makeColumn({ name: "signal" }),
+    ];
+    const derived = deriveChartViewerState(columns, makeState(), {
+      source: "manifest",
+      duplicatePolicy: "latest_by_record_id",
+      indexRealization: "implicit",
+      axes: [
+        {
+          id: "logicalIndex:gate",
+          name: "gate",
+          label: "Gate",
+          kind: "logical_index",
+          numeric: true,
+          isCompatibility: false,
+          physicalColumn: null,
+        },
+        {
+          id: "logicalIndex:bias",
+          name: "bias",
+          label: "Bias",
+          kind: "logical_index",
+          numeric: true,
+          isCompatibility: false,
+          physicalColumn: null,
+        },
+      ],
+      valueColumns: [
+        {
+          id: "column:signal",
+          name: "signal",
+          label: "Signal",
+          isComplex: false,
+          isTrace: false,
+          hiddenByDefault: false,
+        },
+      ],
+      chartAxisCandidates: [
+        {
+          id: "column:physicalAxis",
+          name: "physicalAxis",
+          label: "Physical Axis",
+          kind: "column",
+          numeric: true,
+          isCompatibility: false,
+          physicalColumn: "physicalAxis",
+        },
+      ],
+    });
+
+    expect(derived.liveMonitorTraceGroupIndexColumnNames).toEqual([
+      "logicalIndex:gate",
+    ]);
+    expect(derived.liveMonitorSweepIndexColumnName).toBe("logicalIndex:bias");
+    expect(derived.sweepAxisOptions.map((column) => column.name)).toEqual([
+      "logicalIndex:gate",
+      "logicalIndex:bias",
+    ]);
+    expect(derived.heatmapXOptions.map((column) => column.name)).toContain(
+      "column:physicalAxis",
+    );
   });
 });

@@ -5,9 +5,9 @@ use arrow_array::{Array, ArrayRef, BooleanArray, Float64Array, RecordBatch, Stri
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
 use fricon::{
-    DatasetDataType, DatasetInterpretation, DatasetReader, DatasetSchema, ResolvedDuplicatePolicy,
-    ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ScalarKind, SelectOptions,
-    dataset::semantics::ScanAxisValue,
+    DatasetDataType, DatasetInterpretation, DatasetReader, DatasetSchema, InterpretationSource,
+    ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ScalarKind,
+    SelectOptions, dataset::semantics::ScanAxisValue,
 };
 
 use super::types::ChartCommonOptions;
@@ -166,13 +166,22 @@ fn prepare_batch_from_reader(
     let mut schema = source_schema.clone();
     let mut batch = append_logical_axes(dataset, interpretation, &mut schema, batch, start, end)?;
     batch = apply_semantic_filters(batch, filters)?;
-    let index_columns = resolve_index_columns(interpretation, &schema)
-        .or_else(|| dataset.try_index_columns().ok().flatten());
+    let index_columns = resolve_index_columns(interpretation, &schema).or_else(|| {
+        fallback_to_inferred_index_columns(interpretation)
+            .then(|| dataset.try_index_columns().ok().flatten())
+            .flatten()
+    });
     Ok(PreparedChartData {
         batch,
         schema,
         index_columns,
     })
+}
+
+fn fallback_to_inferred_index_columns(interpretation: &DatasetInterpretation) -> bool {
+    interpretation.source == InterpretationSource::CompatibilityInference
+        || (interpretation.scan_axes.is_empty()
+            && interpretation.chart_axis_candidate_columns.is_empty())
 }
 
 fn append_logical_axes(
@@ -286,16 +295,6 @@ fn resolve_index_columns(
     schema: &DatasetSchema,
 ) -> Option<Vec<usize>> {
     let mut indices = Vec::new();
-    for ordinal in &interpretation.chart_axis_candidate_columns {
-        if let Some(column) = interpretation
-            .columns
-            .iter()
-            .find(|column| column.visible_ordinal == Some(*ordinal))
-            && let Some((index, _, _)) = schema.columns().get_full(&column.name)
-        {
-            indices.push(index);
-        }
-    }
     for axis in interpretation
         .scan_axes
         .iter()

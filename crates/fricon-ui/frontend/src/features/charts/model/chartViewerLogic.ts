@@ -73,7 +73,10 @@ function semanticValueOptions(
     hiddenByDefault: column.hiddenByDefault,
   }));
   const visibleValues = values.filter((column) => !column.hiddenByDefault);
-  return visibleValues.length > 0 ? visibleValues : values;
+  const hiddenValues = values.filter((column) => column.hiddenByDefault);
+  return visibleValues.length > 0
+    ? [...visibleValues, ...hiddenValues]
+    : values;
 }
 
 function semanticAxisOptions(
@@ -105,6 +108,7 @@ function semanticAxisOptions(
       isTrace: false,
       isIndex: true,
       hiddenByDefault: false,
+      isChartAxisCandidate: axis.kind === "column" && !axis.isCompatibility,
     }));
 }
 
@@ -145,6 +149,9 @@ export function deriveChartViewerState(
   chartSemantics?: ChartSemantics | null,
 ) {
   const indexColumns = semanticAxisOptions(columns, chartSemantics);
+  const roleIndexColumns = chartSemantics
+    ? indexColumns.filter((column) => !column.isChartAxisCandidate)
+    : indexColumns;
   const valueColumns = semanticValueOptions(columns, chartSemantics);
   const allColumns = [...valueColumns, ...indexColumns];
   const sweepQuantityOptions = valueColumns;
@@ -276,23 +283,23 @@ export function deriveChartViewerState(
     effectiveView === "xy" &&
     !xyUsesTraceSource &&
     activeXYSource !== undefined &&
-    indexColumns.length > 0;
+    roleIndexColumns.length > 0;
   const liveMonitorSweepIndexColumnName = liveMonitorUsesForcedRoles
-    ? (indexColumns[indexColumns.length - 1]?.name ?? null)
+    ? (roleIndexColumns[roleIndexColumns.length - 1]?.name ?? null)
     : null;
   const liveMonitorTraceGroupIndexColumnNames =
-    liveMonitorUsesForcedRoles && indexColumns.length > 1
-      ? indexColumns.slice(0, -1).map((column) => column.name)
+    liveMonitorUsesForcedRoles && roleIndexColumns.length > 1
+      ? roleIndexColumns.slice(0, -1).map((column) => column.name)
       : [];
 
   const xyRoleControlsVisible =
     effectiveView === "xy" &&
     !xyUsesTraceSource &&
-    indexColumns.length > 0 &&
+    roleIndexColumns.length > 0 &&
     activeXYSource !== undefined;
 
   const sweepAxisOptions = xyRoleControlsVisible
-    ? indexColumns.filter(
+    ? roleIndexColumns.filter(
         (column) => !state.traceGroupIndexColumnNames.includes(column.name),
       )
     : [];
@@ -310,7 +317,7 @@ export function deriveChartViewerState(
   );
 
   const traceGroupOptions = xyRoleControlsVisible
-    ? indexColumns.filter(
+    ? roleIndexColumns.filter(
         (column) => column.name !== effectiveSweepIndexColumnName,
       )
     : [];
