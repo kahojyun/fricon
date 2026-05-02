@@ -6,7 +6,8 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use arrow_array::{
-    Array, ArrayRef, BooleanArray, Float64Array, RecordBatch, StringArray, StructArray,
+    Array, ArrayRef, BooleanArray, Float64Array, RecordBatch, RecordBatchOptions, StringArray,
+    StructArray,
 };
 use arrow_schema::{DataType, Field, Fields, Schema, SchemaRef};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -104,16 +105,25 @@ pub(crate) async fn load_axis_rows(
     let interpretation = dataset.interpret()?;
     let source_schema = dataset.schema()?.clone();
     let end = dataset.num_rows();
-    let (output_schema, batches) = dataset.select_data(&SelectOptions {
-        start: Bound::Included(0),
-        end: Bound::Excluded(end),
-        index_filters: None,
-        selected_columns: None,
-    })?;
-    let batch = concat_or_empty(output_schema, batches)?;
+    let selected_columns = axis_row_selected_columns(&dataset, &interpretation)?;
+    if interpretation.scan_axes.is_empty() && selected_columns.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    let batch = if selected_columns.is_empty() {
+        empty_row_count_batch(end)?
+    } else {
+        let (output_schema, batches) = dataset.select_data(&SelectOptions {
+            start: Bound::Included(0),
+            end: Bound::Excluded(end),
+            index_filters: None,
+            selected_columns: Some(selected_columns.clone()),
+        })?;
+        concat_or_empty(output_schema, batches)?
+    };
+    let selected_schema = project_schema(&source_schema, &selected_columns)?;
     let prepared = prepare_batch_from_reader(
         &dataset,
-        &source_schema,
+        &selected_schema,
         &interpretation,
         batch,
         0,
@@ -202,6 +212,19 @@ fn fallback_to_inferred_index_columns(interpretation: &DatasetInterpretation) ->
             && interpretation.chart_axis_candidate_columns.is_empty())
 }
 
+fn axis_row_selected_columns(
+    dataset: &DatasetReader,
+    interpretation: &DatasetInterpretation,
+) -> Result<Vec<usize>> {
+    if !interpretation.scan_axes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let Some(index_columns) = dataset.try_index_columns()? else {
+        return Ok(Vec::new());
+    };
+    Ok(index_columns)
+}
+
 fn selected_physical_columns(
     source_schema: &DatasetSchema,
     selected_columns: Option<&[usize]>,
@@ -224,6 +247,14 @@ fn selected_physical_columns(
         }
     }
     Ok(Some(physical_columns))
+}
+
+fn empty_row_count_batch(row_count: usize) -> Result<RecordBatch> {
+    Ok(RecordBatch::try_new_with_options(
+        Arc::new(Schema::new(Vec::<Field>::new())),
+        Vec::new(),
+        &RecordBatchOptions::new().with_row_count(Some(row_count)),
+    )?)
 }
 
 fn push_unique(columns: &mut Vec<usize>, index: usize) {
