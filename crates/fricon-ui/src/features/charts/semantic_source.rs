@@ -14,8 +14,8 @@ use arrow_select::{concat::concat_batches, filter::FilterBuilder};
 #[cfg(test)]
 use fricon::{
     ColumnMeaning, PhysicalColumnOrdinal, ResolvedColumn, ResolvedIndexRealization,
-    ResolvedPhysicalColumnReference, ResolvedSemanticReference, VisibleColumnOrdinal,
-    dataset::semantics::DatasetDType,
+    ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedSemanticReference,
+    VisibleColumnOrdinal, dataset::semantics::DatasetDType,
 };
 use fricon::{
     DatasetDataType, DatasetInterpretation, DatasetReader, DatasetSchema, InterpretationSource,
@@ -571,7 +571,7 @@ fn resolve_index_columns(
 ) -> Option<Vec<usize>> {
     let mut indices = Vec::new();
     for reference in interpretation
-        .plotted_coordinates
+        .sweep_axes
         .iter()
         .filter(|reference| reference.numeric_axis())
     {
@@ -1005,6 +1005,73 @@ mod tests {
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].id, "column:logicalIndex:gate");
         assert_eq!(fields[0].column_name, "logicalIndex:gate");
+    }
+
+    #[test]
+    fn index_columns_use_sweep_axes_not_chart_axis_candidates() {
+        let schema = DatasetSchema::new(IndexMap::from([
+            (
+                "signal".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "physicalAxis".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "logicalIndex:gate".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+        ]));
+        let logical_gate = ResolvedSemanticReference::LogicalIndex(ResolvedLogicalIndexReference {
+            id: "logicalIndex:gate".to_string(),
+            name: "gate".to_string(),
+            axis_ordinal: 0,
+            label: None,
+            hidden_by_default: false,
+            numeric_axis: true,
+            is_compatibility: false,
+        });
+        let chart_axis =
+            ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
+                id: "column:physicalAxis".to_string(),
+                name: "physicalAxis".to_string(),
+                physical_ordinal: PhysicalColumnOrdinal(1),
+                visible_ordinal: Some(VisibleColumnOrdinal(1)),
+                dtype: DatasetDType::Float64,
+                meaning: ColumnMeaning::UserValue,
+                is_index: false,
+                is_system: false,
+                is_compatibility: false,
+                hidden_by_default: false,
+                is_chart_axis_candidate: true,
+                unit: None,
+                label: None,
+                is_complex: false,
+                is_trace: false,
+                numeric_axis: true,
+            });
+        let interpretation = DatasetInterpretation {
+            columns: Vec::<ResolvedColumn>::new(),
+            semantic_references: vec![logical_gate.clone(), chart_axis.clone()],
+            value_references: Vec::new(),
+            plotted_coordinates: vec![logical_gate.clone(), chart_axis.clone()],
+            sweep_axes: vec![logical_gate],
+            group_axes: Vec::new(),
+            filter_axes: Vec::new(),
+            chart_axis_candidates: vec![chart_axis],
+            value_columns: Vec::new(),
+            logical_index_columns: Vec::new(),
+            chart_axis_candidate_columns: Vec::new(),
+            duplicate_policy: ResolvedDuplicatePolicy::LatestByRecordId,
+            index_realization: ResolvedIndexRealization::Implicit,
+            scan_axes: Vec::new(),
+            source: InterpretationSource::Manifest,
+        };
+
+        let index_columns = resolve_index_columns(&interpretation, &schema);
+
+        assert_eq!(index_columns, Some(vec![2]));
     }
 
     #[test]
