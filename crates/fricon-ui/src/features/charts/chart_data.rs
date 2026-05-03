@@ -10,8 +10,8 @@ use crate::{
     desktop_runtime::session::WorkspaceSession,
     features::charts::{
         transform::{
-            build_heatmap_series, build_live_heatmap_series, build_live_xy_series, build_xy_series,
-            compute_group_starts,
+            SemanticRoleColumns, build_heatmap_series, build_live_heatmap_series,
+            build_live_xy_series, build_xy_series, compute_group_starts,
             mapping::{build_chart_selected_columns, build_live_chart_selected_columns},
             resolve_xy_trace_roles,
         },
@@ -190,8 +190,12 @@ async fn resolve_live_row_start(
                 return Ok(total_rows.saturating_sub(tail_count));
             }
 
-            let roles =
-                resolve_xy_trace_roles(schema, index_columns, &opts.trace_roles, opts.draw_style)?;
+            let roles = resolve_xy_trace_roles(
+                schema,
+                SemanticRoleColumns::new(index_columns, prepared.group_columns.as_deref()),
+                &opts.trace_roles,
+                opts.draw_style,
+            )?;
             if roles.trace_group.is_empty() {
                 Ok(total_rows.saturating_sub(tail_count))
             } else {
@@ -261,11 +265,12 @@ pub(crate) async fn dataset_chart_data(
     } else {
         Vec::new()
     };
-    let resolved_options = resolve_dataset_chart_options(options);
     let metadata = prepare_live_range(session, id, 0, 0, None).await?;
+    let resolved_options = resolve_dataset_chart_options(&metadata, options);
     let selected_columns = build_chart_selected_columns(
         &metadata.schema,
         metadata.index_columns.as_deref(),
+        metadata.group_columns.as_deref(),
         &resolved_options,
     )?;
     let prepared =
@@ -285,6 +290,7 @@ pub(crate) async fn dataset_chart_data(
             &prepared.batch,
             &prepared.schema,
             prepared.index_columns.as_deref(),
+            prepared.group_columns.as_deref(),
             options,
         ),
         DatasetChartDataOptions::Heatmap(options) => {
@@ -312,12 +318,13 @@ pub(crate) async fn dataset_live_chart_data(
 ) -> anyhow::Result<LiveChartDataResponse> {
     let dataset = session.dataset(id).await?;
     let total_rows = dataset.num_rows();
-    let resolved_options = resolve_live_chart_options(options);
-    let start = resolve_live_row_start(session, id, total_rows, &resolved_options).await?;
     let metadata = prepare_live_range(session, id, 0, 0, None).await?;
+    let resolved_options = resolve_live_chart_options(&metadata, options);
+    let start = resolve_live_row_start(session, id, total_rows, &resolved_options).await?;
     let selected_columns = build_live_chart_selected_columns(
         &metadata.schema,
         metadata.index_columns.as_deref(),
+        metadata.group_columns.as_deref(),
         &resolved_options,
     )?;
     let prepared =
@@ -335,6 +342,7 @@ pub(crate) async fn dataset_live_chart_data(
         &prepared.batch,
         &prepared.schema,
         prepared.index_columns.as_deref(),
+        prepared.group_columns.as_deref(),
         start,
         &resolved_options,
     );
@@ -390,6 +398,7 @@ pub(crate) async fn dataset_live_chart_data(
         &previous_prepared.batch,
         &previous_prepared.schema,
         previous_prepared.index_columns.as_deref(),
+        previous_prepared.group_columns.as_deref(),
         previous_start,
         &resolved_options,
     )?;
@@ -411,12 +420,13 @@ fn build_live_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     row_start: usize,
     options: &LiveChartDataOptions,
 ) -> anyhow::Result<ChartSnapshot> {
     match options {
         LiveChartDataOptions::Xy(opts) => {
-            build_live_xy_series(batch, schema, index_columns, row_start, opts)
+            build_live_xy_series(batch, schema, index_columns, group_columns, row_start, opts)
         }
         LiveChartDataOptions::Heatmap(opts) => {
             build_live_heatmap_series(batch, schema, index_columns, opts)
@@ -424,19 +434,22 @@ fn build_live_snapshot(
     }
 }
 
-fn resolve_dataset_chart_options(options: &DatasetChartDataOptions) -> DatasetChartDataOptions {
+fn resolve_dataset_chart_options(
+    metadata: &semantic_source::PreparedChartData,
+    options: &DatasetChartDataOptions,
+) -> DatasetChartDataOptions {
     match options {
         DatasetChartDataOptions::Xy(options) => {
-            DatasetChartDataOptions::Xy(resolve_xy_chart_options(options))
+            DatasetChartDataOptions::Xy(resolve_xy_chart_options(metadata, options))
         }
         DatasetChartDataOptions::Heatmap(options) => {
             DatasetChartDataOptions::Heatmap(HeatmapChartDataOptions {
-                quantity: semantic_source::resolve_column_name(&options.quantity),
+                quantity: metadata.resolve_column_name(&options.quantity),
                 x_column: options
                     .x_column
                     .as_deref()
-                    .map(semantic_source::resolve_axis_column_name),
-                y_column: semantic_source::resolve_axis_column_name(&options.y_column),
+                    .map(|column| metadata.resolve_column_name(column)),
+                y_column: metadata.resolve_column_name(&options.y_column),
                 complex_view_single: options.complex_view_single,
                 common: options.common.clone(),
             })
@@ -444,18 +457,21 @@ fn resolve_dataset_chart_options(options: &DatasetChartDataOptions) -> DatasetCh
     }
 }
 
-fn resolve_live_chart_options(options: &LiveChartDataOptions) -> LiveChartDataOptions {
+fn resolve_live_chart_options(
+    metadata: &semantic_source::PreparedChartData,
+    options: &LiveChartDataOptions,
+) -> LiveChartDataOptions {
     match options {
         LiveChartDataOptions::Xy(options) => LiveChartDataOptions::Xy(LiveXYOptions {
             draw_style: options.draw_style,
             tail_count: options.tail_count,
             known_row_count: options.known_row_count,
-            plot_mode: resolve_xy_plot_mode_options(&options.plot_mode),
-            trace_roles: resolve_trace_roles(&options.trace_roles),
+            plot_mode: resolve_xy_plot_mode_options(metadata, &options.plot_mode),
+            trace_roles: resolve_trace_roles(metadata, &options.trace_roles),
         }),
         LiveChartDataOptions::Heatmap(options) => {
             LiveChartDataOptions::Heatmap(LiveHeatmapOptions {
-                quantity: semantic_source::resolve_column_name(&options.quantity),
+                quantity: metadata.resolve_column_name(&options.quantity),
                 complex_view_single: options.complex_view_single,
                 known_row_count: options.known_row_count,
             })
@@ -463,46 +479,55 @@ fn resolve_live_chart_options(options: &LiveChartDataOptions) -> LiveChartDataOp
     }
 }
 
-fn resolve_xy_chart_options(options: &XYChartDataOptions) -> XYChartDataOptions {
+fn resolve_xy_chart_options(
+    metadata: &semantic_source::PreparedChartData,
+    options: &XYChartDataOptions,
+) -> XYChartDataOptions {
     XYChartDataOptions {
         draw_style: options.draw_style,
-        plot_mode: resolve_xy_plot_mode_options(&options.plot_mode),
-        trace_roles: resolve_trace_roles(&options.trace_roles),
+        plot_mode: resolve_xy_plot_mode_options(metadata, &options.plot_mode),
+        trace_roles: resolve_trace_roles(metadata, &options.trace_roles),
         common: options.common.clone(),
     }
 }
 
-fn resolve_xy_plot_mode_options(options: &XYPlotModeOptions) -> XYPlotModeOptions {
+fn resolve_xy_plot_mode_options(
+    metadata: &semantic_source::PreparedChartData,
+    options: &XYPlotModeOptions,
+) -> XYPlotModeOptions {
     match options {
         XYPlotModeOptions::QuantityVsSweep {
             quantity,
             complex_views,
         } => XYPlotModeOptions::QuantityVsSweep {
-            quantity: semantic_source::resolve_column_name(quantity),
+            quantity: metadata.resolve_column_name(quantity),
             complex_views: complex_views.clone(),
         },
         XYPlotModeOptions::Xy { x_column, y_column } => XYPlotModeOptions::Xy {
-            x_column: semantic_source::resolve_column_name(x_column),
-            y_column: semantic_source::resolve_column_name(y_column),
+            x_column: metadata.resolve_column_name(x_column),
+            y_column: metadata.resolve_column_name(y_column),
         },
         XYPlotModeOptions::ComplexPlane { quantity } => XYPlotModeOptions::ComplexPlane {
-            quantity: semantic_source::resolve_column_name(quantity),
+            quantity: metadata.resolve_column_name(quantity),
         },
     }
 }
 
-fn resolve_trace_roles(options: &XYTraceRoleOptions) -> XYTraceRoleOptions {
+fn resolve_trace_roles(
+    metadata: &semantic_source::PreparedChartData,
+    options: &XYTraceRoleOptions,
+) -> XYTraceRoleOptions {
     XYTraceRoleOptions {
         trace_group_index_columns: options.trace_group_index_columns.as_ref().map(|columns| {
             columns
                 .iter()
-                .map(|column| semantic_source::resolve_axis_column_name(column))
+                .map(|column| metadata.resolve_column_name(column))
                 .collect()
         }),
         sweep_index_column: options
             .sweep_index_column
             .as_deref()
-            .map(semantic_source::resolve_axis_column_name),
+            .map(|column| metadata.resolve_column_name(column)),
     }
 }
 
@@ -609,22 +634,31 @@ fn diff_heatmap(
 
 #[cfg(test)]
 mod tests {
-    use fricon::{AppManager, Client, DatasetRow, DatasetScalar, WorkspaceRoot};
+    use std::collections::HashMap;
+
+    use fricon::{
+        AppManager, Client, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, ScalarKind,
+        WorkspaceRoot,
+    };
     use indexmap::IndexMap;
     use tempfile::TempDir;
 
     use super::{
         dataset_live_chart_data as load_live_chart_data, diff_heatmap, diff_live_snapshots,
-        diff_xy_series, recent_group_starts_in_scan_batch, resolve_group_tail_start_in_scan_batch,
+        diff_xy_series, recent_group_starts_in_scan_batch, resolve_dataset_chart_options,
+        resolve_group_tail_start_in_scan_batch,
     };
     use crate::{
         desktop_runtime::session::WorkspaceSession,
         features::charts::{
+            semantic_source,
             transform::test_utils::{numeric_batch, numeric_schema},
             types::{
-                ChartSnapshot, FlatSeries, FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot,
-                LiveChartAppendOperation, LiveChartDataOptions, LiveChartDataResponse,
-                LiveHeatmapOptions, XYChartSnapshot, XYDrawStyle, XYPlotMode,
+                ChartCommonOptions, ChartSnapshot, DatasetChartDataOptions, FlatSeries,
+                FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot, LiveChartAppendOperation,
+                LiveChartDataOptions, LiveChartDataResponse, LiveHeatmapOptions,
+                XYChartDataOptions, XYChartSnapshot, XYDrawStyle, XYPlotMode, XYPlotModeOptions,
+                XYTraceRoleOptions,
             },
         },
     };
@@ -712,6 +746,71 @@ mod tests {
         assert_eq!(
             resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], &row_indices, 0, 1),
             Some(5)
+        );
+    }
+
+    #[test]
+    fn resolve_dataset_chart_options_uses_projection_semantic_names() {
+        let schema = DatasetSchema::new(IndexMap::from([
+            (
+                "signal".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "logicalIndex:gate".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "column:logicalIndex:physical".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+        ]));
+        let metadata = semantic_source::prepared_chart_data_for_test(
+            schema,
+            HashMap::from([
+                ("column:signal".to_string(), "signal".to_string()),
+                (
+                    "logicalIndex:gate".to_string(),
+                    "logicalIndex:gate".to_string(),
+                ),
+                (
+                    "column:logicalIndex:physical".to_string(),
+                    "column:logicalIndex:physical".to_string(),
+                ),
+            ]),
+            Some(vec![1]),
+            Some(vec![1, 2]),
+        );
+        let options = DatasetChartDataOptions::Xy(XYChartDataOptions {
+            draw_style: XYDrawStyle::Line,
+            plot_mode: XYPlotModeOptions::QuantityVsSweep {
+                quantity: "column:signal".to_string(),
+                complex_views: None,
+            },
+            trace_roles: XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["column:logicalIndex:physical".to_string()]),
+                sweep_index_column: Some("logicalIndex:gate".to_string()),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let DatasetChartDataOptions::Xy(resolved) =
+            resolve_dataset_chart_options(&metadata, &options)
+        else {
+            panic!("expected XY options");
+        };
+
+        let XYPlotModeOptions::QuantityVsSweep { quantity, .. } = resolved.plot_mode else {
+            panic!("expected quantity vs sweep options");
+        };
+        assert_eq!(quantity, "signal");
+        assert_eq!(
+            resolved.trace_roles.trace_group_index_columns,
+            Some(vec!["column:logicalIndex:physical".to_string()])
+        );
+        assert_eq!(
+            resolved.trace_roles.sweep_index_column,
+            Some("logicalIndex:gate".to_string())
         );
     }
 
