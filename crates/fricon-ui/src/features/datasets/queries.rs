@@ -1,10 +1,7 @@
 use fricon::{
     DatasetInterpretation, DatasetListQuery, InterpretationSource, ReadAppError, ResolvedColumn,
-    ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedScanAxisMode, VisibleColumnOrdinal,
-    dataset::{
-        model::DatasetId,
-        semantics::{DatasetDType, ScanAxisValue, TraceValueDType},
-    },
+    ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedSemanticReference,
+    dataset::model::DatasetId,
 };
 
 use super::{
@@ -108,46 +105,21 @@ fn chart_semantics_from_interpretation(interpretation: &DatasetInterpretation) -
     };
 
     let value_columns = interpretation
-        .value_columns
+        .value_references
         .iter()
-        .filter_map(|ordinal| visible_column(interpretation, *ordinal))
-        .map(chart_semantic_column)
+        .filter_map(chart_semantic_column)
         .collect();
 
-    let mut axes = Vec::new();
-    if interpretation.source == InterpretationSource::Manifest {
-        axes.extend(interpretation.scan_axes.iter().map(|axis| {
-            let numeric = match &axis.mode {
-                ResolvedScanAxisMode::ImplicitIndex => true,
-                ResolvedScanAxisMode::Static { values } => {
-                    values.iter().all(scan_axis_value_is_numeric)
-                }
-            };
-            ChartSemanticAxis {
-                id: logical_index_id(&axis.name),
-                name: axis.name.clone(),
-                label: axis.label.clone(),
-                kind: ChartSemanticAxisKind::LogicalIndex,
-                numeric,
-                is_compatibility: false,
-                physical_column: None,
-            }
-        }));
-    } else {
-        axes.extend(
-            interpretation
-                .logical_index_columns
-                .iter()
-                .filter_map(|ordinal| visible_column(interpretation, *ordinal))
-                .map(|column| column_axis(column, true)),
-        );
-    }
+    let axes = interpretation
+        .sweep_axes
+        .iter()
+        .map(semantic_axis)
+        .collect();
 
     let chart_axis_candidates = interpretation
-        .chart_axis_candidate_columns
+        .chart_axis_candidates
         .iter()
-        .filter_map(|ordinal| visible_column(interpretation, *ordinal))
-        .map(|column| column_axis(column, false))
+        .map(semantic_axis)
         .collect();
 
     ChartSemantics {
@@ -160,56 +132,41 @@ fn chart_semantics_from_interpretation(interpretation: &DatasetInterpretation) -
     }
 }
 
-fn visible_column(
-    interpretation: &DatasetInterpretation,
-    ordinal: VisibleColumnOrdinal,
-) -> Option<&ResolvedColumn> {
-    interpretation
-        .columns
-        .iter()
-        .find(|column| column.visible_ordinal == Some(ordinal))
-}
-
-fn chart_semantic_column(column: &ResolvedColumn) -> ChartSemanticColumn {
-    ChartSemanticColumn {
-        id: column_id(&column.name),
+fn chart_semantic_column(reference: &ResolvedSemanticReference) -> Option<ChartSemanticColumn> {
+    let ResolvedSemanticReference::PhysicalColumn(column) = reference else {
+        return None;
+    };
+    Some(ChartSemanticColumn {
+        id: column.id.clone(),
         name: column.name.clone(),
         label: column.label.clone(),
-        is_complex: dtype_is_complex(&column.dtype),
-        is_trace: matches!(column.dtype, DatasetDType::Trace { .. }),
+        is_complex: column.is_complex,
+        is_trace: column.is_trace,
         hidden_by_default: column.hidden_by_default,
+    })
+}
+
+fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
+    match reference {
+        ResolvedSemanticReference::PhysicalColumn(column) => ChartSemanticAxis {
+            id: column.id.clone(),
+            name: column.name.clone(),
+            label: column.label.clone(),
+            kind: ChartSemanticAxisKind::Column,
+            numeric: column.numeric_axis,
+            is_compatibility: column.is_compatibility,
+            physical_column: Some(column.name.clone()),
+        },
+        ResolvedSemanticReference::LogicalIndex(axis) => ChartSemanticAxis {
+            id: axis.id.clone(),
+            name: axis.name.clone(),
+            label: axis.label.clone(),
+            kind: ChartSemanticAxisKind::LogicalIndex,
+            numeric: axis.numeric_axis,
+            is_compatibility: axis.is_compatibility,
+            physical_column: None,
+        },
     }
-}
-
-fn column_axis(column: &ResolvedColumn, is_compatibility: bool) -> ChartSemanticAxis {
-    ChartSemanticAxis {
-        id: column_id(&column.name),
-        name: column.name.clone(),
-        label: column.label.clone(),
-        kind: ChartSemanticAxisKind::Column,
-        numeric: dtype_is_chart_axis_numeric(&column.dtype),
-        is_compatibility,
-        physical_column: Some(column.name.clone()),
-    }
-}
-
-fn dtype_is_chart_axis_numeric(dtype: &DatasetDType) -> bool {
-    matches!(
-        dtype,
-        DatasetDType::Float64 | DatasetDType::Float32 | DatasetDType::Int64 | DatasetDType::UInt64
-    )
-}
-
-fn scan_axis_value_is_numeric(value: &ScanAxisValue) -> bool {
-    matches!(value, ScanAxisValue::Int(_) | ScanAxisValue::Float(_))
-}
-
-fn column_id(name: &str) -> String {
-    format!("column:{name}")
-}
-
-fn logical_index_id(name: &str) -> String {
-    format!("logicalIndex:{name}")
 }
 
 fn column_info_from_resolved_column(
@@ -221,23 +178,12 @@ fn column_info_from_resolved_column(
         name: column.name.clone(),
         label: column.label.clone(),
         unit: column.unit.clone(),
-        is_complex: dtype_is_complex(&column.dtype),
-        is_trace: matches!(column.dtype, DatasetDType::Trace { .. }),
+        is_complex: column.is_complex,
+        is_trace: column.is_trace,
         is_index: column.is_index,
         hidden_by_default: column.hidden_by_default,
         is_chart_axis_candidate: expose_manifest_hints && column.is_chart_axis_candidate,
     })
-}
-
-fn dtype_is_complex(dtype: &DatasetDType) -> bool {
-    matches!(
-        dtype,
-        DatasetDType::Complex128
-            | DatasetDType::Trace {
-                value: TraceValueDType::Complex128,
-                ..
-            }
-    )
 }
 
 pub(crate) async fn get_dataset_write_status(
@@ -258,31 +204,19 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use fricon::{
         AppManager, Client, DatasetRow, DatasetScalar, ScalarArray, WorkspaceRoot,
-        dataset::semantics::{ColumnMetadata, DatasetDType},
-        workspace::WorkspacePaths,
+        dataset::semantics::ColumnMetadata, workspace::WorkspacePaths,
     };
     use indexmap::IndexMap;
     use num::complex::Complex64;
     use tempfile::TempDir;
 
-    use super::{dtype_is_chart_axis_numeric, get_dataset_detail, validate_non_negative};
+    use super::{get_dataset_detail, validate_non_negative};
     use crate::desktop_runtime::session::WorkspaceSession;
 
     #[test]
     fn validate_non_negative_rejects_negative_values() {
         let error = validate_non_negative(Some(-1), "limit").expect_err("expected error");
         assert_eq!(error.to_string(), "limit must be non-negative");
-    }
-
-    #[test]
-    fn chart_axis_numeric_includes_supported_scalar_numeric_dtypes() {
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::Float64));
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::Float32));
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::Int64));
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::UInt64));
-        assert!(!dtype_is_chart_axis_numeric(&DatasetDType::Bool));
-        assert!(!dtype_is_chart_axis_numeric(&DatasetDType::Utf8));
-        assert!(!dtype_is_chart_axis_numeric(&DatasetDType::Complex128));
     }
 
     #[tokio::test]

@@ -11,10 +11,17 @@ use arrow_array::{
 };
 use arrow_schema::{DataType, Field, Fields, Schema, SchemaRef};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
+#[cfg(test)]
+use fricon::{
+    ColumnMeaning, PhysicalColumnOrdinal, ResolvedIndexRealization, ResolvedLogicalIndexReference,
+    ResolvedPhysicalColumnReference, ResolvedSemanticReference, VisibleColumnOrdinal,
+    dataset::semantics::DatasetDType,
+};
 use fricon::{
     DatasetDataType, DatasetInterpretation, DatasetReader, DatasetSchema, InterpretationSource,
     ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ScalarKind,
     SelectOptions, dataset::semantics::ScanAxisValue,
+    physical_column_id as core_physical_column_id,
 };
 use indexmap::IndexMap;
 
@@ -40,11 +47,7 @@ pub(crate) struct PreparedChartData {
 }
 
 pub(crate) fn column_id(name: &str) -> String {
-    format!("{COLUMN_PREFIX}{name}")
-}
-
-pub(crate) fn logical_index_id(name: &str) -> String {
-    format!("{LOGICAL_INDEX_PREFIX}{name}")
+    core_physical_column_id(name)
 }
 
 pub(crate) fn resolve_column_name(value: &str) -> String {
@@ -73,6 +76,32 @@ fn resolve_source_column_name(value: &str) -> String {
         .to_string()
 }
 
+fn resolve_axis_column_name_for_interpretation(
+    interpretation: &DatasetInterpretation,
+    value: &str,
+) -> String {
+    if let Some(axis) = interpretation.logical_axis_for_id(value) {
+        return axis.id.clone();
+    }
+    if let Some(column) = interpretation.physical_column_for_id(value) {
+        return alias_physical_column_name(&column.name, true);
+    }
+    resolve_axis_column_name(value)
+}
+
+fn resolve_source_column_name_for_interpretation(
+    interpretation: &DatasetInterpretation,
+    value: &str,
+) -> Option<String> {
+    if interpretation.logical_axis_for_id(value).is_some() {
+        return None;
+    }
+    Some(interpretation.physical_column_for_id(value).map_or_else(
+        || resolve_source_column_name(value),
+        |column| column.name.clone(),
+    ))
+}
+
 pub(crate) async fn prepare_chart_data(
     session: &WorkspaceSession,
     id: i32,
@@ -85,8 +114,12 @@ pub(crate) async fn prepare_chart_data(
     let source_schema = dataset.schema()?.clone();
     let alias_physical_columns = true;
     let (start, end) = resolve_row_range(&dataset, common.start, common.end);
-    let selected_physical_columns =
-        selected_physical_columns(&source_schema, selected_columns, filters);
+    let selected_physical_columns = selected_physical_columns(
+        &source_schema,
+        Some(&interpretation),
+        selected_columns,
+        filters,
+    );
     let (output_schema, batches) = dataset.select_data(&SelectOptions {
         start: Bound::Included(start),
         end: Bound::Excluded(end),
@@ -167,6 +200,7 @@ pub(crate) async fn load_axis_rows(
 }
 
 fn semantic_filter_mask(
+    interpretation: &DatasetInterpretation,
     batch: &RecordBatch,
     filters: &[(String, serde_json::Value)],
 ) -> Result<Option<Vec<bool>>> {
@@ -177,7 +211,7 @@ fn semantic_filter_mask(
     for row in 0..batch.num_rows() {
         let mut keep = true;
         for (field, expected) in filters {
-            let column_name = resolve_axis_column_name(field);
+            let column_name = resolve_axis_column_name_for_interpretation(interpretation, field);
             let column = batch
                 .column_by_name(&column_name)
                 .with_context(|| format!("Filter field '{field}' not found"))?;
@@ -211,7 +245,7 @@ fn prepare_batch_from_reader(
         start,
         end,
     )?;
-    if let Some(mask) = semantic_filter_mask(&batch, filters)? {
+    if let Some(mask) = semantic_filter_mask(interpretation, &batch, filters)? {
         batch = filter_batch(&batch, &mask)?;
         row_indices = filter_row_indices(&row_indices, &mask);
     }
@@ -252,6 +286,7 @@ fn axis_row_selected_columns(
 
 fn selected_physical_columns(
     source_schema: &DatasetSchema,
+    interpretation: Option<&DatasetInterpretation>,
     selected_columns: Option<&[usize]>,
     filters: &[(String, serde_json::Value)],
 ) -> Option<Vec<usize>> {
@@ -264,7 +299,13 @@ fn selected_physical_columns(
         }
     }
     for (field, _) in filters {
-        let column_name = resolve_source_column_name(field);
+        let column_name = interpretation.map_or_else(
+            || Some(resolve_source_column_name(field)),
+            |interpretation| resolve_source_column_name_for_interpretation(interpretation, field),
+        );
+        let Some(column_name) = column_name else {
+            continue;
+        };
         if let Some((index, _, _)) = source_schema.columns().get_full(&column_name) {
             push_unique(&mut physical_columns, index);
         }
@@ -457,9 +498,9 @@ fn append_logical_axes(
     let mut arrays = batch.columns().to_vec();
     let mut columns = schema.columns().clone();
     for (axis_index, axis) in interpretation.scan_axes.iter().enumerate() {
-        let id = logical_index_id(&axis.name);
+        let id = axis.id.clone();
         let values = logical_axis_values(&kept_record_ids, &point_by_record_id, axis_index);
-        if scan_axis_is_numeric(&axis.mode) {
+        if axis.numeric_axis {
             fields.push(Arc::new(Field::new(&id, DataType::Float64, true)));
             arrays.push(numeric_axis_array(&values));
             columns.insert(id, DatasetDataType::Scalar(ScalarKind::Numeric));
@@ -488,35 +529,40 @@ fn filter_row_indices(row_indices: &[usize], mask: &[bool]) -> Vec<usize> {
 }
 
 fn axis_fields(interpretation: &DatasetInterpretation, batch: &RecordBatch) -> Vec<AxisField> {
-    let mut fields = Vec::new();
-    if interpretation.scan_axes.is_empty() {
-        fields.extend(
-            interpretation
-                .logical_index_columns
-                .iter()
-                .filter_map(|ordinal| {
-                    let column = interpretation
-                        .columns
-                        .iter()
-                        .find(|column| column.visible_ordinal == Some(*ordinal))?;
-                    Some(AxisField {
-                        id: column_id(&column.name),
-                        column_name: column.name.clone(),
-                        label: column.label.clone().unwrap_or_else(|| column.name.clone()),
-                    })
+    interpretation
+        .group_axes
+        .iter()
+        .filter_map(|reference| match reference {
+            fricon::ResolvedSemanticReference::PhysicalColumn(column) => {
+                axis_field_column_name(batch, &column.name).map(|column_name| AxisField {
+                    id: column.id.clone(),
+                    column_name,
+                    label: column.label.clone().unwrap_or_else(|| column.name.clone()),
+                })
+            }
+            fricon::ResolvedSemanticReference::LogicalIndex(axis) => batch
+                .schema()
+                .field_with_name(&axis.id)
+                .ok()
+                .map(|_| AxisField {
+                    id: axis.id.clone(),
+                    column_name: axis.id.clone(),
+                    label: axis.label.clone().unwrap_or_else(|| axis.name.clone()),
                 }),
-        );
-    } else {
-        fields.extend(interpretation.scan_axes.iter().filter_map(|axis| {
-            let id = logical_index_id(&axis.name);
-            batch.schema().field_with_name(&id).ok().map(|_| AxisField {
-                id: id.clone(),
-                column_name: id,
-                label: axis.label.clone().unwrap_or_else(|| axis.name.clone()),
-            })
-        }));
+        })
+        .collect()
+}
+
+fn axis_field_column_name(batch: &RecordBatch, physical_name: &str) -> Option<String> {
+    if batch.schema().field_with_name(physical_name).is_ok() {
+        return Some(physical_name.to_string());
     }
-    fields
+    let aliased_name = alias_physical_column_name(physical_name, true);
+    batch
+        .schema()
+        .field_with_name(&aliased_name)
+        .ok()
+        .map(|_| aliased_name)
 }
 
 fn resolve_index_columns(
@@ -524,29 +570,29 @@ fn resolve_index_columns(
     schema: &DatasetSchema,
 ) -> Option<Vec<usize>> {
     let mut indices = Vec::new();
-    for axis in interpretation
-        .scan_axes
+    for reference in interpretation
+        .sweep_axes
         .iter()
-        .filter(|axis| scan_axis_is_numeric(&axis.mode))
+        .filter(|reference| reference.numeric_axis())
     {
-        let id = logical_index_id(&axis.name);
-        if let Some((index, _, _)) = schema.columns().get_full(&id) {
-            indices.push(index);
+        match reference {
+            fricon::ResolvedSemanticReference::PhysicalColumn(column) => {
+                let column_name = alias_physical_column_name(&column.name, true);
+                if let Some((index, _, _)) = schema.columns().get_full(&column_name) {
+                    indices.push(index);
+                }
+            }
+            fricon::ResolvedSemanticReference::LogicalIndex(axis) => {
+                if let Some((index, _, _)) = schema.columns().get_full(&axis.id) {
+                    indices.push(index);
+                }
+            }
         }
     }
     if indices.is_empty() {
         None
     } else {
         Some(indices)
-    }
-}
-
-fn scan_axis_is_numeric(mode: &ResolvedScanAxisMode) -> bool {
-    match mode {
-        ResolvedScanAxisMode::ImplicitIndex => true,
-        ResolvedScanAxisMode::Static { values } => values
-            .iter()
-            .all(|value| matches!(value, ScanAxisValue::Int(_) | ScanAxisValue::Float(_))),
     }
 }
 
@@ -776,6 +822,64 @@ mod tests {
         }
     }
 
+    fn empty_interpretation(source: InterpretationSource) -> DatasetInterpretation {
+        DatasetInterpretation {
+            columns: Vec::new(),
+            semantic_references: Vec::new(),
+            value_references: Vec::new(),
+            plotted_coordinates: Vec::new(),
+            sweep_axes: Vec::new(),
+            group_axes: Vec::new(),
+            filter_axes: Vec::new(),
+            chart_axis_candidates: Vec::new(),
+            value_columns: Vec::new(),
+            logical_index_columns: Vec::new(),
+            chart_axis_candidate_columns: Vec::new(),
+            duplicate_policy: ResolvedDuplicatePolicy::LatestByRecordId,
+            index_realization: ResolvedIndexRealization::None,
+            scan_axes: Vec::new(),
+            source,
+        }
+    }
+
+    fn physical_reference(
+        id: &str,
+        name: &str,
+        meaning: ColumnMeaning,
+        is_compatibility: bool,
+    ) -> ResolvedSemanticReference {
+        ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
+            id: id.to_string(),
+            name: name.to_string(),
+            physical_ordinal: PhysicalColumnOrdinal(0),
+            visible_ordinal: Some(VisibleColumnOrdinal(0)),
+            dtype: DatasetDType::Float64,
+            meaning,
+            is_index: matches!(meaning, ColumnMeaning::CompatibilityIndex),
+            is_system: false,
+            is_compatibility,
+            hidden_by_default: false,
+            is_chart_axis_candidate: true,
+            unit: None,
+            label: None,
+            is_complex: false,
+            is_trace: false,
+            numeric_axis: true,
+        })
+    }
+
+    fn logical_reference(id: &str, name: &str) -> ResolvedSemanticReference {
+        ResolvedSemanticReference::LogicalIndex(ResolvedLogicalIndexReference {
+            id: id.to_string(),
+            name: name.to_string(),
+            axis_ordinal: 0,
+            label: None,
+            hidden_by_default: false,
+            numeric_axis: true,
+            is_compatibility: false,
+        })
+    }
+
     #[test]
     fn latest_logical_points_are_projected_within_selected_points() {
         let projected = logical_points_by_record_id(
@@ -805,16 +909,8 @@ mod tests {
 
     #[test]
     fn manifest_without_scan_axes_still_uses_inferred_index_fallback() {
-        let interpretation = DatasetInterpretation {
-            columns: Vec::new(),
-            value_columns: Vec::new(),
-            logical_index_columns: Vec::new(),
-            chart_axis_candidate_columns: vec![fricon::VisibleColumnOrdinal(0)],
-            duplicate_policy: ResolvedDuplicatePolicy::LatestByRecordId,
-            index_realization: fricon::ResolvedIndexRealization::None,
-            scan_axes: Vec::new(),
-            source: InterpretationSource::Manifest,
-        };
+        let mut interpretation = empty_interpretation(InterpretationSource::Manifest);
+        interpretation.chart_axis_candidate_columns = vec![VisibleColumnOrdinal(0)];
 
         assert!(fallback_to_inferred_index_columns(&interpretation));
     }
@@ -834,6 +930,7 @@ mod tests {
 
         let selected = selected_physical_columns(
             &source_schema,
+            None,
             Some(&[0, 2]),
             &[("column:axis".to_string(), serde_json::json!(1.0))],
         )
@@ -895,6 +992,77 @@ mod tests {
             map_full_index_columns(&source_schema, &projected, &[0]),
             vec![0]
         );
+    }
+
+    #[test]
+    fn axis_fields_find_unaliased_prefixed_compatibility_columns() {
+        let source_schema = Arc::new(Schema::new(vec![Field::new(
+            "logicalIndex:gate",
+            DataType::Float64,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            source_schema,
+            vec![Arc::new(Float64Array::from(vec![1.0])) as ArrayRef],
+        )
+        .expect("source batch");
+        let reference = physical_reference(
+            "column:logicalIndex:gate",
+            "logicalIndex:gate",
+            ColumnMeaning::CompatibilityIndex,
+            true,
+        );
+        let mut interpretation = empty_interpretation(InterpretationSource::CompatibilityInference);
+        interpretation.semantic_references = vec![reference.clone()];
+        interpretation.plotted_coordinates = vec![reference.clone()];
+        interpretation.sweep_axes = vec![reference.clone()];
+        interpretation.group_axes = vec![reference.clone()];
+        interpretation.filter_axes = vec![reference.clone()];
+        interpretation.chart_axis_candidates = vec![reference];
+        interpretation.logical_index_columns = vec![VisibleColumnOrdinal(0)];
+        interpretation.chart_axis_candidate_columns = vec![VisibleColumnOrdinal(0)];
+        interpretation.duplicate_policy = ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder;
+
+        let fields = axis_fields(&interpretation, &batch);
+
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].id, "column:logicalIndex:gate");
+        assert_eq!(fields[0].column_name, "logicalIndex:gate");
+    }
+
+    #[test]
+    fn index_columns_use_sweep_axes_not_chart_axis_candidates() {
+        let schema = DatasetSchema::new(IndexMap::from([
+            (
+                "signal".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "physicalAxis".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "logicalIndex:gate".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+        ]));
+        let logical_gate = logical_reference("logicalIndex:gate", "gate");
+        let chart_axis = physical_reference(
+            "column:physicalAxis",
+            "physicalAxis",
+            ColumnMeaning::UserValue,
+            false,
+        );
+        let mut interpretation = empty_interpretation(InterpretationSource::Manifest);
+        interpretation.semantic_references = vec![logical_gate.clone(), chart_axis.clone()];
+        interpretation.plotted_coordinates = vec![logical_gate.clone(), chart_axis.clone()];
+        interpretation.sweep_axes = vec![logical_gate];
+        interpretation.chart_axis_candidates = vec![chart_axis];
+        interpretation.index_realization = ResolvedIndexRealization::Implicit;
+
+        let index_columns = resolve_index_columns(&interpretation, &schema);
+
+        assert_eq!(index_columns, Some(vec![2]));
     }
 
     #[test]
