@@ -173,12 +173,17 @@ Fricon does not currently aim to support:
 - centralized lab administration
 - distributed database semantics
 - web-first deployment as the primary experience
+- regulated-lab compliance workflow as a v0.2 product goal
 - direct multi-machine access to the same database-backed data library through
   a shared folder
 - remote mode or browser/PWA distribution in the v0.2 replacement slice
 
 These may become integration concerns someday, but they should not drive the
 core architecture now.
+
+Regulated-lab guidance can be useful as a traceability stress test, especially
+for audit events, actor labels, timing, checksums, and correction history, but
+it should not turn the v0.2 product into a compliance system.
 
 ## Design Principles
 
@@ -205,8 +210,13 @@ The Python API is a primary user surface. It should support straightforward
 data collection scripts without forcing users to predefine every low-level
 schema detail. For datasets intended for live or historical plotting, however,
 the acquisition code should provide explicit scan schema such as
-independent/dependent roles and enough axis structure for slicing and display;
-the code knows this better than a later chart guesser.
+setpoint/independent, measured/dependent, fixed/config, monitor/readback roles
+and enough axis structure for slicing and display; the code knows this better
+than a later chart guesser.
+
+Live viewing is an operational aid for judging whether a run is sane. Live
+plots, preview transforms, export preparation, and future analysis hooks should
+not slow or fail acquisition writes.
 
 Desktop and documentation workflows should help users get back to Python code.
 For example, dataset detail views may eventually provide Python read snippets
@@ -227,7 +237,10 @@ for analysis. Prefer measurement-centered portable exports that can be opened
 directly from Python or a read-only viewer over workflows that require creating
 and importing into a second local data library before analysis can begin. Include
 a simple human-readable manifest/index preview so exported bundles remain
-inspectable even before opening Fricon Desktop or Python.
+inspectable even before opening Fricon Desktop or Python. Treat exports as
+analysis packages, not raw file dumps: preserve IDs, units, checksums,
+notes/events, sample/session context, setup/method labels, timing metadata, and
+loader snippets where practical.
 
 ### Preserve Provenance
 
@@ -250,7 +263,8 @@ Some concepts may be implemented later but should influence early model
 boundaries because they are expensive to retrofit. Dataset, run, and parameter
 work should leave room for units and display metadata, sample or specimen
 identity, dataset lineage, parameter snapshots, workflow definitions, local
-automation approvals, and event or audit logs.
+automation approvals, setup/method labels, basic clock/timing source metadata,
+and event or audit logs.
 
 ### Make Advanced Workflows Explicit
 

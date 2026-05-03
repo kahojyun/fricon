@@ -195,10 +195,13 @@ It should link:
 
 - sample and session
 - parameter snapshot or legacy parameter JSON
+- optional instrument/setup/method labels
 - code and environment summary
 - produced datasets
 - favorite or pin state, timestamped notes/markers, optional tags, lifecycle
   flags, and light attachments
+- basic clock/timing source metadata for event ordering, especially on offline
+  or locked-down lab computers
 - continuation or recovery decisions
 
 Use `Experiment` for informal scientific discussion, or later for a broader
@@ -475,6 +478,10 @@ Acceptance notes:
   datasets
 - core plot scope is table, line/scatter, and basic 2D heatmap/image views from
   tabular columns; richer dashboards wait for later versions
+- live plots are operational instruments for deciding whether a run is sane,
+  not publication-figure tooling
+- live plotting, previews, export preparation, and future analysis hooks are
+  noncritical consumers; they must not slow or fail acquisition writes
 - interrupted or partial measurements remain visible and recoverable
 - users can detach measurement or plot windows from the main console to watch
   multiple active runs without creating multiple full app instances
@@ -543,11 +550,15 @@ Acceptance notes:
 - exported bundles include produced datasets, selected artifacts, favorites,
   notes, optional tags, lifecycle flags, sample/session labels, source data
   library UUID/display name, export UUID, format version, checksums, original
-  record IDs, and Fricon versions by default
+  record IDs, Fricon versions, setup/method labels, and basic timing metadata
+  by default
 - exports include convenient common tabular files, such as CSV or Parquet when
   practical, in addition to the Fricon bundle manifest
 - exports include a simple human-readable manifest or index preview; do not
   present this as a full analysis report
+- exports are analysis packages, not raw file dumps; include enough IDs, units,
+  timing, notes/events, sample/session, checksums, and Python loader snippets
+  for laptop or HPC analysis
 - sensitive provenance such as full code paths, dirty Git details, full
   environment summaries, source computer label, and extensive sample metadata
   should be opt-in or explicitly previewed before export
@@ -598,8 +609,9 @@ Acceptance notes:
 - numeric and complex-valued measurement columns are in scope
 - datasets intended for live or historical plotting require explicit scan
   schema at creation time
-- scan schema should include independent/dependent roles and enough axis shape
-  or ordering metadata for slicing and display
+- scan schema should include roles such as setpoint/independent,
+  measured/dependent, fixed/config, monitor/readback, and enough axis shape or
+  ordering metadata for slicing and display
 - scratch or unplotted tables may use a generated guessed schema
 - column unit, label, and display hints are lightweight metadata that complement
   scan schema
@@ -787,6 +799,16 @@ declarative API.
 - Calibration workflow templates and history views.
 - Lightweight measurement templates for repeated names, scan schemas, and
   display defaults after the explicit scan-schema path proves useful.
+- Passive setup/device snapshots with software, firmware, driver, method, and
+  calibration-state summaries.
+- Compare-what-changed views across sample, setup/method labels, parameters,
+  code, operator, calibration state, and produced data.
+- Rerun-from-artifact workflow that starts from a previous measurement's scan
+  schema, labels, code/method summary, and display defaults.
+- Offline or silent installer, rollback, and side-by-side version support for
+  locked-down Windows lab PCs.
+- Richer search by setup, operator, parameter, method/config, instrument label,
+  and calibration state.
 - Import of legacy LabRAD/Data Vault history.
 - Device identity and readback verification.
 - AI-assisted metadata cleanup, reports, and calibration explanations.
@@ -804,6 +826,9 @@ declarative API.
 - Managed/declarative measurement framework.
 - Labber-like visual sweep builder as a product goal before managed-plan
   previews prove a need.
+- Driver marketplace or shared-driver ecosystem in v0.2.
+- Regulated-lab compliance UX as a v0.2 product goal; use regulated workflows
+  only as a traceability stress test.
 - LabRAD Data Vault/Grapher compatibility layer for old scripts.
 - Full legacy LabRAD/Data Vault import or browsing.
 - Generic workflow DAG engine as the first automation layer.

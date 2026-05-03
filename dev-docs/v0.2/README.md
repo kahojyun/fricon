@@ -36,7 +36,8 @@ one Fricon data library
 
 The first v0.2 shipped slice should be narrower than the full target model:
 record new measurements and table-shaped datasets, preserve context and safety
-paths, require explicit scan schema for plotted datasets, and leave analysis,
+paths, require explicit scan schema for plotted datasets, keep live consumers
+from slowing acquisition, export analysis packages, and leave analysis,
 automatic calibration, managed device communication, and declarative managed
 measurement as later layers.
 
@@ -59,15 +60,16 @@ aliases that make the roadmap look like it has a second versioning scheme.
   keep datasets directly inspectable and reopenable, support optional
   sample/session context, preserve partial/interrupted data, support basic
   backup/restore and trash/recover, require scan schema for datasets intended
-  for plotting, and keep the user model minimal. It is local-only: Fricon
-  Desktop and the Python SDK operate through one local service and one primary
-  local data library; the bundled CLI is mainly for setup, diagnostics, service
-  control, and developer workflows.
+  for plotting, keep live viewing nonblocking, and keep the user model minimal.
+  It is local-only: Fricon Desktop and the Python SDK operate through one local
+  service and one primary local data library; the bundled CLI is mainly for
+  setup, diagnostics, service control, and developer workflows.
 - v0.3: candidate product-assistance slice after the v0.2 measurement loop is
   usable. The leading candidate is read-only LAN viewing from another computer.
   Other likely areas include richer sample fields and 2D sample maps,
   comparison views, saved views, portable export viewer polish, attach/correct
-  context UX, and better passive code/environment summaries.
+  context UX, passive setup/device snapshots, rerun-from-artifact, locked-down
+  Windows installer polish, and better passive code/environment summaries.
 - v0.4: candidate automation-foundation slice after measurement history is
   trustworthy. Likely areas include parameter snapshots and proposals, analysis
   provenance UI, calibration workflow history, managed measurement plans, and
@@ -206,9 +208,12 @@ Non-goals:
 - automatic notebook state capture
 - mandatory parameter schema design before exploratory measurement
 - post-hoc scan guessing as the primary path for plotted measurement data
+- live preview/export/analysis consumers that can block acquisition writes
 - LabRAD Data Vault/Grapher compatibility layer for old scripts
 - automatic calibration, managed analysis, or managed device communication in
   the first replacement slice
+- driver marketplace or regulated-lab compliance UX in the first replacement
+  slice
 - remote mode or browser/PWA distribution as shipped v0.2 features
 - remote annotations or remote acquisition writes
 - Labber-like visual sweep builder as a product goal

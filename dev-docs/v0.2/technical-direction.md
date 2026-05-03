@@ -115,6 +115,11 @@ CLI, or the Python SDK. A fixed lab computer may optionally enable a per-user
 "start Fricon service at login" mode, but v0.2 should not require root/system
 service registration for ordinary use.
 
+Lab PCs may be locked down, offline, firewalled, or managed by IT. v0.2 should
+avoid web-installer-only assumptions. Silent/offline installation,
+side-by-side versions, and rollback are important follow-up packaging topics
+once the local replacement workflow is proven.
+
 Python measurement scripts should be able to run headlessly without first
 opening Fricon Desktop. The Python SDK should discover, start, or connect to
 the local service where practical and report guided diagnostics when it cannot.
@@ -288,6 +293,8 @@ Preferred direction:
   runs without creating multiple independent full app instances
 - highlight newly started Python measurements in the console and live list
   without stealing focus or opening windows automatically
+- treat live views as operational monitoring surfaces, not publication plotting
+  tools
 - provide default shortcuts for today, live/active, active sample/session,
   favorites, partial/failed, trash, and text search
 - bundle the frontend assets in the Tauri desktop app for normal local use
@@ -339,6 +346,11 @@ status to the console.
 Measurement list DTOs should provide a human-first display identity: name or
 title, start time, sample/session label when available, and stable record ID as
 secondary technical identity.
+
+Live views, preview transforms, export preparation, and future analysis hooks
+should be noncritical consumers of the acquisition stream. They must not block
+or fail dataset writes; use async event delivery, bounded queues, backpressure,
+or dropped preview updates where needed.
 
 ## Future Remote Access
 
@@ -435,10 +447,11 @@ only one mutable text field.
 
 Datasets intended for live or historical plotting should require explicit scan
 schema at creation time. The schema should carry the acquisition code's own
-knowledge of independent columns, dependent columns, axis order or shape when
-known, units/labels, and enough role metadata for slicing and display. Scratch
-or unplotted lower-level tables may use a generated guessed schema, but guessed
-schema should not be the primary path for measurement data.
+knowledge of setpoint/independent columns, measured/dependent columns,
+fixed/config values, monitor/readback values, axis order or shape when known,
+units/labels, limits when available, and enough role metadata for slicing and
+display. Scratch or unplotted lower-level tables may use a generated guessed
+schema, but guessed schema should not be the primary path for measurement data.
 
 ## API Model Direction
 
@@ -492,6 +505,10 @@ If a script crashes, the partial measurement remains visible and a rerun
 creates a new linked measurement by default; appending to the old measurement
 requires explicit resume intent and compatibility checks.
 
+The v0.2 measurement API should allow optional setup/method labels and basic
+clock or timing-source metadata. These are run context fields, not a device
+management framework.
+
 ## Portable Export Direction
 
 Exports should be measurement-centered and portable.
@@ -523,8 +540,10 @@ The exact syntax is unsettled. The contract is:
 - a simple human-readable manifest or index preview should be included
 - measurement metadata, sample/session context, produced datasets, selected
   non-table artifacts, parameter snapshot or legacy metadata, code/environment
-  summary, notes, tags, lifecycle flags, and provenance summaries travel with
-  the exported measurement
+  summary, setup/method labels, basic timing metadata, notes, tags, lifecycle
+  flags, and provenance summaries travel with the exported measurement
+- Python loader snippets should treat the export as an analysis package for
+  laptop or HPC work, not as an opaque archive that must be imported first
 - sensitive provenance such as full paths, detailed dirty Git state, full
   environment summaries, source computer label, and extensive sample metadata
   should be opt-in or explicitly previewed before export

@@ -45,6 +45,7 @@ v0.2 should optimize for these user outcomes:
 - run measurement scripts headlessly without first opening Fricon Desktop
 - inspect live and historical datasets through Fricon Desktop and Python
 - watch multiple active measurements through detachable data or plot windows
+- keep live viewing and other consumers from slowing or breaking acquisition
 - preserve flexible parameter snapshots, optional code/environment summaries,
   favorite, note, attachment, and lifecycle context for each measurement
 - require acquisition code to provide scan schema for datasets intended for
@@ -77,6 +78,8 @@ User-visible concepts for the first v0.2 slice:
 - Dataset: a table-shaped artifact produced or consumed by work
 - Operator Profile: an optional lightweight local label for mutating actions on
   shared lab computers
+- Setup/Method Label: optional human-readable labels for the lab setup,
+  instrument configuration, or measurement method used for a run
 
 User-visible concepts to preserve for later v0.2 work:
 
@@ -245,6 +248,12 @@ Settled v0.2 product decisions:
 - When a Python script starts a measurement, Desktop should highlight the new
   live run in the console and live list without stealing focus or opening a
   window automatically.
+- Live table and plot views are operational instruments for deciding whether a
+  run is sane, not publication-figure tooling.
+- Live plotting, export preparation, previews, and future analysis hooks should
+  be noncritical consumers. They must not block, slow, or fail acquisition
+  writes; use async processing, backpressure, or dropped preview updates where
+  needed.
 - The local service should allow multiple concurrent local measurement writers,
   with each writer isolated as its own measurement record.
 - The local service uses a generated local token boundary and optional
@@ -283,6 +292,9 @@ Settled v0.2 product decisions:
   or the Desktop offline viewer without creating a local data library, include
   a simple human-readable manifest/index preview, and make sensitive provenance
   opt-in or explicitly previewed.
+- Portable exports are analysis packages, not raw file dumps. They should keep
+  enough manifest, checksum, IDs, units, timing, notes/events, sample/session,
+  setup/method labels, and Python loader information for laptop or HPC analysis.
 - `Measurement` is the first public acquisition noun. `Experiment` is informal
   scientific language or a possible future grouping/template concept.
 - Sample/session context is useful and visible, but optional. Quick
@@ -296,9 +308,10 @@ Settled v0.2 product decisions:
   and display hints remain lightweight metadata, but plotted datasets need more
   than row-order inference.
 - Datasets intended for live or historical plotting require explicit scan
-  schema at dataset creation, including independent/dependent roles and enough
-  scan-axis structure for slicing and display. Scratch or unplotted tables may
-  use a generated guessed schema.
+  schema at dataset creation, including roles such as setpoint/independent,
+  measured/dependent, fixed/config, monitor/readback, and enough scan-axis
+  structure for slicing and display. Scratch or unplotted tables may use a
+  generated guessed schema.
 - v0.2 plot scope is live table, line/scatter, and basic 2D heatmap/image views
   from tabular columns. Rich dashboards are later scope.
 - Default history shortcuts should cover today, live/active, active
@@ -311,6 +324,9 @@ Settled v0.2 product decisions:
   environment capture.
 - v0.2 parameter capture is an optional flexible snapshot, not a full parameter
   registry or profile UI.
+- v0.2 measurement records should allow optional instrument/setup/method labels
+  and basic clock/timing source metadata without implementing device
+  management.
 - Analysis remains external through Python/export in v0.2. Analysis provenance
   is reserved in the model, but Analysis is not a peer navigation concept in
   the first measurement-facing UI.
@@ -326,6 +342,9 @@ Settled v0.2 product decisions:
   sweep builder a product goal before managed-plan previews prove a need.
 - Measurement templates are a v0.3/v0.4 candidate after explicit scan schema
   and measurement records prove the workflow, not a v0.2 requirement.
+- Passive setup/device snapshots, compare-what-changed views, rerun-from-
+  artifact, offline/silent installers, rollback, and richer search by setup,
+  operator, parameter, method, or calibration state are later candidates.
 - AI integration should initially read, summarize, and suggest. Mutating
   actions require human or script confirmation and audit records.
 - Diagnostics are guided in Desktop. Support bundles are local and redacted by
@@ -572,6 +591,11 @@ measurement in lab data library
 Users should not need to create a new local data library, import the bundle, or
 understand Fricon storage internals before analyzing exported data.
 
+Treat the export as a portable analysis package, not a raw file dump. It should
+be useful on a personal laptop, offline viewer, or HPC workspace while
+preserving enough identity and provenance to reconnect the result to the lab
+data library later.
+
 A measurement export should include:
 
 - export format version and export UUID
@@ -581,6 +605,7 @@ A measurement export should include:
 - measurement name, favorite/pin state, notes, optional tags, lifecycle flags,
   and correction summaries
 - optional sample/session context and attach-later correction history
+- optional setup/method labels and basic clock/timing metadata
 - produced dataset artifacts with facts, semantic manifests, and projections
 - common tabular payload files, such as CSV or Parquet when practical
 - non-table artifacts such as reports, figures, logs, attachments, code

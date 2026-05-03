@@ -151,10 +151,14 @@ measurements and use Fricon instead to:
 - inspect live, recent, and historical measurements through table, line/scatter,
   and basic 2D views
 - provide explicit scan schema for datasets intended for live or historical
-  plotting, including independent/dependent roles and enough axis structure for
-  slicing and display
+  plotting, including setpoint/independent, measured/dependent, fixed/config,
+  monitor/readback roles, and enough axis structure for slicing and display
+- keep live plotting, previews, export preparation, and future analysis hooks
+  from slowing or failing acquisition writes
 - use measurement display identity based on name/title, start time, and
   sample/session label, with stable IDs as secondary technical references
+- record optional setup/method labels and basic clock/timing metadata without
+  building device management
 - install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
   coherent Fricon release rather than assembling mismatched components manually
 - use the CLI primarily for setup, diagnostics, service control, and developer
@@ -189,9 +193,9 @@ measurements and use Fricon instead to:
   data-library identifiers
 - preserve interrupted partial data; reruns create new linked measurements by
   default, while continuation requires explicit intent and compatibility checks
-- export measurements as read-only portable bundles with practical common
-  tabular files, a simple manifest/index preview, and direct Python/Desktop
-  offline-viewer access
+- export measurements as read-only analysis packages with practical common
+  tabular files, a simple manifest/index preview, checksums, units, notes/events,
+  loader snippets, and direct Python/Desktop offline-viewer access
 - include light measurement attachments such as small files, images, or logs
   without building a full artifact management UI
 
@@ -208,6 +212,8 @@ v0.2 replacement does not require:
 - Fricon-managed device communication
 - automatic calibration workflows
 - managed analysis records or analysis-run UI
+- driver marketplace or shared-driver ecosystem
+- regulated-lab compliance UX as a v0.2 product goal
 - automatic Git, `uv`, or `pixi` environment management
 - a long-term third-party client protocol stability promise
 - a complex auto-update system before the first replacement workflow is proven
@@ -259,9 +265,19 @@ Likely v0.3 candidates:
 - lightweight measurement templates for repeated names, scan schemas, and
   display defaults
 - portable export viewer polish
+- passive setup/device snapshots with software, firmware, driver, method, and
+  calibration-state summaries
+- compare-what-changed views across sample, setup/method labels, parameters,
+  code, operator, calibration state, and produced data
+- rerun-from-artifact workflow seeded by a previous measurement's scan schema,
+  labels, code/method summary, and display defaults
 - smoother installer/update polish after the v0.2 release shape is proven
+- offline/silent installer, side-by-side versions, and rollback support for
+  locked-down Windows lab PCs
 - passive code/environment summary improvements
 - better lifecycle/favorite filtering
+- richer search by setup, operator, parameter, method/config, instrument label,
+  and calibration state
 
 Likely v0.4 candidates:
 
