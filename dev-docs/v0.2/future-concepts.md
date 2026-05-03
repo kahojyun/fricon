@@ -150,7 +150,7 @@ Status: partially promoted to v0.2 for minimal measurement records; future
 concept and ADR needed later for managed runner, task queue, resource leases,
 script-run provenance, retry/resume, and managed code snapshots.
 
-Focused proposal:
+Archived background:
 
 - `archive/experiment-run-and-runner-design.md`
 

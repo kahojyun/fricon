@@ -51,6 +51,20 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
   data-library service model, Fricon Desktop shell direction, local-only v0.2
   scope, future remote/auth boundary, and rewrite strategy.
 
+Active supporting notes:
+
+- `dataset-semantic-architecture-proposal.md` defines the detailed dataset
+  semantic direction: explicit dataset semantics, durable manifests, resolved
+  interpretation, and a shaped feature sequence that keeps the foundation
+  separate from later scan and chart migration work. Treat it as proposed
+  design guidance, not current implementation fact, and reconcile it with the
+  broader redesign before implementation.
+- `v0.2/future-concepts.md` preserves lightweight notes for concepts that are
+  not yet ready for focused design proposals. Some entries, such as measurement
+  records and sample identity, are now partially promoted into v0.2; treat the
+  remaining runner, workflow automation, calibration automation, device apply,
+  and AI automation parts as future.
+
 Archived pre-adoption proposal notes remain historical background behind the
 v0.2 reset. Use them for rationale and edge cases only; do not treat them as
 active scope, sequencing, or naming guidance when they conflict with
@@ -60,20 +74,9 @@ active scope, sequencing, or naming guidance when they conflict with
 - `v0.2/archive/measurement-system-foundation-redesign.md` preserves an older
   redesign proposal for dataset artifacts, run-like producer/consumer
   provenance, and future calibration foundations.
-- `dataset-semantic-architecture-proposal.md` defines the detailed dataset
-  semantic direction: explicit dataset semantics, durable manifests, resolved
-  interpretation, and a shaped feature sequence that keeps the foundation
-  separate from later scan and chart migration work. Treat it as proposed
-  design guidance, not current implementation fact, and reconcile it with the
-  broader redesign before implementation.
 - `v0.2/archive/parameter-management-design.md` preserves an older long-term
   parameter registry proposal. Treat it as background input for a future
   rewritten parameter design, not as active v0.2 implementation guidance.
-- `v0.2/future-concepts.md` preserves lightweight notes for concepts that are
-  not yet ready for focused design proposals. Some entries, such as measurement
-  records and sample identity, are now partially promoted into v0.2; treat the
-  remaining runner, workflow automation, calibration automation, device apply,
-  and AI automation parts as future.
 
 When implementation lands, update the current implementation notes and public
 docs before treating proposal content as current behavior.
@@ -416,7 +419,7 @@ After the v0.2 replacement slice is durable, product work should move toward:
 - managed code snapshots and script-run provenance after the runner boundary is
   explicitly designed
 
-Relevant future design note:
+Archived background:
 
 - `v0.2/archive/experiment-run-and-runner-design.md`
 - `v0.2/archive/parameter-management-design.md`
