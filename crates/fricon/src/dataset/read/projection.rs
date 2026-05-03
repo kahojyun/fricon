@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use arrow_array::{
     Array, ArrayRef, BooleanArray, Float32Array, Float64Array, Int64Array, RecordBatch,
-    StringArray, StructArray, UInt64Array,
+    RecordBatchOptions, StringArray, StructArray, UInt64Array,
 };
 use arrow_schema::{DataType, Field, Fields, Schema, SchemaRef};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -86,17 +86,21 @@ pub fn project_semantic_source(
         options.selected_columns,
         options.filters,
     );
-    let (output_schema, batches) = dataset.select_data(&SelectOptions {
-        start: Bound::Included(start),
-        end: Bound::Excluded(end),
-        index_filters: None,
-        selected_columns: selected_physical_columns.clone(),
-    })?;
-    let batch = concat_or_empty(output_schema, &batches)?;
     let selected_schema = selected_physical_columns.as_deref().map_or_else(
         || project_all_schema(&source_schema),
         |columns| project_schema(&source_schema, columns),
     )?;
+    let batch = if matches!(selected_physical_columns.as_deref(), Some([])) {
+        empty_row_count_batch(end.saturating_sub(start))?
+    } else {
+        let (output_schema, batches) = dataset.select_data(&SelectOptions {
+            start: Bound::Included(start),
+            end: Bound::Excluded(end),
+            index_filters: None,
+            selected_columns: selected_physical_columns.clone(),
+        })?;
+        concat_or_empty(output_schema, &batches)?
+    };
     let batch = rename_batch(&batch, &selected_schema)?;
 
     project_selected_batch(
@@ -235,6 +239,14 @@ fn project_schema(source_schema: &DatasetSchema, columns: &[usize]) -> Result<Da
     Ok(DatasetSchema::new(projected))
 }
 
+fn empty_row_count_batch(row_count: usize) -> Result<RecordBatch> {
+    Ok(RecordBatch::try_new_with_options(
+        Arc::new(Schema::new(Vec::<Field>::new())),
+        Vec::new(),
+        &RecordBatchOptions::new().with_row_count(Some(row_count)),
+    )?)
+}
+
 fn alias_physical_column_name(name: &str) -> String {
     if name.starts_with(LOGICAL_INDEX_PREFIX) || name.starts_with(COLUMN_PREFIX) {
         physical_column_id(name)
@@ -265,6 +277,13 @@ fn projected_column_name_for_semantic_id(
 
 fn rename_batch(batch: &RecordBatch, schema: &DatasetSchema) -> Result<RecordBatch> {
     let arrow_schema = Arc::new(schema.to_arrow_schema());
+    if arrow_schema.fields().is_empty() {
+        return Ok(RecordBatch::try_new_with_options(
+            arrow_schema,
+            Vec::new(),
+            &RecordBatchOptions::new().with_row_count(Some(batch.num_rows())),
+        )?);
+    }
     let columns = batch
         .columns()
         .iter()

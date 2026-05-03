@@ -4,8 +4,8 @@ use anyhow::{Context, Result, bail};
 use arrow_array::{Array, BooleanArray, Float64Array, RecordBatch, StringArray, StructArray};
 use arrow_schema::{DataType, Fields};
 use fricon::{
-    DatasetSchema, ProjectedSemanticAxis, ProjectedSemanticSource, SemanticProjectionOptions,
-    project_semantic_source,
+    DatasetReader, DatasetSchema, ProjectedSemanticAxis, ProjectedSemanticSource,
+    SemanticProjectionOptions, project_semantic_source,
 };
 
 use super::types::ChartCommonOptions;
@@ -72,13 +72,17 @@ pub(crate) async fn load_axis_rows(
 ) -> Result<(Vec<AxisField>, Vec<Vec<serde_json::Value>>)> {
     let dataset = session.dataset(id).await?;
     let end = dataset.num_rows();
+    let selected_columns = axis_row_selected_columns(&dataset)?;
+    if selected_columns.is_empty() && dataset.interpret()?.scan_axes.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
     let projection = project_semantic_source(
         &dataset,
         &SemanticProjectionOptions {
             start: Some(0),
             end: Some(end),
             filters: &[],
-            selected_columns: None,
+            selected_columns: Some(&selected_columns),
         },
     )?;
 
@@ -103,6 +107,14 @@ pub(crate) async fn load_axis_rows(
         })
         .collect::<Result<Vec<_>>>()?;
     Ok((fields, rows))
+}
+
+fn axis_row_selected_columns(dataset: &DatasetReader) -> Result<Vec<usize>> {
+    let interpretation = dataset.interpret()?;
+    if !interpretation.scan_axes.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(dataset.try_index_columns()?.unwrap_or_default())
 }
 
 fn json_value_at(array: &dyn Array, row: usize) -> Result<serde_json::Value> {
