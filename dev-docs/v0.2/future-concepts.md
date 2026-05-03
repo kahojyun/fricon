@@ -66,6 +66,67 @@ Open questions:
 - ...
 ```
 
+## Measurement Code Source And Lab Computer Setup
+
+Status: future concept, ADR needed later.
+
+Why it matters:
+
+- Many labs run several acquisition computers for different setups or groups.
+  Measurement code often gets copied between those computers, which makes
+  maintenance, provenance, and review difficult.
+- Fricon should help set up new computers and update shared measurement code
+  without turning ordinary experimenters into Git operators.
+- The solution should improve code reuse without requiring a central Fricon
+  server or a shared active data library.
+
+Boundary:
+
+- Owns the product model for a configured lab code source or package, approved
+  releases/tags, local checkout status, environment checks, setup profiles, and
+  code-source provenance recorded on measurements.
+- Does not own raw data storage, source-code hosting, branch review workflow,
+  secrets management beyond local references, or a full Git client.
+- Does not make network storage the active shared database-backed data library
+  or the primary editable measurement-code folder.
+
+Likely interfaces:
+
+- records code-source summaries on measurements, including code label, entry
+  point, source kind, source label, revision/tag/commit, dirty/hash state, and
+  environment hints
+- exposes setup diagnostics in Fricon Desktop and CLI
+- may wrap a Git repository, read-only network mirror, package cache, or lab
+  release bundle
+- may install or update a local checkout and local Python environment through
+  the lab's chosen tools
+- links setup profiles, measurement templates, scan-schema helpers, plot
+  presets, export recipes, driver/helper modules, and future calibration
+  workflow definitions to lab computers
+- exports measurement bundles with code-source and environment summaries when
+  available and safe to include
+
+Dependencies:
+
+- v0.2 measurement records and code-source summaries
+- installation/update policy
+- Python environment compatibility and diagnostics
+- actor/audit boundary for mutating setup actions
+- clear local/remote/service ownership model
+
+Open questions:
+
+- Should the public concept be named Measurement Code Source, Lab Code Package,
+  or Setup Package?
+- Which assets should be versioned together, and which should stay local to a
+  machine or setup?
+- Should Fricon update code directly, call external Git/package tools, or only
+  diagnose and link to instructions?
+- How should dirty local changes be preserved or handed to a maintainer without
+  forcing ordinary users through branch and pull-request workflows?
+- What is the minimum offline installer or network-mirror story for locked-down
+  Windows lab PCs?
+
 ## Experiment Run Model
 
 Status: future concept, ADR needed later.

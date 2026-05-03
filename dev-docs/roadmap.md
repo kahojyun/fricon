@@ -38,13 +38,14 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
   clean reset model: one data library; samples and sessions; measurement,
   analysis, simulation, import, and calibration activity records; dataset
   artifacts as the first concrete artifact type; reserved general artifacts;
-  parameter snapshots and proposals; code summaries; actor/audit boundaries;
-  optional active sample/session context; the public naming policy that prefers
-  `Measurement` over `ExperimentRun` for data-taking records; and an optional
-  managed measurement path toward Fricon-managed device communication.
+  parameter snapshots and proposals; code-source summaries; actor/audit
+  boundaries; optional active sample/session context; the public naming policy
+  that prefers `Measurement` over `ExperimentRun` for data-taking records; and
+  an optional managed measurement path toward Fricon-managed device
+  communication.
 - `v0.2/product-direction.md` repositions Fricon as a local lab data library
   and automation foundation centered on samples, sessions, measurements,
-  dataset artifacts, parameter history, code summaries, and calibration
+  dataset artifacts, parameter history, code-source summaries, and calibration
   history.
 - `v0.2/technical-direction.md` defines the proposed distribution surfaces,
   data-library service model, Fricon Desktop shell direction, local-only v0.2
@@ -102,6 +103,13 @@ The ordinary v0.2 model is one primary local data library per machine. Windows
 is the first-class lab-computer target; macOS remains supported for development
 and normal local use.
 
+Multi-computer labs should share measurement code and reusable setup assets
+without sharing the active data library. v0.2 should record passive
+measurement-code source provenance for each run. Later slices can add
+experimenter-friendly "set up this computer" and "update approved lab code"
+workflows on top of Git, read-only network mirrors, or package caches without
+requiring a central Fricon server.
+
 Initial measurement support should lean on Python scripts as the execution
 entry point. Fricon Desktop should inspect, browse, and eventually assist those
 workflows, but it should not become the primary measurement execution engine
@@ -129,6 +137,7 @@ user review and durable audit records.
 - Python scripting API for data recording and automation
 - Python-led measurement and parameter workflows
 - Reproducibility support for measurement code and environments
+- Repeatable lab-computer setup and measurement-code source provenance
 - Traceability across runs, datasets, parameters, code, and environments
 - Workflow definitions and scheduled automation
 - AI-assisted automation with explicit review and auditability
@@ -159,6 +168,9 @@ measurements and use Fricon instead to:
   sample/session label, with stable IDs as secondary technical references
 - record optional setup/method labels and basic clock/timing metadata without
   building device management
+- record optional measurement-code source summaries such as code label, entry
+  point, repository or folder label, revision/tag/commit, dirty/hash state,
+  Python/Fricon versions, and environment or lock-file hints when available
 - install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
   coherent Fricon release rather than assembling mismatched components manually
 - use the CLI primarily for setup, diagnostics, service control, and developer
@@ -215,6 +227,10 @@ v0.2 replacement does not require:
 - driver marketplace or shared-driver ecosystem
 - regulated-lab compliance UX as a v0.2 product goal
 - automatic Git, `uv`, or `pixi` environment management
+- a full measurement-code sync system, Git GUI, hosted code service, or
+  central Fricon server for distributing code
+- running active measurement code directly from a shared network folder as the
+  primary workflow
 - a long-term third-party client protocol stability promise
 - a complex auto-update system before the first replacement workflow is proven
 - remote mode, browser-served UI, or PWA distribution as shipped v0.2 features
@@ -275,6 +291,15 @@ Likely v0.3 candidates:
 - offline/silent installer, side-by-side versions, and rollback support for
   locked-down Windows lab PCs
 - passive code/environment summary improvements
+- guided "set up this computer" onboarding that installs or checks Fricon,
+  selects a local data library, connects to the lab measurement-code source,
+  prepares the Python environment, selects a setup profile, and runs diagnostics
+- measurement-code source manager for approved releases/tags, simple update
+  flows, local-change warnings, and change summaries aimed at users who do not
+  want to operate Git directly
+- support for a read-only network mirror or package cache as a code/install
+  distribution aid, while keeping execution in a local checkout and data in the
+  local data library
 - better lifecycle/favorite filtering
 - richer search by setup, operator, parameter, method/config, instrument label,
   and calibration state
@@ -406,11 +431,24 @@ Parameter management may grow beyond static run metadata into:
 Measurement code management may support local reproducibility features such as:
 
 - automatic history tracking for measurement code
-- Git-backed storage, possibly using a bare repository managed inside the
-  workspace
+- shared measurement-code sources or lab code packages used across acquisition
+  computers
+- Git-backed storage, approved release tags, or a read-only network mirror that
+  Fricon can inspect without becoming the lab's Git host
 - automatic environment capture or setup using tools such as `uv` or `pixi`
+- setup profiles, scan-schema helpers, measurement templates, plot presets,
+  calibration workflow definitions, driver/helper modules, and environment
+  lock files that can be reused across lab computers
+- experimenter-facing actions such as install approved code, update to latest
+  approved release, show what changed, check environment, open scripts folder,
+  and export local changes for review
 - clear links between a run, the code version, the environment, parameters, and
   produced datasets
+
+Measurement-code management should not make the active data library shared.
+Each acquisition computer should keep its own local data library, local code
+checkout, local environment, machine-specific setup overrides, tokens, secrets,
+and temporary notebook state.
 
 Dataset usability may include:
 
@@ -462,6 +500,9 @@ Traceability and reproducibility may include:
   summary
 - source data library UUID, display name, and optional source computer label in
   exported measurement bundles
+- measurement-code source label, revision or tag, script entry point, and
+  environment summary in run provenance and exported measurement bundles when
+  available
 - checksums for dataset chunks, exported bundles, code snapshots, and
   environment lock files
 - human-readable audit summaries for selected runs or data libraries
@@ -533,6 +574,12 @@ explicitly:
 - account, team, role, or permission systems
 - distributed database semantics
 - web-first deployment as the primary experience
+- a central Fricon server required only to distribute measurement code
+- a full Git forge, Git teaching tool, or broad source-control client for
+  ordinary experimenter workflows
+- shared editable network folders as the primary way to run measurement code
+- direct multi-machine access to the same database-backed data library through
+  a shared folder
 
 ## Decision Pressure
 
@@ -549,6 +596,9 @@ be rediscovered or relitigated later. Good ADR candidates include:
 - desktop/runtime architecture decisions
 - measurement, parameter, or device model foundations
 - measurement code history and environment management foundations
+- shared measurement-code source or lab code package model, including
+  new-computer setup and the boundary between Fricon-managed actions and
+  ordinary Git/environment tools
 - run provenance and immutability foundations
 - workflow definition and scheduler foundations
 - AI action, approval, and auditability foundations

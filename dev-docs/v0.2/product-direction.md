@@ -19,6 +19,8 @@ It should help experimentalists:
 - record measurement history without manual folder discipline
 - track samples, sessions/cooldowns, parameters, code, and datasets together
 - visualize sample parameters and measurement results
+- set up and reuse measurement code across lab computers without copying
+  folders by hand
 - maintain large parameter sets without silent drift
 - leave room for repetitive calibration work with explicit proposals and
   history
@@ -40,7 +42,7 @@ The current lab pattern Fricon should replace is:
 ```text
 new sample or setup
   -> create a new data-vault folder
-  -> sometimes copy a measurement code directory
+  -> sometimes copy a measurement code directory to the same or another lab PC
   -> edit JSON parameters locally
   -> run scripts and save data
   -> later struggle to know which sample, cooldown, code, and parameters
@@ -57,7 +59,7 @@ one Fricon data library
   -> sample and session records
   -> measurements
   -> dataset artifacts
-  -> code and environment summaries
+  -> code-source and environment summaries
   -> parameter snapshots and proposals
   -> analysis and calibration history
 ```
@@ -228,8 +230,8 @@ dataset facts in place.
 Reserve `Artifact` as the broader provenance concept. `DatasetArtifact` is the
 primary v0.2 artifact because measured tables and live plots are the LabRAD
 replacement path. Reports, figures, logs, attachments, waveform/configuration
-files, code summaries, and future device snapshots should not have to masquerade
-as datasets.
+files, code-source summaries, and future device snapshots should not have to
+masquerade as datasets.
 
 ### Parameter Profile And Snapshot
 
@@ -262,6 +264,46 @@ Start with passive summaries:
 - lock file or environment summary when practical
 
 Do not make v0.2 a full Git client or environment manager.
+
+### Measurement Code Source
+
+A measurement-code source is the lab-managed source of acquisition code and
+reusable measurement assets for one or more lab computers.
+
+The concept should help with the real workflow where several equipment PCs are
+used by different groups and code is copied between them. Fricon should separate
+three things that were previously mixed together:
+
+- the local Fricon data library on each acquisition computer
+- the local checkout or installed package used to run measurement code
+- the upstream source, such as a Git repository, read-only network mirror, or
+  package cache
+
+v0.2 should only record passive source summaries and surface diagnostics. A
+future UI can make setup and update easier, but the data model should avoid
+assuming copied folders are the normal preservation strategy.
+
+High-value reusable assets include:
+
+- measurement scripts and helper modules
+- scan-schema helpers and measurement templates
+- plot presets and display defaults
+- setup profiles with machine-local overrides
+- environment lock files or package constraints
+- export recipes
+- future calibration workflow definitions
+
+Keep these local or machine-specific unless explicitly exported:
+
+- raw data libraries
+- active sample/session state
+- local service tokens and secrets
+- device addresses, ports, and safety limits that differ by setup
+- dirty local code changes and temporary notebook state
+
+Do not make network storage the active shared data library or the primary
+editable code folder. It can be a practical mirror, package cache, backup
+target, or export destination.
 
 ## Sample Parameter Visualization
 
@@ -327,6 +369,8 @@ Acceptance notes:
   unauthenticated open loopback writes
 - notebook and script examples show how to connect to the same local data
   library used by Fricon Desktop
+- setup guidance distinguishes Fricon installation, local data-library
+  location, measurement-code source, and Python environment as separate things
 - the recommended Python SDK setup is normal lab-environment installation, such
   as `uv` or `pip`, plus service discovery/startup diagnostics
 - users get a clear diagnostic when the local service is not running or cannot
@@ -338,6 +382,28 @@ Acceptance notes:
   automatically
 - remote mode, browser-served UI, and PWA distribution are future-ready
   architecture targets, not v0.2 shipped workflows
+
+### Set Up A Lab Computer Without Copying Code Folders
+
+As an experimentalist, I want a new acquisition computer to be configured from
+an approved lab code source so that measurement code does not fork silently
+between equipment PCs.
+
+Acceptance notes:
+
+- v0.2 records the code-source summary for each measurement when available,
+  but it does not need to implement full code installation or update workflows
+- setup docs and diagnostics treat Fricon install, data-library location,
+  measurement-code source, and Python environment as separate checks
+- code runs from a local checkout, installed package, or local environment on
+  the measurement computer
+- a shared Git repository, read-only network mirror, or package cache can be an
+  upstream source, but Fricon does not require a central server
+- network storage may be used as a mirror/cache/export/backup target, not as
+  the active database-backed data library or main editable code workspace
+- future UI can expose "install approved code", "update to approved release",
+  "show what changed", "run environment check", and "export local changes for
+  review" actions without requiring ordinary users to operate Git directly
 
 ### Update Without Breaking Measurement Work
 
@@ -389,8 +455,8 @@ Acceptance notes:
 ### Create A Local Data Library
 
 As an experimentalist, I want one Fricon data library so that data, sample
-records, parameters, code summaries, and run history do not fragment into many
-folders.
+records, parameters, code-source summaries, and run history do not fragment
+into many folders.
 
 Acceptance notes:
 
@@ -593,6 +659,10 @@ Acceptance notes:
 
 - v0.2 starts with passive summaries such as script path, Git/hash state,
   Python/Fricon versions, and environment hints when available
+- summaries should include the source label, repository or folder identity,
+  release/tag/commit, dirty state, and entry point when available
+- the summary should make it visible when a lab computer is running unknown,
+  dirty, or locally modified measurement code
 - code provenance is optional summary data, not a mandatory full source or
   environment snapshot
 - managed code history and environment snapshots remain v0.3+ candidates
@@ -666,6 +736,25 @@ Acceptance notes:
 - a browser-served read-only viewer may remain useful for quick access or
   troubleshooting
 
+### Install Or Update Shared Measurement Code
+
+As an experimentalist, I want Fricon to help install or update approved
+measurement code on a lab computer so that different equipment PCs do not drift
+through copied folders and ad hoc local edits.
+
+Acceptance notes:
+
+- this is a v0.3+ candidate, not a v0.2 replacement requirement
+- Fricon may wrap an existing Git repository, read-only network mirror, package
+  cache, or lab-managed release bundle rather than hosting code itself
+- ordinary users should see approved releases, current local version,
+  environment status, and a change summary, not raw branch-management UI
+- maintainers can still use normal Git and environment tools outside Fricon
+- Fricon should warn when local changes exist before updating or running a
+  measurement
+- machine-specific setup profiles, device addresses, secrets, and local
+  overrides stay local
+
 ## v0.2 Design-Covered Edge Stories
 
 These stories do not all need full UI workflows in v0.2. The v0.2 data model
@@ -701,8 +790,8 @@ Acceptance notes:
 ### Compare Measurements And Sessions
 
 As an experimentalist, I want to compare measurements across samples,
-cooldowns, parameter snapshots, or code summaries so that drift and regressions
-are visible without manually reconstructing history from folders.
+cooldowns, parameter snapshots, or code-source summaries so that drift and
+regressions are visible without manually reconstructing history from folders.
 
 Acceptance notes:
 
@@ -801,6 +890,11 @@ declarative API.
   display defaults after the explicit scan-schema path proves useful.
 - Passive setup/device snapshots with software, firmware, driver, method, and
   calibration-state summaries.
+- Guided lab-computer setup that installs/checks Fricon, chooses a local data
+  library, connects to an approved measurement-code source, checks the Python
+  environment, selects a setup profile, and runs diagnostics.
+- Measurement-code source manager for approved releases/tags, update checks,
+  local-change warnings, and maintainer handoff.
 - Compare-what-changed views across sample, setup/method labels, parameters,
   code, operator, calibration state, and produced data.
 - Rerun-from-artifact workflow that starts from a previous measurement's scan
@@ -820,6 +914,10 @@ declarative API.
 - Full permissions/roles UI.
 - Complete notebook state capture.
 - Automatic code rewrite or environment management.
+- Full Git client, Git hosting, or source-control training UI for ordinary
+  experimenters.
+- Central Fricon server required only to distribute measurement code.
+- Shared editable network folder as the primary measurement-code workflow.
 - Broad hardware driver framework.
 - Fricon-managed device communication.
 - Automatic calibration workflows.

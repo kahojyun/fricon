@@ -46,8 +46,13 @@ v0.2 should optimize for these user outcomes:
 - inspect live and historical datasets through Fricon Desktop and Python
 - watch multiple active measurements through detachable data or plot windows
 - keep live viewing and other consumers from slowing or breaking acquisition
-- preserve flexible parameter snapshots, optional code/environment summaries,
-  favorite, note, attachment, and lifecycle context for each measurement
+- preserve flexible parameter snapshots, optional code-source/environment
+  summaries, favorite, note, attachment, and lifecycle context for each
+  measurement
+- trace which measurement-code source ran on each lab computer without copying
+  code folders into data folders
+- leave a path to repeatable new-computer setup while keeping the active data
+  library local to each acquisition computer
 - require acquisition code to provide scan schema for datasets intended for
   live or historical plotting, instead of reconstructing scan meaning from row
   order after the fact
@@ -80,11 +85,17 @@ User-visible concepts for the first v0.2 slice:
   shared lab computers
 - Setup/Method Label: optional human-readable labels for the lab setup,
   instrument configuration, or measurement method used for a run
+- Code Source Summary: optional provenance that records the measurement code
+  label, entry point, source repository or folder label, revision/tag/commit,
+  dirty/hash state, and environment hints when available
 
 User-visible concepts to preserve for later v0.2 work:
 
 - Parameter Profile: a named mutable reference to a useful parameter state
 - Parameter Snapshot: immutable parameter facts captured for a run
+- Measurement Code Source: a configured lab code package or repository used to
+  set up and update acquisition computers without asking ordinary users to run
+  Git commands
 - Analysis: later work that consumes datasets and may produce results,
   datasets, reports, or parameter proposals
 - Calibration: a reviewable workflow that turns measurements and analysis into
@@ -237,6 +248,18 @@ Settled v0.2 product decisions:
 - One primary local data library per machine is the normal user model.
   First-run setup asks for the data-library location, creates a durable UUID
   and editable display name, and remembers the choice.
+- Multi-computer labs should share measurement code and setup assets through a
+  measurement-code source, package, Git repository, or read-only network mirror,
+  not by sharing the active database-backed data library.
+- v0.2 records passive code-source summaries on measurements. It does not need
+  full source capture, code synchronization, or environment management.
+- Ordinary experimenters should not have to learn Git for daily measurement
+  work. Future code-source tooling should expose approved releases, update
+  checks, local-change warnings, diagnostics, and maintainer handoff rather than
+  a broad Git UI.
+- Network storage can be useful as a code mirror, installer/package cache,
+  export destination, or backup destination. It should not be the primary
+  editable measurement-code workflow or a shared database path.
 - Basic manual backup/restore belongs in the v0.2 data-library UX. Migrations
   and repairs should create checkpoints where practical.
 - Fricon Desktop is the primary GUI, but measurement scripts must run
@@ -320,8 +343,8 @@ Settled v0.2 product decisions:
   can exist behind the primary shortcuts where practical.
 - v0.2 can support light measurement attachments such as small files, images,
   and logs. Rich artifact management is later scope.
-- v0.2 code provenance is an optional summary, not mandatory source or
-  environment capture.
+- v0.2 code provenance is an optional code-source summary, not mandatory source
+  or environment capture.
 - v0.2 parameter capture is an optional flexible snapshot, not a full parameter
   registry or profile UI.
 - v0.2 measurement records should allow optional instrument/setup/method labels
@@ -361,6 +384,9 @@ Defer to ADR or technical design before implementation:
 - actor/auth token model for local and remote access
 - minimal device adapter/capability boundary
 - parameter snapshot/profile/proposal storage and calibration promotion rules
+- measurement-code source/package boundary, including new-computer setup and
+  the split between Fricon actions, Git/source-control tools, and environment
+  tools
 - managed measurement plan syntax, retry/resume behavior, and resource leases
 
 Keep future-only until a narrower design proves the need:
@@ -371,7 +397,8 @@ Keep future-only until a narrower design proves the need:
 - broad hardware driver framework
 - generic workflow DAG engine
 - automatic notebook state capture
-- full Git/environment management
+- full Git/environment management or a central code-distribution service
+- shared editable network folders as the primary measurement-code workflow
 - AI-driven mutating automation without explicit approval and audit records
 
 ## Domain Model
@@ -391,12 +418,13 @@ DataLibrary
             parameter_proposal | device_snapshot
     ParameterProfile
     ParameterSnapshot
-    CodeSnapshot
+    CodeSourceSummary
     Event/AuditRecord
 
   links:
     SampleSession -> Sample
     Measurement -> optional SampleSession
+    Measurement -> optional CodeSourceSummary
     ActivityRun -> consumes -> Artifact | ParameterSnapshot | ActivityRun
     ActivityRun -> produces -> Artifact
     CalibrationWorkflowRun -> coordinates -> Measurement + Analysis +
@@ -419,8 +447,8 @@ workflow-facing activity types.
 
 Artifact is the general output or input concept. DatasetArtifact is the primary
 table-shaped artifact for v0.2, while AnalysisResult, Report,
-ParameterProposal, file attachments, logs, figures, code summaries, and future
-device snapshots should fit the same provenance pattern.
+ParameterProposal, file attachments, logs, figures, code-source summaries, and
+future device snapshots should fit the same provenance pattern.
 ```
 
 The `ActivityRun` pattern should be an internal modeling tool, not the primary
@@ -460,7 +488,7 @@ such as:
 - figures
 - logs
 - attachments
-- code and environment summaries
+- code-source and environment summaries
 - waveform or configuration files
 - future device snapshots and readback summaries
 
@@ -576,6 +604,53 @@ with lib.dataset("scratch") as ds:
 
 Lower-level datasets are unassigned artifacts until linked to a producer.
 
+## Measurement Code Source
+
+The data library should not become a shared source-code repository. Treat
+measurement code as a separate local artifact that can be inspected and linked
+to measurements.
+
+v0.2 should start with passive summaries:
+
+- user-provided code label and script path or module entry point
+- source kind such as Git repository, read-only network mirror, package, or
+  local folder when known
+- source label or URI summary that is useful to humans without leaking
+  sensitive paths by default
+- revision, tag, commit, file hash, dirty state, or untracked-change summary
+  when available
+- Python, Fricon, and environment or lock-file hints when practical
+
+This is enough for a researcher to answer "which code probably produced this
+measurement" and for Desktop diagnostics to flag obvious mismatches. It is not
+a guarantee of bit-for-bit reproducibility.
+
+Future code-source tooling should focus on the lab setup pain:
+
+- set up a new acquisition computer from an approved measurement-code source
+- install or update a local checkout to an approved release or tag
+- create or check the Python environment with `uv`, `pip`, `pixi`, or the lab's
+  chosen tool
+- apply a machine/setup profile with local overrides for device addresses,
+  paths, and secrets
+- show what changed between the installed code and the approved source
+- warn before measurement when the local checkout is dirty, unknown, or
+  incompatible with the selected setup profile
+- help users export local changes for a maintainer instead of requiring them to
+  understand branches and pull requests
+
+High-value reusable assets include measurement scripts, helper modules,
+scan-schema helpers, measurement templates, plot presets, export recipes,
+environment lock files, setup profiles, and future calibration workflow
+definitions. Keep raw data libraries, active sample/session context, local
+tokens, secrets, machine-specific device bindings, and temporary notebook state
+local to each lab computer unless the user explicitly exports them.
+
+Network storage may be a practical mirror, package cache, backup destination,
+or export destination. It should not be the active shared data library, and it
+should not be the main editable code workspace where multiple computers run and
+mutate the same files.
+
 ## Portable Measurement Export
 
 Export should be measurement-centered by default.
@@ -608,10 +683,10 @@ A measurement export should include:
 - optional setup/method labels and basic clock/timing metadata
 - produced dataset artifacts with facts, semantic manifests, and projections
 - common tabular payload files, such as CSV or Parquet when practical
-- non-table artifacts such as reports, figures, logs, attachments, code
+- non-table artifacts such as reports, figures, logs, attachments, code-source
   summaries, and future device snapshots when selected
 - parameter snapshot or legacy parameter JSON used by the run when available
-- code and environment summary when available
+- code-source and environment summary when available
 - provenance links needed to explain inputs, outputs, analysis, and calibration
 - checksums for payload files and manifest records
 - simple human-readable manifest or index preview
@@ -971,8 +1046,8 @@ The initial v0.2 engineering slice should prove the new model end to end:
    console, with detachable data or plot windows for live monitoring.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
-9. Record actor, passive code summary, favorite/pin state, run note, lifecycle
-   flags, and sample/session links.
+9. Record actor, passive code-source summary, favorite/pin state, run note,
+   lifecycle flags, and sample/session links.
 10. Export a read-only measurement bundle with common tabular files, a simple
     manifest/index preview, and direct Python/Desktop offline-viewer access.
 11. Exercise backup/restore and trash/recover as user-visible safety paths.
@@ -995,6 +1070,7 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - plotted dataset scan schema contract and guessed-schema fallback
 - public naming policy for Measurement versus Experiment
 - measurement-scoped dataset writer lifecycle
+- measurement-code source/package model and new-computer setup boundary
 - minimal device adapter/capability boundary for future LabRAD replacement
 - actor/auth boundary for local access and future remote access
 - client/server protocol compatibility, version negotiation, and
@@ -1017,6 +1093,8 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - Keep sample/session/run/parameter/provenance out of dataset names.
 - Keep favorites, optional notes/tags, and lifecycle flags mostly on sample,
   session, measurement, analysis, and calibration records.
+- Keep measurement-code source separate from the data library: record passive
+  provenance in v0.2, and leave full setup/update management for later slices.
 - Keep advanced execution concepts optional until users need retry, resume,
   dry-run, or calibration automation.
 - Keep v0.2 record-only for device communication and external-only for

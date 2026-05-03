@@ -21,6 +21,12 @@ history, sample context, copied code folders, JSON parameters, calibration
 scripts, and measured data quietly diverge until they are hard to trust or
 maintain.
 
+This includes the multi-computer lab case. Fricon should help researchers stop
+copying measurement code folders between acquisition PCs, but it should do so
+through explicit code-source provenance and future setup/update tooling, not by
+making one central Fricon server or shared data folder responsible for
+everything.
+
 The v0.2 product model is:
 
 ```text
@@ -29,8 +35,8 @@ one Fricon data library
   -> measurement, analysis, simulation, import, and calibration activity records
   -> artifacts: datasets first, then results, reports, logs, attachments,
      device snapshots, and parameter proposals
-  -> parameter snapshots, code summaries, favorites, optional notes/tags, and
-     lifecycle flags
+  -> parameter snapshots, code-source summaries, favorites, optional
+     notes/tags, and lifecycle flags
   -> measurement-centered portable exports for offline analysis
 ```
 
@@ -61,6 +67,9 @@ aliases that make the roadmap look like it has a second versioning scheme.
   sample/session context, preserve partial/interrupted data, support basic
   backup/restore and trash/recover, require scan schema for datasets intended
   for plotting, keep live viewing nonblocking, and keep the user model minimal.
+  It should record passive measurement-code source summaries so runs can be
+  traced across lab computers, but it should not yet manage full code sync or
+  environment setup.
   It is local-only: Fricon Desktop and the Python SDK operate through one local
   service and one primary local data library; the bundled CLI is mainly for
   setup, diagnostics, service control, and developer workflows.
@@ -69,7 +78,9 @@ aliases that make the roadmap look like it has a second versioning scheme.
   Other likely areas include richer sample fields and 2D sample maps,
   comparison views, saved views, portable export viewer polish, attach/correct
   context UX, passive setup/device snapshots, rerun-from-artifact, locked-down
-  Windows installer polish, and better passive code/environment summaries.
+  Windows installer polish, guided new-computer setup, shared
+  measurement-code source update flows, and better passive code/environment
+  summaries.
 - v0.4: candidate automation-foundation slice after measurement history is
   trustworthy. Likely areas include parameter snapshots and proposals, analysis
   provenance UI, calibration workflow history, managed measurement plans, and
@@ -117,6 +128,8 @@ dataset catalog to a measurement record system:
 - parameter and code history as first-class provenance
 - analysis, simulation, import, and calibration as activity records that
   consume and produce artifacts
+- measurement-code source summaries that record where acquisition code came
+  from without making the data library a shared code repository
 
 Older dataset semantics work remains useful, especially append-only facts,
 record IDs, manifests, and resolved interpretation. But v0.2 implementation
@@ -163,6 +176,8 @@ to rewrite every line of code. v0.2 may intentionally break:
   library
 - metadata ownership rules that put measurement, sample, parameter, or code
   meaning inside dataset-local metadata
+- multi-computer setup assumptions that rely on copying code folders or running
+  active measurement code from a shared editable network directory
 
 Compatibility for existing local test workspaces should be an explicit
 storage/migration ADR decision. Until that ADR exists, do not optimize the v0.2
@@ -217,6 +232,10 @@ Non-goals:
 - remote mode or browser/PWA distribution as shipped v0.2 features
 - remote annotations or remote acquisition writes
 - Labber-like visual sweep builder as a product goal
+- full Git client, Git hosting, or automatic source-control workflow for
+  ordinary experimenters
+- central Fricon server required only to distribute measurement code
+- shared editable network folder as the primary measurement-code workflow
 
 Remote access, authentication boundaries, and actor/audit records should be
 planned early, but the first product should remain local-first and single-owner.

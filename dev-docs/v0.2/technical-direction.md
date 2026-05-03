@@ -39,6 +39,8 @@ High rewrite risk:
 - IPC/protobuf contracts
 - archive/import/export assumptions
 - run, sample, parameter, code, and provenance boundaries
+- setup assumptions that rely on copied code folders, shared editable network
+  directories, or one-off local Python environments
 
 Likely reusable or adaptable:
 
@@ -123,6 +125,21 @@ once the local replacement workflow is proven.
 Python measurement scripts should be able to run headlessly without first
 opening Fricon Desktop. The Python SDK should discover, start, or connect to
 the local service where practical and report guided diagnostics when it cannot.
+
+New lab-computer setup should be treated as a product workflow, even if v0.2
+only documents and diagnoses part of it. The user-visible pieces are:
+
+- install Fricon Desktop, bundled service, and CLI
+- choose or create the local data library
+- connect the computer to the lab's measurement-code source when one exists
+- create or select the Python environment used by measurement scripts
+- select a local setup profile with machine-specific device bindings and
+  overrides
+- run diagnostics before the first measurement
+
+v0.2 does not need to automate all of this. It should avoid architecture that
+would make the future flow depend on a central Fricon server or on opening a
+database-backed data library through a shared folder.
 
 Use one visible product version for the bundled desktop/service/CLI release:
 
@@ -424,7 +441,7 @@ DataLibrary
   AnalysisResult
   ParameterSnapshot
   ParameterProposal
-  CodeSnapshot
+  CodeSourceSummary
   DeviceIdentity
   Event/AuditRecord
 ```
@@ -433,13 +450,18 @@ Dataset payloads can continue to use Arrow chunk concepts where appropriate.
 The catalog and provenance model should be redesigned around the broader data
 library, not around dataset-only ownership. `DatasetArtifact` should be the
 first concrete artifact type, but storage should reserve the general
-`Artifact` boundary for reports, figures, logs, attachments, code summaries,
-waveform or configuration files, and future device snapshots.
+`Artifact` boundary for reports, figures, logs, attachments, code-source
+summaries, waveform or configuration files, and future device snapshots.
 
 For v0.2, table-shaped dataset artifacts and light measurement attachments are
 the concrete scope. Dataset contents should be appendable while their writer is
 active and immutable after finish; fixes should create derived artifacts or
 correction events.
+
+Measurement records should reserve a passive code-source summary so run
+history can explain which lab code source, local checkout, entry point, and
+environment likely produced the data. This summary should be linked to the
+measurement, not stored as dataset-local metadata.
 
 Measurement notes and markers should be stored as timestamped events in the
 measurement event timeline, beside lifecycle and system events, rather than as
@@ -640,13 +662,52 @@ v0.2 should avoid encouraging copied code directories.
 Start with optional passive summaries:
 
 - user-provided code label and script path or module entry point when available
-- optional Git commit, dirty state, or file hash summary when available
+- source kind and label when known, such as Git repository, read-only network
+  mirror, release package, or local folder
+- optional Git remote, tag, commit, dirty state, untracked-change summary, or
+  file hash summary when available
 - Python version
 - Fricon version
 - lock-file or environment summary when practical
 
 Do not make v0.2 a full Git client or environment manager. Reserve that for a
 later explicit reproducibility feature.
+
+## Measurement Code Source Direction
+
+The measurement-code source is separate from the Fricon data library. Each
+acquisition computer should keep:
+
+- its own local data library
+- a local checkout, installed package, or local folder for measurement code
+- its own Python environment or environment lock
+- local setup overrides for device addresses, ports, paths, and secrets
+
+Shared infrastructure can still help:
+
+- a Git repository for maintainers and advanced users
+- a read-only network mirror for labs that already rely on shared storage
+- a package cache or release bundle for locked-down Windows lab PCs
+- shared setup profiles, measurement templates, scan-schema helpers, plot
+  presets, export recipes, driver/helper modules, and future calibration
+  workflow definitions
+
+The service should record passive code-source facts when a measurement starts,
+but should not mutate source code in the v0.2 replacement slice. Future setup
+and update tooling can wrap existing Git or package operations through
+experimenter-facing actions:
+
+- install approved measurement code
+- update to an approved release or tag
+- show what changed
+- check the Python environment
+- warn about dirty or unknown local code before measurement
+- export local changes for maintainer review
+
+Do not make network storage the active shared data library. Do not make a
+shared editable network directory the primary way to run measurement code on
+multiple computers. Network storage can be a mirror, package cache, export
+target, or backup target.
 
 ## Parameter And Calibration Direction
 
@@ -699,6 +760,8 @@ Likely ADRs:
 - authentication/actor boundary for local access and future remote access
 - client/server protocol compatibility, version negotiation, and
   fail-before-write diagnostics for incompatible clients
+- measurement-code source/package model, new-computer setup, and the boundary
+  between Fricon-managed actions and ordinary Git/environment tools
 - public naming policy for Measurement versus Experiment
 - Python SDK surface and measurement-scoped dataset writer lifecycle
 - minimal device adapter and capability boundary for future LabRAD replacement
@@ -725,8 +788,8 @@ foundation:
 6. Browse the run and datasets in the Fricon Desktop measurement console.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
-9. Record actor/operator label, code summary, run note, lifecycle flags, and
-   sample/session links.
+9. Record actor/operator label, passive code-source summary, run note,
+   lifecycle flags, and sample/session links.
 10. Export a read-only measurement bundle with common tabular files, a simple
     manifest/index preview, and direct Python/Desktop offline-viewer access.
 11. Exercise backup/restore and trash/recover as user-visible safety paths.
