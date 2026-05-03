@@ -32,6 +32,24 @@ impl PreparedChartData {
     }
 }
 
+#[cfg(test)]
+pub(crate) fn prepared_chart_data_for_test(
+    schema: DatasetSchema,
+    semantic_column_names: HashMap<String, String>,
+    index_columns: Option<Vec<usize>>,
+    group_columns: Option<Vec<usize>>,
+) -> PreparedChartData {
+    let batch = RecordBatch::new_empty(std::sync::Arc::new(schema.to_arrow_schema()));
+    PreparedChartData {
+        batch,
+        schema,
+        index_columns,
+        group_columns,
+        row_indices: Vec::new(),
+        semantic_column_names,
+    }
+}
+
 fn prepared_chart_data(projection: ProjectedSemanticSource) -> PreparedChartData {
     let index_columns = projection.sweep_columns().map(<[_]>::to_vec);
     let group_columns = projection.group_columns().map(<[_]>::to_vec);
@@ -183,32 +201,9 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_array::{ArrayRef, StructArray};
-    use arrow_schema::{Field, Schema};
-    use indexmap::IndexMap;
+    use arrow_schema::Field;
 
     use super::*;
-
-    #[test]
-    fn prepared_data_resolves_core_semantic_column_names() {
-        let batch = RecordBatch::new_empty(Arc::new(Schema::empty()));
-        let prepared = PreparedChartData {
-            batch,
-            schema: DatasetSchema::new(IndexMap::new()),
-            index_columns: None,
-            group_columns: None,
-            row_indices: Vec::new(),
-            semantic_column_names: HashMap::from([(
-                "column:logicalIndex:gate".to_string(),
-                "column:logicalIndex:gate".to_string(),
-            )]),
-        };
-
-        assert_eq!(
-            prepared.resolve_column_name("column:logicalIndex:gate"),
-            "column:logicalIndex:gate"
-        );
-        assert_eq!(prepared.resolve_column_name("plain"), "plain");
-    }
 
     #[test]
     fn json_value_at_serializes_complex_struct_axes() {

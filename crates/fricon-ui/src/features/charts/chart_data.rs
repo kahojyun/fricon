@@ -634,22 +634,31 @@ fn diff_heatmap(
 
 #[cfg(test)]
 mod tests {
-    use fricon::{AppManager, Client, DatasetRow, DatasetScalar, WorkspaceRoot};
+    use std::collections::HashMap;
+
+    use fricon::{
+        AppManager, Client, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, ScalarKind,
+        WorkspaceRoot,
+    };
     use indexmap::IndexMap;
     use tempfile::TempDir;
 
     use super::{
         dataset_live_chart_data as load_live_chart_data, diff_heatmap, diff_live_snapshots,
-        diff_xy_series, recent_group_starts_in_scan_batch, resolve_group_tail_start_in_scan_batch,
+        diff_xy_series, recent_group_starts_in_scan_batch, resolve_dataset_chart_options,
+        resolve_group_tail_start_in_scan_batch,
     };
     use crate::{
         desktop_runtime::session::WorkspaceSession,
         features::charts::{
+            semantic_source,
             transform::test_utils::{numeric_batch, numeric_schema},
             types::{
-                ChartSnapshot, FlatSeries, FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot,
-                LiveChartAppendOperation, LiveChartDataOptions, LiveChartDataResponse,
-                LiveHeatmapOptions, XYChartSnapshot, XYDrawStyle, XYPlotMode,
+                ChartCommonOptions, ChartSnapshot, DatasetChartDataOptions, FlatSeries,
+                FlatXYSeries, FlatXYZSeries, HeatmapChartSnapshot, LiveChartAppendOperation,
+                LiveChartDataOptions, LiveChartDataResponse, LiveHeatmapOptions,
+                XYChartDataOptions, XYChartSnapshot, XYDrawStyle, XYPlotMode, XYPlotModeOptions,
+                XYTraceRoleOptions,
             },
         },
     };
@@ -737,6 +746,71 @@ mod tests {
         assert_eq!(
             resolve_group_tail_start_in_scan_batch(&batch, &schema, &[0, 1], &row_indices, 0, 1),
             Some(5)
+        );
+    }
+
+    #[test]
+    fn resolve_dataset_chart_options_uses_projection_semantic_names() {
+        let schema = DatasetSchema::new(IndexMap::from([
+            (
+                "signal".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "logicalIndex:gate".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+            (
+                "column:logicalIndex:physical".to_string(),
+                DatasetDataType::Scalar(ScalarKind::Numeric),
+            ),
+        ]));
+        let metadata = semantic_source::prepared_chart_data_for_test(
+            schema,
+            HashMap::from([
+                ("column:signal".to_string(), "signal".to_string()),
+                (
+                    "logicalIndex:gate".to_string(),
+                    "logicalIndex:gate".to_string(),
+                ),
+                (
+                    "column:logicalIndex:physical".to_string(),
+                    "column:logicalIndex:physical".to_string(),
+                ),
+            ]),
+            Some(vec![1]),
+            Some(vec![1, 2]),
+        );
+        let options = DatasetChartDataOptions::Xy(XYChartDataOptions {
+            draw_style: XYDrawStyle::Line,
+            plot_mode: XYPlotModeOptions::QuantityVsSweep {
+                quantity: "column:signal".to_string(),
+                complex_views: None,
+            },
+            trace_roles: XYTraceRoleOptions {
+                trace_group_index_columns: Some(vec!["column:logicalIndex:physical".to_string()]),
+                sweep_index_column: Some("logicalIndex:gate".to_string()),
+            },
+            common: ChartCommonOptions::default(),
+        });
+
+        let DatasetChartDataOptions::Xy(resolved) =
+            resolve_dataset_chart_options(&metadata, &options)
+        else {
+            panic!("expected XY options");
+        };
+
+        let XYPlotModeOptions::QuantityVsSweep { quantity, .. } = resolved.plot_mode else {
+            panic!("expected quantity vs sweep options");
+        };
+        assert_eq!(quantity, "signal");
+        assert_eq!(
+            resolved.trace_roles.trace_group_index_columns,
+            Some(vec!["column:logicalIndex:physical".to_string()])
+        );
+        assert_eq!(
+            resolved.trace_roles.sweep_index_column,
+            Some("logicalIndex:gate".to_string())
         );
     }
 
