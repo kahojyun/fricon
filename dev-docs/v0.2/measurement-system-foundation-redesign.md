@@ -105,7 +105,7 @@ Keep the v0.2 user model small:
 - optional active `Sample` and `Sample Session`
 - `Measurement`
 - `Dataset`
-- notes, tags, pin or favorite state, and quality state
+- notes, tags, pin or favorite state, and lifecycle state
 
 Later user-visible concepts may include:
 
@@ -201,7 +201,7 @@ A dataset artifact should have stable identity and independent lifecycle:
 - `kind`: at least reserve `measured`, `processed`, `imported`, and
   `simulation`
 - lifecycle/status
-- quality summary or output-local quality state
+- lifecycle summary or output-local lifecycle state
 - current semantic manifest or manifest reference
 - producer and consumer provenance links
 - archive/export compatibility metadata
@@ -325,7 +325,7 @@ long-term ambiguity:
 - change archive layout to include dataset semantics and provenance summaries
 - change desktop DTOs to expose resolved semantics and run links instead of
   coarse chart flags
-- bump workspace, archive, and IPC versions as needed
+- bump data-library/storage, archive, and IPC versions as needed
 
 Do not use breaking-change freedom to make simple measurement scripts heavy.
 The low-friction write path must survive.
@@ -343,7 +343,7 @@ v0.2 should expose:
 - explicit dataset semantics enough for robust scan/chart behavior
 - measurement-scoped dataset writer handles with default finalization tied to
   the measurement context
-- run-level notes, tags, pin/favorite state, quality state, and legacy JSON
+- run-level notes, tags, pin/favorite state, lifecycle state, and legacy JSON
   metadata
 - dataset-local notes or quality only for output-specific exceptions
 - generated Python snippets or stable IDs for reopening data
@@ -406,9 +406,9 @@ Suggested staged path:
 - What should the first portable measurement export bundle format include beyond
   source data library identity, measurement metadata, dataset artifacts, selected
   non-table artifacts, provenance summaries, and checksums?
-- Should output-specific notes and quality state live directly on datasets, or
-  on run-output link records?
+- Should output-specific notes and lifecycle state live directly on datasets,
+  or on run-output link records?
 - How should dataset continuation interact with completed measurement runs?
 - What compatibility promise, if any, should exist for pre-redesign local test
-  workspaces?
+  workspaces or data libraries?
 - Which decisions require a new ADR versus revising ADR 0002?

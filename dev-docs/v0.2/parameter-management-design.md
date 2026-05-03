@@ -789,7 +789,7 @@ schema or migration operation, not an incidental display preference.
 ### Starting From Empty Or Rough Imports
 
 Users should not need to design a perfect schema before using the registry. A
-new workspace should be able to start from:
+new data library should be able to start from:
 
 ```text
 empty draft
@@ -1020,9 +1020,9 @@ If table sections become very large, table snapshot payloads can later move to
 Arrow IPC or Parquet artifacts while relational metadata continues to own
 snapshot identity, refs, schema, keys, and history.
 
-Any implementation that changes workspace layout, SQLite schema, IPC contracts,
-Python API contracts, or desktop DTOs must follow the corresponding maintenance
-checklists.
+Any implementation that changes data-library layout, SQLite schema, IPC
+contracts, Python API contracts, or desktop DTOs must follow the corresponding
+maintenance checklists.
 
 ## Feature Shaping
 
@@ -1116,7 +1116,8 @@ Scope:
 
 - Should the public term be `profile`, `ref`, or both with one treated as the
   Python/API spelling?
-- Should a workspace have one parameter registry or multiple named registries?
+- Should a data library have one parameter registry or multiple named
+  registries?
 - How much schema metadata belongs in the MVP: dtype only, or dtype, unit,
   nullable, constraints, description, and lifecycle status?
 - What should be available in the direct Python API versus the stricter

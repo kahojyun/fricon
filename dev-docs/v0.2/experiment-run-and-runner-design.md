@@ -2,7 +2,7 @@
 
 ## Status
 
-Supporting future experiment and runner proposal for the v0.2 reset.
+Historical supporting runner proposal for the v0.2 reset.
 
 This is not current behavior. Do not implement or document behavior from this
 proposal as user-facing functionality until the relevant dataset semantic,
@@ -13,9 +13,22 @@ detail for measurement execution, retry/resume, and runner boundaries; it is not
 the canonical v0.2 entry point.
 
 Canonical v0.2 naming now prefers `Measurement` for the public data-taking
-record. Treat this proposal's `ExperimentRun` terminology as historical
-supporting detail until an ADR reconciles the storage/API names with the
-canonical naming policy.
+record. Treat this proposal's `ExperimentRun`, `experiment_run_id`,
+`ManagedExperimentRun`, managed submission, task queue, `ScriptRun`, and
+resource-lease details as historical runner background unless a later ADR
+explicitly promotes them.
+
+Terminology bridge for readers:
+
+- public `Measurement` replaces the old public `ExperimentRun` wording
+- internal shared activity shape is `ActivityRun` unless an ADR chooses
+  `MeasurementRun`
+- `ScriptRun`, `TaskQueueEntry`, `ResourceLease`, `CodeSnapshot`, and
+  execution worktrees are future managed-runner concepts, not first-slice v0.2
+  scope
+- `interactive` and `managed` describe execution mode; `code_provenance_level`
+  separately describes whether code provenance is `unmanaged`,
+  `user_supplied_summary`, or a future managed snapshot
 
 ## Purpose
 
@@ -65,7 +78,9 @@ Future runner implementation also depends on:
 
 ## Settled PO Decisions For v0.2
 
-The first experiment-run product slice should be record-centric.
+The first measurement-record product slice should be record-centric.
+Historical `ExperimentRun` wording below should be read as `Measurement`
+unless the text is specifically about future runner internals.
 
 v0.2 should promise:
 
@@ -76,13 +91,14 @@ v0.2 should promise:
 - attach supporting files or artifacts when users have no structured Fricon
   concept for that information yet
 - link produced datasets
-- expose notes, quality state, and retry or continuation history
+- expose notes, lifecycle state, and retry or continuation history
 - keep script execution details available as debugging context
 
-v0.2 should not promise a full generic runner implementation. The queue, script
-run, resource requirement, and resource lease model should be documented now so
-the experiment model does not block future execution work, but implementation
-can start with run records and dataset provenance.
+v0.2 should not promise a full generic runner implementation. The queue,
+script-run, managed code snapshot, execution worktree, resource requirement,
+and resource lease model should be documented only as future background so the
+measurement model does not block future execution work. Implementation should
+start with measurement records and dataset provenance.
 
 v0.2 should also be sufficient to replace a simple LabRAD Grapher/Data Vault
 style measurement logger for new measurement work. This means users can record
@@ -96,10 +112,11 @@ migration feature once the new run, dataset, and metadata boundaries are stable.
 
 Settled user-facing policies:
 
-- experiment submission should support two product modes:
-  interactive runs and managed submitted runs
-- every real experiment attempt gets a new `experiment_run_id`
-- interrupted continuation may reuse an existing `experiment_run_id`
+- v0.2 should support interactive measurement records; managed submitted runs
+  are future scope
+- every real measurement attempt gets a new measurement record
+- interrupted continuation may reuse an existing measurement only through
+  explicit continuation policy
 - continuation should require explicit user or API intent
 - every execution retry gets a new `script_run_id` when script-run records
   exist
@@ -133,15 +150,16 @@ Settled user-facing policies:
 - default run names should use a template or script label plus timestamp
 - notes should be easy to add, but Fricon should not interrupt run start or
   completion with required note prompts
-- experiment-level notes, tags, pin or favorite state, quality state, and legacy
-  JSON metadata should live on the run by default
+- measurement-level notes, tags, pin or favorite state, lifecycle state, and
+  legacy JSON metadata should live on the measurement by default
 - dataset metadata should stay focused on output-local semantics, per-output
-  notes, and per-output quality exceptions
+  notes, and per-output lifecycle exceptions
 - interrupted partial datasets should default to `suspect` until the user
   continues, validates, or invalidates them
 - run detail views should lead with produced datasets
-- provenance level should be shown as a plain label such as `Interactive` or
-  `Managed`, not as a numeric confidence score
+- execution mode should be shown as a plain label such as `Interactive` or
+  `Managed`, while code provenance level is shown separately; neither should be
+  a numeric confidence score
 - generated snippets should prioritize reopening produced datasets from Python
 
 The next product discussion should be the dataset semantics baseline, especially the
@@ -402,7 +420,7 @@ Notes:
 - optional sample or specimen reference in future work
 - expected or produced dataset links
 - related task and script run links
-- notes, tags, quality state, and correction references
+- notes, tags, lifecycle state, and correction references
 
 ### Does Not Own
 
@@ -659,10 +677,10 @@ Example resource keys:
 ```text
 device:qcm_1
 device:lockin_1
-workspace:python-env
+data-library:python-env
 ```
 
-The first runner implementation can implement leases with local workspace server
+The first runner implementation can implement leases with local service
 coordination and SQLite transactions. It should not require distributed locks.
 
 The scheduler should start a task only after all required leases can be acquired
@@ -782,7 +800,7 @@ Fricon should record:
 - attachment references for supporting files or artifacts
 - produced datasets
 - dataset write sessions when datasets are appended
-- notes, quality state, and explicit continuation decisions
+- notes, lifecycle state, and explicit continuation decisions
 - code provenance level, usually `unmanaged`, plus optional user-supplied code
   and environment summary
 
@@ -804,8 +822,8 @@ experiment has stabilized.
 Existing systems often store experiment-level context on individual datasets.
 Interactive runs should provide a better landing point for that context:
 
-- experiment-level labels, tags, and quality state should live on the run when
-  they describe the whole attempt
+- measurement-level labels, tags, and lifecycle state should live on the
+  measurement when they describe the whole attempt
 - dataset metadata should remain for dataset-local semantics and per-output
   details
 - arbitrary JSON metadata and attachments can preserve legacy context while
@@ -958,10 +976,12 @@ experiment model is stable.
 
 Desktop views should emphasize:
 
-- experiment outputs and quality state
+- measurement outputs and lifecycle state
 - produced datasets
 - parameter snapshot used by the experiment
-- provenance level: interactive or managed
+- execution mode: interactive or managed
+- code provenance level: unmanaged, user-supplied summary, or future managed
+  snapshot
 - script execution history for debugging
 - retry or continue actions when safe
 - resource conflicts and queue status when tasks are managed by Fricon
@@ -1027,9 +1047,9 @@ Recommended information order:
 
 ```text
 datasets
-quality state
+lifecycle state
 parameter snapshot
-provenance level
+execution mode and code provenance level
 notes
 execution history
 ```
@@ -1038,17 +1058,19 @@ Users usually inspect outputs first. Parameter and execution provenance should
 be close enough to explain those outputs without making debugging details the
 primary browsing model.
 
-### Provenance Labels
+### Execution Mode And Code Provenance Labels
 
-Runs should display a plain provenance label:
+Runs should display a plain execution mode label:
 
 ```text
 Interactive
 Managed
 ```
 
-Avoid numeric reproducibility or provenance scores. They imply precision Fricon
-cannot honestly provide, especially for notebook and ad hoc script workflows.
+Code provenance should be shown separately as `unmanaged`,
+`user_supplied_summary`, or a future managed snapshot. Avoid numeric
+reproducibility or provenance scores. They imply precision Fricon cannot
+honestly provide, especially for notebook and ad hoc script workflows.
 
 ### Python Snippets
 
@@ -1065,7 +1087,7 @@ reopenable, including outside the source data library.
 
 As a researcher iterating in a notebook, I want to create an interactive
 experiment run with a small amount of Python code so that Fricon records the
-datasets, notes, quality state, and basic context for my exploratory
+datasets, notes, lifecycle state, and basic context for my exploratory
 measurement.
 
 Acceptance notes:
@@ -1075,7 +1097,8 @@ Acceptance notes:
   legacy context
 - attachments can reference supporting files or artifacts
 - produced datasets are linked to the run
-- provenance label is `Interactive`
+- execution mode is `Interactive`
+- code provenance level is usually `unmanaged`
 
 ### Migrate From An External Data Vault
 
@@ -1121,8 +1144,8 @@ Acceptance notes:
 - produced datasets are the primary detail-view content
 - Python read snippets are available for datasets
 - export snippets are available for measurement-centered portable bundles
-- run quality state is visible
-- provenance label is visible
+- measurement lifecycle state is visible
+- execution mode and code provenance labels are visible
 - parameter snapshot or migration metadata summary is visible
 - execution details remain secondary debugging context
 
@@ -1150,7 +1173,8 @@ Acceptance notes:
 
 - managed runs use an importable function or module entry point
 - parameter-aware managed runs resolve an immutable parameter snapshot
-- provenance label is `Managed`
+- execution mode is `Managed`
+- code provenance can point to a managed snapshot when the runner exists
 - future runner implementation can create task and script-run records
 - produced datasets are linked through dataset write sessions
 
@@ -1167,7 +1191,7 @@ v0.2 ownership direction:
 ExperimentRun metadata
   run-level tags
   run-level favorite or pin state
-  run-level quality state
+  measurement-level lifecycle state
   notes about the scientific attempt
   sample/context references
   migration JSON metadata
@@ -1261,7 +1285,7 @@ Questions to settle there:
 - dataset finalized versus continuable state
 - schema and manifest compatibility checks for continuation
 - column roles, axes, scan semantics, units, labels, and display hints
-- how partial writes and failed write sessions affect dataset quality state
+- how partial writes and failed write sessions affect dataset lifecycle state
 
 After that, the next product slices should be:
 

@@ -428,22 +428,18 @@ Use actors for audit/provenance before using them for permissions.
 
 ## Storage Model Direction
 
-Storage should support one data library with explicit domain records:
+The first shipped v0.2 storage model should support one data library with a
+small concrete record set:
 
 ```text
 DataLibrary
   Sample
   SampleSession
-  MeasurementRun
-  Artifact
+  Measurement
   DatasetArtifact
   AttachmentArtifact
-  AnalysisResult
   ParameterSnapshot
-  ParameterProposal
   CodeProvenanceSummary
-  CodeSnapshot
-  DeviceIdentity
   Event/AuditRecord
 ```
 
@@ -455,6 +451,19 @@ first concrete artifact type, but storage should reserve the general
 summaries, managed code snapshots, waveform or configuration files, and future
 device snapshots.
 
+Reserve these records for future or ADR-gated layers instead of making them
+first-slice v0.2 storage commitments:
+
+- `ActivityRun` as a shared internal provenance pattern
+- `AnalysisResult`
+- `ParameterProposal`
+- `CodeSnapshot`
+- `ScriptRun`
+- `DeviceIdentity`
+- `DeviceSnapshot`
+- `TaskQueueEntry`
+- `ResourceLease`
+
 For v0.2, table-shaped dataset artifacts and light measurement attachments are
 the concrete scope. Dataset contents should be appendable while their writer is
 active and immutable after finish; fixes should create derived artifacts or
@@ -463,9 +472,9 @@ correction events.
 Measurement records should reserve a code provenance summary so run history can
 explain the provenance level for the code that likely produced the data. For
 non-managed user-run Python, this may be only `unmanaged` or a user-supplied
-label. For managed runs, the summary should link to an immutable `CodeSnapshot`
-and `ScriptRun`. This summary should be linked to the measurement, not stored
-as dataset-local metadata.
+label. Future managed runs may link the summary to an immutable `CodeSnapshot`
+and `ScriptRun` after the managed-runner boundary is designed. This summary
+should be linked to the measurement, not stored as dataset-local metadata.
 
 Measurement notes and markers should be stored as timestamped events in the
 measurement event timeline, beside lifecycle and system events, rather than as

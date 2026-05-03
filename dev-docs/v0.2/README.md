@@ -27,7 +27,7 @@ through explicit code-source provenance and future setup/update tooling, not by
 making one central Fricon server or shared data folder responsible for
 everything.
 
-The v0.2 product model is:
+The full product model that v0.2 should leave room for is:
 
 ```text
 one Fricon data library
@@ -40,12 +40,21 @@ one Fricon data library
   -> measurement-centered portable exports for offline analysis
 ```
 
-The first v0.2 shipped slice should be narrower than the full target model:
-record new measurements and table-shaped datasets, preserve context and safety
-paths, require explicit scan schema for plotted datasets, keep live consumers
-from slowing acquisition, export analysis packages, and leave analysis,
-automatic calibration, managed device communication, and declarative managed
-measurement as later layers.
+The first shipped v0.2 slice is deliberately narrower:
+
+```text
+one local data library
+  -> optional sample/session context
+  -> explicit measurements
+  -> table-shaped dataset artifacts with scan schema for plotted data
+  -> notes/events, lifecycle flags, attachments, and honest code provenance
+  -> backup/restore, trash/recover, diagnostics, and portable exports
+```
+
+Analysis records, simulation/import activity records, calibration records,
+parameter proposals, managed code snapshots, managed script execution, device
+communication, and declarative managed measurement are reserved future layers
+unless a focused ADR narrows a minimal placeholder.
 
 For normal users, the first mental model should stay simple:
 
@@ -80,7 +89,7 @@ aliases that make the roadmap look like it has a second versioning scheme.
   comparison views, saved views, portable export viewer polish, attach/correct
   context UX, passive setup/device snapshots, rerun-from-artifact, locked-down
   Windows installer polish, guided new-computer setup, shared
-  measurement-code source update flows, and better passive code/environment
+  measurement-code source update flows, and better code-provenance/environment
   summaries.
 - v0.4: candidate automation-foundation slice after measurement history is
   trustworthy. Likely areas include parameter snapshots and proposals, analysis
@@ -101,9 +110,10 @@ Start here for v0.2 planning:
    direction
 4. `measurement-system-foundation-redesign.md` - background redesign proposal
    for dataset artifacts and run-like provenance
-5. `experiment-run-and-runner-design.md` - older detailed runner proposal;
-   reconcile its `ExperimentRun` terminology with the v0.2 `Measurement`
-   naming policy before implementation
+5. `experiment-run-and-runner-design.md` - historical runner background. Its
+   `ExperimentRun`, managed submission, task queue, resource lease, and
+   `ScriptRun` details are not v0.2 shipped scope and must be reconciled with
+   the v0.2 `Measurement` naming policy before implementation.
 6. `parameter-management-design.md` - detailed future parameter proposal
 7. `future-concepts.md` - lower-confidence or less narrowed ideas
 
@@ -126,9 +136,9 @@ dataset catalog to a measurement record system:
   fragmented
 - measurements as the default data-taking work record
 - artifacts as outputs, with datasets as the primary table-shaped case
-- parameter and code history as first-class provenance
-- analysis, simulation, import, and calibration as activity records that
-  consume and produce artifacts
+- parameter and code provenance as explicit recorded context
+- analysis, simulation, import, and calibration as reserved future activity
+  records that consume and produce artifacts
 - code provenance summaries that record whether acquisition code was unmanaged,
   user-supplied, or resolved from a managed code snapshot without making the
   data library a shared code repository

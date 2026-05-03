@@ -43,7 +43,7 @@ Fricon is expected to provide:
 - parameter management, including future snapshot, history, diff, and
   versioning workflows
 - device management
-- local data-library or workspace management
+- local data-library management
 - a desktop UI for browsing, managing, and inspecting collected data
 - Python APIs for scripting and automation
 - reproducibility support for measurement code, environments, parameters, and
@@ -59,14 +59,22 @@ Fricon is expected to provide:
 The product should make common scientific measurement workflows easier while
 remaining scriptable for users who already use Python in their research.
 
-## Current Product Route
+## Product Route
 
-The current route is dataset-first, Python-led, and local-first.
+The product route is now the v0.2 measurement-library reset: Python-led,
+local-first, and measurement-centered.
 
-Fricon should first become reliable for recording, organizing, and inspecting
-scientific measurement datasets. Dataset semantics should be explicit enough
-that later measurement, parameter, and device concepts do not have to be hidden
-inside dataset names, incidental metadata, or chart heuristics.
+The current implementation is still workspace/dataset-first, but that is
+implementation baseline, not the desired product direction. v0.2 should make a
+large reset from a dataset catalog into a local data library for measurement
+work.
+
+Fricon should first become reliable for recording, organizing, inspecting, and
+exporting new measurement records and their table-shaped datasets. Dataset
+semantics still matter, but they are part of the v0.2 measurement foundation:
+explicit scan schema, column meaning, units, and chart interpretation should
+support measurement records instead of becoming a separate gate that postpones
+the measurement model.
 
 The first adoption milestone is the v0.2 replacement slice: replacing a simple
 LabRAD Grapher/Data Vault style measurement logger for new measurement work.
@@ -115,15 +123,16 @@ one.
 
 Workflow automation should be treated as a layer above individual measurements.
 It can eventually coordinate scheduled calibration, optimization, benchmark,
-and repeated measurement tasks, but should rely on clear run records, parameter
-snapshots, provenance, and human approval boundaries.
+and repeated measurement tasks, but should rely on clear measurement records,
+parameter snapshots, provenance, and human approval boundaries.
 
 AI-assisted workflows should be designed as assistive automation rather than
 silent authority. AI may help draft snippets, summaries, reports, metadata
-cleanup, parameter comparisons, and workflow proposals, but mutating workspace
-state should remain explicit, reviewable, and auditable. The initial AI posture
-is read and suggest; AI-written annotations, analysis records, calibration
-actions, and device or acquisition control require later product decisions.
+cleanup, parameter comparisons, and workflow proposals, but mutating
+data-library, parameter, code, workflow, or execution state should remain
+explicit, reviewable, and auditable. The initial AI posture is read and
+suggest; AI-written annotations, analysis records, calibration actions, and
+device or acquisition control require later product decisions.
 
 The proposed v0.2 reset is captured in `v0.2/design.md`. It keeps the
 Python-led and local-first constraints while broadening the durable product
@@ -223,7 +232,7 @@ documentation.
 ### Prefer Local Reliability Over Distributed Flexibility
 
 Because the product is local-first and single-user, prioritize predictable local
-state, understandable recovery paths, and clear workspace compatibility over
+state, understandable recovery paths, and clear data-library compatibility over
 distributed coordination patterns.
 
 ### Keep Python Ergonomic
@@ -339,9 +348,10 @@ This document is a constraint for AI-assisted changes:
 - Keep user-facing docs focused on workflows and stable product concepts.
 - Put implementation details, architectural notes, and maintenance rules in
   `dev-docs/`.
-- Preserve the Python-led and local-first product route. Treat the dataset-first
-  route as the current implementation baseline, and treat `v0.2/design.md` as
-  the proposed planning reset when working on v0.2 scope.
+- Preserve the Python-led, local-first, measurement-library reset route. Treat
+  dataset-first behavior as current implementation baseline only, and treat
+  `v0.2/design.md` as the canonical v0.2 planning reset when working on v0.2
+  scope.
 - Prefer feature-local changes that preserve clear ownership.
 - Treat Python API and desktop UI behavior as user-facing contracts.
 - Treat internal Rust module boundaries as changeable when doing so improves
@@ -380,8 +390,8 @@ These questions are intentionally unresolved:
 - Which calibration, optimization, and benchmark tasks should be first-class
   workflow types?
 - Beyond the initial read-and-suggest AI posture, which AI actions may mutate
-  workspace or data-library state, and what approval or audit metadata should
-  each class require?
+  data-library, parameter, code, workflow, or execution state, and what approval
+  or audit metadata should each class require?
 - What AI model/provider/version and prompt-summary metadata is needed for
   reproducibility without storing unnecessary sensitive context?
 - What level of device abstraction is useful without overbuilding a hardware

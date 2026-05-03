@@ -46,7 +46,7 @@ v0.2 should optimize for these user outcomes:
 - inspect live and historical datasets through Fricon Desktop and Python
 - watch multiple active measurements through detachable data or plot windows
 - keep live viewing and other consumers from slowing or breaking acquisition
-- preserve flexible parameter snapshots, optional code-source/environment
+- preserve flexible parameter snapshots, optional code provenance/environment
   summaries, favorite, note, attachment, and lifecycle context for each
   measurement
 - trace which measurement-code source ran on each lab computer without copying
@@ -56,7 +56,8 @@ v0.2 should optimize for these user outcomes:
 - require acquisition code to provide scan schema for datasets intended for
   live or historical plotting, instead of reconstructing scan meaning from row
   order after the fact
-- visualize sample/device parameters on a 2D map when the lab model needs it
+- reserve room for richer sample fields and 2D sample maps without making them
+  first-slice scope
 - leave room for repeated calibration without silent parameter mutation
 - leave a clean path to managed device communication after LabRAD is removed
 
@@ -90,15 +91,13 @@ User-visible concepts for the first v0.2 slice:
   `unmanaged` or user-provided text. For future managed runs it can summarize a
   resolved code snapshot.
 
-User-visible concepts to preserve for later v0.2 work:
+Reserved future or advanced user-visible concepts:
 
 - Parameter Profile: a named mutable reference to a useful parameter state
 - Parameter Snapshot: immutable parameter facts captured for a run
 - Measurement Code Source: a configured lab code package or repository used to
   set up and update acquisition computers without asking ordinary users to run
   Git commands
-- Code Snapshot: an immutable resolved code state for a managed run, usually a
-  Git commit or tree plus lock-file/environment hints
 - Analysis: later work that consumes datasets and may produce results,
   datasets, reports, or parameter proposals
 - Calibration: a reviewable workflow that turns measurements and analysis into
@@ -106,6 +105,8 @@ User-visible concepts to preserve for later v0.2 work:
 
 Concepts that should mostly remain internal or advanced:
 
+- ActivityRun
+- CodeSnapshot
 - dataset write session
 - script run
 - execution worktree
@@ -301,8 +302,9 @@ Settled v0.2 product decisions:
 - Active sample/session context should stay visible, but v0.2 should not rely
   on unreliable stale-context guessing. Optimize for selecting recent
   measurements and bulk-correcting sample/session context with history.
-- The sample map is an important secondary view and filter entry, not the
-  default home view for v0.2.
+- The sample map is an important v0.3+ secondary view and filter entry. v0.2
+  should reserve model space for it but should not make the map editor part of
+  the first shipped slice.
 - Favorites or pins are the primary manual signal for important measurements.
   Tags and notes should be available but secondary.
 - Users can add basic timestamped notes/markers during and after a measurement.
@@ -394,7 +396,8 @@ Defer to ADR or technical design before implementation:
 - measurement-code source/package boundary, including new-computer setup and
   the split between Fricon actions, Git/source-control tools, and environment
   tools
-- managed measurement plan syntax, retry/resume behavior, and resource leases
+- managed code snapshot, execution worktree, script-run, managed measurement
+  plan syntax, retry/resume behavior, and resource lease boundaries
 
 Keep future-only until a narrower design proves the need:
 
@@ -410,8 +413,30 @@ Keep future-only until a narrower design proves the need:
 
 ## Domain Model
 
-The clean v0.2 domain model is a data library of records plus explicit links,
-not a strict containment tree:
+The first shipped v0.2 domain model should stay small:
+
+```text
+DataLibrary
+  records:
+    Sample
+    SampleSession
+    Measurement
+    DatasetArtifact
+    AttachmentArtifact
+    ParameterSnapshot
+    CodeProvenanceSummary
+    Event/AuditRecord
+
+  links:
+    SampleSession -> Sample
+    Measurement -> optional SampleSession
+    Measurement -> produces -> DatasetArtifact | AttachmentArtifact
+    Measurement -> optional ParameterSnapshot
+    Measurement -> optional CodeProvenanceSummary
+```
+
+The reserved future model is a data library of records plus explicit links, not
+a strict containment tree:
 
 ```text
 DataLibrary
@@ -498,7 +523,7 @@ such as:
 - figures
 - logs
 - attachments
-- code-source and environment summaries
+- code provenance and environment summaries
 - waveform or configuration files
 - future device snapshots and readback summaries
 

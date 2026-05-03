@@ -59,7 +59,7 @@ one Fricon data library
   -> sample and session records
   -> measurements
   -> dataset artifacts
-  -> code-source and environment summaries
+  -> code provenance and environment summaries
   -> parameter snapshots and proposals
   -> analysis and calibration history
 ```
@@ -326,14 +326,14 @@ managed run.
 
 ## Sample Parameter Visualization
 
-Sample visualization should be treated as a first-class product need.
+Sample visualization should be treated as an important follow-up product need.
 
 v0.2 should design the sample model so custom fields and 2D visualization fit
 cleanly, even if the initial implementation ships after the minimal measurement
 loop.
 
-The sample map should be a strong secondary view and filter entry, not the
-default v0.2 home screen. The measurement console remains the default home.
+The sample map should be a strong v0.3+ secondary view and filter entry, not a
+first-slice v0.2 home screen. The measurement console remains the default home.
 
 User story:
 
@@ -402,11 +402,11 @@ Acceptance notes:
 - remote mode, browser-served UI, and PWA distribution are future-ready
   architecture targets, not v0.2 shipped workflows
 
-### Set Up A Lab Computer Without Copying Code Folders
+### Record And Diagnose Code Provenance
 
-As an experimentalist, I want a new acquisition computer to be configured from
-an approved lab code source so that measurement code does not fork silently
-between equipment PCs.
+As an experimentalist, I want Fricon to record whether a measurement came from
+unmanaged code, user-supplied code context, or a future managed snapshot so
+that copied folders do not create false reproducibility.
 
 Acceptance notes:
 
@@ -421,9 +421,10 @@ Acceptance notes:
   require a central Fricon server
 - network storage may be used as a mirror/cache/export/backup target, not as
   the active database-backed data library or main editable code workspace
-- future UI can expose "install approved code", "update to approved release",
-  "show what changed", "run environment check", and "export local changes for
-  review" actions without requiring ordinary users to operate Git directly
+- future setup UI can expose "install approved code", "update to approved
+  release", "show what changed", "run environment check", and "export local
+  changes for review" actions without requiring ordinary users to operate Git
+  directly
 
 ### Update Without Breaking Measurement Work
 

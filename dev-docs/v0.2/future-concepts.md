@@ -14,10 +14,10 @@ ideas that remain less narrowed than the canonical v0.2 design.
 ## Purpose
 
 Fricon has several future product areas that depend on the current dataset-first
-baseline and the proposed v0.2 data-library reset,
+implementation baseline and the proposed v0.2 data-library reset,
 but are not ready for implementation design. This ledger keeps their boundaries
-visible so later dataset, run, parameter, workspace/data-library, and UI work
-can avoid decisions that would make those areas harder.
+visible so later dataset, measurement, parameter, data-library, and UI work can
+avoid decisions that would make those areas harder.
 
 Use this file for short notes only. When a concept becomes active product work,
 promote it into a focused design proposal, ADR, or issue plan.
@@ -144,9 +144,11 @@ Open questions:
 - What is the minimum offline installer or network-mirror story for locked-down
   Windows lab PCs?
 
-## Experiment Run Model
+## Measurement Record And Future Runner Model
 
-Status: future concept, ADR needed later.
+Status: partially promoted to v0.2 for minimal measurement records; future
+concept and ADR needed later for managed runner, task queue, resource leases,
+script-run provenance, retry/resume, and managed code snapshots.
 
 Focused proposal:
 
@@ -154,11 +156,11 @@ Focused proposal:
 
 Why it matters:
 
-- Fricon needs explicit run records before parameter snapshots, code versions,
-  environments, generated datasets, device state, and notes can be connected
+- Fricon needs explicit measurement records in v0.2 before parameter snapshots,
+  code provenance, generated datasets, device state, and notes can be connected
   coherently.
-- Run records are the natural bridge between Python scripts and later desktop
-  inspection, workflow automation, provenance, and AI assistance.
+- Measurement records are the natural bridge between Python scripts and later
+  desktop inspection, workflow automation, provenance, and AI assistance.
 - Runs should preserve reproducibility facts without making the desktop UI the
   primary measurement execution engine too early.
 - Code and environment tracking should be explicit run reproducibility context,
@@ -166,10 +168,14 @@ Why it matters:
 
 Boundary:
 
-- Owns run identity, lifecycle state, source script or workflow entry point,
+- v0.2 owns measurement identity, lifecycle state, produced dataset links,
+  notes/events, optional sample/session context, optional parameter snapshot,
+  and honest code provenance level.
+- Future runner work owns source script or workflow entry point,
   run-local parameters, parameter bindings, runtime overrides, dataset links,
   effective configuration references, code and environment references, notes,
-  quality flags, and correction events.
+  lifecycle flags, correction events, task queue records, script-run records,
+  and managed code snapshots.
 - Does not own parameter history, dataset payload semantics, device driver
   implementation, analysis algorithms, workflow scheduling, or hosted
   repository/account behavior.
@@ -190,8 +196,8 @@ Dependencies:
 - minimal run storage model
 - parameter snapshot binding design before parameter-aware runs
 - provenance and correction-event policy before immutable run facts harden
-- clear policy for Git-backed storage before any workspace-managed repository
-  exists
+- clear policy for Git-backed storage before any managed code-source mirror or
+  code snapshot system exists
 - environment capture policy that does not make setup opaque
 
 Open questions:
@@ -210,7 +216,9 @@ Open questions:
 
 ## Sample Or Specimen Identity
 
-Status: future concept.
+Status: partially promoted to v0.2 for lightweight Sample and Sample Session;
+future concept for rich sample fields, sample maps, inventory-like behavior,
+and cross-session drift workflows.
 
 Why it matters:
 
@@ -296,11 +304,11 @@ Likely interfaces:
 - analysis, import, simulation, and calibration activity records use shared
   input/output provenance edges instead of forcing all datasets to be owned by
   experiment runs
-- dataset and run views expose lineage, quality/status badges, filters, and
-  provenance summaries
+- dataset and measurement views expose lineage, lifecycle/status badges,
+  filters, and provenance summaries
 - corrections and invalidations are recorded as events instead of silent edits
-- workflow and automation systems can consume quality state before promoting
-  results
+- workflow and automation systems can consume lifecycle and validation state
+  before promoting results
 
 Dependencies:
 
@@ -318,7 +326,8 @@ Open questions:
 - How should lineage survive dataset archive export and import?
 - What is the minimum portable measurement bundle that is useful for offline
   analysis?
-- Which quality states apply to datasets, runs, or both?
+- Which lifecycle or validation states apply to datasets, measurements, or
+  both?
 - Should invalidation block downstream use or only warn?
 - How should superseded datasets relate to processed replacements?
 - Which status changes require a reason, source, or audit event?
@@ -339,8 +348,8 @@ Why it matters:
 Boundary:
 
 - Owns analysis identity, input links, output links, analysis parameters,
-  result summaries, quality state, and links to generated datasets, artifacts,
-  reports, or parameter proposals.
+  result summaries, lifecycle or validation state, and links to generated
+  datasets, artifacts, reports, or parameter proposals.
 - Does not own measurement execution, raw dataset semantics, parameter registry
   commits, workflow scheduling, or device application.
 
@@ -443,7 +452,7 @@ Clean automatic calibration should look like:
 ```text
 CalibrationWorkflowDefinition
   -> CalibrationWorkflowRun
-      -> ManagedExperimentRun produces measured Dataset
+      -> ManagedMeasurement produces measured Dataset
       -> AnalysisRun consumes measured Dataset
       -> AnalysisRun produces AnalysisResult and ParameterProposal
       -> ValidationResult checks proposal
@@ -468,7 +477,7 @@ Boundary:
 
 Likely interfaces:
 
-- creates managed experiment runs or run plans
+- creates managed measurement runs or run plans
 - consumes parameter profiles or bindings
 - creates or receives analysis runs, analysis results, and parameter proposals
 - creates parameter proposals against a base parameter snapshot
