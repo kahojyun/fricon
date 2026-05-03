@@ -108,14 +108,8 @@ Start here for v0.2 planning:
 2. `product-direction.md` - supporting product stories and user pain
 3. `technical-direction.md` - supporting engineering posture and API/runtime
    direction
-4. `measurement-system-foundation-redesign.md` - background redesign proposal
-   for dataset artifacts and run-like provenance
-5. `experiment-run-and-runner-design.md` - historical runner background. Its
-   `ExperimentRun`, managed submission, task queue, resource lease, and
-   `ScriptRun` details are not v0.2 shipped scope and must be reconciled with
-   the v0.2 `Measurement` naming policy before implementation.
-6. `parameter-management-design.md` - detailed future parameter proposal
-7. `future-concepts.md` - lower-confidence or less narrowed ideas
+4. `future-concepts.md` - active ledger for lower-confidence or less narrowed
+   ideas
 
 Use current implementation notes only to understand what must be replaced or
 adapted:
@@ -124,6 +118,17 @@ adapted:
 - `../dataset-semantic-architecture-proposal.md`
 - `../database-schema-changes.md`
 - `../maintenance-checklist.md`
+
+Use archived proposal inputs only for historical rationale or edge-case context:
+
+- `archive/README.md`
+- `archive/measurement-system-foundation-redesign.md`
+- `archive/experiment-run-and-runner-design.md`
+- `archive/parameter-management-design.md`
+
+The archived proposals are not active v0.2 guidance. They may preserve older
+sequencing, terminology, or boundaries that were superseded by `design.md`,
+`product-direction.md`, and `technical-direction.md`.
 
 ## Relationship To Older Docs
 

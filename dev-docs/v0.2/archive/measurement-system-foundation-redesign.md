@@ -2,15 +2,15 @@
 
 ## Status
 
-Supporting pre-adoption redesign proposal for the v0.2 reset.
+Archived historical redesign proposal.
 
-This is not current behavior. Do not implement or document behavior from this
-note as user-facing functionality until the relevant ADR, storage, IPC, Python
-API, desktop UI, migration, and release decisions have landed.
+This file is preserved for background reasoning only. It is not current
+behavior, active v0.2 guidance, or an implementation plan. Do not implement or
+document behavior from this note as user-facing functionality.
 
-Read `README.md` and `design.md` first. This note preserves the broader
-reasoning behind the reset; `design.md` is the cleaner canonical synthesis for
-new planning.
+Read `../README.md` and `../design.md` first. The canonical v0.2 documents
+override this archived proposal when terminology, scope, sequencing, or model
+boundaries differ.
 
 Canonical v0.2 naming now prefers `Measurement` for the public data-taking
 record. Historical `Experiment` or `ExperimentRun` wording in this supporting
@@ -19,8 +19,8 @@ different public noun.
 
 This note intentionally allows large breaking changes while Fricon has not yet
 entered real lab use. It may revise or supersede parts of
-`../dataset-semantic-architecture-proposal.md` and
-`../adr/0002-decide-dataset-semantic-manifest-v1.md` if the broader
+`../../dataset-semantic-architecture-proposal.md` and
+`../../adr/0002-decide-dataset-semantic-manifest-v1.md` if the broader
 measurement-system model requires a different foundation.
 
 ## Purpose
@@ -71,9 +71,9 @@ with lib.measurement("cooldown sweep") as meas:
 The measurement context should own default finalization for datasets opened
 through it. On normal measurement exit, open produced datasets are finished. On
 exceptional measurement exit, open produced datasets are aborted or marked
-suspect according to the settled lifecycle policy. Individual datasets may still
-be explicitly finished or aborted earlier when a multi-output measurement needs
-per-output control.
+partial/interrupted according to the settled lifecycle policy. Individual
+datasets may still be explicitly finished or aborted earlier when a multi-output
+measurement needs per-output control.
 
 Nested dataset context managers may remain available for advanced explicit
 lifecycle control, but public v0.2 examples should prefer the flatter
@@ -128,23 +128,24 @@ public docs should not lead with a generic `RunRecord` abstraction. Use concrete
 user terms when they matter: measurement, analysis, import, simulation, and
 calibration.
 
-## Notes, Tags, And Quality
+## Notes, Tags, And Lifecycle
 
 Users should not need to tag or annotate every object.
 
 Default rule:
 
 ```text
-Put notes, tags, and quality on the highest meaningful work record.
+Put notes, tags, and lifecycle/status decisions on the highest meaningful work
+record.
 ```
 
 For v0.2 this usually means the measurement record:
 
-- measurement-level labels, notes, tags, pin or favorite state, and quality live
-  on `Measurement`
+- measurement-level labels, notes, tags, pin or favorite state, and lifecycle
+  flags live on `Measurement`
 - datasets keep dataset-local semantics and output-specific exceptions
-- dataset notes or quality are useful when one output differs from the whole
-  run
+- dataset notes, invalidation, or output-local lifecycle exceptions are useful
+  when one output differs from the whole run
 
 Examples:
 
@@ -165,7 +166,7 @@ DataLibrary
        kind: measurement | analysis | import | simulation | calibration
        inputs
        outputs
-       notes/tags/quality
+       notes/tags/lifecycle
        metadata
        parameter binding when relevant
   -> dataset artifacts
@@ -345,7 +346,8 @@ v0.2 should expose:
   the measurement context
 - run-level notes, tags, pin/favorite state, lifecycle state, and legacy JSON
   metadata
-- dataset-local notes or quality only for output-specific exceptions
+- dataset-local notes or lifecycle exceptions only for output-specific
+  exceptions
 - generated Python snippets or stable IDs for reopening data
 - measurement-centered export bundles that can be opened directly from Python
   or a read-only GUI viewer without import into another data library
@@ -385,7 +387,7 @@ Suggested staged path:
 4. Desktop v0.2 replacement flow
    - Run-first measurement browsing.
    - Dataset table/chart/detail views.
-   - Run notes/tags/quality and output-specific dataset exceptions.
+   - Run notes/tags/lifecycle and output-specific dataset exceptions.
    - Python read snippets.
 
 5. Later derived-data foundation

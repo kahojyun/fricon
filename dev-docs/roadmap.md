@@ -51,24 +51,24 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
   data-library service model, Fricon Desktop shell direction, local-only v0.2
   scope, future remote/auth boundary, and rewrite strategy.
 
-The pre-adoption measurement-system redesign note remains supporting background
-behind the v0.2 reset:
+Archived pre-adoption proposal notes remain historical background behind the
+v0.2 reset. Use them for rationale and edge cases only; do not treat them as
+active scope, sequencing, or naming guidance when they conflict with
+`v0.2/design.md`, `v0.2/product-direction.md`, or
+`v0.2/technical-direction.md`:
 
-- `v0.2/measurement-system-foundation-redesign.md` defines the proposed breaking
-  redesign direction for dataset artifacts, run-like producer/consumer
-  provenance, the v0.2 measurement-first mental model, and future calibration
-  foundations. Treat historical `ExperimentRun` wording there as supporting
-  proposal terminology unless reconciled by ADR. Treat it as proposed design
-  guidance, not current implementation fact.
+- `v0.2/archive/measurement-system-foundation-redesign.md` preserves an older
+  redesign proposal for dataset artifacts, run-like producer/consumer
+  provenance, and future calibration foundations.
 - `dataset-semantic-architecture-proposal.md` defines the detailed dataset
   semantic direction: explicit dataset semantics, durable manifests, resolved
   interpretation, and a shaped feature sequence that keeps the foundation
   separate from later scan and chart migration work. Treat it as proposed
   design guidance, not current implementation fact, and reconcile it with the
   broader redesign before implementation.
-- `v0.2/parameter-management-design.md` defines proposed long-term parameter
-  registry direction after the v0.2 measurement record foundation exists.
-  Treat it as future design guidance, not current implementation fact.
+- `v0.2/archive/parameter-management-design.md` preserves an older long-term
+  parameter registry proposal. Treat it as background input for a future
+  rewritten parameter design, not as active v0.2 implementation guidance.
 - `v0.2/future-concepts.md` preserves lightweight notes for concepts that are
   not yet ready for focused design proposals. Some entries, such as measurement
   records and sample identity, are now partially promoted into v0.2; treat the
@@ -418,8 +418,8 @@ After the v0.2 replacement slice is durable, product work should move toward:
 
 Relevant future design note:
 
-- `v0.2/experiment-run-and-runner-design.md`
-- `v0.2/parameter-management-design.md`
+- `v0.2/archive/experiment-run-and-runner-design.md`
+- `v0.2/archive/parameter-management-design.md`
 
 This phase should avoid turning measurement support into a desktop-first
 workflow engine too early. Python scripts should remain the first-class way to

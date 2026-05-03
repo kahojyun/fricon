@@ -152,7 +152,7 @@ script-run provenance, retry/resume, and managed code snapshots.
 
 Focused proposal:
 
-- `experiment-run-and-runner-design.md`
+- `archive/experiment-run-and-runner-design.md`
 
 Why it matters:
 
@@ -258,7 +258,7 @@ Open questions:
 - How should imported datasets with external sample identifiers be handled?
 - When is a sample concept unnecessary and a tag or note sufficient?
 
-## Dataset Provenance, Lineage, And Quality State
+## Dataset Provenance, Lineage, And Lifecycle State
 
 Status: future concept, ADR needed later.
 
@@ -273,17 +273,19 @@ Why it matters:
   creating or importing into another data library.
 - Dataset lineage should build on explicit dataset semantics and run records,
   not chart heuristics or file layout details.
-- Users need to mark datasets, runs, or outputs as good, suspect, failed,
-  calibration, test, invalidated, or superseded without rewriting measurement
-  facts.
-- Later automation and AI suggestions need explicit quality and invalidation
-  context.
+- Users need lifecycle/status and trust context such as partial, failed,
+  calibration/test, invalidated, or superseded without rewriting measurement
+  facts. Broad manual good/suspect labels should remain optional notes, tags, or
+  later custom states unless real workflows justify first-class fields.
+- Later automation and AI suggestions need explicit lifecycle, validation, and
+  invalidation context.
 
 Boundary:
 
 - Owns lineage links between datasets, runs, imports, exports, processing
-  steps, simulations, source metadata, quality flags, invalidation or
-  supersession records, correction links, review notes, and status summaries.
+  steps, simulations, source metadata, lifecycle/status flags, invalidation or
+  supersession records, correction links, review notes, and validation
+  summaries.
 - Owns producer/consumer provenance edges that connect concrete activity
   records, such as measurement, analysis, import, simulation, and calibration
   runs, to their input and output datasets or artifacts.

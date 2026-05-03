@@ -2,15 +2,15 @@
 
 ## Status
 
-Supporting future parameter-management proposal for the v0.2 reset.
+Archived historical parameter-management proposal.
 
-This is not current behavior. Do not implement or document behavior from this
-proposal as user-facing functionality until the relevant dataset, run,
-provenance, storage, IPC, Python API, and desktop UI work has landed.
+This file is preserved for background reasoning only. It is not current
+behavior, active v0.2 guidance, or an implementation plan. Do not implement or
+document behavior from this proposal as user-facing functionality.
 
-Read `README.md` and `design.md` first. This long proposal is supporting
-detail for parameter snapshots, profiles, diffs, proposals, and calibration
-integration; it is not the canonical v0.2 entry point.
+Read `../README.md` and `../design.md` first. The canonical v0.2 documents
+override this archived proposal when terminology, scope, sequencing, or model
+boundaries differ.
 
 Canonical v0.2 naming now prefers `Measurement` for the public data-taking
 record. Historical experiment wording in this supporting proposal should be
@@ -38,7 +38,12 @@ system.
 
 ## Classification
 
-Classification: `after dataset semantics`.
+Historical classification: `after dataset semantics`.
+
+This classification no longer defines v0.2 sequencing. The canonical v0.2 first
+engineering slice now pairs minimal measurement records with enough explicit
+dataset semantics for plotted measurement data. Parameter registry work remains
+future scope until a rewritten focused design narrows it.
 
 ADR need: create an ADR before implementation commits to the durable parameter
 model, storage shape, Python API contract, desktop UI semantics, or run
@@ -1028,7 +1033,7 @@ maintenance checklists.
 
 ### Feature 0: ADR And Product Boundary
 
-Classification: `after dataset semantics`.
+Historical classification: `after dataset semantics`.
 
 Scope:
 
@@ -1040,7 +1045,8 @@ Scope:
 
 ### Feature 1: Run-Linked Parameter Snapshot References
 
-Classification: `after dataset semantics`, after minimal run records exist.
+Historical classification: `after dataset semantics`, after minimal run records
+exist.
 
 Scope:
 

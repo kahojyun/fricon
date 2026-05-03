@@ -2,15 +2,15 @@
 
 ## Status
 
-Historical supporting runner proposal for the v0.2 reset.
+Archived historical runner proposal.
 
-This is not current behavior. Do not implement or document behavior from this
-proposal as user-facing functionality until the relevant dataset semantic,
-parameter, storage, IPC, Python API, desktop UI, and migration work has landed.
+This file is preserved for background reasoning only. It is not current
+behavior, active v0.2 guidance, or an implementation plan. Do not implement or
+document behavior from this proposal as user-facing functionality.
 
-Read `README.md` and `design.md` first. This long proposal is supporting
-detail for measurement execution, retry/resume, and runner boundaries; it is not
-the canonical v0.2 entry point.
+Read `../README.md` and `../design.md` first. The canonical v0.2 documents
+override this archived proposal when terminology, scope, sequencing, or model
+boundaries differ.
 
 Canonical v0.2 naming now prefers `Measurement` for the public data-taking
 record. Treat this proposal's `ExperimentRun`, `experiment_run_id`,
@@ -46,17 +46,21 @@ The design should help users answer:
 - Which records in a dataset were appended by which execution attempt?
 - Which devices or local resources forced tasks to run sequentially?
 
-This proposal was written against the current dataset-first, Python-led, and
-local-first route. Under the v0.2 reset, reconcile the details here with the
+This proposal was written against the older dataset-first, Python-led, and
+local-first route. Under the v0.2 reset, reconcile any reused details with the
 broader data-library, sample/session, and activity-provenance model in
-`design.md`. Python scripts remain the first execution entry point. The desktop
-UI may browse, inspect, retry, continue, and summarize work, but it should not
-become the primary measurement execution engine before the Python-led model is
-clear.
+`../design.md`. Python scripts remain the first execution entry point. The
+desktop UI may browse, inspect, retry, continue, and summarize work, but it
+should not become the primary measurement execution engine before the Python-led
+model is clear.
 
 ## Classification
 
-Classification: `after dataset semantics`.
+Historical classification: `after dataset semantics`.
+
+This classification no longer defines v0.2 sequencing. The canonical v0.2 first
+engineering slice now pairs minimal measurement records with enough explicit
+dataset semantics for plotted measurement data.
 
 ADR need: create an ADR before implementation commits to durable identifiers,
 storage shape, retry/resume semantics, dataset append provenance, runner
@@ -76,11 +80,12 @@ Future runner implementation also depends on:
 - a local execution service that can coordinate data-library state and script
   processes
 
-## Settled PO Decisions For v0.2
+## Historical PO Decisions Captured Before The v0.2 Reset
 
-The first measurement-record product slice should be record-centric.
-Historical `ExperimentRun` wording below should be read as `Measurement`
-unless the text is specifically about future runner internals.
+The first measurement-record product slice should be record-centric. Historical
+`ExperimentRun` wording below should be read as `Measurement` unless the text is
+specifically about future runner internals. Current v0.2 scope and sequencing
+come from `../design.md`, not from this archived section.
 
 v0.2 should promise:
 
@@ -1269,17 +1274,19 @@ Questions to settle later:
 - Should imported or legacy datasets create synthetic import runs, remain
   dataset-only, or support both?
 - Should the desktop home view be run-first, dataset-first, or split by task?
-- How should search, tags, favorites, quality, and recent activity behave when
-  users primarily act on experiment runs?
+- How should search, tags, favorites, lifecycle/status, and recent activity
+  behave when users primarily act on experiment runs?
 - How should unassigned datasets be surfaced so they are useful without
   undermining the experiment-first measurement path?
 
-## Next Product Work
+## Archived Sequencing Notes
 
-The next product discussion should focus on the dataset semantics baseline because
-experiment retry and dataset continuation depend on stable dataset facts.
+This section is historical. It should not be read as active v0.2 sequencing.
+The current v0.2 route starts with the first engineering slice in
+`../design.md`: minimal measurement records plus enough explicit dataset
+semantics for reliable plotted measurement data.
 
-Questions to settle there:
+Background questions preserved from the older proposal:
 
 - durable append-order identity
 - dataset finalized versus continuable state
@@ -1287,14 +1294,14 @@ Questions to settle there:
 - column roles, axes, scan semantics, units, labels, and display hints
 - how partial writes and failed write sessions affect dataset lifecycle state
 
-After that, the next product slices should be:
+Historical follow-up slices from the older proposal:
 
 - experiment run detail view
 - parameter snapshot binding and display
 - retry or continue UX
 - interactive versus managed provenance indicators
 - guided extraction from notebook or ad hoc script to importable template
-- run notes and quality flags
+- run notes and lifecycle/status flags
 - dataset versus experiment-run metadata ownership
 - experiment-first user model and dataset-only fallback path
 
@@ -1350,5 +1357,5 @@ This proposal intentionally leaves the following to later focused designs:
 - `dev-docs/project-intent.md`
 - `dev-docs/roadmap.md`
 - `dev-docs/dataset-semantic-architecture-proposal.md`
-- `dev-docs/v0.2/parameter-management-design.md`
+- `dev-docs/v0.2/archive/parameter-management-design.md`
 - `dev-docs/v0.2/future-concepts.md`
