@@ -11,6 +11,12 @@ use arrow_array::{
 };
 use arrow_schema::{DataType, Field, Fields, Schema, SchemaRef};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
+#[cfg(test)]
+use fricon::{
+    ColumnMeaning, PhysicalColumnOrdinal, ResolvedColumn, ResolvedIndexRealization,
+    ResolvedPhysicalColumnReference, ResolvedSemanticReference, VisibleColumnOrdinal,
+    dataset::semantics::DatasetDType,
+};
 use fricon::{
     DatasetDataType, DatasetInterpretation, DatasetReader, DatasetSchema, InterpretationSource,
     ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ScalarKind,
@@ -528,16 +534,11 @@ fn axis_fields(interpretation: &DatasetInterpretation, batch: &RecordBatch) -> V
         .iter()
         .filter_map(|reference| match reference {
             fricon::ResolvedSemanticReference::PhysicalColumn(column) => {
-                let column_name = alias_physical_column_name(&column.name, true);
-                batch
-                    .schema()
-                    .field_with_name(&column_name)
-                    .ok()
-                    .map(|_| AxisField {
-                        id: column.id.clone(),
-                        column_name,
-                        label: column.label.clone().unwrap_or_else(|| column.name.clone()),
-                    })
+                axis_field_column_name(batch, &column.name).map(|column_name| AxisField {
+                    id: column.id.clone(),
+                    column_name,
+                    label: column.label.clone().unwrap_or_else(|| column.name.clone()),
+                })
             }
             fricon::ResolvedSemanticReference::LogicalIndex(axis) => batch
                 .schema()
@@ -550,6 +551,18 @@ fn axis_fields(interpretation: &DatasetInterpretation, batch: &RecordBatch) -> V
                 }),
         })
         .collect()
+}
+
+fn axis_field_column_name(batch: &RecordBatch, physical_name: &str) -> Option<String> {
+    if batch.schema().field_with_name(physical_name).is_ok() {
+        return Some(physical_name.to_string());
+    }
+    let aliased_name = alias_physical_column_name(physical_name, true);
+    batch
+        .schema()
+        .field_with_name(&aliased_name)
+        .ok()
+        .map(|_| aliased_name)
 }
 
 fn resolve_index_columns(
@@ -936,6 +949,62 @@ mod tests {
             map_full_index_columns(&source_schema, &projected, &[0]),
             vec![0]
         );
+    }
+
+    #[test]
+    fn axis_fields_find_unaliased_prefixed_compatibility_columns() {
+        let source_schema = Arc::new(Schema::new(vec![Field::new(
+            "logicalIndex:gate",
+            DataType::Float64,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            source_schema,
+            vec![Arc::new(Float64Array::from(vec![1.0])) as ArrayRef],
+        )
+        .expect("source batch");
+        let reference =
+            ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
+                id: "column:logicalIndex:gate".to_string(),
+                name: "logicalIndex:gate".to_string(),
+                physical_ordinal: PhysicalColumnOrdinal(0),
+                visible_ordinal: Some(VisibleColumnOrdinal(0)),
+                dtype: DatasetDType::Float64,
+                meaning: ColumnMeaning::CompatibilityIndex,
+                is_index: true,
+                is_system: false,
+                is_compatibility: true,
+                hidden_by_default: false,
+                is_chart_axis_candidate: true,
+                unit: None,
+                label: None,
+                is_complex: false,
+                is_trace: false,
+                numeric_axis: true,
+            });
+        let interpretation = DatasetInterpretation {
+            columns: Vec::<ResolvedColumn>::new(),
+            semantic_references: vec![reference.clone()],
+            value_references: Vec::new(),
+            plotted_coordinates: vec![reference.clone()],
+            sweep_axes: vec![reference.clone()],
+            group_axes: vec![reference.clone()],
+            filter_axes: vec![reference.clone()],
+            chart_axis_candidates: vec![reference],
+            value_columns: Vec::new(),
+            logical_index_columns: vec![VisibleColumnOrdinal(0)],
+            chart_axis_candidate_columns: vec![VisibleColumnOrdinal(0)],
+            duplicate_policy: ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder,
+            index_realization: ResolvedIndexRealization::None,
+            scan_axes: Vec::new(),
+            source: InterpretationSource::CompatibilityInference,
+        };
+
+        let fields = axis_fields(&interpretation, &batch);
+
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].id, "column:logicalIndex:gate");
+        assert_eq!(fields[0].column_name, "logicalIndex:gate");
     }
 
     #[test]
