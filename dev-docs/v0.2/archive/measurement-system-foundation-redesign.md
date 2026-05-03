@@ -70,9 +70,9 @@ with lib.measurement("cooldown sweep") as meas:
 The measurement context should own default finalization for datasets opened
 through it. On normal measurement exit, open produced datasets are finished. On
 exceptional measurement exit, open produced datasets are aborted or marked
-partial/interrupted according to the settled lifecycle policy. Individual
-datasets may still be explicitly finished or aborted earlier when a multi-output
-measurement needs per-output control.
+partial/interrupted according to the lifecycle policy. Individual datasets may
+still be explicitly finished or aborted earlier when a multi-output measurement
+needs per-output control.
 
 Nested dataset context managers may remain available for advanced explicit
 lifecycle control, but public v0.2 examples should prefer the flatter

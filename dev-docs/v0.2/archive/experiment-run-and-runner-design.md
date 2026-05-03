@@ -115,7 +115,7 @@ v0.2 LabRAD-style replacement does not include bulk migration or full browsing o
 legacy LabRAD/Data Vault history. Importing old history can be a follow-up
 migration feature once the new run, dataset, and metadata boundaries are stable.
 
-Settled user-facing policies:
+Historical user-facing policies captured in this proposal:
 
 - v0.2 should support interactive measurement records; managed submitted runs
   are future scope
@@ -940,9 +940,9 @@ should still be valid and visibly missing context.
 The measurement context should own default dataset writer finalization for
 datasets opened through the run. On normal run exit, open produced datasets are
 finished. On exceptional run exit, open produced datasets are aborted or marked
-suspect according to the settled lifecycle policy. A dataset writer may still
-offer explicit `finish()` or `abort()` for multi-output runs where one output
-ends earlier or fails independently.
+partial/interrupted according to the lifecycle policy. A dataset writer may
+still offer explicit `finish()` or `abort()` for multi-output runs where one
+output ends earlier or fails independently.
 
 Nested dataset context managers may remain available for advanced explicit
 lifecycle control:
@@ -1183,12 +1183,13 @@ Acceptance notes:
 - future runner implementation can create task and script-run records
 - produced datasets are linked through dataset write sessions
 
-## Settled v0.2 Boundary: Dataset Vs Experiment Metadata
+## Historical Boundary Note: Dataset Vs Experiment Metadata
 
-This proposal settles the default v0.2 ownership boundary for new interactive
-experiment workflows. Experiment-level organization should live on the run, not
-be duplicated onto every produced dataset. Dataset metadata remains available
-for output-specific meaning and exceptions.
+This proposal captured an older default ownership boundary for new interactive
+experiment workflows. The canonical v0.2 documents now own the settled boundary.
+The historical direction was that experiment-level organization should live on
+the run, not be duplicated onto every produced dataset. Dataset metadata remains
+available for output-specific meaning and exceptions.
 
 v0.2 ownership direction:
 
@@ -1214,7 +1215,7 @@ dataset metadata. Attachments, logs, reports, figures, code summaries, waveform
 files, and future device snapshots should share provenance links with datasets
 without pretending to be table-shaped data.
 
-Remaining questions to settle later:
+Remaining historical questions:
 
 - How should dataset list views behave when most organization happens at the
   experiment-run level?
@@ -1262,7 +1263,7 @@ Dataset-only path
   data library -> dataset artifact
 ```
 
-Questions to settle later:
+Historical questions:
 
 - Should new user-facing tutorials start from `Measurement` instead of
   dataset creation once the run API exists?
