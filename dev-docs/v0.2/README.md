@@ -115,6 +115,9 @@ Use current implementation notes only to understand what must be replaced or
 adapted:
 
 - `../current-storage-notes.md`
+
+Use active supporting and process notes for design or implementation context:
+
 - `../dataset-semantic-architecture-proposal.md`
 - `../database-schema-changes.md`
 - `../maintenance-checklist.md`
