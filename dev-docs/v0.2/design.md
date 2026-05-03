@@ -85,9 +85,10 @@ User-visible concepts for the first v0.2 slice:
   shared lab computers
 - Setup/Method Label: optional human-readable labels for the lab setup,
   instrument configuration, or measurement method used for a run
-- Code Source Summary: optional provenance that records the measurement code
-  label, entry point, source repository or folder label, revision/tag/commit,
-  dirty/hash state, and environment hints when available
+- Code Provenance Summary: optional display/provenance summary for the code
+  context of a measurement. For non-managed measurements this may be only
+  `unmanaged` or user-provided text. For future managed runs it can summarize a
+  resolved code snapshot.
 
 User-visible concepts to preserve for later v0.2 work:
 
@@ -96,6 +97,8 @@ User-visible concepts to preserve for later v0.2 work:
 - Measurement Code Source: a configured lab code package or repository used to
   set up and update acquisition computers without asking ordinary users to run
   Git commands
+- Code Snapshot: an immutable resolved code state for a managed run, usually a
+  Git commit or tree plus lock-file/environment hints
 - Analysis: later work that consumes datasets and may produce results,
   datasets, reports, or parameter proposals
 - Calibration: a reviewable workflow that turns measurements and analysis into
@@ -105,6 +108,7 @@ Concepts that should mostly remain internal or advanced:
 
 - dataset write session
 - script run
+- execution worktree
 - scan point identity
 - resource lease
 - device apply plan
@@ -251,8 +255,10 @@ Settled v0.2 product decisions:
 - Multi-computer labs should share measurement code and setup assets through a
   measurement-code source, package, Git repository, or read-only network mirror,
   not by sharing the active database-backed data library.
-- v0.2 records passive code-source summaries on measurements. It does not need
-  full source capture, code synchronization, or environment management.
+- v0.2 records honest code provenance. Non-managed measurements do not get
+  automatic code-history capture; they should be labeled `unmanaged` unless the
+  user explicitly supplies a code label or summary. Future managed runs can
+  require a resolved immutable code snapshot before execution.
 - Ordinary experimenters should not have to learn Git for daily measurement
   work. Future code-source tooling should expose approved releases, update
   checks, local-change warnings, diagnostics, and maintainer handoff rather than
@@ -343,8 +349,9 @@ Settled v0.2 product decisions:
   can exist behind the primary shortcuts where practical.
 - v0.2 can support light measurement attachments such as small files, images,
   and logs. Rich artifact management is later scope.
-- v0.2 code provenance is an optional code-source summary, not mandatory source
-  or environment capture.
+- v0.2 code provenance is an optional summary with an explicit provenance
+  level, not mandatory source or environment capture. Avoid presenting
+  non-managed user-run code as reproducible.
 - v0.2 parameter capture is an optional flexible snapshot, not a full parameter
   registry or profile UI.
 - v0.2 measurement records should allow optional instrument/setup/method labels
@@ -397,7 +404,7 @@ Keep future-only until a narrower design proves the need:
 - broad hardware driver framework
 - generic workflow DAG engine
 - automatic notebook state capture
-- full Git/environment management or a central code-distribution service
+- full Git/environment management or a central Fricon code-distribution service
 - shared editable network folders as the primary measurement-code workflow
 - AI-driven mutating automation without explicit approval and audit records
 
@@ -418,13 +425,15 @@ DataLibrary
             parameter_proposal | device_snapshot
     ParameterProfile
     ParameterSnapshot
-    CodeSourceSummary
+    CodeProvenanceSummary
+    CodeSnapshot
     Event/AuditRecord
 
   links:
     SampleSession -> Sample
     Measurement -> optional SampleSession
-    Measurement -> optional CodeSourceSummary
+    Measurement -> optional CodeProvenanceSummary
+    ScriptRun -> optional CodeSnapshot
     ActivityRun -> consumes -> Artifact | ParameterSnapshot | ActivityRun
     ActivityRun -> produces -> Artifact
     CalibrationWorkflowRun -> coordinates -> Measurement + Analysis +
@@ -447,8 +456,9 @@ workflow-facing activity types.
 
 Artifact is the general output or input concept. DatasetArtifact is the primary
 table-shaped artifact for v0.2, while AnalysisResult, Report,
-ParameterProposal, file attachments, logs, figures, code-source summaries, and
-future device snapshots should fit the same provenance pattern.
+ParameterProposal, file attachments, logs, figures, code provenance summaries,
+managed code snapshots, and future device snapshots should fit the same
+provenance pattern.
 ```
 
 The `ActivityRun` pattern should be an internal modeling tool, not the primary
@@ -604,26 +614,55 @@ with lib.dataset("scratch") as ds:
 
 Lower-level datasets are unassigned artifacts until linked to a producer.
 
-## Measurement Code Source
+## Measurement Code Source And Code Snapshots
 
 The data library should not become a shared source-code repository. Treat
-measurement code as a separate local artifact that can be inspected and linked
-to measurements.
+measurement code as a separate source that can be referenced by measurements
+and, for managed execution, resolved into immutable snapshots.
 
-v0.2 should start with passive summaries:
+A self-hosted Git service such as Gitea is a good fit for the shared source
+role. So are GitLab, GitHub, a bare Git repository on network storage, a
+read-only mirror, or a lab release bundle. Fricon should integrate with these
+as external code sources; it should not become the lab's Git host.
 
-- user-provided code label and script path or module entry point
-- source kind such as Git repository, read-only network mirror, package, or
-  local folder when known
-- source label or URI summary that is useful to humans without leaking
-  sensitive paths by default
-- revision, tag, commit, file hash, dirty state, or untracked-change summary
-  when available
-- Python, Fricon, and environment or lock-file hints when practical
+Keep these concepts distinct:
 
-This is enough for a researcher to answer "which code probably produced this
-measurement" and for Desktop diagnostics to flag obvious mismatches. It is not
-a guarantee of bit-for-bit reproducibility.
+- Measurement Code Source: configured upstream source, such as a Gitea
+  repository, Git remote, bare repository mirror, package source, or local
+  folder.
+- Code Snapshot: immutable resolved code state used by managed execution, such
+  as a Git commit or tree plus relevant lock-file and submodule state.
+- Execution Worktree: temporary internal directory where the managed runner
+  materializes a snapshot before running code.
+- ScriptRun: execution attempt that records entry point, arguments,
+  environment summary, worktree reference, logs, exit status, and produced
+  measurement links.
+- Code Provenance Summary: human-readable summary shown on measurements and
+  exports. For managed runs it summarizes the snapshot. For non-managed runs it
+  may only say `unmanaged` or show user-supplied text.
+
+The managed direction is:
+
+```text
+external Git/Gitea source
+  -> local bare mirror or cache
+  -> resolved immutable code snapshot
+  -> temporary execution worktree
+  -> ScriptRun
+  -> Measurement
+  -> produced datasets
+```
+
+This fits future managed measurement, script runner, calibration, and
+automation workflows. It lets Fricon run code from a known snapshot without
+asking the experimenter to manually copy folders or operate Git during normal
+measurement work.
+
+Non-managed Python remains useful for exploratory measurement, but Fricon
+should not overclaim provenance for it. Unless the user explicitly supplies a
+code label or summary, non-managed measurements should record code provenance
+as `unmanaged`. Do not silently inspect arbitrary notebooks, imported modules,
+or local working trees and present that as reproducible history.
 
 Future code-source tooling should focus on the lab setup pain:
 
@@ -631,6 +670,7 @@ Future code-source tooling should focus on the lab setup pain:
 - install or update a local checkout to an approved release or tag
 - create or check the Python environment with `uv`, `pip`, `pixi`, or the lab's
   chosen tool
+- maintain a local bare mirror or cache where useful for managed execution
 - apply a machine/setup profile with local overrides for device addresses,
   paths, and secrets
 - show what changed between the installed code and the approved source
@@ -646,10 +686,10 @@ definitions. Keep raw data libraries, active sample/session context, local
 tokens, secrets, machine-specific device bindings, and temporary notebook state
 local to each lab computer unless the user explicitly exports them.
 
-Network storage may be a practical mirror, package cache, backup destination,
-or export destination. It should not be the active shared data library, and it
-should not be the main editable code workspace where multiple computers run and
-mutate the same files.
+Network storage may be a practical bare Git mirror, package cache, backup
+destination, or export destination. It should not be the active shared data
+library, and it should not be the main editable code workspace where multiple
+computers run and mutate the same files.
 
 ## Portable Measurement Export
 
@@ -683,10 +723,11 @@ A measurement export should include:
 - optional setup/method labels and basic clock/timing metadata
 - produced dataset artifacts with facts, semantic manifests, and projections
 - common tabular payload files, such as CSV or Parquet when practical
-- non-table artifacts such as reports, figures, logs, attachments, code-source
-  summaries, and future device snapshots when selected
+- non-table artifacts such as reports, figures, logs, attachments, code
+  provenance summaries, managed code snapshots, and future device snapshots
+  when selected
 - parameter snapshot or legacy parameter JSON used by the run when available
-- code-source and environment summary when available
+- code provenance and environment summary when available
 - provenance links needed to explain inputs, outputs, analysis, and calibration
 - checksums for payload files and manifest records
 - simple human-readable manifest or index preview
@@ -1046,7 +1087,7 @@ The initial v0.2 engineering slice should prove the new model end to end:
    console, with detachable data or plot windows for live monitoring.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
-9. Record actor, passive code-source summary, favorite/pin state, run note,
+9. Record actor, code provenance level, favorite/pin state, run note,
    lifecycle flags, and sample/session links.
 10. Export a read-only measurement bundle with common tabular files, a simple
     manifest/index preview, and direct Python/Desktop offline-viewer access.
@@ -1070,7 +1111,8 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - plotted dataset scan schema contract and guessed-schema fallback
 - public naming policy for Measurement versus Experiment
 - measurement-scoped dataset writer lifecycle
-- measurement-code source/package model and new-computer setup boundary
+- measurement-code source/package model, code snapshot, execution worktree, and
+  new-computer setup boundary
 - minimal device adapter/capability boundary for future LabRAD replacement
 - actor/auth boundary for local access and future remote access
 - client/server protocol compatibility, version negotiation, and
@@ -1093,8 +1135,9 @@ Create ADRs before committing durable storage, API, or IPC contracts for:
 - Keep sample/session/run/parameter/provenance out of dataset names.
 - Keep favorites, optional notes/tags, and lifecycle flags mostly on sample,
   session, measurement, analysis, and calibration records.
-- Keep measurement-code source separate from the data library: record passive
-  provenance in v0.2, and leave full setup/update management for later slices.
+- Keep measurement-code source separate from the data library: record honest
+  provenance in v0.2, use immutable snapshots only for managed execution, and
+  leave full setup/update management for later slices.
 - Keep advanced execution concepts optional until users need retry, resume,
   dry-run, or calibration automation.
 - Keep v0.2 record-only for device communication and external-only for

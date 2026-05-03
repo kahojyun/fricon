@@ -441,7 +441,8 @@ DataLibrary
   AnalysisResult
   ParameterSnapshot
   ParameterProposal
-  CodeSourceSummary
+  CodeProvenanceSummary
+  CodeSnapshot
   DeviceIdentity
   Event/AuditRecord
 ```
@@ -450,18 +451,21 @@ Dataset payloads can continue to use Arrow chunk concepts where appropriate.
 The catalog and provenance model should be redesigned around the broader data
 library, not around dataset-only ownership. `DatasetArtifact` should be the
 first concrete artifact type, but storage should reserve the general
-`Artifact` boundary for reports, figures, logs, attachments, code-source
-summaries, waveform or configuration files, and future device snapshots.
+`Artifact` boundary for reports, figures, logs, attachments, code provenance
+summaries, managed code snapshots, waveform or configuration files, and future
+device snapshots.
 
 For v0.2, table-shaped dataset artifacts and light measurement attachments are
 the concrete scope. Dataset contents should be appendable while their writer is
 active and immutable after finish; fixes should create derived artifacts or
 correction events.
 
-Measurement records should reserve a passive code-source summary so run
-history can explain which lab code source, local checkout, entry point, and
-environment likely produced the data. This summary should be linked to the
-measurement, not stored as dataset-local metadata.
+Measurement records should reserve a code provenance summary so run history can
+explain the provenance level for the code that likely produced the data. For
+non-managed user-run Python, this may be only `unmanaged` or a user-supplied
+label. For managed runs, the summary should link to an immutable `CodeSnapshot`
+and `ScriptRun`. This summary should be linked to the measurement, not stored
+as dataset-local metadata.
 
 Measurement notes and markers should be stored as timestamped events in the
 measurement event timeline, beside lifecycle and system events, rather than as
@@ -624,9 +628,11 @@ The managed plan model should enable:
 - readback verification and partial failure reporting
 
 The API should be optional. Existing imperative code can continue to create
-interactive runs and write datasets directly. Advanced managed features such as
-resume, retry, dry-run, resource leases, automatic calibration, and device
-readback may require the declarative plan or explicit advanced API hooks.
+interactive runs and write datasets directly. Its code provenance should be
+`unmanaged` unless the user supplies an explicit label or summary. Advanced
+managed features such as strong code snapshots, resume, retry, dry-run,
+resource leases, automatic calibration, and device readback may require the
+declarative plan or explicit advanced API hooks.
 
 Example shape for discussion, not settled API:
 
@@ -655,25 +661,43 @@ Acquisition should remain Python-first. Do not plan a Labber-like visual sweep
 builder as a product goal before explicit scan schema and optional managed-plan
 previews prove that users need a visual authoring layer.
 
-## Code And Environment Provenance
+## Code, Environment, And Measurement Code Source
 
-v0.2 should avoid encouraging copied code directories.
+v0.2 should avoid encouraging copied code directories and avoid overclaiming
+code reproducibility.
 
-Start with optional passive summaries:
+For non-managed user-run Python, Fricon should not try to reconstruct complete
+code history by inspecting arbitrary notebooks, imports, or working trees. The
+default code provenance level is `unmanaged`. The user may provide a code
+label, script path, module entry point, or freeform summary, but Fricon should
+show that as user-provided context, not as a verified executable snapshot.
 
-- user-provided code label and script path or module entry point when available
-- source kind and label when known, such as Git repository, read-only network
-  mirror, release package, or local folder
-- optional Git remote, tag, commit, dirty state, untracked-change summary, or
-  file hash summary when available
+For managed execution, the code path should be stronger:
+
+```text
+external Git/Gitea source
+  -> local bare mirror or cache
+  -> resolved immutable code snapshot
+  -> temporary execution worktree
+  -> ScriptRun
+  -> Measurement
+```
+
+The managed snapshot should capture:
+
+- source kind and label, such as Gitea, GitLab, GitHub, bare Git mirror,
+  read-only network mirror, release package, or local folder
+- remote/repository identity when safe to record
+- resolved tag, branch, commit, tree hash, submodule state, or package version
+- dirty or untracked-change state when the source is not an immutable release
+- script path or module entry point
 - Python version
 - Fricon version
 - lock-file or environment summary when practical
 
-Do not make v0.2 a full Git client or environment manager. Reserve that for a
-later explicit reproducibility feature.
-
-## Measurement Code Source Direction
+Do not make v0.2 a full Git client or environment manager. Reserve source
+mutation, environment creation, and managed execution for later explicit
+reproducibility features.
 
 The measurement-code source is separate from the Fricon data library. Each
 acquisition computer should keep:
@@ -685,14 +709,16 @@ acquisition computer should keep:
 
 Shared infrastructure can still help:
 
-- a Git repository for maintainers and advanced users
+- a self-hosted Git service such as Gitea for maintainers and advanced users
+- a GitLab, GitHub, or other Git repository when the lab already uses one
+- a local bare Git mirror or cache for managed execution
 - a read-only network mirror for labs that already rely on shared storage
 - a package cache or release bundle for locked-down Windows lab PCs
 - shared setup profiles, measurement templates, scan-schema helpers, plot
   presets, export recipes, driver/helper modules, and future calibration
   workflow definitions
 
-The service should record passive code-source facts when a measurement starts,
+The service should record the code provenance level when a measurement starts,
 but should not mutate source code in the v0.2 replacement slice. Future setup
 and update tooling can wrap existing Git or package operations through
 experimenter-facing actions:
@@ -760,8 +786,9 @@ Likely ADRs:
 - authentication/actor boundary for local access and future remote access
 - client/server protocol compatibility, version negotiation, and
   fail-before-write diagnostics for incompatible clients
-- measurement-code source/package model, new-computer setup, and the boundary
-  between Fricon-managed actions and ordinary Git/environment tools
+- measurement-code source/package model, code snapshot, execution worktree,
+  new-computer setup, and the boundary between Fricon-managed actions and
+  ordinary Git/environment tools
 - public naming policy for Measurement versus Experiment
 - Python SDK surface and measurement-scoped dataset writer lifecycle
 - minimal device adapter and capability boundary for future LabRAD replacement
@@ -788,8 +815,8 @@ foundation:
 6. Browse the run and datasets in the Fricon Desktop measurement console.
 7. Reopen a dataset from Python by stable ID.
 8. Attach or correct sample/session context after the run when needed.
-9. Record actor/operator label, passive code-source summary, run note,
-   lifecycle flags, and sample/session links.
+9. Record actor/operator label, code provenance level, run note, lifecycle
+   flags, and sample/session links.
 10. Export a read-only measurement bundle with common tabular files, a simple
     manifest/index preview, and direct Python/Desktop offline-viewer access.
 11. Exercise backup/restore and trash/recover as user-visible safety paths.

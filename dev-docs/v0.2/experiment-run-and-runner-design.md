@@ -122,8 +122,10 @@ Settled user-facing policies:
   metadata can bridge existing code until the parameter system is adopted
 - managed or parameter-aware runs should require a resolved immutable parameter
   snapshot when they claim strong reproducibility
-- code and environment reproducibility should start as passive summary metadata,
-  not managed Git, `uv`, or `pixi` history
+- code and environment reproducibility should start with an explicit provenance
+  level. Non-managed user-run Python should be `unmanaged` unless the user
+  supplies context; managed submitted runs can require an immutable code
+  snapshot resolved from a configured code source.
 - managed submitted runs should start from importable Python functions or module
   entry points, not notebook conversion
 - Fricon should provide a guided extraction path from notebook or ad hoc script
@@ -526,7 +528,8 @@ Candidate fields:
 - `args`
 - `working_directory`
 - `environment_summary`
-- `code_reference`
+- `code_snapshot_id`
+- `execution_worktree_summary`
 - `status`
 - `started_at`
 - `finished_at`
@@ -553,15 +556,18 @@ execute a script.
 
 Passive execution summary for the record-centric v0.2 slice may include:
 
+- provenance level such as `unmanaged` or `user_supplied_summary`
 - script path or display name
 - arguments when known and safe to record
 - current working directory summary
 - Python version
 - Fricon package version
-- optional lock-file, script hash, or code reference when easy to capture
+- optional lock-file or user-supplied code reference when explicitly provided
 
-This passive summary should not imply that Fricon manages Git history,
-environments, `uv`, or `pixi`.
+This passive summary should not imply that Fricon verified Git history,
+notebook state, imported modules, environments, `uv`, or `pixi`. Strong code
+provenance starts when the runner resolves a configured source into an
+immutable snapshot and executes from a materialized worktree.
 
 ## DatasetWriteSession
 
@@ -777,12 +783,14 @@ Fricon should record:
 - produced datasets
 - dataset write sessions when datasets are appended
 - notes, quality state, and explicit continuation decisions
-- passive code and environment summary when available
+- code provenance level, usually `unmanaged`, plus optional user-supplied code
+  and environment summary
 
 Fricon should not over-promise:
 
 - complete notebook state capture
 - complete imported code history
+- verified code snapshot for non-managed user-run scripts
 - automatic retry
 - resource leases
 - queue priority
@@ -826,6 +834,8 @@ When the runner exists, Fricon can own:
 
 - task queue entry
 - script run record
+- code snapshot resolved from a configured code source
+- temporary execution worktree materialized from that snapshot
 - resolved immutable parameter snapshot
 - logs, exit status, and failure reason
 - resource requirements and leases
@@ -1272,7 +1282,8 @@ Before implementation, discuss:
 - how `DatasetWriteSession` state stays consistent with chunk writes
 - crash recovery when the server, Python script, or device communication dies
 - atomicity across experiment-run state, dataset state, and write-session state
-- which passive code and environment fields can be captured reliably
+- which code provenance levels and user-supplied environment summaries can be
+  captured honestly before managed snapshots exist
 - whether to reserve storage for future `TaskQueueEntry` and `ScriptRun` now or
   defer it until runner implementation
 - which states are user-facing contracts and which remain internal storage

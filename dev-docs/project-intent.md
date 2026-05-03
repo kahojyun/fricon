@@ -129,12 +129,12 @@ The proposed v0.2 reset is captured in `v0.2/design.md`. It keeps the
 Python-led and local-first constraints while broadening the durable product
 model from a workspace/dataset catalog into a local data library centered on
 samples, sample sessions, measurement records, dataset artifacts, analysis,
-calibration, parameter snapshots, code-source summaries, and auditability.
+calibration, parameter snapshots, code provenance summaries, and auditability.
 
 The first v0.2 shipped slice should remain narrower than that full model:
 record-only measurement history, table-shaped datasets, optional
 sample/session context, light attachments, optional parameter snapshots,
-passive code-source summaries, guided diagnostics, trash/recover,
+honest code provenance levels, guided diagnostics, trash/recover,
 backup/restore, and measurement-centered exports. Analysis records, automatic
 calibration, managed device communication, and declarative managed measurement
 remain later layers.
@@ -154,9 +154,10 @@ Fricon is local-first. The v0.2 supported runtime model is local-only:
   Desktop
 - first-run setup asks where the data library should live and remembers it
 - the local service uses a generated local token boundary for mutating access
-- measurement code may come from a shared Git repository, read-only network
-  mirror, package cache, or manually managed folder, but execution should use a
-  local checkout or local environment on the measurement computer
+- measurement code may come from a self-hosted Git service such as Gitea, a
+  shared Git repository, read-only network mirror, package cache, or manually
+  managed folder, but execution should use a local checkout, local environment,
+  or future managed snapshot on the measurement computer
 - network storage may be useful as an installer cache, code mirror, export
   destination, or backup destination, but not as the active shared
   database-backed data library
@@ -275,11 +276,12 @@ Data libraries should have durable source identity, such as a generated UUID
 and user-editable display name, so exported measurements can record where they
 came from.
 
-Measurement records should also be able to carry passive code-source
-provenance: code label, script or module entry point, source repository or
-folder label, revision or tag when available, dirty/hash state when available,
-and environment or lock-file hints. This helps explain what ran on each lab
-computer without making every user learn Git.
+Measurement records should also be able to carry an honest code provenance
+level. Non-managed user-run Python may only be `unmanaged` or user-supplied
+context. Future managed runs can link to immutable code snapshots resolved from
+a configured source, such as a Gitea repository, Git remote, bare mirror, or
+release bundle. This helps explain what ran on each lab computer without making
+every user learn Git.
 
 When records need correction, prefer appended correction or event history over
 silent mutation of completed run facts.
@@ -304,12 +306,12 @@ measurement work while Fricon records datasets, run metadata, and parameters.
 UI-led execution can be introduced later if the Python-led workflow proves too
 limited.
 
-Measurement reproducibility may eventually include automatic code history,
+Measurement reproducibility may eventually include managed code snapshots,
 shared measurement-code packages, and environment management. Git-backed code
-history, approved release tags, read-only network mirrors, and environment
-tools such as `uv` or `pixi` are plausible directions, but they should be
-designed as explicit product capabilities rather than hidden side effects of
-dataset writes.
+history, approved release tags, self-hosted Git services such as Gitea,
+read-only network mirrors, and environment tools such as `uv` or `pixi` are
+plausible directions, but they should be designed as explicit product
+capabilities rather than hidden side effects of dataset writes.
 
 Workflow definitions may eventually orchestrate repeated measurement execution,
 scheduled calibration, parameter optimization, and benchmark runs. These

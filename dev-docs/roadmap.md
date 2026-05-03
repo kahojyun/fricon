@@ -38,14 +38,14 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
   clean reset model: one data library; samples and sessions; measurement,
   analysis, simulation, import, and calibration activity records; dataset
   artifacts as the first concrete artifact type; reserved general artifacts;
-  parameter snapshots and proposals; code-source summaries; actor/audit
+  parameter snapshots and proposals; code provenance summaries; actor/audit
   boundaries; optional active sample/session context; the public naming policy
   that prefers `Measurement` over `ExperimentRun` for data-taking records; and
   an optional managed measurement path toward Fricon-managed device
   communication.
 - `v0.2/product-direction.md` repositions Fricon as a local lab data library
   and automation foundation centered on samples, sessions, measurements,
-  dataset artifacts, parameter history, code-source summaries, and calibration
+  dataset artifacts, parameter history, code provenance summaries, and calibration
   history.
 - `v0.2/technical-direction.md` defines the proposed distribution surfaces,
   data-library service model, Fricon Desktop shell direction, local-only v0.2
@@ -107,8 +107,9 @@ Multi-computer labs should share measurement code and reusable setup assets
 without sharing the active data library. v0.2 should record passive
 measurement-code source provenance for each run. Later slices can add
 experimenter-friendly "set up this computer" and "update approved lab code"
-workflows on top of Git, read-only network mirrors, or package caches without
-requiring a central Fricon server.
+workflows on top of Gitea, GitLab, GitHub, bare Git mirrors, read-only network
+mirrors, or package caches without requiring Fricon itself to become a central
+server.
 
 Initial measurement support should lean on Python scripts as the execution
 entry point. Fricon Desktop should inspect, browse, and eventually assist those
@@ -168,9 +169,9 @@ measurements and use Fricon instead to:
   sample/session label, with stable IDs as secondary technical references
 - record optional setup/method labels and basic clock/timing metadata without
   building device management
-- record optional measurement-code source summaries such as code label, entry
-  point, repository or folder label, revision/tag/commit, dirty/hash state,
-  Python/Fricon versions, and environment or lock-file hints when available
+- record an honest code provenance level for each measurement. Non-managed
+  user-run Python may be `unmanaged` or user-supplied summary; future managed
+  runs can require a resolved immutable code snapshot before execution.
 - install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
   coherent Fricon release rather than assembling mismatched components manually
 - use the CLI primarily for setup, diagnostics, service control, and developer
@@ -297,9 +298,10 @@ Likely v0.3 candidates:
 - measurement-code source manager for approved releases/tags, simple update
   flows, local-change warnings, and change summaries aimed at users who do not
   want to operate Git directly
-- support for a read-only network mirror or package cache as a code/install
-  distribution aid, while keeping execution in a local checkout and data in the
-  local data library
+- support for Gitea/Git remotes, bare mirrors, read-only network mirrors, or
+  package caches as code/install distribution aids, while keeping execution in
+  a local checkout, managed snapshot worktree, and data in the local data
+  library
 - better lifecycle/favorite filtering
 - richer search by setup, operator, parameter, method/config, instrument label,
   and calibration state
@@ -433,8 +435,12 @@ Measurement code management may support local reproducibility features such as:
 - automatic history tracking for measurement code
 - shared measurement-code sources or lab code packages used across acquisition
   computers
-- Git-backed storage, approved release tags, or a read-only network mirror that
-  Fricon can inspect without becoming the lab's Git host
+- Git-backed storage, approved release tags, a self-hosted Git service such as
+  Gitea, or a read-only network mirror that Fricon can inspect without becoming
+  the lab's Git host
+- managed code snapshots resolved from a code source, cached in a local bare
+  mirror where useful, and expanded into temporary execution worktrees for
+  ScriptRuns
 - automatic environment capture or setup using tools such as `uv` or `pixi`
 - setup profiles, scan-schema helpers, measurement templates, plot presets,
   calibration workflow definitions, driver/helper modules, and environment

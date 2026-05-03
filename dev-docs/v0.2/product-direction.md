@@ -230,8 +230,8 @@ dataset facts in place.
 Reserve `Artifact` as the broader provenance concept. `DatasetArtifact` is the
 primary v0.2 artifact because measured tables and live plots are the LabRAD
 replacement path. Reports, figures, logs, attachments, waveform/configuration
-files, code-source summaries, and future device snapshots should not have to
-masquerade as datasets.
+files, code provenance summaries, managed code snapshots, and future device
+snapshots should not have to masquerade as datasets.
 
 ### Parameter Profile And Snapshot
 
@@ -276,12 +276,15 @@ three things that were previously mixed together:
 
 - the local Fricon data library on each acquisition computer
 - the local checkout or installed package used to run measurement code
-- the upstream source, such as a Git repository, read-only network mirror, or
-  package cache
+- the upstream source, such as a self-hosted Gitea repository, GitLab/GitHub
+  repository, bare Git mirror, read-only network mirror, or package cache
 
-v0.2 should only record passive source summaries and surface diagnostics. A
-future UI can make setup and update easier, but the data model should avoid
-assuming copied folders are the normal preservation strategy.
+v0.2 should record honest source summaries and surface diagnostics. For
+non-managed user-run Python, that may only be `unmanaged` plus optional
+user-supplied labels. For future managed runs, Fricon can require a resolved
+immutable code snapshot before execution. A future UI can make setup and update
+easier, but the data model should avoid assuming copied folders are the normal
+preservation strategy.
 
 High-value reusable assets include:
 
@@ -304,6 +307,22 @@ Keep these local or machine-specific unless explicitly exported:
 Do not make network storage the active shared data library or the primary
 editable code folder. It can be a practical mirror, package cache, backup
 target, or export destination.
+
+Managed execution should use the code source differently from ordinary
+interactive scripts:
+
+```text
+configured Git/Gitea source
+  -> local bare mirror or cache
+  -> immutable commit or tree snapshot
+  -> temporary execution worktree
+  -> ScriptRun
+  -> Measurement
+```
+
+This gives future script runner, managed measurement, and calibration workflows
+stronger provenance without requiring every exploratory notebook to become a
+managed run.
 
 ## Sample Parameter Visualization
 
@@ -391,14 +410,15 @@ between equipment PCs.
 
 Acceptance notes:
 
-- v0.2 records the code-source summary for each measurement when available,
+- v0.2 records the code provenance level for each measurement when available,
   but it does not need to implement full code installation or update workflows
 - setup docs and diagnostics treat Fricon install, data-library location,
   measurement-code source, and Python environment as separate checks
 - code runs from a local checkout, installed package, or local environment on
   the measurement computer
-- a shared Git repository, read-only network mirror, or package cache can be an
-  upstream source, but Fricon does not require a central server
+- a self-hosted Gitea repository, shared Git repository, read-only network
+  mirror, or package cache can be an upstream source, but Fricon does not
+  require a central Fricon server
 - network storage may be used as a mirror/cache/export/backup target, not as
   the active database-backed data library or main editable code workspace
 - future UI can expose "install approved code", "update to approved release",
@@ -455,7 +475,7 @@ Acceptance notes:
 ### Create A Local Data Library
 
 As an experimentalist, I want one Fricon data library so that data, sample
-records, parameters, code-source summaries, and run history do not fragment
+records, parameters, code provenance summaries, and run history do not fragment
 into many folders.
 
 Acceptance notes:
@@ -651,21 +671,26 @@ Acceptance notes:
 
 ### Avoid Code Directory Copies
 
-As an experimentalist, I want Fricon to record code and environment summaries
-for runs so that I do not copy measurement code directories just to preserve
-history.
+As an experimentalist, I want Fricon to distinguish unmanaged code from managed
+code snapshots so that I do not copy measurement code directories just to
+preserve history or create false reproducibility.
 
 Acceptance notes:
 
-- v0.2 starts with passive summaries such as script path, Git/hash state,
-  Python/Fricon versions, and environment hints when available
-- summaries should include the source label, repository or folder identity,
-  release/tag/commit, dirty state, and entry point when available
+- non-managed Python measurements should be allowed to record measurement data,
+  but code provenance should be `unmanaged` unless the user explicitly provides
+  a label or summary
+- Fricon should not automatically inspect arbitrary notebooks, imports, or
+  working trees and present that as reproducible history
+- managed measurements can require a code snapshot resolved from a configured
+  source before execution
+- managed summaries should include the source label, repository identity,
+  release/tag/commit, tree hash, dirty state, entry point, and environment
+  hints when available
 - the summary should make it visible when a lab computer is running unknown,
-  dirty, or locally modified measurement code
-- code provenance is optional summary data, not a mandatory full source or
-  environment snapshot
-- managed code history and environment snapshots remain v0.3+ candidates
+  dirty, locally modified, or unmanaged measurement code
+- full source capture and environment snapshots remain v0.3+ candidates tied
+  to the managed runner/code-source design
 
 ### Write Table-Shaped Measurement Data
 
@@ -745,11 +770,14 @@ through copied folders and ad hoc local edits.
 Acceptance notes:
 
 - this is a v0.3+ candidate, not a v0.2 replacement requirement
-- Fricon may wrap an existing Git repository, read-only network mirror, package
-  cache, or lab-managed release bundle rather than hosting code itself
+- Fricon may wrap an existing Gitea, GitLab, GitHub, bare Git mirror, read-only
+  network mirror, package cache, or lab-managed release bundle rather than
+  hosting code itself
 - ordinary users should see approved releases, current local version,
   environment status, and a change summary, not raw branch-management UI
 - maintainers can still use normal Git and environment tools outside Fricon
+- managed runners may maintain local bare mirrors or caches and expand
+  immutable snapshots into temporary execution worktrees
 - Fricon should warn when local changes exist before updating or running a
   measurement
 - machine-specific setup profiles, device addresses, secrets, and local
@@ -790,7 +818,7 @@ Acceptance notes:
 ### Compare Measurements And Sessions
 
 As an experimentalist, I want to compare measurements across samples,
-cooldowns, parameter snapshots, or code-source summaries so that drift and
+cooldowns, parameter snapshots, or code provenance summaries so that drift and
 regressions are visible without manually reconstructing history from folders.
 
 Acceptance notes:

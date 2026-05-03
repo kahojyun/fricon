@@ -35,7 +35,7 @@ one Fricon data library
   -> measurement, analysis, simulation, import, and calibration activity records
   -> artifacts: datasets first, then results, reports, logs, attachments,
      device snapshots, and parameter proposals
-  -> parameter snapshots, code-source summaries, favorites, optional
+  -> parameter snapshots, code provenance summaries, favorites, optional
      notes/tags, and lifecycle flags
   -> measurement-centered portable exports for offline analysis
 ```
@@ -67,9 +67,10 @@ aliases that make the roadmap look like it has a second versioning scheme.
   sample/session context, preserve partial/interrupted data, support basic
   backup/restore and trash/recover, require scan schema for datasets intended
   for plotting, keep live viewing nonblocking, and keep the user model minimal.
-  It should record passive measurement-code source summaries so runs can be
-  traced across lab computers, but it should not yet manage full code sync or
-  environment setup.
+  It should record honest code provenance levels so runs can be traced across
+  lab computers without false reproducibility claims. Non-managed user-run
+  Python may be `unmanaged`; future managed runs can require immutable code
+  snapshots. v0.2 should not yet manage full code sync or environment setup.
   It is local-only: Fricon Desktop and the Python SDK operate through one local
   service and one primary local data library; the bundled CLI is mainly for
   setup, diagnostics, service control, and developer workflows.
@@ -128,8 +129,9 @@ dataset catalog to a measurement record system:
 - parameter and code history as first-class provenance
 - analysis, simulation, import, and calibration as activity records that
   consume and produce artifacts
-- measurement-code source summaries that record where acquisition code came
-  from without making the data library a shared code repository
+- code provenance summaries that record whether acquisition code was unmanaged,
+  user-supplied, or resolved from a managed code snapshot without making the
+  data library a shared code repository
 
 Older dataset semantics work remains useful, especially append-only facts,
 record IDs, manifests, and resolved interpretation. But v0.2 implementation

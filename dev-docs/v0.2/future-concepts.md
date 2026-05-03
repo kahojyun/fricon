@@ -75,44 +75,55 @@ Why it matters:
 - Many labs run several acquisition computers for different setups or groups.
   Measurement code often gets copied between those computers, which makes
   maintenance, provenance, and review difficult.
-- Fricon should help set up new computers and update shared measurement code
-  without turning ordinary experimenters into Git operators.
+- Fricon should help set up new computers, update shared measurement code, and
+  run managed measurements from immutable code snapshots without turning
+  ordinary experimenters into Git operators.
 - The solution should improve code reuse without requiring a central Fricon
   server or a shared active data library.
+- A self-hosted Git service such as Gitea can be the lab's source of truth
+  without making Fricon itself the Git host.
 
 Boundary:
 
 - Owns the product model for a configured lab code source or package, approved
-  releases/tags, local checkout status, environment checks, setup profiles, and
-  code-source provenance recorded on measurements.
+  releases/tags, local checkout status, local bare mirrors/caches, immutable
+  code snapshots, execution worktrees, environment checks, setup profiles, and
+  code provenance recorded on measurements.
 - Does not own raw data storage, source-code hosting, branch review workflow,
   secrets management beyond local references, or a full Git client.
 - Does not make network storage the active shared database-backed data library
   or the primary editable measurement-code folder.
+- Does not claim verified code history for non-managed user-run Python unless a
+  managed snapshot or explicit user-supplied summary exists.
 
 Likely interfaces:
 
-- records code-source summaries on measurements, including code label, entry
-  point, source kind, source label, revision/tag/commit, dirty/hash state, and
-  environment hints
+- records a code provenance level on measurements, such as unmanaged,
+  user-supplied summary, or managed snapshot
+- records managed code snapshots with code label, entry point, source kind,
+  source label, revision/tag/commit/tree, dirty/hash state, submodule state,
+  and environment hints
 - exposes setup diagnostics in Fricon Desktop and CLI
-- may wrap a Git repository, read-only network mirror, package cache, or lab
-  release bundle
+- may wrap Gitea, GitLab, GitHub, a bare Git repository, a read-only network
+  mirror, package cache, or lab release bundle
 - may install or update a local checkout and local Python environment through
   the lab's chosen tools
+- may maintain a local bare mirror or cache and expand immutable snapshots into
+  temporary execution worktrees for managed ScriptRuns
 - links setup profiles, measurement templates, scan-schema helpers, plot
   presets, export recipes, driver/helper modules, and future calibration
   workflow definitions to lab computers
-- exports measurement bundles with code-source and environment summaries when
-  available and safe to include
+- exports measurement bundles with code provenance and environment summaries
+  when available and safe to include
 
 Dependencies:
 
-- v0.2 measurement records and code-source summaries
+- v0.2 measurement records and code provenance summaries
 - installation/update policy
 - Python environment compatibility and diagnostics
 - actor/audit boundary for mutating setup actions
 - clear local/remote/service ownership model
+- future ScriptRun, managed measurement, and runner boundaries
 
 Open questions:
 
@@ -122,6 +133,12 @@ Open questions:
   machine or setup?
 - Should Fricon update code directly, call external Git/package tools, or only
   diagnose and link to instructions?
+- Should Fricon create the local bare mirror itself, use a user-maintained
+  mirror, or support both?
+- What exact facts make a managed code snapshot reproducible enough for
+  calibration and rerun workflows?
+- Should non-managed measurements record only `unmanaged`, or allow
+  user-supplied labels and script paths with clear warnings?
 - How should dirty local changes be preserved or handed to a maintainer without
   forcing ordinary users through branch and pull-request workflows?
 - What is the minimum offline installer or network-mirror story for locked-down
