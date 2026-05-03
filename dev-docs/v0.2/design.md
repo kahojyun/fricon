@@ -5,8 +5,9 @@
 Canonical v0.2 design synthesis.
 
 This is proposed direction, not current behavior. Use this document as the
-first v0.2 reference before reading the longer supporting proposals in this
-directory.
+first v0.2 reference before reading `product-direction.md`,
+`technical-direction.md`, and `future-concepts.md`. Archived proposals in this
+directory are historical background only.
 
 ## Product Thesis
 
