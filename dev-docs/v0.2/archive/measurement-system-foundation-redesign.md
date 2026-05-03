@@ -17,11 +17,10 @@ record. Historical `Experiment` or `ExperimentRun` wording in this supporting
 note should be read as older proposal terminology unless a later ADR chooses a
 different public noun.
 
-This note intentionally allows large breaking changes while Fricon has not yet
-entered real lab use. It may revise or supersede parts of
-`../../dataset-semantic-architecture-proposal.md` and
-`../../adr/0002-decide-dataset-semantic-manifest-v1.md` if the broader
-measurement-system model requires a different foundation.
+This proposal was written while Fricon had not yet entered real lab use, and it
+raised questions about whether the broader measurement-system model should
+change dataset semantics decisions. Current changes must go through
+`../design.md`, active dataset design notes, and the ADR process.
 
 ## Purpose
 
@@ -370,7 +369,9 @@ v0.2 should not require:
 Suggested staged path:
 
 1. Foundation ADR
-   - Decide whether this note supersedes or revises ADR 0002.
+   - Revisit the historical questions this note raised through the current ADR
+     process if dataset artifact identity or semantic manifest boundaries need
+     to change.
    - Commit to dataset artifact identity, dataset fact invariants, semantic
      manifest boundaries, and provenance edge direction.
 
@@ -413,4 +414,5 @@ Suggested staged path:
 - How should dataset continuation interact with completed measurement runs?
 - What compatibility promise, if any, should exist for pre-redesign local test
   workspaces or data libraries?
-- Which decisions require a new ADR versus revising ADR 0002?
+- Which decisions require a new ADR or a formal revision to ADR 0002 through the
+  current ADR process?
