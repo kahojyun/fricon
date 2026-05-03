@@ -1,5 +1,3 @@
-#[cfg(test)]
-use fricon::dataset::semantics::DatasetDType;
 use fricon::{
     DatasetInterpretation, DatasetListQuery, InterpretationSource, ReadAppError, ResolvedColumn,
     ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedSemanticReference,
@@ -171,14 +169,6 @@ fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
     }
 }
 
-#[cfg(test)]
-fn dtype_is_chart_axis_numeric(dtype: &DatasetDType) -> bool {
-    matches!(
-        dtype,
-        DatasetDType::Float64 | DatasetDType::Float32 | DatasetDType::Int64 | DatasetDType::UInt64
-    )
-}
-
 fn column_info_from_resolved_column(
     column: &ResolvedColumn,
     expose_manifest_hints: bool,
@@ -214,31 +204,19 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use fricon::{
         AppManager, Client, DatasetRow, DatasetScalar, ScalarArray, WorkspaceRoot,
-        dataset::semantics::{ColumnMetadata, DatasetDType},
-        workspace::WorkspacePaths,
+        dataset::semantics::ColumnMetadata, workspace::WorkspacePaths,
     };
     use indexmap::IndexMap;
     use num::complex::Complex64;
     use tempfile::TempDir;
 
-    use super::{dtype_is_chart_axis_numeric, get_dataset_detail, validate_non_negative};
+    use super::{get_dataset_detail, validate_non_negative};
     use crate::desktop_runtime::session::WorkspaceSession;
 
     #[test]
     fn validate_non_negative_rejects_negative_values() {
         let error = validate_non_negative(Some(-1), "limit").expect_err("expected error");
         assert_eq!(error.to_string(), "limit must be non-negative");
-    }
-
-    #[test]
-    fn chart_axis_numeric_includes_supported_scalar_numeric_dtypes() {
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::Float64));
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::Float32));
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::Int64));
-        assert!(dtype_is_chart_axis_numeric(&DatasetDType::UInt64));
-        assert!(!dtype_is_chart_axis_numeric(&DatasetDType::Bool));
-        assert!(!dtype_is_chart_axis_numeric(&DatasetDType::Utf8));
-        assert!(!dtype_is_chart_axis_numeric(&DatasetDType::Complex128));
     }
 
     #[tokio::test]
