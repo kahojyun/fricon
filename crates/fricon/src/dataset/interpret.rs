@@ -7,7 +7,9 @@ use arrow_schema::Schema;
 pub use self::model::{
     ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
     ResolvedColumn, ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
-    ResolvedScanAxis, ResolvedScanAxisMode, VisibleColumnOrdinal,
+    ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedScanAxis,
+    ResolvedScanAxisMode, ResolvedSemanticReference, VisibleColumnOrdinal, logical_index_id,
+    physical_column_id,
 };
 use crate::dataset::{
     schema::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
@@ -41,11 +43,13 @@ pub(crate) fn resolve_from_manifest(
                 .get(&name)
                 .expect("manifest should be validated against arrow schema");
             let is_record_id = column.system == Some(SystemColumn::RecordId);
+            let dtype = column.dtype.clone();
             ResolvedColumn {
+                id: physical_column_id(&name),
                 name,
                 physical_ordinal: PhysicalColumnOrdinal(physical_ordinal),
                 visible_ordinal: visible_ordinals.get(&physical_ordinal).copied(),
-                dtype: column.dtype.clone(),
+                dtype: dtype.clone(),
                 meaning: if is_record_id {
                     ColumnMeaning::SystemRecordId
                 } else {
@@ -57,6 +61,9 @@ pub(crate) fn resolve_from_manifest(
                 is_chart_axis_candidate: column.chart_axis,
                 unit: column.unit.clone(),
                 label: column.label.clone(),
+                is_complex: dtype_is_complex(&dtype),
+                is_trace: dtype_is_trace(&dtype),
+                is_numeric_axis_candidate: dtype_is_chart_axis_numeric(&dtype),
             }
         })
         .collect();
@@ -72,9 +79,17 @@ pub(crate) fn resolve_from_manifest(
         .filter_map(|column| column.visible_ordinal)
         .collect();
     let scan_axes = resolve_scan_axes(manifest);
+    let role_projections = manifest_role_projections(&columns, &scan_axes);
 
     DatasetInterpretation {
         columns,
+        semantic_references: role_projections.semantic_references,
+        value_references: role_projections.value_references,
+        plotted_coordinates: role_projections.plotted_coordinates,
+        sweep_axes: role_projections.sweep_axes,
+        group_axes: role_projections.group_axes,
+        filter_axes: role_projections.filter_axes,
+        chart_axis_candidates: role_projections.chart_axis_candidates,
         value_columns,
         logical_index_columns: Vec::new(),
         chart_axis_candidate_columns,
@@ -93,6 +108,60 @@ pub(crate) fn resolve_from_manifest(
     }
 }
 
+struct RoleProjections {
+    semantic_references: Vec<ResolvedSemanticReference>,
+    value_references: Vec<ResolvedSemanticReference>,
+    plotted_coordinates: Vec<ResolvedSemanticReference>,
+    sweep_axes: Vec<ResolvedSemanticReference>,
+    group_axes: Vec<ResolvedSemanticReference>,
+    filter_axes: Vec<ResolvedSemanticReference>,
+    chart_axis_candidates: Vec<ResolvedSemanticReference>,
+}
+
+fn manifest_role_projections(
+    columns: &[ResolvedColumn],
+    scan_axes: &[ResolvedScanAxis],
+) -> RoleProjections {
+    let logical_index_references = scan_axes
+        .iter()
+        .map(ResolvedScanAxis::as_semantic_reference)
+        .collect::<Vec<_>>();
+    let value_references = physical_column_references(columns, false, |column| {
+        column.meaning == ColumnMeaning::UserValue
+    });
+    let chart_axis_candidates = physical_column_references(columns, false, |column| {
+        column.is_chart_axis_candidate && column.visible_ordinal.is_some()
+    });
+    let mut semantic_references = physical_column_references(columns, false, |_| true);
+    semantic_references.extend(logical_index_references.clone());
+    let mut plotted_coordinates = logical_index_references.clone();
+    plotted_coordinates.extend(chart_axis_candidates.clone());
+    let mut filter_axes = logical_index_references.clone();
+    filter_axes.extend(chart_axis_candidates.clone());
+
+    RoleProjections {
+        semantic_references,
+        value_references,
+        plotted_coordinates,
+        sweep_axes: logical_index_references.clone(),
+        group_axes: logical_index_references,
+        filter_axes,
+        chart_axis_candidates,
+    }
+}
+
+fn physical_column_references(
+    columns: &[ResolvedColumn],
+    is_compatibility: bool,
+    predicate: impl Fn(&ResolvedColumn) -> bool,
+) -> Vec<ResolvedSemanticReference> {
+    columns
+        .iter()
+        .filter(|column| predicate(column))
+        .map(|column| column.as_semantic_reference(is_compatibility))
+        .collect()
+}
+
 fn resolve_scan_axes(manifest: &DatasetSemanticManifest) -> Vec<ResolvedScanAxis> {
     manifest
         .scan_plan
@@ -101,15 +170,22 @@ fn resolve_scan_axes(manifest: &DatasetSemanticManifest) -> Vec<ResolvedScanAxis
             scan_plan
                 .axes
                 .iter()
-                .map(|axis| ResolvedScanAxis {
-                    name: axis.name.clone(),
-                    label: axis.label.clone(),
-                    mode: match &axis.mode {
+                .enumerate()
+                .map(|(axis_ordinal, axis)| {
+                    let mode = match &axis.mode {
                         ScanAxisMode::Static { values } => ResolvedScanAxisMode::Static {
                             values: values.clone(),
                         },
                         ScanAxisMode::ImplicitIndex => ResolvedScanAxisMode::ImplicitIndex,
-                    },
+                    };
+                    ResolvedScanAxis {
+                        id: logical_index_id(&axis.name),
+                        axis_ordinal,
+                        name: axis.name.clone(),
+                        label: axis.label.clone(),
+                        numeric_axis: scan_axis_mode_is_numeric(&mode),
+                        mode,
+                    }
                 })
                 .collect()
         })
@@ -208,11 +284,13 @@ pub(crate) fn resolve_from_compatibility_inference(
         .map(|(ordinal, (name, data_type))| {
             let visible_ordinal = VisibleColumnOrdinal(ordinal);
             let is_index = index_column_set.contains(&visible_ordinal);
+            let dtype = dataset_dtype_from_compatibility_type(*data_type);
             ResolvedColumn {
+                id: physical_column_id(name),
                 name: name.to_owned(),
                 physical_ordinal: PhysicalColumnOrdinal(ordinal),
                 visible_ordinal: Some(visible_ordinal),
-                dtype: dataset_dtype_from_compatibility_type(*data_type),
+                dtype: dtype.clone(),
                 meaning: if is_index {
                     ColumnMeaning::CompatibilityIndex
                 } else {
@@ -224,6 +302,9 @@ pub(crate) fn resolve_from_compatibility_inference(
                 is_chart_axis_candidate: is_index,
                 unit: None,
                 label: None,
+                is_complex: dtype_is_complex(&dtype),
+                is_trace: dtype_is_trace(&dtype),
+                is_numeric_axis_candidate: dtype_is_chart_axis_numeric(&dtype),
             }
         })
         .collect();
@@ -233,9 +314,17 @@ pub(crate) fn resolve_from_compatibility_inference(
         .filter(|column| column.meaning == ColumnMeaning::UserValue)
         .filter_map(|column| column.visible_ordinal)
         .collect();
+    let role_projections = compatibility_role_projections(&columns);
 
     DatasetInterpretation {
         columns,
+        semantic_references: role_projections.semantic_references,
+        value_references: role_projections.value_references,
+        plotted_coordinates: role_projections.plotted_coordinates,
+        sweep_axes: role_projections.sweep_axes,
+        group_axes: role_projections.group_axes,
+        filter_axes: role_projections.filter_axes,
+        chart_axis_candidates: role_projections.chart_axis_candidates,
         value_columns,
         logical_index_columns: index_columns.clone(),
         chart_axis_candidate_columns: index_columns,
@@ -243,6 +332,26 @@ pub(crate) fn resolve_from_compatibility_inference(
         index_realization: ResolvedIndexRealization::None,
         scan_axes: Vec::new(),
         source: InterpretationSource::CompatibilityInference,
+    }
+}
+
+fn compatibility_role_projections(columns: &[ResolvedColumn]) -> RoleProjections {
+    let value_references = physical_column_references(columns, true, |column| {
+        column.meaning == ColumnMeaning::UserValue
+    });
+    let compatibility_axes = physical_column_references(columns, true, |column| {
+        column.meaning == ColumnMeaning::CompatibilityIndex
+    });
+    let semantic_references = physical_column_references(columns, true, |_| true);
+
+    RoleProjections {
+        semantic_references,
+        value_references,
+        plotted_coordinates: compatibility_axes.clone(),
+        sweep_axes: compatibility_axes.clone(),
+        group_axes: compatibility_axes.clone(),
+        filter_axes: compatibility_axes.clone(),
+        chart_axis_candidates: compatibility_axes,
     }
 }
 
@@ -273,6 +382,37 @@ fn trace_value_from_compatibility_type(scalar_kind: ScalarKind) -> TraceValueDTy
     }
 }
 
+fn dtype_is_complex(dtype: &DatasetDType) -> bool {
+    matches!(
+        dtype,
+        DatasetDType::Complex128
+            | DatasetDType::Trace {
+                value: TraceValueDType::Complex128,
+                ..
+            }
+    )
+}
+
+fn dtype_is_trace(dtype: &DatasetDType) -> bool {
+    matches!(dtype, DatasetDType::Trace { .. })
+}
+
+fn dtype_is_chart_axis_numeric(dtype: &DatasetDType) -> bool {
+    matches!(
+        dtype,
+        DatasetDType::Float64 | DatasetDType::Float32 | DatasetDType::Int64 | DatasetDType::UInt64
+    )
+}
+
+fn scan_axis_mode_is_numeric(mode: &ResolvedScanAxisMode) -> bool {
+    match mode {
+        ResolvedScanAxisMode::ImplicitIndex => true,
+        ResolvedScanAxisMode::Static { values } => values
+            .iter()
+            .all(|value| matches!(value, ScanAxisValue::Int(_) | ScanAxisValue::Float(_))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{ops::Bound, sync::Arc};
@@ -283,7 +423,8 @@ mod tests {
     use super::{
         ColumnMeaning, InterpretationSource, PhysicalColumnOrdinal, ResolvedDuplicatePolicy,
         ResolvedIndexRealization, ResolvedLogicalIndexPoint, ResolvedScanAxisMode,
-        VisibleColumnOrdinal, resolve_from_manifest, resolve_logical_index_points,
+        ResolvedSemanticReference, VisibleColumnOrdinal, resolve_from_manifest,
+        resolve_logical_index_points,
     };
     use crate::dataset::{
         DatasetReader,
@@ -331,6 +472,7 @@ mod tests {
         );
 
         let record_id = &interpretation.columns[0];
+        assert_eq!(record_id.id, "column:__ds_record_id");
         assert_eq!(record_id.name, RECORD_ID_COLUMN);
         assert_eq!(record_id.physical_ordinal, PhysicalColumnOrdinal(0));
         assert_eq!(record_id.visible_ordinal, None);
@@ -342,12 +484,22 @@ mod tests {
         assert!(!record_id.is_chart_axis_candidate);
 
         let signal = &interpretation.columns[1];
+        assert_eq!(signal.id, "column:signal");
         assert_eq!(signal.physical_ordinal, PhysicalColumnOrdinal(1));
         assert_eq!(signal.visible_ordinal, Some(VisibleColumnOrdinal(0)));
         assert_eq!(signal.meaning, ColumnMeaning::UserValue);
         assert_eq!(signal.dtype, DatasetDType::Float64);
         assert!(!signal.is_system);
         assert!(!signal.hidden_by_default);
+        assert_eq!(interpretation.value_references.len(), 1);
+        assert_eq!(interpretation.value_references[0].id(), "column:signal");
+        assert_eq!(
+            interpretation
+                .physical_column_for_id("column:signal")
+                .expect("physical semantic reference")
+                .name,
+            "signal"
+        );
     }
 
     #[test]
@@ -371,6 +523,12 @@ mod tests {
         assert!(signal.hidden_by_default);
         assert!(signal.is_chart_axis_candidate);
         assert_eq!(interpretation.chart_axis_candidate_columns, visible(&[0]));
+        assert_eq!(interpretation.chart_axis_candidates.len(), 1);
+        assert_eq!(
+            interpretation.chart_axis_candidates[0].id(),
+            "column:signal"
+        );
+        assert!(interpretation.chart_axis_candidates[0].hidden_by_default());
     }
 
     #[test]
@@ -398,6 +556,20 @@ mod tests {
             ResolvedIndexRealization::Implicit
         );
         assert_eq!(interpretation.scan_axes.len(), 2);
+        assert_eq!(interpretation.scan_axes[0].id, "logicalIndex:gate");
+        assert_eq!(interpretation.sweep_axes.len(), 2);
+        assert_eq!(interpretation.group_axes[0].id(), "logicalIndex:gate");
+        assert_eq!(interpretation.filter_axes[1].id(), "logicalIndex:bias");
+        assert_eq!(
+            interpretation.plotted_coordinates[0].id(),
+            "logicalIndex:gate"
+        );
+        assert!(
+            interpretation
+                .logical_axis_for_id("logicalIndex:gate")
+                .expect("logical semantic reference")
+                .numeric_axis
+        );
         assert!(matches!(
             interpretation.scan_axes[0].mode,
             ResolvedScanAxisMode::Static { .. }
@@ -525,6 +697,28 @@ mod tests {
             interpretation.chart_axis_candidate_columns,
             visible(&[0, 1])
         );
+        assert_eq!(
+            interpretation
+                .sweep_axes
+                .iter()
+                .map(ResolvedSemanticReference::id)
+                .collect::<Vec<_>>(),
+            vec!["column:run", "column:step"]
+        );
+        assert_eq!(
+            interpretation
+                .chart_axis_candidates
+                .iter()
+                .map(ResolvedSemanticReference::id)
+                .collect::<Vec<_>>(),
+            vec!["column:run", "column:step"]
+        );
+        assert!(
+            interpretation
+                .sweep_axes
+                .iter()
+                .all(ResolvedSemanticReference::is_compatibility)
+        );
         assert_eq!(interpretation.value_columns, visible(&[2]));
         assert_eq!(
             interpretation.columns[0].meaning,
@@ -534,6 +728,34 @@ mod tests {
         assert!(interpretation.columns[0].is_chart_axis_candidate);
         assert_eq!(interpretation.columns[2].meaning, ColumnMeaning::UserValue);
         assert!(!interpretation.columns[2].is_index);
+    }
+
+    #[test]
+    fn interpretation_ids_preserve_prefixed_physical_column_names() {
+        let schema = DatasetSchema::try_from(&Schema::new(vec![
+            Field::new("logicalIndex:gate", DataType::Float64, false),
+            Field::new("column:value", DataType::Float64, false),
+        ]))
+        .expect("schema");
+
+        let interpretation = resolve_from_compatibility_inference(&schema, Some(vec![0]));
+
+        assert_eq!(interpretation.columns[0].id, "column:logicalIndex:gate");
+        assert_eq!(interpretation.columns[1].id, "column:column:value");
+        assert_eq!(
+            interpretation
+                .physical_column_for_id("column:logicalIndex:gate")
+                .expect("prefixed physical column")
+                .name,
+            "logicalIndex:gate"
+        );
+        assert!(
+            matches!(
+                interpretation.semantic_reference("logicalIndex:gate"),
+                None | Some(ResolvedSemanticReference::LogicalIndex(_))
+            ),
+            "a physical column whose name starts with logicalIndex: must stay in column namespace"
+        );
     }
 
     #[test]

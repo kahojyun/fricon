@@ -15,7 +15,9 @@ pub use self::{
     interpret::{
         ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
         ResolvedColumn, ResolvedDuplicatePolicy, ResolvedIndexRealization,
-        ResolvedLogicalIndexPoint, ResolvedScanAxis, ResolvedScanAxisMode, VisibleColumnOrdinal,
+        ResolvedLogicalIndexPoint, ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference,
+        ResolvedScanAxis, ResolvedScanAxisMode, ResolvedSemanticReference, VisibleColumnOrdinal,
+        logical_index_id, physical_column_id,
     },
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,

@@ -24,9 +24,10 @@ pub use self::{
         DatasetRow, DatasetScalar, DatasetSchema, DatasetSortBy, DatasetStatus, DatasetUpdate,
         FixedStepTrace, InterpretationSource, PhysicalColumnOrdinal, ResolvedColumn,
         ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
-        ResolvedScanAxis, ResolvedScanAxisMode, ScalarArray, ScalarKind, ScanAxis, ScanAxisMode,
-        ScanAxisValue, ScanPlan, SelectOptions, SortDirection, TraceKind, VariableStepTrace,
-        VisibleColumnOrdinal,
+        ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedScanAxis,
+        ResolvedScanAxisMode, ResolvedSemanticReference, ScalarArray, ScalarKind, ScanAxis,
+        ScanAxisMode, ScanAxisValue, ScanPlan, SelectOptions, SortDirection, TraceKind,
+        VariableStepTrace, VisibleColumnOrdinal, logical_index_id, physical_column_id,
     },
     workspace::{WorkspaceError, WorkspaceRoot, get_log_dir},
 };
