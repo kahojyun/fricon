@@ -1,7 +1,7 @@
 use anyhow::Context;
 use fricon::{DatasetDataType, DatasetSchema};
 
-use super::resolve_xy_trace_roles;
+use super::{SemanticRoleColumns, resolve_xy_trace_roles};
 use crate::features::charts::types::{
     ChartCommonOptions, DatasetChartDataOptions, HeatmapChartDataOptions, LiveChartDataOptions,
     LiveHeatmapOptions, LiveXYOptions, XYChartDataOptions, XYPlotModeOptions,
@@ -56,6 +56,7 @@ fn build_heatmap_selected_columns(
 fn build_xy_selected_columns(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     options: &XYChartDataOptions,
 ) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
@@ -67,7 +68,7 @@ fn build_xy_selected_columns(
             if !matches!(data_type, DatasetDataType::Trace(_, _)) {
                 let roles = resolve_xy_trace_roles(
                     schema,
-                    index_columns,
+                    SemanticRoleColumns::new(index_columns, group_columns),
                     &options.trace_roles,
                     options.draw_style,
                 )?;
@@ -93,7 +94,7 @@ fn build_xy_selected_columns(
             {
                 let roles = resolve_xy_trace_roles(
                     schema,
-                    index_columns,
+                    SemanticRoleColumns::new(index_columns, group_columns),
                     &options.trace_roles,
                     options.draw_style,
                 )?;
@@ -109,7 +110,7 @@ fn build_xy_selected_columns(
             if !matches!(data_type, DatasetDataType::Trace(_, _)) {
                 let roles = resolve_xy_trace_roles(
                     schema,
-                    index_columns,
+                    SemanticRoleColumns::new(index_columns, group_columns),
                     &options.trace_roles,
                     options.draw_style,
                 )?;
@@ -126,11 +127,12 @@ fn build_xy_selected_columns(
 pub(crate) fn build_chart_selected_columns(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     options: &DatasetChartDataOptions,
 ) -> anyhow::Result<Vec<usize>> {
     match options {
         DatasetChartDataOptions::Xy(options) => {
-            build_xy_selected_columns(schema, index_columns, options)
+            build_xy_selected_columns(schema, index_columns, group_columns, options)
         }
         DatasetChartDataOptions::Heatmap(options) => {
             build_heatmap_selected_columns(schema, options)
@@ -154,11 +156,13 @@ fn build_live_heatmap_selected_columns(
 fn build_live_xy_selected_columns(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     options: &LiveXYOptions,
 ) -> anyhow::Result<Vec<usize>> {
     build_xy_selected_columns(
         schema,
         index_columns,
+        group_columns,
         &XYChartDataOptions {
             draw_style: options.draw_style,
             plot_mode: options.plot_mode.clone(),
@@ -171,11 +175,12 @@ fn build_live_xy_selected_columns(
 pub(crate) fn build_live_chart_selected_columns(
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     options: &LiveChartDataOptions,
 ) -> anyhow::Result<Vec<usize>> {
     match options {
         LiveChartDataOptions::Xy(options) => {
-            build_live_xy_selected_columns(schema, index_columns, options)
+            build_live_xy_selected_columns(schema, index_columns, group_columns, options)
         }
         LiveChartDataOptions::Heatmap(options) => {
             build_live_heatmap_selected_columns(schema, index_columns, options)
@@ -239,7 +244,8 @@ mod tests {
             common: ChartCommonOptions::default(),
         });
 
-        let selected = build_chart_selected_columns(&schema, Some(&[0, 1]), &options).unwrap();
+        let selected =
+            build_chart_selected_columns(&schema, Some(&[0, 1]), Some(&[0, 1]), &options).unwrap();
         assert_eq!(selected, vec![2, 3, 0, 1]);
     }
 
@@ -258,7 +264,8 @@ mod tests {
             common: ChartCommonOptions::default(),
         });
 
-        let selected = build_chart_selected_columns(&schema, Some(&[0, 1]), &options).unwrap();
+        let selected =
+            build_chart_selected_columns(&schema, Some(&[0, 1]), Some(&[0, 1]), &options).unwrap();
         assert_eq!(selected, vec![1]);
     }
 
@@ -271,7 +278,9 @@ mod tests {
             known_row_count: None,
         });
 
-        let selected = build_live_chart_selected_columns(&schema, Some(&[0, 1]), &options).unwrap();
+        let selected =
+            build_live_chart_selected_columns(&schema, Some(&[0, 1]), Some(&[0, 1]), &options)
+                .unwrap();
         assert_eq!(selected, vec![3, 0, 1]);
     }
 
@@ -289,7 +298,9 @@ mod tests {
             trace_roles: XYTraceRoleOptions::default(),
         });
 
-        let selected = build_live_chart_selected_columns(&schema, Some(&[0, 1]), &options).unwrap();
+        let selected =
+            build_live_chart_selected_columns(&schema, Some(&[0, 1]), Some(&[0, 1]), &options)
+                .unwrap();
         assert_eq!(selected, vec![3, 1]);
     }
 
@@ -304,7 +315,8 @@ mod tests {
             common: ChartCommonOptions::default(),
         });
 
-        let selected = build_chart_selected_columns(&schema, Some(&[0, 1]), &options).unwrap();
+        let selected =
+            build_chart_selected_columns(&schema, Some(&[0, 1]), Some(&[0, 1]), &options).unwrap();
         assert_eq!(selected, vec![3, 1, 0]);
     }
 }

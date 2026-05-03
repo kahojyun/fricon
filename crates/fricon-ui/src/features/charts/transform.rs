@@ -28,6 +28,18 @@ pub(super) struct XYTraceRoles {
     pub(super) sweep: Option<usize>,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct SemanticRoleColumns<'a> {
+    pub(super) sweep: Option<&'a [usize]>,
+    pub(super) group: Option<&'a [usize]>,
+}
+
+impl<'a> SemanticRoleColumns<'a> {
+    pub(super) const fn new(sweep: Option<&'a [usize]>, group: Option<&'a [usize]>) -> Self {
+        Self { sweep, group }
+    }
+}
+
 pub(super) fn row_series_id(row: usize) -> String {
     format!("row:{row}")
 }
@@ -38,22 +50,23 @@ pub(super) fn group_series_id(group_start: usize) -> String {
 
 pub(super) fn resolve_xy_trace_roles(
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     options: &XYTraceRoleOptions,
     draw_style: XYDrawStyle,
 ) -> Result<XYTraceRoles> {
-    let index_columns = index_columns.unwrap_or(&[]);
+    let sweep_columns = role_columns.sweep.unwrap_or(&[]);
+    let group_columns = role_columns.group.unwrap_or(sweep_columns);
 
     let trace_group = resolve_named_index_columns(
         schema,
-        index_columns,
+        group_columns,
         options.trace_group_index_columns.as_deref().unwrap_or(&[]),
     )?;
 
     let explicit_sweep = options
         .sweep_index_column
         .as_deref()
-        .map(|name| resolve_named_index_column(schema, index_columns, name))
+        .map(|name| resolve_named_index_column(schema, sweep_columns, name))
         .transpose()?;
 
     if explicit_sweep.is_some_and(|sweep| trace_group.contains(&sweep)) {
@@ -61,7 +74,7 @@ pub(super) fn resolve_xy_trace_roles(
     }
 
     let default_sweep = if draw_style.includes_lines() {
-        index_columns
+        sweep_columns
             .iter()
             .rev()
             .find(|&&index| !trace_group.contains(&index))
@@ -243,17 +256,17 @@ fn resolve_named_index_columns(
 
 fn resolve_named_group_column(
     schema: &DatasetSchema,
-    index_columns: &[usize],
+    group_columns: &[usize],
     name: &str,
 ) -> Result<usize> {
     let (idx, _, _) = schema
         .columns()
         .get_full(name)
         .with_context(|| format!("Column '{name}' not found"))?;
-    if index_columns.contains(&idx) || name.starts_with("logicalIndex:") {
+    if group_columns.contains(&idx) {
         return Ok(idx);
     }
-    bail!("Column '{name}' is not an index column");
+    bail!("Column '{name}' is not a group axis column");
 }
 
 fn resolve_named_index_column(
@@ -382,8 +395,8 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::{
-        compute_group_starts, group_ranges, last_outer_group_start, make_group_id_suffix,
-        resolve_xy_trace_roles,
+        SemanticRoleColumns, compute_group_starts, group_ranges, last_outer_group_start,
+        make_group_id_suffix, resolve_xy_trace_roles,
         test_utils::{numeric_batch, numeric_schema},
     };
     use crate::features::charts::types::{XYDrawStyle, XYTraceRoleOptions};
@@ -464,7 +477,7 @@ mod tests {
         let schema = numeric_schema(&["outer", "middle", "inner"]);
         let roles = resolve_xy_trace_roles(
             &schema,
-            Some(&[0, 1, 2]),
+            SemanticRoleColumns::new(Some(&[0, 1, 2]), Some(&[0, 1, 2])),
             &XYTraceRoleOptions {
                 trace_group_index_columns: Some(vec!["outer".to_string()]),
                 sweep_index_column: None,
@@ -485,7 +498,7 @@ mod tests {
         )]));
         let roles = resolve_xy_trace_roles(
             &schema,
-            None,
+            SemanticRoleColumns::new(None, Some(&[0])),
             &XYTraceRoleOptions {
                 trace_group_index_columns: Some(vec!["logicalIndex:gate".to_string()]),
                 sweep_index_column: None,
@@ -503,7 +516,7 @@ mod tests {
         let schema = numeric_schema(&["outer", "inner"]);
         let result = resolve_xy_trace_roles(
             &schema,
-            Some(&[0, 1]),
+            SemanticRoleColumns::new(Some(&[0, 1]), Some(&[0, 1])),
             &XYTraceRoleOptions {
                 trace_group_index_columns: Some(vec!["inner".to_string()]),
                 sweep_index_column: Some("inner".to_string()),

@@ -4,8 +4,8 @@ use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 use tracing::debug;
 
 use super::{
-    XYTraceRoles, compute_group_starts, group_ranges, make_group_id_suffix, make_group_label,
-    resolve_xy_trace_roles, row_order_for_group, row_series_id,
+    SemanticRoleColumns, XYTraceRoles, compute_group_starts, group_ranges, make_group_id_suffix,
+    make_group_label, resolve_xy_trace_roles, row_order_for_group, row_series_id,
 };
 use crate::features::charts::types::{
     ChartSnapshot, ComplexViewOption, FlatXYSeries, LiveXYOptions, XYChartSnapshot, XYPlotMode,
@@ -16,9 +16,11 @@ pub(crate) fn build_live_xy_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     row_start: usize,
     options: &LiveXYOptions,
 ) -> Result<ChartSnapshot> {
+    let role_columns = SemanticRoleColumns::new(index_columns, group_columns);
     debug!(
         chart_type = "live_xy",
         plot_mode = ?options.plot_mode.plot_mode(),
@@ -34,17 +36,17 @@ pub(crate) fn build_live_xy_series(
         } => build_live_quantity_vs_sweep_snapshot(
             batch,
             schema,
-            index_columns,
+            role_columns,
             row_start,
             options,
             quantity,
             complex_views.as_deref().unwrap_or(&[]),
         )?,
         XYPlotModeOptions::Xy { x_column, y_column } => {
-            build_live_xy_snapshot(batch, schema, index_columns, options, x_column, y_column)?
+            build_live_xy_snapshot(batch, schema, role_columns, options, x_column, y_column)?
         }
         XYPlotModeOptions::ComplexPlane { quantity } => {
-            build_live_complex_plane_snapshot(batch, schema, index_columns, options, quantity)?
+            build_live_complex_plane_snapshot(batch, schema, role_columns, options, quantity)?
         }
     };
 
@@ -54,7 +56,7 @@ pub(crate) fn build_live_xy_series(
 fn build_live_quantity_vs_sweep_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     row_start: usize,
     options: &LiveXYOptions,
     series_name: &str,
@@ -79,7 +81,7 @@ fn build_live_quantity_vs_sweep_snapshot(
     } else {
         let roles = resolve_xy_trace_roles(
             schema,
-            index_columns,
+            role_columns,
             &options.trace_roles,
             options.draw_style,
         )?;
@@ -112,7 +114,7 @@ fn build_live_quantity_vs_sweep_snapshot(
     let x_name = if is_trace {
         format!("{series_name} - X")
     } else {
-        resolve_live_quantity_vs_sweep_x_name(schema, index_columns, options)?
+        resolve_live_quantity_vs_sweep_x_name(schema, role_columns, options)?
     };
 
     Ok(XYChartSnapshot {
@@ -127,7 +129,7 @@ fn build_live_quantity_vs_sweep_snapshot(
 fn build_live_xy_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     options: &LiveXYOptions,
     x_column: &str,
     y_column: &str,
@@ -149,7 +151,7 @@ fn build_live_xy_snapshot(
         (false, false) => {
             let roles = resolve_xy_trace_roles(
                 schema,
-                index_columns,
+                role_columns,
                 &options.trace_roles,
                 options.draw_style,
             )?;
@@ -170,7 +172,7 @@ fn build_live_xy_snapshot(
 fn build_live_complex_plane_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     options: &LiveXYOptions,
     series_name: &str,
 ) -> Result<XYChartSnapshot> {
@@ -186,7 +188,7 @@ fn build_live_complex_plane_snapshot(
     } else {
         let roles = resolve_xy_trace_roles(
             schema,
-            index_columns,
+            role_columns,
             &options.trace_roles,
             options.draw_style,
         )?;
@@ -479,12 +481,12 @@ fn build_live_grouped_xy(
 
 fn resolve_live_quantity_vs_sweep_x_name(
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     options: &LiveXYOptions,
 ) -> Result<String> {
     let roles = resolve_xy_trace_roles(
         schema,
-        index_columns,
+        role_columns,
         &options.trace_roles,
         options.draw_style,
     )?;
@@ -762,6 +764,7 @@ mod tests {
                 &batch,
                 &schema,
                 Some(&[0]),
+                Some(&[0]),
                 0,
                 match &LiveChartDataOptions::Xy(LiveXYOptions {
                     draw_style: XYDrawStyle::Line,
@@ -793,6 +796,7 @@ mod tests {
             build_live_xy_series(
                 &batch,
                 &schema,
+                None,
                 None,
                 5,
                 match &LiveChartDataOptions::Xy(LiveXYOptions {

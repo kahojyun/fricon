@@ -3,8 +3,9 @@ use arrow_array::RecordBatch;
 use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
 
 use super::{
-    XYTraceRoles, compute_group_starts, format_numeric_value, group_ranges, make_group_id_suffix,
-    make_group_label, resolve_xy_trace_roles, row_order_for_group, row_series_id,
+    SemanticRoleColumns, XYTraceRoles, compute_group_starts, format_numeric_value, group_ranges,
+    make_group_id_suffix, make_group_label, resolve_xy_trace_roles, row_order_for_group,
+    row_series_id,
 };
 use crate::features::charts::types::{
     ChartSnapshot, ComplexViewOption, FlatXYSeries, XYChartDataOptions, XYChartSnapshot,
@@ -16,8 +17,10 @@ pub(crate) fn build_xy_series(
     batch: &RecordBatch,
     schema: &DatasetSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     options: &XYChartDataOptions,
 ) -> Result<ChartSnapshot> {
+    let role_columns = SemanticRoleColumns::new(index_columns, group_columns);
     let snapshot = match &options.plot_mode {
         XYPlotModeOptions::QuantityVsSweep {
             quantity,
@@ -25,7 +28,7 @@ pub(crate) fn build_xy_series(
         } => build_quantity_vs_sweep_snapshot(
             batch,
             schema,
-            index_columns,
+            role_columns,
             options.draw_style,
             quantity,
             complex_views.as_deref().unwrap_or(&[]),
@@ -34,7 +37,7 @@ pub(crate) fn build_xy_series(
         XYPlotModeOptions::Xy { x_column, y_column } => build_xy_snapshot(
             batch,
             schema,
-            index_columns,
+            role_columns,
             options.draw_style,
             x_column,
             y_column,
@@ -43,7 +46,7 @@ pub(crate) fn build_xy_series(
         XYPlotModeOptions::ComplexPlane { quantity } => build_complex_plane_snapshot(
             batch,
             schema,
-            index_columns,
+            role_columns,
             options.draw_style,
             quantity,
             &options.trace_roles,
@@ -56,7 +59,7 @@ pub(crate) fn build_xy_series(
 fn build_quantity_vs_sweep_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     draw_style: XYDrawStyle,
     series_name: &str,
     complex_views: &[ComplexViewOption],
@@ -72,7 +75,7 @@ fn build_quantity_vs_sweep_snapshot(
     let series = if is_trace {
         build_trace_quantity_vs_sweep_series(batch, series_name, is_complex, complex_views)?
     } else {
-        let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+        let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
         build_scalar_quantity_vs_sweep_series(
             batch,
             schema,
@@ -86,7 +89,7 @@ fn build_quantity_vs_sweep_snapshot(
     let x_name = if is_trace {
         format!("{series_name} - X")
     } else {
-        resolve_quantity_vs_sweep_x_name(schema, index_columns, trace_roles, draw_style)?
+        resolve_quantity_vs_sweep_x_name(schema, role_columns, trace_roles, draw_style)?
     };
 
     Ok(XYChartSnapshot {
@@ -101,7 +104,7 @@ fn build_quantity_vs_sweep_snapshot(
 fn build_xy_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     draw_style: XYDrawStyle,
     x_column: &str,
     y_column: &str,
@@ -121,7 +124,7 @@ fn build_xy_snapshot(
     let series = match (x_is_trace, y_is_trace) {
         (true, true) => build_trace_xy_series(batch, x_column, y_column)?,
         (false, false) => {
-            let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+            let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
             build_scalar_xy_series(batch, schema, x_column, y_column, &roles)?
         }
         _ => bail!("X/Y plot mode requires both columns to be trace or both to be scalar"),
@@ -139,7 +142,7 @@ fn build_xy_snapshot(
 fn build_complex_plane_snapshot(
     batch: &RecordBatch,
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     draw_style: XYDrawStyle,
     series_name: &str,
     trace_roles: &XYTraceRoleOptions,
@@ -153,7 +156,7 @@ fn build_complex_plane_snapshot(
     let series = if is_trace {
         build_trace_complex_plane_series(batch, schema, series_name)?
     } else {
-        let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+        let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
         build_scalar_complex_plane_series(batch, schema, series_name, &roles)?
     };
 
@@ -496,11 +499,11 @@ fn build_grouped_xy_series(
 
 fn resolve_quantity_vs_sweep_x_name(
     schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    role_columns: SemanticRoleColumns<'_>,
     trace_roles: &XYTraceRoleOptions,
     draw_style: XYDrawStyle,
 ) -> Result<String> {
-    let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+    let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
     Ok(match roles.sweep {
         Some(index) => schema
             .columns()
@@ -651,6 +654,7 @@ mod tests {
                 &batch,
                 &schema,
                 Some(&[0, 1]),
+                Some(&[0, 1]),
                 &XYChartDataOptions {
                     draw_style: XYDrawStyle::Line,
                     plot_mode: XYPlotModeOptions::QuantityVsSweep {
@@ -691,6 +695,7 @@ mod tests {
                 &batch,
                 &schema,
                 Some(&[0, 1]),
+                Some(&[0, 1]),
                 &XYChartDataOptions {
                     draw_style: XYDrawStyle::Points,
                     plot_mode: XYPlotModeOptions::Xy {
@@ -722,6 +727,7 @@ mod tests {
         let result = build_xy_series(
             &batch,
             &schema,
+            Some(&[0]),
             Some(&[0]),
             &XYChartDataOptions {
                 draw_style: XYDrawStyle::Points,

@@ -24,7 +24,10 @@ pub use self::{
         DatasetUpdate, SortDirection,
     },
     portability::{ExportedMetadata, FieldDiff, ImportConflict, ImportPreview, PortabilityError},
-    read::{DatasetReader, SelectOptions},
+    read::{
+        DatasetReader, ProjectedSemanticAxis, ProjectedSemanticRoles, ProjectedSemanticSource,
+        SelectOptions, SemanticProjectionOptions, project_semantic_source,
+    },
     schema::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
