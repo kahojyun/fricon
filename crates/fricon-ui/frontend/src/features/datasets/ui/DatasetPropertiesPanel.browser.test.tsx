@@ -12,7 +12,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { datasetKeys } from "../api/queryKeys";
 import type {
-  ChartSemanticCapabilities,
   ChartSemanticDescriptor,
   DatasetDetail,
 } from "../api/types";
@@ -112,26 +111,24 @@ function semantic(
   };
 }
 
-function capabilities(
-  descriptor: ChartSemanticDescriptor,
-): ChartSemanticCapabilities {
-  const isTrace = descriptor.shapeKind === "trace";
-  const isNumeric = descriptor.valueKind === "numeric";
-  const isComplex = descriptor.valueKind === "complex";
-  return {
-    numericCoordinate: descriptor.shapeKind === "scalar" && isNumeric,
-    filterable: descriptor.shapeKind === "scalar",
-    groupable: descriptor.shapeKind === "scalar",
-    traceSource: isTrace,
-    complexProjectable: isComplex,
-    plottableValue: isNumeric || isComplex || isTrace,
-  };
-}
-
 const numericSemantic = semantic();
 const traceSemantic = semantic({ shapeKind: "trace" });
-const numericCapabilities = capabilities(numericSemantic);
-const traceCapabilities = capabilities(traceSemantic);
+const numericCapabilities = {
+  numericCoordinate: true,
+  filterable: true,
+  groupable: true,
+  traceSource: false,
+  complexProjectable: false,
+  plottableValue: true,
+};
+const traceCapabilities = {
+  numericCoordinate: false,
+  filterable: false,
+  groupable: false,
+  traceSource: true,
+  complexProjectable: false,
+  plottableValue: true,
+};
 
 describe("DatasetPropertiesPanel", () => {
   beforeEach(() => {

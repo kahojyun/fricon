@@ -23,22 +23,23 @@ Current implemented user-facing behavior is still centered on:
 - local workspaces
 - dataset creation, write, list, read, tag, favorite, and delete flows
 - Arrow-compatible table payloads with schema inferred from the first row
+- durable dataset manifests with record IDs and resolved semantic
+  interpretation
 - Python API, CLI, server process, and desktop dataset explorer surfaces
 
 Use `docs/concepts.md`, `docs/dataset.md`, and
 `dev-docs/current-storage-notes.md` as the source of truth for current behavior.
 This roadmap includes future product direction and should not be used as proof
 that experiment, parameter, workflow, device, provenance, AI automation, or
-semantic-manifest behavior has already landed.
+later semantic scan/chart authoring behavior has already landed.
 
 The existing dataset semantics proposal is the bridge between current dataset
 behavior and the next product phase:
 
-- `dataset-semantic-architecture-proposal.md` defines the proposed direction:
-  explicit dataset semantics, durable manifests, resolved interpretation, and a
-  shaped feature sequence that keeps the foundation separate from later scan
-  and chart migration work. Treat it as proposed design guidance, not current
-  implementation fact.
+- `dataset-semantic-architecture-proposal.md` defines the broader direction.
+  The durable manifest and resolved interpretation foundation has landed; later
+  scan authoring, chart migration, and richer semantic workflows remain future
+  design guidance.
 - `parameter-management-design.md` defines proposed long-term parameter
   registry direction after dataset semantics and minimal run records exist.
   Treat it as future design guidance, not current implementation fact.

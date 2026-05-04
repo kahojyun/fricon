@@ -63,7 +63,7 @@ inference settings. New semantic datasets physically materialize the
 Fricon-owned `__ds_record_id: uint64` system column as the first Arrow column.
 Earlier transition snapshots that declare `__ds_record_id` before the Arrow
 chunks materialized that column, or manifests without required column semantic
-facets, are unsupported by the semantic reader in this PR.
+facets, are unsupported by the semantic reader.
 
 Datasets written with explicit logical scan indices store those indices in
 append-only `logical_index_chunk_<n>.arrow` sidecar files. Logical-index chunks
@@ -85,12 +85,12 @@ required column semantic facets, optional scan plans, and inference settings
 for new ingested datasets live in `dataset_manifest.json`. Resolved chart
 capabilities are derived interpretation/DTO fields, not durable manifest fields.
 
-Dataset archives store catalog metadata in `metadata.json`, Arrow payload chunks
-under `data/data_chunk_<n>.arrow`, logical-index chunks under
-`logical_index/logical_index_chunk_<n>.arrow` when present, and
-`dataset_manifest.json` as an optional root sidecar when the source dataset has
-one. Dataset readers require manifests; manifest-free payloads are not
-supported by the semantic read path in this PR.
+Dataset archives store catalog metadata in `metadata.json`, the required
+`dataset_manifest.json` root sidecar, Arrow payload chunks under
+`data/data_chunk_<n>.arrow`, and logical-index chunks under
+`logical_index/logical_index_chunk_<n>.arrow` when present. Dataset readers
+require manifests; manifest-free payloads are not supported by the semantic read
+path.
 
 ## Write Buffering
 

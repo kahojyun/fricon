@@ -9,9 +9,11 @@ The durable foundation decisions for `dataset_manifest.json`,
 minimal axis inference, and the interpretation boundary are accepted in
 `dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`.
 
-This is not current behavior. Do not implement or document behavior from this
-proposal without checking current code, `dev-docs/current-storage-notes.md`, and
-the relevant checklist in `dev-docs/maintenance-checklist.md`.
+Some foundation pieces are now current behavior, including durable manifests,
+record IDs, and resolved interpretation. Treat the remaining scan authoring,
+chart migration, and workflow sections as proposal material unless current code,
+`dev-docs/current-storage-notes.md`, and the relevant checklist confirm they
+have landed.
 
 This note revises the earlier append-only dataset idea for the actual Fricon
 codebase and assumes the product is still pre-adoption, so breaking internal

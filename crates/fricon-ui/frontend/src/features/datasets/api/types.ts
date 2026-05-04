@@ -1,5 +1,13 @@
 import type {
   ColumnInfo as WireColumnInfo,
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticRole,
+  ChartSemanticShapeKind,
+  ChartSemanticValueKind,
+  ChartSemantics,
   DatasetDeleteResult,
   DatasetOperationError,
   DatasetTagBatchResult,
@@ -33,86 +41,14 @@ export type DatasetDetail = Omit<
   createdAt: Date;
   trashedAt: Date | null;
   deletedAt: Date | null;
-  columns: DatasetColumnInfo[];
+  columns: WireColumnInfo[];
   chartSemantics: ChartSemantics | null;
 };
 
 export const DATASET_PAGE_SIZE = 200;
 
-export interface DatasetColumnInfo {
-  name: string;
-  label: string | null;
-  unit: string | null;
-  semantic: ChartSemanticDescriptor;
-  capabilities: ChartSemanticCapabilities;
-  isInferredAxis: boolean;
-  hiddenByDefault: boolean;
-  isChartAxisCandidate: boolean;
-}
-
-export type ChartDuplicatePolicy =
-  | "latest_by_record_id"
-  | "row_order_placeholder";
-export type ChartIndexRealization = "none" | "implicit" | "sidecar";
-export type ChartSemanticAxisKind = "logical_index" | "column";
-export type ChartSemanticValueKind =
-  | "numeric"
-  | "categorical"
-  | "boolean"
-  | "timestamp"
-  | "complex"
-  | "display";
-export type ChartSemanticShapeKind = "scalar" | "trace";
-export type ChartSemanticRole =
-  | "value"
-  | "logical_index"
-  | "system"
-  | "display";
-
-export interface ChartSemanticDescriptor {
-  valueKind: ChartSemanticValueKind;
-  shapeKind: ChartSemanticShapeKind;
-  role: ChartSemanticRole;
-}
-
-export interface ChartSemanticCapabilities {
-  numericCoordinate: boolean;
-  filterable: boolean;
-  groupable: boolean;
-  traceSource: boolean;
-  complexProjectable: boolean;
-  plottableValue: boolean;
-}
-
-export interface ChartSemanticColumn {
-  id: string;
-  name: string;
-  label: string | null;
-  semantic: ChartSemanticDescriptor;
-  capabilities: ChartSemanticCapabilities;
-  hiddenByDefault: boolean;
-}
-
-export interface ChartSemanticAxis {
-  id: string;
-  name: string;
-  label: string | null;
-  kind: ChartSemanticAxisKind;
-  semantic: ChartSemanticDescriptor;
-  capabilities: ChartSemanticCapabilities;
-  isInferredAxis: boolean;
-  physicalColumn: string | null;
-}
-
-export interface ChartSemantics {
-  duplicatePolicy: ChartDuplicatePolicy;
-  indexRealization: ChartIndexRealization;
-  axes: ChartSemanticAxis[];
-  valueColumns: ChartSemanticColumn[];
-  chartAxisCandidates: ChartSemanticAxis[];
-}
-
-export type ColumnInfo = DatasetColumnInfo;
+export type DatasetColumnInfo = WireColumnInfo;
+export type ColumnInfo = WireColumnInfo;
 
 export type {
   DatasetDeleteResult,
@@ -127,6 +63,14 @@ export type {
   UiImportConflict,
   UiFieldDiff,
   UiExportedMetadata,
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticRole,
+  ChartSemanticShapeKind,
+  ChartSemanticValueKind,
+  ChartSemantics,
 };
 
 export type DatasetViewMode = "active" | "trash";
@@ -153,20 +97,7 @@ export function normalizeDatasetDetail(
   const normalized = normalizeDatasetDates(value);
   return {
     ...normalized,
-    columns: value.columns.map(normalizeDatasetColumnInfo),
+    columns: value.columns,
     chartSemantics: value.chartSemantics ?? null,
-  };
-}
-
-function normalizeDatasetColumnInfo(value: WireColumnInfo): DatasetColumnInfo {
-  return {
-    name: value.name,
-    label: value.label,
-    unit: value.unit,
-    semantic: value.semantic,
-    capabilities: value.capabilities,
-    isInferredAxis: value.isInferredAxis,
-    hiddenByDefault: value.hiddenByDefault,
-    isChartAxisCandidate: value.isChartAxisCandidate,
   };
 }

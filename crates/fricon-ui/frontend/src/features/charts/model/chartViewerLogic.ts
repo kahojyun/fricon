@@ -112,6 +112,9 @@ function semanticAxisOptions(
   const semanticAxisById = new Map(
     chartSemantics.axes.map((axis) => [axis.id, axis]),
   );
+  const chartAxisCandidateIds = new Set(
+    chartSemantics.chartAxisCandidates.map((axis) => axis.id),
+  );
   const orderedAxes = [
     ...chartSemantics.chartAxisCandidates.map(
       (axis) => semanticAxisById.get(axis.id) ?? axis,
@@ -130,7 +133,7 @@ function semanticAxisOptions(
       semantic: axis.semantic,
       capabilities: axis.capabilities,
       hiddenByDefault: false,
-      isChartAxisCandidate: axis.kind === "column" && !axis.isInferredAxis,
+      isChartAxisCandidate: chartAxisCandidateIds.has(axis.id),
     }));
 }
 

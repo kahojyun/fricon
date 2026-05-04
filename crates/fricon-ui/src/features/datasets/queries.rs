@@ -145,7 +145,6 @@ fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
             semantic: column.semantic.into(),
             capabilities: column.capabilities.into(),
             is_inferred_axis: column.is_inferred_axis,
-            physical_column: Some(column.name.clone()),
         },
         ResolvedSemanticReference::LogicalIndex(axis) => ChartSemanticAxis {
             id: axis.id.clone(),
@@ -155,7 +154,6 @@ fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
             semantic: axis.semantic.into(),
             capabilities: axis.capabilities.into(),
             is_inferred_axis: axis.is_inferred_axis,
-            physical_column: None,
         },
     }
 }

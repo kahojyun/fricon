@@ -76,7 +76,6 @@ export type ChartSemanticAxis = {
 	semantic: ChartSemanticDescriptor,
 	capabilities: ChartSemanticCapabilities,
 	isInferredAxis: boolean,
-	physicalColumn: string | null,
 };
 
 export type ChartSemanticAxisKind = "logical_index" | "column";

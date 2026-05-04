@@ -21,22 +21,16 @@ export function makeSemanticDescriptor(
 }
 
 export function makeSemanticCapabilities(
-  semantic: ChartSemanticDescriptor,
+  overrides: Partial<ChartSemanticCapabilities> = {},
 ): ChartSemanticCapabilities {
-  const isSystem = semantic.role === "system";
-  const isDisplay = semantic.role === "display";
-  const isScalar = semantic.shapeKind === "scalar";
-  const isTrace = semantic.shapeKind === "trace";
-  const isNumeric = semantic.valueKind === "numeric";
-  const isComplex = semantic.valueKind === "complex";
-  const isValue = semantic.role === "value";
   return {
-    numericCoordinate: !isSystem && !isDisplay && isScalar && isNumeric,
-    filterable: !isSystem && !isDisplay && isScalar,
-    groupable: !isSystem && !isDisplay && isScalar,
-    traceSource: isTrace,
-    complexProjectable: isComplex,
-    plottableValue: isValue && (isNumeric || isComplex || isTrace),
+    numericCoordinate: true,
+    filterable: true,
+    groupable: true,
+    traceSource: false,
+    complexProjectable: false,
+    plottableValue: true,
+    ...overrides,
   };
 }
 
@@ -58,7 +52,7 @@ export function makeColumn(overrides: ColumnInput): ColumnInfo {
   return {
     name,
     semantic,
-    capabilities: rest.capabilities ?? makeSemanticCapabilities(semantic),
+    capabilities: rest.capabilities ?? makeSemanticCapabilities(),
     isInferredAxis: false,
     ...rest,
   };
@@ -93,14 +87,8 @@ export function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
         ...column.semantic,
         role: "logical_index",
       }),
-      capabilities: makeSemanticCapabilities(
-        makeSemanticDescriptor({
-          ...column.semantic,
-          role: "logical_index",
-        }),
-      ),
+      capabilities: makeSemanticCapabilities({ plottableValue: false }),
       isInferredAxis: true,
-      physicalColumn: column.name,
     }));
   return {
     duplicatePolicy:
@@ -117,7 +105,7 @@ export function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
         capabilities: column.capabilities,
         hiddenByDefault: column.hiddenByDefault ?? false,
       })),
-    chartAxisCandidates: axes,
+    chartAxisCandidates: [],
   };
 }
 

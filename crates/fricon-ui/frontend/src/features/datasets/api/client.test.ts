@@ -138,7 +138,6 @@ describe("dataset client", () => {
               semantic: numericAxisSemantic,
               capabilities: numericAxisCapabilities,
               isInferredAxis: false,
-              physicalColumn: null,
             },
           ],
           valueColumns: [
@@ -189,7 +188,6 @@ describe("dataset client", () => {
           semantic: numericAxisSemantic,
           capabilities: numericAxisCapabilities,
           isInferredAxis: false,
-          physicalColumn: null,
         },
       ],
       valueColumns: [

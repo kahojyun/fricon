@@ -51,8 +51,8 @@ vi.mock("@tanstack/react-virtual", () => ({
 
 const numericSemantic = makeSemanticDescriptor();
 const numericAxisSemantic = makeSemanticDescriptor({ role: "logical_index" });
-const numericCapabilities = makeSemanticCapabilities(numericSemantic);
-const numericAxisCapabilities = makeSemanticCapabilities(numericAxisSemantic);
+const numericCapabilities = makeSemanticCapabilities();
+const numericAxisCapabilities = makeSemanticCapabilities({ plottableValue: false });
 
 vi.mock("react-resizable-panels", () => ({
   Group: ({
@@ -134,7 +134,6 @@ describe("DatasetExplorerScreen integration", () => {
             semantic: numericAxisSemantic,
             capabilities: numericAxisCapabilities,
             isInferredAxis: true,
-            physicalColumn: "t",
           };
           return {
             id: 1,
@@ -156,7 +155,7 @@ describe("DatasetExplorerScreen integration", () => {
                 capabilities: numericAxisCapabilities,
                 isInferredAxis: true,
                 hiddenByDefault: false,
-                isChartAxisCandidate: true,
+                isChartAxisCandidate: false,
               },
               {
                 name: "signal",
@@ -183,7 +182,7 @@ describe("DatasetExplorerScreen integration", () => {
                   hiddenByDefault: false,
                 },
               ],
-              chartAxisCandidates: [tAxis],
+              chartAxisCandidates: [],
             },
           };
         }

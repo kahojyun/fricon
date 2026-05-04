@@ -230,7 +230,7 @@ fn visible_projection_from_manifest(
         .enumerate()
         .filter_map(|(index, field)| {
             let manifest_column = manifest.columns.get(field.name());
-            (!is_hidden_system_column(field.name(), manifest_column)).then_some(index)
+            (!is_hidden_system_column(manifest_column)).then_some(index)
         })
         .collect();
     let visible_schema = Arc::new(physical_schema.project(&visible_columns)?);

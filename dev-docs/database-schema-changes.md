@@ -29,9 +29,9 @@ Today, dataset catalog metadata such as name, description, favorite state,
 status timestamps, and tags is stored in SQLite and mapped into
 `DatasetRecord` / `DatasetMetadata`.
 
-Dataset payload facts live in Arrow chunk files under the dataset directory.
-Future semantic manifest files described by dataset semantic proposal docs are
-not current behavior.
+Dataset payload facts live under the dataset directory, not in SQLite. Current
+semantic dataset payloads combine Arrow chunk files with `dataset_manifest.json`;
+use `dev-docs/current-storage-notes.md` for the current payload metadata shape.
 
 Ordinary Diesel migrations are database compatibility changes. They do not
 require a `WORKSPACE_VERSION` decision unless they also change workspace

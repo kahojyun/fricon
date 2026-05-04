@@ -1,5 +1,11 @@
 import type {
   ColumnUniqueValue,
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticValueKind,
+  ChartSemantics,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
@@ -15,6 +21,12 @@ import type {
 } from "@/shared/lib/chartTypes";
 
 export type {
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticValueKind,
+  ChartSemantics,
   ColumnUniqueValue,
   DatasetStatus,
   DatasetWriteStatus,
@@ -30,64 +42,6 @@ export interface ColumnInfo {
   isInferredAxis: boolean;
   hiddenByDefault?: boolean;
   isChartAxisCandidate?: boolean;
-}
-
-export type ChartSemanticAxisKind = "logical_index" | "column";
-export type ChartSemanticValueKind =
-  | "numeric"
-  | "categorical"
-  | "boolean"
-  | "timestamp"
-  | "complex"
-  | "display";
-export type ChartSemanticShapeKind = "scalar" | "trace";
-export type ChartSemanticRole =
-  | "value"
-  | "logical_index"
-  | "system"
-  | "display";
-
-export interface ChartSemanticDescriptor {
-  valueKind: ChartSemanticValueKind;
-  shapeKind: ChartSemanticShapeKind;
-  role: ChartSemanticRole;
-}
-
-export interface ChartSemanticCapabilities {
-  numericCoordinate: boolean;
-  filterable: boolean;
-  groupable: boolean;
-  traceSource: boolean;
-  complexProjectable: boolean;
-  plottableValue: boolean;
-}
-
-export interface ChartSemanticColumn {
-  id: string;
-  name: string;
-  label: string | null;
-  semantic: ChartSemanticDescriptor;
-  capabilities: ChartSemanticCapabilities;
-  hiddenByDefault: boolean;
-}
-
-export interface ChartSemanticAxis {
-  id: string;
-  name: string;
-  label: string | null;
-  kind: ChartSemanticAxisKind;
-  semantic: ChartSemanticDescriptor;
-  capabilities: ChartSemanticCapabilities;
-  isInferredAxis: boolean;
-  physicalColumn: string | null;
-}
-
-export interface ChartSemantics {
-  duplicatePolicy: "latest_by_record_id" | "row_order_placeholder";
-  indexRealization: "none" | "implicit" | "sidecar";
-  axes: ChartSemanticAxis[];
-  valueColumns: ChartSemanticColumn[];
-  chartAxisCandidates: ChartSemanticAxis[];
 }
 
 export interface DatasetDetail {

@@ -247,7 +247,6 @@ pub(crate) struct ChartSemanticAxis {
     pub(crate) semantic: ChartSemanticDescriptor,
     pub(crate) capabilities: ChartSemanticCapabilities,
     pub(crate) is_inferred_axis: bool,
-    pub(crate) physical_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]

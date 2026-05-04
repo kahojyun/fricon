@@ -14,6 +14,7 @@ import {
   columnId,
   makeDatasetDetail,
   makeFilterTableData,
+  makeSemanticCapabilities,
   makeSemanticDescriptor,
 } from "../test-utils";
 import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
@@ -357,6 +358,12 @@ describe("ChartViewer", () => {
               {
                 name: "trace_signal",
                 semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  filterable: false,
+                  groupable: false,
+                  traceSource: true,
+                }),
                 isInferredAxis: false,
               },
             ],
@@ -541,6 +548,10 @@ describe("ChartViewer", () => {
               {
                 name: "c",
                 semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
                 isInferredAxis: false,
               },
             ],
@@ -702,6 +713,10 @@ describe("ChartViewer", () => {
               {
                 name: "sig",
                 semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
                 isInferredAxis: false,
               },
             ],
@@ -806,6 +821,10 @@ describe("ChartViewer", () => {
               {
                 name: "complex_impedance_ohm",
                 semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
                 isInferredAxis: false,
               },
             ],
