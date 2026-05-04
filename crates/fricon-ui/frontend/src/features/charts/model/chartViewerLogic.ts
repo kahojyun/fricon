@@ -1,4 +1,8 @@
-import type { ChartSemantics, DatasetDetail } from "../api/types";
+import type {
+  ChartSemanticKind,
+  ChartSemantics,
+  DatasetDetail,
+} from "../api/types";
 import type {
   ChartDataOptions,
   FilterTableData,
@@ -40,6 +44,7 @@ export interface ChartViewerSelectionState {
 export interface ChartColumnOption {
   name: string;
   label: string | null;
+  semanticKind: ChartSemanticKind;
   isComplex: boolean;
   isTrace: boolean;
   hiddenByDefault: boolean;
@@ -57,6 +62,18 @@ function stripSemanticPrefix(value: string) {
   return value.replace(/^column:/, "").replace(/^logicalIndex:/, "");
 }
 
+function semanticKindIsComplex(kind: ChartSemanticKind) {
+  return kind === "complex";
+}
+
+function semanticKindIsTrace(kind: ChartSemanticKind) {
+  return kind === "trace";
+}
+
+function semanticKindIsNumeric(kind: ChartSemanticKind) {
+  return kind === "numeric";
+}
+
 function semanticValueOptions(
   chartSemantics?: ChartSemantics | null,
 ): ChartColumnOption[] {
@@ -67,11 +84,12 @@ function semanticValueOptions(
   const values = chartSemantics.valueColumns.map((column) => ({
     name: column.id,
     label: column.label ?? column.name,
-    isComplex: column.isComplex,
-    isTrace: column.isTrace,
+    semanticKind: column.semanticKind,
+    isComplex: semanticKindIsComplex(column.semanticKind),
+    isTrace: semanticKindIsTrace(column.semanticKind),
     hiddenByDefault: column.hiddenByDefault,
     isChartAxisCandidate: false,
-    numeric: false,
+    numeric: semanticKindIsNumeric(column.semanticKind),
   }));
   const visibleValues = values.filter((column) => !column.hiddenByDefault);
   const hiddenValues = values.filter((column) => column.hiddenByDefault);
@@ -106,11 +124,12 @@ function semanticAxisOptions(
     .map((axis) => ({
       name: axis.id,
       label: axis.label ?? axis.name,
-      isComplex: false,
-      isTrace: false,
+      semanticKind: axis.semanticKind,
+      isComplex: semanticKindIsComplex(axis.semanticKind),
+      isTrace: semanticKindIsTrace(axis.semanticKind),
       hiddenByDefault: false,
       isChartAxisCandidate: axis.kind === "column" && !axis.isInferredAxis,
-      numeric: axis.numeric,
+      numeric: semanticKindIsNumeric(axis.semanticKind),
     }));
 }
 
@@ -150,25 +169,31 @@ export function deriveChartViewerState(
   chartSemantics?: ChartSemantics | null,
 ) {
   const indexColumns = semanticAxisOptions(chartSemantics);
-  const plottedIndexColumns = indexColumns.filter((column) => column.numeric);
+  const plottedIndexColumns = indexColumns.filter((column) =>
+    semanticKindIsNumeric(column.semanticKind),
+  );
   const roleIndexColumns = chartSemantics
     ? indexColumns.filter((column) => !column.isChartAxisCandidate)
     : indexColumns;
   const sweepRoleIndexColumns = roleIndexColumns.filter(
-    (column) => column.numeric,
+    (column) => semanticKindIsNumeric(column.semanticKind),
   );
   const valueColumns = semanticValueOptions(chartSemantics);
   const allColumns = [...valueColumns, ...indexColumns];
   const sweepQuantityOptions = valueColumns;
   const heatmapQuantityOptions = valueColumns;
   const complexPlaneQuantityOptions = valueColumns.filter(
-    (column) => column.isComplex,
+    (column) => semanticKindIsComplex(column.semanticKind),
   );
   const scalarXYColumnOptions = valueColumns.filter(
-    (column) => !column.isComplex && !column.isTrace,
+    (column) =>
+      !semanticKindIsComplex(column.semanticKind) &&
+      !semanticKindIsTrace(column.semanticKind),
   );
   const traceXYColumnOptions = valueColumns.filter(
-    (column) => !column.isComplex && column.isTrace,
+    (column) =>
+      !semanticKindIsComplex(column.semanticKind) &&
+      semanticKindIsTrace(column.semanticKind),
   );
 
   const availableViews = (() => {
@@ -241,7 +266,8 @@ export function deriveChartViewerState(
   const xyXColumn = allColumns.find(
     (column) => column.name === effectiveXYXName,
   );
-  const xyYOptions = xyXColumn?.isTrace
+  const xyYOptions =
+    xyXColumn && semanticKindIsTrace(xyXColumn.semanticKind)
     ? traceXYColumnOptions
     : scalarXYColumnOptions;
   const effectiveXYYName = pickSelection(
@@ -259,7 +285,8 @@ export function deriveChartViewerState(
     state.heatmapXName,
     heatmapXOptions.length - 1,
   );
-  const heatmapYSelectionOptions = heatmapQuantity?.isTrace
+  const heatmapYSelectionOptions =
+    heatmapQuantity && semanticKindIsTrace(heatmapQuantity.semanticKind)
     ? heatmapYOptions
     : heatmapYOptions.filter((column) => column.name !== effectiveHeatmapXName);
   const heatmapYDefaultIndex = Math.max(heatmapYSelectionOptions.length - 1, 0);
@@ -284,10 +311,16 @@ export function deriveChartViewerState(
   const xyUsesTraceSource =
     effectiveView === "xy" &&
     ((effectivePlotMode === "quantity_vs_sweep" &&
-      Boolean(sweepQuantity?.isTrace)) ||
+      Boolean(
+        sweepQuantity && semanticKindIsTrace(sweepQuantity.semanticKind),
+      )) ||
       (effectivePlotMode === "complex_plane" &&
-        Boolean(complexPlaneQuantity?.isTrace)) ||
-      (effectivePlotMode === "xy" && Boolean(xyXColumn?.isTrace)));
+        Boolean(
+          complexPlaneQuantity &&
+            semanticKindIsTrace(complexPlaneQuantity.semanticKind),
+        )) ||
+      (effectivePlotMode === "xy" &&
+        Boolean(xyXColumn && semanticKindIsTrace(xyXColumn.semanticKind))));
   const liveMonitorUsesForcedRoles =
     effectiveView === "xy" &&
     !xyUsesTraceSource &&
@@ -340,9 +373,15 @@ export function deriveChartViewerState(
     effectiveView === "heatmap" ? null : state.drawStyle;
 
   const complexControlsDisabled = (() => {
-    if (effectiveView === "heatmap") return !heatmapQuantity?.isComplex;
+    if (effectiveView === "heatmap") {
+      return !(
+        heatmapQuantity && semanticKindIsComplex(heatmapQuantity.semanticKind)
+      );
+    }
     if (effectiveView === "xy" && effectivePlotMode === "quantity_vs_sweep") {
-      return !sweepQuantity?.isComplex;
+      return !(
+        sweepQuantity && semanticKindIsComplex(sweepQuantity.semanticKind)
+      );
     }
     return true;
   })();
@@ -350,7 +389,10 @@ export function deriveChartViewerState(
   const excludeColumns = (() => {
     if (effectiveView === "heatmap") {
       const excludes: string[] = [];
-      if (heatmapQuantity?.isTrace) {
+      if (
+        heatmapQuantity &&
+        semanticKindIsTrace(heatmapQuantity.semanticKind)
+      ) {
         if (heatmapYColumn) excludes.push(heatmapYColumn.name);
       } else {
         if (heatmapXColumn) excludes.push(heatmapXColumn.name);
@@ -445,17 +487,22 @@ export function buildChartRequest(
     if (!derived.heatmapQuantity || !derived.heatmapYColumn) {
       return null;
     }
-    if (!derived.heatmapQuantity.isTrace && !derived.heatmapXColumn) {
+    if (
+      !semanticKindIsTrace(derived.heatmapQuantity.semanticKind) &&
+      !derived.heatmapXColumn
+    ) {
       return null;
     }
     return {
       view: "heatmap",
       quantity: derived.heatmapQuantity.name,
-      xColumn: derived.heatmapQuantity.isTrace
+      xColumn: semanticKindIsTrace(derived.heatmapQuantity.semanticKind)
         ? undefined
         : (derived.heatmapXColumn?.name ?? undefined),
       yColumn: derived.heatmapYColumn.name,
-      complexViewSingle: derived.heatmapQuantity.isComplex
+      complexViewSingle: semanticKindIsComplex(
+        derived.heatmapQuantity.semanticKind,
+      )
         ? selectedComplexViewSingle
         : undefined,
       indexFilters,
@@ -486,7 +533,7 @@ export function buildChartRequest(
       plotMode: "quantity_vs_sweep",
       drawStyle: derived.effectiveDrawStyle,
       quantity: derived.sweepQuantity.name,
-      complexViews: derived.sweepQuantity.isComplex
+      complexViews: semanticKindIsComplex(derived.sweepQuantity.semanticKind)
         ? selectedComplexView
         : undefined,
       indexFilters,

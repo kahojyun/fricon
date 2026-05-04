@@ -73,6 +73,7 @@ export type ChartSemanticAxis = {
 	name: string,
 	label: string | null,
 	kind: ChartSemanticAxisKind,
+	semanticKind: ChartSemanticKind,
 	numeric: boolean,
 	isInferredAxis: boolean,
 	physicalColumn: string | null,
@@ -84,10 +85,13 @@ export type ChartSemanticColumn = {
 	id: string,
 	name: string,
 	label: string | null,
+	semanticKind: ChartSemanticKind,
 	isComplex: boolean,
 	isTrace: boolean,
 	hiddenByDefault: boolean,
 };
+
+export type ChartSemanticKind = "numeric" | "categorical" | "boolean" | "timestamp" | "complex" | "trace" | "display";
 
 export type ChartSemantics = {
 	duplicatePolicy: ChartDuplicatePolicy,
@@ -101,6 +105,7 @@ export type ColumnInfo = {
 	name: string,
 	label: string | null,
 	unit: string | null,
+	semanticKind: ChartSemanticKind,
 	isComplex: boolean,
 	isTrace: boolean,
 	isInferredAxis: boolean,

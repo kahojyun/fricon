@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use fricon::{DatasetRecord, DatasetStatus};
+use fricon::{DatasetRecord, DatasetStatus, ResolvedSemanticKind};
 use serde::{Deserialize, Serialize};
 
 use crate::tauri_api::ApiErrorCode;
@@ -92,6 +92,7 @@ pub(crate) struct ColumnInfo {
     pub(crate) name: String,
     pub(crate) label: Option<String>,
     pub(crate) unit: Option<String>,
+    pub(crate) semantic_kind: ChartSemanticKind,
     pub(crate) is_complex: bool,
     pub(crate) is_trace: bool,
     pub(crate) is_inferred_axis: bool,
@@ -121,12 +122,39 @@ pub(crate) enum ChartSemanticAxisKind {
     Column,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartSemanticKind {
+    Numeric,
+    Categorical,
+    Boolean,
+    Timestamp,
+    Complex,
+    Trace,
+    Display,
+}
+
+impl From<ResolvedSemanticKind> for ChartSemanticKind {
+    fn from(value: ResolvedSemanticKind) -> Self {
+        match value {
+            ResolvedSemanticKind::Numeric => Self::Numeric,
+            ResolvedSemanticKind::Categorical => Self::Categorical,
+            ResolvedSemanticKind::Boolean => Self::Boolean,
+            ResolvedSemanticKind::Timestamp => Self::Timestamp,
+            ResolvedSemanticKind::Complex => Self::Complex,
+            ResolvedSemanticKind::Trace => Self::Trace,
+            ResolvedSemanticKind::Display => Self::Display,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChartSemanticColumn {
     pub(crate) id: String,
     pub(crate) name: String,
     pub(crate) label: Option<String>,
+    pub(crate) semantic_kind: ChartSemanticKind,
     pub(crate) is_complex: bool,
     pub(crate) is_trace: bool,
     pub(crate) hidden_by_default: bool,
@@ -139,6 +167,7 @@ pub(crate) struct ChartSemanticAxis {
     pub(crate) name: String,
     pub(crate) label: Option<String>,
     pub(crate) kind: ChartSemanticAxisKind,
+    pub(crate) semantic_kind: ChartSemanticKind,
     pub(crate) numeric: bool,
     pub(crate) is_inferred_axis: bool,
     pub(crate) physical_column: Option<String>,

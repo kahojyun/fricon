@@ -10,7 +10,6 @@ import {
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { describe, expect, it, vi } from "vitest";
-import type { DatasetDetail } from "../api/types";
 import {
   columnId,
   makeDatasetDetail,
@@ -66,7 +65,9 @@ function createQueryClient() {
   });
 }
 
-function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
+function makeDetail(
+  overrides: Parameters<typeof makeDatasetDetail>[0] = {},
+): ReturnType<typeof makeDatasetDetail> {
   return makeDatasetDetail(overrides);
 }
 

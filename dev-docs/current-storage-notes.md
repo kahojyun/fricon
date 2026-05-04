@@ -83,6 +83,10 @@ Dataset payload facts live in Arrow chunk files. Dataset semantic defaults,
 optional scan plans, and inference settings for new ingested datasets live
 in `dataset_manifest.json`.
 
+Resolved semantic kinds such as numeric, categorical, boolean, timestamp,
+complex, and trace are interpretation and UI DTO fields derived from manifest
+v1 dtypes and scan-axis values. They are not additional durable manifest fields.
+
 Dataset archives store catalog metadata in `metadata.json`, Arrow payload chunks
 under `data/data_chunk_<n>.arrow`, logical-index chunks under
 `logical_index/logical_index_chunk_<n>.arrow` when present, and

@@ -25,6 +25,7 @@ export type {
 export interface ColumnInfo {
   name: string;
   label?: string | null;
+  semanticKind: ChartSemanticKind;
   isComplex: boolean;
   isTrace: boolean;
   isInferredAxis: boolean;
@@ -33,11 +34,20 @@ export interface ColumnInfo {
 }
 
 export type ChartSemanticAxisKind = "logical_index" | "column";
+export type ChartSemanticKind =
+  | "numeric"
+  | "categorical"
+  | "boolean"
+  | "timestamp"
+  | "complex"
+  | "trace"
+  | "display";
 
 export interface ChartSemanticColumn {
   id: string;
   name: string;
   label: string | null;
+  semanticKind: ChartSemanticKind;
   isComplex: boolean;
   isTrace: boolean;
   hiddenByDefault: boolean;
@@ -48,6 +58,7 @@ export interface ChartSemanticAxis {
   name: string;
   label: string | null;
   kind: ChartSemanticAxisKind;
+  semanticKind: ChartSemanticKind;
   numeric: boolean;
   isInferredAxis: boolean;
   physicalColumn: string | null;

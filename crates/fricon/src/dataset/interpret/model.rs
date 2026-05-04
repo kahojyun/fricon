@@ -65,6 +65,7 @@ pub struct ResolvedColumn {
     pub physical_ordinal: PhysicalColumnOrdinal,
     pub visible_ordinal: Option<VisibleColumnOrdinal>,
     pub dtype: DatasetDType,
+    pub semantic_kind: ResolvedSemanticKind,
     pub meaning: ColumnMeaning,
     pub is_inferred_axis: bool,
     pub is_system: bool,
@@ -86,6 +87,7 @@ impl ResolvedColumn {
             physical_ordinal: self.physical_ordinal,
             visible_ordinal: self.visible_ordinal,
             dtype: self.dtype.clone(),
+            semantic_kind: self.semantic_kind,
             meaning: self.meaning,
             is_system: self.is_system,
             is_inferred_axis,
@@ -148,6 +150,14 @@ impl ResolvedSemanticReference {
     }
 
     #[must_use]
+    pub const fn semantic_kind(&self) -> ResolvedSemanticKind {
+        match self {
+            Self::PhysicalColumn(column) => column.semantic_kind,
+            Self::LogicalIndex(axis) => axis.semantic_kind,
+        }
+    }
+
+    #[must_use]
     pub const fn is_inferred_axis(&self) -> bool {
         match self {
             Self::PhysicalColumn(column) => column.is_inferred_axis,
@@ -167,6 +177,7 @@ pub struct ResolvedPhysicalColumnReference {
     pub physical_ordinal: PhysicalColumnOrdinal,
     pub visible_ordinal: Option<VisibleColumnOrdinal>,
     pub dtype: DatasetDType,
+    pub semantic_kind: ResolvedSemanticKind,
     pub meaning: ColumnMeaning,
     pub is_inferred_axis: bool,
     pub is_system: bool,
@@ -185,9 +196,38 @@ pub struct ResolvedLogicalIndexReference {
     pub name: String,
     pub axis_ordinal: usize,
     pub label: Option<String>,
+    pub semantic_kind: ResolvedSemanticKind,
     pub hidden_by_default: bool,
     pub numeric_axis: bool,
     pub is_inferred_axis: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolvedSemanticKind {
+    Numeric,
+    Categorical,
+    Boolean,
+    Timestamp,
+    Complex,
+    Trace,
+    Display,
+}
+
+impl ResolvedSemanticKind {
+    #[must_use]
+    pub const fn is_numeric(self) -> bool {
+        matches!(self, Self::Numeric)
+    }
+
+    #[must_use]
+    pub const fn is_complex(self) -> bool {
+        matches!(self, Self::Complex)
+    }
+
+    #[must_use]
+    pub const fn is_trace(self) -> bool {
+        matches!(self, Self::Trace)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -211,6 +251,7 @@ pub struct ResolvedScanAxis {
     pub name: String,
     pub label: Option<String>,
     pub mode: ResolvedScanAxisMode,
+    pub semantic_kind: ResolvedSemanticKind,
     pub numeric_axis: bool,
 }
 
@@ -222,6 +263,7 @@ impl ResolvedScanAxis {
             name: self.name.clone(),
             axis_ordinal: self.axis_ordinal,
             label: self.label.clone(),
+            semantic_kind: self.semantic_kind,
             hidden_by_default: false,
             numeric_axis: self.numeric_axis,
             is_inferred_axis: false,

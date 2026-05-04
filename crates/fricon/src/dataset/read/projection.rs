@@ -16,7 +16,7 @@ use indexmap::IndexMap;
 use crate::dataset::{
     interpret::{
         DatasetInterpretation, ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint,
-        ResolvedScanAxisMode, ResolvedSemanticReference, physical_column_id,
+        ResolvedScanAxisMode, ResolvedSemanticKind, ResolvedSemanticReference, physical_column_id,
     },
     read::{DatasetReader, SelectOptions},
     schema::{DatasetDataType, DatasetSchema, ScalarKind},
@@ -39,6 +39,7 @@ pub struct ProjectedSemanticAxis {
     pub id: String,
     pub column_name: String,
     pub label: String,
+    pub semantic_kind: ResolvedSemanticKind,
     pub numeric: bool,
 }
 
@@ -494,6 +495,7 @@ fn projected_axes(
                         id: column.id.clone(),
                         column_name,
                         label: column.label.clone().unwrap_or_else(|| column.name.clone()),
+                        semantic_kind: column.semantic_kind,
                         numeric: column.numeric_axis,
                     }
                 })
@@ -506,6 +508,7 @@ fn projected_axes(
                     id: axis.id.clone(),
                     column_name: axis.id.clone(),
                     label: axis.label.clone().unwrap_or_else(|| axis.name.clone()),
+                    semantic_kind: axis.semantic_kind,
                     numeric: axis.numeric_axis,
                 }),
         })
@@ -807,6 +810,7 @@ mod tests {
             physical_ordinal: PhysicalColumnOrdinal(0),
             visible_ordinal: Some(VisibleColumnOrdinal(0)),
             dtype: DatasetDType::Float64,
+            semantic_kind: ResolvedSemanticKind::Numeric,
             meaning,
             is_system: false,
             is_inferred_axis,
@@ -1003,6 +1007,10 @@ mod tests {
         let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1]);
 
         assert_eq!(
+            interpretation.scan_axes[0].semantic_kind,
+            ResolvedSemanticKind::Categorical
+        );
+        assert_eq!(
             projected_reference_columns(&interpretation.group_axes, &schema, |_| true),
             vec![0]
         );
@@ -1011,6 +1019,44 @@ mod tests {
                 axis.numeric_axis()
             }),
             Vec::<usize>::new()
+        );
+    }
+
+    #[test]
+    fn logical_axis_projection_preserves_numeric_boolean_and_implicit_kinds() {
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![
+            ScanAxis::static_values(
+                "gate",
+                vec![ScanAxisValue::Float(0.0), ScanAxisValue::Float(1.0)],
+            ),
+            ScanAxis::static_values(
+                "enabled",
+                vec![ScanAxisValue::Bool(false), ScanAxisValue::Bool(true)],
+            ),
+            ScanAxis::implicit_index("step", None),
+        ])));
+        let arrow_schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]);
+
+        let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1]);
+
+        assert_eq!(
+            interpretation
+                .scan_axes
+                .iter()
+                .map(|axis| axis.semantic_kind)
+                .collect::<Vec<_>>(),
+            vec![
+                ResolvedSemanticKind::Numeric,
+                ResolvedSemanticKind::Boolean,
+                ResolvedSemanticKind::Numeric,
+            ]
         );
     }
 

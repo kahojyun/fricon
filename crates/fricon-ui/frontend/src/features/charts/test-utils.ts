@@ -5,6 +5,12 @@ import type {
   FilterTableData,
 } from "./api/types";
 
+type ColumnInput = Partial<ColumnInfo> & { name: string };
+
+type DatasetDetailInput = Partial<Omit<DatasetDetail, "columns">> & {
+  columns?: ColumnInput[];
+};
+
 export function columnId(name: string) {
   return `column:${name}`;
 }
@@ -14,11 +20,15 @@ export function logicalIndexId(name: string) {
 }
 
 export function makeColumn(
-  overrides: Partial<ColumnInfo> & { name: string },
+  overrides: ColumnInput,
 ): ColumnInfo {
   const { name, ...rest } = overrides;
+  const semanticKind =
+    rest.semanticKind ??
+    (rest.isTrace ? "trace" : rest.isComplex ? "complex" : "numeric");
   return {
     name,
+    semanticKind,
     isComplex: false,
     isTrace: false,
     isInferredAxis: false,
@@ -27,16 +37,19 @@ export function makeColumn(
 }
 
 export function makeDatasetDetail(
-  input: Partial<DatasetDetail> | ColumnInfo[] = {},
+  input: DatasetDetailInput | ColumnInput[] = {},
 ): DatasetDetail {
   const overrides = Array.isArray(input) ? { columns: input } : input;
-  const columns = overrides.columns ?? [];
+  const columns = (overrides.columns ?? []).map(makeColumn);
   return {
     status: "Completed",
     payloadAvailable: true,
-    columns,
-    chartSemantics: makeInferredSemantics(columns),
     ...overrides,
+    columns,
+    chartSemantics:
+      overrides.chartSemantics === undefined
+        ? makeInferredSemantics(columns)
+        : overrides.chartSemantics,
   };
 }
 
@@ -48,7 +61,8 @@ export function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
       name: column.name,
       label: column.label ?? null,
       kind: "column" as const,
-      numeric: true,
+      semanticKind: column.semanticKind,
+      numeric: column.semanticKind === "numeric",
       isInferredAxis: true,
       physicalColumn: column.name,
     }));
@@ -63,6 +77,7 @@ export function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
         id: columnId(column.name),
         name: column.name,
         label: column.label ?? null,
+        semanticKind: column.semanticKind,
         isComplex: column.isComplex,
         isTrace: column.isTrace,
         hiddenByDefault: column.hiddenByDefault ?? false,

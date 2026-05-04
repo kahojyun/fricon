@@ -129,6 +129,7 @@ fn chart_semantic_column(reference: &ResolvedSemanticReference) -> Option<ChartS
         id: column.id.clone(),
         name: column.name.clone(),
         label: column.label.clone(),
+        semantic_kind: column.semantic_kind.into(),
         is_complex: column.is_complex,
         is_trace: column.is_trace,
         hidden_by_default: column.hidden_by_default,
@@ -142,6 +143,7 @@ fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
             name: column.name.clone(),
             label: column.label.clone(),
             kind: ChartSemanticAxisKind::Column,
+            semantic_kind: column.semantic_kind.into(),
             numeric: column.numeric_axis,
             is_inferred_axis: column.is_inferred_axis,
             physical_column: Some(column.name.clone()),
@@ -151,6 +153,7 @@ fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
             name: axis.name.clone(),
             label: axis.label.clone(),
             kind: ChartSemanticAxisKind::LogicalIndex,
+            semantic_kind: axis.semantic_kind.into(),
             numeric: axis.numeric_axis,
             is_inferred_axis: axis.is_inferred_axis,
             physical_column: None,
@@ -164,6 +167,7 @@ fn column_info_from_resolved_column(column: &ResolvedColumn) -> Option<ColumnInf
         name: column.name.clone(),
         label: column.label.clone(),
         unit: column.unit.clone(),
+        semantic_kind: column.semantic_kind.into(),
         is_complex: column.is_complex,
         is_trace: column.is_trace,
         is_inferred_axis: column.is_inferred_axis,
@@ -192,7 +196,9 @@ mod tests {
     use tempfile::TempDir;
 
     use super::{get_dataset_detail, validate_non_negative};
-    use crate::desktop_runtime::session::WorkspaceSession;
+    use crate::{
+        desktop_runtime::session::WorkspaceSession, features::datasets::types::ChartSemanticKind,
+    };
 
     #[test]
     fn validate_non_negative_rejects_negative_values() {
@@ -210,6 +216,7 @@ mod tests {
 
         assert_eq!(detail.columns.len(), 3);
         assert_eq!(detail.columns[0].name, "signal");
+        assert_eq!(detail.columns[0].semantic_kind, ChartSemanticKind::Numeric);
         assert_eq!(detail.columns[0].label.as_deref(), Some("Signal"));
         assert_eq!(detail.columns[0].unit.as_deref(), Some("V"));
         assert!(!detail.columns[0].is_inferred_axis);
@@ -223,10 +230,19 @@ mod tests {
             .expect("chart semantics should be exposed");
         assert_eq!(semantics.value_columns.len(), 3);
         assert_eq!(semantics.value_columns[0].id, "column:signal");
+        assert_eq!(
+            semantics.value_columns[0].semantic_kind,
+            ChartSemanticKind::Numeric
+        );
         assert_eq!(semantics.chart_axis_candidates.len(), 2);
         assert_eq!(semantics.chart_axis_candidates[0].id, "column:signal");
+        assert_eq!(
+            semantics.chart_axis_candidates[0].semantic_kind,
+            ChartSemanticKind::Numeric
+        );
         assert!(semantics.chart_axis_candidates[0].numeric);
         assert_eq!(detail.columns[1].name, "trace");
+        assert_eq!(detail.columns[1].semantic_kind, ChartSemanticKind::Trace);
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
         assert!(!detail.columns[1].is_inferred_axis);
@@ -235,8 +251,13 @@ mod tests {
         assert!(!detail.columns[1].hidden_by_default);
         assert!(detail.columns[1].is_chart_axis_candidate);
         assert_eq!(semantics.chart_axis_candidates[1].id, "column:trace");
+        assert_eq!(
+            semantics.chart_axis_candidates[1].semantic_kind,
+            ChartSemanticKind::Trace
+        );
         assert!(!semantics.chart_axis_candidates[1].numeric);
         assert_eq!(detail.columns[2].name, "complex");
+        assert_eq!(detail.columns[2].semantic_kind, ChartSemanticKind::Complex);
         assert_eq!(detail.columns[2].label, None);
         assert_eq!(detail.columns[2].unit, None);
         assert!(!detail.columns[2].is_inferred_axis);
@@ -264,6 +285,7 @@ mod tests {
 
         assert_eq!(detail.columns.len(), 3);
         assert_eq!(detail.columns[0].name, "run");
+        assert_eq!(detail.columns[0].semantic_kind, ChartSemanticKind::Numeric);
         assert_eq!(detail.columns[0].label, None);
         assert_eq!(detail.columns[0].unit, None);
         assert!(detail.columns[0].is_inferred_axis);
@@ -272,6 +294,7 @@ mod tests {
         assert!(!detail.columns[0].hidden_by_default);
         assert!(detail.columns[0].is_chart_axis_candidate);
         assert_eq!(detail.columns[1].name, "step");
+        assert_eq!(detail.columns[1].semantic_kind, ChartSemanticKind::Numeric);
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
         assert!(detail.columns[1].is_inferred_axis);
@@ -292,6 +315,7 @@ mod tests {
             vec!["column:run", "column:step"]
         );
         assert_eq!(detail.columns[2].name, "value");
+        assert_eq!(detail.columns[2].semantic_kind, ChartSemanticKind::Numeric);
         assert_eq!(detail.columns[2].label, None);
         assert_eq!(detail.columns[2].unit, None);
         assert!(!detail.columns[2].is_inferred_axis);

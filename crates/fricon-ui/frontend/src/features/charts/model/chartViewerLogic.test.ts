@@ -273,6 +273,7 @@ describe("chartViewerLogic", () => {
           name: "gate",
           label: "Gate",
           kind: "logical_index",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
@@ -282,6 +283,7 @@ describe("chartViewerLogic", () => {
           name: "bias",
           label: "Bias",
           kind: "logical_index",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
@@ -292,6 +294,7 @@ describe("chartViewerLogic", () => {
           id: "column:hiddenValue",
           name: "hiddenValue",
           label: "Hidden",
+          semanticKind: "numeric",
           isComplex: false,
           isTrace: false,
           hiddenByDefault: true,
@@ -300,6 +303,7 @@ describe("chartViewerLogic", () => {
           id: "column:signal",
           name: "signal",
           label: "Signal",
+          semanticKind: "numeric",
           isComplex: false,
           isTrace: false,
           hiddenByDefault: false,
@@ -311,6 +315,7 @@ describe("chartViewerLogic", () => {
           name: "physicalAxis",
           label: "Physical Axis",
           kind: "column",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: false,
           physicalColumn: "physicalAxis",
@@ -345,6 +350,7 @@ describe("chartViewerLogic", () => {
           name: "gate",
           label: "Gate",
           kind: "logical_index",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
@@ -354,6 +360,7 @@ describe("chartViewerLogic", () => {
           name: "bias",
           label: "Bias",
           kind: "logical_index",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
@@ -364,6 +371,7 @@ describe("chartViewerLogic", () => {
           id: "column:signal",
           name: "signal",
           label: "Signal",
+          semanticKind: "numeric",
           isComplex: false,
           isTrace: false,
           hiddenByDefault: false,
@@ -375,6 +383,7 @@ describe("chartViewerLogic", () => {
           name: "physicalAxis",
           label: "Physical Axis",
           kind: "column",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: false,
           physicalColumn: "physicalAxis",
@@ -409,6 +418,7 @@ describe("chartViewerLogic", () => {
             name: "gate",
             label: "Gate",
             kind: "logical_index",
+            semanticKind: "categorical",
             numeric: false,
             isInferredAxis: false,
             physicalColumn: null,
@@ -418,6 +428,7 @@ describe("chartViewerLogic", () => {
             name: "bias",
             label: "Bias",
             kind: "logical_index",
+            semanticKind: "numeric",
             numeric: true,
             isInferredAxis: false,
             physicalColumn: null,
@@ -428,6 +439,7 @@ describe("chartViewerLogic", () => {
             id: "column:signal",
             name: "signal",
             label: "Signal",
+            semanticKind: "numeric",
             isComplex: false,
             isTrace: false,
             hiddenByDefault: false,
@@ -449,6 +461,72 @@ describe("chartViewerLogic", () => {
     expect(derived.effectiveSweepIndexColumnName).toBe("logicalIndex:bias");
   });
 
+  it("uses semantic kind instead of compatibility booleans for eligibility", () => {
+    const derived = deriveChartViewerState(
+      makeState({
+        plotMode: "xy",
+        xyXName: "column:traceX",
+        xyYName: "column:traceY",
+      }),
+      {
+        duplicatePolicy: "latest_by_record_id",
+        indexRealization: "implicit",
+        axes: [
+          {
+            id: "logicalIndex:category",
+            name: "category",
+            label: "Category",
+            kind: "logical_index",
+            semanticKind: "categorical",
+            numeric: true,
+            isInferredAxis: false,
+            physicalColumn: null,
+          },
+          {
+            id: "logicalIndex:step",
+            name: "step",
+            label: "Step",
+            kind: "logical_index",
+            semanticKind: "numeric",
+            numeric: true,
+            isInferredAxis: false,
+            physicalColumn: null,
+          },
+        ],
+        valueColumns: [
+          {
+            id: "column:traceX",
+            name: "traceX",
+            label: "Trace X",
+            semanticKind: "trace",
+            isComplex: false,
+            isTrace: false,
+            hiddenByDefault: false,
+          },
+          {
+            id: "column:traceY",
+            name: "traceY",
+            label: "Trace Y",
+            semanticKind: "trace",
+            isComplex: false,
+            isTrace: false,
+            hiddenByDefault: false,
+          },
+        ],
+        chartAxisCandidates: [],
+      },
+    );
+
+    expect(derived.heatmapXOptions.map((column) => column.name)).toEqual([
+      "logicalIndex:step",
+    ]);
+    expect(derived.xyXOptions.map((column) => column.name)).toEqual([
+      "column:traceX",
+      "column:traceY",
+    ]);
+    expect(derived.xyUsesTraceSource).toBe(true);
+  });
+
   it("keeps inferred axis axes available for sweep/group roles", () => {
     const derived = deriveChartViewerState(makeState(), {
       duplicatePolicy: "row_order_placeholder",
@@ -459,6 +537,7 @@ describe("chartViewerLogic", () => {
           name: "run",
           label: null,
           kind: "column",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: true,
           physicalColumn: "run",
@@ -468,6 +547,7 @@ describe("chartViewerLogic", () => {
           name: "step",
           label: null,
           kind: "column",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: true,
           physicalColumn: "step",
@@ -478,6 +558,7 @@ describe("chartViewerLogic", () => {
           id: "column:signal",
           name: "signal",
           label: null,
+          semanticKind: "numeric",
           isComplex: false,
           isTrace: false,
           hiddenByDefault: false,
@@ -489,6 +570,7 @@ describe("chartViewerLogic", () => {
           name: "run",
           label: null,
           kind: "column",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: true,
           physicalColumn: "run",
@@ -498,6 +580,7 @@ describe("chartViewerLogic", () => {
           name: "step",
           label: null,
           kind: "column",
+          semanticKind: "numeric",
           numeric: true,
           isInferredAxis: false,
           physicalColumn: "step",
