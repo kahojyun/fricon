@@ -79,17 +79,17 @@ pub fn project_semantic_source(
     options: &SemanticProjectionOptions<'_>,
 ) -> Result<ProjectedSemanticSource> {
     let interpretation = dataset.interpret()?;
-    let source_schema = dataset.schema()?.clone();
+    let source_schema = dataset.arrow_schema().clone();
     let (start, end) = resolve_row_range(dataset, options.start, options.end);
     let selected_physical_columns = selected_physical_columns(
-        &source_schema,
+        source_schema.as_ref(),
         &interpretation,
         options.selected_columns,
         options.filters,
     );
     let selected_schema = selected_physical_columns.as_deref().map_or_else(
-        || project_all_schema(&source_schema),
-        |columns| project_schema(&source_schema, columns),
+        || project_all_schema(source_schema.as_ref()),
+        |columns| project_schema(source_schema.as_ref(), columns),
     )?;
     let batch = if matches!(selected_physical_columns.as_deref(), Some([])) {
         empty_row_count_batch(end.saturating_sub(start))?
@@ -155,7 +155,7 @@ fn project_selected_batch(
 }
 
 fn selected_physical_columns(
-    source_schema: &DatasetPhysicalSchema,
+    source_schema: &Schema,
     interpretation: &DatasetInterpretation,
     selected_columns: Option<&[usize]>,
     filters: &[(String, serde_json::Value)],
@@ -164,7 +164,7 @@ fn selected_physical_columns(
 
     let mut physical_columns = Vec::new();
     for &index in selected_columns {
-        if index < source_schema.columns().len() {
+        if index < source_schema.fields().len() {
             push_unique(&mut physical_columns, index);
         }
     }
@@ -172,7 +172,7 @@ fn selected_physical_columns(
         let Some(column_name) = source_column_name_for_semantic_id(interpretation, field) else {
             continue;
         };
-        if let Some((index, _, _)) = source_schema.columns().get_full(&column_name) {
+        if let Some((index, _)) = source_schema.column_with_name(&column_name) {
             push_unique(&mut physical_columns, index);
         }
     }
@@ -223,22 +223,22 @@ fn semantic_filter_mask(
     Ok(Some(mask))
 }
 
-fn project_all_schema(source_schema: &DatasetPhysicalSchema) -> Result<DatasetPhysicalSchema> {
-    let columns = (0..source_schema.columns().len()).collect::<Vec<_>>();
+fn project_all_schema(source_schema: &Schema) -> Result<DatasetPhysicalSchema> {
+    let columns = (0..source_schema.fields().len()).collect::<Vec<_>>();
     project_schema(source_schema, &columns)
 }
 
-fn project_schema(
-    source_schema: &DatasetPhysicalSchema,
-    columns: &[usize],
-) -> Result<DatasetPhysicalSchema> {
+fn project_schema(source_schema: &Schema, columns: &[usize]) -> Result<DatasetPhysicalSchema> {
     let mut projected = IndexMap::new();
     for &index in columns {
-        let (name, dtype) = source_schema
-            .columns()
-            .get_index(index)
+        let field = source_schema
+            .fields()
+            .get(index)
             .with_context(|| format!("Selected dataset column index out of bounds: {index}"))?;
-        projected.insert(alias_physical_column_name(name), *dtype);
+        projected.insert(
+            alias_physical_column_name(field.name()),
+            DatasetPhysicalType::try_from(field.data_type())?,
+        );
     }
     Ok(DatasetPhysicalSchema::new(projected))
 }
@@ -877,16 +877,10 @@ mod tests {
 
     #[test]
     fn selected_physical_columns_keep_requested_payloads_and_filter_axes() {
-        let source_schema = DatasetPhysicalSchema::new(IndexMap::from([
-            (
-                "quantity".to_string(),
-                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
-            ),
-            (
-                "axis".to_string(),
-                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
-            ),
-        ]));
+        let source_schema = Schema::new(vec![
+            Field::new("quantity", DataType::Float64, false),
+            Field::new("axis", DataType::Float64, false),
+        ]);
         let interpretation = empty_interpretation();
 
         let selected = selected_physical_columns(
@@ -929,10 +923,11 @@ mod tests {
 
     #[test]
     fn prefixed_physical_columns_keep_column_namespace() {
-        let source_schema = DatasetPhysicalSchema::new(IndexMap::from([(
-            "logicalIndex:gate".to_string(),
-            DatasetPhysicalType::Scalar(ScalarKind::Numeric),
-        )]));
+        let source_schema = Schema::new(vec![Field::new(
+            "logicalIndex:gate",
+            DataType::Float64,
+            false,
+        )]);
         let projected = project_schema(&source_schema, &[0]).expect("project schema");
 
         assert!(projected.columns().contains_key("column:logicalIndex:gate"));

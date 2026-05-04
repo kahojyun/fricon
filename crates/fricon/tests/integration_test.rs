@@ -269,7 +269,10 @@ async fn test_dataset_create_metadata_payload_finish_completes() -> anyhow::Resu
     let loaded_batches: Vec<RecordBatch> = reader.batches();
 
     // Verify loaded data matches original
-    assert_eq!(reader.schema()?, &test_schema);
+    assert_eq!(
+        reader.arrow_schema().as_ref(),
+        &test_schema.to_arrow_schema()
+    );
     assert_eq!(loaded_batches.len(), 1);
     let loaded_batch = &loaded_batches[0];
 

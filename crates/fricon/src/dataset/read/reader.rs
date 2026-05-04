@@ -22,7 +22,7 @@ use crate::dataset::{
         resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
-    schema::{DatasetError, DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind},
+    schema::DatasetError,
     semantics::{
         DatasetSemanticManifest, IndexRealization, ManifestError, RECORD_ID_COLUMN, ScanAxisMode,
         ScanAxisValue, is_hidden_system_column, read_manifest,
@@ -100,7 +100,6 @@ impl DatasetSource {
 
 pub struct DatasetReader {
     source: DatasetSource,
-    schema: Option<DatasetPhysicalSchema>,
     physical_arrow_schema: SchemaRef,
     arrow_schema: SchemaRef,
     visible_columns: Vec<usize>,
@@ -274,10 +273,8 @@ impl DatasetReader {
             .map_err(ManifestError::from)?;
         let (arrow_schema, visible_columns) =
             visible_projection_from_manifest(&physical_arrow_schema, &manifest)?;
-        let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::WriteSession(source),
-            schema,
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
@@ -296,22 +293,14 @@ impl DatasetReader {
             .map_err(ManifestError::from)?;
         let (arrow_schema, visible_columns) =
             visible_projection_from_manifest(&physical_arrow_schema, &manifest)?;
-        let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::File(reader),
-            schema,
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
             manifest,
             dataset_path: Some(path.to_owned()),
         })
-    }
-
-    pub fn schema(&self) -> Result<&DatasetPhysicalSchema, ReadError> {
-        self.schema
-            .as_ref()
-            .ok_or(ReadError::Dataset(DatasetError::IncompatibleType))
     }
 
     #[must_use]
@@ -502,7 +491,6 @@ impl DatasetReader {
     }
 
     fn infer_minimal_axis_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
-        let schema = self.schema()?;
         if self.source.num_rows() < 2 {
             Ok(None)
         } else {
@@ -515,16 +503,8 @@ impl DatasetReader {
             let sample =
                 concat_batches(&self.arrow_schema, &samples).expect("Should have same schema");
             let mut result = vec![];
-            for (index, (sample_array, column_type)) in sample
-                .columns()
-                .iter()
-                .zip(schema.columns().values())
-                .enumerate()
-            {
-                if !matches!(
-                    column_type,
-                    DatasetPhysicalType::Scalar(ScalarKind::Numeric)
-                ) {
+            for (index, sample_array) in sample.columns().iter().enumerate() {
+                if !sample_array.data_type().is_numeric() {
                     break;
                 }
                 result.push(index);
