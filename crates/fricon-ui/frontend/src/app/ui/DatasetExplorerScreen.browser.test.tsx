@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { columnId } from "@/features/charts/test-utils";
 import { encodeChartSnapshotBufferForTest } from "@/shared/test/chartWire";
 import { DatasetExplorerScreen } from "./DatasetExplorerScreen";
 
@@ -115,7 +116,16 @@ describe("DatasetExplorerScreen integration", () => {
           ];
         case "list_dataset_tags":
           return ["vision", "audio"];
-        case "dataset_detail":
+        case "dataset_detail": {
+          const tAxis = {
+            id: columnId("t"),
+            name: "t",
+            label: null,
+            kind: "column" as const,
+            numeric: true,
+            isInferredAxis: true,
+            physicalColumn: "t",
+          };
           return {
             id: 1,
             name: "Dataset Alpha",
@@ -130,18 +140,43 @@ describe("DatasetExplorerScreen integration", () => {
             columns: [
               {
                 name: "t",
+                label: null,
+                unit: null,
                 isComplex: false,
                 isTrace: false,
                 isInferredAxis: true,
+                hiddenByDefault: false,
+                isChartAxisCandidate: true,
               },
               {
                 name: "signal",
+                label: null,
+                unit: null,
                 isComplex: false,
                 isTrace: false,
                 isInferredAxis: false,
+                hiddenByDefault: false,
+                isChartAxisCandidate: false,
               },
             ],
+            chartSemantics: {
+              duplicatePolicy: "row_order_placeholder",
+              indexRealization: "none",
+              axes: [tAxis],
+              valueColumns: [
+                {
+                  id: columnId("signal"),
+                  name: "signal",
+                  label: null,
+                  isComplex: false,
+                  isTrace: false,
+                  hiddenByDefault: false,
+                },
+              ],
+              chartAxisCandidates: [tAxis],
+            },
           };
+        }
         case "get_filter_table_data":
           return {
             fields: [],
@@ -225,7 +260,7 @@ describe("DatasetExplorerScreen integration", () => {
               payload as {
                 options?: { excludeColumns?: string[] };
               } | null
-            )?.options?.excludeColumns?.[0] === "t",
+            )?.options?.excludeColumns?.[0] === columnId("t"),
         ),
       ).toBe(true);
     });
@@ -275,7 +310,7 @@ describe("DatasetExplorerScreen integration", () => {
                   sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.quantity === "signal" &&
+            )?.options?.quantity === columnId("signal") &&
             (
               payload as {
                 options?: {
@@ -285,7 +320,7 @@ describe("DatasetExplorerScreen integration", () => {
                   sweepIndexColumn?: string;
                 };
               } | null
-            )?.options?.sweepIndexColumn === "t",
+            )?.options?.sweepIndexColumn === columnId("t"),
         ),
       ).toBe(true);
     });

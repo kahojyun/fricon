@@ -210,7 +210,9 @@ fn apply_minimal_axis_inference(
         .filter(|column| column.meaning == ColumnMeaning::UserValue)
         .filter_map(|column| column.visible_ordinal)
         .collect();
-    interpretation.inferred_axis_columns = inferred_axis_columns.clone();
+    interpretation
+        .inferred_axis_columns
+        .clone_from(&inferred_axis_columns);
     interpretation.chart_axis_candidate_columns = interpretation
         .columns
         .iter()
