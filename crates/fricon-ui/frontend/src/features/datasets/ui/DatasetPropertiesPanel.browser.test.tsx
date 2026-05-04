@@ -11,10 +11,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { datasetKeys } from "../api/queryKeys";
-import type {
-  ChartSemanticDescriptor,
-  DatasetDetail,
-} from "../api/types";
+import type { ChartSemanticDescriptor, DatasetDetail } from "../api/types";
 import { DatasetPropertiesPanel } from "./DatasetPropertiesPanel";
 
 type UpdateDatasetInfoFn = (

@@ -52,7 +52,9 @@ vi.mock("@tanstack/react-virtual", () => ({
 const numericSemantic = makeSemanticDescriptor();
 const numericAxisSemantic = makeSemanticDescriptor({ role: "logical_index" });
 const numericCapabilities = makeSemanticCapabilities();
-const numericAxisCapabilities = makeSemanticCapabilities({ plottableValue: false });
+const numericAxisCapabilities = makeSemanticCapabilities({
+  plottableValue: false,
+});
 
 vi.mock("react-resizable-panels", () => ({
   Group: ({
