@@ -193,7 +193,9 @@ fn apply_minimal_axis_inference(
         {
             column.meaning = ColumnMeaning::InferredAxis;
             column.is_inferred_axis = true;
-            column.is_chart_axis_candidate = true;
+            column.is_chart_axis_candidate = false;
+            column.semantic = column.semantic.with_role(SemanticRole::LogicalIndex);
+            column.capabilities = ResolvedSemanticCapabilities::for_descriptor(column.semantic);
         }
     }
 
@@ -242,9 +244,6 @@ fn manifest_with_inferred_axis_role_projections(columns: &[ResolvedColumn]) -> R
     plotted_coordinates.extend(chart_axis_candidates.clone());
     let mut filter_axes = inferred_axes.clone();
     filter_axes.extend(chart_axis_candidates.clone());
-    let mut all_chart_axis_candidates = inferred_axes.clone();
-    all_chart_axis_candidates.extend(chart_axis_candidates);
-
     RoleProjections {
         semantic_references,
         value_references,
@@ -252,7 +251,7 @@ fn manifest_with_inferred_axis_role_projections(columns: &[ResolvedColumn]) -> R
         sweep_axes: inferred_axes.clone(),
         group_axes: inferred_axes,
         filter_axes,
-        chart_axis_candidates: all_chart_axis_candidates,
+        chart_axis_candidates,
     }
 }
 
@@ -830,7 +829,7 @@ mod tests {
         assert_eq!(interpretation.inferred_axis_columns, visible(&[0, 1]));
         assert_eq!(
             interpretation.chart_axis_candidate_columns,
-            visible(&[0, 1])
+            Vec::<VisibleColumnOrdinal>::new()
         );
         assert_eq!(
             interpretation
@@ -846,7 +845,7 @@ mod tests {
                 .iter()
                 .map(ResolvedSemanticReference::id)
                 .collect::<Vec<_>>(),
-            vec!["column:run", "column:step"]
+            Vec::<&str>::new()
         );
         assert!(
             interpretation
@@ -860,7 +859,17 @@ mod tests {
             ColumnMeaning::InferredAxis
         );
         assert!(interpretation.columns[1].is_inferred_axis);
-        assert!(interpretation.columns[1].is_chart_axis_candidate);
+        assert!(!interpretation.columns[1].is_chart_axis_candidate);
+        assert_eq!(
+            interpretation.columns[1].semantic,
+            ResolvedSemanticDescriptor::new(
+                SemanticValueKind::Numeric,
+                SemanticShapeKind::Scalar,
+                SemanticRole::LogicalIndex
+            )
+        );
+        assert!(interpretation.columns[1].capabilities.numeric_coordinate);
+        assert!(!interpretation.columns[1].capabilities.plottable_value);
         assert_eq!(interpretation.columns[3].meaning, ColumnMeaning::UserValue);
         assert!(!interpretation.columns[3].is_inferred_axis);
     }
@@ -1002,6 +1011,11 @@ mod tests {
             ColumnMeaning::InferredAxis
         );
         assert!(interpretation.columns[1].is_inferred_axis);
+        assert_eq!(
+            interpretation.columns[1].semantic.role,
+            SemanticRole::LogicalIndex
+        );
+        assert!(!interpretation.columns[1].capabilities.plottable_value);
         assert_eq!(
             interpretation
                 .group_axes

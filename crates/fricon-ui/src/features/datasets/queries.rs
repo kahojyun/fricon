@@ -194,7 +194,9 @@ mod tests {
     use super::{get_dataset_detail, validate_non_negative};
     use crate::{
         desktop_runtime::session::WorkspaceSession,
-        features::datasets::types::{ChartSemanticShapeKind, ChartSemanticValueKind},
+        features::datasets::types::{
+            ChartSemanticRole, ChartSemanticShapeKind, ChartSemanticValueKind,
+        },
     };
 
     #[test]
@@ -307,29 +309,42 @@ mod tests {
             detail.columns[0].semantic.value_kind,
             ChartSemanticValueKind::Numeric
         );
+        assert_eq!(
+            detail.columns[0].semantic.role,
+            ChartSemanticRole::LogicalIndex
+        );
         assert_eq!(detail.columns[0].label, None);
         assert_eq!(detail.columns[0].unit, None);
         assert!(detail.columns[0].is_inferred_axis);
+        assert!(detail.columns[0].capabilities.numeric_coordinate);
+        assert!(!detail.columns[0].capabilities.plottable_value);
         assert!(!detail.columns[0].capabilities.trace_source);
         assert!(!detail.columns[0].capabilities.complex_projectable);
         assert!(!detail.columns[0].hidden_by_default);
-        assert!(detail.columns[0].is_chart_axis_candidate);
+        assert!(!detail.columns[0].is_chart_axis_candidate);
         assert_eq!(detail.columns[1].name, "step");
         assert_eq!(
             detail.columns[1].semantic.value_kind,
             ChartSemanticValueKind::Numeric
         );
+        assert_eq!(
+            detail.columns[1].semantic.role,
+            ChartSemanticRole::LogicalIndex
+        );
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
         assert!(detail.columns[1].is_inferred_axis);
+        assert!(detail.columns[1].capabilities.numeric_coordinate);
+        assert!(!detail.columns[1].capabilities.plottable_value);
         assert!(!detail.columns[1].capabilities.trace_source);
         assert!(!detail.columns[1].capabilities.complex_projectable);
         assert!(!detail.columns[1].hidden_by_default);
-        assert!(detail.columns[1].is_chart_axis_candidate);
+        assert!(!detail.columns[1].is_chart_axis_candidate);
         let semantics = detail
             .chart_semantics
             .as_ref()
             .expect("inferred axis chart semantics should be exposed");
+        assert!(semantics.chart_axis_candidates.is_empty());
         assert_eq!(
             semantics
                 .axes
