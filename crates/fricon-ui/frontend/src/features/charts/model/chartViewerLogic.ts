@@ -45,6 +45,7 @@ export interface ChartColumnOption {
   name: string;
   label: string | null;
   semanticKind: ChartSemanticKind;
+  isComplex: boolean;
   hiddenByDefault: boolean;
   isChartAxisCandidate: boolean;
   numeric: boolean;
@@ -60,16 +61,16 @@ function stripSemanticPrefix(value: string) {
   return value.replace(/^column:/, "").replace(/^logicalIndex:/, "");
 }
 
-function semanticKindIsComplex(kind: ChartSemanticKind) {
-  return kind === "complex";
-}
-
 function semanticKindIsTrace(kind: ChartSemanticKind) {
   return kind === "trace";
 }
 
 function semanticKindIsNumeric(kind: ChartSemanticKind) {
   return kind === "numeric";
+}
+
+function columnIsComplexValued(column: Pick<ChartColumnOption, "isComplex">) {
+  return column.isComplex;
 }
 
 function semanticValueOptions(
@@ -83,6 +84,7 @@ function semanticValueOptions(
     name: column.id,
     label: column.label ?? column.name,
     semanticKind: column.semanticKind,
+    isComplex: column.isComplex,
     hiddenByDefault: column.hiddenByDefault,
     isChartAxisCandidate: false,
     numeric: semanticKindIsNumeric(column.semanticKind),
@@ -121,6 +123,7 @@ function semanticAxisOptions(
       name: axis.id,
       label: axis.label ?? axis.name,
       semanticKind: axis.semanticKind,
+      isComplex: false,
       hiddenByDefault: false,
       isChartAxisCandidate: axis.kind === "column" && !axis.isInferredAxis,
       numeric: semanticKindIsNumeric(axis.semanticKind),
@@ -177,16 +180,16 @@ export function deriveChartViewerState(
   const sweepQuantityOptions = valueColumns;
   const heatmapQuantityOptions = valueColumns;
   const complexPlaneQuantityOptions = valueColumns.filter(
-    (column) => semanticKindIsComplex(column.semanticKind),
+    (column) => columnIsComplexValued(column),
   );
   const scalarXYColumnOptions = valueColumns.filter(
     (column) =>
-      !semanticKindIsComplex(column.semanticKind) &&
+      !columnIsComplexValued(column) &&
       !semanticKindIsTrace(column.semanticKind),
   );
   const traceXYColumnOptions = valueColumns.filter(
     (column) =>
-      !semanticKindIsComplex(column.semanticKind) &&
+      !columnIsComplexValued(column) &&
       semanticKindIsTrace(column.semanticKind),
   );
 
@@ -368,14 +371,10 @@ export function deriveChartViewerState(
 
   const complexControlsDisabled = (() => {
     if (effectiveView === "heatmap") {
-      return !(
-        heatmapQuantity && semanticKindIsComplex(heatmapQuantity.semanticKind)
-      );
+      return !(heatmapQuantity && columnIsComplexValued(heatmapQuantity));
     }
     if (effectiveView === "xy" && effectivePlotMode === "quantity_vs_sweep") {
-      return !(
-        sweepQuantity && semanticKindIsComplex(sweepQuantity.semanticKind)
-      );
+      return !(sweepQuantity && columnIsComplexValued(sweepQuantity));
     }
     return true;
   })();
@@ -494,9 +493,7 @@ export function buildChartRequest(
         ? undefined
         : (derived.heatmapXColumn?.name ?? undefined),
       yColumn: derived.heatmapYColumn.name,
-      complexViewSingle: semanticKindIsComplex(
-        derived.heatmapQuantity.semanticKind,
-      )
+      complexViewSingle: columnIsComplexValued(derived.heatmapQuantity)
         ? selectedComplexViewSingle
         : undefined,
       indexFilters,
@@ -527,7 +524,7 @@ export function buildChartRequest(
       plotMode: "quantity_vs_sweep",
       drawStyle: derived.effectiveDrawStyle,
       quantity: derived.sweepQuantity.name,
-      complexViews: semanticKindIsComplex(derived.sweepQuantity.semanticKind)
+      complexViews: columnIsComplexValued(derived.sweepQuantity)
         ? selectedComplexView
         : undefined,
       indexFilters,

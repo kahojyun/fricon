@@ -527,6 +527,50 @@ describe("chartViewerLogic", () => {
     expect(derived.xyUsesTraceSource).toBe(true);
   });
 
+  it("keeps complex-valued traces eligible for complex projections", () => {
+    const columns = [
+      makeColumn({
+        name: "complexTrace",
+        semanticKind: "trace",
+        isComplex: true,
+      }),
+      makeColumn({ name: "numericTrace", semanticKind: "trace" }),
+    ];
+    const derived = deriveWithInferredSemantics(
+      columns,
+      makeState({ sweepQuantityName: columnId("complexTrace") }),
+    );
+
+    expect(derived.availablePlotModes.map((item) => item.value)).toContain(
+      "complex_plane",
+    );
+    expect(
+      derived.complexPlaneQuantityOptions.map((column) => column.name),
+    ).toEqual([columnId("complexTrace")]);
+    expect(derived.traceXYColumnOptions.map((column) => column.name)).toEqual([
+      columnId("numericTrace"),
+    ]);
+    expect(derived.complexControlsDisabled).toBe(false);
+
+    const request = buildChartRequest({
+      datasetDetail: makeDatasetDetail(columns),
+      filterTableData: makeFilterTableData(),
+      hasFilters: false,
+      filterRow: null,
+      selectedComplexView: ["real", "imag"],
+      selectedComplexViewSingle: "mag",
+      indexFilters: undefined,
+      derived,
+    });
+
+    expect(request).toMatchObject({
+      view: "xy",
+      plotMode: "quantity_vs_sweep",
+      quantity: columnId("complexTrace"),
+      complexViews: ["real", "imag"],
+    });
+  });
+
   it("keeps inferred axis axes available for sweep/group roles", () => {
     const derived = deriveChartViewerState(makeState(), {
       duplicatePolicy: "row_order_placeholder",

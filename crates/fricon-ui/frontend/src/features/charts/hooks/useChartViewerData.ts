@@ -29,7 +29,7 @@ function buildLiveChartRequest(
     return {
       view: "heatmap",
       quantity: derived.heatmapQuantity.name,
-      complexViewSingle: derived.heatmapQuantity.semanticKind === "complex"
+      complexViewSingle: derived.heatmapQuantity.isComplex
         ? selectedComplexViewSingle
         : undefined,
     };
@@ -58,7 +58,7 @@ function buildLiveChartRequest(
       plotMode: "quantity_vs_sweep",
       drawStyle: derived.effectiveDrawStyle,
       quantity: derived.sweepQuantity.name,
-      complexViews: derived.sweepQuantity.semanticKind === "complex"
+      complexViews: derived.sweepQuantity.isComplex
         ? selectedComplexView
         : undefined,
       tailCount,

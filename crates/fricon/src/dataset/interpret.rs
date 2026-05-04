@@ -13,7 +13,7 @@ pub use self::model::{
 };
 use crate::dataset::semantics::{
     DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault, IndexRealization,
-    ScanAxisMode, ScanAxisValue, SystemColumn,
+    ScanAxisMode, ScanAxisValue, SystemColumn, TraceValueDType,
 };
 
 pub(crate) fn resolve_from_manifest(
@@ -60,7 +60,7 @@ pub(crate) fn resolve_from_manifest(
                 is_chart_axis_candidate: column.chart_axis,
                 unit: column.unit.clone(),
                 label: column.label.clone(),
-                is_complex: semantic_kind.is_complex(),
+                is_complex: dtype_is_complex(&dtype),
                 is_trace: semantic_kind.is_trace(),
                 is_numeric_axis_candidate: semantic_kind.is_numeric(),
             }
@@ -389,6 +389,17 @@ fn semantic_kind_for_dtype(dtype: &DatasetDType) -> ResolvedSemanticKind {
     }
 }
 
+fn dtype_is_complex(dtype: &DatasetDType) -> bool {
+    matches!(
+        dtype,
+        DatasetDType::Complex128
+            | DatasetDType::Trace {
+                value: TraceValueDType::Complex128,
+                ..
+            }
+    )
+}
+
 fn semantic_kind_for_scan_axis_mode(mode: &ResolvedScanAxisMode) -> ResolvedSemanticKind {
     match mode {
         ResolvedScanAxisMode::ImplicitIndex => ResolvedSemanticKind::Numeric,
@@ -525,6 +536,14 @@ mod tests {
                     value: TraceValueDType::Float64,
                 }),
             ),
+            (
+                "complex_trace".to_string(),
+                ManifestColumn::new(DatasetDType::Trace {
+                    layout: TraceLayout::Simple,
+                    axis: TraceAxisDType::UInt64,
+                    value: TraceValueDType::Complex128,
+                }),
+            ),
         ]);
         let schema = Schema::new(vec![
             Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
@@ -551,9 +570,19 @@ mod tests {
                 .physical_data_type(),
                 false,
             ),
+            Field::new(
+                "complex_trace",
+                DatasetDType::Trace {
+                    layout: TraceLayout::Simple,
+                    axis: TraceAxisDType::UInt64,
+                    value: TraceValueDType::Complex128,
+                }
+                .physical_data_type(),
+                false,
+            ),
         ]);
 
-        let interpretation = resolve_from_manifest(&schema, &manifest, &[1, 2, 3, 4, 5, 6]);
+        let interpretation = resolve_from_manifest(&schema, &manifest, &[1, 2, 3, 4, 5, 6, 7]);
         let kinds = interpretation
             .columns
             .iter()
@@ -570,11 +599,14 @@ mod tests {
                 ResolvedSemanticKind::Timestamp,
                 ResolvedSemanticKind::Complex,
                 ResolvedSemanticKind::Trace,
+                ResolvedSemanticKind::Trace,
             ]
         );
         assert!(interpretation.columns[5].is_complex);
         assert!(!interpretation.columns[6].is_complex);
         assert!(interpretation.columns[6].is_trace);
+        assert!(interpretation.columns[7].is_complex);
+        assert!(interpretation.columns[7].is_trace);
     }
 
     #[test]
