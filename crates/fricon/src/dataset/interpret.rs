@@ -526,7 +526,7 @@ fn scan_axis_mode_is_numeric(mode: &ResolvedScanAxisMode) -> bool {
 mod tests {
     use std::{ops::Bound, sync::Arc};
 
-    use arrow_array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array};
+    use arrow_array::{Float64Array, RecordBatch, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
 
     use super::{
@@ -1191,8 +1191,8 @@ mod tests {
                     logical_index_schema(&scan_plan),
                     vec![
                         Arc::new(UInt64Array::from(vec![0, 1, 2])),
-                        Arc::new(Int64Array::from(vec![1, 0, 1])),
-                        Arc::new(Int64Array::from(vec![0, 1, 0])),
+                        Arc::new(UInt64Array::from(vec![1, 0, 1])),
+                        Arc::new(UInt64Array::from(vec![0, 1, 0])),
                     ],
                 )
                 .expect("sidecar batch"),
@@ -1315,7 +1315,7 @@ mod tests {
                     logical_index_schema(&scan_plan),
                     vec![
                         Arc::new(UInt64Array::from(vec![0, 2])),
-                        Arc::new(Int64Array::from(vec![0, 1])),
+                        Arc::new(UInt64Array::from(vec![0, 1])),
                     ],
                 )
                 .expect("sidecar batch"),

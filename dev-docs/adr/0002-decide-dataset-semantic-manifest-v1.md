@@ -115,7 +115,7 @@ meaning belongs in `dataset_manifest.json`, not in Arrow extension metadata.
 The intended physical mappings are:
 
 - `complex128` as `struct<real: float64, imag: float64>`
-- simple trace as `list<value>` with an implicit integer sample index axis
+- simple trace as `list<value>` with an implicit `uint64` sample index axis
 - fixed-step trace as `struct<x0: axis, step: axis, y: list<value>>`
 - variable-step trace as `struct<x: list<axis>, y: list<value>>`
 

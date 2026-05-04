@@ -8,9 +8,7 @@ use std::{
 };
 
 use arrow_arith::boolean::and;
-use arrow_array::{
-    ArrayRef, BooleanArray, Int64Array, RecordBatch, RecordBatchOptions, Scalar, UInt64Array,
-};
+use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar, UInt64Array};
 use arrow_ord::{cmp::eq, ord::make_comparator};
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -458,8 +456,8 @@ impl DatasetReader {
                 matched_record_ids.insert(record_id);
                 let indices = axis_columns
                     .iter()
-                    .map(|column| Self::logical_index_value(column, row))
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .map(|column| column.value(row))
+                    .collect::<Vec<_>>();
                 let coordinates = indices
                     .iter()
                     .zip(&scan_plan.axes)
@@ -489,10 +487,6 @@ impl DatasetReader {
         }
         points.sort_by_key(|point| point.record_id);
         Ok(points)
-    }
-
-    fn logical_index_value(column: &Int64Array, row: usize) -> Result<u64, DatasetError> {
-        u64::try_from(column.value(row)).map_err(|_| DatasetError::InvalidFilter)
     }
 
     pub fn record_ids(&self) -> Result<Vec<u64>, ReadError> {

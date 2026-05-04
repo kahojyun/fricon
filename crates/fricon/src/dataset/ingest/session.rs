@@ -156,7 +156,7 @@ impl WriteSessionHandle {
 mod tests {
     use std::sync::Arc;
 
-    use arrow_array::{Float64Array, Int64Array, RecordBatch, UInt64Array};
+    use arrow_array::{Float64Array, RecordBatch, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
     use tempfile::TempDir;
 
@@ -185,12 +185,12 @@ mod tests {
             .expect("batch")
     }
 
-    fn logical_batch(scan_plan: &ScanPlan, gate: Vec<i64>, bias: Vec<i64>) -> RecordBatch {
+    fn logical_batch(scan_plan: &ScanPlan, gate: Vec<u64>, bias: Vec<u64>) -> RecordBatch {
         RecordBatch::try_new(
             logical_index_values_schema(scan_plan),
             vec![
-                Arc::new(Int64Array::from(gate)),
-                Arc::new(Int64Array::from(bias)),
+                Arc::new(UInt64Array::from(gate)),
+                Arc::new(UInt64Array::from(bias)),
             ],
         )
         .expect("logical batch")
@@ -344,12 +344,12 @@ mod tests {
         let gate = stored
             .column(1)
             .as_any()
-            .downcast_ref::<Int64Array>()
+            .downcast_ref::<UInt64Array>()
             .expect("gate indices");
         let bias = stored
             .column(2)
             .as_any()
-            .downcast_ref::<Int64Array>()
+            .downcast_ref::<UInt64Array>()
             .expect("bias indices");
 
         assert_eq!(record_ids.values(), &[0, 1]);

@@ -751,7 +751,7 @@ fn try_trace_dtype(data_type: &DataType) -> Result<Option<TraceDType>, ManifestV
             let value = trace_value_dtype(value.data_type())?;
             Ok(Some(TraceDType {
                 layout: TraceLayout::Simple,
-                axis: TraceAxisDType::Int64,
+                axis: TraceAxisDType::UInt64,
                 value,
             }))
         }
@@ -1190,7 +1190,7 @@ mod tests {
                 "simple_trace".to_string(),
                 ManifestColumn::new(DatasetDType::trace(TraceDType {
                     layout: TraceLayout::Simple,
-                    axis: TraceAxisDType::Int64,
+                    axis: TraceAxisDType::UInt64,
                     value: TraceValueDType::Float64,
                 })),
             ),
@@ -1274,7 +1274,7 @@ mod tests {
             manifest.columns["simple_trace"].dtype,
             DatasetDType::trace(TraceDType {
                 layout: TraceLayout::Simple,
-                axis: TraceAxisDType::Int64,
+                axis: TraceAxisDType::UInt64,
                 value: TraceValueDType::Float64,
             })
         );

@@ -355,7 +355,7 @@ meaning in `dataset_manifest.json`.
 Recommended physical layouts:
 
 - `complex128`: `struct<real: float64, imag: float64>`
-- simple trace: `list<value>`, with an implicit integer sample index axis
+- simple trace: `list<value>`, with an implicit `uint64` sample index axis
 - fixed-step trace: `struct<x0: axis, step: axis, y: list<value>>`
 - variable-step trace: `struct<x: list<axis>, y: list<value>>`
 
@@ -522,7 +522,7 @@ index table. The sidecar schema should be compact:
 
 ```text
 __ds_record_id: uint64
-<axis_id>: int64
+<axis_id>: uint64
 ...
 ```
 

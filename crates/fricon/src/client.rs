@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use arrow_array::{Int64Array, RecordBatch};
+use arrow_array::{RecordBatch, UInt64Array};
 use arrow_ipc::writer::StreamWriter;
 use arrow_schema::{ArrowError, SchemaRef};
 use arrow_select::concat::concat_batches;
@@ -476,9 +476,8 @@ impl DatasetWriter {
             .axes
             .iter()
             .map(|axis| {
-                let value = i64::try_from(logical_indices[&axis.name])
-                    .map_err(|_| ClientError::DatasetOperationFailed)?;
-                Ok(Arc::new(Int64Array::from(vec![value; row_count])) as _)
+                let value = logical_indices[&axis.name];
+                Ok(Arc::new(UInt64Array::from(vec![value; row_count])) as _)
             })
             .collect::<Result<Vec<_>, ClientError>>()?;
         Ok(Some(RecordBatch::try_new(
