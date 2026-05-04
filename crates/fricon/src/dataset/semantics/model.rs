@@ -251,7 +251,13 @@ impl DatasetSemanticManifest {
         let Some(scan_plan) = &self.scan_plan else {
             return Ok(());
         };
-        scan_plan.validate()
+        scan_plan.validate()?;
+        if scan_plan.mixes_static_and_implicit_axes()
+            && self.realization.index_realization != IndexRealization::Sidecar
+        {
+            return Err(ManifestValidationError::MixedStaticAndUnknownScanAxes);
+        }
+        Ok(())
     }
 }
 
@@ -272,7 +278,6 @@ impl ScanPlan {
         }
 
         let mut seen = BTreeSet::new();
-        let mut static_count = 0;
         let mut implicit_count = 0;
         for axis in &self.axes {
             axis.validate()?;
@@ -282,7 +287,7 @@ impl ScanPlan {
                 });
             }
             match &axis.mode {
-                ScanAxisMode::Static { .. } => static_count += 1,
+                ScanAxisMode::Static { .. } => {}
                 ScanAxisMode::ImplicitIndex => implicit_count += 1,
             }
         }
@@ -290,10 +295,20 @@ impl ScanPlan {
         if implicit_count > 1 {
             return Err(ManifestValidationError::MultipleUnknownScanAxes);
         }
-        if implicit_count > 0 && static_count > 0 {
-            return Err(ManifestValidationError::MixedStaticAndUnknownScanAxes);
-        }
         Ok(())
+    }
+
+    #[must_use]
+    fn mixes_static_and_implicit_axes(&self) -> bool {
+        let has_static = self
+            .axes
+            .iter()
+            .any(|axis| matches!(axis.mode, ScanAxisMode::Static { .. }));
+        let has_implicit = self
+            .axes
+            .iter()
+            .any(|axis| matches!(axis.mode, ScanAxisMode::ImplicitIndex));
+        has_static && has_implicit
     }
 }
 
@@ -997,6 +1012,11 @@ mod tests {
             mixed.validate(),
             Err(ManifestValidationError::MixedStaticAndUnknownScanAxes)
         );
+        let mut mixed_sidecar = mixed.clone();
+        mixed_sidecar.realization.index_realization = IndexRealization::Sidecar;
+        mixed_sidecar
+            .validate()
+            .expect("mixed static and implicit axes are valid with sidecar indices");
 
         let duplicate = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
             ScanPlan::new(vec![

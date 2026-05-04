@@ -15,9 +15,8 @@ use indexmap::IndexMap;
 
 use crate::dataset::{
     interpret::{
-        DatasetInterpretation, InterpretationSource, ResolvedDuplicatePolicy,
-        ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ResolvedSemanticReference,
-        physical_column_id,
+        DatasetInterpretation, ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint,
+        ResolvedScanAxisMode, ResolvedSemanticReference, physical_column_id,
     },
     read::{DatasetReader, SelectOptions},
     schema::{DatasetDataType, DatasetSchema, ScalarKind},
@@ -139,7 +138,7 @@ fn project_selected_batch(
         row_indices = filter_row_indices(&row_indices, &mask);
     }
     let semantic_column_names = semantic_column_names(interpretation, &schema);
-    let roles = projected_roles(dataset, interpretation, &schema)?;
+    let roles = projected_roles(interpretation, &schema);
     let group_axes = projected_axes(&interpretation.group_axes, &batch);
     let filter_axes = projected_axes(&interpretation.filter_axes, &batch);
     Ok(ProjectedSemanticSource {
@@ -450,11 +449,10 @@ fn projected_column_name(
 }
 
 fn projected_roles(
-    dataset: &DatasetReader,
     interpretation: &DatasetInterpretation,
     schema: &DatasetSchema,
-) -> Result<ProjectedSemanticRoles> {
-    let mut roles = ProjectedSemanticRoles {
+) -> ProjectedSemanticRoles {
+    ProjectedSemanticRoles {
         sweep_columns: projected_reference_columns(
             &interpretation.sweep_axes,
             schema,
@@ -462,25 +460,7 @@ fn projected_roles(
         ),
         group_columns: projected_reference_columns(&interpretation.group_axes, schema, |_| true),
         filter_columns: projected_reference_columns(&interpretation.filter_axes, schema, |_| true),
-    };
-
-    if fallback_to_inferred_index_columns(interpretation) {
-        let full_schema = dataset.schema()?;
-        if let Some(indices) = dataset.try_index_columns()? {
-            let projected = map_full_index_columns(full_schema, schema, &indices);
-            if roles.sweep_columns.is_empty() {
-                roles.sweep_columns.clone_from(&projected);
-            }
-            if roles.group_columns.is_empty() {
-                roles.group_columns.clone_from(&projected);
-            }
-            if roles.filter_columns.is_empty() {
-                roles.filter_columns = projected;
-            }
-        }
     }
-
-    Ok(roles)
 }
 
 fn projected_reference_columns(
@@ -542,33 +522,6 @@ fn axis_field_column_name(batch: &RecordBatch, physical_name: &str) -> Option<St
         .field_with_name(&aliased_name)
         .ok()
         .map(|_| aliased_name)
-}
-
-fn fallback_to_inferred_index_columns(interpretation: &DatasetInterpretation) -> bool {
-    interpretation.source == InterpretationSource::CompatibilityInference
-        || interpretation.scan_axes.is_empty()
-}
-
-fn map_full_index_columns(
-    full_schema: &DatasetSchema,
-    selected_schema: &DatasetSchema,
-    indices: &[usize],
-) -> Vec<usize> {
-    indices
-        .iter()
-        .filter_map(|&index| {
-            let name = full_schema.columns().get_index(index)?.0;
-            selected_schema
-                .columns()
-                .get_full(name)
-                .or_else(|| {
-                    selected_schema
-                        .columns()
-                        .get_full(&alias_physical_column_name(name))
-                })
-                .map(|(selected_index, _, _)| selected_index)
-        })
-        .collect()
 }
 
 fn logical_points_by_record_id(
@@ -806,7 +759,7 @@ mod tests {
     use super::*;
     use crate::dataset::{
         interpret::{
-            ColumnMeaning, PhysicalColumnOrdinal, ResolvedIndexRealization,
+            ColumnMeaning, InterpretationSource, PhysicalColumnOrdinal, ResolvedIndexRealization,
             ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, VisibleColumnOrdinal,
         },
         semantics::DatasetDType,
@@ -966,10 +919,6 @@ mod tests {
         let projected = project_schema(&source_schema, &[0]).expect("project schema");
 
         assert!(projected.columns().contains_key("column:logicalIndex:gate"));
-        assert_eq!(
-            map_full_index_columns(&source_schema, &projected, &[0]),
-            vec![0]
-        );
     }
 
     #[test]
