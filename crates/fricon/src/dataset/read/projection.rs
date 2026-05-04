@@ -759,7 +759,7 @@ mod tests {
     use super::*;
     use crate::dataset::{
         interpret::{
-            ColumnMeaning, InterpretationSource, PhysicalColumnOrdinal, ResolvedIndexRealization,
+            ColumnMeaning, PhysicalColumnOrdinal, ResolvedIndexRealization,
             ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, VisibleColumnOrdinal,
         },
         semantics::DatasetDType,
@@ -773,7 +773,7 @@ mod tests {
         }
     }
 
-    fn empty_interpretation(source: InterpretationSource) -> DatasetInterpretation {
+    fn empty_interpretation() -> DatasetInterpretation {
         DatasetInterpretation {
             columns: Vec::new(),
             semantic_references: Vec::new(),
@@ -784,12 +784,11 @@ mod tests {
             filter_axes: Vec::new(),
             chart_axis_candidates: Vec::new(),
             value_columns: Vec::new(),
-            logical_index_columns: Vec::new(),
+            inferred_axis_columns: Vec::new(),
             chart_axis_candidate_columns: Vec::new(),
             duplicate_policy: ResolvedDuplicatePolicy::LatestByRecordId,
             index_realization: ResolvedIndexRealization::None,
             scan_axes: Vec::new(),
-            source,
         }
     }
 
@@ -869,7 +868,7 @@ mod tests {
                 DatasetDataType::Scalar(ScalarKind::Numeric),
             ),
         ]));
-        let interpretation = empty_interpretation(InterpretationSource::Manifest);
+        let interpretation = empty_interpretation();
 
         let selected = selected_physical_columns(
             &source_schema,
@@ -969,7 +968,7 @@ mod tests {
             ColumnMeaning::UserValue,
             false,
         );
-        let mut interpretation = empty_interpretation(InterpretationSource::Manifest);
+        let mut interpretation = empty_interpretation();
         interpretation.semantic_references = vec![logical_gate.clone(), chart_axis.clone()];
         interpretation.plotted_coordinates = vec![logical_gate.clone(), chart_axis.clone()];
         interpretation.sweep_axes = vec![logical_gate];
@@ -990,7 +989,7 @@ mod tests {
             DatasetDataType::Scalar(ScalarKind::Complex),
         )]));
         let logical_gate = logical_reference("logicalIndex:gate", "gate", false);
-        let mut interpretation = empty_interpretation(InterpretationSource::Manifest);
+        let mut interpretation = empty_interpretation();
         interpretation.semantic_references = vec![logical_gate.clone()];
         interpretation.group_axes = vec![logical_gate.clone()];
         interpretation.sweep_axes = vec![logical_gate];

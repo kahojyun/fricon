@@ -68,8 +68,6 @@ export type ChartDuplicatePolicy = "latest_by_record_id" | "row_order_placeholde
 
 export type ChartIndexRealization = "none" | "implicit" | "sidecar";
 
-export type ChartInterpretationSource = "manifest";
-
 export type ChartSemanticAxis = {
 	id: string,
 	name: string,
@@ -92,7 +90,6 @@ export type ChartSemanticColumn = {
 };
 
 export type ChartSemantics = {
-	source: ChartInterpretationSource,
 	duplicatePolicy: ChartDuplicatePolicy,
 	indexRealization: ChartIndexRealization,
 	axes: ChartSemanticAxis[],

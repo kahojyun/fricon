@@ -60,8 +60,9 @@ New datasets created through ingest also store `dataset_manifest.json` beside
 the chunk files. The manifest records v1 dataset semantic columns, realization
 defaults, optional scan plans, and inference settings. New semantic datasets
 physically materialize the Fricon-owned `__ds_record_id: uint64` system column
-as the first Arrow column. Earlier transition snapshots may contain manifests
-that declare `__ds_record_id` before the Arrow chunks materialized that column.
+as the first Arrow column. Earlier transition snapshots that declare
+`__ds_record_id` before the Arrow chunks materialized that column are
+unsupported by the semantic reader in this PR.
 
 Datasets written with explicit logical scan indices store those indices in
 append-only `logical_index_chunk_<n>.arrow` sidecar files. Logical-index chunks

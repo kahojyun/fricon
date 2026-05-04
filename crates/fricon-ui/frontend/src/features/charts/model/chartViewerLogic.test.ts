@@ -66,8 +66,8 @@ function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
       physicalColumn: column.name,
     }));
   return {
-    source: "manifest",
-    duplicatePolicy: axes.length > 0 ? "row_order_placeholder" : "latest_by_record_id",
+    duplicatePolicy:
+      axes.length > 0 ? "row_order_placeholder" : "latest_by_record_id",
     indexRealization: "none",
     axes,
     valueColumns: columns
@@ -88,7 +88,7 @@ function deriveWithInferredSemantics(
   columns: ColumnInfo[],
   state: ChartViewerSelectionState,
 ) {
-  return deriveChartViewerState(columns, state, makeInferredSemantics(columns));
+  return deriveChartViewerState(state, makeInferredSemantics(columns));
 }
 
 function makeFilterTableData(): FilterTableData {
@@ -103,7 +103,7 @@ function makeFilterTableData(): FilterTableData {
 }
 
 describe("chartViewerLogic", () => {
-  it("defaults trend ordering to the trailing index column", () => {
+  it("defaults trend ordering to the trailing inferred axis", () => {
     const columns = [
       makeColumn({ name: "idxA", isInferredAxis: true }),
       makeColumn({ name: "idxB", isInferredAxis: true }),
@@ -135,7 +135,7 @@ describe("chartViewerLogic", () => {
     expect(pointsDerived.effectiveSweepIndexColumnName).toBe("idxB");
   });
 
-  it("defaults scalar heatmap axes to the two trailing index columns", () => {
+  it("defaults scalar heatmap axes to the two trailing inferred axes", () => {
     const columns = [
       makeColumn({ name: "idxSlow", isInferredAxis: true }),
       makeColumn({ name: "idxMid", isInferredAxis: true }),
@@ -168,7 +168,7 @@ describe("chartViewerLogic", () => {
     ]);
   });
 
-  it("excludes explicit index roles from filter-table columns", () => {
+  it("excludes explicit semantic axis roles from filter-table columns", () => {
     const columns = [
       makeColumn({ name: "idxA", isInferredAxis: true }),
       makeColumn({ name: "idxB", isInferredAxis: true }),
@@ -310,69 +310,59 @@ describe("chartViewerLogic", () => {
   });
 
   it("uses resolved chart semantics for value and logical axis defaults", () => {
-    const columns = [
-      makeColumn({ name: "inferredGuess", isInferredAxis: true }),
-      makeColumn({ name: "hiddenValue" }),
-      makeColumn({ name: "signal" }),
-    ];
-    const derived = deriveChartViewerState(
-      columns,
-      makeState({ view: "heatmap" }),
-      {
-        source: "manifest",
-        duplicatePolicy: "latest_by_record_id",
-        indexRealization: "implicit",
-        axes: [
-          {
-            id: "logicalIndex:gate",
-            name: "gate",
-            label: "Gate",
-            kind: "logical_index",
-            numeric: true,
-            isInferredAxis: false,
-            physicalColumn: null,
-          },
-          {
-            id: "logicalIndex:bias",
-            name: "bias",
-            label: "Bias",
-            kind: "logical_index",
-            numeric: true,
-            isInferredAxis: false,
-            physicalColumn: null,
-          },
-        ],
-        valueColumns: [
-          {
-            id: "column:hiddenValue",
-            name: "hiddenValue",
-            label: "Hidden",
-            isComplex: false,
-            isTrace: false,
-            hiddenByDefault: true,
-          },
-          {
-            id: "column:signal",
-            name: "signal",
-            label: "Signal",
-            isComplex: false,
-            isTrace: false,
-            hiddenByDefault: false,
-          },
-        ],
-        chartAxisCandidates: [
-          {
-            id: "column:physicalAxis",
-            name: "physicalAxis",
-            label: "Physical Axis",
-            kind: "column",
-            numeric: true,
-            isInferredAxis: false,
-            physicalColumn: "physicalAxis",
-          },
-        ],
-      },
-    );
+    const derived = deriveChartViewerState(makeState({ view: "heatmap" }), {
+      duplicatePolicy: "latest_by_record_id",
+      indexRealization: "implicit",
+      axes: [
+        {
+          id: "logicalIndex:gate",
+          name: "gate",
+          label: "Gate",
+          kind: "logical_index",
+          numeric: true,
+          isInferredAxis: false,
+          physicalColumn: null,
+        },
+        {
+          id: "logicalIndex:bias",
+          name: "bias",
+          label: "Bias",
+          kind: "logical_index",
+          numeric: true,
+          isInferredAxis: false,
+          physicalColumn: null,
+        },
+      ],
+      valueColumns: [
+        {
+          id: "column:hiddenValue",
+          name: "hiddenValue",
+          label: "Hidden",
+          isComplex: false,
+          isTrace: false,
+          hiddenByDefault: true,
+        },
+        {
+          id: "column:signal",
+          name: "signal",
+          label: "Signal",
+          isComplex: false,
+          isTrace: false,
+          hiddenByDefault: false,
+        },
+      ],
+      chartAxisCandidates: [
+        {
+          id: "column:physicalAxis",
+          name: "physicalAxis",
+          label: "Physical Axis",
+          kind: "column",
+          numeric: true,
+          isInferredAxis: false,
+          physicalColumn: "physicalAxis",
+        },
+      ],
+    });
 
     expect(derived.effectiveHeatmapQuantityName).toBe("column:signal");
     expect(derived.heatmapQuantityOptions.map((column) => column.name)).toEqual(
@@ -392,12 +382,7 @@ describe("chartViewerLogic", () => {
   });
 
   it("excludes physical chart-axis candidates from sweep/group roles", () => {
-    const columns = [
-      makeColumn({ name: "physicalAxis" }),
-      makeColumn({ name: "signal" }),
-    ];
-    const derived = deriveChartViewerState(columns, makeState(), {
-      source: "manifest",
+    const derived = deriveChartViewerState(makeState(), {
       duplicatePolicy: "latest_by_record_id",
       indexRealization: "implicit",
       axes: [
@@ -457,17 +442,11 @@ describe("chartViewerLogic", () => {
   });
 
   it("keeps categorical logical axes available for grouping roles", () => {
-    const columns = [
-      makeColumn({ name: "gate" }),
-      makeColumn({ name: "signal" }),
-    ];
     const derived = deriveChartViewerState(
-      columns,
       makeState({
         traceGroupIndexColumnNames: ["logicalIndex:gate"],
       }),
       {
-        source: "manifest",
         duplicatePolicy: "latest_by_record_id",
         indexRealization: "implicit",
         axes: [
@@ -517,13 +496,7 @@ describe("chartViewerLogic", () => {
   });
 
   it("keeps inferred axis axes available for sweep/group roles", () => {
-    const columns = [
-      makeColumn({ name: "run", isInferredAxis: true }),
-      makeColumn({ name: "step", isInferredAxis: true }),
-      makeColumn({ name: "signal" }),
-    ];
-    const derived = deriveChartViewerState(columns, makeState(), {
-      source: "manifest",
+    const derived = deriveChartViewerState(makeState(), {
       duplicatePolicy: "row_order_placeholder",
       indexRealization: "none",
       axes: [

@@ -21,7 +21,7 @@ use crate::dataset::{
         resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
-    schema::{DatasetDataType, DatasetError, DatasetSchema},
+    schema::{DatasetDataType, DatasetError, DatasetSchema, ScalarKind},
     semantics::{
         DatasetSemanticManifest, IndexRealization, ManifestError, RECORD_ID_COLUMN, ScanAxisMode,
         ScanAxisValue, is_hidden_system_column, read_manifest_optional,
@@ -255,17 +255,15 @@ fn project_batch(
 impl DatasetReader {
     pub(crate) fn from_handle(
         source: WriteSessionHandle,
-        manifest: Option<DatasetSemanticManifest>,
+        manifest: DatasetSemanticManifest,
         dataset_path: Option<PathBuf>,
     ) -> Result<Self, ReadError> {
         let physical_arrow_schema = source.schema();
-        if let Some(manifest) = manifest.as_ref() {
-            manifest
-                .validate_against_arrow_schema(physical_arrow_schema.as_ref())
-                .map_err(ManifestError::from)?;
-        }
+        manifest
+            .validate_against_arrow_schema(physical_arrow_schema.as_ref())
+            .map_err(ManifestError::from)?;
         let (arrow_schema, visible_columns) =
-            visible_projection_from_manifest(&physical_arrow_schema, manifest.as_ref())?;
+            visible_projection_from_manifest(&physical_arrow_schema, Some(&manifest))?;
         let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::WriteSession(source),
@@ -273,7 +271,7 @@ impl DatasetReader {
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
-            manifest,
+            manifest: Some(manifest),
             dataset_path,
         })
     }
@@ -520,12 +518,14 @@ impl DatasetReader {
                 .zip(schema.columns().values())
                 .enumerate()
             {
-                if !matches!(column_type, DatasetDataType::Scalar(_)) {
+                if !matches!(column_type, DatasetDataType::Scalar(ScalarKind::Numeric)) {
                     break;
                 }
                 result.push(index);
-                let cmp = make_comparator(sample_array, sample_array, SortOptions::default())
-                    .expect("Should be self comparable");
+                let Ok(cmp) = make_comparator(sample_array, sample_array, SortOptions::default())
+                else {
+                    break;
+                };
                 if cmp(0, 1) != Ordering::Equal {
                     break;
                 }

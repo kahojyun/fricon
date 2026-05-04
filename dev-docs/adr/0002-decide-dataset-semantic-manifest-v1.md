@@ -166,6 +166,10 @@ Chart and UI behavior may be preserved temporarily through adapters, but the
 long-term contract is resolved interpretation rather than legacy index-column
 inference.
 
+The temporary `row_order_placeholder` duplicate-policy value belongs to resolved
+interpretation for minimal inferred physical axes only. It is not a manifest v1
+duplicate policy; manifest defaults remain `latest_by_record_id`.
+
 The manifest becomes a compatibility surface. Future changes to required
 manifest fields, system-field semantics, payload schema rules, archive entries,
 workspace layout, or IPC creation metadata must use the relevant maintenance

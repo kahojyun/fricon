@@ -54,10 +54,7 @@ export interface ChartSemanticAxis {
 }
 
 export interface ChartSemantics {
-  source: "manifest";
-  duplicatePolicy:
-    | "latest_by_record_id"
-    | "row_order_placeholder";
+  duplicatePolicy: "latest_by_record_id" | "row_order_placeholder";
   indexRealization: "none" | "implicit" | "sidecar";
   axes: ChartSemanticAxis[];
   valueColumns: ChartSemanticColumn[];

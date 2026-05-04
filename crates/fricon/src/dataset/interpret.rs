@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use arrow_schema::Schema;
 
 pub use self::model::{
-    ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
-    ResolvedColumn, ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
+    ColumnMeaning, DatasetInterpretation, PhysicalColumnOrdinal, ResolvedColumn,
+    ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
     ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedScanAxis,
     ResolvedScanAxisMode, ResolvedSemanticReference, VisibleColumnOrdinal, logical_index_id,
     physical_column_id,
@@ -88,7 +88,7 @@ pub(crate) fn resolve_from_manifest(
         filter_axes: role_projections.filter_axes,
         chart_axis_candidates: role_projections.chart_axis_candidates,
         value_columns,
-        logical_index_columns: Vec::new(),
+        inferred_axis_columns: Vec::new(),
         chart_axis_candidate_columns,
         duplicate_policy: match manifest.realization.duplicate_resolution_default {
             DuplicateResolutionDefault::LatestByRecordId => {
@@ -101,7 +101,6 @@ pub(crate) fn resolve_from_manifest(
             IndexRealization::Sidecar => ResolvedIndexRealization::Sidecar,
         },
         scan_axes,
-        source: InterpretationSource::Manifest,
     }
 }
 
@@ -211,7 +210,7 @@ fn apply_minimal_axis_inference(
         .filter(|column| column.meaning == ColumnMeaning::UserValue)
         .filter_map(|column| column.visible_ordinal)
         .collect();
-    interpretation.logical_index_columns = inferred_axis_columns.clone();
+    interpretation.inferred_axis_columns = inferred_axis_columns.clone();
     interpretation.chart_axis_candidate_columns = interpretation
         .columns
         .iter()
@@ -409,9 +408,9 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
 
     use super::{
-        ColumnMeaning, InterpretationSource, PhysicalColumnOrdinal, ResolvedDuplicatePolicy,
-        ResolvedIndexRealization, ResolvedLogicalIndexPoint, ResolvedScanAxisMode,
-        ResolvedSemanticReference, VisibleColumnOrdinal, resolve_from_manifest,
+        ColumnMeaning, PhysicalColumnOrdinal, ResolvedDuplicatePolicy, ResolvedIndexRealization,
+        ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ResolvedSemanticReference,
+        VisibleColumnOrdinal, resolve_from_manifest,
         resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     };
     use crate::dataset::{
@@ -442,14 +441,13 @@ mod tests {
 
         let interpretation = resolve_from_manifest(&schema, &manifest, &[1]);
 
-        assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
             interpretation.duplicate_policy,
             ResolvedDuplicatePolicy::LatestByRecordId
         );
         assert_eq!(interpretation.value_columns, visible(&[0]));
         assert_eq!(
-            interpretation.logical_index_columns,
+            interpretation.inferred_axis_columns,
             Vec::<VisibleColumnOrdinal>::new()
         );
         assert_eq!(
@@ -689,12 +687,11 @@ mod tests {
             Some(vec![0, 1]),
         );
 
-        assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
             interpretation.duplicate_policy,
             ResolvedDuplicatePolicy::RowOrderPlaceholder
         );
-        assert_eq!(interpretation.logical_index_columns, visible(&[0, 1]));
+        assert_eq!(interpretation.inferred_axis_columns, visible(&[0, 1]));
         assert_eq!(
             interpretation.chart_axis_candidate_columns,
             visible(&[0, 1])
@@ -797,7 +794,7 @@ mod tests {
             resolve_from_manifest_with_minimal_axis_inference(&schema, &manifest, &[1, 2], None);
 
         assert_eq!(
-            interpretation.logical_index_columns,
+            interpretation.inferred_axis_columns,
             Vec::<VisibleColumnOrdinal>::new()
         );
         assert_eq!(
@@ -857,7 +854,6 @@ mod tests {
         assert_eq!(reader.batches()[0].num_columns(), 2);
         let interpretation = reader.interpret().expect("interpretation");
 
-        assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
             interpretation.duplicate_policy,
             ResolvedDuplicatePolicy::RowOrderPlaceholder
@@ -866,7 +862,7 @@ mod tests {
             interpretation.columns[0].meaning,
             ColumnMeaning::SystemRecordId
         );
-        assert_eq!(interpretation.logical_index_columns, visible(&[0]));
+        assert_eq!(interpretation.inferred_axis_columns, visible(&[0]));
         assert_eq!(interpretation.value_columns, visible(&[1]));
         assert_eq!(
             interpretation.columns[1].physical_ordinal,
@@ -952,7 +948,7 @@ mod tests {
             ResolvedDuplicatePolicy::LatestByRecordId
         );
         assert_eq!(
-            interpretation.logical_index_columns,
+            interpretation.inferred_axis_columns,
             Vec::<VisibleColumnOrdinal>::new()
         );
         assert_eq!(interpretation.value_columns, visible(&[0, 1]));
@@ -1279,12 +1275,10 @@ mod tests {
             .expect("write batch");
         let handle = registry.get(7).expect("active handle");
 
-        let reader =
-            DatasetReader::from_handle(handle, Some(manifest), Some(dir.path().to_owned()))
-                .expect("reader");
+        let reader = DatasetReader::from_handle(handle, manifest, Some(dir.path().to_owned()))
+            .expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
-        assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
             interpretation.columns[0].meaning,
             ColumnMeaning::SystemRecordId
@@ -1324,7 +1318,7 @@ mod tests {
     }
 
     #[test]
-    fn reader_interpretation_supports_manifest_dtypes_outside_legacy_schema() {
+    fn reader_interpretation_supports_manifest_dtypes_outside_dataset_schema() {
         let dir = tempfile::tempdir().expect("temp dir");
         let schema = Arc::new(Schema::new(vec![
             Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
@@ -1356,7 +1350,6 @@ mod tests {
         let reader = DatasetReader::open_dir(dir.path()).expect("reader");
         let interpretation = reader.interpret().expect("interpretation");
 
-        assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(interpretation.value_columns, visible(&[0]));
         assert_eq!(interpretation.columns[1].dtype, DatasetDType::Utf8);
         assert_eq!(interpretation.columns[1].meaning, ColumnMeaning::UserValue);
@@ -1402,7 +1395,7 @@ mod tests {
     #[test]
     fn reader_interpretation_rejects_missing_manifest() {
         let dir = tempfile::tempdir().expect("temp dir");
-        write_legacy_numeric_dataset(dir.path(), vec![1.0, 1.0], vec![0.0, 1.0]);
+        write_manifest_free_numeric_dataset(dir.path(), vec![1.0, 1.0], vec![0.0, 1.0]);
 
         let Err(error) = DatasetReader::open_dir(dir.path()) else {
             panic!("manifest should be required");
@@ -1411,7 +1404,7 @@ mod tests {
         assert!(matches!(error, ReadError::MissingManifest));
     }
 
-    fn write_legacy_numeric_dataset(dir: &std::path::Path, run: Vec<f64>, step: Vec<f64>) {
+    fn write_manifest_free_numeric_dataset(dir: &std::path::Path, run: Vec<f64>, step: Vec<f64>) {
         let signal: Vec<f64> = step.iter().map(|value| value + 10.0).collect();
         let schema = Arc::new(Schema::new(vec![
             Field::new("run", DataType::Float64, false),

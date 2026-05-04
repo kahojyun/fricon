@@ -50,7 +50,6 @@ export interface DatasetColumnInfo {
   isChartAxisCandidate: boolean;
 }
 
-export type ChartInterpretationSource = "manifest";
 export type ChartDuplicatePolicy =
   | "latest_by_record_id"
   | "row_order_placeholder";
@@ -77,7 +76,6 @@ export interface ChartSemanticAxis {
 }
 
 export interface ChartSemantics {
-  source: ChartInterpretationSource;
   duplicatePolicy: ChartDuplicatePolicy;
   indexRealization: ChartIndexRealization;
   axes: ChartSemanticAxis[];

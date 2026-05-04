@@ -1,4 +1,4 @@
-import type { ChartSemantics, ColumnInfo, DatasetDetail } from "../api/types";
+import type { ChartSemantics, DatasetDetail } from "../api/types";
 import type {
   ChartDataOptions,
   FilterTableData,
@@ -37,9 +37,13 @@ export interface ChartViewerSelectionState {
   sweepIndexColumnName: string | null;
 }
 
-export interface ChartColumnOption extends ColumnInfo {
+export interface ChartColumnOption {
+  name: string;
   label: string | null;
+  isComplex: boolean;
+  isTrace: boolean;
   hiddenByDefault: boolean;
+  isChartAxisCandidate: boolean;
   numeric: boolean;
 }
 
@@ -54,7 +58,6 @@ function stripSemanticPrefix(value: string) {
 }
 
 function semanticValueOptions(
-  _columns: ColumnInfo[],
   chartSemantics?: ChartSemantics | null,
 ): ChartColumnOption[] {
   if (!chartSemantics) {
@@ -66,8 +69,8 @@ function semanticValueOptions(
     label: column.label ?? column.name,
     isComplex: column.isComplex,
     isTrace: column.isTrace,
-    isInferredAxis: false,
     hiddenByDefault: column.hiddenByDefault,
+    isChartAxisCandidate: false,
     numeric: false,
   }));
   const visibleValues = values.filter((column) => !column.hiddenByDefault);
@@ -78,7 +81,6 @@ function semanticValueOptions(
 }
 
 function semanticAxisOptions(
-  _columns: ColumnInfo[],
   chartSemantics?: ChartSemantics | null,
 ): ChartColumnOption[] {
   if (!chartSemantics) {
@@ -106,7 +108,6 @@ function semanticAxisOptions(
       label: axis.label ?? axis.name,
       isComplex: false,
       isTrace: false,
-      isInferredAxis: true,
       hiddenByDefault: false,
       isChartAxisCandidate: axis.kind === "column" && !axis.isInferredAxis,
       numeric: axis.numeric,
@@ -145,11 +146,10 @@ const drawStyleOptions: { label: string; value: XYDrawStyle }[] = [
 ];
 
 export function deriveChartViewerState(
-  columns: ColumnInfo[],
   state: ChartViewerSelectionState,
   chartSemantics?: ChartSemantics | null,
 ) {
-  const indexColumns = semanticAxisOptions(columns, chartSemantics);
+  const indexColumns = semanticAxisOptions(chartSemantics);
   const plottedIndexColumns = indexColumns.filter((column) => column.numeric);
   const roleIndexColumns = chartSemantics
     ? indexColumns.filter((column) => !column.isChartAxisCandidate)
@@ -157,7 +157,7 @@ export function deriveChartViewerState(
   const sweepRoleIndexColumns = roleIndexColumns.filter(
     (column) => column.numeric,
   );
-  const valueColumns = semanticValueOptions(columns, chartSemantics);
+  const valueColumns = semanticValueOptions(chartSemantics);
   const allColumns = [...valueColumns, ...indexColumns];
   const sweepQuantityOptions = valueColumns;
   const heatmapQuantityOptions = valueColumns;

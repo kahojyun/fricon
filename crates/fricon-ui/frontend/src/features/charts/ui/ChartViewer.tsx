@@ -25,9 +25,7 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
         ? "available"
         : "tombstone";
 
-  const columns = datasetDetail?.columns ?? [];
   const selection = useChartViewerSelection(
-    columns,
     datasetDetail?.status,
     datasetDetail?.chartSemantics,
   );

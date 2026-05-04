@@ -820,6 +820,12 @@ workflow needs invalidation or execution-quality state, it should be designed
 with the run or measurement layer rather than added as an under-specified
 dataset column.
 
+Minimal semantic inference for bare writes may expose a resolved
+`row_order_placeholder` adapter so existing chart grouping can treat inferred
+physical axes as ordered roles. That adapter is not a manifest duplicate policy
+and should be removed once chart transforms consume resolved semantic axes
+directly.
+
 ## Live Monitor Rules
 
 ### Contiguous Legacy Scans
@@ -920,8 +926,9 @@ Out of scope:
 
 First success criterion:
 
-- new datasets produce a valid manifest and record IDs while existing datasets
-  still open and current user-facing behavior remains equivalent.
+- new datasets produce a valid manifest and record IDs; manifest-free datasets
+  fail with a clear missing-manifest error, while simple newly written datasets
+  preserve equivalent user-facing behavior.
 
 ADR need:
 
@@ -1326,7 +1333,7 @@ successful when:
 - a known 2D scan opens correctly from explicit semantics without relying on
   first-two-row inference
 - regular ordered scans can derive logical indices implicitly without storing
-  index columns in the main payload
+  semantic axis columns in the main payload
 - shuffled scans with sidecar logical indices render to the correct grid cells
 - retries and resumes preserve all fact rows while default projections use the
   latest row by `__ds_record_id`

@@ -6,9 +6,9 @@ use fricon::{
 use super::{
     error::UiDatasetError,
     types::{
-        ChartDuplicatePolicy, ChartIndexRealization, ChartInterpretationSource, ChartSemanticAxis,
-        ChartSemanticAxisKind, ChartSemanticColumn, ChartSemantics, ColumnInfo, DatasetDetail,
-        DatasetInfo, DatasetWriteStatus,
+        ChartDuplicatePolicy, ChartIndexRealization, ChartSemanticAxis, ChartSemanticAxisKind,
+        ChartSemanticColumn, ChartSemantics, ColumnInfo, DatasetDetail, DatasetInfo,
+        DatasetWriteStatus,
     },
 };
 use crate::desktop_runtime::session::WorkspaceSession;
@@ -84,7 +84,6 @@ pub(crate) async fn get_dataset_detail(
 }
 
 fn chart_semantics_from_interpretation(interpretation: &DatasetInterpretation) -> ChartSemantics {
-    let source = ChartInterpretationSource::Manifest;
     let duplicate_policy = match interpretation.duplicate_policy {
         ResolvedDuplicatePolicy::LatestByRecordId => ChartDuplicatePolicy::LatestByRecordId,
         ResolvedDuplicatePolicy::RowOrderPlaceholder => ChartDuplicatePolicy::RowOrderPlaceholder,
@@ -114,7 +113,6 @@ fn chart_semantics_from_interpretation(interpretation: &DatasetInterpretation) -
         .collect();
 
     ChartSemantics {
-        source,
         duplicate_policy,
         index_realization,
         axes,
@@ -223,10 +221,6 @@ mod tests {
             .chart_semantics
             .as_ref()
             .expect("chart semantics should be exposed");
-        assert!(matches!(
-            semantics.source,
-            super::ChartInterpretationSource::Manifest
-        ));
         assert_eq!(semantics.value_columns.len(), 3);
         assert_eq!(semantics.value_columns[0].id, "column:signal");
         assert_eq!(semantics.chart_axis_candidates.len(), 2);
@@ -289,10 +283,6 @@ mod tests {
             .chart_semantics
             .as_ref()
             .expect("inferred axis chart semantics should be exposed");
-        assert!(matches!(
-            semantics.source,
-            super::ChartInterpretationSource::Manifest
-        ));
         assert_eq!(
             semantics
                 .axes

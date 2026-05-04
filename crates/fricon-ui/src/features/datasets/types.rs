@@ -101,12 +101,6 @@ pub(crate) struct ColumnInfo {
 
 #[derive(Debug, Clone, Copy, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ChartInterpretationSource {
-    Manifest,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
-#[serde(rename_all = "snake_case")]
 pub(crate) enum ChartDuplicatePolicy {
     LatestByRecordId,
     RowOrderPlaceholder,
@@ -153,7 +147,6 @@ pub(crate) struct ChartSemanticAxis {
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChartSemantics {
-    pub(crate) source: ChartInterpretationSource,
     pub(crate) duplicate_policy: ChartDuplicatePolicy,
     pub(crate) index_realization: ChartIndexRealization,
     pub(crate) axes: Vec<ChartSemanticAxis>,

@@ -14,12 +14,11 @@ pub struct DatasetInterpretation {
     pub filter_axes: Vec<ResolvedSemanticReference>,
     pub chart_axis_candidates: Vec<ResolvedSemanticReference>,
     pub value_columns: Vec<VisibleColumnOrdinal>,
-    pub logical_index_columns: Vec<VisibleColumnOrdinal>,
+    pub inferred_axis_columns: Vec<VisibleColumnOrdinal>,
     pub chart_axis_candidate_columns: Vec<VisibleColumnOrdinal>,
     pub duplicate_policy: ResolvedDuplicatePolicy,
     pub index_realization: ResolvedIndexRealization,
     pub scan_axes: Vec<ResolvedScanAxis>,
-    pub source: InterpretationSource,
 }
 
 impl DatasetInterpretation {
@@ -241,11 +240,6 @@ pub struct ResolvedLogicalIndexPoint {
     pub record_id: u64,
     pub indices: Vec<u64>,
     pub coordinates: Vec<ScanAxisValue>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InterpretationSource {
-    Manifest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
