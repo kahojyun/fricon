@@ -8,6 +8,6 @@ pub(crate) use self::table::ChunkedTable;
 pub use self::{
     arrays::{DatasetArray, ScalarArray},
     error::DatasetError,
-    model::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
+    model::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind, TraceKind},
     values::{DatasetRow, DatasetScalar, FixedStepTrace, VariableStepTrace},
 };

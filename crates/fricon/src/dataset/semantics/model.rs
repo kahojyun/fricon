@@ -210,6 +210,7 @@ impl DatasetSemanticManifest {
         }
 
         for (name, column) in &self.columns {
+            validate_column_semantic(name, column)?;
             match column.system {
                 Some(SystemColumn::RecordId) if name != RECORD_ID_COLUMN => {
                     return Err(ManifestValidationError::InvalidSystemColumn {
@@ -258,6 +259,77 @@ impl DatasetSemanticManifest {
             return Err(ManifestValidationError::MixedStaticAndUnknownScanAxes);
         }
         Ok(())
+    }
+}
+
+fn validate_column_semantic(
+    name: &str,
+    column: &ManifestColumn,
+) -> Result<(), ManifestValidationError> {
+    let expected_shape = SemanticShapeKind::for_dtype(&column.dtype);
+    if column.semantic.shape_kind != expected_shape {
+        return Err(ManifestValidationError::InvalidSemanticShape {
+            name: name.to_string(),
+            dtype: format!("{:?}", column.dtype),
+            shape_kind: format!("{:?}", column.semantic.shape_kind),
+        });
+    }
+
+    if !semantic_value_kind_is_valid_for_dtype(column.semantic.value_kind, &column.dtype) {
+        return Err(ManifestValidationError::InvalidSemanticValueKind {
+            name: name.to_string(),
+            dtype: format!("{:?}", column.dtype),
+            value_kind: format!("{:?}", column.semantic.value_kind),
+        });
+    }
+
+    let is_system_column = matches!(column.system.as_ref(), Some(SystemColumn::RecordId));
+    let is_system_role = column.semantic.role == SemanticRole::System;
+    if is_system_column == is_system_role {
+        return Ok(());
+    }
+
+    Err(ManifestValidationError::InvalidSemanticRole {
+        name: name.to_string(),
+        role: format!("{:?}", column.semantic.role),
+    })
+}
+
+fn semantic_value_kind_is_valid_for_dtype(
+    value_kind: SemanticValueKind,
+    dtype: &DatasetDType,
+) -> bool {
+    match dtype {
+        DatasetDType::Float64
+        | DatasetDType::Float32
+        | DatasetDType::Int64
+        | DatasetDType::UInt64 => {
+            matches!(
+                value_kind,
+                SemanticValueKind::Numeric | SemanticValueKind::Categorical
+            )
+        }
+        DatasetDType::Bool => {
+            matches!(
+                value_kind,
+                SemanticValueKind::Boolean | SemanticValueKind::Categorical
+            )
+        }
+        DatasetDType::Utf8 => {
+            matches!(
+                value_kind,
+                SemanticValueKind::Categorical | SemanticValueKind::Display
+            )
+        }
+        DatasetDType::TimestampUs => value_kind == SemanticValueKind::Timestamp,
+        DatasetDType::Complex128 => value_kind == SemanticValueKind::Complex,
+        DatasetDType::Trace { value, .. } => match value {
+            TraceValueDType::Float64
+            | TraceValueDType::Float32
+            | TraceValueDType::Int64
+            | TraceValueDType::UInt64 => value_kind == SemanticValueKind::Numeric,
+            TraceValueDType::Complex128 => value_kind == SemanticValueKind::Complex,
+        },
     }
 }
 
@@ -394,8 +466,116 @@ pub enum ScanAxisValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SemanticDescriptor {
+    pub value_kind: SemanticValueKind,
+    pub shape_kind: SemanticShapeKind,
+    pub role: SemanticRole,
+}
+
+impl SemanticDescriptor {
+    #[must_use]
+    pub const fn new(
+        value_kind: SemanticValueKind,
+        shape_kind: SemanticShapeKind,
+        role: SemanticRole,
+    ) -> Self {
+        Self {
+            value_kind,
+            shape_kind,
+            role,
+        }
+    }
+
+    #[must_use]
+    pub fn for_dtype(dtype: &DatasetDType) -> Self {
+        Self::new(
+            SemanticValueKind::for_dtype(dtype),
+            SemanticShapeKind::for_dtype(dtype),
+            SemanticRole::Value,
+        )
+    }
+
+    #[must_use]
+    pub const fn record_id() -> Self {
+        Self::new(
+            SemanticValueKind::Numeric,
+            SemanticShapeKind::Scalar,
+            SemanticRole::System,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticValueKind {
+    Numeric,
+    Categorical,
+    Boolean,
+    Timestamp,
+    Complex,
+    Display,
+}
+
+impl SemanticValueKind {
+    #[must_use]
+    pub const fn for_dtype(dtype: &DatasetDType) -> Self {
+        match dtype {
+            DatasetDType::Float64
+            | DatasetDType::Float32
+            | DatasetDType::Int64
+            | DatasetDType::UInt64 => Self::Numeric,
+            DatasetDType::Bool => Self::Boolean,
+            DatasetDType::Utf8 => Self::Categorical,
+            DatasetDType::TimestampUs => Self::Timestamp,
+            DatasetDType::Complex128 => Self::Complex,
+            DatasetDType::Trace { value, .. } => match value {
+                TraceValueDType::Float64
+                | TraceValueDType::Float32
+                | TraceValueDType::Int64
+                | TraceValueDType::UInt64 => Self::Numeric,
+                TraceValueDType::Complex128 => Self::Complex,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticShapeKind {
+    Scalar,
+    Trace,
+}
+
+impl SemanticShapeKind {
+    #[must_use]
+    pub const fn for_dtype(dtype: &DatasetDType) -> Self {
+        match dtype {
+            DatasetDType::Trace { .. } => Self::Trace,
+            DatasetDType::Float64
+            | DatasetDType::Float32
+            | DatasetDType::Int64
+            | DatasetDType::UInt64
+            | DatasetDType::Bool
+            | DatasetDType::Utf8
+            | DatasetDType::TimestampUs
+            | DatasetDType::Complex128 => Self::Scalar,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticRole {
+    Value,
+    LogicalIndex,
+    System,
+    Display,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManifestColumn {
     pub dtype: DatasetDType,
+    pub semantic: SemanticDescriptor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub system: Option<SystemColumn>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -411,8 +591,10 @@ pub struct ManifestColumn {
 impl ManifestColumn {
     #[must_use]
     pub fn new(dtype: DatasetDType) -> Self {
+        let semantic = SemanticDescriptor::for_dtype(&dtype);
         Self {
             dtype,
+            semantic,
             system: None,
             unit: None,
             label: None,
@@ -425,6 +607,7 @@ impl ManifestColumn {
     pub fn record_id() -> Self {
         Self {
             dtype: DatasetDType::UInt64,
+            semantic: SemanticDescriptor::record_id(),
             system: Some(SystemColumn::RecordId),
             unit: None,
             label: None,
@@ -435,7 +618,9 @@ impl ManifestColumn {
 
     #[must_use]
     pub fn is_record_id(&self) -> bool {
-        self.dtype == DatasetDType::UInt64 && self.system == Some(SystemColumn::RecordId)
+        self.dtype == DatasetDType::UInt64
+            && self.system == Some(SystemColumn::RecordId)
+            && self.semantic == SemanticDescriptor::record_id()
     }
 }
 
@@ -860,7 +1045,8 @@ mod tests {
     use super::{
         ColumnMetadata, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
         IndexRealization, Inference, ManifestColumn, ManifestValidationError, RECORD_ID_COLUMN,
-        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SystemColumn, TraceAxisDType,
+        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SemanticDescriptor,
+        SemanticRole, SemanticShapeKind, SemanticValueKind, SystemColumn, TraceAxisDType,
         TraceDType, TraceLayout, TraceValueDType,
     };
 
@@ -883,10 +1069,20 @@ mod tests {
                 "columns": {
                     "__ds_record_id": {
                         "dtype": { "kind": "uint64" },
+                        "semantic": {
+                            "value_kind": "numeric",
+                            "shape_kind": "scalar",
+                            "role": "system"
+                        },
                         "system": { "kind": "record_id" }
                     },
                     "signal": {
-                        "dtype": { "kind": "float64" }
+                        "dtype": { "kind": "float64" },
+                        "semantic": {
+                            "value_kind": "numeric",
+                            "shape_kind": "scalar",
+                            "role": "value"
+                        }
                     }
                 },
                 "realization": {
@@ -917,6 +1113,55 @@ mod tests {
         );
         assert_eq!(manifest.realization, Realization::default());
         assert_eq!(manifest.inference, Inference::default());
+    }
+
+    #[test]
+    fn manifest_column_requires_semantic_descriptor() {
+        let value = json!({
+            "manifest_version": 1,
+            "columns": {
+                "__ds_record_id": {
+                    "dtype": { "kind": "uint64" },
+                    "semantic": {
+                        "value_kind": "numeric",
+                        "shape_kind": "scalar",
+                        "role": "system"
+                    },
+                    "system": { "kind": "record_id" }
+                },
+                "signal": {
+                    "dtype": { "kind": "float64" }
+                }
+            },
+            "realization": {
+                "append_only": true,
+                "record_id_column": "__ds_record_id",
+                "index_realization": { "kind": "none" },
+                "duplicate_resolution_default": { "kind": "latest_by_record_id" }
+            },
+            "inference": {
+                "allow_axis_inference": true
+            }
+        });
+
+        let error = serde_json::from_value::<DatasetSemanticManifest>(value)
+            .expect_err("semantic descriptor should be required");
+        assert!(error.to_string().contains("missing field `semantic`"));
+    }
+
+    #[test]
+    fn validate_accepts_supported_semantic_overrides() {
+        let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
+        manifest
+            .columns
+            .get_mut("signal")
+            .expect("signal")
+            .semantic
+            .value_kind = SemanticValueKind::Categorical;
+
+        manifest
+            .validate()
+            .expect("numeric dtype may be categorical");
     }
 
     #[test]
@@ -1113,6 +1358,7 @@ mod tests {
             RECORD_ID_COLUMN.to_string(),
             ManifestColumn {
                 dtype: DatasetDType::Int64,
+                semantic: SemanticDescriptor::record_id(),
                 system: Some(SystemColumn::RecordId),
                 unit: None,
                 label: None,
@@ -1124,6 +1370,65 @@ mod tests {
         assert_eq!(
             manifest.validate(),
             Err(ManifestValidationError::InvalidRecordIdColumn)
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_semantic_shape() {
+        let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
+        manifest
+            .columns
+            .get_mut("signal")
+            .expect("signal")
+            .semantic
+            .shape_kind = SemanticShapeKind::Trace;
+
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestValidationError::InvalidSemanticShape {
+                name: "signal".to_string(),
+                dtype: "Float64".to_string(),
+                shape_kind: "Trace".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_semantic_value_kind() {
+        let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
+        manifest
+            .columns
+            .get_mut("signal")
+            .expect("signal")
+            .semantic
+            .value_kind = SemanticValueKind::Complex;
+
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestValidationError::InvalidSemanticValueKind {
+                name: "signal".to_string(),
+                dtype: "Float64".to_string(),
+                value_kind: "Complex".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_semantic_role() {
+        let mut manifest = DatasetSemanticManifest::minimal(signal_columns());
+        manifest
+            .columns
+            .get_mut("signal")
+            .expect("signal")
+            .semantic
+            .role = SemanticRole::System;
+
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestValidationError::InvalidSemanticRole {
+                name: "signal".to_string(),
+                role: "System".to_string(),
+            })
         );
     }
 
@@ -1310,6 +1615,11 @@ mod tests {
             value["columns"]["signal"],
             json!({
                 "dtype": { "kind": "float64" },
+                "semantic": {
+                    "value_kind": "numeric",
+                    "shape_kind": "scalar",
+                    "role": "value"
+                },
                 "unit": "V",
                 "label": "Voltage",
                 "hidden_by_default": true,

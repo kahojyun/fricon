@@ -8,11 +8,12 @@ pub(crate) use self::materialize::{
 };
 pub use self::{
     error::{ManifestError, ManifestValidationError},
-    io::{read_manifest, read_manifest_optional, write_manifest},
+    io::{read_manifest, write_manifest},
     model::{
         ColumnMetadata, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
         IndexRealization, Inference, MANIFEST_VERSION_V1, ManifestColumn, RECORD_ID_COLUMN,
-        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SystemColumn, TraceAxisDType,
+        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SemanticDescriptor,
+        SemanticRole, SemanticShapeKind, SemanticValueKind, SystemColumn, TraceAxisDType,
         TraceDType, TraceLayout, TraceValueDType,
     },
 };

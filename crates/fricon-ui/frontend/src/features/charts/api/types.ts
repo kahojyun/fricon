@@ -1,5 +1,11 @@
 import type {
   ColumnUniqueValue,
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticValueKind,
+  ChartSemantics,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
@@ -15,6 +21,12 @@ import type {
 } from "@/shared/lib/chartTypes";
 
 export type {
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticValueKind,
+  ChartSemantics,
   ColumnUniqueValue,
   DatasetStatus,
   DatasetWriteStatus,
@@ -25,40 +37,11 @@ export type {
 export interface ColumnInfo {
   name: string;
   label?: string | null;
-  isComplex: boolean;
-  isTrace: boolean;
+  semantic: ChartSemanticDescriptor;
+  capabilities: ChartSemanticCapabilities;
   isInferredAxis: boolean;
   hiddenByDefault?: boolean;
   isChartAxisCandidate?: boolean;
-}
-
-export type ChartSemanticAxisKind = "logical_index" | "column";
-
-export interface ChartSemanticColumn {
-  id: string;
-  name: string;
-  label: string | null;
-  isComplex: boolean;
-  isTrace: boolean;
-  hiddenByDefault: boolean;
-}
-
-export interface ChartSemanticAxis {
-  id: string;
-  name: string;
-  label: string | null;
-  kind: ChartSemanticAxisKind;
-  numeric: boolean;
-  isInferredAxis: boolean;
-  physicalColumn: string | null;
-}
-
-export interface ChartSemantics {
-  duplicatePolicy: "latest_by_record_id" | "row_order_placeholder";
-  indexRealization: "none" | "implicit" | "sidecar";
-  axes: ChartSemanticAxis[];
-  valueColumns: ChartSemanticColumn[];
-  chartAxisCandidates: ChartSemanticAxis[];
 }
 
 export interface DatasetDetail {

@@ -32,7 +32,7 @@ describe("buildChartFrameHeader", () => {
           effectiveView: "xy",
           effectivePlotMode: "quantity_vs_sweep",
           effectiveDrawStyle: "line",
-          sweepQuantity: { name: "signal", isComplex: true },
+          sweepQuantity: { name: "signal" },
           heatmapQuantity: undefined,
           complexPlaneQuantity: undefined,
           xyXColumn: undefined,

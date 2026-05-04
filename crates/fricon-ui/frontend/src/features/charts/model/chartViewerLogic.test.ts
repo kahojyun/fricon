@@ -6,7 +6,15 @@ import {
   makeDatasetDetail,
   makeFilterTableData as makeChartFilterTableData,
   makeInferredSemantics,
+  makeSemanticCapabilities,
+  makeSemanticDescriptor,
 } from "../test-utils";
+import type {
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticValueKind,
+} from "../api/types";
 import {
   buildChartRequest,
   deriveChartViewerState,
@@ -48,6 +56,63 @@ function makeFilterTableData(): FilterTableData {
       [columnId("idxA")]: [{ index: 1, displayValue: "1" }],
     },
   });
+}
+
+function testAxis(
+  input: Omit<ChartSemanticAxis, "semantic" | "capabilities"> & {
+    valueKind?: ChartSemanticValueKind;
+    shapeKind?: "scalar" | "trace";
+    capabilities?: Partial<ChartSemanticCapabilities>;
+  },
+): ChartSemanticAxis {
+  const {
+    valueKind = "numeric",
+    shapeKind = "scalar",
+    capabilities,
+    ...axis
+  } = input;
+  const semantic = makeSemanticDescriptor({
+    valueKind,
+    shapeKind,
+    role: "logical_index",
+  });
+  return {
+    ...axis,
+    semantic,
+    capabilities: makeSemanticCapabilities({
+      plottableValue: false,
+      numericCoordinate: valueKind === "numeric",
+      ...capabilities,
+    }),
+  };
+}
+
+function testValueColumn(
+  input: Omit<ChartSemanticColumn, "semantic" | "capabilities"> & {
+    valueKind?: ChartSemanticValueKind;
+    shapeKind?: "scalar" | "trace";
+    capabilities?: Partial<ChartSemanticCapabilities>;
+  },
+): ChartSemanticColumn {
+  const {
+    valueKind = "numeric",
+    shapeKind = "scalar",
+    capabilities,
+    ...column
+  } = input;
+  const semantic = makeSemanticDescriptor({ valueKind, shapeKind });
+  return {
+    ...column,
+    semantic,
+    capabilities: makeSemanticCapabilities({
+      numericCoordinate: false,
+      filterable: shapeKind === "scalar",
+      groupable: shapeKind === "scalar",
+      traceSource: shapeKind === "trace",
+      complexProjectable: valueKind === "complex",
+      ...capabilities,
+    }),
+  };
 }
 
 describe("chartViewerLogic", () => {
@@ -105,7 +170,16 @@ describe("chartViewerLogic", () => {
   });
 
   it("falls back plot mode to available option", () => {
-    const columns = [makeColumn({ name: "c", isComplex: true })];
+    const columns = [
+      makeColumn({
+        name: "c",
+        semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+        capabilities: makeSemanticCapabilities({
+          numericCoordinate: false,
+          complexProjectable: true,
+        }),
+      }),
+    ];
 
     const derived = deriveWithInferredSemantics(
       columns,
@@ -219,8 +293,26 @@ describe("chartViewerLogic", () => {
       makeColumn({ name: "idxA", isInferredAxis: true }),
       makeColumn({ name: "scalarX" }),
       makeColumn({ name: "scalarY" }),
-      makeColumn({ name: "traceX", isTrace: true }),
-      makeColumn({ name: "traceY", isTrace: true }),
+      makeColumn({
+        name: "traceX",
+        semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+        capabilities: makeSemanticCapabilities({
+          numericCoordinate: false,
+          filterable: false,
+          groupable: false,
+          traceSource: true,
+        }),
+      }),
+      makeColumn({
+        name: "traceY",
+        semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+        capabilities: makeSemanticCapabilities({
+          numericCoordinate: false,
+          filterable: false,
+          groupable: false,
+          traceSource: true,
+        }),
+      }),
     ];
     const derived = deriveWithInferredSemantics(
       columns,
@@ -268,53 +360,43 @@ describe("chartViewerLogic", () => {
       duplicatePolicy: "latest_by_record_id",
       indexRealization: "implicit",
       axes: [
-        {
+        testAxis({
           id: "logicalIndex:gate",
           name: "gate",
           label: "Gate",
           kind: "logical_index",
-          numeric: true,
           isInferredAxis: false,
-          physicalColumn: null,
-        },
-        {
+        }),
+        testAxis({
           id: "logicalIndex:bias",
           name: "bias",
           label: "Bias",
           kind: "logical_index",
-          numeric: true,
           isInferredAxis: false,
-          physicalColumn: null,
-        },
+        }),
       ],
       valueColumns: [
-        {
+        testValueColumn({
           id: "column:hiddenValue",
           name: "hiddenValue",
           label: "Hidden",
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: true,
-        },
-        {
+        }),
+        testValueColumn({
           id: "column:signal",
           name: "signal",
           label: "Signal",
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: false,
-        },
+        }),
       ],
       chartAxisCandidates: [
-        {
+        testAxis({
           id: "column:physicalAxis",
           name: "physicalAxis",
           label: "Physical Axis",
           kind: "column",
-          numeric: true,
           isInferredAxis: false,
-          physicalColumn: "physicalAxis",
-        },
+        }),
       ],
     });
 
@@ -340,45 +422,37 @@ describe("chartViewerLogic", () => {
       duplicatePolicy: "latest_by_record_id",
       indexRealization: "implicit",
       axes: [
-        {
+        testAxis({
           id: "logicalIndex:gate",
           name: "gate",
           label: "Gate",
           kind: "logical_index",
-          numeric: true,
           isInferredAxis: false,
-          physicalColumn: null,
-        },
-        {
+        }),
+        testAxis({
           id: "logicalIndex:bias",
           name: "bias",
           label: "Bias",
           kind: "logical_index",
-          numeric: true,
           isInferredAxis: false,
-          physicalColumn: null,
-        },
+        }),
       ],
       valueColumns: [
-        {
+        testValueColumn({
           id: "column:signal",
           name: "signal",
           label: "Signal",
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: false,
-        },
+        }),
       ],
       chartAxisCandidates: [
-        {
+        testAxis({
           id: "column:physicalAxis",
           name: "physicalAxis",
           label: "Physical Axis",
           kind: "column",
-          numeric: true,
           isInferredAxis: false,
-          physicalColumn: "physicalAxis",
-        },
+        }),
       ],
     });
 
@@ -404,34 +478,29 @@ describe("chartViewerLogic", () => {
         duplicatePolicy: "latest_by_record_id",
         indexRealization: "implicit",
         axes: [
-          {
+          testAxis({
             id: "logicalIndex:gate",
             name: "gate",
             label: "Gate",
             kind: "logical_index",
-            numeric: false,
+            valueKind: "categorical",
             isInferredAxis: false,
-            physicalColumn: null,
-          },
-          {
+          }),
+          testAxis({
             id: "logicalIndex:bias",
             name: "bias",
             label: "Bias",
             kind: "logical_index",
-            numeric: true,
             isInferredAxis: false,
-            physicalColumn: null,
-          },
+          }),
         ],
         valueColumns: [
-          {
+          testValueColumn({
             id: "column:signal",
             name: "signal",
             label: "Signal",
-            isComplex: false,
-            isTrace: false,
             hiddenByDefault: false,
-          },
+          }),
         ],
         chartAxisCandidates: [],
       },
@@ -449,60 +518,154 @@ describe("chartViewerLogic", () => {
     expect(derived.effectiveSweepIndexColumnName).toBe("logicalIndex:bias");
   });
 
+  it("uses semantic capabilities for eligibility", () => {
+    const derived = deriveChartViewerState(
+      makeState({
+        plotMode: "xy",
+        xyXName: "column:traceX",
+        xyYName: "column:traceY",
+      }),
+      {
+        duplicatePolicy: "latest_by_record_id",
+        indexRealization: "implicit",
+        axes: [
+          testAxis({
+            id: "logicalIndex:category",
+            name: "category",
+            label: "Category",
+            kind: "logical_index",
+            valueKind: "categorical",
+            isInferredAxis: false,
+          }),
+          testAxis({
+            id: "logicalIndex:step",
+            name: "step",
+            label: "Step",
+            kind: "logical_index",
+            isInferredAxis: false,
+          }),
+        ],
+        valueColumns: [
+          testValueColumn({
+            id: "column:traceX",
+            name: "traceX",
+            label: "Trace X",
+            shapeKind: "trace",
+            hiddenByDefault: false,
+          }),
+          testValueColumn({
+            id: "column:traceY",
+            name: "traceY",
+            label: "Trace Y",
+            shapeKind: "trace",
+            hiddenByDefault: false,
+          }),
+        ],
+        chartAxisCandidates: [],
+      },
+    );
+
+    expect(derived.heatmapXOptions.map((column) => column.name)).toEqual([
+      "logicalIndex:step",
+    ]);
+    expect(derived.xyXOptions.map((column) => column.name)).toEqual([
+      "column:traceX",
+      "column:traceY",
+    ]);
+    expect(derived.xyUsesTraceSource).toBe(true);
+  });
+
+  it("keeps complex-valued traces eligible for complex projections", () => {
+    const columns = [
+      makeColumn({
+        name: "complexTrace",
+        semantic: makeSemanticDescriptor({
+          valueKind: "complex",
+          shapeKind: "trace",
+        }),
+        capabilities: makeSemanticCapabilities({
+          numericCoordinate: false,
+          filterable: false,
+          groupable: false,
+          traceSource: true,
+          complexProjectable: true,
+        }),
+      }),
+      makeColumn({
+        name: "numericTrace",
+        semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+        capabilities: makeSemanticCapabilities({
+          numericCoordinate: false,
+          filterable: false,
+          groupable: false,
+          traceSource: true,
+        }),
+      }),
+    ];
+    const derived = deriveWithInferredSemantics(
+      columns,
+      makeState({ sweepQuantityName: columnId("complexTrace") }),
+    );
+
+    expect(derived.availablePlotModes.map((item) => item.value)).toContain(
+      "complex_plane",
+    );
+    expect(
+      derived.complexPlaneQuantityOptions.map((column) => column.name),
+    ).toEqual([columnId("complexTrace")]);
+    expect(derived.traceXYColumnOptions.map((column) => column.name)).toEqual([
+      columnId("numericTrace"),
+    ]);
+    expect(derived.complexControlsDisabled).toBe(false);
+
+    const request = buildChartRequest({
+      datasetDetail: makeDatasetDetail(columns),
+      filterTableData: makeFilterTableData(),
+      hasFilters: false,
+      filterRow: null,
+      selectedComplexView: ["real", "imag"],
+      selectedComplexViewSingle: "mag",
+      indexFilters: undefined,
+      derived,
+    });
+
+    expect(request).toMatchObject({
+      view: "xy",
+      plotMode: "quantity_vs_sweep",
+      quantity: columnId("complexTrace"),
+      complexViews: ["real", "imag"],
+    });
+  });
+
   it("keeps inferred axis axes available for sweep/group roles", () => {
     const derived = deriveChartViewerState(makeState(), {
       duplicatePolicy: "row_order_placeholder",
       indexRealization: "none",
       axes: [
-        {
+        testAxis({
           id: "column:run",
           name: "run",
           label: null,
           kind: "column",
-          numeric: true,
           isInferredAxis: true,
-          physicalColumn: "run",
-        },
-        {
+        }),
+        testAxis({
           id: "column:step",
           name: "step",
           label: null,
           kind: "column",
-          numeric: true,
           isInferredAxis: true,
-          physicalColumn: "step",
-        },
+        }),
       ],
       valueColumns: [
-        {
+        testValueColumn({
           id: "column:signal",
           name: "signal",
           label: null,
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: false,
-        },
+        }),
       ],
-      chartAxisCandidates: [
-        {
-          id: "column:run",
-          name: "run",
-          label: null,
-          kind: "column",
-          numeric: true,
-          isInferredAxis: true,
-          physicalColumn: "run",
-        },
-        {
-          id: "column:step",
-          name: "step",
-          label: null,
-          kind: "column",
-          numeric: true,
-          isInferredAxis: false,
-          physicalColumn: "step",
-        },
-      ],
+      chartAxisCandidates: [],
     });
 
     expect(derived.sweepAxisOptions.map((column) => column.name)).toEqual([

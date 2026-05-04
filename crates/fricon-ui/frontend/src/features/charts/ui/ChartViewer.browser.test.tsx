@@ -10,11 +10,12 @@ import {
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { describe, expect, it, vi } from "vitest";
-import type { DatasetDetail } from "../api/types";
 import {
   columnId,
   makeDatasetDetail,
   makeFilterTableData,
+  makeSemanticCapabilities,
+  makeSemanticDescriptor,
 } from "../test-utils";
 import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
 import {
@@ -66,7 +67,9 @@ function createQueryClient() {
   });
 }
 
-function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
+function makeDetail(
+  overrides: Parameters<typeof makeDatasetDetail>[0] = {},
+): ReturnType<typeof makeDatasetDetail> {
   return makeDatasetDetail(overrides);
 }
 
@@ -123,14 +126,10 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "t",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: false,
               },
             ],
@@ -189,14 +188,10 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "t",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: false,
               },
             ],
@@ -286,14 +281,10 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "t",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "v",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: false,
               },
             ],
@@ -358,20 +349,21 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "idxA",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "idxB",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "trace_signal",
-                isComplex: false,
-                isTrace: true,
+                semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  filterable: false,
+                  groupable: false,
+                  traceSource: true,
+                }),
                 isInferredAxis: false,
               },
             ],
@@ -461,14 +453,10 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "t",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: false,
               },
             ],
@@ -551,20 +539,19 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "idxA",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "idxB",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "c",
-                isComplex: true,
-                isTrace: false,
+                semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
                 isInferredAxis: false,
               },
             ],
@@ -644,20 +631,14 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "idxA",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "idxB",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: false,
               },
             ],
@@ -727,14 +708,15 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "t",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "sig",
-                isComplex: true,
-                isTrace: false,
+                semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
                 isInferredAxis: false,
               },
             ],
@@ -826,26 +808,23 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "idx_cycle",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "idx_y",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "idx_x",
-                isComplex: false,
-                isTrace: false,
                 isInferredAxis: true,
               },
               {
                 name: "complex_impedance_ohm",
-                isComplex: true,
-                isTrace: false,
+                semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
                 isInferredAxis: false,
               },
             ],

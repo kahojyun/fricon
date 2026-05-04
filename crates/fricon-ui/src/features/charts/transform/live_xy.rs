@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use arrow_array::RecordBatch;
-use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
+use fricon::{DatasetArray, DatasetPhysicalSchema, DatasetPhysicalType};
 use tracing::debug;
 
 use super::{
@@ -14,7 +14,7 @@ use crate::features::charts::types::{
 
 pub(crate) fn build_live_xy_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     group_columns: Option<&[usize]>,
     row_start: usize,
@@ -55,7 +55,7 @@ pub(crate) fn build_live_xy_series(
 
 fn build_live_quantity_vs_sweep_snapshot(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     role_columns: SemanticRoleColumns<'_>,
     row_start: usize,
     options: &LiveXYOptions,
@@ -66,7 +66,7 @@ fn build_live_quantity_vs_sweep_snapshot(
         .columns()
         .get(series_name)
         .context("Column not found")?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let is_trace = matches!(data_type, DatasetPhysicalType::Trace(_, _));
     let is_complex = data_type.is_complex();
     let tail_count = options.tail_count.max(1);
 
@@ -128,7 +128,7 @@ fn build_live_quantity_vs_sweep_snapshot(
 
 fn build_live_xy_snapshot(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     role_columns: SemanticRoleColumns<'_>,
     options: &LiveXYOptions,
     x_column: &str,
@@ -142,8 +142,8 @@ fn build_live_xy_snapshot(
         .columns()
         .get(y_column)
         .context("Y column not found")?;
-    let x_is_trace = matches!(x_type, DatasetDataType::Trace(_, _));
-    let y_is_trace = matches!(y_type, DatasetDataType::Trace(_, _));
+    let x_is_trace = matches!(x_type, DatasetPhysicalType::Trace(_, _));
+    let y_is_trace = matches!(y_type, DatasetPhysicalType::Trace(_, _));
     let tail_count = options.tail_count.max(1);
 
     let series = match (x_is_trace, y_is_trace) {
@@ -171,7 +171,7 @@ fn build_live_xy_snapshot(
 
 fn build_live_complex_plane_snapshot(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     role_columns: SemanticRoleColumns<'_>,
     options: &LiveXYOptions,
     series_name: &str,
@@ -180,7 +180,7 @@ fn build_live_complex_plane_snapshot(
         .columns()
         .get(series_name)
         .context("Column not found")?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let is_trace = matches!(data_type, DatasetPhysicalType::Trace(_, _));
     let tail_count = options.tail_count.max(1);
 
     let series = if is_trace {
@@ -323,7 +323,7 @@ fn build_live_trace_xy(
 
 fn build_live_trace_complex_plane(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     series_name: &str,
     tail_count: usize,
 ) -> Result<Vec<FlatXYSeries>> {
@@ -331,7 +331,7 @@ fn build_live_trace_complex_plane(
         .columns()
         .get(series_name)
         .context("Column not found")?;
-    if !matches!(data_type, DatasetDataType::Trace(_, _)) {
+    if !matches!(data_type, DatasetPhysicalType::Trace(_, _)) {
         bail!("Complex plane live trace plot mode requires a trace quantity");
     }
 
@@ -371,7 +371,7 @@ fn build_live_trace_complex_plane(
 
 fn build_live_scalar_xy(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     x_column: &str,
     y_column: &str,
     tail_count: usize,
@@ -402,7 +402,7 @@ fn build_live_scalar_xy(
 
 fn build_live_scalar_complex_plane(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     series_name: &str,
     tail_count: usize,
     roles: &XYTraceRoles,
@@ -430,7 +430,7 @@ fn build_live_scalar_complex_plane(
 
 fn build_live_grouped_xy(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     tail_count: usize,
     roles: &XYTraceRoles,
     base_label: &str,
@@ -480,7 +480,7 @@ fn build_live_grouped_xy(
 }
 
 fn resolve_live_quantity_vs_sweep_x_name(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     role_columns: SemanticRoleColumns<'_>,
     options: &LiveXYOptions,
 ) -> Result<String> {
@@ -500,7 +500,11 @@ fn resolve_live_quantity_vs_sweep_x_name(
     })
 }
 
-fn numeric_values(batch: &RecordBatch, schema: &DatasetSchema, index: usize) -> Result<Vec<f64>> {
+fn numeric_values(
+    batch: &RecordBatch,
+    schema: &DatasetPhysicalSchema,
+    index: usize,
+) -> Result<Vec<f64>> {
     let name = schema
         .columns()
         .get_index(index)
@@ -571,7 +575,7 @@ fn resolved_complex_views(complex_views: &[ComplexViewOption]) -> Vec<ComplexVie
 
 struct LiveScalarQuantityVsSweepContext<'a> {
     batch: &'a RecordBatch,
-    schema: &'a DatasetSchema,
+    schema: &'a DatasetPhysicalSchema,
     series_name: &'a str,
     ds_y: &'a DatasetArray,
     roles: &'a XYTraceRoles,

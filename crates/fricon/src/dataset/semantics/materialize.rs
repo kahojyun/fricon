@@ -52,9 +52,8 @@ pub(crate) fn materialize_record_ids(
 }
 
 #[must_use]
-pub(crate) fn is_hidden_system_column(name: &str, column: Option<&ManifestColumn>) -> bool {
+pub(crate) fn is_hidden_system_column(column: Option<&ManifestColumn>) -> bool {
     column.is_some_and(|column| column.system == Some(SystemColumn::RecordId))
-        || name == RECORD_ID_COLUMN
 }
 
 #[cfg(test)]

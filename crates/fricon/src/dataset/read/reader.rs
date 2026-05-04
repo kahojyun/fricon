@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::HashSet,
+    io,
     ops::RangeBounds,
     path::{Path, PathBuf},
     sync::Arc,
@@ -21,10 +22,10 @@ use crate::dataset::{
         resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
-    schema::{DatasetDataType, DatasetError, DatasetSchema, ScalarKind},
+    schema::DatasetError,
     semantics::{
         DatasetSemanticManifest, IndexRealization, ManifestError, RECORD_ID_COLUMN, ScanAxisMode,
-        ScanAxisValue, is_hidden_system_column, read_manifest_optional,
+        ScanAxisValue, is_hidden_system_column, read_manifest,
     },
     storage::{
         ChunkReader,
@@ -99,11 +100,10 @@ impl DatasetSource {
 
 pub struct DatasetReader {
     source: DatasetSource,
-    schema: Option<DatasetSchema>,
     physical_arrow_schema: SchemaRef,
     arrow_schema: SchemaRef,
     visible_columns: Vec<usize>,
-    manifest: Option<DatasetSemanticManifest>,
+    manifest: DatasetSemanticManifest,
     dataset_path: Option<PathBuf>,
 }
 
@@ -221,15 +221,15 @@ fn select_data_owned(
 
 fn visible_projection_from_manifest(
     physical_schema: &SchemaRef,
-    manifest: Option<&DatasetSemanticManifest>,
+    manifest: &DatasetSemanticManifest,
 ) -> Result<(SchemaRef, Vec<usize>), DatasetError> {
     let visible_columns: Vec<_> = physical_schema
         .fields()
         .iter()
         .enumerate()
         .filter_map(|(index, field)| {
-            let manifest_column = manifest.and_then(|manifest| manifest.columns.get(field.name()));
-            (!is_hidden_system_column(field.name(), manifest_column)).then_some(index)
+            let manifest_column = manifest.columns.get(field.name());
+            (!is_hidden_system_column(manifest_column)).then_some(index)
         })
         .collect();
     let visible_schema = Arc::new(physical_schema.project(&visible_columns)?);
@@ -252,6 +252,15 @@ fn project_batch(
     )?)
 }
 
+pub(crate) fn read_required_manifest(path: &Path) -> Result<DatasetSemanticManifest, ReadError> {
+    read_manifest(path).map_err(|error| match error {
+        ManifestError::Io(error) if error.kind() == io::ErrorKind::NotFound => {
+            ReadError::MissingManifest
+        }
+        error => error.into(),
+    })
+}
+
 impl DatasetReader {
     pub(crate) fn from_handle(
         source: WriteSessionHandle,
@@ -263,15 +272,13 @@ impl DatasetReader {
             .validate_against_arrow_schema(physical_arrow_schema.as_ref())
             .map_err(ManifestError::from)?;
         let (arrow_schema, visible_columns) =
-            visible_projection_from_manifest(&physical_arrow_schema, Some(&manifest))?;
-        let schema = arrow_schema.as_ref().try_into().ok();
+            visible_projection_from_manifest(&physical_arrow_schema, &manifest)?;
         Ok(Self {
             source: DatasetSource::WriteSession(source),
-            schema,
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
-            manifest: Some(manifest),
+            manifest,
             dataset_path,
         })
     }
@@ -280,28 +287,20 @@ impl DatasetReader {
         let mut reader = ChunkReader::new(path.to_owned(), None);
         reader.read_all()?;
         let physical_arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
-        let manifest = read_manifest_optional(path)?.ok_or(ReadError::MissingManifest)?;
+        let manifest = read_required_manifest(path)?;
         manifest
             .validate_against_arrow_schema(physical_arrow_schema.as_ref())
             .map_err(ManifestError::from)?;
         let (arrow_schema, visible_columns) =
-            visible_projection_from_manifest(&physical_arrow_schema, Some(&manifest))?;
-        let schema = arrow_schema.as_ref().try_into().ok();
+            visible_projection_from_manifest(&physical_arrow_schema, &manifest)?;
         Ok(Self {
             source: DatasetSource::File(reader),
-            schema,
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
-            manifest: Some(manifest),
+            manifest,
             dataset_path: Some(path.to_owned()),
         })
-    }
-
-    pub fn schema(&self) -> Result<&DatasetSchema, ReadError> {
-        self.schema
-            .as_ref()
-            .ok_or(ReadError::Dataset(DatasetError::IncompatibleType))
     }
 
     #[must_use]
@@ -359,22 +358,18 @@ impl DatasetReader {
     }
 
     pub fn interpret(&self) -> Result<DatasetInterpretation, ReadError> {
-        if let Some(manifest) = &self.manifest {
-            manifest
-                .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
-                .map_err(ManifestError::from)?;
-            let inferred_axis_columns = manifest_allows_minimal_axis_inference(manifest)
-                .then(|| self.infer_minimal_axis_columns().ok().flatten())
-                .flatten();
-            return Ok(resolve_from_manifest_with_minimal_axis_inference(
-                self.physical_arrow_schema.as_ref(),
-                manifest,
-                &self.visible_columns,
-                inferred_axis_columns,
-            ));
-        }
-
-        Err(ReadError::MissingManifest)
+        self.manifest
+            .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
+            .map_err(ManifestError::from)?;
+        let inferred_axis_columns = manifest_allows_minimal_axis_inference(&self.manifest)
+            .then(|| self.infer_minimal_axis_columns().ok().flatten())
+            .flatten();
+        Ok(resolve_from_manifest_with_minimal_axis_inference(
+            self.physical_arrow_schema.as_ref(),
+            &self.manifest,
+            &self.visible_columns,
+            inferred_axis_columns,
+        ))
     }
 
     pub fn logical_index_points(&self) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
@@ -386,25 +381,22 @@ impl DatasetReader {
         &self,
         record_ids: &[u64],
     ) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
-        let Some(manifest) = &self.manifest else {
-            return Err(ReadError::MissingManifest);
-        };
-        manifest
+        self.manifest
             .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
             .map_err(ManifestError::from)?;
-        if manifest.scan_plan.is_none() {
+        if self.manifest.scan_plan.is_none() {
             return Ok(Vec::new());
         }
-        if manifest.realization.index_realization == IndexRealization::Sidecar {
+        if self.manifest.realization.index_realization == IndexRealization::Sidecar {
             if record_ids.is_empty() {
                 return Ok(Vec::new());
             }
             let Some(path) = &self.dataset_path else {
                 return Err(ReadError::DatasetFs(DatasetFsError::ChunkNotFound));
             };
-            return Self::sidecar_logical_index_points(path, manifest, record_ids);
+            return Self::sidecar_logical_index_points(path, &self.manifest, record_ids);
         }
-        Ok(resolve_logical_index_points(manifest, record_ids))
+        Ok(resolve_logical_index_points(&self.manifest, record_ids))
     }
 
     fn sidecar_logical_index_points(
@@ -499,7 +491,6 @@ impl DatasetReader {
     }
 
     fn infer_minimal_axis_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
-        let schema = self.schema()?;
         if self.source.num_rows() < 2 {
             Ok(None)
         } else {
@@ -512,13 +503,8 @@ impl DatasetReader {
             let sample =
                 concat_batches(&self.arrow_schema, &samples).expect("Should have same schema");
             let mut result = vec![];
-            for (index, (sample_array, column_type)) in sample
-                .columns()
-                .iter()
-                .zip(schema.columns().values())
-                .enumerate()
-            {
-                if !matches!(column_type, DatasetDataType::Scalar(ScalarKind::Numeric)) {
+            for (index, sample_array) in sample.columns().iter().enumerate() {
+                if !sample_array.data_type().is_numeric() {
                     break;
                 }
                 result.push(index);

@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, BufReader},
+    io::BufReader,
     path::{Path, PathBuf},
 };
 
@@ -19,20 +19,6 @@ pub fn read_manifest(
     let manifest: DatasetSemanticManifest = serde_json::from_reader(BufReader::new(file))?;
     manifest.validate()?;
     Ok(manifest)
-}
-
-pub fn read_manifest_optional(
-    dataset_dir: impl AsRef<Path>,
-) -> Result<Option<DatasetSemanticManifest>, ManifestError> {
-    match File::open(manifest_path(dataset_dir.as_ref())) {
-        Ok(file) => {
-            let manifest: DatasetSemanticManifest = serde_json::from_reader(BufReader::new(file))?;
-            manifest.validate()?;
-            Ok(Some(manifest))
-        }
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error.into()),
-    }
 }
 
 pub fn write_manifest(
@@ -66,8 +52,7 @@ mod tests {
 
     use crate::dataset::{
         semantics::{
-            DatasetDType, DatasetSemanticManifest, ManifestColumn, read_manifest,
-            read_manifest_optional, write_manifest,
+            DatasetDType, DatasetSemanticManifest, ManifestColumn, read_manifest, write_manifest,
         },
         storage::layout::manifest_path,
     };
@@ -77,15 +62,6 @@ mod tests {
             "signal".to_string(),
             ManifestColumn::new(DatasetDType::Float64),
         )]))
-    }
-
-    #[test]
-    fn optional_read_returns_none_when_manifest_is_absent() {
-        let dir = tempdir().expect("temp dir");
-
-        let read = read_manifest_optional(dir.path()).expect("optional read");
-
-        assert_eq!(read, None);
     }
 
     #[test]

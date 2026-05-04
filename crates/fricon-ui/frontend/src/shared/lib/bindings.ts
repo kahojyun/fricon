@@ -73,21 +73,42 @@ export type ChartSemanticAxis = {
 	name: string,
 	label: string | null,
 	kind: ChartSemanticAxisKind,
-	numeric: boolean,
+	semantic: ChartSemanticDescriptor,
+	capabilities: ChartSemanticCapabilities,
 	isInferredAxis: boolean,
-	physicalColumn: string | null,
 };
 
 export type ChartSemanticAxisKind = "logical_index" | "column";
+
+export type ChartSemanticCapabilities = {
+	numericCoordinate: boolean,
+	filterable: boolean,
+	groupable: boolean,
+	traceSource: boolean,
+	complexProjectable: boolean,
+	plottableValue: boolean,
+};
 
 export type ChartSemanticColumn = {
 	id: string,
 	name: string,
 	label: string | null,
-	isComplex: boolean,
-	isTrace: boolean,
+	semantic: ChartSemanticDescriptor,
+	capabilities: ChartSemanticCapabilities,
 	hiddenByDefault: boolean,
 };
+
+export type ChartSemanticDescriptor = {
+	valueKind: ChartSemanticValueKind,
+	shapeKind: ChartSemanticShapeKind,
+	role: ChartSemanticRole,
+};
+
+export type ChartSemanticRole = "value" | "logical_index" | "system" | "display";
+
+export type ChartSemanticShapeKind = "scalar" | "trace";
+
+export type ChartSemanticValueKind = "numeric" | "categorical" | "boolean" | "timestamp" | "complex" | "display";
 
 export type ChartSemantics = {
 	duplicatePolicy: ChartDuplicatePolicy,
@@ -101,8 +122,8 @@ export type ColumnInfo = {
 	name: string,
 	label: string | null,
 	unit: string | null,
-	isComplex: boolean,
-	isTrace: boolean,
+	semantic: ChartSemanticDescriptor,
+	capabilities: ChartSemanticCapabilities,
 	isInferredAxis: boolean,
 	hiddenByDefault: boolean,
 	isChartAxisCandidate: boolean,

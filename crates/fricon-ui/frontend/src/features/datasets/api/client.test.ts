@@ -19,6 +19,31 @@ vi.mock("@/shared/lib/bindings", () => ({
 
 import { getDatasetDetail, listDatasets } from "./client";
 
+const numericSemantic = {
+  valueKind: "numeric" as const,
+  shapeKind: "scalar" as const,
+  role: "value" as const,
+};
+
+const numericAxisSemantic = {
+  ...numericSemantic,
+  role: "logical_index" as const,
+};
+
+const numericCapabilities = {
+  numericCoordinate: true,
+  filterable: true,
+  groupable: true,
+  traceSource: false,
+  complexProjectable: false,
+  plottableValue: true,
+};
+
+const numericAxisCapabilities = {
+  ...numericCapabilities,
+  plottableValue: false,
+};
+
 describe("dataset client", () => {
   beforeEach(() => {
     datasetDetailCommandMock.mockReset();
@@ -94,8 +119,8 @@ describe("dataset client", () => {
             name: "signal",
             label: "Signal",
             unit: "V",
-            isComplex: false,
-            isTrace: false,
+            semantic: numericSemantic,
+            capabilities: numericCapabilities,
             isInferredAxis: false,
             hiddenByDefault: true,
             isChartAxisCandidate: true,
@@ -110,9 +135,9 @@ describe("dataset client", () => {
               name: "gate",
               label: "Gate",
               kind: "logical_index",
-              numeric: true,
+              semantic: numericAxisSemantic,
+              capabilities: numericAxisCapabilities,
               isInferredAxis: false,
-              physicalColumn: null,
             },
           ],
           valueColumns: [
@@ -120,8 +145,8 @@ describe("dataset client", () => {
               id: "column:signal",
               name: "signal",
               label: "Signal",
-              isComplex: false,
-              isTrace: false,
+              semantic: numericSemantic,
+              capabilities: numericCapabilities,
               hiddenByDefault: true,
             },
           ],
@@ -144,8 +169,8 @@ describe("dataset client", () => {
         name: "signal",
         label: "Signal",
         unit: "V",
-        isComplex: false,
-        isTrace: false,
+        semantic: numericSemantic,
+        capabilities: numericCapabilities,
         isInferredAxis: false,
         hiddenByDefault: true,
         isChartAxisCandidate: true,
@@ -160,9 +185,9 @@ describe("dataset client", () => {
           name: "gate",
           label: "Gate",
           kind: "logical_index",
-          numeric: true,
+          semantic: numericAxisSemantic,
+          capabilities: numericAxisCapabilities,
           isInferredAxis: false,
-          physicalColumn: null,
         },
       ],
       valueColumns: [
@@ -170,8 +195,8 @@ describe("dataset client", () => {
           id: "column:signal",
           name: "signal",
           label: "Signal",
-          isComplex: false,
-          isTrace: false,
+          semantic: numericSemantic,
+          capabilities: numericCapabilities,
           hiddenByDefault: true,
         },
       ],

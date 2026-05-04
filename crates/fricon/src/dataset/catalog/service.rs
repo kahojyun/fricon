@@ -688,7 +688,7 @@ mod tests {
     }
 
     fn create_import_archive(root: &Path, uid: Uuid, name: &str) -> std::path::PathBuf {
-        create_import_archive_with_manifest(root, uid, name, None)
+        create_import_archive_with_manifest(root, uid, name, Some(b"{\"manifest_version\":1}"))
     }
 
     fn create_import_archive_with_manifest(

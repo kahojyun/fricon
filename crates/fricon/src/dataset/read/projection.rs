@@ -16,10 +16,11 @@ use indexmap::IndexMap;
 use crate::dataset::{
     interpret::{
         DatasetInterpretation, ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint,
-        ResolvedScanAxisMode, ResolvedSemanticReference, physical_column_id,
+        ResolvedScanAxisMode, ResolvedSemanticCapabilities, ResolvedSemanticDescriptor,
+        ResolvedSemanticReference, physical_column_id,
     },
     read::{DatasetReader, SelectOptions},
-    schema::{DatasetDataType, DatasetSchema, ScalarKind},
+    schema::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind},
     semantics::ScanAxisValue,
 };
 
@@ -39,7 +40,8 @@ pub struct ProjectedSemanticAxis {
     pub id: String,
     pub column_name: String,
     pub label: String,
-    pub numeric: bool,
+    pub semantic: ResolvedSemanticDescriptor,
+    pub capabilities: ResolvedSemanticCapabilities,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -52,7 +54,7 @@ pub struct ProjectedSemanticRoles {
 #[derive(Debug)]
 pub struct ProjectedSemanticSource {
     pub batch: RecordBatch,
-    pub schema: DatasetSchema,
+    pub schema: DatasetPhysicalSchema,
     pub row_indices: Vec<usize>,
     pub semantic_column_names: HashMap<String, String>,
     pub roles: ProjectedSemanticRoles,
@@ -77,17 +79,17 @@ pub fn project_semantic_source(
     options: &SemanticProjectionOptions<'_>,
 ) -> Result<ProjectedSemanticSource> {
     let interpretation = dataset.interpret()?;
-    let source_schema = dataset.schema()?.clone();
+    let source_schema = dataset.arrow_schema().clone();
     let (start, end) = resolve_row_range(dataset, options.start, options.end);
     let selected_physical_columns = selected_physical_columns(
-        &source_schema,
+        source_schema.as_ref(),
         &interpretation,
         options.selected_columns,
         options.filters,
     );
     let selected_schema = selected_physical_columns.as_deref().map_or_else(
-        || project_all_schema(&source_schema),
-        |columns| project_schema(&source_schema, columns),
+        || project_all_schema(source_schema.as_ref()),
+        |columns| project_schema(source_schema.as_ref(), columns),
     )?;
     let batch = if matches!(selected_physical_columns.as_deref(), Some([])) {
         empty_row_count_batch(end.saturating_sub(start))?
@@ -115,7 +117,7 @@ pub fn project_semantic_source(
 
 fn project_selected_batch(
     dataset: &DatasetReader,
-    source_schema: &DatasetSchema,
+    source_schema: &DatasetPhysicalSchema,
     interpretation: &DatasetInterpretation,
     batch: RecordBatch,
     start: usize,
@@ -153,7 +155,7 @@ fn project_selected_batch(
 }
 
 fn selected_physical_columns(
-    source_schema: &DatasetSchema,
+    source_schema: &Schema,
     interpretation: &DatasetInterpretation,
     selected_columns: Option<&[usize]>,
     filters: &[(String, serde_json::Value)],
@@ -162,7 +164,7 @@ fn selected_physical_columns(
 
     let mut physical_columns = Vec::new();
     for &index in selected_columns {
-        if index < source_schema.columns().len() {
+        if index < source_schema.fields().len() {
             push_unique(&mut physical_columns, index);
         }
     }
@@ -170,7 +172,7 @@ fn selected_physical_columns(
         let Some(column_name) = source_column_name_for_semantic_id(interpretation, field) else {
             continue;
         };
-        if let Some((index, _, _)) = source_schema.columns().get_full(&column_name) {
+        if let Some((index, _)) = source_schema.column_with_name(&column_name) {
             push_unique(&mut physical_columns, index);
         }
     }
@@ -221,21 +223,24 @@ fn semantic_filter_mask(
     Ok(Some(mask))
 }
 
-fn project_all_schema(source_schema: &DatasetSchema) -> Result<DatasetSchema> {
-    let columns = (0..source_schema.columns().len()).collect::<Vec<_>>();
+fn project_all_schema(source_schema: &Schema) -> Result<DatasetPhysicalSchema> {
+    let columns = (0..source_schema.fields().len()).collect::<Vec<_>>();
     project_schema(source_schema, &columns)
 }
 
-fn project_schema(source_schema: &DatasetSchema, columns: &[usize]) -> Result<DatasetSchema> {
+fn project_schema(source_schema: &Schema, columns: &[usize]) -> Result<DatasetPhysicalSchema> {
     let mut projected = IndexMap::new();
     for &index in columns {
-        let (name, dtype) = source_schema
-            .columns()
-            .get_index(index)
+        let field = source_schema
+            .fields()
+            .get(index)
             .with_context(|| format!("Selected dataset column index out of bounds: {index}"))?;
-        projected.insert(alias_physical_column_name(name), *dtype);
+        projected.insert(
+            alias_physical_column_name(field.name()),
+            DatasetPhysicalType::try_from(field.data_type())?,
+        );
     }
-    Ok(DatasetSchema::new(projected))
+    Ok(DatasetPhysicalSchema::new(projected))
 }
 
 fn empty_row_count_batch(row_count: usize) -> Result<RecordBatch> {
@@ -274,7 +279,7 @@ fn projected_column_name_for_semantic_id(
     }
 }
 
-fn rename_batch(batch: &RecordBatch, schema: &DatasetSchema) -> Result<RecordBatch> {
+fn rename_batch(batch: &RecordBatch, schema: &DatasetPhysicalSchema) -> Result<RecordBatch> {
     let arrow_schema = Arc::new(schema.to_arrow_schema());
     if arrow_schema.fields().is_empty() {
         return Ok(RecordBatch::try_new_with_options(
@@ -354,7 +359,7 @@ fn coerce_numeric_to_float64(column: &dyn Array) -> Result<ArrayRef> {
 fn append_logical_axes(
     dataset: &DatasetReader,
     interpretation: &DatasetInterpretation,
-    schema: &mut DatasetSchema,
+    schema: &mut DatasetPhysicalSchema,
     batch: RecordBatch,
     row_indices: &mut Vec<usize>,
     start: usize,
@@ -399,10 +404,10 @@ fn append_logical_axes(
     for (axis_index, axis) in interpretation.scan_axes.iter().enumerate() {
         let id = axis.id.clone();
         let values = logical_axis_values(&kept_record_ids, &point_by_record_id, axis_index);
-        if axis.numeric_axis {
+        if axis.capabilities.numeric_coordinate {
             fields.push(Arc::new(Field::new(&id, DataType::Float64, true)));
             arrays.push(numeric_axis_array(&values));
-            columns.insert(id, DatasetDataType::Scalar(ScalarKind::Numeric));
+            columns.insert(id, DatasetPhysicalType::Scalar(ScalarKind::Numeric));
         } else {
             fields.push(Arc::new(Field::new(
                 &id,
@@ -410,17 +415,20 @@ fn append_logical_axes(
                 true,
             )));
             arrays.push(logical_axis_array(&axis.mode, &values));
-            columns.insert(id, DatasetDataType::Scalar(ScalarKind::Complex));
+            columns.insert(
+                id,
+                DatasetPhysicalType::Scalar(logical_axis_scalar_kind(&axis.mode)),
+            );
         }
     }
-    *schema = DatasetSchema::new(columns);
+    *schema = DatasetPhysicalSchema::new(columns);
     batch = RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays)?;
     Ok(batch)
 }
 
 fn semantic_column_names(
     interpretation: &DatasetInterpretation,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
 ) -> HashMap<String, String> {
     interpretation
         .semantic_references
@@ -431,7 +439,7 @@ fn semantic_column_names(
 
 fn projected_column_name(
     reference: &ResolvedSemanticReference,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
 ) -> Option<(String, String)> {
     match reference {
         ResolvedSemanticReference::PhysicalColumn(column) => {
@@ -450,13 +458,13 @@ fn projected_column_name(
 
 fn projected_roles(
     interpretation: &DatasetInterpretation,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
 ) -> ProjectedSemanticRoles {
     ProjectedSemanticRoles {
         sweep_columns: projected_reference_columns(
             &interpretation.sweep_axes,
             schema,
-            ResolvedSemanticReference::numeric_axis,
+            ResolvedSemanticReference::numeric_coordinate,
         ),
         group_columns: projected_reference_columns(&interpretation.group_axes, schema, |_| true),
         filter_columns: projected_reference_columns(&interpretation.filter_axes, schema, |_| true),
@@ -465,7 +473,7 @@ fn projected_roles(
 
 fn projected_reference_columns(
     references: &[ResolvedSemanticReference],
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     predicate: impl Fn(&ResolvedSemanticReference) -> bool,
 ) -> Vec<usize> {
     references
@@ -494,7 +502,8 @@ fn projected_axes(
                         id: column.id.clone(),
                         column_name,
                         label: column.label.clone().unwrap_or_else(|| column.name.clone()),
-                        numeric: column.numeric_axis,
+                        semantic: column.semantic,
+                        capabilities: column.capabilities,
                     }
                 })
             }
@@ -506,7 +515,8 @@ fn projected_axes(
                     id: axis.id.clone(),
                     column_name: axis.id.clone(),
                     label: axis.label.clone().unwrap_or_else(|| axis.name.clone()),
-                    numeric: axis.numeric_axis,
+                    semantic: axis.semantic,
+                    capabilities: axis.capabilities,
                 }),
         })
         .collect()
@@ -587,6 +597,15 @@ fn logical_axis_data_type(mode: &ResolvedScanAxisMode) -> DataType {
                 DataType::Utf8
             }
         }
+    }
+}
+
+fn logical_axis_scalar_kind(mode: &ResolvedScanAxisMode) -> ScalarKind {
+    match logical_axis_data_type(mode) {
+        DataType::Boolean => ScalarKind::Boolean,
+        DataType::Float64 => ScalarKind::Numeric,
+        DataType::Utf8 => ScalarKind::Utf8,
+        _ => unreachable!("logical scan axes only use bool, numeric, or string arrays"),
     }
 }
 
@@ -760,11 +779,12 @@ mod tests {
     use crate::dataset::{
         interpret::{
             ColumnMeaning, PhysicalColumnOrdinal, ResolvedIndexRealization,
-            ResolvedPhysicalColumnReference, VisibleColumnOrdinal, resolve_from_manifest,
+            ResolvedPhysicalColumnReference, ResolvedSemanticCapabilities,
+            ResolvedSemanticDescriptor, VisibleColumnOrdinal, resolve_from_manifest,
         },
         semantics::{
             DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, ScanAxis,
-            ScanAxisValue, ScanPlan,
+            ScanAxisValue, ScanPlan, SemanticRole, SemanticShapeKind, SemanticValueKind,
         },
     };
 
@@ -801,12 +821,23 @@ mod tests {
         meaning: ColumnMeaning,
         is_inferred_axis: bool,
     ) -> ResolvedSemanticReference {
+        let semantic = ResolvedSemanticDescriptor::new(
+            SemanticValueKind::Numeric,
+            SemanticShapeKind::Scalar,
+            if is_inferred_axis {
+                SemanticRole::LogicalIndex
+            } else {
+                SemanticRole::Value
+            },
+        );
         ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
             id: id.to_string(),
             name: name.to_string(),
             physical_ordinal: PhysicalColumnOrdinal(0),
             visible_ordinal: Some(VisibleColumnOrdinal(0)),
             dtype: DatasetDType::Float64,
+            semantic,
+            capabilities: ResolvedSemanticCapabilities::for_descriptor(semantic),
             meaning,
             is_system: false,
             is_inferred_axis,
@@ -814,9 +845,6 @@ mod tests {
             is_chart_axis_candidate: true,
             unit: None,
             label: None,
-            is_complex: false,
-            is_trace: false,
-            numeric_axis: true,
         })
     }
 
@@ -849,16 +877,10 @@ mod tests {
 
     #[test]
     fn selected_physical_columns_keep_requested_payloads_and_filter_axes() {
-        let source_schema = DatasetSchema::new(IndexMap::from([
-            (
-                "quantity".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
-            ),
-            (
-                "axis".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
-            ),
-        ]));
+        let source_schema = Schema::new(vec![
+            Field::new("quantity", DataType::Float64, false),
+            Field::new("axis", DataType::Float64, false),
+        ]);
         let interpretation = empty_interpretation();
 
         let selected = selected_physical_columns(
@@ -884,9 +906,9 @@ mod tests {
             vec![Arc::new(Int64Array::from(vec![1_i64, 2_i64])) as ArrayRef],
         )
         .expect("source batch");
-        let target_schema = DatasetSchema::new(IndexMap::from([(
+        let target_schema = DatasetPhysicalSchema::new(IndexMap::from([(
             "axis".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
+            DatasetPhysicalType::Scalar(ScalarKind::Numeric),
         )]));
 
         let renamed = rename_batch(&batch, &target_schema).expect("renamed batch");
@@ -901,10 +923,11 @@ mod tests {
 
     #[test]
     fn prefixed_physical_columns_keep_column_namespace() {
-        let source_schema = DatasetSchema::new(IndexMap::from([(
-            "logicalIndex:gate".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
-        )]));
+        let source_schema = Schema::new(vec![Field::new(
+            "logicalIndex:gate",
+            DataType::Float64,
+            false,
+        )]);
         let projected = project_schema(&source_schema, &[0]).expect("project schema");
 
         assert!(projected.columns().contains_key("column:logicalIndex:gate"));
@@ -938,18 +961,18 @@ mod tests {
 
     #[test]
     fn roles_use_sweep_axes_not_chart_axis_candidates() {
-        let schema = DatasetSchema::new(IndexMap::from([
+        let schema = DatasetPhysicalSchema::new(IndexMap::from([
             (
                 "signal".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
+                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
             ),
             (
                 "physicalAxis".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
+                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
             ),
             (
                 "logicalIndex:gate".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
+                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
             ),
         ]));
         let mut physical_axis = ManifestColumn::new(DatasetDType::Float64);
@@ -973,7 +996,7 @@ mod tests {
         let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1, 2]);
 
         let columns = projected_reference_columns(&interpretation.sweep_axes, &schema, |axis| {
-            axis.numeric_axis()
+            axis.numeric_coordinate()
         });
 
         assert_eq!(columns, vec![2]);
@@ -981,9 +1004,9 @@ mod tests {
 
     #[test]
     fn group_roles_include_categorical_logical_axes() {
-        let schema = DatasetSchema::new(IndexMap::from([(
+        let schema = DatasetPhysicalSchema::new(IndexMap::from([(
             "logicalIndex:gate".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Complex),
+            DatasetPhysicalType::Scalar(ScalarKind::Utf8),
         )]));
         let manifest = DatasetSemanticManifest::minimal([(
             "signal".to_string(),
@@ -1003,14 +1026,56 @@ mod tests {
         let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1]);
 
         assert_eq!(
+            interpretation.scan_axes[0].semantic.value_kind,
+            SemanticValueKind::Categorical
+        );
+        assert_eq!(
             projected_reference_columns(&interpretation.group_axes, &schema, |_| true),
             vec![0]
         );
         assert_eq!(
             projected_reference_columns(&interpretation.sweep_axes, &schema, |axis| {
-                axis.numeric_axis()
+                axis.numeric_coordinate()
             }),
             Vec::<usize>::new()
+        );
+    }
+
+    #[test]
+    fn logical_axis_projection_preserves_numeric_boolean_and_implicit_kinds() {
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![
+            ScanAxis::static_values(
+                "gate",
+                vec![ScanAxisValue::Float(0.0), ScanAxisValue::Float(1.0)],
+            ),
+            ScanAxis::static_values(
+                "enabled",
+                vec![ScanAxisValue::Bool(false), ScanAxisValue::Bool(true)],
+            ),
+            ScanAxis::implicit_index("step", None),
+        ])));
+        let arrow_schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]);
+
+        let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1]);
+
+        assert_eq!(
+            interpretation
+                .scan_axes
+                .iter()
+                .map(|axis| axis.semantic.value_kind)
+                .collect::<Vec<_>>(),
+            vec![
+                SemanticValueKind::Numeric,
+                SemanticValueKind::Boolean,
+                SemanticValueKind::Numeric,
+            ]
         );
     }
 

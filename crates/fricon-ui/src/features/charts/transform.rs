@@ -7,7 +7,7 @@ pub(crate) mod xy;
 use anyhow::{Context, Result, bail};
 use arrow_array::{Array, BooleanArray, Float64Array, RecordBatch, StringArray};
 use arrow_schema::DataType;
-use fricon::{DatasetArray, DatasetSchema};
+use fricon::{DatasetArray, DatasetPhysicalSchema};
 
 pub(crate) use self::{
     heatmap::build_heatmap_series, live_heatmap::build_live_heatmap_series,
@@ -49,7 +49,7 @@ pub(super) fn group_series_id(group_start: usize) -> String {
 }
 
 pub(super) fn resolve_xy_trace_roles(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     role_columns: SemanticRoleColumns<'_>,
     options: &XYTraceRoleOptions,
     draw_style: XYDrawStyle,
@@ -91,7 +91,7 @@ pub(super) fn resolve_xy_trace_roles(
 
 pub(super) fn compute_group_starts(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     group_columns: &[usize],
 ) -> Vec<usize> {
     let num_rows = batch.num_rows();
@@ -137,7 +137,7 @@ pub(super) fn group_ranges(starts: &[usize], num_rows: usize) -> Vec<(usize, usi
 
 pub(super) fn last_outer_group_start(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: &[usize],
     outer_index_count: usize,
 ) -> usize {
@@ -153,7 +153,7 @@ pub(super) fn last_outer_group_start(
 
 pub(super) fn row_order_for_group(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     start: usize,
     end: usize,
     sweep: Option<usize>,
@@ -183,7 +183,7 @@ pub(super) fn row_order_for_group(
 
 pub(super) fn make_group_label(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     group_columns: &[usize],
     row: usize,
 ) -> Option<String> {
@@ -206,7 +206,7 @@ pub(super) fn make_group_label(
 
 pub(super) fn make_group_id_suffix(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     group_columns: &[usize],
     row: usize,
 ) -> Option<String> {
@@ -239,7 +239,7 @@ pub(super) fn format_numeric_value(value: f64) -> String {
 }
 
 fn resolve_named_index_columns(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: &[usize],
     names: &[String],
 ) -> Result<Vec<usize>> {
@@ -255,7 +255,7 @@ fn resolve_named_index_columns(
 }
 
 fn resolve_named_group_column(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     group_columns: &[usize],
     name: &str,
 ) -> Result<usize> {
@@ -270,7 +270,7 @@ fn resolve_named_group_column(
 }
 
 fn resolve_named_index_column(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: &[usize],
     name: &str,
 ) -> Result<usize> {
@@ -359,7 +359,7 @@ pub(super) mod test_utils {
 
     use arrow_array::{Float64Array, RecordBatch};
     use arrow_schema::{DataType, Field};
-    use fricon::{DatasetDataType, DatasetSchema, ScalarKind};
+    use fricon::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind};
     use indexmap::IndexMap;
 
     /// Build a `RecordBatch` from named Float64 columns.
@@ -375,13 +375,18 @@ pub(super) mod test_utils {
         RecordBatch::try_new(Arc::new(arrow_schema::Schema::new(fields)), arrays).unwrap()
     }
 
-    /// Build a `DatasetSchema` where every column is `Scalar(Numeric)`.
-    pub(crate) fn numeric_schema(names: &[&str]) -> DatasetSchema {
-        let columns: IndexMap<String, DatasetDataType> = names
+    /// Build a `DatasetPhysicalSchema` where every column is `Scalar(Numeric)`.
+    pub(crate) fn numeric_schema(names: &[&str]) -> DatasetPhysicalSchema {
+        let columns: IndexMap<String, DatasetPhysicalType> = names
             .iter()
-            .map(|n| (n.to_string(), DatasetDataType::Scalar(ScalarKind::Numeric)))
+            .map(|n| {
+                (
+                    n.to_string(),
+                    DatasetPhysicalType::Scalar(ScalarKind::Numeric),
+                )
+            })
             .collect();
-        DatasetSchema::new(columns)
+        DatasetPhysicalSchema::new(columns)
     }
 }
 
@@ -391,7 +396,7 @@ mod tests {
 
     use arrow_array::{Float64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, Schema};
-    use fricon::{DatasetDataType, DatasetSchema, ScalarKind};
+    use fricon::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind};
     use indexmap::IndexMap;
 
     use super::{
@@ -448,14 +453,14 @@ mod tests {
             ],
         )
         .unwrap();
-        let schema = DatasetSchema::new(IndexMap::from([
+        let schema = DatasetPhysicalSchema::new(IndexMap::from([
             (
                 "logicalIndex:gate".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Complex),
+                DatasetPhysicalType::Scalar(ScalarKind::Utf8),
             ),
             (
                 "sweep".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
+                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
             ),
         ]));
 
@@ -492,9 +497,9 @@ mod tests {
 
     #[test]
     fn resolve_xy_trace_roles_allows_categorical_logical_group_without_numeric_indices() {
-        let schema = DatasetSchema::new(IndexMap::from([(
+        let schema = DatasetPhysicalSchema::new(IndexMap::from([(
             "logicalIndex:gate".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Complex),
+            DatasetPhysicalType::Scalar(ScalarKind::Utf8),
         )]));
         let roles = resolve_xy_trace_roles(
             &schema,

@@ -2,7 +2,7 @@
 //!
 //! # Ownership
 //!
-//! This module owns the archive format (tar+zstd with `metadata.json`, optional
+//! This module owns the archive format (tar+zstd with `metadata.json`,
 //! `dataset_manifest.json`, and `data/data_chunk_*.arrow` entries) and the
 //! filesystem-side import workflow. Database writes and event publishing stay
 //! in higher layers
@@ -25,7 +25,7 @@
 //!
 //! ```text
 //! metadata.json             <- ExportedMetadata (JSON, includes archive version)
-//! dataset_manifest.json     <- optional semantic manifest sidecar
+//! dataset_manifest.json     <- semantic manifest sidecar
 //! data/data_chunk_0.arrow   <- Arrow IPC chunk files
 //! data/data_chunk_1.arrow
 //! logical_index/logical_index_chunk_0.arrow <- optional logical-index chunks
@@ -79,6 +79,8 @@ pub enum PortabilityError {
     Zstd(io::Error),
     #[error("Archive does not contain a metadata entry")]
     MissingMetadata,
+    #[error("Dataset archive does not contain a semantic manifest entry")]
+    MissingManifest,
     #[error(
         "Dataset archive format version {found} is newer than the supported version {supported}. \
          Please update fricon to import this archive"
@@ -177,7 +179,7 @@ pub struct StagedImport {
 
 /// Export a single dataset to a `.tar.zst` archive inside `output_dir`.
 ///
-/// The archive contains `metadata.json`, optional `dataset_manifest.json`, and
+/// The archive contains `metadata.json`, `dataset_manifest.json`, and
 /// `data_chunk_*.arrow` files copied from `dataset_dir`.
 ///
 /// The archive name is `{created_at:%Y%m%d_%H%M%S}_{sanitized_name}.tar.zst`.
@@ -209,9 +211,10 @@ pub fn export_dataset(
 
     // --- dataset_manifest.json ---
     let manifest_path = dataset_dir.join(MANIFEST_FILENAME);
-    if manifest_path.is_file() {
-        tar.append_path_with_name(&manifest_path, MANIFEST_ENTRY)?;
+    if !manifest_path.is_file() {
+        return Err(PortabilityError::MissingManifest);
     }
+    tar.append_path_with_name(&manifest_path, MANIFEST_ENTRY)?;
 
     // --- data chunk files ---
     if dataset_dir.is_dir() {
@@ -297,6 +300,10 @@ pub fn stage_import(
     extract_archive(archive_path, &staging_dir).inspect_err(|_| {
         let _ = fs::remove_dir_all(&staging_dir);
     })?;
+    if !staging_dir.join(MANIFEST_FILENAME).is_file() {
+        let _ = fs::remove_dir_all(&staging_dir);
+        return Err(PortabilityError::MissingManifest);
+    }
     Ok(StagedImport {
         metadata,
         staging_dir,
@@ -695,6 +702,7 @@ mod tests {
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
         dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
 
         let uid = Uuid::new_v4();
         let meta = make_metadata(uid, "my-dataset");
@@ -718,6 +726,7 @@ mod tests {
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
         dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
 
         let uid = Uuid::new_v4();
         let meta = make_metadata(uid, "duplicate-name");
@@ -736,6 +745,7 @@ mod tests {
         let tmp = TempDir::new().expect("temp dir");
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_manifest_file(&ds_dir);
 
         let uid = Uuid::new_v4();
         let meta = make_metadata(uid, "noidstest");
@@ -797,7 +807,7 @@ mod tests {
     }
 
     #[test]
-    fn export_omits_manifest_sidecar_when_absent() {
+    fn export_rejects_missing_manifest_sidecar() {
         let tmp = TempDir::new().expect("temp dir");
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
@@ -807,13 +817,8 @@ mod tests {
         let meta = make_metadata(uid, "without-manifest");
         let output_dir = tmp.path().join("exports");
 
-        let archive = export_dataset(&meta, &ds_dir, &output_dir).expect("export");
-        let entries = archive_entry_names(&archive);
-
-        assert!(
-            !entries.iter().any(|entry| entry == MANIFEST_ENTRY),
-            "manifest should not be exported when missing"
-        );
+        let error = export_dataset(&meta, &ds_dir, &output_dir).expect_err("missing manifest");
+        assert!(matches!(error, PortabilityError::MissingManifest));
     }
 
     #[test]
@@ -822,6 +827,7 @@ mod tests {
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
         dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
         dummy_logical_index_chunk_file(&ds_dir);
 
         let uid = Uuid::new_v4();
@@ -842,6 +848,7 @@ mod tests {
         let tmp = TempDir::new().expect("temp dir");
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_manifest_file(&ds_dir);
 
         let uid = Uuid::new_v4();
         let meta = make_metadata(uid, "preview-test");
@@ -902,6 +909,7 @@ mod tests {
         let tmp = TempDir::new().expect("temp dir");
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
+        dummy_manifest_file(&ds_dir);
 
         let uid = Uuid::new_v4();
         let meta = make_metadata(uid, "incoming-name");
@@ -927,6 +935,7 @@ mod tests {
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
         dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
 
         let uid = Uuid::new_v4();
         let meta = make_metadata(uid, "import-test");
@@ -946,8 +955,8 @@ mod tests {
             "metadata file should not be extracted into staging"
         );
         assert!(
-            !staged.staging_dir.join(MANIFEST_FILENAME).exists(),
-            "missing manifest should not be synthesized during staging"
+            staged.staging_dir.join(MANIFEST_FILENAME).exists(),
+            "manifest sidecar should be extracted to staging"
         );
         assert!(
             !dest.exists(),
@@ -992,6 +1001,7 @@ mod tests {
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
         dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
         dummy_logical_index_chunk_file(&ds_dir);
 
         let uid = Uuid::new_v4();
@@ -1037,6 +1047,18 @@ mod tests {
         metadata_header.set_cksum();
         tar.append_data(&mut metadata_header, METADATA_ENTRY, json_bytes.as_slice())
             .expect("metadata entry");
+
+        let manifest_bytes = b"{\"manifest_version\":1}";
+        let mut manifest_header = tar::Header::new_gnu();
+        manifest_header.set_size(manifest_bytes.len() as u64);
+        manifest_header.set_mode(0o644);
+        manifest_header.set_cksum();
+        tar.append_data(
+            &mut manifest_header,
+            MANIFEST_ENTRY,
+            manifest_bytes.as_slice(),
+        )
+        .expect("manifest entry");
 
         let good_bytes = b"GOOD";
         let mut good_header = tar::Header::new_gnu();
@@ -1292,6 +1314,7 @@ mod tests {
         let ds_dir = tmp.path().join("dataset");
         fs::create_dir_all(&ds_dir).expect("create dataset dir");
         dummy_chunk_file(&ds_dir);
+        dummy_manifest_file(&ds_dir);
 
         let uid = Uuid::new_v4();
         let meta = make_metadata(uid, "dataset-中文-01");

@@ -52,6 +52,18 @@ class TestDatasetOperations:
         )
 
     @staticmethod
+    def _semantic(
+        value_kind: str,
+        shape_kind: str = "scalar",
+        role: str = "value",
+    ) -> dict[str, str]:
+        return {
+            "value_kind": value_kind,
+            "shape_kind": shape_kind,
+            "role": role,
+        }
+
+    @staticmethod
     def _assert_semantic_manifest_defaults(
         manifest: dict[str, object],
         *,
@@ -62,6 +74,11 @@ class TestDatasetOperations:
         columns = cast("dict[str, object]", manifest["columns"])
         assert cast("dict[str, object]", columns["__ds_record_id"]) == {
             "dtype": {"kind": "uint64"},
+            "semantic": {
+                "value_kind": "numeric",
+                "shape_kind": "scalar",
+                "role": "system",
+            },
             "system": {"kind": "record_id"},
         }
         realization = cast("dict[str, object]", manifest["realization"])
@@ -128,12 +145,14 @@ class TestDatasetOperations:
             columns = cast("dict[str, object]", manifest["columns"])
             voltage = cast("dict[str, object]", columns["voltage"])
             assert voltage["dtype"] == {"kind": "float64"}
+            assert voltage["semantic"] == self._semantic("numeric")
             assert voltage["unit"] == "V"
             assert voltage["label"] == "Voltage"
             assert voltage["hidden_by_default"] is True
             assert voltage["chart_axis"] is True
             measurement = cast("dict[str, object]", columns["measurement"])
             assert measurement["dtype"] == {"kind": "complex128"}
+            assert measurement["semantic"] == self._semantic("complex")
             assert dataset.to_arrow().column_names == ["voltage", "measurement"]
 
             server_handle.shutdown()
@@ -160,6 +179,7 @@ class TestDatasetOperations:
             columns = cast("dict[str, object]", manifest["columns"])
             phase = cast("dict[str, object]", columns["phase"])
             assert phase["dtype"] == {"kind": "float64"}
+            assert phase["semantic"] == self._semantic("numeric")
             assert phase["unit"] == "rad"
 
             server_handle.shutdown()

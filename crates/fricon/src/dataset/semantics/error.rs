@@ -32,6 +32,26 @@ pub enum ManifestValidationError {
     InvalidSystemColumn { name: String },
     #[error("System column {name} cannot carry user column metadata")]
     InvalidSystemColumnMetadata { name: String },
+    #[error(
+        "Dataset semantic manifest column {name} has invalid semantic shape {shape_kind} for \
+         dtype {dtype}"
+    )]
+    InvalidSemanticShape {
+        name: String,
+        dtype: String,
+        shape_kind: String,
+    },
+    #[error(
+        "Dataset semantic manifest column {name} has invalid semantic value kind {value_kind} for \
+         dtype {dtype}"
+    )]
+    InvalidSemanticValueKind {
+        name: String,
+        dtype: String,
+        value_kind: String,
+    },
+    #[error("Dataset semantic manifest column {name} has invalid semantic role {role}")]
+    InvalidSemanticRole { name: String, role: String },
     #[error("Dataset semantic manifest v1 requires append_only=true")]
     AppendOnlyRequired,
     #[error("Dataset semantic manifest scan plan must contain at least one axis")]
