@@ -282,8 +282,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn filter_data_includes_compatibility_axes_for_simple_semantic_datasets()
-    -> anyhow::Result<()> {
+    async fn filter_data_includes_inferred_axes_for_simple_semantic_datasets() -> anyhow::Result<()>
+    {
         let temp_dir = TempDir::new()?;
         WorkspaceRoot::create_new(temp_dir.path())?;
         let app_manager =

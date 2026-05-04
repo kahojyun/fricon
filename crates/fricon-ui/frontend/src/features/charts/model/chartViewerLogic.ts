@@ -54,18 +54,11 @@ function stripSemanticPrefix(value: string) {
 }
 
 function semanticValueOptions(
-  columns: ColumnInfo[],
+  _columns: ColumnInfo[],
   chartSemantics?: ChartSemantics | null,
 ): ChartColumnOption[] {
   if (!chartSemantics) {
-    return columns
-      .filter((column) => !column.isIndex)
-      .map((column) => ({
-        ...column,
-        label: column.label ?? null,
-        hiddenByDefault: column.hiddenByDefault ?? false,
-        numeric: true,
-      }));
+    return [];
   }
 
   const values = chartSemantics.valueColumns.map((column) => ({
@@ -73,7 +66,7 @@ function semanticValueOptions(
     label: column.label ?? column.name,
     isComplex: column.isComplex,
     isTrace: column.isTrace,
-    isIndex: false,
+    isInferredAxis: false,
     hiddenByDefault: column.hiddenByDefault,
     numeric: false,
   }));
@@ -85,18 +78,11 @@ function semanticValueOptions(
 }
 
 function semanticAxisOptions(
-  columns: ColumnInfo[],
+  _columns: ColumnInfo[],
   chartSemantics?: ChartSemantics | null,
 ): ChartColumnOption[] {
   if (!chartSemantics) {
-    return columns
-      .filter((column) => column.isIndex)
-      .map((column) => ({
-        ...column,
-        label: column.label ?? null,
-        hiddenByDefault: column.hiddenByDefault ?? false,
-        numeric: true,
-      }));
+    return [];
   }
 
   const seen = new Set<string>();
@@ -120,9 +106,9 @@ function semanticAxisOptions(
       label: axis.label ?? axis.name,
       isComplex: false,
       isTrace: false,
-      isIndex: true,
+      isInferredAxis: true,
       hiddenByDefault: false,
-      isChartAxisCandidate: axis.kind === "column" && !axis.isCompatibility,
+      isChartAxisCandidate: axis.kind === "column" && !axis.isInferredAxis,
       numeric: axis.numeric,
     }));
 }

@@ -17,9 +17,8 @@ use itertools::Itertools;
 use crate::dataset::{
     ingest::WriteSessionHandle,
     interpret::{
-        DatasetInterpretation, ResolvedLogicalIndexPoint,
-        manifest_allows_compatibility_index_projection, resolve_from_compatibility_inference,
-        resolve_from_manifest_with_compatibility_inference, resolve_logical_index_points,
+        DatasetInterpretation, ResolvedLogicalIndexPoint, manifest_allows_minimal_axis_inference,
+        resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
@@ -237,14 +236,6 @@ fn visible_projection_from_manifest(
     Ok((visible_schema, visible_columns))
 }
 
-fn visible_projection_legacy(
-    physical_schema: &SchemaRef,
-) -> Result<(SchemaRef, Vec<usize>), DatasetError> {
-    let visible_columns: Vec<_> = (0..physical_schema.fields().len()).collect();
-    let visible_schema = Arc::new(physical_schema.project(&visible_columns)?);
-    Ok((visible_schema, visible_columns))
-}
-
 fn project_batch(
     batch: &RecordBatch,
     output_schema: SchemaRef,
@@ -291,17 +282,12 @@ impl DatasetReader {
         let mut reader = ChunkReader::new(path.to_owned(), None);
         reader.read_all()?;
         let physical_arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
-        let manifest = read_manifest_optional(path)?;
-        if let Some(manifest) = manifest.as_ref() {
-            manifest
-                .validate_against_arrow_schema(physical_arrow_schema.as_ref())
-                .map_err(ManifestError::from)?;
-        }
-        let (arrow_schema, visible_columns) = if manifest.is_some() {
-            visible_projection_from_manifest(&physical_arrow_schema, manifest.as_ref())?
-        } else {
-            visible_projection_legacy(&physical_arrow_schema)?
-        };
+        let manifest = read_manifest_optional(path)?.ok_or(ReadError::MissingManifest)?;
+        manifest
+            .validate_against_arrow_schema(physical_arrow_schema.as_ref())
+            .map_err(ManifestError::from)?;
+        let (arrow_schema, visible_columns) =
+            visible_projection_from_manifest(&physical_arrow_schema, Some(&manifest))?;
         let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::File(reader),
@@ -309,7 +295,7 @@ impl DatasetReader {
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
-            manifest,
+            manifest: Some(manifest),
             dataset_path: Some(path.to_owned()),
         })
     }
@@ -379,22 +365,18 @@ impl DatasetReader {
             manifest
                 .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
-            let compatibility_index_columns =
-                manifest_allows_compatibility_index_projection(manifest)
-                    .then(|| self.try_index_columns().ok().flatten())
-                    .flatten();
-            return Ok(resolve_from_manifest_with_compatibility_inference(
+            let inferred_axis_columns = manifest_allows_minimal_axis_inference(manifest)
+                .then(|| self.infer_minimal_axis_columns().ok().flatten())
+                .flatten();
+            return Ok(resolve_from_manifest_with_minimal_axis_inference(
                 self.physical_arrow_schema.as_ref(),
                 manifest,
                 &self.visible_columns,
-                compatibility_index_columns,
+                inferred_axis_columns,
             ));
         }
 
-        Ok(resolve_from_compatibility_inference(
-            self.schema()?,
-            self.try_index_columns()?,
-        ))
+        Err(ReadError::MissingManifest)
     }
 
     pub fn logical_index_points(&self) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
@@ -407,7 +389,7 @@ impl DatasetReader {
         record_ids: &[u64],
     ) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
         let Some(manifest) = &self.manifest else {
-            return Ok(Vec::new());
+            return Err(ReadError::MissingManifest);
         };
         manifest
             .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
@@ -518,12 +500,7 @@ impl DatasetReader {
         Ok(record_ids)
     }
 
-    #[must_use]
-    pub fn index_columns(&self) -> Option<Vec<usize>> {
-        self.try_index_columns().ok().flatten()
-    }
-
-    pub fn try_index_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
+    fn infer_minimal_axis_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
         let schema = self.schema()?;
         if self.source.num_rows() < 2 {
             Ok(None)

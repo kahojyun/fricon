@@ -797,7 +797,7 @@ mod tests {
         id: &str,
         name: &str,
         meaning: ColumnMeaning,
-        is_compatibility: bool,
+        is_inferred_axis: bool,
     ) -> ResolvedSemanticReference {
         ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
             id: id.to_string(),
@@ -806,9 +806,8 @@ mod tests {
             visible_ordinal: Some(VisibleColumnOrdinal(0)),
             dtype: DatasetDType::Float64,
             meaning,
-            is_index: matches!(meaning, ColumnMeaning::CompatibilityIndex),
             is_system: false,
-            is_compatibility,
+            is_inferred_axis,
             hidden_by_default: false,
             is_chart_axis_candidate: true,
             unit: None,
@@ -827,7 +826,7 @@ mod tests {
             label: None,
             hidden_by_default: false,
             numeric_axis,
-            is_compatibility: false,
+            is_inferred_axis: false,
         })
     }
 
@@ -870,7 +869,7 @@ mod tests {
                 DatasetDataType::Scalar(ScalarKind::Numeric),
             ),
         ]));
-        let interpretation = empty_interpretation(InterpretationSource::CompatibilityInference);
+        let interpretation = empty_interpretation(InterpretationSource::Manifest);
 
         let selected = selected_physical_columns(
             &source_schema,
@@ -922,7 +921,7 @@ mod tests {
     }
 
     #[test]
-    fn projected_axes_find_unaliased_prefixed_compatibility_columns() {
+    fn projected_axes_find_unaliased_prefixed_inferred_axis_columns() {
         let source_schema = Arc::new(Schema::new(vec![Field::new(
             "logicalIndex:gate",
             DataType::Float64,
@@ -936,7 +935,7 @@ mod tests {
         let reference = physical_reference(
             "column:logicalIndex:gate",
             "logicalIndex:gate",
-            ColumnMeaning::CompatibilityIndex,
+            ColumnMeaning::InferredAxis,
             true,
         );
 

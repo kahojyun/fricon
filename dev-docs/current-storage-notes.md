@@ -58,7 +58,7 @@ directory. A dataset is modeled as one logical Arrow table split across
 
 New datasets created through ingest also store `dataset_manifest.json` beside
 the chunk files. The manifest records v1 dataset semantic columns, realization
-defaults, optional scan plans, and compatibility settings. New semantic datasets
+defaults, optional scan plans, and inference settings. New semantic datasets
 physically materialize the Fricon-owned `__ds_record_id: uint64` system column
 as the first Arrow column. Earlier transition snapshots may contain manifests
 that declare `__ds_record_id` before the Arrow chunks materialized that column.
@@ -79,15 +79,15 @@ description, favorite state, status, timestamps, and tags as represented by
 `DatasetRecord` / `DatasetMetadata`.
 
 Dataset payload facts live in Arrow chunk files. Dataset semantic defaults,
-optional scan plans, and compatibility settings for new ingested datasets live
+optional scan plans, and inference settings for new ingested datasets live
 in `dataset_manifest.json`.
 
 Dataset archives store catalog metadata in `metadata.json`, Arrow payload chunks
 under `data/data_chunk_<n>.arrow`, logical-index chunks under
 `logical_index/logical_index_chunk_<n>.arrow` when present, and
 `dataset_manifest.json` as an optional root sidecar when the source dataset has
-one. Archives without a manifest remain valid and are read through
-compatibility inference.
+one. Dataset readers require manifests; manifest-free payloads are not
+supported by the semantic read path in this PR.
 
 ## Write Buffering
 

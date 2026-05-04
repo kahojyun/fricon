@@ -27,7 +27,7 @@ export interface ColumnInfo {
   label?: string | null;
   isComplex: boolean;
   isTrace: boolean;
-  isIndex: boolean;
+  isInferredAxis: boolean;
   hiddenByDefault?: boolean;
   isChartAxisCandidate?: boolean;
 }
@@ -49,15 +49,15 @@ export interface ChartSemanticAxis {
   label: string | null;
   kind: ChartSemanticAxisKind;
   numeric: boolean;
-  isCompatibility: boolean;
+  isInferredAxis: boolean;
   physicalColumn: string | null;
 }
 
 export interface ChartSemantics {
-  source: "manifest" | "compatibility_inference";
+  source: "manifest";
   duplicatePolicy:
     | "latest_by_record_id"
-    | "compatibility_row_order_placeholder";
+    | "row_order_placeholder";
   indexRealization: "none" | "implicit" | "sidecar";
   axes: ChartSemanticAxis[];
   valueColumns: ChartSemanticColumn[];

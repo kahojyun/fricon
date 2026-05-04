@@ -11,12 +11,9 @@ pub use self::model::{
     ResolvedScanAxisMode, ResolvedSemanticReference, VisibleColumnOrdinal, logical_index_id,
     physical_column_id,
 };
-use crate::dataset::{
-    schema::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
-    semantics::{
-        DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault, IndexRealization,
-        ScanAxisMode, ScanAxisValue, SystemColumn, TraceAxisDType, TraceLayout, TraceValueDType,
-    },
+use crate::dataset::semantics::{
+    DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault, IndexRealization,
+    ScanAxisMode, ScanAxisValue, SystemColumn, TraceValueDType,
 };
 
 pub(crate) fn resolve_from_manifest(
@@ -55,7 +52,7 @@ pub(crate) fn resolve_from_manifest(
                 } else {
                     ColumnMeaning::UserValue
                 },
-                is_index: false,
+                is_inferred_axis: false,
                 is_system: is_record_id,
                 hidden_by_default: is_record_id || column.hidden_by_default,
                 is_chart_axis_candidate: column.chart_axis,
@@ -108,26 +105,24 @@ pub(crate) fn resolve_from_manifest(
     }
 }
 
-pub(crate) fn resolve_from_manifest_with_compatibility_inference(
+pub(crate) fn resolve_from_manifest_with_minimal_axis_inference(
     arrow_schema: &Schema,
     manifest: &DatasetSemanticManifest,
     visible_columns: &[usize],
-    index_columns: Option<Vec<usize>>,
+    inferred_axis_columns: Option<Vec<usize>>,
 ) -> DatasetInterpretation {
     let mut interpretation = resolve_from_manifest(arrow_schema, manifest, visible_columns);
-    if manifest_allows_compatibility_index_projection(manifest) {
-        apply_compatibility_index_projection(
+    if manifest_allows_minimal_axis_inference(manifest) {
+        apply_minimal_axis_inference(
             &mut interpretation,
-            index_columns.unwrap_or_default(),
+            inferred_axis_columns.unwrap_or_default(),
         );
     }
     interpretation
 }
 
-pub(crate) fn manifest_allows_compatibility_index_projection(
-    manifest: &DatasetSemanticManifest,
-) -> bool {
-    manifest.compatibility.allow_inference
+pub(crate) fn manifest_allows_minimal_axis_inference(manifest: &DatasetSemanticManifest) -> bool {
+    manifest.inference.allow_axis_inference
         && manifest.scan_plan.is_none()
         && manifest.columns.values().all(|column| {
             column.system.is_some()
@@ -180,29 +175,29 @@ fn manifest_role_projections(
     }
 }
 
-fn apply_compatibility_index_projection(
+fn apply_minimal_axis_inference(
     interpretation: &mut DatasetInterpretation,
-    index_columns: Vec<usize>,
+    inferred_axis_columns: Vec<usize>,
 ) {
-    let index_columns = index_columns
+    let inferred_axis_columns = inferred_axis_columns
         .into_iter()
         .map(VisibleColumnOrdinal)
         .collect::<Vec<_>>();
-    let index_column_set: HashSet<_> = index_columns.iter().copied().collect();
+    let inferred_axis_column_set: HashSet<_> = inferred_axis_columns.iter().copied().collect();
 
     for column in &mut interpretation.columns {
         if column.meaning == ColumnMeaning::UserValue
             && column
                 .visible_ordinal
-                .is_some_and(|ordinal| index_column_set.contains(&ordinal))
+                .is_some_and(|ordinal| inferred_axis_column_set.contains(&ordinal))
         {
-            column.meaning = ColumnMeaning::CompatibilityIndex;
-            column.is_index = true;
+            column.meaning = ColumnMeaning::InferredAxis;
+            column.is_inferred_axis = true;
             column.is_chart_axis_candidate = true;
         }
     }
 
-    let role_projections = manifest_with_compatibility_role_projections(&interpretation.columns);
+    let role_projections = manifest_with_inferred_axis_role_projections(&interpretation.columns);
     interpretation.semantic_references = role_projections.semantic_references;
     interpretation.value_references = role_projections.value_references;
     interpretation.plotted_coordinates = role_projections.plotted_coordinates;
@@ -216,24 +211,24 @@ fn apply_compatibility_index_projection(
         .filter(|column| column.meaning == ColumnMeaning::UserValue)
         .filter_map(|column| column.visible_ordinal)
         .collect();
-    interpretation.logical_index_columns = index_columns.clone();
+    interpretation.logical_index_columns = inferred_axis_columns.clone();
     interpretation.chart_axis_candidate_columns = interpretation
         .columns
         .iter()
         .filter(|column| column.is_chart_axis_candidate)
         .filter_map(|column| column.visible_ordinal)
         .collect();
-    if !index_columns.is_empty() {
-        interpretation.duplicate_policy = ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder;
+    if !inferred_axis_columns.is_empty() {
+        interpretation.duplicate_policy = ResolvedDuplicatePolicy::RowOrderPlaceholder;
     }
 }
 
-fn manifest_with_compatibility_role_projections(columns: &[ResolvedColumn]) -> RoleProjections {
+fn manifest_with_inferred_axis_role_projections(columns: &[ResolvedColumn]) -> RoleProjections {
     let value_references = physical_column_references(columns, false, |column| {
         column.meaning == ColumnMeaning::UserValue
     });
-    let compatibility_axes = physical_column_references(columns, true, |column| {
-        column.meaning == ColumnMeaning::CompatibilityIndex
+    let inferred_axes = physical_column_references(columns, true, |column| {
+        column.meaning == ColumnMeaning::InferredAxis
     });
     let chart_axis_candidates = physical_column_references(columns, false, |column| {
         column.meaning == ColumnMeaning::UserValue
@@ -241,19 +236,19 @@ fn manifest_with_compatibility_role_projections(columns: &[ResolvedColumn]) -> R
             && column.visible_ordinal.is_some()
     });
     let semantic_references = physical_column_references(columns, false, |_| true);
-    let mut plotted_coordinates = compatibility_axes.clone();
+    let mut plotted_coordinates = inferred_axes.clone();
     plotted_coordinates.extend(chart_axis_candidates.clone());
-    let mut filter_axes = compatibility_axes.clone();
+    let mut filter_axes = inferred_axes.clone();
     filter_axes.extend(chart_axis_candidates.clone());
-    let mut all_chart_axis_candidates = compatibility_axes.clone();
+    let mut all_chart_axis_candidates = inferred_axes.clone();
     all_chart_axis_candidates.extend(chart_axis_candidates);
 
     RoleProjections {
         semantic_references,
         value_references,
         plotted_coordinates,
-        sweep_axes: compatibility_axes.clone(),
-        group_axes: compatibility_axes,
+        sweep_axes: inferred_axes.clone(),
+        group_axes: inferred_axes,
         filter_axes,
         chart_axis_candidates: all_chart_axis_candidates,
     }
@@ -261,13 +256,13 @@ fn manifest_with_compatibility_role_projections(columns: &[ResolvedColumn]) -> R
 
 fn physical_column_references(
     columns: &[ResolvedColumn],
-    is_compatibility: bool,
+    is_inferred_axis: bool,
     predicate: impl Fn(&ResolvedColumn) -> bool,
 ) -> Vec<ResolvedSemanticReference> {
     columns
         .iter()
         .filter(|column| predicate(column))
-        .map(|column| column.as_semantic_reference(is_compatibility))
+        .map(|column| column.as_semantic_reference(is_inferred_axis))
         .collect()
 }
 
@@ -375,122 +370,6 @@ pub(crate) fn resolve_logical_index_points(
         .collect()
 }
 
-pub(crate) fn resolve_from_compatibility_inference(
-    schema: &DatasetSchema,
-    index_columns: Option<Vec<usize>>,
-) -> DatasetInterpretation {
-    let index_columns = index_columns.unwrap_or_default();
-    let index_columns: Vec<_> = index_columns
-        .into_iter()
-        .map(VisibleColumnOrdinal)
-        .collect();
-    let index_column_set: HashSet<_> = index_columns.iter().copied().collect();
-
-    let columns: Vec<_> = schema
-        .columns()
-        .iter()
-        .enumerate()
-        .map(|(ordinal, (name, data_type))| {
-            let visible_ordinal = VisibleColumnOrdinal(ordinal);
-            let is_index = index_column_set.contains(&visible_ordinal);
-            let dtype = dataset_dtype_from_compatibility_type(*data_type);
-            ResolvedColumn {
-                id: physical_column_id(name),
-                name: name.to_owned(),
-                physical_ordinal: PhysicalColumnOrdinal(ordinal),
-                visible_ordinal: Some(visible_ordinal),
-                dtype: dtype.clone(),
-                meaning: if is_index {
-                    ColumnMeaning::CompatibilityIndex
-                } else {
-                    ColumnMeaning::UserValue
-                },
-                is_index,
-                is_system: false,
-                hidden_by_default: false,
-                is_chart_axis_candidate: is_index,
-                unit: None,
-                label: None,
-                is_complex: dtype_is_complex(&dtype),
-                is_trace: dtype_is_trace(&dtype),
-                is_numeric_axis_candidate: dtype_is_chart_axis_numeric(&dtype),
-            }
-        })
-        .collect();
-
-    let value_columns = columns
-        .iter()
-        .filter(|column| column.meaning == ColumnMeaning::UserValue)
-        .filter_map(|column| column.visible_ordinal)
-        .collect();
-    let role_projections = compatibility_role_projections(&columns);
-
-    DatasetInterpretation {
-        columns,
-        semantic_references: role_projections.semantic_references,
-        value_references: role_projections.value_references,
-        plotted_coordinates: role_projections.plotted_coordinates,
-        sweep_axes: role_projections.sweep_axes,
-        group_axes: role_projections.group_axes,
-        filter_axes: role_projections.filter_axes,
-        chart_axis_candidates: role_projections.chart_axis_candidates,
-        value_columns,
-        logical_index_columns: index_columns.clone(),
-        chart_axis_candidate_columns: index_columns,
-        duplicate_policy: ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder,
-        index_realization: ResolvedIndexRealization::None,
-        scan_axes: Vec::new(),
-        source: InterpretationSource::CompatibilityInference,
-    }
-}
-
-fn compatibility_role_projections(columns: &[ResolvedColumn]) -> RoleProjections {
-    let value_references = physical_column_references(columns, true, |column| {
-        column.meaning == ColumnMeaning::UserValue
-    });
-    let compatibility_axes = physical_column_references(columns, true, |column| {
-        column.meaning == ColumnMeaning::CompatibilityIndex
-    });
-    let semantic_references = physical_column_references(columns, true, |_| true);
-
-    RoleProjections {
-        semantic_references,
-        value_references,
-        plotted_coordinates: compatibility_axes.clone(),
-        sweep_axes: compatibility_axes.clone(),
-        group_axes: compatibility_axes.clone(),
-        filter_axes: compatibility_axes.clone(),
-        chart_axis_candidates: compatibility_axes,
-    }
-}
-
-fn dataset_dtype_from_compatibility_type(data_type: DatasetDataType) -> DatasetDType {
-    match data_type {
-        DatasetDataType::Scalar(ScalarKind::Numeric) => DatasetDType::Float64,
-        DatasetDataType::Scalar(ScalarKind::Complex) => DatasetDType::Complex128,
-        DatasetDataType::Trace(trace_kind, scalar_kind) => DatasetDType::Trace {
-            layout: trace_layout_from_compatibility_type(trace_kind),
-            axis: TraceAxisDType::Float64,
-            value: trace_value_from_compatibility_type(scalar_kind),
-        },
-    }
-}
-
-fn trace_layout_from_compatibility_type(trace_kind: TraceKind) -> TraceLayout {
-    match trace_kind {
-        TraceKind::Simple => TraceLayout::Simple,
-        TraceKind::FixedStep => TraceLayout::FixedStep,
-        TraceKind::VariableStep => TraceLayout::VariableStep,
-    }
-}
-
-fn trace_value_from_compatibility_type(scalar_kind: ScalarKind) -> TraceValueDType {
-    match scalar_kind {
-        ScalarKind::Numeric => TraceValueDType::Float64,
-        ScalarKind::Complex => TraceValueDType::Complex128,
-    }
-}
-
 fn dtype_is_complex(dtype: &DatasetDType) -> bool {
     matches!(
         dtype,
@@ -533,14 +412,12 @@ mod tests {
         ColumnMeaning, InterpretationSource, PhysicalColumnOrdinal, ResolvedDuplicatePolicy,
         ResolvedIndexRealization, ResolvedLogicalIndexPoint, ResolvedScanAxisMode,
         ResolvedSemanticReference, VisibleColumnOrdinal, resolve_from_manifest,
-        resolve_logical_index_points,
+        resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     };
     use crate::dataset::{
         DatasetReader,
         ingest::WriteSessionRegistry,
-        interpret::resolve_from_compatibility_inference,
         read::{ReadError, SelectOptions},
-        schema::DatasetSchema,
         semantics::{
             DatasetDType, DatasetSemanticManifest, IndexRealization, ManifestColumn,
             RECORD_ID_COLUMN, ScanAxis, ScanAxisValue, ScanPlan, write_manifest,
@@ -587,7 +464,7 @@ mod tests {
         assert_eq!(record_id.visible_ordinal, None);
         assert_eq!(record_id.meaning, ColumnMeaning::SystemRecordId);
         assert_eq!(record_id.dtype, DatasetDType::UInt64);
-        assert!(!record_id.is_index);
+        assert!(!record_id.is_inferred_axis);
         assert!(record_id.is_system);
         assert!(record_id.hidden_by_default);
         assert!(!record_id.is_chart_axis_candidate);
@@ -783,23 +660,39 @@ mod tests {
     }
 
     #[test]
-    fn compatibility_interpretation_uses_legacy_index_columns() {
-        let schema = DatasetSchema::try_from(&Schema::new(vec![
+    fn minimal_manifest_inference_uses_row_shape_axis_columns() {
+        let schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
             Field::new("run", DataType::Float64, false),
             Field::new("step", DataType::Float64, false),
             Field::new("signal", DataType::Float64, false),
-        ]))
-        .expect("schema");
+        ]);
+        let manifest = DatasetSemanticManifest::minimal([
+            (
+                "run".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+            (
+                "step".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+            (
+                "signal".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+        ]);
 
-        let interpretation = resolve_from_compatibility_inference(&schema, Some(vec![0, 1]));
-
-        assert_eq!(
-            interpretation.source,
-            InterpretationSource::CompatibilityInference
+        let interpretation = resolve_from_manifest_with_minimal_axis_inference(
+            &schema,
+            &manifest,
+            &[1, 2, 3],
+            Some(vec![0, 1]),
         );
+
+        assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
             interpretation.duplicate_policy,
-            ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder
+            ResolvedDuplicatePolicy::RowOrderPlaceholder
         );
         assert_eq!(interpretation.logical_index_columns, visible(&[0, 1]));
         assert_eq!(
@@ -826,31 +719,46 @@ mod tests {
             interpretation
                 .sweep_axes
                 .iter()
-                .all(ResolvedSemanticReference::is_compatibility)
+                .all(ResolvedSemanticReference::is_inferred_axis)
         );
         assert_eq!(interpretation.value_columns, visible(&[2]));
         assert_eq!(
-            interpretation.columns[0].meaning,
-            ColumnMeaning::CompatibilityIndex
+            interpretation.columns[1].meaning,
+            ColumnMeaning::InferredAxis
         );
-        assert!(interpretation.columns[0].is_index);
-        assert!(interpretation.columns[0].is_chart_axis_candidate);
-        assert_eq!(interpretation.columns[2].meaning, ColumnMeaning::UserValue);
-        assert!(!interpretation.columns[2].is_index);
+        assert!(interpretation.columns[1].is_inferred_axis);
+        assert!(interpretation.columns[1].is_chart_axis_candidate);
+        assert_eq!(interpretation.columns[3].meaning, ColumnMeaning::UserValue);
+        assert!(!interpretation.columns[3].is_inferred_axis);
     }
 
     #[test]
     fn interpretation_ids_preserve_prefixed_physical_column_names() {
-        let schema = DatasetSchema::try_from(&Schema::new(vec![
+        let schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
             Field::new("logicalIndex:gate", DataType::Float64, false),
             Field::new("column:value", DataType::Float64, false),
-        ]))
-        .expect("schema");
+        ]);
+        let manifest = DatasetSemanticManifest::minimal([
+            (
+                "logicalIndex:gate".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+            (
+                "column:value".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+        ]);
 
-        let interpretation = resolve_from_compatibility_inference(&schema, Some(vec![0]));
+        let interpretation = resolve_from_manifest_with_minimal_axis_inference(
+            &schema,
+            &manifest,
+            &[1, 2],
+            Some(vec![0]),
+        );
 
-        assert_eq!(interpretation.columns[0].id, "column:logicalIndex:gate");
-        assert_eq!(interpretation.columns[1].id, "column:column:value");
+        assert_eq!(interpretation.columns[1].id, "column:logicalIndex:gate");
+        assert_eq!(interpretation.columns[2].id, "column:column:value");
         assert_eq!(
             interpretation
                 .physical_column_for_id("column:logicalIndex:gate")
@@ -868,14 +776,25 @@ mod tests {
     }
 
     #[test]
-    fn compatibility_interpretation_handles_missing_inferred_indexes() {
-        let schema = DatasetSchema::try_from(&Schema::new(vec![
+    fn inferred_axis_interpretation_handles_missing_inferred_indexes() {
+        let schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
             Field::new("run", DataType::Float64, false),
             Field::new("signal", DataType::Float64, false),
-        ]))
-        .expect("schema");
+        ]);
+        let manifest = DatasetSemanticManifest::minimal([
+            (
+                "run".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+            (
+                "signal".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+        ]);
 
-        let interpretation = resolve_from_compatibility_inference(&schema, None);
+        let interpretation =
+            resolve_from_manifest_with_minimal_axis_inference(&schema, &manifest, &[1, 2], None);
 
         assert_eq!(
             interpretation.logical_index_columns,
@@ -886,7 +805,12 @@ mod tests {
             Vec::<VisibleColumnOrdinal>::new()
         );
         assert_eq!(interpretation.value_columns, visible(&[0, 1]));
-        assert!(interpretation.columns.iter().all(|column| !column.is_index));
+        assert!(
+            interpretation
+                .columns
+                .iter()
+                .all(|column| !column.is_inferred_axis)
+        );
     }
 
     #[test]
@@ -931,16 +855,12 @@ mod tests {
         assert_eq!(reader.schema().expect("visible schema").columns().len(), 2);
         assert_eq!(reader.arrow_schema().fields().len(), 2);
         assert_eq!(reader.batches()[0].num_columns(), 2);
-        assert_eq!(
-            reader.try_index_columns().expect("index columns"),
-            Some(vec![0])
-        );
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
             interpretation.duplicate_policy,
-            ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder
+            ResolvedDuplicatePolicy::RowOrderPlaceholder
         );
         assert_eq!(
             interpretation.columns[0].meaning,
@@ -958,9 +878,9 @@ mod tests {
         );
         assert_eq!(
             interpretation.columns[1].meaning,
-            ColumnMeaning::CompatibilityIndex
+            ColumnMeaning::InferredAxis
         );
-        assert!(interpretation.columns[1].is_index);
+        assert!(interpretation.columns[1].is_inferred_axis);
         assert_eq!(
             interpretation
                 .group_axes
@@ -969,7 +889,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["column:run"]
         );
-        assert!(interpretation.group_axes[0].is_compatibility());
+        assert!(interpretation.group_axes[0].is_inferred_axis());
         let selected_columns = interpretation
             .value_columns
             .iter()
@@ -1036,7 +956,12 @@ mod tests {
             Vec::<VisibleColumnOrdinal>::new()
         );
         assert_eq!(interpretation.value_columns, visible(&[0, 1]));
-        assert!(interpretation.columns.iter().all(|column| !column.is_index));
+        assert!(
+            interpretation
+                .columns
+                .iter()
+                .all(|column| !column.is_inferred_axis)
+        );
     }
 
     #[test]
@@ -1475,56 +1400,15 @@ mod tests {
     }
 
     #[test]
-    fn reader_interpretation_falls_back_to_legacy_index_inference() {
+    fn reader_interpretation_rejects_missing_manifest() {
         let dir = tempfile::tempdir().expect("temp dir");
         write_legacy_numeric_dataset(dir.path(), vec![1.0, 1.0], vec![0.0, 1.0]);
 
-        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
-        let interpretation = reader.interpret().expect("interpretation");
+        let Err(error) = DatasetReader::open_dir(dir.path()) else {
+            panic!("manifest should be required");
+        };
 
-        assert_eq!(
-            interpretation.source,
-            InterpretationSource::CompatibilityInference
-        );
-        assert_eq!(interpretation.logical_index_columns, visible(&[0, 1]));
-        assert_eq!(
-            interpretation.chart_axis_candidate_columns,
-            visible(&[0, 1])
-        );
-        assert_eq!(interpretation.value_columns, visible(&[2]));
-        assert_eq!(
-            interpretation.columns[0].meaning,
-            ColumnMeaning::CompatibilityIndex
-        );
-        assert_eq!(
-            interpretation.columns[1].meaning,
-            ColumnMeaning::CompatibilityIndex
-        );
-        assert_eq!(interpretation.columns[2].meaning, ColumnMeaning::UserValue);
-    }
-
-    #[test]
-    fn reader_interpretation_with_less_than_two_rows_has_no_legacy_indexes() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        write_legacy_numeric_dataset(dir.path(), vec![1.0], vec![0.0]);
-
-        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
-        let interpretation = reader.interpret().expect("interpretation");
-
-        assert_eq!(
-            interpretation.source,
-            InterpretationSource::CompatibilityInference
-        );
-        assert_eq!(
-            interpretation.logical_index_columns,
-            Vec::<VisibleColumnOrdinal>::new()
-        );
-        assert_eq!(
-            interpretation.chart_axis_candidate_columns,
-            Vec::<VisibleColumnOrdinal>::new()
-        );
-        assert_eq!(interpretation.value_columns, visible(&[0, 1, 2]));
-        assert!(interpretation.columns.iter().all(|column| !column.is_index));
+        assert!(matches!(error, ReadError::MissingManifest));
     }
 
     fn write_legacy_numeric_dataset(dir: &std::path::Path, run: Vec<f64>, step: Vec<f64>) {

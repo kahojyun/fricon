@@ -510,7 +510,7 @@ mod tests {
         );
         assert_eq!(manifest.columns["id"].dtype, DatasetDType::Float64);
         assert!(manifest.realization.append_only);
-        assert!(manifest.compatibility.allow_inference);
+        assert!(manifest.inference.allow_axis_inference);
     }
 
     #[test]

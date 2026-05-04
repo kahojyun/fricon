@@ -10,7 +10,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { describe, expect, it, vi } from "vitest";
-import type { DatasetDetail } from "../api/types";
+import type { ChartSemantics, DatasetDetail } from "../api/types";
 import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
 import {
   encodeChartSnapshotBufferForTest,
@@ -62,11 +62,46 @@ function createQueryClient() {
 }
 
 function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
+  const columns = overrides.columns ?? [];
   return {
     status: "Completed",
     payloadAvailable: true,
-    columns: [],
+    columns,
+    chartSemantics: makeInferredSemantics(columns),
     ...overrides,
+  };
+}
+
+function makeInferredSemantics(
+  columns: DatasetDetail["columns"],
+): ChartSemantics {
+  const axes = columns
+    .filter((column) => column.isInferredAxis)
+    .map((column) => ({
+      id: column.name,
+      name: column.name,
+      label: column.label ?? null,
+      kind: "column" as const,
+      numeric: true,
+      isInferredAxis: true,
+      physicalColumn: column.name,
+    }));
+  return {
+    source: "manifest",
+    duplicatePolicy: axes.length > 0 ? "row_order_placeholder" : "latest_by_record_id",
+    indexRealization: "none",
+    axes,
+    valueColumns: columns
+      .filter((column) => !column.isInferredAxis)
+      .map((column) => ({
+        id: column.name,
+        name: column.name,
+        label: column.label ?? null,
+        isComplex: column.isComplex,
+        isTrace: column.isTrace,
+        hiddenByDefault: column.hiddenByDefault ?? false,
+      })),
+    chartAxisCandidates: axes,
   };
 }
 
@@ -121,12 +156,12 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              { name: "t", isComplex: false, isTrace: false, isInferredAxis: true },
               {
                 name: "signal",
                 isComplex: false,
                 isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -182,12 +217,12 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              { name: "t", isComplex: false, isTrace: false, isInferredAxis: true },
               {
                 name: "signal",
                 isComplex: false,
                 isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -274,8 +309,8 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
-              { name: "v", isComplex: false, isTrace: false, isIndex: false },
+              { name: "t", isComplex: false, isTrace: false, isInferredAxis: true },
+              { name: "v", isComplex: false, isTrace: false, isInferredAxis: false },
             ],
           })}
         />
@@ -336,13 +371,13 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              { name: "idxA", isComplex: false, isTrace: false, isInferredAxis: true },
+              { name: "idxB", isComplex: false, isTrace: false, isInferredAxis: true },
               {
                 name: "trace_signal",
                 isComplex: false,
                 isTrace: true,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -429,12 +464,12 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              { name: "t", isComplex: false, isTrace: false, isInferredAxis: true },
               {
                 name: "signal",
                 isComplex: false,
                 isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -514,9 +549,9 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
-              { name: "c", isComplex: true, isTrace: false, isIndex: false },
+              { name: "idxA", isComplex: false, isTrace: false, isInferredAxis: true },
+              { name: "idxB", isComplex: false, isTrace: false, isInferredAxis: true },
+              { name: "c", isComplex: true, isTrace: false, isInferredAxis: false },
             ],
           })}
         />
@@ -592,13 +627,13 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              { name: "idxA", isComplex: false, isTrace: false, isInferredAxis: true },
+              { name: "idxB", isComplex: false, isTrace: false, isInferredAxis: true },
               {
                 name: "signal",
                 isComplex: false,
                 isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -665,8 +700,8 @@ describe("ChartViewer", () => {
           datasetDetail={makeDetail({
             status: "Writing",
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
-              { name: "sig", isComplex: true, isTrace: false, isIndex: false },
+              { name: "t", isComplex: false, isTrace: false, isInferredAxis: true },
+              { name: "sig", isComplex: true, isTrace: false, isInferredAxis: false },
             ],
           })}
         />
@@ -758,25 +793,25 @@ describe("ChartViewer", () => {
                 name: "idx_cycle",
                 isComplex: false,
                 isTrace: false,
-                isIndex: true,
+                isInferredAxis: true,
               },
               {
                 name: "idx_y",
                 isComplex: false,
                 isTrace: false,
-                isIndex: true,
+                isInferredAxis: true,
               },
               {
                 name: "idx_x",
                 isComplex: false,
                 isTrace: false,
-                isIndex: true,
+                isInferredAxis: true,
               },
               {
                 name: "complex_impedance_ohm",
                 isComplex: true,
                 isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}

@@ -132,13 +132,13 @@ describe("DatasetExplorerScreen integration", () => {
                 name: "t",
                 isComplex: false,
                 isTrace: false,
-                isIndex: true,
+                isInferredAxis: true,
               },
               {
                 name: "signal",
                 isComplex: false,
                 isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           };

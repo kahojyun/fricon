@@ -16,7 +16,7 @@ pub struct DatasetSemanticManifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scan_plan: Option<ScanPlan>,
     pub realization: Realization,
-    pub compatibility: Compatibility,
+    pub inference: Inference,
 }
 
 impl DatasetSemanticManifest {
@@ -29,7 +29,7 @@ impl DatasetSemanticManifest {
             columns,
             scan_plan: None,
             realization: Realization::default(),
-            compatibility: Compatibility::default(),
+            inference: Inference::default(),
         }
     }
 
@@ -693,14 +693,14 @@ pub enum SystemColumn {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Compatibility {
-    pub allow_inference: bool,
+pub struct Inference {
+    pub allow_axis_inference: bool,
 }
 
-impl Default for Compatibility {
+impl Default for Inference {
     fn default() -> Self {
         Self {
-            allow_inference: true,
+            allow_axis_inference: true,
         }
     }
 }
@@ -858,10 +858,10 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        ColumnMetadata, Compatibility, DatasetDType, DatasetSemanticManifest,
-        DuplicateResolutionDefault, IndexRealization, ManifestColumn, ManifestValidationError,
-        RECORD_ID_COLUMN, Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan,
-        SystemColumn, TraceAxisDType, TraceDType, TraceLayout, TraceValueDType,
+        ColumnMetadata, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
+        IndexRealization, Inference, ManifestColumn, ManifestValidationError, RECORD_ID_COLUMN,
+        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SystemColumn, TraceAxisDType,
+        TraceDType, TraceLayout, TraceValueDType,
     };
 
     fn signal_columns() -> BTreeMap<String, ManifestColumn> {
@@ -895,8 +895,8 @@ mod tests {
                     "index_realization": { "kind": "none" },
                     "duplicate_resolution_default": { "kind": "latest_by_record_id" }
                 },
-                "compatibility": {
-                    "allow_inference": true
+                "inference": {
+                    "allow_axis_inference": true
                 }
             })
         );
@@ -916,7 +916,7 @@ mod tests {
             Some(&ManifestColumn::record_id())
         );
         assert_eq!(manifest.realization, Realization::default());
-        assert_eq!(manifest.compatibility, Compatibility::default());
+        assert_eq!(manifest.inference, Inference::default());
     }
 
     #[test]
@@ -1097,7 +1097,7 @@ mod tests {
             columns: signal_columns(),
             scan_plan: None,
             realization: Realization::default(),
-            compatibility: Compatibility::default(),
+            inference: Inference::default(),
         };
 
         assert_eq!(

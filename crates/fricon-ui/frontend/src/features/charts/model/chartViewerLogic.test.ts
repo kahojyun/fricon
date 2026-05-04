@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  ChartSemantics,
   ColumnInfo,
   DatasetDetail,
   FilterTableData,
@@ -19,7 +20,7 @@ function makeColumn(
     name,
     isComplex: false,
     isTrace: false,
-    isIndex: false,
+    isInferredAxis: false,
     ...rest,
   };
 }
@@ -52,6 +53,44 @@ function makeDatasetDetail(columns: ColumnInfo[]): DatasetDetail {
   };
 }
 
+function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
+  const axes = columns
+    .filter((column) => column.isInferredAxis)
+    .map((column) => ({
+      id: column.name,
+      name: column.name,
+      label: column.label ?? null,
+      kind: "column" as const,
+      numeric: true,
+      isInferredAxis: true,
+      physicalColumn: column.name,
+    }));
+  return {
+    source: "manifest",
+    duplicatePolicy: axes.length > 0 ? "row_order_placeholder" : "latest_by_record_id",
+    indexRealization: "none",
+    axes,
+    valueColumns: columns
+      .filter((column) => !column.isInferredAxis)
+      .map((column) => ({
+        id: column.name,
+        name: column.name,
+        label: column.label ?? null,
+        isComplex: column.isComplex,
+        isTrace: column.isTrace,
+        hiddenByDefault: column.hiddenByDefault ?? false,
+      })),
+    chartAxisCandidates: axes,
+  };
+}
+
+function deriveWithInferredSemantics(
+  columns: ColumnInfo[],
+  state: ChartViewerSelectionState,
+) {
+  return deriveChartViewerState(columns, state, makeInferredSemantics(columns));
+}
+
 function makeFilterTableData(): FilterTableData {
   return {
     fields: ["idxA"],
@@ -66,28 +105,28 @@ function makeFilterTableData(): FilterTableData {
 describe("chartViewerLogic", () => {
   it("defaults trend ordering to the trailing index column", () => {
     const columns = [
-      makeColumn({ name: "idxA", isIndex: true }),
-      makeColumn({ name: "idxB", isIndex: true }),
+      makeColumn({ name: "idxA", isInferredAxis: true }),
+      makeColumn({ name: "idxB", isInferredAxis: true }),
       makeColumn({ name: "signal" }),
     ];
 
-    const derived = deriveChartViewerState(columns, makeState());
+    const derived = deriveWithInferredSemantics(columns, makeState());
 
     expect(derived.effectiveSweepIndexColumnName).toBe("idxB");
   });
 
   it("keeps the same default order-by when style changes", () => {
     const columns = [
-      makeColumn({ name: "idxA", isIndex: true }),
-      makeColumn({ name: "idxB", isIndex: true }),
+      makeColumn({ name: "idxA", isInferredAxis: true }),
+      makeColumn({ name: "idxB", isInferredAxis: true }),
       makeColumn({ name: "signal" }),
     ];
 
-    const lineDerived = deriveChartViewerState(
+    const lineDerived = deriveWithInferredSemantics(
       columns,
       makeState({ plotMode: "complex_plane", drawStyle: "line" }),
     );
-    const pointsDerived = deriveChartViewerState(
+    const pointsDerived = deriveWithInferredSemantics(
       columns,
       makeState({ plotMode: "complex_plane", drawStyle: "points" }),
     );
@@ -98,13 +137,13 @@ describe("chartViewerLogic", () => {
 
   it("defaults scalar heatmap axes to the two trailing index columns", () => {
     const columns = [
-      makeColumn({ name: "idxSlow", isIndex: true }),
-      makeColumn({ name: "idxMid", isIndex: true }),
-      makeColumn({ name: "idxFast", isIndex: true }),
+      makeColumn({ name: "idxSlow", isInferredAxis: true }),
+      makeColumn({ name: "idxMid", isInferredAxis: true }),
+      makeColumn({ name: "idxFast", isInferredAxis: true }),
       makeColumn({ name: "signal" }),
     ];
 
-    const derived = deriveChartViewerState(
+    const derived = deriveWithInferredSemantics(
       columns,
       makeState({ view: "heatmap" }),
     );
@@ -117,7 +156,7 @@ describe("chartViewerLogic", () => {
   it("falls back plot mode to available option", () => {
     const columns = [makeColumn({ name: "c", isComplex: true })];
 
-    const derived = deriveChartViewerState(
+    const derived = deriveWithInferredSemantics(
       columns,
       makeState({ plotMode: "xy" }),
     );
@@ -131,13 +170,13 @@ describe("chartViewerLogic", () => {
 
   it("excludes explicit index roles from filter-table columns", () => {
     const columns = [
-      makeColumn({ name: "idxA", isIndex: true }),
-      makeColumn({ name: "idxB", isIndex: true }),
+      makeColumn({ name: "idxA", isInferredAxis: true }),
+      makeColumn({ name: "idxB", isInferredAxis: true }),
       makeColumn({ name: "xVal" }),
       makeColumn({ name: "yVal" }),
     ];
 
-    const derived = deriveChartViewerState(
+    const derived = deriveWithInferredSemantics(
       columns,
       makeState({
         plotMode: "xy",
@@ -154,10 +193,10 @@ describe("chartViewerLogic", () => {
 
   it("returns null request when filters exist but no resolved row", () => {
     const columns = [
-      makeColumn({ name: "idxA", isIndex: true }),
+      makeColumn({ name: "idxA", isInferredAxis: true }),
       makeColumn({ name: "signal" }),
     ];
-    const derived = deriveChartViewerState(columns, makeState());
+    const derived = deriveWithInferredSemantics(columns, makeState());
 
     const request = buildChartRequest({
       datasetDetail: makeDatasetDetail(columns),
@@ -175,12 +214,12 @@ describe("chartViewerLogic", () => {
 
   it("builds scalar XY requests with explicit group/order roles", () => {
     const columns = [
-      makeColumn({ name: "idxA", isIndex: true }),
-      makeColumn({ name: "idxB", isIndex: true }),
+      makeColumn({ name: "idxA", isInferredAxis: true }),
+      makeColumn({ name: "idxB", isInferredAxis: true }),
       makeColumn({ name: "xVal" }),
       makeColumn({ name: "yVal" }),
     ];
-    const derived = deriveChartViewerState(
+    const derived = deriveWithInferredSemantics(
       columns,
       makeState({
         plotMode: "xy",
@@ -223,13 +262,13 @@ describe("chartViewerLogic", () => {
 
   it("preserves trace XY selections when scalar XY columns are also available", () => {
     const columns = [
-      makeColumn({ name: "idxA", isIndex: true }),
+      makeColumn({ name: "idxA", isInferredAxis: true }),
       makeColumn({ name: "scalarX" }),
       makeColumn({ name: "scalarY" }),
       makeColumn({ name: "traceX", isTrace: true }),
       makeColumn({ name: "traceY", isTrace: true }),
     ];
-    const derived = deriveChartViewerState(
+    const derived = deriveWithInferredSemantics(
       columns,
       makeState({
         plotMode: "xy",
@@ -272,7 +311,7 @@ describe("chartViewerLogic", () => {
 
   it("uses resolved chart semantics for value and logical axis defaults", () => {
     const columns = [
-      makeColumn({ name: "legacyGuess", isIndex: true }),
+      makeColumn({ name: "inferredGuess", isInferredAxis: true }),
       makeColumn({ name: "hiddenValue" }),
       makeColumn({ name: "signal" }),
     ];
@@ -290,7 +329,7 @@ describe("chartViewerLogic", () => {
             label: "Gate",
             kind: "logical_index",
             numeric: true,
-            isCompatibility: false,
+            isInferredAxis: false,
             physicalColumn: null,
           },
           {
@@ -299,7 +338,7 @@ describe("chartViewerLogic", () => {
             label: "Bias",
             kind: "logical_index",
             numeric: true,
-            isCompatibility: false,
+            isInferredAxis: false,
             physicalColumn: null,
           },
         ],
@@ -328,7 +367,7 @@ describe("chartViewerLogic", () => {
             label: "Physical Axis",
             kind: "column",
             numeric: true,
-            isCompatibility: false,
+            isInferredAxis: false,
             physicalColumn: "physicalAxis",
           },
         ],
@@ -368,7 +407,7 @@ describe("chartViewerLogic", () => {
           label: "Gate",
           kind: "logical_index",
           numeric: true,
-          isCompatibility: false,
+          isInferredAxis: false,
           physicalColumn: null,
         },
         {
@@ -377,7 +416,7 @@ describe("chartViewerLogic", () => {
           label: "Bias",
           kind: "logical_index",
           numeric: true,
-          isCompatibility: false,
+          isInferredAxis: false,
           physicalColumn: null,
         },
       ],
@@ -398,7 +437,7 @@ describe("chartViewerLogic", () => {
           label: "Physical Axis",
           kind: "column",
           numeric: true,
-          isCompatibility: false,
+          isInferredAxis: false,
           physicalColumn: "physicalAxis",
         },
       ],
@@ -438,7 +477,7 @@ describe("chartViewerLogic", () => {
             label: "Gate",
             kind: "logical_index",
             numeric: false,
-            isCompatibility: false,
+            isInferredAxis: false,
             physicalColumn: null,
           },
           {
@@ -447,7 +486,7 @@ describe("chartViewerLogic", () => {
             label: "Bias",
             kind: "logical_index",
             numeric: true,
-            isCompatibility: false,
+            isInferredAxis: false,
             physicalColumn: null,
           },
         ],
@@ -477,15 +516,15 @@ describe("chartViewerLogic", () => {
     expect(derived.effectiveSweepIndexColumnName).toBe("logicalIndex:bias");
   });
 
-  it("keeps compatibility index axes available for sweep/group roles", () => {
+  it("keeps inferred axis axes available for sweep/group roles", () => {
     const columns = [
-      makeColumn({ name: "run", isIndex: true }),
-      makeColumn({ name: "step", isIndex: true }),
+      makeColumn({ name: "run", isInferredAxis: true }),
+      makeColumn({ name: "step", isInferredAxis: true }),
       makeColumn({ name: "signal" }),
     ];
     const derived = deriveChartViewerState(columns, makeState(), {
-      source: "compatibility_inference",
-      duplicatePolicy: "compatibility_row_order_placeholder",
+      source: "manifest",
+      duplicatePolicy: "row_order_placeholder",
       indexRealization: "none",
       axes: [
         {
@@ -494,7 +533,7 @@ describe("chartViewerLogic", () => {
           label: null,
           kind: "column",
           numeric: true,
-          isCompatibility: true,
+          isInferredAxis: true,
           physicalColumn: "run",
         },
         {
@@ -503,7 +542,7 @@ describe("chartViewerLogic", () => {
           label: null,
           kind: "column",
           numeric: true,
-          isCompatibility: true,
+          isInferredAxis: true,
           physicalColumn: "step",
         },
       ],
@@ -524,7 +563,7 @@ describe("chartViewerLogic", () => {
           label: null,
           kind: "column",
           numeric: true,
-          isCompatibility: false,
+          isInferredAxis: true,
           physicalColumn: "run",
         },
         {
@@ -533,7 +572,7 @@ describe("chartViewerLogic", () => {
           label: null,
           kind: "column",
           numeric: true,
-          isCompatibility: false,
+          isInferredAxis: false,
           physicalColumn: "step",
         },
       ],
