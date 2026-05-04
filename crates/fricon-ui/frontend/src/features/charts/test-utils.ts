@@ -1,5 +1,6 @@
 import type {
-  ChartSemanticKind,
+  ChartSemanticCapabilities,
+  ChartSemanticDescriptor,
   ChartSemantics,
   ColumnInfo,
   DatasetDetail,
@@ -7,6 +8,37 @@ import type {
 } from "./api/types";
 
 type ColumnInput = Partial<ColumnInfo> & { name: string };
+
+export function makeSemanticDescriptor(
+  overrides: Partial<ChartSemanticDescriptor> = {},
+): ChartSemanticDescriptor {
+  return {
+    valueKind: "numeric",
+    shapeKind: "scalar",
+    role: "value",
+    ...overrides,
+  };
+}
+
+export function makeSemanticCapabilities(
+  semantic: ChartSemanticDescriptor,
+): ChartSemanticCapabilities {
+  const isSystem = semantic.role === "system";
+  const isDisplay = semantic.role === "display";
+  const isScalar = semantic.shapeKind === "scalar";
+  const isTrace = semantic.shapeKind === "trace";
+  const isNumeric = semantic.valueKind === "numeric";
+  const isComplex = semantic.valueKind === "complex";
+  const isValue = semantic.role === "value";
+  return {
+    numericCoordinate: !isSystem && !isDisplay && isScalar && isNumeric,
+    filterable: !isSystem && !isDisplay && isScalar,
+    groupable: !isSystem && !isDisplay && isScalar,
+    traceSource: isTrace,
+    complexProjectable: isComplex,
+    plottableValue: isValue && (isNumeric || isComplex || isTrace),
+  };
+}
 
 type DatasetDetailInput = Partial<Omit<DatasetDetail, "columns">> & {
   columns?: ColumnInput[];
@@ -20,22 +52,13 @@ export function logicalIndexId(name: string) {
   return `logicalIndex:${name}`;
 }
 
-function semanticKindIsComplex(kind: ChartSemanticKind) {
-  return kind === "complex";
-}
-
-function semanticKindIsTrace(kind: ChartSemanticKind) {
-  return kind === "trace";
-}
-
 export function makeColumn(overrides: ColumnInput): ColumnInfo {
   const { name, ...rest } = overrides;
-  const semanticKind = rest.semanticKind ?? "numeric";
+  const semantic = rest.semantic ?? makeSemanticDescriptor();
   return {
     name,
-    semanticKind,
-    isComplex: semanticKindIsComplex(semanticKind),
-    isTrace: semanticKindIsTrace(semanticKind),
+    semantic,
+    capabilities: rest.capabilities ?? makeSemanticCapabilities(semantic),
     isInferredAxis: false,
     ...rest,
   };
@@ -66,8 +89,16 @@ export function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
       name: column.name,
       label: column.label ?? null,
       kind: "column" as const,
-      semanticKind: column.semanticKind,
-      numeric: column.semanticKind === "numeric",
+      semantic: makeSemanticDescriptor({
+        ...column.semantic,
+        role: "logical_index",
+      }),
+      capabilities: makeSemanticCapabilities(
+        makeSemanticDescriptor({
+          ...column.semantic,
+          role: "logical_index",
+        }),
+      ),
       isInferredAxis: true,
       physicalColumn: column.name,
     }));
@@ -82,9 +113,8 @@ export function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
         id: columnId(column.name),
         name: column.name,
         label: column.label ?? null,
-        semanticKind: column.semanticKind,
-        isComplex: column.isComplex,
-        isTrace: column.isTrace,
+        semantic: column.semantic,
+        capabilities: column.capabilities,
         hiddenByDefault: column.hiddenByDefault ?? false,
       })),
     chartAxisCandidates: axes,

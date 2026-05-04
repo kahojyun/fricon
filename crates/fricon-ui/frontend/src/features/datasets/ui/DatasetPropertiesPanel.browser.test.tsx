@@ -11,7 +11,11 @@ import {
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { datasetKeys } from "../api/queryKeys";
-import type { DatasetDetail } from "../api/types";
+import type {
+  ChartSemanticCapabilities,
+  ChartSemanticDescriptor,
+  DatasetDetail,
+} from "../api/types";
 import { DatasetPropertiesPanel } from "./DatasetPropertiesPanel";
 
 type UpdateDatasetInfoFn = (
@@ -96,6 +100,38 @@ function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
     ...overrides,
   };
 }
+
+function semantic(
+  overrides: Partial<ChartSemanticDescriptor> = {},
+): ChartSemanticDescriptor {
+  return {
+    valueKind: "numeric",
+    shapeKind: "scalar",
+    role: "value",
+    ...overrides,
+  };
+}
+
+function capabilities(
+  descriptor: ChartSemanticDescriptor,
+): ChartSemanticCapabilities {
+  const isTrace = descriptor.shapeKind === "trace";
+  const isNumeric = descriptor.valueKind === "numeric";
+  const isComplex = descriptor.valueKind === "complex";
+  return {
+    numericCoordinate: descriptor.shapeKind === "scalar" && isNumeric,
+    filterable: descriptor.shapeKind === "scalar",
+    groupable: descriptor.shapeKind === "scalar",
+    traceSource: isTrace,
+    complexProjectable: isComplex,
+    plottableValue: isNumeric || isComplex || isTrace,
+  };
+}
+
+const numericSemantic = semantic();
+const traceSemantic = semantic({ shapeKind: "trace" });
+const numericCapabilities = capabilities(numericSemantic);
+const traceCapabilities = capabilities(traceSemantic);
 
 describe("DatasetPropertiesPanel", () => {
   beforeEach(() => {
@@ -296,10 +332,9 @@ describe("DatasetPropertiesPanel", () => {
               name: "signal",
               label: "Signal",
               unit: "V",
-              semanticKind: "numeric",
+              semantic: numericSemantic,
+              capabilities: numericCapabilities,
               isInferredAxis: false,
-              isTrace: false,
-              isComplex: false,
               hiddenByDefault: true,
               isChartAxisCandidate: true,
             },
@@ -307,10 +342,9 @@ describe("DatasetPropertiesPanel", () => {
               name: "trace",
               label: null,
               unit: null,
-              semanticKind: "trace",
+              semantic: traceSemantic,
+              capabilities: traceCapabilities,
               isInferredAxis: false,
-              isTrace: true,
-              isComplex: false,
               hiddenByDefault: false,
               isChartAxisCandidate: false,
             },
@@ -330,6 +364,6 @@ describe("DatasetPropertiesPanel", () => {
     expect(table.getByText("V")).toBeVisible();
     expect(table.getByText("Hidden")).toBeVisible();
     expect(table.getByText("Axis")).toBeVisible();
-    expect(table.getByText("Trace")).toBeVisible();
+    expect(table.getByText(/Trace\s*\/\s*Numeric/)).toBeVisible();
   });
 });

@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use fricon::{DatasetRecord, DatasetStatus, ResolvedSemanticKind};
+use fricon::{
+    DatasetRecord, DatasetStatus, ResolvedSemanticCapabilities, ResolvedSemanticDescriptor,
+    SemanticRole, SemanticShapeKind, SemanticValueKind,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::tauri_api::ApiErrorCode;
@@ -83,18 +86,13 @@ impl From<DatasetRecord> for DatasetInfo {
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "dataset detail columns are serialized UI-facing flag projections"
-)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ColumnInfo {
     pub(crate) name: String,
     pub(crate) label: Option<String>,
     pub(crate) unit: Option<String>,
-    pub(crate) semantic_kind: ChartSemanticKind,
-    pub(crate) is_complex: bool,
-    pub(crate) is_trace: bool,
+    pub(crate) semantic: ChartSemanticDescriptor,
+    pub(crate) capabilities: ChartSemanticCapabilities,
     pub(crate) is_inferred_axis: bool,
     pub(crate) hidden_by_default: bool,
     pub(crate) is_chart_axis_candidate: bool,
@@ -124,26 +122,106 @@ pub(crate) enum ChartSemanticAxisKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ChartSemanticKind {
+pub(crate) enum ChartSemanticValueKind {
     Numeric,
     Categorical,
     Boolean,
     Timestamp,
     Complex,
-    Trace,
     Display,
 }
 
-impl From<ResolvedSemanticKind> for ChartSemanticKind {
-    fn from(value: ResolvedSemanticKind) -> Self {
+impl From<SemanticValueKind> for ChartSemanticValueKind {
+    fn from(value: SemanticValueKind) -> Self {
         match value {
-            ResolvedSemanticKind::Numeric => Self::Numeric,
-            ResolvedSemanticKind::Categorical => Self::Categorical,
-            ResolvedSemanticKind::Boolean => Self::Boolean,
-            ResolvedSemanticKind::Timestamp => Self::Timestamp,
-            ResolvedSemanticKind::Complex => Self::Complex,
-            ResolvedSemanticKind::Trace => Self::Trace,
-            ResolvedSemanticKind::Display => Self::Display,
+            SemanticValueKind::Numeric => Self::Numeric,
+            SemanticValueKind::Categorical => Self::Categorical,
+            SemanticValueKind::Boolean => Self::Boolean,
+            SemanticValueKind::Timestamp => Self::Timestamp,
+            SemanticValueKind::Complex => Self::Complex,
+            SemanticValueKind::Display => Self::Display,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartSemanticShapeKind {
+    Scalar,
+    Trace,
+}
+
+impl From<SemanticShapeKind> for ChartSemanticShapeKind {
+    fn from(value: SemanticShapeKind) -> Self {
+        match value {
+            SemanticShapeKind::Scalar => Self::Scalar,
+            SemanticShapeKind::Trace => Self::Trace,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ChartSemanticRole {
+    Value,
+    LogicalIndex,
+    System,
+    Display,
+}
+
+impl From<SemanticRole> for ChartSemanticRole {
+    fn from(value: SemanticRole) -> Self {
+        match value {
+            SemanticRole::Value => Self::Value,
+            SemanticRole::LogicalIndex => Self::LogicalIndex,
+            SemanticRole::System => Self::System,
+            SemanticRole::Display => Self::Display,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartSemanticDescriptor {
+    pub(crate) value_kind: ChartSemanticValueKind,
+    pub(crate) shape_kind: ChartSemanticShapeKind,
+    pub(crate) role: ChartSemanticRole,
+}
+
+impl From<ResolvedSemanticDescriptor> for ChartSemanticDescriptor {
+    fn from(value: ResolvedSemanticDescriptor) -> Self {
+        Self {
+            value_kind: value.value_kind.into(),
+            shape_kind: value.shape_kind.into(),
+            role: value.role.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "DTO-facing capability flags intentionally stay explicit and independently consumable"
+)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChartSemanticCapabilities {
+    pub(crate) numeric_coordinate: bool,
+    pub(crate) filterable: bool,
+    pub(crate) groupable: bool,
+    pub(crate) trace_source: bool,
+    pub(crate) complex_projectable: bool,
+    pub(crate) plottable_value: bool,
+}
+
+impl From<ResolvedSemanticCapabilities> for ChartSemanticCapabilities {
+    fn from(value: ResolvedSemanticCapabilities) -> Self {
+        Self {
+            numeric_coordinate: value.numeric_coordinate,
+            filterable: value.filterable,
+            groupable: value.groupable,
+            trace_source: value.trace_source,
+            complex_projectable: value.complex_projectable,
+            plottable_value: value.plottable_value,
         }
     }
 }
@@ -154,9 +232,8 @@ pub(crate) struct ChartSemanticColumn {
     pub(crate) id: String,
     pub(crate) name: String,
     pub(crate) label: Option<String>,
-    pub(crate) semantic_kind: ChartSemanticKind,
-    pub(crate) is_complex: bool,
-    pub(crate) is_trace: bool,
+    pub(crate) semantic: ChartSemanticDescriptor,
+    pub(crate) capabilities: ChartSemanticCapabilities,
     pub(crate) hidden_by_default: bool,
 }
 
@@ -167,8 +244,8 @@ pub(crate) struct ChartSemanticAxis {
     pub(crate) name: String,
     pub(crate) label: Option<String>,
     pub(crate) kind: ChartSemanticAxisKind,
-    pub(crate) semantic_kind: ChartSemanticKind,
-    pub(crate) numeric: bool,
+    pub(crate) semantic: ChartSemanticDescriptor,
+    pub(crate) capabilities: ChartSemanticCapabilities,
     pub(crate) is_inferred_axis: bool,
     pub(crate) physical_column: Option<String>,
 }

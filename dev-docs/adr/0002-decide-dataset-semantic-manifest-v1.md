@@ -34,6 +34,11 @@ The minimal v1 manifest has these top-level sections:
             "dtype": {
                 "kind": "uint64"
             },
+            "semantic": {
+                "value_kind": "numeric",
+                "shape_kind": "scalar",
+                "role": "system"
+            },
             "system": {
                 "kind": "record_id"
             }
@@ -41,6 +46,11 @@ The minimal v1 manifest has these top-level sections:
         "signal": {
             "dtype": {
                 "kind": "float64"
+            },
+            "semantic": {
+                "value_kind": "numeric",
+                "shape_kind": "scalar",
+                "role": "value"
             }
         }
     },
@@ -61,9 +71,10 @@ The minimal v1 manifest has these top-level sections:
 ```
 
 `manifest_version`, `columns`, `realization`, and `inference` are required
-for v1. Future or non-minimal semantic datasets may add optional sections such
-as `scan_plan`, `live_defaults`, and `view_defaults`, but those sections are not
-part of the foundation implementation.
+for v1. Every column entry requires both `dtype` and `semantic`. Future or
+non-minimal semantic datasets may add optional sections such as `scan_plan`,
+`live_defaults`, and `view_defaults`, but those sections are not part of the
+foundation implementation.
 
 Manifest enums should use internally tagged JSON objects such as
 `{"kind": "none"}` rather than bare strings when a value may later need fields.
@@ -110,6 +121,19 @@ Allowed trace axis dtypes are numeric scalar dtypes. Allowed trace value dtypes
 are numeric scalar dtypes and `complex128`. Nested traces are invalid by type,
 not merely by late validation.
 
+Column `semantic` facets describe the durable meaning of the physical dtype:
+
+- `value_kind`: `numeric`, `categorical`, `boolean`, `timestamp`, `complex`, or
+  `display`
+- `shape_kind`: `scalar` or `trace`
+- `role`: `value`, `logical_index`, `system`, or `display`
+
+The physical dtype remains the Arrow storage contract. Semantic facets are
+validated against the dtype but may intentionally refine meaning, such as an
+integer column marked as `categorical`. Chart/rendering capabilities are not
+durable manifest fields; they are derived by resolved interpretation from
+semantic facets and current renderer support.
+
 New semantic datasets should use plain Arrow physical schemas. Fricon-specific
 meaning belongs in `dataset_manifest.json`, not in Arrow extension metadata.
 The intended physical mappings are:
@@ -130,7 +154,7 @@ The compatibility and versioning decisions for the foundation are:
 - adding `dataset_manifest.json` and `__ds_record_id` changes durable dataset
   payload rules and must follow the dataset payload layout checklist
 - no old-workspace reader compatibility is preserved for manifest-free dataset
-  payloads in this PR
+  payloads or earlier v1 manifests without required `semantic` facets in this PR
 - adding semantic creation metadata to Rust IPC requests requires an
   `IPC_PROTOCOL_VERSION` decision; keeping schema in the Arrow stream and
   adding no required wire fields does not by itself require an IPC bump

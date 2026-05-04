@@ -16,7 +16,8 @@ use indexmap::IndexMap;
 use crate::dataset::{
     interpret::{
         DatasetInterpretation, ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint,
-        ResolvedScanAxisMode, ResolvedSemanticKind, ResolvedSemanticReference, physical_column_id,
+        ResolvedScanAxisMode, ResolvedSemanticCapabilities, ResolvedSemanticDescriptor,
+        ResolvedSemanticReference, physical_column_id,
     },
     read::{DatasetReader, SelectOptions},
     schema::{DatasetDataType, DatasetSchema, ScalarKind},
@@ -39,8 +40,8 @@ pub struct ProjectedSemanticAxis {
     pub id: String,
     pub column_name: String,
     pub label: String,
-    pub semantic_kind: ResolvedSemanticKind,
-    pub numeric: bool,
+    pub semantic: ResolvedSemanticDescriptor,
+    pub capabilities: ResolvedSemanticCapabilities,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -400,7 +401,7 @@ fn append_logical_axes(
     for (axis_index, axis) in interpretation.scan_axes.iter().enumerate() {
         let id = axis.id.clone();
         let values = logical_axis_values(&kept_record_ids, &point_by_record_id, axis_index);
-        if axis.numeric_axis {
+        if axis.capabilities.numeric_coordinate {
             fields.push(Arc::new(Field::new(&id, DataType::Float64, true)));
             arrays.push(numeric_axis_array(&values));
             columns.insert(id, DatasetDataType::Scalar(ScalarKind::Numeric));
@@ -460,7 +461,7 @@ fn projected_roles(
         sweep_columns: projected_reference_columns(
             &interpretation.sweep_axes,
             schema,
-            ResolvedSemanticReference::numeric_axis,
+            ResolvedSemanticReference::numeric_coordinate,
         ),
         group_columns: projected_reference_columns(&interpretation.group_axes, schema, |_| true),
         filter_columns: projected_reference_columns(&interpretation.filter_axes, schema, |_| true),
@@ -498,8 +499,8 @@ fn projected_axes(
                         id: column.id.clone(),
                         column_name,
                         label: column.label.clone().unwrap_or_else(|| column.name.clone()),
-                        semantic_kind: column.semantic_kind,
-                        numeric: column.numeric_axis,
+                        semantic: column.semantic,
+                        capabilities: column.capabilities,
                     }
                 })
             }
@@ -511,8 +512,8 @@ fn projected_axes(
                     id: axis.id.clone(),
                     column_name: axis.id.clone(),
                     label: axis.label.clone().unwrap_or_else(|| axis.name.clone()),
-                    semantic_kind: axis.semantic_kind,
-                    numeric: axis.numeric_axis,
+                    semantic: axis.semantic,
+                    capabilities: axis.capabilities,
                 }),
         })
         .collect()
@@ -775,11 +776,12 @@ mod tests {
     use crate::dataset::{
         interpret::{
             ColumnMeaning, PhysicalColumnOrdinal, ResolvedIndexRealization,
-            ResolvedPhysicalColumnReference, VisibleColumnOrdinal, resolve_from_manifest,
+            ResolvedPhysicalColumnReference, ResolvedSemanticCapabilities,
+            ResolvedSemanticDescriptor, VisibleColumnOrdinal, resolve_from_manifest,
         },
         semantics::{
             DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, ScanAxis,
-            ScanAxisValue, ScanPlan,
+            ScanAxisValue, ScanPlan, SemanticRole, SemanticShapeKind, SemanticValueKind,
         },
     };
 
@@ -816,13 +818,23 @@ mod tests {
         meaning: ColumnMeaning,
         is_inferred_axis: bool,
     ) -> ResolvedSemanticReference {
+        let semantic = ResolvedSemanticDescriptor::new(
+            SemanticValueKind::Numeric,
+            SemanticShapeKind::Scalar,
+            if is_inferred_axis {
+                SemanticRole::LogicalIndex
+            } else {
+                SemanticRole::Value
+            },
+        );
         ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
             id: id.to_string(),
             name: name.to_string(),
             physical_ordinal: PhysicalColumnOrdinal(0),
             visible_ordinal: Some(VisibleColumnOrdinal(0)),
             dtype: DatasetDType::Float64,
-            semantic_kind: ResolvedSemanticKind::Numeric,
+            semantic,
+            capabilities: ResolvedSemanticCapabilities::for_descriptor(semantic),
             meaning,
             is_system: false,
             is_inferred_axis,
@@ -830,9 +842,6 @@ mod tests {
             is_chart_axis_candidate: true,
             unit: None,
             label: None,
-            is_complex: false,
-            is_trace: false,
-            numeric_axis: true,
         })
     }
 
@@ -989,7 +998,7 @@ mod tests {
         let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1, 2]);
 
         let columns = projected_reference_columns(&interpretation.sweep_axes, &schema, |axis| {
-            axis.numeric_axis()
+            axis.numeric_coordinate()
         });
 
         assert_eq!(columns, vec![2]);
@@ -1019,8 +1028,8 @@ mod tests {
         let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1]);
 
         assert_eq!(
-            interpretation.scan_axes[0].semantic_kind,
-            ResolvedSemanticKind::Categorical
+            interpretation.scan_axes[0].semantic.value_kind,
+            SemanticValueKind::Categorical
         );
         assert_eq!(
             projected_reference_columns(&interpretation.group_axes, &schema, |_| true),
@@ -1028,7 +1037,7 @@ mod tests {
         );
         assert_eq!(
             projected_reference_columns(&interpretation.sweep_axes, &schema, |axis| {
-                axis.numeric_axis()
+                axis.numeric_coordinate()
             }),
             Vec::<usize>::new()
         );
@@ -1062,12 +1071,12 @@ mod tests {
             interpretation
                 .scan_axes
                 .iter()
-                .map(|axis| axis.semantic_kind)
+                .map(|axis| axis.semantic.value_kind)
                 .collect::<Vec<_>>(),
             vec![
-                ResolvedSemanticKind::Numeric,
-                ResolvedSemanticKind::Boolean,
-                ResolvedSemanticKind::Numeric,
+                SemanticValueKind::Numeric,
+                SemanticValueKind::Boolean,
+                SemanticValueKind::Numeric,
             ]
         );
     }

@@ -5,7 +5,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { columnId } from "@/features/charts/test-utils";
+import {
+  columnId,
+  makeSemanticCapabilities,
+  makeSemanticDescriptor,
+} from "@/features/charts/test-utils";
 import { encodeChartSnapshotBufferForTest } from "@/shared/test/chartWire";
 import { DatasetExplorerScreen } from "./DatasetExplorerScreen";
 
@@ -44,6 +48,11 @@ vi.mock("@tanstack/react-virtual", () => ({
     scrollToIndex: () => undefined,
   }),
 }));
+
+const numericSemantic = makeSemanticDescriptor();
+const numericAxisSemantic = makeSemanticDescriptor({ role: "logical_index" });
+const numericCapabilities = makeSemanticCapabilities(numericSemantic);
+const numericAxisCapabilities = makeSemanticCapabilities(numericAxisSemantic);
 
 vi.mock("react-resizable-panels", () => ({
   Group: ({
@@ -122,8 +131,8 @@ describe("DatasetExplorerScreen integration", () => {
             name: "t",
             label: null,
             kind: "column" as const,
-            semanticKind: "numeric" as const,
-            numeric: true,
+            semantic: numericAxisSemantic,
+            capabilities: numericAxisCapabilities,
             isInferredAxis: true,
             physicalColumn: "t",
           };
@@ -143,9 +152,8 @@ describe("DatasetExplorerScreen integration", () => {
                 name: "t",
                 label: null,
                 unit: null,
-                semanticKind: "numeric",
-                isComplex: false,
-                isTrace: false,
+                semantic: numericAxisSemantic,
+                capabilities: numericAxisCapabilities,
                 isInferredAxis: true,
                 hiddenByDefault: false,
                 isChartAxisCandidate: true,
@@ -154,9 +162,8 @@ describe("DatasetExplorerScreen integration", () => {
                 name: "signal",
                 label: null,
                 unit: null,
-                semanticKind: "numeric",
-                isComplex: false,
-                isTrace: false,
+                semantic: numericSemantic,
+                capabilities: numericCapabilities,
                 isInferredAxis: false,
                 hiddenByDefault: false,
                 isChartAxisCandidate: false,
@@ -171,9 +178,8 @@ describe("DatasetExplorerScreen integration", () => {
                   id: columnId("signal"),
                   name: "signal",
                   label: null,
-                  semanticKind: "numeric",
-                  isComplex: false,
-                  isTrace: false,
+                  semantic: numericSemantic,
+                  capabilities: numericCapabilities,
                   hiddenByDefault: false,
                 },
               ],

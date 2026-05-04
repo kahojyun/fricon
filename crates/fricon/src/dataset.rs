@@ -16,8 +16,8 @@ pub use self::{
         ColumnMeaning, DatasetInterpretation, PhysicalColumnOrdinal, ResolvedColumn,
         ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
         ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedScanAxis,
-        ResolvedScanAxisMode, ResolvedSemanticKind, ResolvedSemanticReference,
-        VisibleColumnOrdinal, logical_index_id, physical_column_id,
+        ResolvedScanAxisMode, ResolvedSemanticCapabilities, ResolvedSemanticDescriptor,
+        ResolvedSemanticReference, VisibleColumnOrdinal, logical_index_id, physical_column_id,
     },
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
@@ -32,7 +32,10 @@ pub use self::{
         DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
         ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
-    semantics::{ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan},
+    semantics::{
+        ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SemanticDescriptor,
+        SemanticRole, SemanticShapeKind, SemanticValueKind,
+    },
 };
 pub(crate) use self::{
     ingest::{CreateDatasetInput, CreateDatasetRequest},

@@ -1,4 +1,7 @@
-use crate::dataset::semantics::{DatasetDType, ScanAxisValue};
+use crate::dataset::semantics::{
+    DatasetDType, ScanAxisValue, SemanticDescriptor, SemanticRole, SemanticShapeKind,
+    SemanticValueKind,
+};
 
 const COLUMN_ID_PREFIX: &str = "column:";
 const LOGICAL_INDEX_ID_PREFIX: &str = "logicalIndex:";
@@ -65,7 +68,8 @@ pub struct ResolvedColumn {
     pub physical_ordinal: PhysicalColumnOrdinal,
     pub visible_ordinal: Option<VisibleColumnOrdinal>,
     pub dtype: DatasetDType,
-    pub semantic_kind: ResolvedSemanticKind,
+    pub semantic: ResolvedSemanticDescriptor,
+    pub capabilities: ResolvedSemanticCapabilities,
     pub meaning: ColumnMeaning,
     pub is_inferred_axis: bool,
     pub is_system: bool,
@@ -73,21 +77,24 @@ pub struct ResolvedColumn {
     pub is_chart_axis_candidate: bool,
     pub unit: Option<String>,
     pub label: Option<String>,
-    pub is_complex: bool,
-    pub is_trace: bool,
-    pub is_numeric_axis_candidate: bool,
 }
 
 impl ResolvedColumn {
     #[must_use]
     pub fn as_semantic_reference(&self, is_inferred_axis: bool) -> ResolvedSemanticReference {
+        let semantic = self.semantic.with_role(if is_inferred_axis {
+            SemanticRole::LogicalIndex
+        } else {
+            self.semantic.role
+        });
         ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
             id: self.id.clone(),
             name: self.name.clone(),
             physical_ordinal: self.physical_ordinal,
             visible_ordinal: self.visible_ordinal,
             dtype: self.dtype.clone(),
-            semantic_kind: self.semantic_kind,
+            semantic,
+            capabilities: ResolvedSemanticCapabilities::for_descriptor(semantic),
             meaning: self.meaning,
             is_system: self.is_system,
             is_inferred_axis,
@@ -95,9 +102,6 @@ impl ResolvedColumn {
             is_chart_axis_candidate: self.is_chart_axis_candidate,
             unit: self.unit.clone(),
             label: self.label.clone(),
-            is_complex: self.is_complex,
-            is_trace: self.is_trace,
-            numeric_axis: self.is_numeric_axis_candidate,
         })
     }
 }
@@ -142,18 +146,26 @@ impl ResolvedSemanticReference {
     }
 
     #[must_use]
-    pub const fn numeric_axis(&self) -> bool {
+    pub const fn numeric_coordinate(&self) -> bool {
         match self {
-            Self::PhysicalColumn(column) => column.numeric_axis,
-            Self::LogicalIndex(axis) => axis.numeric_axis,
+            Self::PhysicalColumn(column) => column.capabilities.numeric_coordinate,
+            Self::LogicalIndex(axis) => axis.capabilities.numeric_coordinate,
         }
     }
 
     #[must_use]
-    pub const fn semantic_kind(&self) -> ResolvedSemanticKind {
+    pub const fn semantic(&self) -> ResolvedSemanticDescriptor {
         match self {
-            Self::PhysicalColumn(column) => column.semantic_kind,
-            Self::LogicalIndex(axis) => axis.semantic_kind,
+            Self::PhysicalColumn(column) => column.semantic,
+            Self::LogicalIndex(axis) => axis.semantic,
+        }
+    }
+
+    #[must_use]
+    pub const fn capabilities(&self) -> ResolvedSemanticCapabilities {
+        match self {
+            Self::PhysicalColumn(column) => column.capabilities,
+            Self::LogicalIndex(axis) => axis.capabilities,
         }
     }
 
@@ -177,7 +189,8 @@ pub struct ResolvedPhysicalColumnReference {
     pub physical_ordinal: PhysicalColumnOrdinal,
     pub visible_ordinal: Option<VisibleColumnOrdinal>,
     pub dtype: DatasetDType,
-    pub semantic_kind: ResolvedSemanticKind,
+    pub semantic: ResolvedSemanticDescriptor,
+    pub capabilities: ResolvedSemanticCapabilities,
     pub meaning: ColumnMeaning,
     pub is_inferred_axis: bool,
     pub is_system: bool,
@@ -185,9 +198,6 @@ pub struct ResolvedPhysicalColumnReference {
     pub is_chart_axis_candidate: bool,
     pub unit: Option<String>,
     pub label: Option<String>,
-    pub is_complex: bool,
-    pub is_trace: bool,
-    pub numeric_axis: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,37 +206,77 @@ pub struct ResolvedLogicalIndexReference {
     pub name: String,
     pub axis_ordinal: usize,
     pub label: Option<String>,
-    pub semantic_kind: ResolvedSemanticKind,
+    pub semantic: ResolvedSemanticDescriptor,
+    pub capabilities: ResolvedSemanticCapabilities,
     pub hidden_by_default: bool,
-    pub numeric_axis: bool,
     pub is_inferred_axis: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResolvedSemanticKind {
-    Numeric,
-    Categorical,
-    Boolean,
-    Timestamp,
-    Complex,
-    Trace,
-    Display,
+pub struct ResolvedSemanticDescriptor {
+    pub value_kind: SemanticValueKind,
+    pub shape_kind: SemanticShapeKind,
+    pub role: SemanticRole,
 }
 
-impl ResolvedSemanticKind {
+impl ResolvedSemanticDescriptor {
     #[must_use]
-    pub const fn is_numeric(self) -> bool {
-        matches!(self, Self::Numeric)
+    pub const fn new(
+        value_kind: SemanticValueKind,
+        shape_kind: SemanticShapeKind,
+        role: SemanticRole,
+    ) -> Self {
+        Self {
+            value_kind,
+            shape_kind,
+            role,
+        }
     }
 
     #[must_use]
-    pub const fn is_complex(self) -> bool {
-        matches!(self, Self::Complex)
+    pub const fn with_role(self, role: SemanticRole) -> Self {
+        Self { role, ..self }
     }
+}
 
+impl From<SemanticDescriptor> for ResolvedSemanticDescriptor {
+    fn from(value: SemanticDescriptor) -> Self {
+        Self::new(value.value_kind, value.shape_kind, value.role)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "DTO-facing capability flags intentionally stay explicit and independently consumable"
+)]
+pub struct ResolvedSemanticCapabilities {
+    pub numeric_coordinate: bool,
+    pub filterable: bool,
+    pub groupable: bool,
+    pub trace_source: bool,
+    pub complex_projectable: bool,
+    pub plottable_value: bool,
+}
+
+impl ResolvedSemanticCapabilities {
     #[must_use]
-    pub const fn is_trace(self) -> bool {
-        matches!(self, Self::Trace)
+    pub const fn for_descriptor(descriptor: ResolvedSemanticDescriptor) -> Self {
+        let is_system = matches!(descriptor.role, SemanticRole::System);
+        let is_display = matches!(descriptor.role, SemanticRole::Display);
+        let is_scalar = matches!(descriptor.shape_kind, SemanticShapeKind::Scalar);
+        let is_trace = matches!(descriptor.shape_kind, SemanticShapeKind::Trace);
+        let is_numeric = matches!(descriptor.value_kind, SemanticValueKind::Numeric);
+        let is_complex = matches!(descriptor.value_kind, SemanticValueKind::Complex);
+        let is_value = matches!(descriptor.role, SemanticRole::Value);
+        Self {
+            numeric_coordinate: !is_system && !is_display && is_scalar && is_numeric,
+            filterable: !is_system && !is_display && is_scalar,
+            groupable: !is_system && !is_display && is_scalar,
+            trace_source: is_trace,
+            complex_projectable: is_complex,
+            plottable_value: is_value && (is_numeric || is_complex || is_trace),
+        }
     }
 }
 
@@ -251,8 +301,8 @@ pub struct ResolvedScanAxis {
     pub name: String,
     pub label: Option<String>,
     pub mode: ResolvedScanAxisMode,
-    pub semantic_kind: ResolvedSemanticKind,
-    pub numeric_axis: bool,
+    pub semantic: ResolvedSemanticDescriptor,
+    pub capabilities: ResolvedSemanticCapabilities,
 }
 
 impl ResolvedScanAxis {
@@ -263,9 +313,9 @@ impl ResolvedScanAxis {
             name: self.name.clone(),
             axis_ordinal: self.axis_ordinal,
             label: self.label.clone(),
-            semantic_kind: self.semantic_kind,
+            semantic: self.semantic,
+            capabilities: self.capabilities,
             hidden_by_default: false,
-            numeric_axis: self.numeric_axis,
             is_inferred_axis: false,
         })
     }

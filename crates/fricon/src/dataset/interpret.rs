@@ -8,12 +8,12 @@ pub use self::model::{
     ColumnMeaning, DatasetInterpretation, PhysicalColumnOrdinal, ResolvedColumn,
     ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
     ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedScanAxis,
-    ResolvedScanAxisMode, ResolvedSemanticKind, ResolvedSemanticReference, VisibleColumnOrdinal,
-    logical_index_id, physical_column_id,
+    ResolvedScanAxisMode, ResolvedSemanticCapabilities, ResolvedSemanticDescriptor,
+    ResolvedSemanticReference, VisibleColumnOrdinal, logical_index_id, physical_column_id,
 };
 use crate::dataset::semantics::{
-    DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault, IndexRealization,
-    ScanAxisMode, ScanAxisValue, SystemColumn, TraceValueDType,
+    DatasetSemanticManifest, DuplicateResolutionDefault, IndexRealization, ScanAxisMode,
+    ScanAxisValue, SemanticRole, SemanticShapeKind, SemanticValueKind, SystemColumn,
 };
 
 pub(crate) fn resolve_from_manifest(
@@ -41,14 +41,16 @@ pub(crate) fn resolve_from_manifest(
                 .expect("manifest should be validated against arrow schema");
             let is_record_id = column.system == Some(SystemColumn::RecordId);
             let dtype = column.dtype.clone();
-            let semantic_kind = semantic_kind_for_dtype(&dtype);
+            let semantic = ResolvedSemanticDescriptor::from(column.semantic.clone());
+            let capabilities = ResolvedSemanticCapabilities::for_descriptor(semantic);
             ResolvedColumn {
                 id: physical_column_id(&name),
                 name,
                 physical_ordinal: PhysicalColumnOrdinal(physical_ordinal),
                 visible_ordinal: visible_ordinals.get(&physical_ordinal).copied(),
                 dtype: dtype.clone(),
-                semantic_kind,
+                semantic,
+                capabilities,
                 meaning: if is_record_id {
                     ColumnMeaning::SystemRecordId
                 } else {
@@ -60,9 +62,6 @@ pub(crate) fn resolve_from_manifest(
                 is_chart_axis_candidate: column.chart_axis,
                 unit: column.unit.clone(),
                 label: column.label.clone(),
-                is_complex: dtype_is_complex(&dtype),
-                is_trace: semantic_kind.is_trace(),
-                is_numeric_axis_candidate: semantic_kind.is_numeric(),
             }
         })
         .collect();
@@ -285,15 +284,16 @@ fn resolve_scan_axes(manifest: &DatasetSemanticManifest) -> Vec<ResolvedScanAxis
                         },
                         ScanAxisMode::ImplicitIndex => ResolvedScanAxisMode::ImplicitIndex,
                     };
-                    let semantic_kind = semantic_kind_for_scan_axis_mode(&mode);
+                    let semantic = semantic_for_scan_axis_mode(&mode);
+                    let capabilities = ResolvedSemanticCapabilities::for_descriptor(semantic);
                     ResolvedScanAxis {
                         id: logical_index_id(&axis.name),
                         axis_ordinal,
                         name: axis.name.clone(),
                         label: axis.label.clone(),
                         mode,
-                        semantic_kind,
-                        numeric_axis: semantic_kind.is_numeric(),
+                        semantic,
+                        capabilities,
                     }
                 })
                 .collect()
@@ -375,50 +375,30 @@ pub(crate) fn resolve_logical_index_points(
         .collect()
 }
 
-fn semantic_kind_for_dtype(dtype: &DatasetDType) -> ResolvedSemanticKind {
-    match dtype {
-        DatasetDType::Float64
-        | DatasetDType::Float32
-        | DatasetDType::Int64
-        | DatasetDType::UInt64 => ResolvedSemanticKind::Numeric,
-        DatasetDType::Bool => ResolvedSemanticKind::Boolean,
-        DatasetDType::Utf8 => ResolvedSemanticKind::Categorical,
-        DatasetDType::TimestampUs => ResolvedSemanticKind::Timestamp,
-        DatasetDType::Complex128 => ResolvedSemanticKind::Complex,
-        DatasetDType::Trace { .. } => ResolvedSemanticKind::Trace,
-    }
-}
-
-fn dtype_is_complex(dtype: &DatasetDType) -> bool {
-    matches!(
-        dtype,
-        DatasetDType::Complex128
-            | DatasetDType::Trace {
-                value: TraceValueDType::Complex128,
-                ..
-            }
-    )
-}
-
-fn semantic_kind_for_scan_axis_mode(mode: &ResolvedScanAxisMode) -> ResolvedSemanticKind {
-    match mode {
-        ResolvedScanAxisMode::ImplicitIndex => ResolvedSemanticKind::Numeric,
+fn semantic_for_scan_axis_mode(mode: &ResolvedScanAxisMode) -> ResolvedSemanticDescriptor {
+    let value_kind = match mode {
+        ResolvedScanAxisMode::ImplicitIndex => SemanticValueKind::Numeric,
         ResolvedScanAxisMode::Static { values }
             if values
                 .iter()
                 .all(|value| matches!(value, ScanAxisValue::Int(_) | ScanAxisValue::Float(_))) =>
         {
-            ResolvedSemanticKind::Numeric
+            SemanticValueKind::Numeric
         }
         ResolvedScanAxisMode::Static { values }
             if values
                 .iter()
                 .all(|value| matches!(value, ScanAxisValue::Bool(_))) =>
         {
-            ResolvedSemanticKind::Boolean
+            SemanticValueKind::Boolean
         }
-        ResolvedScanAxisMode::Static { .. } => ResolvedSemanticKind::Categorical,
-    }
+        ResolvedScanAxisMode::Static { .. } => SemanticValueKind::Categorical,
+    };
+    ResolvedSemanticDescriptor::new(
+        value_kind,
+        SemanticShapeKind::Scalar,
+        SemanticRole::LogicalIndex,
+    )
 }
 
 #[cfg(test)]
@@ -430,7 +410,7 @@ mod tests {
 
     use super::{
         ColumnMeaning, PhysicalColumnOrdinal, ResolvedDuplicatePolicy, ResolvedIndexRealization,
-        ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ResolvedSemanticKind,
+        ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ResolvedSemanticDescriptor,
         ResolvedSemanticReference, VisibleColumnOrdinal, resolve_from_manifest,
         resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     };
@@ -440,8 +420,8 @@ mod tests {
         read::ReadError,
         semantics::{
             DatasetDType, DatasetSemanticManifest, IndexRealization, ManifestColumn,
-            RECORD_ID_COLUMN, ScanAxis, ScanAxisValue, ScanPlan, TraceAxisDType, TraceLayout,
-            TraceValueDType, write_manifest,
+            RECORD_ID_COLUMN, ScanAxis, ScanAxisValue, ScanPlan, SemanticRole, SemanticShapeKind,
+            SemanticValueKind, TraceAxisDType, TraceLayout, TraceValueDType, write_manifest,
         },
         storage::{ChunkWriter, layout::ChunkKind, logical_index::logical_index_schema},
     };
@@ -509,6 +489,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "matrix-style test keeps descriptor and capability expectations together"
+    )]
     fn manifest_interpretation_maps_dataset_dtypes_to_semantic_kinds() {
         let manifest = DatasetSemanticManifest::minimal([
             (
@@ -583,30 +567,58 @@ mod tests {
         ]);
 
         let interpretation = resolve_from_manifest(&schema, &manifest, &[1, 2, 3, 4, 5, 6, 7]);
-        let kinds = interpretation
+        let descriptors = interpretation
             .columns
             .iter()
             .skip(1)
-            .map(|column| column.semantic_kind)
+            .map(|column| column.semantic)
             .collect::<Vec<_>>();
 
         assert_eq!(
-            kinds,
+            descriptors,
             vec![
-                ResolvedSemanticKind::Numeric,
-                ResolvedSemanticKind::Categorical,
-                ResolvedSemanticKind::Boolean,
-                ResolvedSemanticKind::Timestamp,
-                ResolvedSemanticKind::Complex,
-                ResolvedSemanticKind::Trace,
-                ResolvedSemanticKind::Trace,
+                ResolvedSemanticDescriptor::new(
+                    SemanticValueKind::Numeric,
+                    SemanticShapeKind::Scalar,
+                    SemanticRole::Value
+                ),
+                ResolvedSemanticDescriptor::new(
+                    SemanticValueKind::Categorical,
+                    SemanticShapeKind::Scalar,
+                    SemanticRole::Value
+                ),
+                ResolvedSemanticDescriptor::new(
+                    SemanticValueKind::Boolean,
+                    SemanticShapeKind::Scalar,
+                    SemanticRole::Value
+                ),
+                ResolvedSemanticDescriptor::new(
+                    SemanticValueKind::Timestamp,
+                    SemanticShapeKind::Scalar,
+                    SemanticRole::Value
+                ),
+                ResolvedSemanticDescriptor::new(
+                    SemanticValueKind::Complex,
+                    SemanticShapeKind::Scalar,
+                    SemanticRole::Value
+                ),
+                ResolvedSemanticDescriptor::new(
+                    SemanticValueKind::Numeric,
+                    SemanticShapeKind::Trace,
+                    SemanticRole::Value
+                ),
+                ResolvedSemanticDescriptor::new(
+                    SemanticValueKind::Complex,
+                    SemanticShapeKind::Trace,
+                    SemanticRole::Value
+                ),
             ]
         );
-        assert!(interpretation.columns[5].is_complex);
-        assert!(!interpretation.columns[6].is_complex);
-        assert!(interpretation.columns[6].is_trace);
-        assert!(interpretation.columns[7].is_complex);
-        assert!(interpretation.columns[7].is_trace);
+        assert!(interpretation.columns[5].capabilities.complex_projectable);
+        assert!(!interpretation.columns[6].capabilities.complex_projectable);
+        assert!(interpretation.columns[6].capabilities.trace_source);
+        assert!(interpretation.columns[7].capabilities.complex_projectable);
+        assert!(interpretation.columns[7].capabilities.trace_source);
     }
 
     #[test]
@@ -675,7 +687,8 @@ mod tests {
             interpretation
                 .logical_axis_for_id("logicalIndex:gate")
                 .expect("logical semantic reference")
-                .numeric_axis
+                .capabilities
+                .numeric_coordinate
         );
         assert!(matches!(
             interpretation.scan_axes[0].mode,

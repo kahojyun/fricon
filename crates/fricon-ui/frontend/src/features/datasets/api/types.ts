@@ -43,9 +43,8 @@ export interface DatasetColumnInfo {
   name: string;
   label: string | null;
   unit: string | null;
-  semanticKind: ChartSemanticKind;
-  isComplex: boolean;
-  isTrace: boolean;
+  semantic: ChartSemanticDescriptor;
+  capabilities: ChartSemanticCapabilities;
   isInferredAxis: boolean;
   hiddenByDefault: boolean;
   isChartAxisCandidate: boolean;
@@ -56,22 +55,41 @@ export type ChartDuplicatePolicy =
   | "row_order_placeholder";
 export type ChartIndexRealization = "none" | "implicit" | "sidecar";
 export type ChartSemanticAxisKind = "logical_index" | "column";
-export type ChartSemanticKind =
+export type ChartSemanticValueKind =
   | "numeric"
   | "categorical"
   | "boolean"
   | "timestamp"
   | "complex"
-  | "trace"
   | "display";
+export type ChartSemanticShapeKind = "scalar" | "trace";
+export type ChartSemanticRole =
+  | "value"
+  | "logical_index"
+  | "system"
+  | "display";
+
+export interface ChartSemanticDescriptor {
+  valueKind: ChartSemanticValueKind;
+  shapeKind: ChartSemanticShapeKind;
+  role: ChartSemanticRole;
+}
+
+export interface ChartSemanticCapabilities {
+  numericCoordinate: boolean;
+  filterable: boolean;
+  groupable: boolean;
+  traceSource: boolean;
+  complexProjectable: boolean;
+  plottableValue: boolean;
+}
 
 export interface ChartSemanticColumn {
   id: string;
   name: string;
   label: string | null;
-  semanticKind: ChartSemanticKind;
-  isComplex: boolean;
-  isTrace: boolean;
+  semantic: ChartSemanticDescriptor;
+  capabilities: ChartSemanticCapabilities;
   hiddenByDefault: boolean;
 }
 
@@ -80,8 +98,8 @@ export interface ChartSemanticAxis {
   name: string;
   label: string | null;
   kind: ChartSemanticAxisKind;
-  semanticKind: ChartSemanticKind;
-  numeric: boolean;
+  semantic: ChartSemanticDescriptor;
+  capabilities: ChartSemanticCapabilities;
   isInferredAxis: boolean;
   physicalColumn: string | null;
 }
@@ -145,9 +163,8 @@ function normalizeDatasetColumnInfo(value: WireColumnInfo): DatasetColumnInfo {
     name: value.name,
     label: value.label,
     unit: value.unit,
-    semanticKind: value.semanticKind,
-    isComplex: value.isComplex,
-    isTrace: value.isTrace,
+    semantic: value.semantic,
+    capabilities: value.capabilities,
     isInferredAxis: value.isInferredAxis,
     hiddenByDefault: value.hiddenByDefault,
     isChartAxisCandidate: value.isChartAxisCandidate,

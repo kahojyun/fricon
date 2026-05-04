@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateDatasetInfo } from "../api/client";
 import { datasetKeys } from "../api/queryKeys";
 import type {
-  ChartSemanticKind,
+  ChartSemanticShapeKind,
+  ChartSemanticValueKind,
   DatasetDetail,
   DatasetInfoUpdate,
 } from "../api/types";
@@ -87,17 +88,21 @@ interface DatasetDetailEditorDraft {
   normalizedTags: string[];
 }
 
-const semanticKindLabels: Record<ChartSemanticKind, string> = {
+const semanticValueKindLabels: Record<ChartSemanticValueKind, string> = {
   numeric: "Numeric",
   categorical: "Categorical",
   boolean: "Boolean",
   timestamp: "Timestamp",
   complex: "Complex",
-  trace: "Trace",
   display: "Display",
 };
 
-function semanticKindBadgeVariant(kind: ChartSemanticKind) {
+const semanticShapeKindLabels: Record<ChartSemanticShapeKind, string> = {
+  scalar: "Scalar",
+  trace: "Trace",
+};
+
+function semanticValueBadgeVariant(kind: ChartSemanticValueKind) {
   return kind === "complex" ? "outline" : "secondary";
 }
 
@@ -363,11 +368,12 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <Badge
-                          variant={semanticKindBadgeVariant(
-                            column.semanticKind,
+                          variant={semanticValueBadgeVariant(
+                            column.semantic.valueKind,
                           )}
                         >
-                          {semanticKindLabels[column.semanticKind]}
+                          {semanticShapeKindLabels[column.semantic.shapeKind]} /{" "}
+                          {semanticValueKindLabels[column.semantic.valueKind]}
                         </Badge>
                       </TableCell>
                       <TableCell>

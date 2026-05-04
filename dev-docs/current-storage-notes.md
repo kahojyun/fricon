@@ -57,12 +57,13 @@ directory. A dataset is modeled as one logical Arrow table split across
 `data_chunk_<n>.arrow` files as needed.
 
 New datasets created through ingest also store `dataset_manifest.json` beside
-the chunk files. The manifest records v1 dataset semantic columns, realization
-defaults, optional scan plans, and inference settings. New semantic datasets
-physically materialize the Fricon-owned `__ds_record_id: uint64` system column
-as the first Arrow column. Earlier transition snapshots that declare
-`__ds_record_id` before the Arrow chunks materialized that column are
-unsupported by the semantic reader in this PR.
+the chunk files. The manifest records v1 dataset semantic columns, required
+column semantic facets, realization defaults, optional scan plans, and
+inference settings. New semantic datasets physically materialize the
+Fricon-owned `__ds_record_id: uint64` system column as the first Arrow column.
+Earlier transition snapshots that declare `__ds_record_id` before the Arrow
+chunks materialized that column, or manifests without required column semantic
+facets, are unsupported by the semantic reader in this PR.
 
 Datasets written with explicit logical scan indices store those indices in
 append-only `logical_index_chunk_<n>.arrow` sidecar files. Logical-index chunks
@@ -80,12 +81,9 @@ description, favorite state, status, timestamps, and tags as represented by
 `DatasetRecord` / `DatasetMetadata`.
 
 Dataset payload facts live in Arrow chunk files. Dataset semantic defaults,
-optional scan plans, and inference settings for new ingested datasets live
-in `dataset_manifest.json`.
-
-Resolved semantic kinds such as numeric, categorical, boolean, timestamp,
-complex, and trace are interpretation and UI DTO fields derived from manifest
-v1 dtypes and scan-axis values. They are not additional durable manifest fields.
+required column semantic facets, optional scan plans, and inference settings
+for new ingested datasets live in `dataset_manifest.json`. Resolved chart
+capabilities are derived interpretation/DTO fields, not durable manifest fields.
 
 Dataset archives store catalog metadata in `metadata.json`, Arrow payload chunks
 under `data/data_chunk_<n>.arrow`, logical-index chunks under

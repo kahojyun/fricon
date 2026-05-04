@@ -12,7 +12,8 @@ pub use self::{
     model::{
         ColumnMetadata, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
         IndexRealization, Inference, MANIFEST_VERSION_V1, ManifestColumn, RECORD_ID_COLUMN,
-        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SystemColumn, TraceAxisDType,
+        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SemanticDescriptor,
+        SemanticRole, SemanticShapeKind, SemanticValueKind, SystemColumn, TraceAxisDType,
         TraceDType, TraceLayout, TraceValueDType,
     },
 };

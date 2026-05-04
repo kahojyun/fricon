@@ -6,7 +6,14 @@ import {
   makeDatasetDetail,
   makeFilterTableData as makeChartFilterTableData,
   makeInferredSemantics,
+  makeSemanticCapabilities,
+  makeSemanticDescriptor,
 } from "../test-utils";
+import type {
+  ChartSemanticAxis,
+  ChartSemanticColumn,
+  ChartSemanticValueKind,
+} from "../api/types";
 import {
   buildChartRequest,
   deriveChartViewerState,
@@ -48,6 +55,40 @@ function makeFilterTableData(): FilterTableData {
       [columnId("idxA")]: [{ index: 1, displayValue: "1" }],
     },
   });
+}
+
+function testAxis(
+  input: Omit<ChartSemanticAxis, "semantic" | "capabilities"> & {
+    valueKind?: ChartSemanticValueKind;
+    shapeKind?: "scalar" | "trace";
+  },
+): ChartSemanticAxis {
+  const { valueKind = "numeric", shapeKind = "scalar", ...axis } = input;
+  const semantic = makeSemanticDescriptor({
+    valueKind,
+    shapeKind,
+    role: "logical_index",
+  });
+  return {
+    ...axis,
+    semantic,
+    capabilities: makeSemanticCapabilities(semantic),
+  };
+}
+
+function testValueColumn(
+  input: Omit<ChartSemanticColumn, "semantic" | "capabilities"> & {
+    valueKind?: ChartSemanticValueKind;
+    shapeKind?: "scalar" | "trace";
+  },
+): ChartSemanticColumn {
+  const { valueKind = "numeric", shapeKind = "scalar", ...column } = input;
+  const semantic = makeSemanticDescriptor({ valueKind, shapeKind });
+  return {
+    ...column,
+    semantic,
+    capabilities: makeSemanticCapabilities(semantic),
+  };
 }
 
 describe("chartViewerLogic", () => {
@@ -105,7 +146,12 @@ describe("chartViewerLogic", () => {
   });
 
   it("falls back plot mode to available option", () => {
-    const columns = [makeColumn({ name: "c", semanticKind: "complex" })];
+    const columns = [
+      makeColumn({
+        name: "c",
+        semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+      }),
+    ];
 
     const derived = deriveWithInferredSemantics(
       columns,
@@ -219,8 +265,14 @@ describe("chartViewerLogic", () => {
       makeColumn({ name: "idxA", isInferredAxis: true }),
       makeColumn({ name: "scalarX" }),
       makeColumn({ name: "scalarY" }),
-      makeColumn({ name: "traceX", semanticKind: "trace" }),
-      makeColumn({ name: "traceY", semanticKind: "trace" }),
+      makeColumn({
+        name: "traceX",
+        semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+      }),
+      makeColumn({
+        name: "traceY",
+        semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+      }),
     ];
     const derived = deriveWithInferredSemantics(
       columns,
@@ -268,58 +320,46 @@ describe("chartViewerLogic", () => {
       duplicatePolicy: "latest_by_record_id",
       indexRealization: "implicit",
       axes: [
-        {
+        testAxis({
           id: "logicalIndex:gate",
           name: "gate",
           label: "Gate",
           kind: "logical_index",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
-        },
-        {
+        }),
+        testAxis({
           id: "logicalIndex:bias",
           name: "bias",
           label: "Bias",
           kind: "logical_index",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
-        },
+        }),
       ],
       valueColumns: [
-        {
+        testValueColumn({
           id: "column:hiddenValue",
           name: "hiddenValue",
           label: "Hidden",
-          semanticKind: "numeric",
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: true,
-        },
-        {
+        }),
+        testValueColumn({
           id: "column:signal",
           name: "signal",
           label: "Signal",
-          semanticKind: "numeric",
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: false,
-        },
+        }),
       ],
       chartAxisCandidates: [
-        {
+        testAxis({
           id: "column:physicalAxis",
           name: "physicalAxis",
           label: "Physical Axis",
           kind: "column",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: false,
           physicalColumn: "physicalAxis",
-        },
+        }),
       ],
     });
 
@@ -345,49 +385,40 @@ describe("chartViewerLogic", () => {
       duplicatePolicy: "latest_by_record_id",
       indexRealization: "implicit",
       axes: [
-        {
+        testAxis({
           id: "logicalIndex:gate",
           name: "gate",
           label: "Gate",
           kind: "logical_index",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
-        },
-        {
+        }),
+        testAxis({
           id: "logicalIndex:bias",
           name: "bias",
           label: "Bias",
           kind: "logical_index",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: false,
           physicalColumn: null,
-        },
+        }),
       ],
       valueColumns: [
-        {
+        testValueColumn({
           id: "column:signal",
           name: "signal",
           label: "Signal",
-          semanticKind: "numeric",
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: false,
-        },
+        }),
       ],
       chartAxisCandidates: [
-        {
+        testAxis({
           id: "column:physicalAxis",
           name: "physicalAxis",
           label: "Physical Axis",
           kind: "column",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: false,
           physicalColumn: "physicalAxis",
-        },
+        }),
       ],
     });
 
@@ -413,37 +444,31 @@ describe("chartViewerLogic", () => {
         duplicatePolicy: "latest_by_record_id",
         indexRealization: "implicit",
         axes: [
-          {
+          testAxis({
             id: "logicalIndex:gate",
             name: "gate",
             label: "Gate",
             kind: "logical_index",
-            semanticKind: "categorical",
-            numeric: false,
+            valueKind: "categorical",
             isInferredAxis: false,
             physicalColumn: null,
-          },
-          {
+          }),
+          testAxis({
             id: "logicalIndex:bias",
             name: "bias",
             label: "Bias",
             kind: "logical_index",
-            semanticKind: "numeric",
-            numeric: true,
             isInferredAxis: false,
             physicalColumn: null,
-          },
+          }),
         ],
         valueColumns: [
-          {
+          testValueColumn({
             id: "column:signal",
             name: "signal",
             label: "Signal",
-            semanticKind: "numeric",
-            isComplex: false,
-            isTrace: false,
             hiddenByDefault: false,
-          },
+          }),
         ],
         chartAxisCandidates: [],
       },
@@ -472,46 +497,39 @@ describe("chartViewerLogic", () => {
         duplicatePolicy: "latest_by_record_id",
         indexRealization: "implicit",
         axes: [
-          {
+          testAxis({
             id: "logicalIndex:category",
             name: "category",
             label: "Category",
             kind: "logical_index",
-            semanticKind: "categorical",
-            numeric: true,
+            valueKind: "categorical",
             isInferredAxis: false,
             physicalColumn: null,
-          },
-          {
+          }),
+          testAxis({
             id: "logicalIndex:step",
             name: "step",
             label: "Step",
             kind: "logical_index",
-            semanticKind: "numeric",
-            numeric: true,
             isInferredAxis: false,
             physicalColumn: null,
-          },
+          }),
         ],
         valueColumns: [
-          {
+          testValueColumn({
             id: "column:traceX",
             name: "traceX",
             label: "Trace X",
-            semanticKind: "trace",
-            isComplex: false,
-            isTrace: false,
+            shapeKind: "trace",
             hiddenByDefault: false,
-          },
-          {
+          }),
+          testValueColumn({
             id: "column:traceY",
             name: "traceY",
             label: "Trace Y",
-            semanticKind: "trace",
-            isComplex: false,
-            isTrace: false,
+            shapeKind: "trace",
             hiddenByDefault: false,
-          },
+          }),
         ],
         chartAxisCandidates: [],
       },
@@ -531,10 +549,15 @@ describe("chartViewerLogic", () => {
     const columns = [
       makeColumn({
         name: "complexTrace",
-        semanticKind: "trace",
-        isComplex: true,
+        semantic: makeSemanticDescriptor({
+          valueKind: "complex",
+          shapeKind: "trace",
+        }),
       }),
-      makeColumn({ name: "numericTrace", semanticKind: "trace" }),
+      makeColumn({
+        name: "numericTrace",
+        semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+      }),
     ];
     const derived = deriveWithInferredSemantics(
       columns,
@@ -576,59 +599,48 @@ describe("chartViewerLogic", () => {
       duplicatePolicy: "row_order_placeholder",
       indexRealization: "none",
       axes: [
-        {
+        testAxis({
           id: "column:run",
           name: "run",
           label: null,
           kind: "column",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: true,
           physicalColumn: "run",
-        },
-        {
+        }),
+        testAxis({
           id: "column:step",
           name: "step",
           label: null,
           kind: "column",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: true,
           physicalColumn: "step",
-        },
+        }),
       ],
       valueColumns: [
-        {
+        testValueColumn({
           id: "column:signal",
           name: "signal",
           label: null,
-          semanticKind: "numeric",
-          isComplex: false,
-          isTrace: false,
           hiddenByDefault: false,
-        },
+        }),
       ],
       chartAxisCandidates: [
-        {
+        testAxis({
           id: "column:run",
           name: "run",
           label: null,
           kind: "column",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: true,
           physicalColumn: "run",
-        },
-        {
+        }),
+        testAxis({
           id: "column:step",
           name: "step",
           label: null,
           kind: "column",
-          semanticKind: "numeric",
-          numeric: true,
           isInferredAxis: false,
           physicalColumn: "step",
-        },
+        }),
       ],
     });
 

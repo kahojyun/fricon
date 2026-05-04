@@ -495,7 +495,7 @@ export function ChartViewerControls({
                   onValueChange={(value) =>
                     setHeatmapXName(value === "" ? null : value)
                   }
-                  disabled={derived.heatmapQuantity?.semanticKind === "trace"}
+                  disabled={derived.heatmapQuantity?.capabilities.traceSource}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select X index">
