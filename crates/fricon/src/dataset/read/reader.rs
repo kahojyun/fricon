@@ -18,7 +18,7 @@ use crate::dataset::{
     ingest::WriteSessionHandle,
     interpret::{
         DatasetInterpretation, ResolvedLogicalIndexPoint, resolve_from_compatibility_inference,
-        resolve_from_manifest, resolve_logical_index_points,
+        resolve_from_manifest_with_compatibility_inference, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
     schema::{DatasetDataType, DatasetError, DatasetSchema},
@@ -378,10 +378,17 @@ impl DatasetReader {
             manifest
                 .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
-            return Ok(resolve_from_manifest(
+            let compatibility_index_columns =
+                if manifest.compatibility.allow_inference && manifest.scan_plan.is_none() {
+                    self.try_index_columns().ok().flatten()
+                } else {
+                    None
+                };
+            return Ok(resolve_from_manifest_with_compatibility_inference(
                 self.physical_arrow_schema.as_ref(),
                 manifest,
                 &self.visible_columns,
+                compatibility_index_columns,
             ));
         }
 

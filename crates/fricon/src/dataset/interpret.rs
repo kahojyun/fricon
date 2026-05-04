@@ -108,6 +108,22 @@ pub(crate) fn resolve_from_manifest(
     }
 }
 
+pub(crate) fn resolve_from_manifest_with_compatibility_inference(
+    arrow_schema: &Schema,
+    manifest: &DatasetSemanticManifest,
+    visible_columns: &[usize],
+    index_columns: Option<Vec<usize>>,
+) -> DatasetInterpretation {
+    let mut interpretation = resolve_from_manifest(arrow_schema, manifest, visible_columns);
+    if manifest.compatibility.allow_inference && manifest.scan_plan.is_none() {
+        apply_compatibility_index_projection(
+            &mut interpretation,
+            index_columns.unwrap_or_default(),
+        );
+    }
+    interpretation
+}
+
 struct RoleProjections {
     semantic_references: Vec<ResolvedSemanticReference>,
     value_references: Vec<ResolvedSemanticReference>,
@@ -147,6 +163,85 @@ fn manifest_role_projections(
         group_axes: logical_index_references,
         filter_axes,
         chart_axis_candidates,
+    }
+}
+
+fn apply_compatibility_index_projection(
+    interpretation: &mut DatasetInterpretation,
+    index_columns: Vec<usize>,
+) {
+    let index_columns = index_columns
+        .into_iter()
+        .map(VisibleColumnOrdinal)
+        .collect::<Vec<_>>();
+    let index_column_set: HashSet<_> = index_columns.iter().copied().collect();
+
+    for column in &mut interpretation.columns {
+        if column.meaning == ColumnMeaning::UserValue
+            && column
+                .visible_ordinal
+                .is_some_and(|ordinal| index_column_set.contains(&ordinal))
+        {
+            column.meaning = ColumnMeaning::CompatibilityIndex;
+            column.is_index = true;
+            column.is_chart_axis_candidate = true;
+        }
+    }
+
+    let role_projections = manifest_with_compatibility_role_projections(&interpretation.columns);
+    interpretation.semantic_references = role_projections.semantic_references;
+    interpretation.value_references = role_projections.value_references;
+    interpretation.plotted_coordinates = role_projections.plotted_coordinates;
+    interpretation.sweep_axes = role_projections.sweep_axes;
+    interpretation.group_axes = role_projections.group_axes;
+    interpretation.filter_axes = role_projections.filter_axes;
+    interpretation.chart_axis_candidates = role_projections.chart_axis_candidates;
+    interpretation.value_columns = interpretation
+        .columns
+        .iter()
+        .filter(|column| column.meaning == ColumnMeaning::UserValue)
+        .filter_map(|column| column.visible_ordinal)
+        .collect();
+    interpretation.logical_index_columns = index_columns.clone();
+    interpretation.chart_axis_candidate_columns = interpretation
+        .columns
+        .iter()
+        .filter(|column| column.is_chart_axis_candidate)
+        .filter_map(|column| column.visible_ordinal)
+        .collect();
+    if !index_columns.is_empty() {
+        interpretation.duplicate_policy = ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder;
+    }
+}
+
+fn manifest_with_compatibility_role_projections(columns: &[ResolvedColumn]) -> RoleProjections {
+    let value_references = physical_column_references(columns, false, |column| {
+        column.meaning == ColumnMeaning::UserValue
+    });
+    let compatibility_axes = physical_column_references(columns, true, |column| {
+        column.meaning == ColumnMeaning::CompatibilityIndex
+    });
+    let chart_axis_candidates = physical_column_references(columns, false, |column| {
+        column.meaning == ColumnMeaning::UserValue
+            && column.is_chart_axis_candidate
+            && column.visible_ordinal.is_some()
+    });
+    let semantic_references = physical_column_references(columns, false, |_| true);
+    let mut plotted_coordinates = compatibility_axes.clone();
+    plotted_coordinates.extend(chart_axis_candidates.clone());
+    let mut filter_axes = compatibility_axes.clone();
+    filter_axes.extend(chart_axis_candidates.clone());
+    let mut all_chart_axis_candidates = compatibility_axes.clone();
+    all_chart_axis_candidates.extend(chart_axis_candidates);
+
+    RoleProjections {
+        semantic_references,
+        value_references,
+        plotted_coordinates,
+        sweep_axes: compatibility_axes.clone(),
+        group_axes: compatibility_axes,
+        filter_axes,
+        chart_axis_candidates: all_chart_axis_candidates,
     }
 }
 
@@ -795,7 +890,7 @@ mod tests {
                     schema,
                     vec![
                         Arc::new(UInt64Array::from(vec![0, 1])),
-                        Arc::new(Float64Array::from(vec![1.0, 1.0])),
+                        Arc::new(Float64Array::from(vec![1.0, 2.0])),
                         Arc::new(Float64Array::from(vec![10.0, 20.0])),
                     ],
                 )
@@ -824,16 +919,21 @@ mod tests {
         assert_eq!(reader.batches()[0].num_columns(), 2);
         assert_eq!(
             reader.try_index_columns().expect("index columns"),
-            Some(vec![0, 1])
+            Some(vec![0])
         );
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(interpretation.source, InterpretationSource::Manifest);
         assert_eq!(
+            interpretation.duplicate_policy,
+            ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder
+        );
+        assert_eq!(
             interpretation.columns[0].meaning,
             ColumnMeaning::SystemRecordId
         );
-        assert_eq!(interpretation.value_columns, visible(&[0, 1]));
+        assert_eq!(interpretation.logical_index_columns, visible(&[0]));
+        assert_eq!(interpretation.value_columns, visible(&[1]));
         assert_eq!(
             interpretation.columns[1].physical_ordinal,
             PhysicalColumnOrdinal(1)
@@ -842,6 +942,20 @@ mod tests {
             interpretation.columns[1].visible_ordinal,
             Some(VisibleColumnOrdinal(0))
         );
+        assert_eq!(
+            interpretation.columns[1].meaning,
+            ColumnMeaning::CompatibilityIndex
+        );
+        assert!(interpretation.columns[1].is_index);
+        assert_eq!(
+            interpretation
+                .group_axes
+                .iter()
+                .map(ResolvedSemanticReference::id)
+                .collect::<Vec<_>>(),
+            vec!["column:run"]
+        );
+        assert!(interpretation.group_axes[0].is_compatibility());
         let selected_columns = interpretation
             .value_columns
             .iter()
@@ -855,8 +969,8 @@ mod tests {
                 selected_columns: Some(selected_columns),
             })
             .expect("select value columns from interpretation");
-        assert_eq!(selected_schema.fields().len(), 2);
-        assert_eq!(selected_batches[0].num_columns(), 2);
+        assert_eq!(selected_schema.fields().len(), 1);
+        assert_eq!(selected_batches[0].num_columns(), 1);
     }
 
     #[test]

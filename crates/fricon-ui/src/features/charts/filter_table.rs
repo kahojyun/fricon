@@ -280,4 +280,63 @@ mod tests {
         app_manager.shutdown().await;
         Ok(())
     }
+
+    #[tokio::test]
+    async fn filter_data_includes_compatibility_axes_for_simple_semantic_datasets()
+    -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let rows = (1..=3)
+            .map(|row_id| {
+                DatasetRow(IndexMap::from([
+                    (
+                        "row_id".to_string(),
+                        DatasetScalar::Numeric(f64::from(row_id)),
+                    ),
+                    (
+                        "signal".to_string(),
+                        DatasetScalar::Numeric(f64::from(row_id * 10)),
+                    ),
+                ]))
+            })
+            .collect::<Vec<_>>();
+        let mut writer = client
+            .create_dataset(
+                "simple-filter-test".to_string(),
+                String::new(),
+                vec![],
+                rows[0].to_schema(),
+                Vec::new(),
+                None,
+                false,
+            )
+            .await?;
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let data = load_filter_data(&session, dataset.id(), None).await?;
+
+        assert_eq!(data.fields, vec!["column:row_id"]);
+        assert_eq!(
+            data.unique_rows
+                .iter()
+                .map(|row| row.display_values.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                vec!["1.0".to_string()],
+                vec!["2.0".to_string()],
+                vec!["3.0".to_string()],
+            ]
+        );
+
+        app_manager.shutdown().await;
+        Ok(())
+    }
 }
