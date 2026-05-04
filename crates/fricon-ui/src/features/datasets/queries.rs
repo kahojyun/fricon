@@ -1,15 +1,14 @@
 use fricon::{
-    DatasetInterpretation, DatasetListQuery, InterpretationSource, ReadAppError, ResolvedColumn,
-    ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedSemanticReference,
-    dataset::model::DatasetId,
+    DatasetInterpretation, DatasetListQuery, ReadAppError, ResolvedColumn, ResolvedDuplicatePolicy,
+    ResolvedIndexRealization, ResolvedSemanticReference, dataset::model::DatasetId,
 };
 
 use super::{
     error::UiDatasetError,
     types::{
-        ChartDuplicatePolicy, ChartIndexRealization, ChartInterpretationSource, ChartSemanticAxis,
-        ChartSemanticAxisKind, ChartSemanticColumn, ChartSemantics, ColumnInfo, DatasetDetail,
-        DatasetInfo, DatasetWriteStatus,
+        ChartDuplicatePolicy, ChartIndexRealization, ChartSemanticAxis, ChartSemanticAxisKind,
+        ChartSemanticColumn, ChartSemantics, ColumnInfo, DatasetDetail, DatasetInfo,
+        DatasetWriteStatus,
     },
 };
 use crate::desktop_runtime::session::WorkspaceSession;
@@ -57,11 +56,10 @@ pub(crate) async fn get_dataset_detail(
     let (columns, chart_semantics) = if payload_available {
         let reader = session.dataset(id).await?;
         let interpretation = reader.interpret().map_err(ReadAppError::from)?;
-        let expose_manifest_hints = interpretation.source == InterpretationSource::Manifest;
         let columns = interpretation
             .columns
             .iter()
-            .filter_map(|column| column_info_from_resolved_column(column, expose_manifest_hints))
+            .filter_map(column_info_from_resolved_column)
             .collect();
         let chart_semantics = chart_semantics_from_interpretation(&interpretation);
         (columns, Some(chart_semantics))
@@ -86,17 +84,9 @@ pub(crate) async fn get_dataset_detail(
 }
 
 fn chart_semantics_from_interpretation(interpretation: &DatasetInterpretation) -> ChartSemantics {
-    let source = match interpretation.source {
-        InterpretationSource::Manifest => ChartInterpretationSource::Manifest,
-        InterpretationSource::CompatibilityInference => {
-            ChartInterpretationSource::CompatibilityInference
-        }
-    };
     let duplicate_policy = match interpretation.duplicate_policy {
         ResolvedDuplicatePolicy::LatestByRecordId => ChartDuplicatePolicy::LatestByRecordId,
-        ResolvedDuplicatePolicy::CompatibilityRowOrderPlaceholder => {
-            ChartDuplicatePolicy::CompatibilityRowOrderPlaceholder
-        }
+        ResolvedDuplicatePolicy::RowOrderPlaceholder => ChartDuplicatePolicy::RowOrderPlaceholder,
     };
     let index_realization = match interpretation.index_realization {
         ResolvedIndexRealization::None => ChartIndexRealization::None,
@@ -123,7 +113,6 @@ fn chart_semantics_from_interpretation(interpretation: &DatasetInterpretation) -
         .collect();
 
     ChartSemantics {
-        source,
         duplicate_policy,
         index_realization,
         axes,
@@ -154,7 +143,7 @@ fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
             label: column.label.clone(),
             kind: ChartSemanticAxisKind::Column,
             numeric: column.numeric_axis,
-            is_compatibility: column.is_compatibility,
+            is_inferred_axis: column.is_inferred_axis,
             physical_column: Some(column.name.clone()),
         },
         ResolvedSemanticReference::LogicalIndex(axis) => ChartSemanticAxis {
@@ -163,16 +152,13 @@ fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
             label: axis.label.clone(),
             kind: ChartSemanticAxisKind::LogicalIndex,
             numeric: axis.numeric_axis,
-            is_compatibility: axis.is_compatibility,
+            is_inferred_axis: axis.is_inferred_axis,
             physical_column: None,
         },
     }
 }
 
-fn column_info_from_resolved_column(
-    column: &ResolvedColumn,
-    expose_manifest_hints: bool,
-) -> Option<ColumnInfo> {
+fn column_info_from_resolved_column(column: &ResolvedColumn) -> Option<ColumnInfo> {
     column.visible_ordinal?;
     Some(ColumnInfo {
         name: column.name.clone(),
@@ -180,9 +166,9 @@ fn column_info_from_resolved_column(
         unit: column.unit.clone(),
         is_complex: column.is_complex,
         is_trace: column.is_trace,
-        is_index: column.is_index,
+        is_inferred_axis: column.is_inferred_axis,
         hidden_by_default: column.hidden_by_default,
-        is_chart_axis_candidate: expose_manifest_hints && column.is_chart_axis_candidate,
+        is_chart_axis_candidate: column.is_chart_axis_candidate,
     })
 }
 
@@ -197,14 +183,9 @@ pub(crate) async fn get_dataset_write_status(
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, sync::Arc};
-
-    use arrow_array::{Float64Array, RecordBatch};
-    use arrow_ipc::writer::FileWriter;
-    use arrow_schema::{DataType, Field, Schema};
     use fricon::{
         AppManager, Client, DatasetRow, DatasetScalar, ScalarArray, WorkspaceRoot,
-        dataset::semantics::ColumnMetadata, workspace::WorkspacePaths,
+        dataset::semantics::ColumnMetadata,
     };
     use indexmap::IndexMap;
     use num::complex::Complex64;
@@ -231,7 +212,7 @@ mod tests {
         assert_eq!(detail.columns[0].name, "signal");
         assert_eq!(detail.columns[0].label.as_deref(), Some("Signal"));
         assert_eq!(detail.columns[0].unit.as_deref(), Some("V"));
-        assert!(!detail.columns[0].is_index);
+        assert!(!detail.columns[0].is_inferred_axis);
         assert!(!detail.columns[0].is_trace);
         assert!(!detail.columns[0].is_complex);
         assert!(detail.columns[0].hidden_by_default);
@@ -240,10 +221,6 @@ mod tests {
             .chart_semantics
             .as_ref()
             .expect("chart semantics should be exposed");
-        assert!(matches!(
-            semantics.source,
-            super::ChartInterpretationSource::Manifest
-        ));
         assert_eq!(semantics.value_columns.len(), 3);
         assert_eq!(semantics.value_columns[0].id, "column:signal");
         assert_eq!(semantics.chart_axis_candidates.len(), 2);
@@ -252,7 +229,7 @@ mod tests {
         assert_eq!(detail.columns[1].name, "trace");
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
-        assert!(!detail.columns[1].is_index);
+        assert!(!detail.columns[1].is_inferred_axis);
         assert!(detail.columns[1].is_trace);
         assert!(!detail.columns[1].is_complex);
         assert!(!detail.columns[1].hidden_by_default);
@@ -262,7 +239,7 @@ mod tests {
         assert_eq!(detail.columns[2].name, "complex");
         assert_eq!(detail.columns[2].label, None);
         assert_eq!(detail.columns[2].unit, None);
-        assert!(!detail.columns[2].is_index);
+        assert!(!detail.columns[2].is_inferred_axis);
         assert!(!detail.columns[2].is_trace);
         assert!(detail.columns[2].is_complex);
         assert!(!detail.columns[2].hidden_by_default);
@@ -278,9 +255,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_dataset_detail_uses_legacy_interpretation_when_manifest_is_absent()
+    async fn get_dataset_detail_exposes_inferred_axes_for_simple_semantic_dataset()
     -> anyhow::Result<()> {
-        let (_temp_dir, _app_manager, session, dataset_id) = create_legacy_dataset().await?;
+        let (_temp_dir, _app_manager, session, dataset_id) =
+            create_simple_dataset(simple_rows()).await?;
 
         let detail = get_dataset_detail(&session, dataset_id).await?;
 
@@ -288,27 +266,23 @@ mod tests {
         assert_eq!(detail.columns[0].name, "run");
         assert_eq!(detail.columns[0].label, None);
         assert_eq!(detail.columns[0].unit, None);
-        assert!(detail.columns[0].is_index);
+        assert!(detail.columns[0].is_inferred_axis);
         assert!(!detail.columns[0].is_trace);
         assert!(!detail.columns[0].is_complex);
         assert!(!detail.columns[0].hidden_by_default);
-        assert!(!detail.columns[0].is_chart_axis_candidate);
+        assert!(detail.columns[0].is_chart_axis_candidate);
         assert_eq!(detail.columns[1].name, "step");
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
-        assert!(detail.columns[1].is_index);
+        assert!(detail.columns[1].is_inferred_axis);
         assert!(!detail.columns[1].is_trace);
         assert!(!detail.columns[1].is_complex);
         assert!(!detail.columns[1].hidden_by_default);
-        assert!(!detail.columns[1].is_chart_axis_candidate);
+        assert!(detail.columns[1].is_chart_axis_candidate);
         let semantics = detail
             .chart_semantics
             .as_ref()
-            .expect("compatibility chart semantics should be exposed");
-        assert!(matches!(
-            semantics.source,
-            super::ChartInterpretationSource::CompatibilityInference
-        ));
+            .expect("inferred axis chart semantics should be exposed");
         assert_eq!(
             semantics
                 .axes
@@ -320,7 +294,7 @@ mod tests {
         assert_eq!(detail.columns[2].name, "value");
         assert_eq!(detail.columns[2].label, None);
         assert_eq!(detail.columns[2].unit, None);
-        assert!(!detail.columns[2].is_index);
+        assert!(!detail.columns[2].is_inferred_axis);
         assert!(!detail.columns[2].is_trace);
         assert!(!detail.columns[2].is_complex);
         assert!(!detail.columns[2].hidden_by_default);
@@ -374,46 +348,34 @@ mod tests {
         Ok((temp_dir, app_manager, session, dataset.id()))
     }
 
-    async fn create_legacy_dataset() -> anyhow::Result<(TempDir, AppManager, WorkspaceSession, i32)>
-    {
+    async fn create_simple_dataset(
+        rows: Vec<DatasetRow>,
+    ) -> anyhow::Result<(TempDir, AppManager, WorkspaceSession, i32)> {
         let temp_dir = TempDir::new()?;
         WorkspaceRoot::create_new(temp_dir.path())?;
-        let app_manager = AppManager::new_with_path(temp_dir.path())?;
-        let session = WorkspaceSession::new(app_manager.handle().clone());
 
-        let record = session
-            .app()
-            .create_empty_dataset("legacy-detail-test".to_string(), String::new(), vec![])
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let schema = rows[0].to_schema();
+        let mut writer = client
+            .create_dataset(
+                "simple-detail-test".to_string(),
+                String::new(),
+                vec!["test".to_string()],
+                schema,
+                Vec::new(),
+                None,
+                false,
+            )
             .await?;
-        let dataset_dir =
-            WorkspacePaths::new(temp_dir.path()).dataset_path_from_uid(record.metadata.uid);
-        std::fs::remove_file(dataset_dir.join("dataset_manifest.json"))?;
-        write_legacy_arrow_chunk(&dataset_dir)?;
-
-        Ok((temp_dir, app_manager, session, record.id))
-    }
-
-    fn write_legacy_arrow_chunk(dataset_dir: &std::path::Path) -> anyhow::Result<()> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("run", DataType::Float64, false),
-            Field::new("step", DataType::Float64, false),
-            Field::new("value", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(Float64Array::from(vec![1.0, 1.0])),
-                Arc::new(Float64Array::from(vec![0.0, 1.0])),
-                Arc::new(Float64Array::from(vec![10.0, 20.0])),
-            ],
-        )?;
-        let mut writer = FileWriter::try_new(
-            File::create(dataset_dir.join("data_chunk_0.arrow"))?,
-            &schema,
-        )?;
-        writer.write(&batch)?;
-        writer.finish()?;
-        Ok(())
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+        Ok((temp_dir, app_manager, session, dataset.id()))
     }
 
     fn manifest_rows() -> Vec<DatasetRow> {
@@ -432,5 +394,20 @@ mod tests {
             ),
             ("complex".to_string(), DatasetScalar::Complex(complex)),
         ]))
+    }
+
+    fn simple_rows() -> Vec<DatasetRow> {
+        vec![
+            DatasetRow(IndexMap::from([
+                ("run".to_string(), DatasetScalar::Numeric(1.0)),
+                ("step".to_string(), DatasetScalar::Numeric(0.0)),
+                ("value".to_string(), DatasetScalar::Numeric(10.0)),
+            ])),
+            DatasetRow(IndexMap::from([
+                ("run".to_string(), DatasetScalar::Numeric(1.0)),
+                ("step".to_string(), DatasetScalar::Numeric(1.0)),
+                ("value".to_string(), DatasetScalar::Numeric(20.0)),
+            ])),
+        ]
     }
 }

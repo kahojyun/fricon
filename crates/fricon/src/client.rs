@@ -477,9 +477,9 @@ impl DatasetWriter {
             .iter()
             .map(|axis| {
                 let value = logical_indices[&axis.name];
-                Arc::new(UInt64Array::from(vec![value; row_count])) as _
+                Ok(Arc::new(UInt64Array::from(vec![value; row_count])) as _)
             })
-            .collect();
+            .collect::<Result<Vec<_>, ClientError>>()?;
         Ok(Some(RecordBatch::try_new(
             logical_index_values_schema(scan_plan),
             arrays,

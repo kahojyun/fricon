@@ -94,23 +94,16 @@ pub(crate) struct ColumnInfo {
     pub(crate) unit: Option<String>,
     pub(crate) is_complex: bool,
     pub(crate) is_trace: bool,
-    pub(crate) is_index: bool,
+    pub(crate) is_inferred_axis: bool,
     pub(crate) hidden_by_default: bool,
     pub(crate) is_chart_axis_candidate: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ChartInterpretationSource {
-    Manifest,
-    CompatibilityInference,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
-#[serde(rename_all = "snake_case")]
 pub(crate) enum ChartDuplicatePolicy {
     LatestByRecordId,
-    CompatibilityRowOrderPlaceholder,
+    RowOrderPlaceholder,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, specta::Type)]
@@ -147,14 +140,13 @@ pub(crate) struct ChartSemanticAxis {
     pub(crate) label: Option<String>,
     pub(crate) kind: ChartSemanticAxisKind,
     pub(crate) numeric: bool,
-    pub(crate) is_compatibility: bool,
+    pub(crate) is_inferred_axis: bool,
     pub(crate) physical_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChartSemantics {
-    pub(crate) source: ChartInterpretationSource,
     pub(crate) duplicate_policy: ChartDuplicatePolicy,
     pub(crate) index_realization: ChartIndexRealization,
     pub(crate) axes: Vec<ChartSemanticAxis>,

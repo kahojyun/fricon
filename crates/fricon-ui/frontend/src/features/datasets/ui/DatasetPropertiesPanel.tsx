@@ -319,7 +319,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                     <TableHead>Name</TableHead>
                     <TableHead>Label</TableHead>
                     <TableHead>Unit</TableHead>
-                    <TableHead>Index</TableHead>
+                    <TableHead>Inferred</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Hints</TableHead>
                   </TableRow>
@@ -341,7 +341,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                         )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {column.isIndex ? "✓" : ""}
+                        {column.isInferredAxis ? "✓" : ""}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {column.isTrace ? (

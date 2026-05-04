@@ -15,9 +15,8 @@ use indexmap::IndexMap;
 
 use crate::dataset::{
     interpret::{
-        DatasetInterpretation, InterpretationSource, ResolvedDuplicatePolicy,
-        ResolvedLogicalIndexPoint, ResolvedScanAxisMode, ResolvedSemanticReference,
-        physical_column_id,
+        DatasetInterpretation, ResolvedDuplicatePolicy, ResolvedLogicalIndexPoint,
+        ResolvedScanAxisMode, ResolvedSemanticReference, physical_column_id,
     },
     read::{DatasetReader, SelectOptions},
     schema::{DatasetDataType, DatasetSchema, ScalarKind},
@@ -139,7 +138,7 @@ fn project_selected_batch(
         row_indices = filter_row_indices(&row_indices, &mask);
     }
     let semantic_column_names = semantic_column_names(interpretation, &schema);
-    let roles = projected_roles(dataset, interpretation, &schema)?;
+    let roles = projected_roles(interpretation, &schema);
     let group_axes = projected_axes(&interpretation.group_axes, &batch);
     let filter_axes = projected_axes(&interpretation.filter_axes, &batch);
     Ok(ProjectedSemanticSource {
@@ -450,11 +449,10 @@ fn projected_column_name(
 }
 
 fn projected_roles(
-    dataset: &DatasetReader,
     interpretation: &DatasetInterpretation,
     schema: &DatasetSchema,
-) -> Result<ProjectedSemanticRoles> {
-    let mut roles = ProjectedSemanticRoles {
+) -> ProjectedSemanticRoles {
+    ProjectedSemanticRoles {
         sweep_columns: projected_reference_columns(
             &interpretation.sweep_axes,
             schema,
@@ -462,25 +460,7 @@ fn projected_roles(
         ),
         group_columns: projected_reference_columns(&interpretation.group_axes, schema, |_| true),
         filter_columns: projected_reference_columns(&interpretation.filter_axes, schema, |_| true),
-    };
-
-    if fallback_to_inferred_index_columns(interpretation) {
-        let full_schema = dataset.schema()?;
-        if let Some(indices) = dataset.try_index_columns()? {
-            let projected = map_full_index_columns(full_schema, schema, &indices);
-            if roles.sweep_columns.is_empty() {
-                roles.sweep_columns.clone_from(&projected);
-            }
-            if roles.group_columns.is_empty() {
-                roles.group_columns.clone_from(&projected);
-            }
-            if roles.filter_columns.is_empty() {
-                roles.filter_columns = projected;
-            }
-        }
     }
-
-    Ok(roles)
 }
 
 fn projected_reference_columns(
@@ -542,33 +522,6 @@ fn axis_field_column_name(batch: &RecordBatch, physical_name: &str) -> Option<St
         .field_with_name(&aliased_name)
         .ok()
         .map(|_| aliased_name)
-}
-
-fn fallback_to_inferred_index_columns(interpretation: &DatasetInterpretation) -> bool {
-    interpretation.source == InterpretationSource::CompatibilityInference
-        || interpretation.scan_axes.is_empty()
-}
-
-fn map_full_index_columns(
-    full_schema: &DatasetSchema,
-    selected_schema: &DatasetSchema,
-    indices: &[usize],
-) -> Vec<usize> {
-    indices
-        .iter()
-        .filter_map(|&index| {
-            let name = full_schema.columns().get_index(index)?.0;
-            selected_schema
-                .columns()
-                .get_full(name)
-                .or_else(|| {
-                    selected_schema
-                        .columns()
-                        .get_full(&alias_physical_column_name(name))
-                })
-                .map(|(selected_index, _, _)| selected_index)
-        })
-        .collect()
 }
 
 fn logical_points_by_record_id(
@@ -807,9 +760,12 @@ mod tests {
     use crate::dataset::{
         interpret::{
             ColumnMeaning, PhysicalColumnOrdinal, ResolvedIndexRealization,
-            ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, VisibleColumnOrdinal,
+            ResolvedPhysicalColumnReference, VisibleColumnOrdinal, resolve_from_manifest,
         },
-        semantics::DatasetDType,
+        semantics::{
+            DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, ScanAxis,
+            ScanAxisValue, ScanPlan,
+        },
     };
 
     fn point(record_id: u64, indices: Vec<u64>) -> ResolvedLogicalIndexPoint {
@@ -820,7 +776,7 @@ mod tests {
         }
     }
 
-    fn empty_interpretation(source: InterpretationSource) -> DatasetInterpretation {
+    fn empty_interpretation() -> DatasetInterpretation {
         DatasetInterpretation {
             columns: Vec::new(),
             semantic_references: Vec::new(),
@@ -831,12 +787,11 @@ mod tests {
             filter_axes: Vec::new(),
             chart_axis_candidates: Vec::new(),
             value_columns: Vec::new(),
-            logical_index_columns: Vec::new(),
+            inferred_axis_columns: Vec::new(),
             chart_axis_candidate_columns: Vec::new(),
             duplicate_policy: ResolvedDuplicatePolicy::LatestByRecordId,
             index_realization: ResolvedIndexRealization::None,
             scan_axes: Vec::new(),
-            source,
         }
     }
 
@@ -844,7 +799,7 @@ mod tests {
         id: &str,
         name: &str,
         meaning: ColumnMeaning,
-        is_compatibility: bool,
+        is_inferred_axis: bool,
     ) -> ResolvedSemanticReference {
         ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
             id: id.to_string(),
@@ -853,9 +808,8 @@ mod tests {
             visible_ordinal: Some(VisibleColumnOrdinal(0)),
             dtype: DatasetDType::Float64,
             meaning,
-            is_index: matches!(meaning, ColumnMeaning::CompatibilityIndex),
             is_system: false,
-            is_compatibility,
+            is_inferred_axis,
             hidden_by_default: false,
             is_chart_axis_candidate: true,
             unit: None,
@@ -863,18 +817,6 @@ mod tests {
             is_complex: false,
             is_trace: false,
             numeric_axis: true,
-        })
-    }
-
-    fn logical_reference(id: &str, name: &str, numeric_axis: bool) -> ResolvedSemanticReference {
-        ResolvedSemanticReference::LogicalIndex(ResolvedLogicalIndexReference {
-            id: id.to_string(),
-            name: name.to_string(),
-            axis_ordinal: 0,
-            label: None,
-            hidden_by_default: false,
-            numeric_axis,
-            is_compatibility: false,
         })
     }
 
@@ -917,7 +859,7 @@ mod tests {
                 DatasetDataType::Scalar(ScalarKind::Numeric),
             ),
         ]));
-        let interpretation = empty_interpretation(InterpretationSource::CompatibilityInference);
+        let interpretation = empty_interpretation();
 
         let selected = selected_physical_columns(
             &source_schema,
@@ -966,14 +908,10 @@ mod tests {
         let projected = project_schema(&source_schema, &[0]).expect("project schema");
 
         assert!(projected.columns().contains_key("column:logicalIndex:gate"));
-        assert_eq!(
-            map_full_index_columns(&source_schema, &projected, &[0]),
-            vec![0]
-        );
     }
 
     #[test]
-    fn projected_axes_find_unaliased_prefixed_compatibility_columns() {
+    fn projected_axes_find_unaliased_prefixed_inferred_axis_columns() {
         let source_schema = Arc::new(Schema::new(vec![Field::new(
             "logicalIndex:gate",
             DataType::Float64,
@@ -987,7 +925,7 @@ mod tests {
         let reference = physical_reference(
             "column:logicalIndex:gate",
             "logicalIndex:gate",
-            ColumnMeaning::CompatibilityIndex,
+            ColumnMeaning::InferredAxis,
             true,
         );
 
@@ -1014,19 +952,25 @@ mod tests {
                 DatasetDataType::Scalar(ScalarKind::Numeric),
             ),
         ]));
-        let logical_gate = logical_reference("logicalIndex:gate", "gate", true);
-        let chart_axis = physical_reference(
-            "column:physicalAxis",
-            "physicalAxis",
-            ColumnMeaning::UserValue,
-            false,
-        );
-        let mut interpretation = empty_interpretation(InterpretationSource::Manifest);
-        interpretation.semantic_references = vec![logical_gate.clone(), chart_axis.clone()];
-        interpretation.plotted_coordinates = vec![logical_gate.clone(), chart_axis.clone()];
-        interpretation.sweep_axes = vec![logical_gate];
-        interpretation.chart_axis_candidates = vec![chart_axis];
-        interpretation.index_realization = ResolvedIndexRealization::Implicit;
+        let mut physical_axis = ManifestColumn::new(DatasetDType::Float64);
+        physical_axis.chart_axis = true;
+        let manifest = DatasetSemanticManifest::minimal([
+            (
+                "signal".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+            ("physicalAxis".to_string(), physical_axis),
+        ])
+        .with_scan_plan(Some(ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)],
+        )])));
+        let arrow_schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+            Field::new("physicalAxis", DataType::Float64, false),
+        ]);
+        let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1, 2]);
 
         let columns = projected_reference_columns(&interpretation.sweep_axes, &schema, |axis| {
             axis.numeric_axis()
@@ -1041,11 +985,22 @@ mod tests {
             "logicalIndex:gate".to_string(),
             DatasetDataType::Scalar(ScalarKind::Complex),
         )]));
-        let logical_gate = logical_reference("logicalIndex:gate", "gate", false);
-        let mut interpretation = empty_interpretation(InterpretationSource::Manifest);
-        interpretation.semantic_references = vec![logical_gate.clone()];
-        interpretation.group_axes = vec![logical_gate.clone()];
-        interpretation.sweep_axes = vec![logical_gate];
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![
+                ScanAxisValue::String("low".to_string()),
+                ScanAxisValue::String("high".to_string()),
+            ],
+        )])));
+        let arrow_schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]);
+        let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1]);
 
         assert_eq!(
             projected_reference_columns(&interpretation.group_axes, &schema, |_| true),

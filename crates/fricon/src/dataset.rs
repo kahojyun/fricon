@@ -13,11 +13,11 @@ mod tag;
 pub use self::{
     events::DatasetEvent,
     interpret::{
-        ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
-        ResolvedColumn, ResolvedDuplicatePolicy, ResolvedIndexRealization,
-        ResolvedLogicalIndexPoint, ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference,
-        ResolvedScanAxis, ResolvedScanAxisMode, ResolvedSemanticReference, VisibleColumnOrdinal,
-        logical_index_id, physical_column_id,
+        ColumnMeaning, DatasetInterpretation, PhysicalColumnOrdinal, ResolvedColumn,
+        ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
+        ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedScanAxis,
+        ResolvedScanAxisMode, ResolvedSemanticReference, VisibleColumnOrdinal, logical_index_id,
+        physical_column_id,
     },
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,

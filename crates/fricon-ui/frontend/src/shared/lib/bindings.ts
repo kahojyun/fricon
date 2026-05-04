@@ -64,11 +64,9 @@ export type ChartCommonOptions = {
 	excludeColumns: string[] | null,
 };
 
-export type ChartDuplicatePolicy = "latest_by_record_id" | "compatibility_row_order_placeholder";
+export type ChartDuplicatePolicy = "latest_by_record_id" | "row_order_placeholder";
 
 export type ChartIndexRealization = "none" | "implicit" | "sidecar";
-
-export type ChartInterpretationSource = "manifest" | "compatibility_inference";
 
 export type ChartSemanticAxis = {
 	id: string,
@@ -76,7 +74,7 @@ export type ChartSemanticAxis = {
 	label: string | null,
 	kind: ChartSemanticAxisKind,
 	numeric: boolean,
-	isCompatibility: boolean,
+	isInferredAxis: boolean,
 	physicalColumn: string | null,
 };
 
@@ -92,7 +90,6 @@ export type ChartSemanticColumn = {
 };
 
 export type ChartSemantics = {
-	source: ChartInterpretationSource,
 	duplicatePolicy: ChartDuplicatePolicy,
 	indexRealization: ChartIndexRealization,
 	axes: ChartSemanticAxis[],
@@ -106,7 +103,7 @@ export type ColumnInfo = {
 	unit: string | null,
 	isComplex: boolean,
 	isTrace: boolean,
-	isIndex: boolean,
+	isInferredAxis: boolean,
 	hiddenByDefault: boolean,
 	isChartAxisCandidate: boolean,
 };

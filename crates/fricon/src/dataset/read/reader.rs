@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     ops::RangeBounds,
     path::{Path, PathBuf},
     sync::Arc,
@@ -17,11 +17,11 @@ use itertools::Itertools;
 use crate::dataset::{
     ingest::WriteSessionHandle,
     interpret::{
-        DatasetInterpretation, ResolvedLogicalIndexPoint, resolve_from_compatibility_inference,
-        resolve_from_manifest, resolve_logical_index_points,
+        DatasetInterpretation, ResolvedLogicalIndexPoint, manifest_allows_minimal_axis_inference,
+        resolve_from_manifest_with_minimal_axis_inference, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
-    schema::{DatasetDataType, DatasetError, DatasetSchema},
+    schema::{DatasetDataType, DatasetError, DatasetSchema, ScalarKind},
     semantics::{
         DatasetSemanticManifest, IndexRealization, ManifestError, RECORD_ID_COLUMN, ScanAxisMode,
         ScanAxisValue, is_hidden_system_column, read_manifest_optional,
@@ -236,14 +236,6 @@ fn visible_projection_from_manifest(
     Ok((visible_schema, visible_columns))
 }
 
-fn visible_projection_legacy(
-    physical_schema: &SchemaRef,
-) -> Result<(SchemaRef, Vec<usize>), DatasetError> {
-    let visible_columns: Vec<_> = (0..physical_schema.fields().len()).collect();
-    let visible_schema = Arc::new(physical_schema.project(&visible_columns)?);
-    Ok((visible_schema, visible_columns))
-}
-
 fn project_batch(
     batch: &RecordBatch,
     output_schema: SchemaRef,
@@ -263,17 +255,15 @@ fn project_batch(
 impl DatasetReader {
     pub(crate) fn from_handle(
         source: WriteSessionHandle,
-        manifest: Option<DatasetSemanticManifest>,
+        manifest: DatasetSemanticManifest,
         dataset_path: Option<PathBuf>,
     ) -> Result<Self, ReadError> {
         let physical_arrow_schema = source.schema();
-        if let Some(manifest) = manifest.as_ref() {
-            manifest
-                .validate_against_arrow_schema(physical_arrow_schema.as_ref())
-                .map_err(ManifestError::from)?;
-        }
+        manifest
+            .validate_against_arrow_schema(physical_arrow_schema.as_ref())
+            .map_err(ManifestError::from)?;
         let (arrow_schema, visible_columns) =
-            visible_projection_from_manifest(&physical_arrow_schema, manifest.as_ref())?;
+            visible_projection_from_manifest(&physical_arrow_schema, Some(&manifest))?;
         let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::WriteSession(source),
@@ -281,7 +271,7 @@ impl DatasetReader {
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
-            manifest,
+            manifest: Some(manifest),
             dataset_path,
         })
     }
@@ -290,17 +280,12 @@ impl DatasetReader {
         let mut reader = ChunkReader::new(path.to_owned(), None);
         reader.read_all()?;
         let physical_arrow_schema = reader.schema().ok_or(ReadError::EmptyDataset)?.clone();
-        let manifest = read_manifest_optional(path)?;
-        if let Some(manifest) = manifest.as_ref() {
-            manifest
-                .validate_against_arrow_schema(physical_arrow_schema.as_ref())
-                .map_err(ManifestError::from)?;
-        }
-        let (arrow_schema, visible_columns) = if manifest.is_some() {
-            visible_projection_from_manifest(&physical_arrow_schema, manifest.as_ref())?
-        } else {
-            visible_projection_legacy(&physical_arrow_schema)?
-        };
+        let manifest = read_manifest_optional(path)?.ok_or(ReadError::MissingManifest)?;
+        manifest
+            .validate_against_arrow_schema(physical_arrow_schema.as_ref())
+            .map_err(ManifestError::from)?;
+        let (arrow_schema, visible_columns) =
+            visible_projection_from_manifest(&physical_arrow_schema, Some(&manifest))?;
         let schema = arrow_schema.as_ref().try_into().ok();
         Ok(Self {
             source: DatasetSource::File(reader),
@@ -308,7 +293,7 @@ impl DatasetReader {
             physical_arrow_schema,
             arrow_schema,
             visible_columns,
-            manifest,
+            manifest: Some(manifest),
             dataset_path: Some(path.to_owned()),
         })
     }
@@ -378,17 +363,18 @@ impl DatasetReader {
             manifest
                 .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
-            return Ok(resolve_from_manifest(
+            let inferred_axis_columns = manifest_allows_minimal_axis_inference(manifest)
+                .then(|| self.infer_minimal_axis_columns().ok().flatten())
+                .flatten();
+            return Ok(resolve_from_manifest_with_minimal_axis_inference(
                 self.physical_arrow_schema.as_ref(),
                 manifest,
                 &self.visible_columns,
+                inferred_axis_columns,
             ));
         }
 
-        Ok(resolve_from_compatibility_inference(
-            self.schema()?,
-            self.try_index_columns()?,
-        ))
+        Err(ReadError::MissingManifest)
     }
 
     pub fn logical_index_points(&self) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
@@ -401,7 +387,7 @@ impl DatasetReader {
         record_ids: &[u64],
     ) -> Result<Vec<ResolvedLogicalIndexPoint>, ReadError> {
         let Some(manifest) = &self.manifest else {
-            return Ok(Vec::new());
+            return Err(ReadError::MissingManifest);
         };
         manifest
             .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
@@ -436,7 +422,7 @@ impl DatasetReader {
         }
         let record_id_set = record_ids.iter().copied().collect::<HashSet<_>>();
         let mut matched_record_ids = HashSet::new();
-        let mut latest_by_indices: HashMap<Vec<u64>, ResolvedLogicalIndexPoint> = HashMap::new();
+        let mut points = Vec::new();
         for batch in &batches {
             let record_ids = logical_index_record_ids(batch)?;
             let axis_columns = (0..scan_plan.axes.len())
@@ -469,25 +455,16 @@ impl DatasetReader {
                         )),
                     })
                     .collect::<Result<Vec<_>, DatasetError>>()?;
-                let point = ResolvedLogicalIndexPoint {
+                points.push(ResolvedLogicalIndexPoint {
                     record_id,
-                    indices: indices.clone(),
+                    indices,
                     coordinates,
-                };
-                latest_by_indices
-                    .entry(indices)
-                    .and_modify(|current| {
-                        if record_id > current.record_id {
-                            *current = point.clone();
-                        }
-                    })
-                    .or_insert(point);
+                });
             }
         }
         if matched_record_ids != record_id_set {
             return Err(ReadError::Dataset(DatasetError::SchemaMismatch));
         }
-        let mut points = latest_by_indices.into_values().collect::<Vec<_>>();
         points.sort_by_key(|point| point.record_id);
         Ok(points)
     }
@@ -521,12 +498,7 @@ impl DatasetReader {
         Ok(record_ids)
     }
 
-    #[must_use]
-    pub fn index_columns(&self) -> Option<Vec<usize>> {
-        self.try_index_columns().ok().flatten()
-    }
-
-    pub fn try_index_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
+    fn infer_minimal_axis_columns(&self) -> Result<Option<Vec<usize>>, ReadError> {
         let schema = self.schema()?;
         if self.source.num_rows() < 2 {
             Ok(None)
@@ -546,12 +518,14 @@ impl DatasetReader {
                 .zip(schema.columns().values())
                 .enumerate()
             {
-                if !matches!(column_type, DatasetDataType::Scalar(_)) {
+                if !matches!(column_type, DatasetDataType::Scalar(ScalarKind::Numeric)) {
                     break;
                 }
                 result.push(index);
-                let cmp = make_comparator(sample_array, sample_array, SortOptions::default())
-                    .expect("Should be self comparable");
+                let Ok(cmp) = make_comparator(sample_array, sample_array, SortOptions::default())
+                else {
+                    break;
+                };
                 if cmp(0, 1) != Ordering::Equal {
                     break;
                 }

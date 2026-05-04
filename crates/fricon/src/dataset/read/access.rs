@@ -32,11 +32,8 @@ pub(crate) fn get_dataset_reader(
     // Prefer the active write session so reads observe in-progress data for a
     // dataset that has not yet been finalized to disk.
     if let Some(handle) = write_sessions.get(dataset.id) {
-        Ok(DatasetReader::from_handle(
-            handle,
-            read_manifest_optional(&path)?,
-            Some(path),
-        )?)
+        let manifest = read_manifest_optional(&path)?.ok_or(ReadError::MissingManifest)?;
+        Ok(DatasetReader::from_handle(handle, manifest, Some(path))?)
     } else {
         Ok(DatasetReader::open_dir(&path)?)
     }

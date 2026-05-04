@@ -4,14 +4,12 @@ use arrow_array::{
     Array, ArrayRef, Float64Array, ListArray, StructArray, cast::AsArray, types::Float64Type,
 };
 use arrow_buffer::OffsetBuffer;
-use arrow_schema::extension::ExtensionType;
 use derive_more::From;
 use num::complex::Complex64;
 
 use crate::dataset::schema::{
-    arrow_ext::ComplexType,
     error::DatasetError,
-    model::{DatasetDataType, ScalarKind, TraceKind},
+    model::{DatasetDataType, ScalarKind, TraceKind, complex_fields},
 };
 
 #[derive(Debug, Clone)]
@@ -54,7 +52,7 @@ impl FromIterator<Complex64> for ComplexArray {
             iter.into_iter().map(|c| (c.re, c.im)).unzip();
         let real = Arc::new(Float64Array::from(real_values));
         let imag = Arc::new(Float64Array::from(imag_values));
-        let struct_array = StructArray::new(ComplexType::fields(), vec![real, imag], None);
+        let struct_array = StructArray::new(complex_fields(), vec![real, imag], None);
         ComplexArray(Arc::new(struct_array))
     }
 }

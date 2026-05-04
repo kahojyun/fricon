@@ -171,8 +171,8 @@ pub(crate) fn process_filter_rows(
 #[cfg(test)]
 mod tests {
     use fricon::{
-        AppManager, Client, DatasetRow, DatasetScalar, ScanAxis, ScanAxisValue, ScanPlan,
-        WorkspaceRoot,
+        AppManager, Client, ColumnMetadata, DatasetRow, DatasetScalar, ScanAxis, ScanAxisValue,
+        ScanPlan, WorkspaceRoot,
     };
     use indexmap::IndexMap;
     use serde_json::json;
@@ -198,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn complex_filter_values_keep_stable_display_and_indices() {
+    fn complex_filter_values_keep_stable_display_and_indices() -> anyhow::Result<()> {
         let fields = vec!["z".to_string()];
         let rows = vec![
             vec![json!({"real": 1.0, "imag": 2.0})],
@@ -209,12 +209,12 @@ mod tests {
         let processed = process_filter_rows(&fields, rows);
 
         assert_eq!(processed.unique_rows.len(), 2);
-        assert_eq!(
-            processed.unique_rows[0].display_values,
-            vec![r#"{"imag":2.0,"real":1.0}"#]
-        );
+        let first_display: serde_json::Value =
+            serde_json::from_str(&processed.unique_rows[0].display_values[0])?;
+        assert_eq!(first_display, json!({"real": 1.0, "imag": 2.0}));
         assert_eq!(processed.unique_rows[0].value_indices, vec![0]);
         assert_eq!(processed.unique_rows[1].value_indices, vec![1]);
+        Ok(())
     }
 
     #[tokio::test]
@@ -274,6 +274,134 @@ mod tests {
                 vec!["low".to_string(), "1.0".to_string()],
                 vec!["high".to_string(), "0.0".to_string()],
                 vec!["high".to_string(), "1.0".to_string()],
+            ]
+        );
+
+        app_manager.shutdown().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn filter_data_includes_inferred_axes_for_simple_semantic_datasets() -> anyhow::Result<()>
+    {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let rows = (1..=3)
+            .map(|row_id| {
+                DatasetRow(IndexMap::from([
+                    (
+                        "row_id".to_string(),
+                        DatasetScalar::Numeric(f64::from(row_id)),
+                    ),
+                    (
+                        "signal".to_string(),
+                        DatasetScalar::Numeric(f64::from(row_id * 10)),
+                    ),
+                ]))
+            })
+            .collect::<Vec<_>>();
+        let mut writer = client
+            .create_dataset(
+                "simple-filter-test".to_string(),
+                String::new(),
+                vec![],
+                rows[0].to_schema(),
+                Vec::new(),
+                None,
+                false,
+            )
+            .await?;
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let data = load_filter_data(&session, dataset.id(), None).await?;
+
+        assert_eq!(data.fields, vec!["column:row_id"]);
+        assert_eq!(
+            data.unique_rows
+                .iter()
+                .map(|row| row.display_values.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                vec!["1.0".to_string()],
+                vec!["2.0".to_string()],
+                vec!["3.0".to_string()],
+            ]
+        );
+
+        app_manager.shutdown().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn filter_data_includes_manifest_chart_axis_candidates() -> anyhow::Result<()> {
+        let temp_dir = TempDir::new()?;
+        WorkspaceRoot::create_new(temp_dir.path())?;
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let rows = [("low", 295.0, 10.0), ("high", 300.0, 20.0)]
+            .into_iter()
+            .map(|(_, temperature, signal)| {
+                DatasetRow(IndexMap::from([
+                    (
+                        "temperature".to_string(),
+                        DatasetScalar::Numeric(temperature),
+                    ),
+                    ("signal".to_string(), DatasetScalar::Numeric(signal)),
+                ]))
+            })
+            .collect::<Vec<_>>();
+        let scan_plan = ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![
+                ScanAxisValue::String("low".to_string()),
+                ScanAxisValue::String("high".to_string()),
+            ],
+        )]);
+        let mut writer = client
+            .create_dataset(
+                "manifest-filter-axis-test".to_string(),
+                String::new(),
+                vec![],
+                rows[0].to_schema(),
+                vec![ColumnMetadata {
+                    name: "temperature".to_string(),
+                    unit: Some("K".to_string()),
+                    label: Some("Temperature".to_string()),
+                    hidden_by_default: false,
+                    chart_axis: true,
+                }],
+                Some(scan_plan),
+                false,
+            )
+            .await?;
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+
+        let data = load_filter_data(&session, dataset.id(), None).await?;
+
+        assert_eq!(data.fields, vec!["logicalIndex:gate", "column:temperature"]);
+        assert_eq!(data.field_labels["column:temperature"], "Temperature");
+        assert_eq!(
+            data.unique_rows
+                .iter()
+                .map(|row| row.display_values.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                vec!["low".to_string(), "295.0".to_string()],
+                vec!["high".to_string(), "300.0".to_string()],
             ]
         );
 

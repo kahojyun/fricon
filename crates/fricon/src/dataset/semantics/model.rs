@@ -16,7 +16,7 @@ pub struct DatasetSemanticManifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scan_plan: Option<ScanPlan>,
     pub realization: Realization,
-    pub compatibility: Compatibility,
+    pub inference: Inference,
 }
 
 impl DatasetSemanticManifest {
@@ -29,7 +29,7 @@ impl DatasetSemanticManifest {
             columns,
             scan_plan: None,
             realization: Realization::default(),
-            compatibility: Compatibility::default(),
+            inference: Inference::default(),
         }
     }
 
@@ -86,7 +86,7 @@ impl DatasetSemanticManifest {
         self.apply_scan_plan_with_realization(scan_plan, false);
     }
 
-    fn apply_scan_plan_with_realization(
+    pub(crate) fn apply_scan_plan_with_realization(
         &mut self,
         scan_plan: Option<ScanPlan>,
         sidecar_index_realization: bool,
@@ -251,7 +251,13 @@ impl DatasetSemanticManifest {
         let Some(scan_plan) = &self.scan_plan else {
             return Ok(());
         };
-        scan_plan.validate()
+        scan_plan.validate()?;
+        if scan_plan.mixes_static_and_implicit_axes()
+            && self.realization.index_realization != IndexRealization::Sidecar
+        {
+            return Err(ManifestValidationError::MixedStaticAndUnknownScanAxes);
+        }
+        Ok(())
     }
 }
 
@@ -272,7 +278,6 @@ impl ScanPlan {
         }
 
         let mut seen = BTreeSet::new();
-        let mut static_count = 0;
         let mut implicit_count = 0;
         for axis in &self.axes {
             axis.validate()?;
@@ -282,7 +287,7 @@ impl ScanPlan {
                 });
             }
             match &axis.mode {
-                ScanAxisMode::Static { .. } => static_count += 1,
+                ScanAxisMode::Static { .. } => {}
                 ScanAxisMode::ImplicitIndex => implicit_count += 1,
             }
         }
@@ -290,10 +295,20 @@ impl ScanPlan {
         if implicit_count > 1 {
             return Err(ManifestValidationError::MultipleUnknownScanAxes);
         }
-        if implicit_count > 0 && static_count > 0 {
-            return Err(ManifestValidationError::MixedStaticAndUnknownScanAxes);
-        }
         Ok(())
+    }
+
+    #[must_use]
+    fn mixes_static_and_implicit_axes(&self) -> bool {
+        let has_static = self
+            .axes
+            .iter()
+            .any(|axis| matches!(axis.mode, ScanAxisMode::Static { .. }));
+        let has_implicit = self
+            .axes
+            .iter()
+            .any(|axis| matches!(axis.mode, ScanAxisMode::ImplicitIndex));
+        has_static && has_implicit
     }
 }
 
@@ -678,14 +693,14 @@ pub enum SystemColumn {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Compatibility {
-    pub allow_inference: bool,
+pub struct Inference {
+    pub allow_axis_inference: bool,
 }
 
-impl Default for Compatibility {
+impl Default for Inference {
     fn default() -> Self {
         Self {
-            allow_inference: true,
+            allow_axis_inference: true,
         }
     }
 }
@@ -736,7 +751,7 @@ fn try_trace_dtype(data_type: &DataType) -> Result<Option<TraceDType>, ManifestV
             let value = trace_value_dtype(value.data_type())?;
             Ok(Some(TraceDType {
                 layout: TraceLayout::Simple,
-                axis: TraceAxisDType::Float64,
+                axis: TraceAxisDType::UInt64,
                 value,
             }))
         }
@@ -843,10 +858,10 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        ColumnMetadata, Compatibility, DatasetDType, DatasetSemanticManifest,
-        DuplicateResolutionDefault, IndexRealization, ManifestColumn, ManifestValidationError,
-        RECORD_ID_COLUMN, Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan,
-        SystemColumn, TraceAxisDType, TraceDType, TraceLayout, TraceValueDType,
+        ColumnMetadata, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
+        IndexRealization, Inference, ManifestColumn, ManifestValidationError, RECORD_ID_COLUMN,
+        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SystemColumn, TraceAxisDType,
+        TraceDType, TraceLayout, TraceValueDType,
     };
 
     fn signal_columns() -> BTreeMap<String, ManifestColumn> {
@@ -880,8 +895,8 @@ mod tests {
                     "index_realization": { "kind": "none" },
                     "duplicate_resolution_default": { "kind": "latest_by_record_id" }
                 },
-                "compatibility": {
-                    "allow_inference": true
+                "inference": {
+                    "allow_axis_inference": true
                 }
             })
         );
@@ -901,7 +916,7 @@ mod tests {
             Some(&ManifestColumn::record_id())
         );
         assert_eq!(manifest.realization, Realization::default());
-        assert_eq!(manifest.compatibility, Compatibility::default());
+        assert_eq!(manifest.inference, Inference::default());
     }
 
     #[test]
@@ -997,6 +1012,11 @@ mod tests {
             mixed.validate(),
             Err(ManifestValidationError::MixedStaticAndUnknownScanAxes)
         );
+        let mut mixed_sidecar = mixed.clone();
+        mixed_sidecar.realization.index_realization = IndexRealization::Sidecar;
+        mixed_sidecar
+            .validate()
+            .expect("mixed static and implicit axes are valid with sidecar indices");
 
         let duplicate = DatasetSemanticManifest::minimal(signal_columns()).with_scan_plan(Some(
             ScanPlan::new(vec![
@@ -1077,7 +1097,7 @@ mod tests {
             columns: signal_columns(),
             scan_plan: None,
             realization: Realization::default(),
-            compatibility: Compatibility::default(),
+            inference: Inference::default(),
         };
 
         assert_eq!(
@@ -1166,6 +1186,14 @@ mod tests {
                     value: TraceValueDType::Complex128,
                 })),
             ),
+            (
+                "simple_trace".to_string(),
+                ManifestColumn::new(DatasetDType::trace(TraceDType {
+                    layout: TraceLayout::Simple,
+                    axis: TraceAxisDType::UInt64,
+                    value: TraceValueDType::Float64,
+                })),
+            ),
         ]);
         let schema = Schema::new(vec![
             Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
@@ -1183,6 +1211,11 @@ mod tests {
                     value: TraceValueDType::Complex128,
                 })
                 .physical_data_type(),
+                false,
+            ),
+            Field::new(
+                "simple_trace",
+                DataType::new_list(DataType::Float64, false),
                 false,
             ),
         ]);
@@ -1214,6 +1247,11 @@ mod tests {
                 .physical_data_type(),
                 false,
             ),
+            Field::new(
+                "simple_trace",
+                DataType::new_list(DataType::Float64, false),
+                false,
+            ),
         ]);
 
         let manifest =
@@ -1228,6 +1266,14 @@ mod tests {
             manifest.columns["trace"].dtype,
             DatasetDType::trace(TraceDType {
                 layout: TraceLayout::VariableStep,
+                axis: TraceAxisDType::UInt64,
+                value: TraceValueDType::Float64,
+            })
+        );
+        assert_eq!(
+            manifest.columns["simple_trace"].dtype,
+            DatasetDType::trace(TraceDType {
+                layout: TraceLayout::Simple,
                 axis: TraceAxisDType::UInt64,
                 value: TraceValueDType::Float64,
             })

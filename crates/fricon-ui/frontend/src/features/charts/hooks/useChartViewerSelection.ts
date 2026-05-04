@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ChartSemantics, ColumnInfo, DatasetStatus } from "../api/types";
+import type { ChartSemantics, DatasetStatus } from "../api/types";
 import type {
   ChartView,
   ComplexViewOption,
@@ -46,7 +46,6 @@ export interface ChartViewerControlActions {
 }
 
 export function useChartViewerSelection(
-  columns: ColumnInfo[],
   datasetStatus?: DatasetStatus,
   chartSemantics?: ChartSemantics | null,
 ) {
@@ -93,7 +92,6 @@ export function useChartViewerSelection(
     currentLiveModeSelection?.value ?? datasetStatus === "Writing";
 
   const derived = deriveChartViewerState(
-    columns,
     {
       view,
       plotMode,

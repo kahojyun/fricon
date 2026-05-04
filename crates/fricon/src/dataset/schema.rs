@@ -1,5 +1,4 @@
 mod arrays;
-mod arrow_ext;
 pub(crate) mod error;
 mod model;
 mod table;

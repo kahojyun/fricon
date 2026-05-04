@@ -188,7 +188,7 @@ impl From<ReadAppError> for Status {
                 DatasetTransportErrorCode::DatasetDeleted,
                 ReadError::Deleted { id }.to_string(),
             ),
-            ReadAppError::Domain(ReadError::EmptyDataset)
+            ReadAppError::Domain(ReadError::EmptyDataset | ReadError::MissingManifest)
             | ReadAppError::StateDropped
             | ReadAppError::TaskPanic { .. }
             | ReadAppError::TaskCancelled { .. } => dataset_status(

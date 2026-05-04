@@ -14,12 +14,11 @@ pub struct DatasetInterpretation {
     pub filter_axes: Vec<ResolvedSemanticReference>,
     pub chart_axis_candidates: Vec<ResolvedSemanticReference>,
     pub value_columns: Vec<VisibleColumnOrdinal>,
-    pub logical_index_columns: Vec<VisibleColumnOrdinal>,
+    pub inferred_axis_columns: Vec<VisibleColumnOrdinal>,
     pub chart_axis_candidate_columns: Vec<VisibleColumnOrdinal>,
     pub duplicate_policy: ResolvedDuplicatePolicy,
     pub index_realization: ResolvedIndexRealization,
     pub scan_axes: Vec<ResolvedScanAxis>,
-    pub source: InterpretationSource,
 }
 
 impl DatasetInterpretation {
@@ -58,7 +57,7 @@ pub struct VisibleColumnOrdinal(pub usize);
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "resolved column flags are compatibility and UI-facing projections"
+    reason = "resolved column flags are semantic and UI-facing projections"
 )]
 pub struct ResolvedColumn {
     pub id: String,
@@ -67,7 +66,7 @@ pub struct ResolvedColumn {
     pub visible_ordinal: Option<VisibleColumnOrdinal>,
     pub dtype: DatasetDType,
     pub meaning: ColumnMeaning,
-    pub is_index: bool,
+    pub is_inferred_axis: bool,
     pub is_system: bool,
     pub hidden_by_default: bool,
     pub is_chart_axis_candidate: bool,
@@ -80,7 +79,7 @@ pub struct ResolvedColumn {
 
 impl ResolvedColumn {
     #[must_use]
-    pub fn as_semantic_reference(&self, is_compatibility: bool) -> ResolvedSemanticReference {
+    pub fn as_semantic_reference(&self, is_inferred_axis: bool) -> ResolvedSemanticReference {
         ResolvedSemanticReference::PhysicalColumn(ResolvedPhysicalColumnReference {
             id: self.id.clone(),
             name: self.name.clone(),
@@ -88,9 +87,8 @@ impl ResolvedColumn {
             visible_ordinal: self.visible_ordinal,
             dtype: self.dtype.clone(),
             meaning: self.meaning,
-            is_index: self.is_index,
             is_system: self.is_system,
-            is_compatibility,
+            is_inferred_axis,
             hidden_by_default: self.hidden_by_default,
             is_chart_axis_candidate: self.is_chart_axis_candidate,
             unit: self.unit.clone(),
@@ -150,10 +148,10 @@ impl ResolvedSemanticReference {
     }
 
     #[must_use]
-    pub const fn is_compatibility(&self) -> bool {
+    pub const fn is_inferred_axis(&self) -> bool {
         match self {
-            Self::PhysicalColumn(column) => column.is_compatibility,
-            Self::LogicalIndex(axis) => axis.is_compatibility,
+            Self::PhysicalColumn(column) => column.is_inferred_axis,
+            Self::LogicalIndex(axis) => axis.is_inferred_axis,
         }
     }
 }
@@ -170,9 +168,8 @@ pub struct ResolvedPhysicalColumnReference {
     pub visible_ordinal: Option<VisibleColumnOrdinal>,
     pub dtype: DatasetDType,
     pub meaning: ColumnMeaning,
-    pub is_index: bool,
+    pub is_inferred_axis: bool,
     pub is_system: bool,
-    pub is_compatibility: bool,
     pub hidden_by_default: bool,
     pub is_chart_axis_candidate: bool,
     pub unit: Option<String>,
@@ -190,13 +187,13 @@ pub struct ResolvedLogicalIndexReference {
     pub label: Option<String>,
     pub hidden_by_default: bool,
     pub numeric_axis: bool,
-    pub is_compatibility: bool,
+    pub is_inferred_axis: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnMeaning {
     UserValue,
-    CompatibilityIndex,
+    InferredAxis,
     SystemRecordId,
 }
 
@@ -227,7 +224,7 @@ impl ResolvedScanAxis {
             label: self.label.clone(),
             hidden_by_default: false,
             numeric_axis: self.numeric_axis,
-            is_compatibility: false,
+            is_inferred_axis: false,
         })
     }
 }
@@ -246,15 +243,9 @@ pub struct ResolvedLogicalIndexPoint {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InterpretationSource {
-    Manifest,
-    CompatibilityInference,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolvedDuplicatePolicy {
     LatestByRecordId,
-    CompatibilityRowOrderPlaceholder,
+    RowOrderPlaceholder,
 }
 
 #[must_use]

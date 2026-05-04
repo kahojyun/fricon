@@ -45,15 +45,14 @@ export interface DatasetColumnInfo {
   unit: string | null;
   isComplex: boolean;
   isTrace: boolean;
-  isIndex: boolean;
+  isInferredAxis: boolean;
   hiddenByDefault: boolean;
   isChartAxisCandidate: boolean;
 }
 
-export type ChartInterpretationSource = "manifest" | "compatibility_inference";
 export type ChartDuplicatePolicy =
   | "latest_by_record_id"
-  | "compatibility_row_order_placeholder";
+  | "row_order_placeholder";
 export type ChartIndexRealization = "none" | "implicit" | "sidecar";
 export type ChartSemanticAxisKind = "logical_index" | "column";
 
@@ -72,12 +71,11 @@ export interface ChartSemanticAxis {
   label: string | null;
   kind: ChartSemanticAxisKind;
   numeric: boolean;
-  isCompatibility: boolean;
+  isInferredAxis: boolean;
   physicalColumn: string | null;
 }
 
 export interface ChartSemantics {
-  source: ChartInterpretationSource;
   duplicatePolicy: ChartDuplicatePolicy;
   indexRealization: ChartIndexRealization;
   axes: ChartSemanticAxis[];
@@ -138,7 +136,7 @@ function normalizeDatasetColumnInfo(value: WireColumnInfo): DatasetColumnInfo {
     unit: value.unit,
     isComplex: value.isComplex,
     isTrace: value.isTrace,
-    isIndex: value.isIndex,
+    isInferredAxis: value.isInferredAxis,
     hiddenByDefault: value.hiddenByDefault,
     isChartAxisCandidate: value.isChartAxisCandidate,
   };

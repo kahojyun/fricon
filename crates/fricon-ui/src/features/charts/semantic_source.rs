@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail};
 use arrow_array::{Array, BooleanArray, Float64Array, RecordBatch, StringArray, StructArray};
 use arrow_schema::{DataType, Fields};
 use fricon::{
-    DatasetReader, DatasetSchema, ProjectedSemanticAxis, ProjectedSemanticSource,
+    DatasetSchema, ProjectedSemanticAxis, ProjectedSemanticSource, ResolvedSemanticReference,
     SemanticProjectionOptions, project_semantic_source,
 };
 
@@ -90,10 +90,11 @@ pub(crate) async fn load_axis_rows(
 ) -> Result<(Vec<AxisField>, Vec<Vec<serde_json::Value>>)> {
     let dataset = session.dataset(id).await?;
     let end = dataset.num_rows();
-    let selected_columns = axis_row_selected_columns(&dataset)?;
-    if selected_columns.is_empty() && dataset.interpret()?.scan_axes.is_empty() {
+    let interpretation = dataset.interpret()?;
+    if interpretation.filter_axes.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
+    let selected_columns = axis_row_selected_columns(&interpretation.filter_axes);
     let projection = project_semantic_source(
         &dataset,
         &SemanticProjectionOptions {
@@ -105,7 +106,7 @@ pub(crate) async fn load_axis_rows(
     )?;
 
     let fields = projection
-        .group_axes
+        .filter_axes
         .into_iter()
         .filter(|field| !exclude_fields.iter().any(|excluded| excluded == &field.id))
         .collect::<Vec<_>>();
@@ -127,12 +128,16 @@ pub(crate) async fn load_axis_rows(
     Ok((fields, rows))
 }
 
-fn axis_row_selected_columns(dataset: &DatasetReader) -> Result<Vec<usize>> {
-    let interpretation = dataset.interpret()?;
-    if !interpretation.scan_axes.is_empty() {
-        return Ok(Vec::new());
-    }
-    Ok(dataset.try_index_columns()?.unwrap_or_default())
+fn axis_row_selected_columns(filter_axes: &[ResolvedSemanticReference]) -> Vec<usize> {
+    filter_axes
+        .iter()
+        .filter_map(|axis| match axis {
+            ResolvedSemanticReference::PhysicalColumn(column) => {
+                column.visible_ordinal.map(|ordinal| ordinal.0)
+            }
+            ResolvedSemanticReference::LogicalIndex(_) => None,
+        })
+        .collect()
 }
 
 fn json_value_at(array: &dyn Array, row: usize) -> Result<serde_json::Value> {

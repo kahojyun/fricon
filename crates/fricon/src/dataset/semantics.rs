@@ -10,9 +10,9 @@ pub use self::{
     error::{ManifestError, ManifestValidationError},
     io::{read_manifest, read_manifest_optional, write_manifest},
     model::{
-        ColumnMetadata, Compatibility, DatasetDType, DatasetSemanticManifest,
-        DuplicateResolutionDefault, IndexRealization, MANIFEST_VERSION_V1, ManifestColumn,
-        RECORD_ID_COLUMN, Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan,
-        SystemColumn, TraceAxisDType, TraceDType, TraceLayout, TraceValueDType,
+        ColumnMetadata, DatasetDType, DatasetSemanticManifest, DuplicateResolutionDefault,
+        IndexRealization, Inference, MANIFEST_VERSION_V1, ManifestColumn, RECORD_ID_COLUMN,
+        Realization, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SystemColumn, TraceAxisDType,
+        TraceDType, TraceLayout, TraceValueDType,
     },
 };

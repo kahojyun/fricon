@@ -11,6 +11,8 @@ pub enum ReadError {
     Deleted { id: String },
     #[error("No dataset file found.")]
     EmptyDataset,
+    #[error("Dataset semantic manifest is missing.")]
+    MissingManifest,
     #[error(transparent)]
     Dataset(#[from] DatasetError),
     #[error(transparent)]

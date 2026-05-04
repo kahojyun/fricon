@@ -61,7 +61,7 @@ def realtime_case_01_multitype_stream(
             )
 
             writer.write(
-                # Keep index columns ordered from least-frequent to most-frequent.
+                # Keep inferred axis columns ordered from least-frequent to most-frequent.
                 idx_scan_cycle=idx_scan_cycle,
                 idx_scan_y=idx_scan_y,
                 idx_scan_x=idx_scan_x,

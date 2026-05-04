@@ -6,7 +6,7 @@ Proposed.
 
 The durable foundation decisions for `dataset_manifest.json`,
 `__ds_record_id`, the reserved `__ds_` prefix, v1 dtypes, plain Arrow storage,
-compatibility fallback, and the interpretation boundary are accepted in
+minimal axis inference, and the interpretation boundary are accepted in
 `dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`.
 
 This is not current behavior. Do not implement or document behavior from this
@@ -52,7 +52,7 @@ Breaking changes are appropriate for:
 - reserving `__ds_` for Fricon-owned system fields
 - replacing Fricon Arrow extension metadata with plain Arrow physical schemas
   plus manifest-owned semantics for new datasets
-- making resolved interpretation, not `isIndex`, the canonical consumer
+- making resolved interpretation, not legacy `isIndex`, the canonical consumer
   contract
 - changing internal chunk layout, DTOs, or protocol versions when they would
   otherwise preserve the wrong abstraction boundary
@@ -62,9 +62,9 @@ model. Bare `write(col=...)` and first-row schema inference in minimal mode
 should keep working. Users should not need to author raw manifests, declare
 scan plans, or understand storage details for simple datasets.
 
-Compatibility fallback should exist to keep old fixtures and local test data
-readable during the transition. It should not constrain the new semantic model
-or remain the primary path for new datasets.
+Old fixture and local test data compatibility is intentionally dropped in this
+PR. Simple datasets should stay readable through newly written semantic
+manifests, not through manifest-free fallback inference.
 
 ## Why Change
 
@@ -78,7 +78,7 @@ Today the dataset stack has one strong property and one weak property:
 That weak property leaks through the stack:
 
 - the backend derives "index columns" from the first two rows
-- dataset detail returns only a coarse `isIndex` bit
+- dataset detail returns only a coarse inferred-axis bit
 - frontend chart selection and live grouping use that bit as the primary
   semantic signal
 - non-contiguous scans, retries, resumes, and explicit scan plans are not
@@ -209,15 +209,15 @@ source for:
 - active live grouping defaults
 - default view suggestions
 
-### 6. Compatibility Inference Is A Fallback Layer
+### 6. Minimal Axis Inference Is Manifest-Owned
 
-Inference still exists, but only as a compatibility mechanism for:
+Inference still exists, but only as a semantic-manifest mechanism for:
 
-- bare datasets created without semantic configuration
-- old test fixtures
-- exploratory one-off data
+- simple datasets created by bare `write(col=...)`
+- minimal manifests without scan plans or explicit column metadata
 
-Inference should not remain the primary path for new semantic datasets.
+Manifest-free datasets, old fixtures, and exploratory raw Arrow directories are
+not supported by this PR.
 
 The proposal does not require that inferred semantics remain in-memory only. A
 future implementation may materialize a generated manifest for caching or user
@@ -233,7 +233,7 @@ Recommended top-level sections:
 - `manifest_version`
 - `columns`
 - `realization`
-- `compatibility`
+- `inference`
 - `scan_plan`
 - `live_defaults`
 - `view_defaults`
@@ -281,8 +281,8 @@ durable facts needed by all datasets:
             "kind": "latest_by_record_id"
         }
     },
-    "compatibility": {
-        "allow_inference": true
+    "inference": {
+        "allow_axis_inference": true
     }
 }
 ```
@@ -304,7 +304,8 @@ Notes:
 - `scan_plan` is absent until the user passes `scan=` or the system later
   materializes inferred scan metadata.
 - `index_realization.kind = "none"` means no durable logical index space has
-  been declared yet; charts may use compatibility inference if needed.
+  been declared yet; charts may use minimal axis inference when allowed by the
+  manifest.
 - `live_defaults` and `view_defaults` are absent until explicitly provided or
   cached by a future implementation.
 - Adding optional sections later should not require rewriting payload chunks.
@@ -355,7 +356,7 @@ meaning in `dataset_manifest.json`.
 Recommended physical layouts:
 
 - `complex128`: `struct<real: float64, imag: float64>`
-- simple trace: `list<value>`, with an implicit integer sample index axis
+- simple trace: `list<value>`, with an implicit `uint64` sample index axis
 - fixed-step trace: `struct<x0: axis, step: axis, y: list<value>>`
 - variable-step trace: `struct<x: list<axis>, y: list<value>>`
 
@@ -366,8 +367,8 @@ be representable in the trace value type.
 
 The current project has not reached production use, so this is the right time
 to remove `fricon.complex` and `fricon.trace` extension metadata as a durable
-storage dependency. Compatibility fallback, where kept, should infer from plain
-Arrow field shape rather than treating extension metadata as canonical.
+storage dependency. Minimal axis inference should infer from plain Arrow field
+shape rather than treating extension metadata as canonical.
 
 ### DatasetDataType Refactor Direction
 
@@ -453,7 +454,7 @@ The public API should therefore accept column metadata such as:
 `chart_axis` means "this stored column is a good coordinate-axis candidate in
 chart UI." It does not create a separate durable coordinate model. All other
 chart defaults should be resolved from datatype, scan axes, index realization,
-and compatibility inference.
+and minimal axis inference.
 
 ### Scan Plan
 
@@ -522,7 +523,7 @@ index table. The sidecar schema should be compact:
 
 ```text
 __ds_record_id: uint64
-<axis_id>: int64
+<axis_id>: uint64
 ...
 ```
 
@@ -603,7 +604,7 @@ that owns:
 - manifest read and write
 - validation
 - defaulting
-- compatibility inference for bare datasets
+- minimal axis inference for bare datasets
 
 This layer should not know about charts or Tauri.
 
@@ -628,7 +629,7 @@ This becomes the API consumed by UI query code and chart transforms.
 
 ### Charts Consume Resolved Semantics
 
-Chart selection should stop depending on the coarse `isIndex` bit as its
+Chart selection should stop depending on the coarse inferred-axis bit as its
 primary abstraction.
 
 Instead, `crates/fricon-ui` should receive richer dataset interpretation data,
@@ -644,8 +645,8 @@ for example:
 - resolved live grouping defaults
 - resolved default views
 
-The current `isIndex` field may exist temporarily as a compatibility projection,
-but it should not remain the canonical contract.
+The legacy `isIndex` field should be removed from UI contracts; chart defaults
+should come from resolved semantic axes and value columns.
 
 ## Writer Architecture
 
@@ -819,6 +820,12 @@ workflow needs invalidation or execution-quality state, it should be designed
 with the run or measurement layer rather than added as an under-specified
 dataset column.
 
+Minimal semantic inference for bare writes may expose a resolved
+`row_order_placeholder` adapter so existing chart grouping can treat inferred
+physical axes as ordered roles. That adapter is not a manifest duplicate policy
+and should be removed once chart transforms consume resolved semantic axes
+directly.
+
 ## Live Monitor Rules
 
 ### Contiguous Legacy Scans
@@ -890,7 +897,7 @@ User value:
 
 - bare Python writes keep working
 - every new dataset gets durable local meaning
-- old datasets and fixtures can still open through compatibility inference
+- simple datasets still get inferred axes through their semantic manifests
 - future run, parameter, provenance, and workflow models get a stable dataset
   anchor without being hidden inside chart heuristics
 
@@ -901,10 +908,10 @@ Scope:
 - `__ds_record_id`
 - reserved `__ds_` system-field prefix
 - minimal manifest for bare writes with column metadata, realization, and
-  compatibility settings
+  inference settings
 - manifest IO, serde model, validation, and defaulting
 - plain Arrow physical schemas for new semantic datasets
-- compatibility fallback for datasets without manifests
+- explicit missing-manifest errors for datasets without manifests
 - resolved interpretation API for readers and downstream consumers
 - temporary adapters that preserve existing chart and dataset-detail behavior
 
@@ -919,8 +926,9 @@ Out of scope:
 
 First success criterion:
 
-- new datasets produce a valid manifest and record IDs while existing datasets
-  still open and current user-facing behavior remains equivalent.
+- new datasets produce a valid manifest and record IDs; manifest-free datasets
+  fail with a clear missing-manifest error, while simple newly written datasets
+  preserve equivalent user-facing behavior.
 
 ADR need:
 
@@ -1000,8 +1008,8 @@ Scope:
 - dataset detail DTOs expose resolved semantic fields such as logical index,
   chart-axis candidate, label, unit, scan axes, and defaults
 - chart transforms consume resolved logical indices and duplicate policy
-- `isIndex` remains temporarily as a compatibility projection
-- legacy direct use of index-column inference is removed after migration
+- legacy `isIndex` is removed from the UI contract
+- legacy direct use of index-column inference is removed
 
 Out of scope:
 
@@ -1083,8 +1091,8 @@ Recommended internal behavior:
     - `__ds_record_id` as the record-id system field
     - no scan plan
     - no durable logical index realization
-    - compatibility mode enabled
-4. Readers and charts may still use compatibility inference for this dataset.
+    - minimal axis inference enabled
+4. Readers and charts may still use minimal axis inference for this dataset.
 
 Result:
 
@@ -1230,7 +1238,7 @@ The public API should intentionally support two entry modes:
 - minimal mode:
     - optimized for ad hoc Python scripts
     - zero or near-zero semantic boilerplate
-    - compatibility inference remains acceptable
+    - minimal axis inference remains acceptable
 - semantic mode:
     - optimized for framework-owned execution
     - columns and scan declared before acquisition starts where possible
@@ -1245,7 +1253,7 @@ should differ only in how much information is supplied at creation time.
 Because the product is still pre-adoption, these changes are acceptable:
 
 - change dataset payload layout inside the workspace data directory
-- add a workspace compatibility bump if needed
+- record the deliberate no-old-workspace compatibility decision
 - replace the dataset detail UI contract with richer semantic fields
 - remove the assumption that chart semantics come from inferred "index
   columns"
@@ -1261,11 +1269,10 @@ Recommended approach:
 
 1. Introduce the semantic model and resolved interpretation API.
 2. Update dataset creation to produce manifests for all new datasets.
-3. Keep a compatibility inference path only for old fixtures and ad hoc test
-   data.
+3. Delete the old manifest-free compatibility path.
 4. Switch chart and live-query code to consume resolved interpretation after
    the foundation is stable.
-5. Remove architecture that treats inferred `isIndex` as the primary semantic
+5. Remove architecture that treats inferred-axis flags as the primary semantic
    contract once the new path is stable.
 
 ## Suggested Module Plan
@@ -1285,7 +1292,7 @@ Desktop UI backend:
 
 ```text
 crates/fricon-ui/src/features/datasets/
-  queries.rs      # return richer semantic detail, not only isIndex
+  queries.rs      # return richer semantic detail, not only inferred-axis bits
 ```
 
 Charts:
@@ -1312,10 +1319,10 @@ The foundation feature is considered successful when:
 - bare `write(col=...)` still works, but now produces a minimal semantic
   manifest owned by the dataset layer
 - every new semantic dataset has stable `__ds_record_id` values
-- old datasets without manifests still open through compatibility inference
+- datasets without manifests fail with a clear missing-manifest read error
 - readers can expose raw rows, raw manifest data, and resolved interpretation
 - current chart and dataset-detail behavior remains equivalent through
-  compatibility adapters
+  semantic adapters
 
 The later column, scan, and consumer-migration features are considered
 successful when:
@@ -1326,7 +1333,7 @@ successful when:
 - a known 2D scan opens correctly from explicit semantics without relying on
   first-two-row inference
 - regular ordered scans can derive logical indices implicitly without storing
-  index columns in the main payload
+  semantic axis columns in the main payload
 - shuffled scans with sidecar logical indices render to the correct grid cells
 - retries and resumes preserve all fact rows while default projections use the
   latest row by `__ds_record_id`
