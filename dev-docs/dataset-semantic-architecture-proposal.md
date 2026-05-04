@@ -370,9 +370,9 @@ to remove `fricon.complex` and `fricon.trace` extension metadata as a durable
 storage dependency. Minimal axis inference should infer from plain Arrow field
 shape rather than treating extension metadata as canonical.
 
-### DatasetDataType Refactor Direction
+### DatasetPhysicalType Refactor Direction
 
-The current runtime `DatasetDataType` collapses physical details into broad
+The current runtime `DatasetPhysicalType` collapses physical details into broad
 business categories such as numeric scalar, complex scalar, and trace. That was
 simple, but it makes future support for `float32`, `int64`, `uint64`,
 timestamps, strings, or booleans awkward.

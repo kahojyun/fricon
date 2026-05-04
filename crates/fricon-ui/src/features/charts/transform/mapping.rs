@@ -1,5 +1,5 @@
 use anyhow::Context;
-use fricon::{DatasetDataType, DatasetSchema};
+use fricon::{DatasetPhysicalSchema, DatasetPhysicalType};
 
 use super::{SemanticRoleColumns, resolve_xy_trace_roles};
 use crate::features::charts::types::{
@@ -7,7 +7,7 @@ use crate::features::charts::types::{
     LiveHeatmapOptions, LiveXYOptions, XYChartDataOptions, XYPlotModeOptions,
 };
 
-fn column_index(schema: &DatasetSchema, name: &str) -> anyhow::Result<usize> {
+fn column_index(schema: &DatasetPhysicalSchema, name: &str) -> anyhow::Result<usize> {
     let (idx, _, _) = schema
         .columns()
         .get_full(name)
@@ -28,7 +28,7 @@ fn push_columns(columns: &mut Vec<usize>, indices: &[usize]) {
 }
 
 fn build_heatmap_selected_columns(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     options: &HeatmapChartDataOptions,
 ) -> anyhow::Result<Vec<usize>> {
     let mut selected = Vec::new();
@@ -42,7 +42,7 @@ fn build_heatmap_selected_columns(
     let y_index = column_index(schema, &options.y_column)?;
     push_column(&mut selected, y_index);
 
-    if !matches!(data_type, DatasetDataType::Trace(_, _)) {
+    if !matches!(data_type, DatasetPhysicalType::Trace(_, _)) {
         let x_name = options
             .x_column
             .as_ref()
@@ -54,7 +54,7 @@ fn build_heatmap_selected_columns(
 }
 
 fn build_xy_selected_columns(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     group_columns: Option<&[usize]>,
     options: &XYChartDataOptions,
@@ -65,7 +65,7 @@ fn build_xy_selected_columns(
             let quantity_index = column_index(schema, quantity)?;
             let data_type = *schema.columns().get(quantity).context("Column not found")?;
             push_column(&mut selected, quantity_index);
-            if !matches!(data_type, DatasetDataType::Trace(_, _)) {
+            if !matches!(data_type, DatasetPhysicalType::Trace(_, _)) {
                 let roles = resolve_xy_trace_roles(
                     schema,
                     SemanticRoleColumns::new(index_columns, group_columns),
@@ -89,8 +89,8 @@ fn build_xy_selected_columns(
                 .columns()
                 .get(y_column)
                 .context("Y column not found")?;
-            if !matches!(x_type, DatasetDataType::Trace(_, _))
-                && !matches!(y_type, DatasetDataType::Trace(_, _))
+            if !matches!(x_type, DatasetPhysicalType::Trace(_, _))
+                && !matches!(y_type, DatasetPhysicalType::Trace(_, _))
             {
                 let roles = resolve_xy_trace_roles(
                     schema,
@@ -107,7 +107,7 @@ fn build_xy_selected_columns(
         XYPlotModeOptions::ComplexPlane { quantity } => {
             push_column(&mut selected, column_index(schema, quantity)?);
             let data_type = *schema.columns().get(quantity).context("Column not found")?;
-            if !matches!(data_type, DatasetDataType::Trace(_, _)) {
+            if !matches!(data_type, DatasetPhysicalType::Trace(_, _)) {
                 let roles = resolve_xy_trace_roles(
                     schema,
                     SemanticRoleColumns::new(index_columns, group_columns),
@@ -125,7 +125,7 @@ fn build_xy_selected_columns(
 }
 
 pub(crate) fn build_chart_selected_columns(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     group_columns: Option<&[usize]>,
     options: &DatasetChartDataOptions,
@@ -141,7 +141,7 @@ pub(crate) fn build_chart_selected_columns(
 }
 
 fn build_live_heatmap_selected_columns(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     options: &LiveHeatmapOptions,
 ) -> anyhow::Result<Vec<usize>> {
@@ -154,7 +154,7 @@ fn build_live_heatmap_selected_columns(
 }
 
 fn build_live_xy_selected_columns(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     group_columns: Option<&[usize]>,
     options: &LiveXYOptions,
@@ -173,7 +173,7 @@ fn build_live_xy_selected_columns(
 }
 
 pub(crate) fn build_live_chart_selected_columns(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     group_columns: Option<&[usize]>,
     options: &LiveChartDataOptions,
@@ -190,7 +190,7 @@ pub(crate) fn build_live_chart_selected_columns(
 
 #[cfg(test)]
 mod tests {
-    use fricon::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind};
+    use fricon::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind, TraceKind};
     use indexmap::IndexMap;
 
     use super::{
@@ -203,29 +203,29 @@ mod tests {
         XYTraceRoleOptions,
     };
 
-    fn numeric_schema() -> DatasetSchema {
+    fn numeric_schema() -> DatasetPhysicalSchema {
         make_numeric_schema(&["outer", "inner", "x", "y"])
     }
 
-    fn mixed_schema() -> DatasetSchema {
+    fn mixed_schema() -> DatasetPhysicalSchema {
         let mut columns = IndexMap::new();
         columns.insert(
             "complex_scalar".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Complex),
+            DatasetPhysicalType::Scalar(ScalarKind::Complex),
         );
         columns.insert(
             "complex_trace".to_string(),
-            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Complex),
+            DatasetPhysicalType::Trace(TraceKind::Simple, ScalarKind::Complex),
         );
         columns.insert(
             "trace_x".to_string(),
-            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+            DatasetPhysicalType::Trace(TraceKind::Simple, ScalarKind::Numeric),
         );
         columns.insert(
             "trace_y".to_string(),
-            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+            DatasetPhysicalType::Trace(TraceKind::Simple, ScalarKind::Numeric),
         );
-        DatasetSchema::new(columns)
+        DatasetPhysicalSchema::new(columns)
     }
 
     #[test]

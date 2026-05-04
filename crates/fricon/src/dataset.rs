@@ -29,8 +29,8 @@ pub use self::{
         SelectOptions, SemanticProjectionOptions, project_semantic_source,
     },
     schema::{
-        DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
-        ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
+        DatasetArray, DatasetPhysicalSchema, DatasetPhysicalType, DatasetRow, DatasetScalar,
+        FixedStepTrace, ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
     },
     semantics::{
         ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SemanticDescriptor,

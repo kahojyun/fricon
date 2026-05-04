@@ -4,8 +4,8 @@ use anyhow::{Context, Result, bail};
 use arrow_array::{Array, BooleanArray, Float64Array, RecordBatch, StringArray, StructArray};
 use arrow_schema::{DataType, Fields};
 use fricon::{
-    DatasetSchema, ProjectedSemanticAxis, ProjectedSemanticSource, ResolvedSemanticReference,
-    SemanticProjectionOptions, project_semantic_source,
+    DatasetPhysicalSchema, ProjectedSemanticAxis, ProjectedSemanticSource,
+    ResolvedSemanticReference, SemanticProjectionOptions, project_semantic_source,
 };
 
 use super::types::ChartCommonOptions;
@@ -16,7 +16,7 @@ pub(crate) type AxisField = ProjectedSemanticAxis;
 #[derive(Debug)]
 pub(crate) struct PreparedChartData {
     pub(crate) batch: RecordBatch,
-    pub(crate) schema: DatasetSchema,
+    pub(crate) schema: DatasetPhysicalSchema,
     pub(crate) index_columns: Option<Vec<usize>>,
     pub(crate) group_columns: Option<Vec<usize>>,
     pub(crate) row_indices: Vec<usize>,
@@ -34,7 +34,7 @@ impl PreparedChartData {
 
 #[cfg(test)]
 pub(crate) fn prepared_chart_data_for_test(
-    schema: DatasetSchema,
+    schema: DatasetPhysicalSchema,
     semantic_column_names: HashMap<String, String>,
     index_columns: Option<Vec<usize>>,
     group_columns: Option<Vec<usize>>,

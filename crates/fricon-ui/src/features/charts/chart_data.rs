@@ -1,6 +1,6 @@
 use anyhow::Context;
 use arrow_array::RecordBatch;
-use fricon::{DatasetDataType, DatasetSchema};
+use fricon::{DatasetPhysicalSchema, DatasetPhysicalType};
 use tracing::{debug, error, instrument};
 
 use super::{
@@ -26,7 +26,7 @@ use crate::{
 
 fn recent_group_starts_in_scan_batch(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     grouping_index_columns: &[usize],
     row_indices: &[usize],
     range_start: usize,
@@ -40,7 +40,7 @@ fn recent_group_starts_in_scan_batch(
 
 fn resolve_group_tail_start_in_scan_batch(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     grouping_index_columns: &[usize],
     row_indices: &[usize],
     range_start: usize,
@@ -75,7 +75,7 @@ async fn prepare_live_range(
 async fn resolve_group_tail_start(
     session: &WorkspaceSession,
     id: i32,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     grouping_index_columns: &[usize],
     total_rows: usize,
     required_groups: usize,
@@ -119,7 +119,7 @@ async fn resolve_group_tail_start(
     }
 }
 
-fn column_names(schema: &DatasetSchema, columns: &[usize]) -> anyhow::Result<Vec<String>> {
+fn column_names(schema: &DatasetPhysicalSchema, columns: &[usize]) -> anyhow::Result<Vec<String>> {
     columns
         .iter()
         .map(|&index| {
@@ -132,7 +132,10 @@ fn column_names(schema: &DatasetSchema, columns: &[usize]) -> anyhow::Result<Vec
         .collect()
 }
 
-fn column_indices(schema: &DatasetSchema, columns: &[String]) -> anyhow::Result<Vec<usize>> {
+fn column_indices(
+    schema: &DatasetPhysicalSchema,
+    columns: &[String],
+) -> anyhow::Result<Vec<usize>> {
     columns
         .iter()
         .map(|name| {
@@ -146,14 +149,14 @@ fn column_indices(schema: &DatasetSchema, columns: &[String]) -> anyhow::Result<
 }
 
 fn plot_mode_is_trace(
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     plot_mode: &XYPlotModeOptions,
 ) -> anyhow::Result<bool> {
     match plot_mode {
         XYPlotModeOptions::QuantityVsSweep { quantity, .. }
         | XYPlotModeOptions::ComplexPlane { quantity } => Ok(matches!(
             schema.columns().get(quantity).context("Column not found")?,
-            DatasetDataType::Trace(_, _)
+            DatasetPhysicalType::Trace(_, _)
         )),
         XYPlotModeOptions::Xy { x_column, y_column } => {
             let x_type = *schema
@@ -164,8 +167,8 @@ fn plot_mode_is_trace(
                 .columns()
                 .get(y_column)
                 .context("Y column not found")?;
-            Ok(matches!(x_type, DatasetDataType::Trace(_, _))
-                && matches!(y_type, DatasetDataType::Trace(_, _)))
+            Ok(matches!(x_type, DatasetPhysicalType::Trace(_, _))
+                && matches!(y_type, DatasetPhysicalType::Trace(_, _)))
         }
     }
 }
@@ -215,7 +218,7 @@ async fn resolve_live_row_start(
                 .columns()
                 .get(&opts.quantity)
                 .context("Column not found")?;
-            if matches!(data_type, DatasetDataType::Trace(_, _)) {
+            if matches!(data_type, DatasetPhysicalType::Trace(_, _)) {
                 match index_columns {
                     Some(idx_cols) if idx_cols.len() >= 2 => {
                         resolve_group_tail_start(
@@ -418,7 +421,7 @@ pub(crate) async fn dataset_live_chart_data(
 
 fn build_live_snapshot(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     group_columns: Option<&[usize]>,
     row_start: usize,
@@ -637,8 +640,8 @@ mod tests {
     use std::collections::HashMap;
 
     use fricon::{
-        AppManager, Client, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, ScalarKind,
-        WorkspaceRoot,
+        AppManager, Client, DatasetPhysicalSchema, DatasetPhysicalType, DatasetRow, DatasetScalar,
+        ScalarKind, WorkspaceRoot,
     };
     use indexmap::IndexMap;
     use tempfile::TempDir;
@@ -751,18 +754,18 @@ mod tests {
 
     #[test]
     fn resolve_dataset_chart_options_uses_projection_semantic_names() {
-        let schema = DatasetSchema::new(IndexMap::from([
+        let schema = DatasetPhysicalSchema::new(IndexMap::from([
             (
                 "signal".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
+                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
             ),
             (
                 "logicalIndex:gate".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
+                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
             ),
             (
                 "column:logicalIndex:physical".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Numeric),
+                DatasetPhysicalType::Scalar(ScalarKind::Numeric),
             ),
         ]));
         let metadata = semantic_source::prepared_chart_data_for_test(

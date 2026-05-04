@@ -493,7 +493,7 @@ mod tests {
         clippy::too_many_lines,
         reason = "matrix-style test keeps descriptor and capability expectations together"
     )]
-    fn manifest_interpretation_maps_dataset_dtypes_to_semantic_kinds() {
+    fn manifest_interpretation_maps_dataset_dtypes_to_semantic_descriptors() {
         let manifest = DatasetSemanticManifest::minimal([
             (
                 "numeric".to_string(),

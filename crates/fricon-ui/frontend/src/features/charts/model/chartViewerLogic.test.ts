@@ -486,7 +486,7 @@ describe("chartViewerLogic", () => {
     expect(derived.effectiveSweepIndexColumnName).toBe("logicalIndex:bias");
   });
 
-  it("uses semantic kind instead of compatibility booleans for eligibility", () => {
+  it("uses semantic capabilities for eligibility", () => {
     const derived = deriveChartViewerState(
       makeState({
         plotMode: "xy",

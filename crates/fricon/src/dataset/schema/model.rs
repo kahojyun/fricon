@@ -156,16 +156,16 @@ impl TraceKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DatasetDataType {
+pub enum DatasetPhysicalType {
     Scalar(ScalarKind),
     Trace(TraceKind, ScalarKind),
 }
 
-impl DatasetDataType {
+impl DatasetPhysicalType {
     fn to_field(self, name: impl Into<String>, nullable: bool) -> Field {
         match self {
-            DatasetDataType::Scalar(scalar_kind) => scalar_kind.to_field(name, nullable),
-            DatasetDataType::Trace(trace_kind, scalar_kind) => {
+            DatasetPhysicalType::Scalar(scalar_kind) => scalar_kind.to_field(name, nullable),
+            DatasetPhysicalType::Trace(trace_kind, scalar_kind) => {
                 trace_kind.to_field(name, Arc::new(scalar_kind.to_item_field()), nullable)
             }
         }
@@ -175,42 +175,42 @@ impl DatasetDataType {
     pub fn is_complex(self) -> bool {
         matches!(
             self,
-            DatasetDataType::Scalar(ScalarKind::Complex)
-                | DatasetDataType::Trace(_, ScalarKind::Complex)
+            DatasetPhysicalType::Scalar(ScalarKind::Complex)
+                | DatasetPhysicalType::Trace(_, ScalarKind::Complex)
         )
     }
 }
 
-impl TryFrom<&DataType> for DatasetDataType {
+impl TryFrom<&DataType> for DatasetPhysicalType {
     type Error = DatasetError;
 
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         if let Some((trace, field)) = TraceKind::parse_data_type(value) {
             let scalar_kind = ScalarKind::try_from(field.data_type())?;
             if matches!(scalar_kind, ScalarKind::Numeric | ScalarKind::Complex) {
-                Ok(DatasetDataType::Trace(trace, scalar_kind))
+                Ok(DatasetPhysicalType::Trace(trace, scalar_kind))
             } else {
                 Err(DatasetError::IncompatibleType)
             }
         } else {
-            Ok(DatasetDataType::Scalar(value.try_into()?))
+            Ok(DatasetPhysicalType::Scalar(value.try_into()?))
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetSchema {
-    columns: IndexMap<String, DatasetDataType>,
+pub struct DatasetPhysicalSchema {
+    columns: IndexMap<String, DatasetPhysicalType>,
 }
 
-impl DatasetSchema {
+impl DatasetPhysicalSchema {
     #[must_use]
-    pub fn new(columns: IndexMap<String, DatasetDataType>) -> Self {
+    pub fn new(columns: IndexMap<String, DatasetPhysicalType>) -> Self {
         Self { columns }
     }
 
     #[must_use]
-    pub fn columns(&self) -> &IndexMap<String, DatasetDataType> {
+    pub fn columns(&self) -> &IndexMap<String, DatasetPhysicalType> {
         &self.columns
     }
 
@@ -225,7 +225,7 @@ impl DatasetSchema {
     }
 }
 
-impl TryFrom<&Schema> for DatasetSchema {
+impl TryFrom<&Schema> for DatasetPhysicalSchema {
     type Error = DatasetError;
 
     fn try_from(value: &Schema) -> Result<Self, Self::Error> {
@@ -235,7 +235,7 @@ impl TryFrom<&Schema> for DatasetSchema {
             .map(|x| {
                 Ok::<_, DatasetError>((
                     x.name().to_owned(),
-                    DatasetDataType::try_from(x.data_type())?,
+                    DatasetPhysicalType::try_from(x.data_type())?,
                 ))
             })
             .try_collect()?;
@@ -248,7 +248,7 @@ mod tests {
     use arrow_schema::{DataType, Field, extension::EXTENSION_TYPE_NAME_KEY};
     use indexmap::IndexMap;
 
-    use super::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind};
+    use super::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind, TraceKind};
 
     #[test]
     fn trace_kind_parse_variable_step_rejects_nullable_fields() {
@@ -279,14 +279,14 @@ mod tests {
 
     #[test]
     fn generated_arrow_schema_uses_plain_physical_fields() {
-        let schema = DatasetSchema::new(IndexMap::from([
+        let schema = DatasetPhysicalSchema::new(IndexMap::from([
             (
                 "complex".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Complex),
+                DatasetPhysicalType::Scalar(ScalarKind::Complex),
             ),
             (
                 "trace".to_string(),
-                DatasetDataType::Trace(TraceKind::VariableStep, ScalarKind::Complex),
+                DatasetPhysicalType::Trace(TraceKind::VariableStep, ScalarKind::Complex),
             ),
         ]))
         .to_arrow_schema();
