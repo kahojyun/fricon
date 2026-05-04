@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateDatasetInfo } from "../api/client";
 import { datasetKeys } from "../api/queryKeys";
-import type { DatasetDetail, DatasetInfoUpdate } from "../api/types";
+import type {
+  ChartSemanticKind,
+  DatasetDetail,
+  DatasetInfoUpdate,
+} from "../api/types";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -81,6 +85,20 @@ interface DatasetDetailEditorDraft {
   favorite: boolean;
   tagsText: string;
   normalizedTags: string[];
+}
+
+const semanticKindLabels: Record<ChartSemanticKind, string> = {
+  numeric: "Numeric",
+  categorical: "Categorical",
+  boolean: "Boolean",
+  timestamp: "Timestamp",
+  complex: "Complex",
+  trace: "Trace",
+  display: "Display",
+};
+
+function semanticKindBadgeVariant(kind: ChartSemanticKind) {
+  return kind === "complex" ? "outline" : "secondary";
 }
 
 function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
@@ -344,13 +362,13 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                         {column.isInferredAxis ? "✓" : ""}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {column.isTrace ? (
-                          <Badge variant="secondary">Trace</Badge>
-                        ) : column.isComplex ? (
-                          <Badge variant="outline">Complex</Badge>
-                        ) : (
-                          <Badge variant="secondary">Scalar</Badge>
-                        )}
+                        <Badge
+                          variant={semanticKindBadgeVariant(
+                            column.semanticKind,
+                          )}
+                        >
+                          {semanticKindLabels[column.semanticKind]}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

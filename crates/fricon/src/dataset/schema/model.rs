@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arrow_schema::{DataType, Field, FieldRef, Fields, Schema};
+use arrow_schema::{DataType, Field, FieldRef, Fields, Schema, TimeUnit};
 use indexmap::IndexMap;
 use itertools::Itertools;
 
@@ -21,6 +21,9 @@ pub(crate) fn complex_data_type() -> DataType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScalarKind {
     Numeric,
+    Boolean,
+    Utf8,
+    TimestampUs,
     Complex,
 }
 
@@ -28,6 +31,9 @@ impl ScalarKind {
     fn to_data_type(self) -> DataType {
         match self {
             ScalarKind::Numeric => DataType::Float64,
+            ScalarKind::Boolean => DataType::Boolean,
+            ScalarKind::Utf8 => DataType::Utf8,
+            ScalarKind::TimestampUs => DataType::Timestamp(TimeUnit::Microsecond, None),
             ScalarKind::Complex => complex_data_type(),
         }
     }
@@ -54,6 +60,12 @@ impl TryFrom<&DataType> for ScalarKind {
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         if value.is_numeric() {
             Ok(ScalarKind::Numeric)
+        } else if matches!(value, DataType::Boolean) {
+            Ok(ScalarKind::Boolean)
+        } else if matches!(value, DataType::Utf8) {
+            Ok(ScalarKind::Utf8)
+        } else if matches!(value, DataType::Timestamp(TimeUnit::Microsecond, None)) {
+            Ok(ScalarKind::TimestampUs)
         } else if *value == complex_data_type() {
             Ok(ScalarKind::Complex)
         } else {
@@ -174,7 +186,12 @@ impl TryFrom<&DataType> for DatasetDataType {
 
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         if let Some((trace, field)) = TraceKind::parse_data_type(value) {
-            Ok(DatasetDataType::Trace(trace, field.data_type().try_into()?))
+            let scalar_kind = ScalarKind::try_from(field.data_type())?;
+            if matches!(scalar_kind, ScalarKind::Numeric | ScalarKind::Complex) {
+                Ok(DatasetDataType::Trace(trace, scalar_kind))
+            } else {
+                Err(DatasetError::IncompatibleType)
+            }
         } else {
             Ok(DatasetDataType::Scalar(value.try_into()?))
         }

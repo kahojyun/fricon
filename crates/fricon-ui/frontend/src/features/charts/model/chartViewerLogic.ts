@@ -45,8 +45,6 @@ export interface ChartColumnOption {
   name: string;
   label: string | null;
   semanticKind: ChartSemanticKind;
-  isComplex: boolean;
-  isTrace: boolean;
   hiddenByDefault: boolean;
   isChartAxisCandidate: boolean;
   numeric: boolean;
@@ -85,8 +83,6 @@ function semanticValueOptions(
     name: column.id,
     label: column.label ?? column.name,
     semanticKind: column.semanticKind,
-    isComplex: semanticKindIsComplex(column.semanticKind),
-    isTrace: semanticKindIsTrace(column.semanticKind),
     hiddenByDefault: column.hiddenByDefault,
     isChartAxisCandidate: false,
     numeric: semanticKindIsNumeric(column.semanticKind),
@@ -125,8 +121,6 @@ function semanticAxisOptions(
       name: axis.id,
       label: axis.label ?? axis.name,
       semanticKind: axis.semanticKind,
-      isComplex: semanticKindIsComplex(axis.semanticKind),
-      isTrace: semanticKindIsTrace(axis.semanticKind),
       hiddenByDefault: false,
       isChartAxisCandidate: axis.kind === "column" && !axis.isInferredAxis,
       numeric: semanticKindIsNumeric(axis.semanticKind),

@@ -451,7 +451,7 @@ mod tests {
         let schema = DatasetSchema::new(IndexMap::from([
             (
                 "logicalIndex:gate".to_string(),
-                DatasetDataType::Scalar(ScalarKind::Complex),
+                DatasetDataType::Scalar(ScalarKind::Utf8),
             ),
             (
                 "sweep".to_string(),
@@ -494,7 +494,7 @@ mod tests {
     fn resolve_xy_trace_roles_allows_categorical_logical_group_without_numeric_indices() {
         let schema = DatasetSchema::new(IndexMap::from([(
             "logicalIndex:gate".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Complex),
+            DatasetDataType::Scalar(ScalarKind::Utf8),
         )]));
         let roles = resolve_xy_trace_roles(
             &schema,

@@ -1,4 +1,5 @@
 import type {
+  ChartSemanticKind,
   ChartSemantics,
   ColumnInfo,
   DatasetDetail,
@@ -19,18 +20,22 @@ export function logicalIndexId(name: string) {
   return `logicalIndex:${name}`;
 }
 
-export function makeColumn(
-  overrides: ColumnInput,
-): ColumnInfo {
+function semanticKindIsComplex(kind: ChartSemanticKind) {
+  return kind === "complex";
+}
+
+function semanticKindIsTrace(kind: ChartSemanticKind) {
+  return kind === "trace";
+}
+
+export function makeColumn(overrides: ColumnInput): ColumnInfo {
   const { name, ...rest } = overrides;
-  const semanticKind =
-    rest.semanticKind ??
-    (rest.isTrace ? "trace" : rest.isComplex ? "complex" : "numeric");
+  const semanticKind = rest.semanticKind ?? "numeric";
   return {
     name,
     semanticKind,
-    isComplex: false,
-    isTrace: false,
+    isComplex: semanticKindIsComplex(semanticKind),
+    isTrace: semanticKindIsTrace(semanticKind),
     isInferredAxis: false,
     ...rest,
   };

@@ -371,8 +371,7 @@ describe("ChartViewer", () => {
               },
               {
                 name: "trace_signal",
-                isComplex: false,
-                isTrace: true,
+                semanticKind: "trace",
                 isInferredAxis: false,
               },
             ],
@@ -564,8 +563,7 @@ describe("ChartViewer", () => {
               },
               {
                 name: "c",
-                isComplex: true,
-                isTrace: false,
+                semanticKind: "complex",
                 isInferredAxis: false,
               },
             ],
@@ -734,8 +732,7 @@ describe("ChartViewer", () => {
               },
               {
                 name: "sig",
-                isComplex: true,
-                isTrace: false,
+                semanticKind: "complex",
                 isInferredAxis: false,
               },
             ],
@@ -845,8 +842,7 @@ describe("ChartViewer", () => {
               },
               {
                 name: "complex_impedance_ohm",
-                isComplex: true,
-                isTrace: false,
+                semanticKind: "complex",
                 isInferredAxis: false,
               },
             ],

@@ -105,7 +105,7 @@ describe("chartViewerLogic", () => {
   });
 
   it("falls back plot mode to available option", () => {
-    const columns = [makeColumn({ name: "c", isComplex: true })];
+    const columns = [makeColumn({ name: "c", semanticKind: "complex" })];
 
     const derived = deriveWithInferredSemantics(
       columns,
@@ -219,8 +219,8 @@ describe("chartViewerLogic", () => {
       makeColumn({ name: "idxA", isInferredAxis: true }),
       makeColumn({ name: "scalarX" }),
       makeColumn({ name: "scalarY" }),
-      makeColumn({ name: "traceX", isTrace: true }),
-      makeColumn({ name: "traceY", isTrace: true }),
+      makeColumn({ name: "traceX", semanticKind: "trace" }),
+      makeColumn({ name: "traceY", semanticKind: "trace" }),
     ];
     const derived = deriveWithInferredSemantics(
       columns,

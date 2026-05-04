@@ -421,6 +421,9 @@ impl TryFrom<ArrayRef> for DatasetArray {
                     Ok(DatasetArray::Numeric(Arc::new(array.clone())))
                 }
                 ScalarKind::Complex => Ok(DatasetArray::Complex(value.try_into()?)),
+                ScalarKind::Boolean | ScalarKind::Utf8 | ScalarKind::TimestampUs => {
+                    Err(DatasetError::IncompatibleType)
+                }
             }
         }
     }

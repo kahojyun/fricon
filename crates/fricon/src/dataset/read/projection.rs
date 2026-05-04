@@ -411,7 +411,10 @@ fn append_logical_axes(
                 true,
             )));
             arrays.push(logical_axis_array(&axis.mode, &values));
-            columns.insert(id, DatasetDataType::Scalar(ScalarKind::Complex));
+            columns.insert(
+                id,
+                DatasetDataType::Scalar(logical_axis_scalar_kind(&axis.mode)),
+            );
         }
     }
     *schema = DatasetSchema::new(columns);
@@ -590,6 +593,15 @@ fn logical_axis_data_type(mode: &ResolvedScanAxisMode) -> DataType {
                 DataType::Utf8
             }
         }
+    }
+}
+
+fn logical_axis_scalar_kind(mode: &ResolvedScanAxisMode) -> ScalarKind {
+    match logical_axis_data_type(mode) {
+        DataType::Boolean => ScalarKind::Boolean,
+        DataType::Float64 => ScalarKind::Numeric,
+        DataType::Utf8 => ScalarKind::Utf8,
+        _ => unreachable!("logical scan axes only use bool, numeric, or string arrays"),
     }
 }
 
@@ -987,7 +999,7 @@ mod tests {
     fn group_roles_include_categorical_logical_axes() {
         let schema = DatasetSchema::new(IndexMap::from([(
             "logicalIndex:gate".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Complex),
+            DatasetDataType::Scalar(ScalarKind::Utf8),
         )]));
         let manifest = DatasetSemanticManifest::minimal([(
             "signal".to_string(),
