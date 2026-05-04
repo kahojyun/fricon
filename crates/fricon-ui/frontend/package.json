@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.4.1",
-    "@tanstack/react-query": "5.97.0",
+    "@tanstack/react-query": "5.99.2",
     "@tanstack/react-router": "1.168.23",
     "@tanstack/react-table": "8.21.3",
     "@tanstack/react-virtual": "3.13.24",
@@ -48,7 +48,7 @@
     "@vitest/browser-playwright": "4.1.4",
     "@rolldown/plugin-babel": "0.2.3",
     "@tailwindcss/vite": "4.2.2",
-    "@tanstack/react-query-devtools": "5.97.0",
+    "@tanstack/react-query-devtools": "5.99.2",
     "@tanstack/react-router-devtools": "1.166.13",
     "@tanstack/router-cli": "1.166.33",
     "@tanstack/router-plugin": "1.167.22",
