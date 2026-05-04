@@ -760,9 +760,12 @@ mod tests {
     use crate::dataset::{
         interpret::{
             ColumnMeaning, PhysicalColumnOrdinal, ResolvedIndexRealization,
-            ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, VisibleColumnOrdinal,
+            ResolvedPhysicalColumnReference, VisibleColumnOrdinal, resolve_from_manifest,
         },
-        semantics::DatasetDType,
+        semantics::{
+            DatasetDType, DatasetSemanticManifest, ManifestColumn, RECORD_ID_COLUMN, ScanAxis,
+            ScanAxisValue, ScanPlan,
+        },
     };
 
     fn point(record_id: u64, indices: Vec<u64>) -> ResolvedLogicalIndexPoint {
@@ -814,18 +817,6 @@ mod tests {
             is_complex: false,
             is_trace: false,
             numeric_axis: true,
-        })
-    }
-
-    fn logical_reference(id: &str, name: &str, numeric_axis: bool) -> ResolvedSemanticReference {
-        ResolvedSemanticReference::LogicalIndex(ResolvedLogicalIndexReference {
-            id: id.to_string(),
-            name: name.to_string(),
-            axis_ordinal: 0,
-            label: None,
-            hidden_by_default: false,
-            numeric_axis,
-            is_inferred_axis: false,
         })
     }
 
@@ -961,19 +952,25 @@ mod tests {
                 DatasetDataType::Scalar(ScalarKind::Numeric),
             ),
         ]));
-        let logical_gate = logical_reference("logicalIndex:gate", "gate", true);
-        let chart_axis = physical_reference(
-            "column:physicalAxis",
-            "physicalAxis",
-            ColumnMeaning::UserValue,
-            false,
-        );
-        let mut interpretation = empty_interpretation();
-        interpretation.semantic_references = vec![logical_gate.clone(), chart_axis.clone()];
-        interpretation.plotted_coordinates = vec![logical_gate.clone(), chart_axis.clone()];
-        interpretation.sweep_axes = vec![logical_gate];
-        interpretation.chart_axis_candidates = vec![chart_axis];
-        interpretation.index_realization = ResolvedIndexRealization::Implicit;
+        let mut physical_axis = ManifestColumn::new(DatasetDType::Float64);
+        physical_axis.chart_axis = true;
+        let manifest = DatasetSemanticManifest::minimal([
+            (
+                "signal".to_string(),
+                ManifestColumn::new(DatasetDType::Float64),
+            ),
+            ("physicalAxis".to_string(), physical_axis),
+        ])
+        .with_scan_plan(Some(ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![ScanAxisValue::Int(0), ScanAxisValue::Int(1)],
+        )])));
+        let arrow_schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+            Field::new("physicalAxis", DataType::Float64, false),
+        ]);
+        let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1, 2]);
 
         let columns = projected_reference_columns(&interpretation.sweep_axes, &schema, |axis| {
             axis.numeric_axis()
@@ -988,11 +985,22 @@ mod tests {
             "logicalIndex:gate".to_string(),
             DatasetDataType::Scalar(ScalarKind::Complex),
         )]));
-        let logical_gate = logical_reference("logicalIndex:gate", "gate", false);
-        let mut interpretation = empty_interpretation();
-        interpretation.semantic_references = vec![logical_gate.clone()];
-        interpretation.group_axes = vec![logical_gate.clone()];
-        interpretation.sweep_axes = vec![logical_gate];
+        let manifest = DatasetSemanticManifest::minimal([(
+            "signal".to_string(),
+            ManifestColumn::new(DatasetDType::Float64),
+        )])
+        .with_scan_plan(Some(ScanPlan::new(vec![ScanAxis::static_values(
+            "gate",
+            vec![
+                ScanAxisValue::String("low".to_string()),
+                ScanAxisValue::String("high".to_string()),
+            ],
+        )])));
+        let arrow_schema = Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]);
+        let interpretation = resolve_from_manifest(&arrow_schema, &manifest, &[1]);
 
         assert_eq!(
             projected_reference_columns(&interpretation.group_axes, &schema, |_| true),

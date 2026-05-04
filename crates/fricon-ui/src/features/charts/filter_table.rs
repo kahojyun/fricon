@@ -198,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn complex_filter_values_keep_stable_display_and_indices() {
+    fn complex_filter_values_keep_stable_display_and_indices() -> anyhow::Result<()> {
         let fields = vec!["z".to_string()];
         let rows = vec![
             vec![json!({"real": 1.0, "imag": 2.0})],
@@ -209,12 +209,12 @@ mod tests {
         let processed = process_filter_rows(&fields, rows);
 
         assert_eq!(processed.unique_rows.len(), 2);
-        assert_eq!(
-            processed.unique_rows[0].display_values,
-            vec![r#"{"imag":2.0,"real":1.0}"#]
-        );
+        let first_display: serde_json::Value =
+            serde_json::from_str(&processed.unique_rows[0].display_values[0])?;
+        assert_eq!(first_display, json!({"real": 1.0, "imag": 2.0}));
         assert_eq!(processed.unique_rows[0].value_indices, vec![0]);
         assert_eq!(processed.unique_rows[1].value_indices, vec![1]);
+        Ok(())
     }
 
     #[tokio::test]

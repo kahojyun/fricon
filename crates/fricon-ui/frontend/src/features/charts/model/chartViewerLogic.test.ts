@@ -1,29 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type {
-  ChartSemantics,
-  ColumnInfo,
-  DatasetDetail,
-  FilterTableData,
-  FilterTableRow,
-} from "../api/types";
+import type { FilterTableData, FilterTableRow } from "../api/types";
+import {
+  columnId,
+  makeColumn,
+  makeDatasetDetail,
+  makeFilterTableData as makeChartFilterTableData,
+  makeInferredSemantics,
+} from "../test-utils";
 import {
   buildChartRequest,
   deriveChartViewerState,
   type ChartViewerSelectionState,
 } from "./chartViewerLogic";
-
-function makeColumn(
-  overrides: Partial<ColumnInfo> & { name: string },
-): ColumnInfo {
-  const { name, ...rest } = overrides;
-  return {
-    name,
-    isComplex: false,
-    isTrace: false,
-    isInferredAxis: false,
-    ...rest,
-  };
-}
 
 function makeState(
   overrides: Partial<ChartViewerSelectionState> = {},
@@ -45,61 +33,21 @@ function makeState(
   };
 }
 
-function makeDatasetDetail(columns: ColumnInfo[]): DatasetDetail {
-  return {
-    status: "Completed",
-    payloadAvailable: true,
-    columns,
-  };
-}
-
-function makeInferredSemantics(columns: ColumnInfo[]): ChartSemantics {
-  const axes = columns
-    .filter((column) => column.isInferredAxis)
-    .map((column) => ({
-      id: column.name,
-      name: column.name,
-      label: column.label ?? null,
-      kind: "column" as const,
-      numeric: true,
-      isInferredAxis: true,
-      physicalColumn: column.name,
-    }));
-  return {
-    duplicatePolicy:
-      axes.length > 0 ? "row_order_placeholder" : "latest_by_record_id",
-    indexRealization: "none",
-    axes,
-    valueColumns: columns
-      .filter((column) => !column.isInferredAxis)
-      .map((column) => ({
-        id: column.name,
-        name: column.name,
-        label: column.label ?? null,
-        isComplex: column.isComplex,
-        isTrace: column.isTrace,
-        hiddenByDefault: column.hiddenByDefault ?? false,
-      })),
-    chartAxisCandidates: axes,
-  };
-}
-
 function deriveWithInferredSemantics(
-  columns: ColumnInfo[],
+  columns: Parameters<typeof makeInferredSemantics>[0],
   state: ChartViewerSelectionState,
 ) {
   return deriveChartViewerState(state, makeInferredSemantics(columns));
 }
 
 function makeFilterTableData(): FilterTableData {
-  return {
-    fields: ["idxA"],
-    fieldLabels: {},
+  return makeChartFilterTableData({
+    fields: [columnId("idxA")],
     rows: [{ index: 1, displayValues: ["1"], valueIndices: [1] }],
     columnUniqueValues: {
-      idxA: [{ index: 1, displayValue: "1" }],
+      [columnId("idxA")]: [{ index: 1, displayValue: "1" }],
     },
-  };
+  });
 }
 
 describe("chartViewerLogic", () => {
@@ -112,7 +60,7 @@ describe("chartViewerLogic", () => {
 
     const derived = deriveWithInferredSemantics(columns, makeState());
 
-    expect(derived.effectiveSweepIndexColumnName).toBe("idxB");
+    expect(derived.effectiveSweepIndexColumnName).toBe(columnId("idxB"));
   });
 
   it("keeps the same default order-by when style changes", () => {
@@ -131,8 +79,8 @@ describe("chartViewerLogic", () => {
       makeState({ plotMode: "complex_plane", drawStyle: "points" }),
     );
 
-    expect(lineDerived.effectiveSweepIndexColumnName).toBe("idxB");
-    expect(pointsDerived.effectiveSweepIndexColumnName).toBe("idxB");
+    expect(lineDerived.effectiveSweepIndexColumnName).toBe(columnId("idxB"));
+    expect(pointsDerived.effectiveSweepIndexColumnName).toBe(columnId("idxB"));
   });
 
   it("defaults scalar heatmap axes to the two trailing inferred axes", () => {
@@ -148,9 +96,12 @@ describe("chartViewerLogic", () => {
       makeState({ view: "heatmap" }),
     );
 
-    expect(derived.effectiveHeatmapXName).toBe("idxFast");
-    expect(derived.effectiveHeatmapYName).toBe("idxMid");
-    expect(derived.excludeColumns).toEqual(["idxFast", "idxMid"]);
+    expect(derived.effectiveHeatmapXName).toBe(columnId("idxFast"));
+    expect(derived.effectiveHeatmapYName).toBe(columnId("idxMid"));
+    expect(derived.excludeColumns).toEqual([
+      columnId("idxFast"),
+      columnId("idxMid"),
+    ]);
   });
 
   it("falls back plot mode to available option", () => {
@@ -181,14 +132,17 @@ describe("chartViewerLogic", () => {
       makeState({
         plotMode: "xy",
         drawStyle: "line_points",
-        xyXName: "xVal",
-        xyYName: "yVal",
-        traceGroupIndexColumnNames: ["idxA"],
-        sweepIndexColumnName: "idxB",
+        xyXName: columnId("xVal"),
+        xyYName: columnId("yVal"),
+        traceGroupIndexColumnNames: [columnId("idxA")],
+        sweepIndexColumnName: columnId("idxB"),
       }),
     );
 
-    expect(derived.excludeColumns).toEqual(["idxA", "idxB"]);
+    expect(derived.excludeColumns).toEqual([
+      columnId("idxA"),
+      columnId("idxB"),
+    ]);
   });
 
   it("returns null request when filters exist but no resolved row", () => {
@@ -224,10 +178,10 @@ describe("chartViewerLogic", () => {
       makeState({
         plotMode: "xy",
         drawStyle: "line_points",
-        xyXName: "xVal",
-        xyYName: "yVal",
-        traceGroupIndexColumnNames: ["idxA"],
-        sweepIndexColumnName: "idxB",
+        xyXName: columnId("xVal"),
+        xyYName: columnId("yVal"),
+        traceGroupIndexColumnNames: [columnId("idxA")],
+        sweepIndexColumnName: columnId("idxB"),
       }),
     );
     const filterRow: FilterTableRow = {
@@ -251,12 +205,12 @@ describe("chartViewerLogic", () => {
       view: "xy",
       plotMode: "xy",
       drawStyle: "line_points",
-      xColumn: "xVal",
-      yColumn: "yVal",
-      traceGroupIndexColumns: ["idxA"],
-      sweepIndexColumn: "idxB",
+      xColumn: columnId("xVal"),
+      yColumn: columnId("yVal"),
+      traceGroupIndexColumns: [columnId("idxA")],
+      sweepIndexColumn: columnId("idxB"),
       indexFilters: [1],
-      excludeColumns: ["idxA", "idxB"],
+      excludeColumns: [columnId("idxA"), columnId("idxB")],
     });
   });
 
@@ -273,19 +227,19 @@ describe("chartViewerLogic", () => {
       makeState({
         plotMode: "xy",
         drawStyle: "points",
-        xyXName: "traceX",
-        xyYName: "traceY",
+        xyXName: columnId("traceX"),
+        xyYName: columnId("traceY"),
       }),
     );
 
     expect(derived.xyXOptions.map((column) => column.name)).toEqual([
-      "scalarX",
-      "scalarY",
-      "traceX",
-      "traceY",
+      columnId("scalarX"),
+      columnId("scalarY"),
+      columnId("traceX"),
+      columnId("traceY"),
     ]);
-    expect(derived.effectiveXYXName).toBe("traceX");
-    expect(derived.effectiveXYYName).toBe("traceY");
+    expect(derived.effectiveXYXName).toBe(columnId("traceX"));
+    expect(derived.effectiveXYYName).toBe(columnId("traceY"));
 
     const request = buildChartRequest({
       datasetDetail: makeDatasetDetail(columns),
@@ -302,8 +256,8 @@ describe("chartViewerLogic", () => {
       view: "xy",
       plotMode: "xy",
       drawStyle: "points",
-      xColumn: "traceX",
-      yColumn: "traceY",
+      xColumn: columnId("traceX"),
+      yColumn: columnId("traceY"),
       indexFilters: undefined,
       excludeColumns: [],
     });

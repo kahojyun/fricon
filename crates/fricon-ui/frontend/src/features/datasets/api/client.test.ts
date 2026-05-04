@@ -101,6 +101,32 @@ describe("dataset client", () => {
             isChartAxisCandidate: true,
           },
         ],
+        chartSemantics: {
+          duplicatePolicy: "latest_by_record_id",
+          indexRealization: "implicit",
+          axes: [
+            {
+              id: "logicalIndex:gate",
+              name: "gate",
+              label: "Gate",
+              kind: "logical_index",
+              numeric: true,
+              isInferredAxis: false,
+              physicalColumn: null,
+            },
+          ],
+          valueColumns: [
+            {
+              id: "column:signal",
+              name: "signal",
+              label: "Signal",
+              isComplex: false,
+              isTrace: false,
+              hiddenByDefault: true,
+            },
+          ],
+          chartAxisCandidates: [],
+        },
       },
     });
 
@@ -125,6 +151,55 @@ describe("dataset client", () => {
         isChartAxisCandidate: true,
       },
     ]);
+    expect(result.chartSemantics).toEqual({
+      duplicatePolicy: "latest_by_record_id",
+      indexRealization: "implicit",
+      axes: [
+        {
+          id: "logicalIndex:gate",
+          name: "gate",
+          label: "Gate",
+          kind: "logical_index",
+          numeric: true,
+          isInferredAxis: false,
+          physicalColumn: null,
+        },
+      ],
+      valueColumns: [
+        {
+          id: "column:signal",
+          name: "signal",
+          label: "Signal",
+          isComplex: false,
+          isTrace: false,
+          hiddenByDefault: true,
+        },
+      ],
+      chartAxisCandidates: [],
+    });
+  });
+
+  it("normalizes absent chart semantics to null", async () => {
+    datasetDetailCommandMock.mockResolvedValue({
+      status: "ok",
+      data: {
+        id: 8,
+        name: "Deleted Payload",
+        description: "",
+        favorite: false,
+        tags: [],
+        status: "Completed",
+        createdAt: "2026-01-02T03:04:05Z",
+        trashedAt: null,
+        deletedAt: null,
+        payloadAvailable: false,
+        columns: [],
+      },
+    });
+
+    const result = await getDatasetDetail(8);
+
+    expect(result.chartSemantics).toBeNull();
   });
 
   it("propagates dataset command error envelopes", async () => {

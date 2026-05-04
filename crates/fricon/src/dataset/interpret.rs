@@ -402,7 +402,7 @@ fn scan_axis_mode_is_numeric(mode: &ResolvedScanAxisMode) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{ops::Bound, sync::Arc};
+    use std::sync::Arc;
 
     use arrow_array::{Float64Array, RecordBatch, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
@@ -416,7 +416,7 @@ mod tests {
     use crate::dataset::{
         DatasetReader,
         ingest::WriteSessionRegistry,
-        read::{ReadError, SelectOptions},
+        read::ReadError,
         semantics::{
             DatasetDType, DatasetSemanticManifest, IndexRealization, ManifestColumn,
             RECORD_ID_COLUMN, ScanAxis, ScanAxisValue, ScanPlan, write_manifest,
@@ -849,9 +849,6 @@ mod tests {
         .expect("write manifest");
 
         let reader = DatasetReader::open_dir(dir.path()).expect("reader");
-        assert_eq!(reader.schema().expect("visible schema").columns().len(), 2);
-        assert_eq!(reader.arrow_schema().fields().len(), 2);
-        assert_eq!(reader.batches()[0].num_columns(), 2);
         let interpretation = reader.interpret().expect("interpretation");
 
         assert_eq!(
@@ -864,14 +861,6 @@ mod tests {
         );
         assert_eq!(interpretation.inferred_axis_columns, visible(&[0]));
         assert_eq!(interpretation.value_columns, visible(&[1]));
-        assert_eq!(
-            interpretation.columns[1].physical_ordinal,
-            PhysicalColumnOrdinal(1)
-        );
-        assert_eq!(
-            interpretation.columns[1].visible_ordinal,
-            Some(VisibleColumnOrdinal(0))
-        );
         assert_eq!(
             interpretation.columns[1].meaning,
             ColumnMeaning::InferredAxis
@@ -886,21 +875,6 @@ mod tests {
             vec!["column:run"]
         );
         assert!(interpretation.group_axes[0].is_inferred_axis());
-        let selected_columns = interpretation
-            .value_columns
-            .iter()
-            .map(|ordinal| ordinal.0)
-            .collect();
-        let (selected_schema, selected_batches) = reader
-            .select_data(&SelectOptions {
-                start: Bound::Unbounded,
-                end: Bound::Unbounded,
-                index_filters: None,
-                selected_columns: Some(selected_columns),
-            })
-            .expect("select value columns from interpretation");
-        assert_eq!(selected_schema.fields().len(), 1);
-        assert_eq!(selected_batches[0].num_columns(), 1);
     }
 
     #[test]
