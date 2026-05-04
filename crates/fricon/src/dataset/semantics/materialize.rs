@@ -15,12 +15,15 @@ pub(crate) fn materialized_schema(user_schema: &Schema) -> SchemaRef {
         DataType::UInt64,
         false,
     )))
-    .chain(user_schema.fields().iter().cloned())
+    .chain(user_schema.fields().iter().map(|field| {
+        Arc::new(Field::new(
+            field.name(),
+            field.data_type().clone(),
+            field.is_nullable(),
+        ))
+    }))
     .collect();
-    Arc::new(Schema::new_with_metadata(
-        fields,
-        user_schema.metadata().clone(),
-    ))
+    Arc::new(Schema::new(fields))
 }
 
 pub(crate) fn materialize_record_ids(
@@ -81,6 +84,26 @@ mod tests {
         assert_eq!(schema.field(0).data_type(), &DataType::UInt64);
         assert!(!schema.field(0).is_nullable());
         assert_eq!(schema.field(1).name(), "signal");
+    }
+
+    #[test]
+    fn materialized_schema_strips_user_arrow_metadata() {
+        let mut field_metadata = std::collections::HashMap::new();
+        field_metadata.insert(
+            "ARROW:extension:name".to_string(),
+            "fricon.test".to_string(),
+        );
+        let mut schema_metadata = std::collections::HashMap::new();
+        schema_metadata.insert("semantic".to_string(), "not-storage".to_string());
+        let user_schema = Schema::new_with_metadata(
+            vec![Field::new("signal", DataType::Float64, false).with_metadata(field_metadata)],
+            schema_metadata,
+        );
+
+        let schema = materialized_schema(&user_schema);
+
+        assert!(schema.metadata().is_empty());
+        assert!(schema.field(1).metadata().is_empty());
     }
 
     #[test]

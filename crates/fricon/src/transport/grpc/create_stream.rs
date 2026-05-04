@@ -549,12 +549,12 @@ mod tests {
     fn build_logical_index_payload_bytes() -> bytes::Bytes {
         let schema = Arc::new(Schema::new(vec![Field::new(
             "step",
-            DataType::UInt64,
+            DataType::Int64,
             false,
         )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(arrow_array::UInt64Array::from(vec![2, 0, 1]))],
+            vec![Arc::new(arrow_array::Int64Array::from(vec![2, 0, 1]))],
         )
         .expect("logical batch");
         let mut bytes = vec![];
@@ -567,17 +567,17 @@ mod tests {
     fn build_two_logical_index_batch_payload_bytes() -> bytes::Bytes {
         let schema = Arc::new(Schema::new(vec![Field::new(
             "step",
-            DataType::UInt64,
+            DataType::Int64,
             false,
         )]));
         let first_batch = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(arrow_array::UInt64Array::from(vec![0]))],
+            vec![Arc::new(arrow_array::Int64Array::from(vec![0]))],
         )
         .expect("first logical batch");
         let second_batch = RecordBatch::try_new(
             schema.clone(),
-            vec![Arc::new(arrow_array::UInt64Array::from(vec![1]))],
+            vec![Arc::new(arrow_array::Int64Array::from(vec![1]))],
         )
         .expect("second logical batch");
         let mut bytes = vec![];

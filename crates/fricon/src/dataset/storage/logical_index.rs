@@ -1,6 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
-use arrow_array::{RecordBatch, UInt64Array};
+use arrow_array::{Int64Array, RecordBatch, UInt64Array};
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 
 use crate::dataset::{
@@ -14,7 +14,7 @@ pub(crate) fn logical_index_values_schema(scan_plan: &ScanPlan) -> SchemaRef {
         scan_plan
             .axes
             .iter()
-            .map(|axis| Field::new(&axis.name, DataType::UInt64, false))
+            .map(|axis| Field::new(&axis.name, DataType::Int64, false))
             .collect::<Vec<_>>(),
     ))
 }
@@ -26,7 +26,7 @@ pub(crate) fn logical_index_schema(scan_plan: &ScanPlan) -> SchemaRef {
         scan_plan
             .axes
             .iter()
-            .map(|axis| Field::new(&axis.name, DataType::UInt64, false)),
+            .map(|axis| Field::new(&axis.name, DataType::Int64, false)),
     );
     Arc::new(Schema::new(fields))
 }
@@ -71,13 +71,17 @@ fn validate_logical_index_bounds(
         let ScanAxisMode::Static { values } = &axis.mode else {
             continue;
         };
-        let len = u64::try_from(values.len()).map_err(|_| DatasetError::IncompatibleType)?;
+        let len = i64::try_from(values.len()).map_err(|_| DatasetError::IncompatibleType)?;
         let column = logical_indices
             .column(axis_ordinal)
             .as_any()
-            .downcast_ref::<UInt64Array>()
+            .downcast_ref::<Int64Array>()
             .ok_or(DatasetError::IncompatibleType)?;
-        if column.values().iter().any(|index| *index >= len) {
+        if column
+            .values()
+            .iter()
+            .any(|index| *index < 0 || *index >= len)
+        {
             return Err(DatasetError::InvalidFilter);
         }
     }
@@ -108,10 +112,10 @@ pub(crate) fn logical_index_record_ids(batch: &RecordBatch) -> Result<&UInt64Arr
 pub(crate) fn logical_index_column(
     batch: &RecordBatch,
     ordinal: usize,
-) -> Result<&UInt64Array, DatasetError> {
+) -> Result<&Int64Array, DatasetError> {
     batch
         .column(ordinal + 1)
         .as_any()
-        .downcast_ref::<UInt64Array>()
+        .downcast_ref::<Int64Array>()
         .ok_or(DatasetError::IncompatibleType)
 }

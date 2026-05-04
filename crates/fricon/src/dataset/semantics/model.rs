@@ -86,7 +86,7 @@ impl DatasetSemanticManifest {
         self.apply_scan_plan_with_realization(scan_plan, false);
     }
 
-    fn apply_scan_plan_with_realization(
+    pub(crate) fn apply_scan_plan_with_realization(
         &mut self,
         scan_plan: Option<ScanPlan>,
         sidecar_index_realization: bool,
@@ -751,7 +751,7 @@ fn try_trace_dtype(data_type: &DataType) -> Result<Option<TraceDType>, ManifestV
             let value = trace_value_dtype(value.data_type())?;
             Ok(Some(TraceDType {
                 layout: TraceLayout::Simple,
-                axis: TraceAxisDType::Float64,
+                axis: TraceAxisDType::Int64,
                 value,
             }))
         }
@@ -1186,6 +1186,14 @@ mod tests {
                     value: TraceValueDType::Complex128,
                 })),
             ),
+            (
+                "simple_trace".to_string(),
+                ManifestColumn::new(DatasetDType::trace(TraceDType {
+                    layout: TraceLayout::Simple,
+                    axis: TraceAxisDType::Int64,
+                    value: TraceValueDType::Float64,
+                })),
+            ),
         ]);
         let schema = Schema::new(vec![
             Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
@@ -1203,6 +1211,11 @@ mod tests {
                     value: TraceValueDType::Complex128,
                 })
                 .physical_data_type(),
+                false,
+            ),
+            Field::new(
+                "simple_trace",
+                DataType::new_list(DataType::Float64, false),
                 false,
             ),
         ]);
@@ -1234,6 +1247,11 @@ mod tests {
                 .physical_data_type(),
                 false,
             ),
+            Field::new(
+                "simple_trace",
+                DataType::new_list(DataType::Float64, false),
+                false,
+            ),
         ]);
 
         let manifest =
@@ -1249,6 +1267,14 @@ mod tests {
             DatasetDType::trace(TraceDType {
                 layout: TraceLayout::VariableStep,
                 axis: TraceAxisDType::UInt64,
+                value: TraceValueDType::Float64,
+            })
+        );
+        assert_eq!(
+            manifest.columns["simple_trace"].dtype,
+            DatasetDType::trace(TraceDType {
+                layout: TraceLayout::Simple,
+                axis: TraceAxisDType::Int64,
                 value: TraceValueDType::Float64,
             })
         );

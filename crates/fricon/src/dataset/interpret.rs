@@ -115,13 +115,27 @@ pub(crate) fn resolve_from_manifest_with_compatibility_inference(
     index_columns: Option<Vec<usize>>,
 ) -> DatasetInterpretation {
     let mut interpretation = resolve_from_manifest(arrow_schema, manifest, visible_columns);
-    if manifest.compatibility.allow_inference && manifest.scan_plan.is_none() {
+    if manifest_allows_compatibility_index_projection(manifest) {
         apply_compatibility_index_projection(
             &mut interpretation,
             index_columns.unwrap_or_default(),
         );
     }
     interpretation
+}
+
+pub(crate) fn manifest_allows_compatibility_index_projection(
+    manifest: &DatasetSemanticManifest,
+) -> bool {
+    manifest.compatibility.allow_inference
+        && manifest.scan_plan.is_none()
+        && manifest.columns.values().all(|column| {
+            column.system.is_some()
+                || (column.unit.is_none()
+                    && column.label.is_none()
+                    && !column.hidden_by_default
+                    && !column.chart_axis)
+        })
 }
 
 struct RoleProjections {
@@ -512,7 +526,7 @@ fn scan_axis_mode_is_numeric(mode: &ResolvedScanAxisMode) -> bool {
 mod tests {
     use std::{ops::Bound, sync::Arc};
 
-    use arrow_array::{Float64Array, RecordBatch, StringArray, UInt64Array};
+    use arrow_array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
 
     use super::{
@@ -974,6 +988,58 @@ mod tests {
     }
 
     #[test]
+    fn reader_interpretation_does_not_infer_indexes_for_metadata_manifest() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(RECORD_ID_COLUMN, DataType::UInt64, false),
+            Field::new("run", DataType::Float64, false),
+            Field::new("signal", DataType::Float64, false),
+        ]));
+        let mut writer = ChunkWriter::new(schema.clone(), dir.path().to_owned());
+        writer
+            .write(
+                RecordBatch::try_new(
+                    schema,
+                    vec![
+                        Arc::new(UInt64Array::from(vec![0, 1])),
+                        Arc::new(Float64Array::from(vec![1.0, 2.0])),
+                        Arc::new(Float64Array::from(vec![10.0, 20.0])),
+                    ],
+                )
+                .expect("batch"),
+            )
+            .expect("write batch");
+        writer.finish().expect("finish writer");
+        let mut run = ManifestColumn::new(DatasetDType::Float64);
+        run.label = Some("Run".to_string());
+        write_manifest(
+            dir.path(),
+            &DatasetSemanticManifest::minimal([
+                ("run".to_string(), run),
+                (
+                    "signal".to_string(),
+                    ManifestColumn::new(DatasetDType::Float64),
+                ),
+            ]),
+        )
+        .expect("write manifest");
+
+        let reader = DatasetReader::open_dir(dir.path()).expect("reader");
+        let interpretation = reader.interpret().expect("interpretation");
+
+        assert_eq!(
+            interpretation.duplicate_policy,
+            ResolvedDuplicatePolicy::LatestByRecordId
+        );
+        assert_eq!(
+            interpretation.logical_index_columns,
+            Vec::<VisibleColumnOrdinal>::new()
+        );
+        assert_eq!(interpretation.value_columns, visible(&[0, 1]));
+        assert!(interpretation.columns.iter().all(|column| !column.is_index));
+    }
+
+    #[test]
     fn reader_interpretation_resolves_implicit_regular_scan_after_reopen() {
         let dir = tempfile::tempdir().expect("temp dir");
         let schema = Arc::new(Schema::new(vec![
@@ -1125,8 +1191,8 @@ mod tests {
                     logical_index_schema(&scan_plan),
                     vec![
                         Arc::new(UInt64Array::from(vec![0, 1, 2])),
-                        Arc::new(UInt64Array::from(vec![1, 0, 1])),
-                        Arc::new(UInt64Array::from(vec![0, 1, 0])),
+                        Arc::new(Int64Array::from(vec![1, 0, 1])),
+                        Arc::new(Int64Array::from(vec![0, 1, 0])),
                     ],
                 )
                 .expect("sidecar batch"),
@@ -1147,10 +1213,10 @@ mod tests {
                 .iter()
                 .map(|point| (point.record_id, point.indices.clone()))
                 .collect::<Vec<_>>(),
-            vec![(1, vec![0, 1]), (2, vec![1, 0])]
+            vec![(0, vec![1, 0]), (1, vec![0, 1]), (2, vec![1, 0])]
         );
         assert_eq!(
-            logical_index_points[1].coordinates,
+            logical_index_points[2].coordinates,
             vec![
                 ScanAxisValue::String("high".to_string()),
                 ScanAxisValue::Int(0)
@@ -1249,7 +1315,7 @@ mod tests {
                     logical_index_schema(&scan_plan),
                     vec![
                         Arc::new(UInt64Array::from(vec![0, 2])),
-                        Arc::new(UInt64Array::from(vec![0, 1])),
+                        Arc::new(Int64Array::from(vec![0, 1])),
                     ],
                 )
                 .expect("sidecar batch"),

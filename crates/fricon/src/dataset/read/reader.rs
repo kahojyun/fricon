@@ -1,14 +1,16 @@
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     ops::RangeBounds,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use arrow_arith::boolean::and;
-use arrow_array::{ArrayRef, BooleanArray, RecordBatch, RecordBatchOptions, Scalar, UInt64Array};
+use arrow_array::{
+    ArrayRef, BooleanArray, Int64Array, RecordBatch, RecordBatchOptions, Scalar, UInt64Array,
+};
 use arrow_ord::{cmp::eq, ord::make_comparator};
 use arrow_schema::{Schema, SchemaRef, SortOptions};
 use arrow_select::{concat::concat_batches, filter::FilterBuilder};
@@ -17,7 +19,8 @@ use itertools::Itertools;
 use crate::dataset::{
     ingest::WriteSessionHandle,
     interpret::{
-        DatasetInterpretation, ResolvedLogicalIndexPoint, resolve_from_compatibility_inference,
+        DatasetInterpretation, ResolvedLogicalIndexPoint,
+        manifest_allows_compatibility_index_projection, resolve_from_compatibility_inference,
         resolve_from_manifest_with_compatibility_inference, resolve_logical_index_points,
     },
     read::{ReadError, SelectOptions},
@@ -379,11 +382,9 @@ impl DatasetReader {
                 .validate_against_arrow_schema(self.physical_arrow_schema.as_ref())
                 .map_err(ManifestError::from)?;
             let compatibility_index_columns =
-                if manifest.compatibility.allow_inference && manifest.scan_plan.is_none() {
-                    self.try_index_columns().ok().flatten()
-                } else {
-                    None
-                };
+                manifest_allows_compatibility_index_projection(manifest)
+                    .then(|| self.try_index_columns().ok().flatten())
+                    .flatten();
             return Ok(resolve_from_manifest_with_compatibility_inference(
                 self.physical_arrow_schema.as_ref(),
                 manifest,
@@ -443,7 +444,7 @@ impl DatasetReader {
         }
         let record_id_set = record_ids.iter().copied().collect::<HashSet<_>>();
         let mut matched_record_ids = HashSet::new();
-        let mut latest_by_indices: HashMap<Vec<u64>, ResolvedLogicalIndexPoint> = HashMap::new();
+        let mut points = Vec::new();
         for batch in &batches {
             let record_ids = logical_index_record_ids(batch)?;
             let axis_columns = (0..scan_plan.axes.len())
@@ -457,8 +458,8 @@ impl DatasetReader {
                 matched_record_ids.insert(record_id);
                 let indices = axis_columns
                     .iter()
-                    .map(|column| column.value(row))
-                    .collect::<Vec<_>>();
+                    .map(|column| Self::logical_index_value(column, row))
+                    .collect::<Result<Vec<_>, _>>()?;
                 let coordinates = indices
                     .iter()
                     .zip(&scan_plan.axes)
@@ -476,27 +477,22 @@ impl DatasetReader {
                         )),
                     })
                     .collect::<Result<Vec<_>, DatasetError>>()?;
-                let point = ResolvedLogicalIndexPoint {
+                points.push(ResolvedLogicalIndexPoint {
                     record_id,
-                    indices: indices.clone(),
+                    indices,
                     coordinates,
-                };
-                latest_by_indices
-                    .entry(indices)
-                    .and_modify(|current| {
-                        if record_id > current.record_id {
-                            *current = point.clone();
-                        }
-                    })
-                    .or_insert(point);
+                });
             }
         }
         if matched_record_ids != record_id_set {
             return Err(ReadError::Dataset(DatasetError::SchemaMismatch));
         }
-        let mut points = latest_by_indices.into_values().collect::<Vec<_>>();
         points.sort_by_key(|point| point.record_id);
         Ok(points)
+    }
+
+    fn logical_index_value(column: &Int64Array, row: usize) -> Result<u64, DatasetError> {
+        u64::try_from(column.value(row)).map_err(|_| DatasetError::InvalidFilter)
     }
 
     pub fn record_ids(&self) -> Result<Vec<u64>, ReadError> {
