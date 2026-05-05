@@ -16,23 +16,23 @@ remains useful for rationale, tradeoffs, and deferred design ideas.
 
 ## Implementation Snapshot
 
-| Area | Status |
-| --- | --- |
-| Manifest sidecar | Implemented |
-| `__ds_record_id` materialization | Implemented |
-| Reserved `__ds_` prefix | Implemented |
-| Manifest v1 dtype and semantic facets | Implemented |
-| Plain Arrow physical schemas for new semantic datasets | Implemented |
-| Minimal axis inference through resolved interpretation | Implemented |
-| Python `columns=` metadata | Implemented |
-| Python `scan=` metadata | Implemented |
-| `write_dict(..., logical_indices=...)` | Implemented |
-| Logical-index sidecar chunks | Implemented |
-| Dataset detail semantic DTOs | Implemented |
-| Chart projection over resolved semantic sources | Partially implemented |
-| Full reader grid/select API | Deferred |
-| Manifest-owned saved/default views | Deferred |
-| Run, measurement, status, and invalidation semantics | Deferred |
+| Area                                                   | Status                |
+| ------------------------------------------------------ | --------------------- |
+| Manifest sidecar                                       | Implemented           |
+| `__ds_record_id` materialization                       | Implemented           |
+| Reserved `__ds_` prefix                                | Implemented           |
+| Manifest v1 dtype and semantic facets                  | Implemented           |
+| Plain Arrow physical schemas for new semantic datasets | Implemented           |
+| Minimal axis inference through resolved interpretation | Implemented           |
+| Python `columns=` metadata                             | Implemented           |
+| Python `scan=` metadata                                | Implemented           |
+| `write_dict(..., logical_indices=...)`                 | Implemented           |
+| Logical-index sidecar chunks                           | Implemented           |
+| Dataset detail semantic DTOs                           | Implemented           |
+| Chart projection over resolved semantic sources        | Partially implemented |
+| Full reader grid/select API                            | Deferred              |
+| Manifest-owned saved/default views                     | Deferred              |
+| Run, measurement, status, and invalidation semantics   | Deferred              |
 
 This note revises the earlier append-only dataset idea for the actual Fricon
 codebase and assumes the product is still pre-adoption, so breaking internal
