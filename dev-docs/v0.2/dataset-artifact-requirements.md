@@ -134,15 +134,31 @@ Required first-slice value kinds:
 - timestamp or time offset
 - nullable values
 - fixed-shape arrays or traces when declared up front
+- variable-length traces when declared up front
 
 Product direction for v0.2+:
 
-- ragged arrays should be supported through an explicit list/offset shape or
-  external asset references, not through ad hoc JSON blobs
+- ragged arrays and variable-length traces should be supported through declared
+  trace or array semantics or external asset references, not through ad hoc
+  JSON blobs
 - larger images, spectra, waveforms, and binary payloads may be represented as
   external assets linked from rows or streams
 - arbitrary Python objects are not dataset values; users should serialize them
   as parameters, attachments, or external artifacts with clear type metadata
+
+Variable-length trace recording is a v0.2 product requirement. A common
+measurement may tune instrument settings such as VNA bandwidth, sweep range,
+and point count during one scan, then write several `(frequency, S21)` traces
+with different lengths. Fricon should record those traces without forcing a
+fake shared frequency grid or padding with null-heavy columns. Stitching,
+resampling, and display policy can be chart or analysis work, but the recorded
+facts must preserve each trace's own coordinate values, measured values, and
+per-trace acquisition settings.
+
+The product requirement is about preserved meaning and user workflows, not the
+physical representation. Choices such as Arrow struct/list columns, sidecar
+trace chunks, or external asset thresholds belong in the dataset storage and
+API ADRs.
 
 ### Variables, Roles, And Dependencies
 
@@ -364,6 +380,23 @@ Acceptance notes:
 - Monitor values can be shown in a table or small status plot.
 - Trace rows can be inspected without breaking the scalar plot.
 
+### Record Adaptive VNA Traces
+
+As an experimentalist measuring a cavity, I want to write multiple `(frequency,
+S21)` traces with different sweep ranges, bandwidths, and point counts so that
+I can optimize measurement precision and runtime without losing the original
+trace facts.
+
+Acceptance notes:
+
+- Each trace can have a different length.
+- Each trace records its own frequency coordinate values and S21 values.
+- Per-trace settings such as bandwidth, range, point count, power, averaging,
+  and timestamp can be recorded beside the trace.
+- Fricon does not require padding, resampling, or a shared grid at write time.
+- Later stitching, resampling, or best-trace selection creates analysis output
+  or display interpretation, not silent mutation of the recorded trace facts.
+
 ### Recover A Partial Measurement
 
 As an experimentalist, I want interrupted data to stay visible and readable so
@@ -458,8 +491,10 @@ Acceptance notes:
 
 These decisions should be confirmed before the dataset storage/API ADRs:
 
-1. Should v0.2 first-slice datasets support fixed-shape trace/array values, or
-   should v0.2 store only scalar table columns and push traces to v0.3?
+1. What product constraints should guide the technical representation for
+   fixed-shape arrays and variable-length traces, such as expected trace size,
+   live-read latency, Python ergonomics, export fidelity, and external asset
+   thresholds?
 2. Should v0.2 expose multiple named streams per dataset, such as `primary`,
    `monitor`, and `baseline`, or keep one stream per dataset and model monitors
    as separate datasets?
