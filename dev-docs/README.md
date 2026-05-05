@@ -32,7 +32,7 @@ every canonical document.
 | Workspace format or metadata compatibility  | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Architecture background unless boundary design is unclear              |
 | Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Public docs unless behavior is user-visible                            |
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
-| Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
+| Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, `current-dataset-semantics.md`                                        | Implementation plan details unless landed behavior is being documented |
 | Parameter management product planning       | `parameter-management-design.md`         | `project-intent.md`, `roadmap.md`, `adr/README.md`                                                | Treating proposal content as current behavior                          |
 | Future concept capture                      | `future-concepts.md`                     | `project-intent.md`, `roadmap.md`                                                                 | Creating implementation issues before the concept is narrowed          |
 | Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
@@ -67,6 +67,8 @@ These files describe the current implementation. Update them when the
 implementation changes.
 
 - `current-storage-notes.md` - current workspace and dataset storage details
+- `current-dataset-semantics.md` - current dataset semantic model, writer
+  metadata, reader interpretation, and chart projection behavior
 
 ## Architecture Notes
 
@@ -80,10 +82,12 @@ checklist, policy, or guideline.
 
 ## Proposals
 
-This file describes proposed future direction. Do not treat it as current
-implementation fact unless the implementation has already landed.
+These files describe proposed or historical direction. Do not treat them as
+current implementation fact unless a current implementation note confirms that
+the behavior has landed.
 
-- `dataset-semantic-architecture-proposal.md`
+- `dataset-semantic-architecture-proposal.md` - historical dataset semantics
+  proposal, implementation snapshot, and remaining roadmap pressure
 - `experiment-run-and-runner-design.md` - proposed experiment run, generic
   runner, retry/resume, resource lease, and dataset write provenance model
 - `future-concepts.md` - lightweight ledger for useful but not-yet-designed

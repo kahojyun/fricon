@@ -12,9 +12,10 @@ as stable user-facing documentation. Public docs should describe workspaces and
 datasets through the CLI, Python API, and desktop UI rather than through the
 on-disk layout.
 
-Dataset semantics proposal documents describe long-term direction. Use this
-file as the current source of truth for implemented storage facts, including
-the current v1 dataset semantic manifest sidecar.
+Dataset semantics documents describe implemented meaning and long-term
+direction. Use this file as the current source of truth for implemented storage
+facts, including the current v1 dataset semantic manifest sidecar. Use
+`dev-docs/current-dataset-semantics.md` for current semantic behavior.
 
 ## Workspace Layout
 
@@ -23,6 +24,7 @@ At the time of writing, a workspace contains:
 ```tree
 workspace/
   .fricon_workspace.json
+  .fricon.lock
   fricon.sqlite3
   fricon.socket
   data/
@@ -44,6 +46,7 @@ Notes:
 - Opening an older workspace may trigger a stepwise migration before the
   workspace is usable.
 - `fricon.sqlite3` stores workspace catalog metadata.
+- `.fricon.lock` is runtime workspace exclusivity state, not durable data.
 - `fricon.socket` is runtime IPC state, not durable data.
 - Dataset directories are currently sharded by the first two characters of the
   dataset UID.
@@ -88,9 +91,11 @@ capabilities are derived interpretation/DTO fields, not durable manifest fields.
 Dataset archives store catalog metadata in `metadata.json`, the required
 `dataset_manifest.json` root sidecar, Arrow payload chunks under
 `data/data_chunk_<n>.arrow`, and logical-index chunks under
-`logical_index/logical_index_chunk_<n>.arrow` when present. Dataset readers
-require manifests; manifest-free payloads are not supported by the semantic read
-path.
+`logical_index/logical_index_chunk_<n>.arrow` when present. The semantic Rust
+reader requires manifests; manifest-free payloads are not supported by that
+path. Python `Dataset.to_arrow()` and `Dataset.to_polars()` are convenience
+helpers that read Arrow chunks directly and hide `__ds_` system columns without
+performing full semantic interpretation.
 
 ## Write Buffering
 
