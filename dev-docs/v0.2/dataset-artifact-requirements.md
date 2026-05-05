@@ -26,7 +26,7 @@ The product should feel natural to users migrating from LabRAD:
 create a measured dataset
 append rows or batches while a measurement runs
 watch it in a graph or table
-reopen it by title, time, sample/session, or legacy-style alias
+reopen it by title, time, sample/session, or source alias
 read it from Python without remembering storage paths
 ```
 
@@ -236,16 +236,19 @@ Acceptance notes:
 ### LabRAD Migration Feel
 
 Fricon v0.2 should make new measurement scripts easy to migrate from Data Vault
-without building a Data Vault compatibility layer.
+without building a Data Vault compatibility layer or promising direct import of
+old Data Vault storage.
 
 Acceptance notes:
 
 - Preserve the mental model of independent variables, dependent variables,
   labels, legends, and units.
-- Allow display aliases for legacy folder paths and numbered titles such as
-  `00001 - Title`, but do not use those as primary identity.
-- Import or map LabRAD-style parameters, comments, timestamps, and tags without
-  hiding them in unqueryable file attributes.
+- Provide generic source-alias and source-metadata fields so user-written
+  migration scripts can preserve original paths, numbered titles, and source
+  IDs without making them primary identity.
+- Let user-written migration scripts map LabRAD-style parameters, comments,
+  timestamps, and tags into Fricon records without Fricon depending on Data
+  Vault implementation details.
 - Provide a low-boilerplate append API that resembles `new` plus `add`, while
   recording richer Fricon semantics.
 - Replace LabRAD's implicit `get` cursor with explicit reader positions and
@@ -337,8 +340,11 @@ completed dataset facts silently.
 
 Imported datasets should record source identity, conversion notes, original
 paths or IDs, checksums when available, and any inferred or user-corrected
-schema. Full legacy LabRAD browsing is not a v0.2 requirement, but the model
-should not block later import tooling.
+schema. Fricon should provide generic APIs that let users write their own
+legacy import scripts, including scripts for LabRAD Data Vault data when they
+understand their lab's old storage. Fricon should not depend on LabRAD
+implementation details, ship a Data Vault parser, or promise direct legacy
+browsing as part of the v0.2 product.
 
 ## User Stories
 
@@ -424,16 +430,17 @@ Acceptance notes:
 
 ### Migrate A LabRAD Script
 
-As a lab user, I want to translate a Data Vault dataset declaration into Fricon
-with minimal conceptual change so that I can stop using Data Vault for new
-measurements without rewriting the whole experiment stack.
+As a lab user, I want to translate a new Data Vault-style dataset declaration
+into Fricon with minimal conceptual change so that I can stop using Data Vault
+for new measurements without rewriting the whole experiment stack.
 
 Acceptance notes:
 
 - LabRAD independent/dependent declarations map to Fricon variables.
 - LabRAD parameters map to typed measurement or dataset metadata.
 - LabRAD comments map to measurement timeline notes.
-- Legacy path and numbered dataset names can be recorded as aliases.
+- Source paths and numbered dataset names can be recorded as aliases when a
+  user script provides them.
 
 ### Watch Multiple Active Measurements
 
@@ -479,6 +486,7 @@ Acceptance notes:
 
 - Full LabRAD Data Vault compatibility server.
 - Full legacy LabRAD history browser.
+- Direct built-in import of old LabRAD Data Vault storage.
 - Publication-quality plotting or figure layout.
 - Generic dashboard builder.
 - Full HDF5/NeXus/Labber compatibility layer.

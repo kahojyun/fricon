@@ -248,6 +248,7 @@ Non-goals:
 - post-hoc scan guessing as the primary path for plotted measurement data
 - live preview/export/analysis consumers that can block acquisition writes
 - LabRAD Data Vault/Grapher compatibility layer for old scripts
+- direct built-in import of old LabRAD Data Vault storage
 - automatic calibration, managed analysis, or managed device communication in
   the first replacement slice
 - driver marketplace or regulated-lab compliance UX in the first replacement
