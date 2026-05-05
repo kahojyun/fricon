@@ -4,7 +4,6 @@ import type { Table } from "@tanstack/react-table";
 import { vi } from "vitest";
 import type { UseDatasetTableDataResult } from "../api/datasetTableShared";
 import type { DatasetInfo } from "../api/types";
-import type { DatasetColumnMeta } from "../model/datasetColumnMeta";
 import { DatasetTable } from "./DatasetTable";
 
 export { COLUMN_VISIBILITY_STORAGE_KEY } from "../model/useDatasetColumnVisibility";
@@ -138,7 +137,7 @@ export function createMockTable(
           meta: {
             label: column.label ?? column.id,
             hideable: column.hideable ?? true,
-          } as DatasetColumnMeta,
+          },
         },
         getIsVisible: () => column.visible ?? true,
       })),

@@ -62,19 +62,19 @@ describe("lineDataBounds", () => {
       aPosition: 0,
       seriesBuffers: [
         {
-          buffer: {} as WebGLBuffer,
+          buffer: {},
           count: 1,
           capacity: 2,
           values: new Float64Array([0, 0]),
         },
         {
-          buffer: {} as WebGLBuffer,
+          buffer: {},
           count: 1,
           capacity: 2,
           values: new Float64Array([1, 1]),
         },
         {
-          buffer: {} as WebGLBuffer,
+          buffer: {},
           count: 1,
           capacity: 2,
           values: new Float64Array([2, 2]),
@@ -159,19 +159,19 @@ describe("scatterDataBounds", () => {
       aPosition: 0,
       seriesBuffers: [
         {
-          buffer: {} as WebGLBuffer,
+          buffer: {},
           count: 1,
           capacity: 2,
           values: new Float64Array([0, 0]),
         },
         {
-          buffer: {} as WebGLBuffer,
+          buffer: {},
           count: 1,
           capacity: 2,
           values: new Float64Array([1, 1]),
         },
         {
-          buffer: {} as WebGLBuffer,
+          buffer: {},
           count: 1,
           capacity: 2,
           values: new Float64Array([2, 2]),

@@ -241,12 +241,11 @@ describe("scaleZoomStateAroundPoint", () => {
     const nowSpy = vi.spyOn(performance, "now").mockReturnValue(0);
     const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
     const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
-    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    globalThis.requestAnimationFrame = (callback: FrameRequestCallback) => {
       callback(250);
       return 1;
-    }) as typeof requestAnimationFrame;
-    globalThis.cancelAnimationFrame = (() =>
-      undefined) as typeof cancelAnimationFrame;
+    };
+    globalThis.cancelAnimationFrame = () => undefined;
 
     try {
       const controller = attachZoom(
