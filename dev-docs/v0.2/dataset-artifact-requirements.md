@@ -48,11 +48,12 @@ For v0.2, a dataset artifact should answer these questions clearly:
 - Is the data still being written, finished, interrupted, or aborted?
 - What variables exist, what are their labels and units, and which variables
   are axes, measured values, monitors, fixed values, or system fields?
-- Which live table or plot views should open by default?
+- Which table or plot actions should the measurement console suggest by
+  default?
 - How do I slice a 1D or 2D plot without guessing column order?
 - How do I reopen the same facts from Python or a portable export?
-- What metadata came from LabRAD-style parameters, Fricon measurement context,
-  or later provenance records?
+- Which metadata belongs to the dataset itself, and which context is inherited
+  from the producing measurement or later provenance records?
 
 For v0.3+ and v0.4+, the same artifact model should leave room for:
 
@@ -72,9 +73,9 @@ For v0.3+ and v0.4+, the same artifact model should leave room for:
 - append state and completion state
 - typed variables and field metadata
 - append-only records or chunks
-- dataset-local scan schema and plot/display defaults
-- dataset-local lifecycle exceptions
-- external data references when a measured value is not stored inline
+- dataset-local scan schema and lightweight display hints
+- write/completion state and output-local exceptions
+- dataset-local references to external data when a later ADR allows them
 - direct Python/Desktop/export readability
 
 `DatasetArtifact` does not own broader measurement context:
@@ -105,8 +106,8 @@ Measurement starts
   -> writers append facts
   -> live consumers receive nonblocking updates
   -> Measurement finishes, interrupts, or aborts
-  -> DatasetArtifacts become immutable facts, except correction events and
-     derived artifacts
+  -> completed DatasetArtifacts become immutable facts
+  -> corrections or derived results are recorded as events or new artifacts
 ```
 
 Acceptance notes:
@@ -146,12 +147,12 @@ Required first-slice value kinds:
 Product direction for v0.2+:
 
 - ragged arrays and variable-length traces should be supported through declared
-  trace or array semantics or external asset references, not through ad hoc
-  JSON blobs
-- larger images, spectra, waveforms, and binary payloads may be represented as
-  external assets linked from rows, traces, or artifacts
+  trace or array semantics, not through ad hoc JSON blobs
 - arbitrary Python objects are not dataset values; users should serialize them
   as parameters, attachments, or external artifacts with clear type metadata
+- large images, spectra, waveforms, row-linked external arrays, and other
+  binary payload workflows are ADR-gated follow-up scope unless a concrete v0.2
+  measurement requires them
 
 Variable-length trace recording is a v0.2 product requirement. A common
 measurement may tune instrument settings such as VNA bandwidth, sweep range,
@@ -178,11 +179,10 @@ Each public variable should have:
 - human label
 - optional unit
 - value type and shape
-- role such as independent, dependent, coordinate, monitor, fixed, uncertainty,
-  display, or system
+- role such as axis/independent, measured/dependent, fixed/config,
+  monitor/readback, or system
 - per-dependent axis/dependency links
 - optional legend or handle for traces
-- optional source or instrument label
 - optional display hints
 
 Acceptance notes:
@@ -191,7 +191,10 @@ Acceptance notes:
 - Do not require every dependent value to depend on every sweep axis.
 - Standalone monitor or baseline values should remain first-class.
 - Duplicate or repeated points need a declared display policy, such as latest
-  by record ID, show all, average, or require user choice.
+  by record ID, show all, or require user choice.
+- Uncertainty columns, rich source metadata, and publication display roles are
+  future or measurement-specific extensions unless a concrete v0.2 workflow
+  proves they are needed.
 - The UI may guess a schema for scratch or imported unplotted data, but guessed
   schema is not the normal path for measurement data that users expect to plot.
 
@@ -203,7 +206,7 @@ Acceptance notes:
 
 - Dataset writes must not wait for chart rendering, preview transforms, export
   preparation, or analysis hooks.
-- Live readers should tail explicit stream positions, not hidden connection
+- Live readers should tail explicit append positions, not hidden connection
   cursors.
 - A live monitor can attach after a dataset starts and request the current
   summary plus later updates.
@@ -224,21 +227,23 @@ v0.2 chart scope:
 - table view
 - line and scatter plots
 - basic 2D heatmap or image view from tabular axes
-- simple trace display when rows contain fixed-shape arrays
+- simple trace inspection for declared fixed-shape or variable-length traces
 
 Acceptance notes:
 
 - Default x/y/color choices come from variable roles and dependencies.
 - Axis labels combine variable label and unit.
 - Plot titles should come from measurement title, dataset title, sample/session
-  context when available, and optional plot-spec title.
+  context when available, and lightweight display hints.
 - Multi-axis datasets need explicit slice controls for fixed axes.
 - The default slice should be predictable, such as latest value for unspecified
   axes, first value, or a declared preferred value.
 - Users should be able to switch dependent variables without rebuilding the
   entire measurement context.
-- Plot presets and saved views are v0.3+ product work, but v0.2 must not make
-  them impossible.
+- Stitching, averaging, resampling, best-trace selection, saved plot presets,
+  and rich saved views are analysis, chart, or future product work. v0.2 should
+  preserve enough facts and hints for those workflows without implementing them
+  as dataset requirements.
 
 ### LabRAD Migration Feel
 
@@ -271,8 +276,8 @@ Acceptance notes:
 - Python read APIs should expose semantic reads, not only raw Arrow files.
 - Users should be able to request a table, a dependent-with-axes view, or a
   grid-like view when the schema supports it.
-- Rectangular gridded data should export cleanly to xarray/NetCDF-style
-  structures.
+- Rectangular gridded data should have enough labels, units, and axis metadata
+  for later xarray/NetCDF-style interoperability.
 - Irregular or adaptive scans should remain readable as row or per-dependent
   data without forcing a fake grid.
 - CSV export is useful but lossy; product UX should pair it with a manifest or
@@ -317,12 +322,12 @@ Charts consume resolved dataset interpretation:
 - axis labels and units
 - duplicate policy
 - slice options
-- preferred plot specs
+- lightweight display hints
 - live append positions or historical read ranges
 
-Charts should not own dataset semantics. If a user changes a durable display
-default, that should be recorded as a dataset or measurement display setting,
-not hidden inside one frontend component.
+Charts should not own dataset semantics. User-selected chart presets, saved
+views, publication styling, stitching, averaging, and resampling should be chart
+or analysis outputs, not hidden mutations of dataset facts.
 
 ### Sample And Sample Session
 
@@ -431,7 +436,9 @@ LabRAD folder names.
 Acceptance notes:
 
 - The Python API can return a semantic table.
-- For gridded data, the API can return an xarray-like representation.
+- For gridded data, the API can return a grid-like representation with labels,
+  units, and axis metadata; direct xarray conversion is interoperability
+  follow-up unless a v0.2 ADR makes it explicit.
 - For irregular data, the API can return per-dependent arrays with axis values.
 - Labels, units, and metadata remain available.
 
@@ -488,6 +495,8 @@ Acceptance notes:
 - Derived artifacts link to their inputs.
 - Corrections, invalidations, and supersession are events or new artifacts, not
   silent edits.
+- Calibration-specific acceptance, rejection, and parameter-promotion state
+  belongs to calibration records, not dataset artifact requirements.
 
 ## v0.2 Non-Goals
 
@@ -499,6 +508,10 @@ Acceptance notes:
 - Full HDF5/NeXus/Labber compatibility layer.
 - User-facing multiple table or named stream containers inside one dataset
   artifact.
+- Row-linked external asset management for large binary values unless a v0.2
+  ADR proves a narrow need.
+- Saved plot preset, rich saved view, stitching, resampling, or aggregation
+  systems.
 - Visual sweep builder as the primary acquisition model.
 - Broad hardware driver framework.
 - Automatic notebook state capture.
@@ -512,9 +525,7 @@ These decisions should be confirmed before the dataset storage/API ADRs:
    fixed-shape arrays and variable-length traces, such as expected trace size,
    live-read latency, Python ergonomics, export fidelity, and external asset
    thresholds?
-2. Should durable plot specs be first-class in v0.2, or should v0.2 derive
-   default plots entirely from variable roles and save user plot presets later?
-3. Should lower-level standalone datasets remain a public Python happy path, or
+2. Should lower-level standalone datasets remain a public Python happy path, or
    should they be an advanced API beneath measurement-scoped examples?
-4. What is the minimum acceptable external asset support for v0.2: manifest
-   references only, local file attachments, or row-linked external arrays?
+3. What is the minimum artifact-level attachment or external-reference support
+   needed for v0.2, if any, before deferring row-linked external assets?
