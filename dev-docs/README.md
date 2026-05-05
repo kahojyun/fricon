@@ -16,26 +16,30 @@ Start here when orienting a new human or AI contributor:
 
 1. `project-intent.md`
 2. `roadmap.md`
-3. `maintenance-checklist.md`
-4. `pr-preflight-checklist.md`
-5. The topic-specific note for the area being changed
+3. `v0.2/README.md` and `v0.2/design.md` when working on the proposed v0.2
+   reset
+4. `maintenance-checklist.md`
+5. `pr-preflight-checklist.md`
+6. The topic-specific note for the area being changed
 
 For narrow tasks, prefer the task-specific starting points below over reading
 every canonical document.
 
 ## Agent Starting Points By Change Type
 
-| Change type                                 | Start here                               | Then read                                                                                         | Usually avoid                                                          |
-| ------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| SQLite schema visible through Python        | `database-schema-changes.md`             | `maintenance-checklist.md`, `release-and-versioning.md`, Diesel skill                             | Dataset semantic proposal files unless semantics are changing          |
-| Desktop UI action with Rust Tauri command   | `desktop-ui-feature-playbook.md`         | `architecture-guidelines.md`, `testing-strategy.md`, `release-and-versioning.md`, UI AGENTS files | React/shadcn skills unless touching those APIs                         |
-| Workspace format or metadata compatibility  | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Architecture background unless boundary design is unclear              |
-| Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Public docs unless behavior is user-visible                            |
-| Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
-| Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, `current-dataset-semantics.md`                                        | Implementation plan details unless landed behavior is being documented |
-| Parameter management product planning       | `parameter-management-design.md`         | `project-intent.md`, `roadmap.md`, `adr/README.md`                                                | Treating proposal content as current behavior                          |
-| Future concept capture                      | `future-concepts.md`                     | `project-intent.md`, `roadmap.md`                                                                 | Creating implementation issues before the concept is narrowed          |
-| Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
+| Change type                                 | Start here                               | Then read                                                                                                                        | Usually avoid                                                          |
+| ------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| SQLite schema visible through Python        | `database-schema-changes.md`             | `maintenance-checklist.md`, `release-and-versioning.md`, Diesel skill                                                            | Dataset semantic proposal files unless semantics are changing          |
+| Desktop UI action with Rust Tauri command   | `desktop-ui-feature-playbook.md`         | `architecture-guidelines.md`, `testing-strategy.md`, `release-and-versioning.md`, UI AGENTS files                                | React/shadcn skills unless touching those APIs                         |
+| Workspace format or metadata compatibility  | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`                                             | Architecture background unless boundary design is unclear              |
+| Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`                                             | Public docs unless behavior is user-visible                            |
+| Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                                                         | Public docs unless behavior is user-visible                            |
+| Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, `current-dataset-semantics.md`                                                                       | Implementation plan details unless landed behavior is being documented |
+| v0.2 product or architecture reset          | `v0.2/README.md`                         | `v0.2/design.md`, `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `adr/README.md`                                    | Treating v0.2 proposal content as current behavior                     |
+| Measurement-system foundation redesign      | `v0.2/design.md`                         | `project-intent.md`, `roadmap.md`, `current-dataset-semantics.md`, `v0.2/archive/README.md`, `adr/README.md`                     | Treating archived proposal content as active v0.2 guidance             |
+| Parameter management product planning       | `v0.2/design.md`                         | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `v0.2/future-concepts.md`, `v0.2/archive/README.md`, `adr/README.md` | Treating archived proposal content as active v0.2 guidance             |
+| Future concept capture                      | `v0.2/future-concepts.md`                | `v0.2/design.md`, `v0.2/product-direction.md`, `v0.2/technical-direction.md`                                                     | Creating implementation issues before the concept is narrowed          |
+| Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                                                    | Treating roadmap future concepts as current implementation facts       |
 
 ## Canonical Guidance
 
@@ -86,14 +90,12 @@ These files describe proposed or historical direction. Do not treat them as
 current implementation fact unless a current implementation note confirms that
 the behavior has landed.
 
-- `dataset-semantic-architecture-proposal.md` - historical dataset semantics
-  proposal, implementation snapshot, and remaining roadmap pressure
-- `experiment-run-and-runner-design.md` - proposed experiment run, generic
-  runner, retry/resume, resource lease, and dataset write provenance model
-- `future-concepts.md` - lightweight ledger for useful but not-yet-designed
-  experiment, workflow, device, calibration, and AI concepts
-- `parameter-management-design.md` - proposed long-term versioned parameter
-  registry direction for measurement and simulation workflows
+- `v0.2/` - canonical planning directory for the proposed v0.2 reset. It now
+  owns the active non-implemented proposal set. Start with `v0.2/design.md` for
+  the canonical synthesis, then use the supporting files for product stories,
+  technical details, future concepts, distribution surfaces, remote/auth
+  boundary, and rewrite strategy. Historical proposal inputs live under
+  `v0.2/archive/` and should not override the canonical v0.2 documents.
 
 ## Maintenance Rules
 

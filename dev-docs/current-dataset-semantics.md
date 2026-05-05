@@ -10,7 +10,7 @@ writer metadata, reader interpretation, or chart projection semantics change.
 This note describes the implemented dataset semantic model. Storage layout
 details live in `dev-docs/current-storage-notes.md`. Historical rationale and
 deferred design pressure live in
-`dev-docs/dataset-semantic-architecture-proposal.md`.
+`dev-docs/v0.2/archive/dataset-semantic-architecture-proposal.md`.
 
 ## Implemented Model
 

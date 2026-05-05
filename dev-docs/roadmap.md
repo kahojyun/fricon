@@ -27,48 +27,114 @@ Current implemented user-facing behavior is still centered on:
   interpretation
 - Python API, CLI, server process, and desktop dataset explorer surfaces
 
-Use `docs/concepts.md`, `docs/dataset.md`, and
-`dev-docs/current-storage-notes.md` as the source of truth for current behavior.
+Use `docs/concepts.md`, `docs/dataset.md`,
+`dev-docs/current-storage-notes.md`, and
+`dev-docs/current-dataset-semantics.md` as the source of truth for current
+behavior.
 This roadmap includes future product direction and should not be used as proof
-that experiment, parameter, workflow, device, provenance, AI automation, or
+that measurement, parameter, workflow, device, provenance, AI automation, or
 later semantic scan/chart authoring behavior has already landed.
 
-The existing dataset semantics proposal is the bridge between current dataset
-behavior and the next product phase:
+The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
 
-- `dataset-semantic-architecture-proposal.md` defines the broader direction.
-  The durable manifest and resolved interpretation foundation has landed; later
-  scan authoring, chart migration, and richer semantic workflows remain future
-  design guidance.
-- `parameter-management-design.md` defines proposed long-term parameter
-  registry direction after dataset semantics and minimal run records exist.
-  Treat it as future design guidance, not current implementation fact.
-- `future-concepts.md` preserves lightweight notes for experiment run,
-  workflow automation, calibration automation, device apply, and AI automation
-  concepts that are not yet ready for focused design proposals.
+- `v0.2/README.md` is the canonical entry point for v0.2 planning.
+- `v0.2/design.md` is the canonical v0.2 design synthesis. It defines the
+  clean reset model and explicitly separates the first shipped v0.2 slice from
+  reserved future concepts. The first slice is one local data library, optional
+  sample/session context, explicit measurements, table-shaped dataset
+  artifacts, scan schema for plotted data, notes/events, lifecycle flags,
+  honest code provenance, portable exports, backup/restore, and guided local
+  diagnostics. Analysis, simulation, calibration, managed code snapshots,
+  managed execution, and device communication are reserved future layers unless
+  an ADR narrows a minimal placeholder.
+- `v0.2/product-direction.md` repositions Fricon as a local lab data library
+  and automation foundation centered on samples, sessions, measurements,
+  dataset artifacts, parameter history, code provenance summaries, and calibration
+  history.
+- `v0.2/technical-direction.md` defines the proposed distribution surfaces,
+  data-library service model, Fricon Desktop shell direction, local-only v0.2
+  scope, future remote/auth boundary, and rewrite strategy.
+
+Active future concept note:
+
+- `v0.2/future-concepts.md` preserves lightweight notes for concepts that are
+  not yet ready for focused design proposals. Some entries, such as measurement
+  records and sample identity, are now partially promoted into v0.2; treat the
+  remaining runner, workflow automation, calibration automation, device apply,
+  and AI automation parts as future.
+
+Archived pre-adoption proposal notes remain historical background behind the
+v0.2 reset. Use them for rationale and edge cases only; do not treat them as
+active scope, sequencing, or naming guidance when they conflict with
+`v0.2/design.md`, `v0.2/product-direction.md`, or
+`v0.2/technical-direction.md`:
+
+- `v0.2/archive/measurement-system-foundation-redesign.md` preserves an older
+  redesign proposal for dataset artifacts, run-like producer/consumer
+  provenance, and future calibration foundations.
+- `v0.2/archive/experiment-run-and-runner-design.md` preserves an older runner
+  and retry/resume proposal. Treat it as background input for a future rewritten
+  runner design, not as active v0.2 implementation guidance.
+- `v0.2/archive/dataset-semantic-architecture-proposal.md` preserves historical
+  dataset semantic rationale and remaining roadmap pressure. The v0.1
+  implementation contract lives in `current-dataset-semantics.md`; treat the
+  archived proposal as reference only.
+- `v0.2/archive/parameter-management-design.md` preserves an older long-term
+  parameter registry proposal. Treat it as background input for a future
+  rewritten parameter design, not as active v0.2 implementation guidance.
 
 When implementation lands, update the current implementation notes and public
 docs before treating proposal content as current behavior.
 
 ## Product Route
 
-The current route is dataset-first, Python-led, and local-first.
+The product route is the v0.2 measurement-library reset: Python-led,
+local-first, and measurement-centered.
 
-Fricon should first become reliable for recording, organizing, and inspecting
-scientific measurement datasets. Experiment, parameter, and device concepts
-should build on that foundation instead of forcing the dataset layer to absorb
-higher-level workflow meaning implicitly.
+The current implementation is still workspace/dataset-first. Treat that as
+implementation baseline only. New product and architecture work should point
+toward the v0.2 reset unless it is explicitly maintaining current behavior.
 
-Initial experiment support should lean on Python scripts as the execution
-entry point. The desktop UI should inspect, browse, and eventually assist those
-workflows, but it should not become the primary experiment execution engine
+v0.2 should replace the old simple logger for new measurement work by recording
+measurements and produced datasets together. Dataset semantics are still
+foundational, but the v0.1 semantics work is now a current baseline rather than
+the next product-development focus. New work should concentrate on the v0.2
+measurement reset, using explicit scan schema, column metadata, and chart
+interpretation to make live and historical measurement browsing reliable.
+
+Datasets remain first-class artifacts, while samples, sample sessions,
+measurements, optional parameter snapshots, code provenance summaries,
+favorites, optional notes/tags, lifecycle flags, exports, and audit events get
+explicit boundaries. `Experiment` can remain an informal scientific term or a
+future grouping/template concept, but v0.2 should prefer `Measurement` as the
+user-facing acquisition record.
+
+v0.2 is local-only. Fricon Desktop, the CLI, and the Python SDK should talk to
+one local service that owns one local data library. Remote mode,
+browser-served UI, and PWA-like access are future product surfaces that should
+shape the service/API boundary, but they are not shipped v0.2 requirements.
+
+The ordinary v0.2 model is one primary local data library per machine. Windows
+is the first-class lab-computer target; macOS remains supported for development
+and normal local use.
+
+Multi-computer labs should share measurement code and reusable setup assets
+without sharing the active data library. v0.2 should record honest code
+provenance levels for measurements. Later slices can add experimenter-friendly
+"set up this computer" and "update approved lab code" workflows on top of
+Gitea, GitLab, GitHub, bare Git mirrors, read-only network mirrors, or package
+caches without requiring Fricon itself to become a central server.
+
+Initial measurement support should lean on Python scripts as the execution
+entry point. Fricon Desktop should inspect, browse, and eventually assist those
+workflows, but it should not become the primary measurement execution engine
 before the Python-led model is clear.
 
 Device management remains a later foundation. Near-term work may preserve space
 for device identity and configuration, but should not build a broad driver or
 hardware orchestration framework.
 
-Workflow definitions are a later layer above individual experiments. They may
+Workflow definitions are a later layer above individual measurements. They may
 eventually coordinate repeated runs, scheduled calibration, optimization, and
 benchmark tasks, but should build on run records, parameter snapshots, and
 provenance first.
@@ -80,30 +146,211 @@ user review and durable audit records.
 
 ## Product Pillars
 
-- Workspace and dataset management
+- Data-library, optional sample/session context, and artifact management
 - Dataset semantics and durable interpretation
 - Desktop dataset browsing, inspection, and charting
 - Python scripting API for data recording and automation
-- Python-led experiment and parameter workflows
-- Reproducibility support for experiment code and environments
+- Python-led measurement and parameter workflows
+- Reproducibility support for measurement code and environments
+- Repeatable lab-computer setup and measurement-code source provenance
 - Traceability across runs, datasets, parameters, code, and environments
 - Workflow definitions and scheduled automation
 - AI-assisted automation with explicit review and auditability
 - Later device identity and configuration foundations
 
+## v0.2 Replacement Target
+
+v0.2 should be able to replace a simple LabRAD Grapher/Data Vault style
+measurement logger for new measurement work.
+
+Replacement means a researcher can stop using the old simple logger for new
+measurements and use Fricon instead to:
+
+- record table-shaped measurement datasets from Python scripts or notebooks
+- run measurement scripts headlessly without opening Fricon Desktop first
+- select or create a lightweight sample and sample-session context when the
+  measured object matters, without blocking quick measurements when context is
+  not yet known
+- see newly produced datasets in Fricon Desktop without manual file handling
+- inspect live, recent, and historical measurements through table, line/scatter,
+  and basic 2D views
+- provide explicit scan schema for datasets intended for live or historical
+  plotting, including setpoint/independent, measured/dependent, fixed/config,
+  monitor/readback roles, and enough axis structure for slicing and display
+- keep live plotting, previews, export preparation, and future analysis hooks
+  from slowing or failing acquisition writes
+- use measurement display identity based on name/title, start time, and
+  sample/session label, with stable IDs as secondary technical references
+- record optional setup/method labels and basic clock/timing metadata without
+  building device management
+- record an honest code provenance level for each measurement. Non-managed
+  user-run Python may be `unmanaged` or user-supplied summary; future managed
+  runs can require a resolved immutable code snapshot before execution.
+- install and launch Fricon Desktop, the CLI, Python SDK, and local service as a
+  coherent Fricon release rather than assembling mismatched components manually
+- use the CLI primarily for setup, diagnostics, service control, and developer
+  workflows rather than as the normal experimenter workflow surface
+- install the local service as a bundled sidecar instead of requiring a
+  separate server install for ordinary local use
+- ask for the data-library location on first run and remember it
+- use basic backup/restore, trash/recover, and explicit migration checkpoints as
+  user-visible safety paths
+- update Fricon with clear compatibility checks for the data library and
+  local-service protocol
+- stage service/Desktop updates and apply them only when active measurements,
+  open writers, imports, exports, and migrations are idle
+- move public Fricon clients toward one HTTP/WebSocket service API with binary
+  dataset payload endpoints instead of separate UI and Python gRPC contracts
+- protect recorded data across v0.x with explicit migrations and
+  fail-before-write diagnostics, while allowing SDK, CLI, UI, and protocol APIs
+  to break when necessary
+- use explicit dataset semantics for column metadata, scan axes, chart defaults,
+  and live-view interpretation instead of relying on row-order heuristics
+- create an explicit but low-ceremony measurement record that groups produced
+  datasets
+- highlight new live measurements in Desktop without stealing focus or opening
+  windows automatically
+- reserve a general artifact model so reports, logs, figures, attachments, and
+  future device snapshots do not have to masquerade as datasets
+- store measurement-level names, favorite or pin state, optional notes/tags,
+  lifecycle flags, and legacy JSON metadata on the run
+- keep dataset metadata focused on output-local semantics and per-output
+  exceptions
+- reopen produced datasets from Python using generated read snippets or stable
+  data-library identifiers
+- preserve interrupted partial data; reruns create new linked measurements by
+  default, while continuation requires explicit intent and compatibility checks
+- export measurements as read-only analysis packages with practical common
+  tabular files, a simple manifest/index preview, checksums, units, notes/events,
+  loader snippets, and direct Python/Desktop offline-viewer access
+- include light measurement attachments such as small files, images, or logs
+  without building a full artifact management UI
+
+v0.2 replacement does not require:
+
+- importing or fully browsing legacy LabRAD/Data Vault history
+- a LabRAD Data Vault/Grapher compatibility layer for old scripts
+- multi-user LabRAD server semantics or hosted collaboration
+- desktop-first measurement execution
+- broad ordinary-user CLI workflows
+- a generic managed runner, queue, resource lease system, or workflow engine
+- a full parameter registry or device driver framework
+- post-hoc scan guessing as the primary path for plotted measurement data
+- Fricon-managed device communication
+- automatic calibration workflows
+- managed analysis records or analysis-run UI
+- driver marketplace or shared-driver ecosystem
+- regulated-lab compliance UX as a v0.2 product goal
+- automatic Git, `uv`, or `pixi` environment management
+- a full measurement-code sync system, Git GUI, hosted code service, or
+  central Fricon server for distributing code
+- running active measurement code directly from a shared network folder as the
+  primary workflow
+- a long-term third-party client protocol stability promise
+- a complex auto-update system before the first replacement workflow is proven
+- remote mode, browser-served UI, or PWA distribution as shipped v0.2 features
+- remote annotations or remote acquisition writes
+- Labber-like visual sweep builder as a product goal
+- opening the same database-backed data library directly from multiple
+  computers through a shared folder
+
+## Primary User Mental Model
+
+v0.2 should optimize the user-facing product around interactive measurement
+records:
+
+```text
+interactive measurement -> produced datasets -> inspection, export, and analysis
+```
+
+For measurement work, examples and desktop navigation may become run-first once
+the run API exists. The dataset remains a first-class artifact with stable
+identity, dataset-local semantics, and direct Python access.
+
+Do not model datasets as owned exclusively by measurements. A dataset may be:
+
+- produced by a measurement
+- produced by a future analysis, import, simulation, or calibration activity
+- consumed by later analysis or calibration work
+- temporarily unassigned when created through lower-level dataset-only APIs
+
+This keeps the v0.2 LabRAD-style workflow simple while leaving room for later
+provenance graph where activity records consume and produce datasets, artifacts,
+analysis results, and parameter proposals.
+
+## v0.3/v0.4 Candidate Direction
+
+After v0.2 proves the core measurement loop, v0.3 and v0.4 should add product
+help in small slices rather than reopening the foundation each time.
+
+The leading v0.3 candidate is read-only LAN viewing from another computer,
+because it preserves the single-owner data-library model while covering an
+existing LabRAD Grapher usage pattern.
+
+Likely v0.3 candidates:
+
+- read-only LAN viewing from another computer through the service API
+- richer sample fields and 2D sample maps
+- attach/correct context UX polish
+- comparison and saved-view workflows
+- lightweight measurement templates for repeated names, scan schemas, and
+  display defaults
+- portable export viewer polish
+- passive setup/device snapshots with software, firmware, driver, method, and
+  calibration-state summaries
+- compare-what-changed views across sample, setup/method labels, parameters,
+  code, operator, calibration state, and produced data
+- rerun-from-artifact workflow seeded by a previous measurement's scan schema,
+  labels, code/method summary, and display defaults
+- smoother installer/update polish after the v0.2 release shape is proven
+- offline/silent installer, side-by-side versions, and rollback support for
+  locked-down Windows lab PCs
+- code provenance/environment summary improvements
+- guided "set up this computer" onboarding that installs or checks Fricon,
+  selects a local data library, connects to the lab measurement-code source,
+  prepares the Python environment, selects a setup profile, and runs diagnostics
+- measurement-code source manager for approved releases/tags, simple update
+  flows, local-change warnings, and change summaries aimed at users who do not
+  want to operate Git directly
+- support for Gitea/Git remotes, bare mirrors, read-only network mirrors, or
+  package caches as code/install distribution aids, while keeping execution in
+  a local checkout and data in the local data library
+- better lifecycle/favorite filtering
+- richer search by setup, operator, parameter, method/config, instrument label,
+  and calibration state
+
+Likely v0.4 candidates:
+
+- parameter snapshot/proposal UI
+- analysis provenance UI
+- calibration workflow history
+- managed measurement plans for repeated scans
+- managed code snapshots, execution worktrees, and script-run provenance for
+  runner-owned execution
+- early device adapter and readback boundaries
+
+These are candidate directions, not release commitments. Convert them into
+focused issues or ADRs after the v0.2 replacement slice is usable.
+
 ## Now
 
-Current work should favor:
+Current work should favor the v0.2 reset:
 
-- stabilizing the local-first workspace and dataset experience
-- landing the minimal durable dataset semantic model
-- keeping dataset semantics separate from higher-level run, workflow, parameter,
-  device, and AI concepts until those concepts have their own model boundaries
+- replacing the public workspace mental model with one local data library
+- landing minimal measurement records that group produced datasets
+- landing explicit scan schema and dataset semantics needed for reliable live
+  and historical plotting
+- keeping table-shaped dataset artifacts directly reopenable from Python
+- adding optional sample/session context with attach-later correction
+- adding honest code provenance levels without claiming verified code history
+  for non-managed Python
+- adding measurement-centered export, backup/restore, trash/recover, and guided
+  local diagnostics
 - keeping Python API and desktop UI behavior coherent as user-facing contracts
 - preserving clear vertical slice boundaries across Rust, Python bindings, and
   the frontend
-- keeping current implementation notes accurate when storage, IPC, or workspace
-  behavior changes
+- keeping current implementation notes accurate when storage, IPC, or
+  data-library behavior changes
 
 Start with:
 
@@ -115,26 +362,30 @@ Start with:
 
 ## Next
 
-Near-term direction should clarify and land the dataset semantic foundation,
-then add progressive column metadata, explicit scan semantics, and desktop UI
-consumption of resolved dataset interpretation instead of rediscovering chart
-meaning from row heuristics.
+Near-term direction should make the v0.2 replacement slice usable end to end,
+then add product assistance in small steps.
 
-Do this before building higher-level experiment, workflow, automation, or AI
-features. Those later features need explicit run and provenance models; they
-should not be smuggled into dataset naming conventions, incidental metadata, or
-chart-specific assumptions.
+Do not reintroduce the older sequencing where dataset semantics must be
+finished before any measurement model can land. The first slice needs both:
+minimal measurement records and enough explicit dataset semantics for plotted
+measurement data.
+
+After that slice works, add small v0.3/v0.4 improvements such as read-only LAN
+viewing, sample-map polish, compare views, code-source setup/update UX,
+parameter snapshot UI, analysis provenance, calibration history, and managed
+measurement plans.
 
 Relevant notes:
 
-- `dataset-semantic-architecture-proposal.md`
+- `current-dataset-semantics.md`
+- `v0.2/archive/dataset-semantic-architecture-proposal.md`
 - `database-schema-changes.md`
 - `release-and-versioning.md`
 
 ## Core Model Pressure
 
 These future concepts have enough model impact that early dataset, run,
-parameter, and workspace work should leave room for them. They are not all
+parameter, and data-library work should leave room for them. They are not all
 near-term implementation scope, but ignoring them may cause avoidable schema,
 API, or UI rewrites later.
 
@@ -149,33 +400,38 @@ API, or UI rewrites later.
   as much as the device or parameter set
 - dataset kind and lineage, including measured, imported, processed, and
   simulation datasets
-- workflow definition, workflow run, and experiment run as distinct concepts
+- a shared producer/consumer provenance pattern for future measurement,
+  analysis, import, simulation, calibration, and workflow runs
+- workflow definition, workflow run, and measurement/activity records as
+  distinct concepts
 - local automation safety and approval boundaries for scheduler, optimizer, and
   AI-assisted actions
 - event and audit log support for immutable records, corrections, manual
   overrides, failed automation, and AI-assisted changes
 
-## After Dataset Semantics
+## v0.3+ Product Direction
 
-After the dataset foundation is durable, product work should move toward:
+After the v0.2 replacement slice is durable, product work should move toward:
 
 - richer desktop inspection and charting workflows
 - dataset read snippets that help users reopen or reproduce analysis from
   Python
 - dataset preview, export, and plotting snippets for common Python workflows
-- lightweight run notes, tags, favorites, and quality flags
-- Python-led experiment run records
+- richer measurement filtering, comparison, favorite/pin, optional notes/tags,
+  lifecycle flags, and legacy metadata workflows
 - parameter snapshots, diffs, and display for recorded runs
-- a minimal model for connecting runs to datasets
-- basic run provenance links between datasets, parameters, code, environment,
-  and notes
+- analysis provenance UI
+- calibration workflow history
+- measurement-code source setup/update UX
+- managed code snapshots and script-run provenance after the runner boundary is
+  explicitly designed
 
-Relevant future design note:
+Archived background:
 
-- `experiment-run-and-runner-design.md`
-- `parameter-management-design.md`
+- `v0.2/archive/experiment-run-and-runner-design.md`
+- `v0.2/archive/parameter-management-design.md`
 
-This phase should avoid turning experiment support into a desktop-first
+This phase should avoid turning measurement support into a desktop-first
 workflow engine too early. Python scripts should remain the first-class way to
 run scientific measurement code.
 
@@ -185,8 +441,8 @@ These ideas are promising, but not current implementation commitments. Convert
 them into focused design notes, issues, or ADRs before implementation if the
 details affect storage, API contracts, or user workflows.
 
-Use `future-concepts.md` for lightweight notes that should be preserved but are
-too early for detailed design or issue planning.
+Use `v0.2/future-concepts.md` for lightweight notes that should be preserved
+but are too early for detailed design or issue planning.
 
 Parameter management may grow beyond static run metadata into:
 
@@ -195,24 +451,47 @@ Parameter management may grow beyond static run metadata into:
 - mutable refs or profiles that resolve to immutable snapshots before a run
 - parameter history views
 - plotting parameter values across runs or time
-- parameter versioning for experiment and numerical simulation configurations
+- parameter versioning for measurement and numerical simulation configurations
 - structured tree and table diffs with selected apply-to-draft workflows
 - analysis-driven parameter update proposals for calibration workflows
 - links between parameter versions, runs, and generated datasets
 
-Experiment code management may support local reproducibility features such as:
+Measurement code management may support local reproducibility features such as:
 
-- automatic history tracking for experiment code
-- Git-backed storage, possibly using a bare repository managed inside the
-  workspace
+- automatic history tracking for measurement code
+- shared measurement-code sources or lab code packages used across acquisition
+  computers
+- Git-backed storage, approved release tags, a self-hosted Git service such as
+  Gitea, or a read-only network mirror that Fricon can inspect without becoming
+  the lab's Git host
+- managed code snapshots resolved from a code source, cached in a local bare
+  mirror where useful, and expanded into temporary execution worktrees for
+  ScriptRuns
 - automatic environment capture or setup using tools such as `uv` or `pixi`
+- setup profiles, scan-schema helpers, measurement templates, plot presets,
+  calibration workflow definitions, driver/helper modules, and environment
+  lock files that can be reused across lab computers
+- experimenter-facing actions such as install approved code, update to latest
+  approved release, show what changed, check environment, open scripts folder,
+  and export local changes for review
 - clear links between a run, the code version, the environment, parameters, and
   produced datasets
+
+Measurement-code management should not make the active data library shared.
+Each acquisition computer should keep its own local data library, local code
+checkout, local environment, machine-specific setup overrides, tokens, secrets,
+and temporary notebook state.
 
 Dataset usability may include:
 
 - generated Python read snippets for each dataset
-- copyable examples for loading selected datasets by workspace-local ID or UID
+- copyable examples for loading selected datasets by data-library-local ID or
+  UID
+- measurement-centered portable export bundles for offline analysis on another
+  computer
+- direct Python APIs for opening exported bundles without creating or importing
+  into a local data library
+- a read-only desktop export viewer for exported measurement bundles
 - preview snippets for pandas, pyarrow, plotting, CSV export, and Parquet export
 - snippets that match the public Python API instead of exposing internal
   storage layout
@@ -223,14 +502,16 @@ Dataset usability may include:
 Scientific quality-of-life features may include:
 
 - run notes for manual observations and experimental context
-- sample or specimen records for experiments organized around a measured object,
+- sample or specimen records for measurements organized around a measured object,
   batch, preparation, condition, or source
-- quick tags, favorites, and filters for datasets, runs, and parameter sets
-- data quality flags such as good, suspect, failed, calibration, or test run
+- favorites, saved filters, and optional tags for datasets, runs, and
+  parameter sets
+- lifecycle flags such as incomplete, interrupted, calibration, test,
+  invalidated, or superseded
 - calibration records linked to runs, parameters, and device configuration
 - unit, label, precision, and display-scale metadata for parameters and dataset
   columns
-- template experiments that copy parameter structure, code entry points, and
+- template measurements that copy parameter structure, code entry points, and
   output dataset conventions from previous work
 
 Traceability and reproducibility may include:
@@ -238,8 +519,8 @@ Traceability and reproducibility may include:
 - a provenance graph from workflow to run, datasets, parameters, code version,
   environment, device configuration, notes, imports, and exports
 - immutable run records with later corrections recorded as appended events
-- a workspace event timeline for dataset, run, parameter, import, export, and
-  automation events
+- a data-library event timeline for dataset, run, parameter, import, export,
+  and automation events
 - parameter snapshots for each run and parameter diffs between runs
 - input lineage for derived datasets, including measured, processed,
   simulation, and imported dataset categories
@@ -249,18 +530,23 @@ Traceability and reproducibility may include:
   options
 - export provenance such as exported content, time, format, and destination
   summary
+- source data library UUID, display name, and optional source computer label in
+  exported measurement bundles
+- measurement-code source label, revision or tag, script entry point, and
+  environment summary in run provenance and exported measurement bundles when
+  available
 - checksums for dataset chunks, exported bundles, code snapshots, and
   environment lock files
-- human-readable audit summaries for selected runs or workspaces
+- human-readable audit summaries for selected runs or data libraries
 
 Workflow automation may include:
 
-- workflow definitions above individual experiments
+- workflow definitions above individual measurements
 - reusable workflow templates
 - workflow versioning and workflow run history
 - scheduled or periodic workflows
 - automatic parameter calibration and optimization
-- periodic instrument or experiment benchmarks
+- periodic instrument or measurement benchmarks
 - benchmark history and trend plots
 - optimization objectives, constraints, chosen parameter changes, and rollback
   context
@@ -283,10 +569,10 @@ AI-assisted automation may include:
 
 Longer-term product direction includes explicit concepts for:
 
-- UI-assisted experiment execution
+- UI-assisted measurement execution
 - richer parameter schemas and sweep definitions
 - parameter history and version comparison workflows
-- experiment code and environment history management
+- measurement code and environment history management
 - run provenance and audit reporting
 - workflow definitions and scheduled automation
 - automatic calibration, optimization, and benchmark workflows
@@ -320,6 +606,12 @@ explicitly:
 - account, team, role, or permission systems
 - distributed database semantics
 - web-first deployment as the primary experience
+- a central Fricon server required only to distribute measurement code
+- a full Git forge, Git teaching tool, or broad source-control client for
+  ordinary experimenter workflows
+- shared editable network folders as the primary way to run measurement code
+- direct multi-machine access to the same database-backed data library through
+  a shared folder
 
 ## Decision Pressure
 
@@ -328,11 +620,17 @@ be rediscovered or relitigated later. Good ADR candidates include:
 
 - workspace and storage format compatibility
 - dataset semantic model commitments
-- IPC or gRPC compatibility policy
+- distribution surfaces, installer/update policy, and release compatibility
+- service API transport and compatibility policy, including the HTTP/WebSocket
+  direction, binary dataset payload endpoints, and fail-before-write behavior
+  for locked lab environments when APIs or protocols break
 - Python API contract decisions
 - desktop/runtime architecture decisions
-- experiment, parameter, or device model foundations
-- experiment code history and environment management foundations
+- measurement, parameter, or device model foundations
+- measurement code history and environment management foundations
+- shared measurement-code source or lab code package model, including
+  new-computer setup and the boundary between Fricon-managed actions and
+  ordinary Git/environment tools
 - run provenance and immutability foundations
 - workflow definition and scheduler foundations
 - AI action, approval, and auditability foundations

@@ -2,11 +2,19 @@
 
 ## Status
 
-Proposed future product direction.
+Archived historical parameter-management proposal.
 
-This is not current behavior. Do not implement or document behavior from this
-proposal as user-facing functionality until the relevant dataset, run,
-provenance, storage, IPC, Python API, and desktop UI work has landed.
+This file is preserved for background reasoning only. It is not current
+behavior, active v0.2 guidance, or an implementation plan. Do not implement or
+document behavior from this proposal as user-facing functionality.
+
+Read `../README.md` and `../design.md` first. The canonical v0.2 documents
+override this archived proposal when terminology, scope, sequencing, or model
+boundaries differ.
+
+Canonical v0.2 naming now prefers `Measurement` for the public data-taking
+record. Historical experiment wording in this supporting proposal should be
+reconciled with that naming policy before any storage or API ADR.
 
 ## Purpose
 
@@ -14,7 +22,7 @@ Define a long-term parameter management direction for Fricon that fits the
 local-first, Python-led scientific workflow route.
 
 The proposed system is a versioned parameter registry for long-lived scientific
-experiment and numerical simulation parameters. It should help users answer:
+measurement and numerical simulation parameters. It should help users answer:
 
 - Which parameter state was used for this run?
 - Which mutable profile or ref did that state come from?
@@ -23,20 +31,26 @@ experiment and numerical simulation parameters. It should help users answer:
 - Which dataset, analysis step, or calibration proposal produced the change?
 - Which runs may be affected by an outdated or incorrect parameter value?
 
-The design should support measurement experiments, calibration workflows, and
+The design should support measurements, calibration workflows, and
 numerical simulation workflows without turning Fricon into a distributed version
 control system, a hardware driver framework, or a hosted lab information
 system.
 
 ## Classification
 
-Classification: `after dataset semantics`.
+Historical classification: `after dataset semantics`.
+
+This classification no longer defines v0.2 sequencing. The canonical v0.2 first
+engineering slice now pairs minimal measurement records with enough explicit
+dataset semantics for plotted measurement data. Parameter registry work remains
+future scope until a rewritten focused design narrows it.
 
 ADR need: create an ADR before implementation commits to the durable parameter
 model, storage shape, Python API contract, desktop UI semantics, or run
 provenance integration.
 
-This proposal depends on the current dataset-first route:
+This proposal depends on the current dataset-semantic baseline and the proposed
+v0.2 data-library reset:
 
 - dataset semantics should land before higher-level parameter behavior depends
   on datasets as provenance anchors
@@ -119,7 +133,7 @@ stay small, while integration and internal terms can be more precise.
 
 | Concept            | Meaning                                                                           |
 | ------------------ | --------------------------------------------------------------------------------- |
-| Parameter registry | Workspace-local store of parameter snapshots, refs, tags, drafts, and history.    |
+| Parameter registry | Data-library-local store of parameter snapshots, refs, tags, drafts, and history. |
 | Parameter snapshot | Immutable full parameter state plus schema at one point in history.               |
 | Profile / ref      | Mutable pointer to a snapshot, such as `main`, `dev`, or `cooldown/2026-04/main`. |
 | Tree section       | Optional nested parameter structure for sparse and irregular values.              |
@@ -149,7 +163,7 @@ control.
 | Concept              | Meaning                                                                    |
 | -------------------- | -------------------------------------------------------------------------- |
 | Parameter binding    | Result of resolving a profile/ref to an immutable snapshot ID and hash.    |
-| Run-local parameters | Inputs specific to one run, owned by the run or experiment system.         |
+| Run-local parameters | Inputs specific to one run, owned by the run or measurement system.        |
 | Runtime overrides    | Run-scoped temporary patch against a resolved parameter snapshot.          |
 | Effective run config | Run/execution-owned configuration derived from parameters and run inputs.  |
 | Parameter proposal   | Reviewable patch proposed by analysis, calibration, import, or automation. |
@@ -201,7 +215,7 @@ Measurement-oriented example:
 
 ```text
 tree:
-  experiment:
+  measurement:
     repetitions: 1000
     cooldown_s: 0.2
   devices:
@@ -555,14 +569,15 @@ status, or applied setpoints when future device integration exists.
 ## Analysis-Driven Updates
 
 Parameter updates should usually be proposed after data collection and analysis,
-not silently written by experiment scripts during execution.
+not silently written by measurement scripts during execution.
 
 Recommended flow:
 
 ```text
 old snapshot
-  -> run
-  -> dataset
+  -> measurement run
+  -> measured dataset
+  -> analysis run
   -> analysis result
   -> parameter update proposal
   -> draft
@@ -779,7 +794,7 @@ schema or migration operation, not an incidental display preference.
 ### Starting From Empty Or Rough Imports
 
 Users should not need to design a perfect schema before using the registry. A
-new workspace should be able to start from:
+new data library should be able to start from:
 
 ```text
 empty draft
@@ -793,7 +808,7 @@ The registry may infer initial dtypes and mark them as inferred. Users can
 later refine units, constraints, descriptions, lifecycle status, table keys,
 and display metadata through normal drafts and commits.
 
-This keeps the standalone parameter system useful before experiment execution,
+This keeps the standalone parameter system useful before measurement execution,
 device management, or workflow automation exists.
 
 ### Snapshot Usage In Runs
@@ -845,7 +860,7 @@ sample
 cooldown
 campaign
 temperature_regime
-experiment_type
+measurement_type
 simulation_model
 ```
 
@@ -944,6 +959,12 @@ parameter changes as patches. The registry should store the proposal, preserve
 its source links, apply it to a draft, validate it, and commit it only through
 an explicit mutation path.
 
+Analysis should be represented as a producer/consumer activity when that model
+exists: it consumes datasets, runs, parameter snapshots, or artifacts and
+produces analysis results, processed datasets, reports, or parameter proposals.
+Calibration workflows should depend on those analysis outputs rather than
+embedding analysis results inside the original measurement record.
+
 ```python
 proposal = params.create_proposal(
     base_snapshot=binding.snapshot_id,
@@ -971,20 +992,22 @@ params.update_ref(
 )
 ```
 
-### Minimal Experiment Convenience
+### Minimal Measurement Convenience
 
-Higher-level experiment helpers may offer a compact API, but it should still
+Higher-level measurement helpers may offer a compact API, but it should still
 resolve refs before execution and store the resulting parameter binding:
 
 ```python
-with experiment.run(parameter_ref="main") as run:
+lib = fricon.library()
+
+with lib.measurement("rabi", params="main") as meas:
     # Fricon resolves main -> immutable snapshot before execution.
     # The run record stores both the source ref and resolved snapshot.
     ...
 ```
 
 This is convenience over the run integration boundary, not an invitation for
-the parameter registry to own experiment execution.
+the parameter registry to own measurement execution.
 
 Typed Python helper generation is a useful later enhancement, not an MVP
 blocker. Helpers should bind to a schema snapshot and include runtime
@@ -994,7 +1017,7 @@ compatibility checks when following mutable refs.
 
 This proposal does not choose a storage implementation.
 
-A first implementation should optimize for correctness, history, diff,
+A first parameter implementation should optimize for correctness, history, diff,
 validation, and human review rather than high write throughput. SQLite-backed
 metadata and value tables may be sufficient for early parameter snapshots.
 
@@ -1002,15 +1025,15 @@ If table sections become very large, table snapshot payloads can later move to
 Arrow IPC or Parquet artifacts while relational metadata continues to own
 snapshot identity, refs, schema, keys, and history.
 
-Any implementation that changes workspace layout, SQLite schema, IPC contracts,
-Python API contracts, or desktop DTOs must follow the corresponding maintenance
-checklists.
+Any implementation that changes data-library layout, SQLite schema, IPC
+contracts, Python API contracts, or desktop DTOs must follow the corresponding
+maintenance checklists.
 
 ## Feature Shaping
 
 ### Feature 0: ADR And Product Boundary
 
-Classification: `after dataset semantics`.
+Historical classification: `after dataset semantics`.
 
 Scope:
 
@@ -1022,7 +1045,8 @@ Scope:
 
 ### Feature 1: Run-Linked Parameter Snapshot References
 
-Classification: `after dataset semantics`, after minimal run records exist.
+Historical classification: `after dataset semantics`, after minimal run records
+exist.
 
 Scope:
 
@@ -1098,7 +1122,8 @@ Scope:
 
 - Should the public term be `profile`, `ref`, or both with one treated as the
   Python/API spelling?
-- Should a workspace have one parameter registry or multiple named registries?
+- Should a data library have one parameter registry or multiple named
+  registries?
 - How much schema metadata belongs in the MVP: dtype only, or dtype, unit,
   nullable, constraints, description, and lifecycle status?
 - What should be available in the direct Python API versus the stricter
