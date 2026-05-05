@@ -2,18 +2,22 @@
 
 ## Status
 
-Future concept ledger.
+Supporting future concept ledger for the v0.2 reset.
 
 This is not current behavior, not a task plan, and not an implementation
 commitment. Use this file to preserve useful product and architecture context
 that is too early for focused proposals, ADRs, or GitHub issues.
 
+Read `README.md` and `design.md` first. This file is only a holding area for
+ideas that remain less narrowed than the canonical v0.2 design.
+
 ## Purpose
 
-Fricon has several future product areas that depend on the current
-dataset-first, Python-led route but are not ready for implementation design.
-This ledger keeps their boundaries visible so later dataset, run, parameter,
-workspace, and UI work can avoid decisions that would make those areas harder.
+Fricon has several future product areas that depend on the current dataset-first
+implementation baseline and the proposed v0.2 data-library reset,
+but are not ready for implementation design. This ledger keeps their boundaries
+visible so later dataset, measurement, parameter, data-library, and UI work can
+avoid decisions that would make those areas harder.
 
 Use this file for short notes only. When a concept becomes active product work,
 promote it into a focused design proposal, ADR, or issue plan.
@@ -62,32 +66,116 @@ Open questions:
 - ...
 ```
 
-## Experiment Run Model
+## Measurement Code Source And Lab Computer Setup
 
 Status: future concept, ADR needed later.
 
-Focused proposal:
+Why it matters:
 
-- `experiment-run-and-runner-design.md`
+- Many labs run several acquisition computers for different setups or groups.
+  Measurement code often gets copied between those computers, which makes
+  maintenance, provenance, and review difficult.
+- Fricon should help set up new computers, update shared measurement code, and
+  run managed measurements from immutable code snapshots without turning
+  ordinary experimenters into Git operators.
+- The solution should improve code reuse without requiring a central Fricon
+  server or a shared active data library.
+- A self-hosted Git service such as Gitea can be the lab's source of truth
+  without making Fricon itself the Git host.
+
+Boundary:
+
+- Owns the product model for a configured lab code source or package, approved
+  releases/tags, local checkout status, local bare mirrors/caches, immutable
+  code snapshots, execution worktrees, environment checks, setup profiles, and
+  code provenance recorded on measurements.
+- Does not own raw data storage, source-code hosting, branch review workflow,
+  secrets management beyond local references, or a full Git client.
+- Does not make network storage the active shared database-backed data library
+  or the primary editable measurement-code folder.
+- Does not claim verified code history for non-managed user-run Python unless a
+  managed snapshot or explicit user-supplied summary exists.
+
+Likely interfaces:
+
+- records a code provenance level on measurements, such as unmanaged,
+  user-supplied summary, or managed snapshot
+- records managed code snapshots with code label, entry point, source kind,
+  source label, revision/tag/commit/tree, dirty/hash state, submodule state,
+  and environment hints
+- exposes setup diagnostics in Fricon Desktop and CLI
+- may wrap Gitea, GitLab, GitHub, a bare Git repository, a read-only network
+  mirror, package cache, or lab release bundle
+- may install or update a local checkout and local Python environment through
+  the lab's chosen tools
+- may maintain a local bare mirror or cache and expand immutable snapshots into
+  temporary execution worktrees for managed ScriptRuns
+- links setup profiles, measurement templates, scan-schema helpers, plot
+  presets, export recipes, driver/helper modules, and future calibration
+  workflow definitions to lab computers
+- exports measurement bundles with code provenance and environment summaries
+  when available and safe to include
+
+Dependencies:
+
+- v0.2 measurement records and code provenance summaries
+- installation/update policy
+- Python environment compatibility and diagnostics
+- actor/audit boundary for mutating setup actions
+- clear local/remote/service ownership model
+- future ScriptRun, managed measurement, and runner boundaries
+
+Open questions:
+
+- Should the public concept be named Measurement Code Source, Lab Code Package,
+  or Setup Package?
+- Which assets should be versioned together, and which should stay local to a
+  machine or setup?
+- Should Fricon update code directly, call external Git/package tools, or only
+  diagnose and link to instructions?
+- Should Fricon create the local bare mirror itself, use a user-maintained
+  mirror, or support both?
+- What exact facts make a managed code snapshot reproducible enough for
+  calibration and rerun workflows?
+- Should non-managed measurements record only `unmanaged`, or allow
+  user-supplied labels and script paths with clear warnings?
+- How should dirty local changes be preserved or handed to a maintainer without
+  forcing ordinary users through branch and pull-request workflows?
+- What is the minimum offline installer or network-mirror story for locked-down
+  Windows lab PCs?
+
+## Measurement Record And Future Runner Model
+
+Status: partially promoted to v0.2 for minimal measurement records; future
+concept and ADR needed later for managed runner, task queue, resource leases,
+script-run provenance, retry/resume, and managed code snapshots.
+
+Archived background:
+
+- `archive/experiment-run-and-runner-design.md`
 
 Why it matters:
 
-- Fricon needs explicit run records before parameter snapshots, code versions,
-  environments, generated datasets, device state, and notes can be connected
+- Fricon needs explicit measurement records in v0.2 before parameter snapshots,
+  code provenance, generated datasets, device state, and notes can be connected
   coherently.
-- Run records are the natural bridge between Python scripts and later desktop
-  inspection, workflow automation, provenance, and AI assistance.
+- Measurement records are the natural bridge between Python scripts and later
+  desktop inspection, workflow automation, provenance, and AI assistance.
 - Runs should preserve reproducibility facts without making the desktop UI the
-  primary experiment execution engine too early.
+  primary measurement execution engine too early.
 - Code and environment tracking should be explicit run reproducibility context,
   not hidden side effects of dataset writes.
 
 Boundary:
 
-- Owns run identity, lifecycle state, source script or workflow entry point,
+- v0.2 owns measurement identity, lifecycle state, produced dataset links,
+  notes/events, optional sample/session context, optional parameter snapshot,
+  and honest code provenance level.
+- Future runner work owns source script or workflow entry point,
   run-local parameters, parameter bindings, runtime overrides, dataset links,
   effective configuration references, code and environment references, notes,
-  quality flags, and correction events.
+  lifecycle flags, correction events, task queue records, script-run records,
+  and managed code snapshots.
 - Does not own parameter history, dataset payload semantics, device driver
   implementation, analysis algorithms, workflow scheduling, or hosted
   repository/account behavior.
@@ -108,8 +196,8 @@ Dependencies:
 - minimal run storage model
 - parameter snapshot binding design before parameter-aware runs
 - provenance and correction-event policy before immutable run facts harden
-- clear policy for Git-backed storage before any workspace-managed repository
-  exists
+- clear policy for Git-backed storage before any managed code-source mirror or
+  code snapshot system exists
 - environment capture policy that does not make setup opaque
 
 Open questions:
@@ -128,7 +216,9 @@ Open questions:
 
 ## Sample Or Specimen Identity
 
-Status: future concept.
+Status: partially promoted to v0.2 for lightweight Sample and Sample Session;
+future concept for rich sample fields, sample maps, inventory-like behavior,
+and cross-session drift workflows.
 
 Why it matters:
 
@@ -148,7 +238,8 @@ Boundary:
 
 Likely interfaces:
 
-- run records may reference a sample or specimen
+- run records may reference a sample or specimen, either from explicit API
+  input, active sample/session context, or an attach-later correction
 - datasets may inherit sample context from a run
 - parameter snapshots or profiles may carry sample context without owning the
   sample record
@@ -163,11 +254,11 @@ Dependencies:
 Open questions:
 
 - What minimal sample fields should be first-class?
-- Should sample identity be workspace-local only?
+- Should sample identity be data-library-local only?
 - How should imported datasets with external sample identifiers be handled?
 - When is a sample concept unnecessary and a tag or note sufficient?
 
-## Dataset Provenance, Lineage, And Quality State
+## Dataset Provenance, Lineage, And Lifecycle State
 
 Status: future concept, ADR needed later.
 
@@ -177,19 +268,27 @@ Why it matters:
   and derived datasets when users compare results or trace conclusions.
 - Import and export operations should be explainable through source paths, file
   hashes, conversion options, destination summaries, and timestamps.
+- Measurement-centered export is a common analysis workflow: a researcher may
+  move one measurement bundle to another computer and open it directly without
+  creating or importing into another data library.
 - Dataset lineage should build on explicit dataset semantics and run records,
   not chart heuristics or file layout details.
-- Users need to mark datasets, runs, or outputs as good, suspect, failed,
-  calibration, test, invalidated, or superseded without rewriting measurement
-  facts.
-- Later automation and AI suggestions need explicit quality and invalidation
-  context.
+- Users need lifecycle/status and trust context such as partial, failed,
+  calibration/test, invalidated, or superseded without rewriting measurement
+  facts. Broad manual good/suspect labels should remain optional notes, tags, or
+  later custom states unless real workflows justify first-class fields.
+- Later automation and AI suggestions need explicit lifecycle, validation, and
+  invalidation context.
 
 Boundary:
 
 - Owns lineage links between datasets, runs, imports, exports, processing
-  steps, simulations, source metadata, quality flags, invalidation or
-  supersession records, correction links, review notes, and status summaries.
+  steps, simulations, source metadata, lifecycle/status flags, invalidation or
+  supersession records, correction links, review notes, and validation
+  summaries.
+- Owns producer/consumer provenance edges that connect concrete activity
+  records, such as measurement, analysis, import, simulation, and calibration
+  runs, to their input and output datasets or artifacts.
 - Does not own raw dataset payload layout, parameter registry history, or
   analysis algorithms.
 - Does not own Arrow payload facts, chart projection semantics, or parameter
@@ -198,37 +297,94 @@ Boundary:
 Likely interfaces:
 
 - dataset records expose kind and lineage references
-- import/export workflows record source, destination, conversion, and checksum
+- import/export workflows record source data library identity, destination,
+  conversion, original IDs, export UUIDs, format versions, and checksum
   summaries
+- portable measurement bundles can be opened through read-only Python APIs and a
+  dedicated GUI viewer without import
 - processed datasets link to input datasets and processing context
-- dataset and run views expose lineage, quality/status badges, filters, and
-  provenance summaries
+- analysis, import, simulation, and calibration activity records use shared
+  input/output provenance edges instead of forcing all datasets to be owned by
+  experiment runs
+- dataset and measurement views expose lineage, lifecycle/status badges,
+  filters, and provenance summaries
 - corrections and invalidations are recorded as events instead of silent edits
-- workflow and automation systems can consume quality state before promoting
-  results
+- workflow and automation systems can consume lifecycle and validation state
+  before promoting results
 
 Dependencies:
 
 - durable dataset semantics
 - import/export compatibility policy
-- experiment run model for measured datasets
+- measurement record model for measured datasets
 - analysis or processing records for derived datasets
-- workspace event or correction model
+- data-library event or correction model
 - UI conventions for flags, filters, and summaries
 
 Open questions:
 
 - Which dataset kinds should be first-class?
 - How much import/export provenance is needed for useful reproducibility?
-- Should simulation outputs use run records, processing records, or a distinct
-  simulation-run model?
 - How should lineage survive dataset archive export and import?
-- Which quality states apply to datasets, runs, or both?
+- What is the minimum portable measurement bundle that is useful for offline
+  analysis?
+- Which lifecycle or validation states apply to datasets, measurements, or
+  both?
 - Should invalidation block downstream use or only warn?
 - How should superseded datasets relate to processed replacements?
 - Which status changes require a reason, source, or audit event?
 
-## Workspace Event And Audit Timeline
+## Analysis Runs And Derived Results
+
+Status: future concept, ADR needed later.
+
+Why it matters:
+
+- Analysis often consumes measured datasets and produces processed datasets,
+  figures, metrics, reports, or parameter update proposals.
+- Derived results should be connected to the measurement that produced their
+  inputs without being stored as children inside the experiment run.
+- Automatic calibration needs a clean analysis record before it can explain why
+  a parameter proposal was created.
+
+Boundary:
+
+- Owns analysis identity, input links, output links, analysis parameters,
+  result summaries, lifecycle or validation state, and links to generated
+  datasets, artifacts, reports, or parameter proposals.
+- Does not own measurement execution, raw dataset semantics, parameter registry
+  commits, workflow scheduling, or device application.
+
+Likely interfaces:
+
+- consumes datasets, experiment runs, parameter snapshots, or artifacts through
+  shared input provenance edges
+- produces processed datasets, analysis results, figures, reports, metrics, or
+  parameter proposals through output provenance edges
+- records enough source context for reproducibility without becoming a generic
+  notebook-state capture system
+- feeds calibration, optimization, benchmark, report, and AI-assistance
+  workflows
+
+Dependencies:
+
+- durable dataset semantics
+- experiment run model
+- shared run input/output provenance edges
+- parameter proposal flow for analysis-driven updates
+- event or audit log model for accepted corrections or promoted results
+
+Open questions:
+
+- Which analysis outputs should be first-class versus generic artifacts?
+- Should simple ad hoc analysis from notebooks create `AnalysisRun` records, or
+  should users opt in explicitly?
+- How much code and environment summary is useful for analysis without turning
+  Fricon into a full notebook or Git history manager?
+- How should the desktop UI present downstream analyses from an experiment run?
+- Which analysis results may drive automatic calibration proposals?
+
+## Data Library Event And Audit Timeline
 
 Status: future concept, ADR needed later.
 
@@ -237,16 +393,16 @@ Why it matters:
 - Corrections, parameter proposals, automation actions, AI-assisted changes,
   imports, exports, run state transitions, and destructive operations all need
   durable audit context.
-- A workspace timeline can help users understand what changed without exposing
-  storage internals.
+- A data-library timeline can help users understand what changed without
+  exposing storage internals.
 - Event history is the preferred direction for correcting completed run facts
   instead of silent mutation.
 
 Boundary:
 
-- Owns append-only or event-like records for user-visible workspace mutations,
-  corrections, automation decisions, manual overrides, failed automation, and
-  AI-assisted changes.
+- Owns append-only or event-like records for user-visible data-library
+  mutations, corrections, automation decisions, manual overrides, failed
+  automation, and AI-assisted changes.
 - Does not own feature-specific business rules, dataset payload storage, or UI
   notification mechanics.
 
@@ -272,7 +428,8 @@ Open questions:
   summaries?
 - How should event records handle privacy-sensitive prompt, path, or note
   content?
-- What retention and export behavior is appropriate for local-first workspaces?
+- What retention and export behavior is appropriate for local-first data
+  libraries?
 
 ## Workflow And Calibration Automation
 
@@ -286,10 +443,27 @@ Why it matters:
   triggers, expected inputs, generated outputs, approval checkpoints, and
   failure records.
 - Calibration is an important workflow family that should connect old
-  parameters, runs, datasets, analysis results, proposed parameter changes,
-  validation, and promoted snapshots.
+  parameters, managed experiment runs, measured datasets, analysis runs,
+  analysis results, proposed parameter changes, validation, and promoted
+  snapshots.
 - Calibration should not silently mutate `main` or any recommended parameter
   profile during data collection.
+
+Clean automatic calibration should look like:
+
+```text
+CalibrationWorkflowDefinition
+  -> CalibrationWorkflowRun
+      -> ManagedMeasurement produces measured Dataset
+      -> AnalysisRun consumes measured Dataset
+      -> AnalysisRun produces AnalysisResult and ParameterProposal
+      -> ValidationResult checks proposal
+      -> Approval or policy gate promotes snapshot to ParameterRef
+```
+
+The calibration workflow coordinates the chain. It should not make measured
+datasets children of the calibration record, and it should not embed analysis
+results inside the original experiment run.
 
 Boundary:
 
@@ -305,9 +479,9 @@ Boundary:
 
 Likely interfaces:
 
-- creates experiment runs or run plans
+- creates managed measurement runs or run plans
 - consumes parameter profiles or bindings
-- receives analysis results and parameter proposals
+- creates or receives analysis runs, analysis results, and parameter proposals
 - creates parameter proposals against a base parameter snapshot
 - requests promotion of a validated parameter snapshot to a profile/ref
 - may request human approval before mutating parameters, workflows, or devices
@@ -317,6 +491,8 @@ Likely interfaces:
 Dependencies:
 
 - experiment run model
+- analysis run and derived-result model
+- shared run input/output provenance edges
 - parameter proposal flow
 - analysis result records
 - event or audit log model
@@ -351,9 +527,9 @@ Why it matters:
 
 Boundary:
 
-- Owns device identity, connection metadata, command planning, dry runs,
-  application ordering, safety checks, readback verification, partial failure
-  handling, and instrument snapshots.
+- Owns device identity, declared capabilities, adapter binding, connection
+  metadata, command planning, dry runs, application ordering, safety checks,
+  readback verification, partial failure handling, and instrument snapshots.
 - Does not own parameter snapshot history, parameter diff UI, dataset payload
   storage, or analysis algorithms.
 
@@ -361,6 +537,8 @@ Likely interfaces:
 
 - consumes parameter snapshots or effective run configs
 - produces device apply plans and instrument snapshots
+- exposes a minimal adapter boundary that can wrap LabRAD, direct Python
+  drivers, VISA, serial, vendor SDKs, or dummy devices
 - returns readback and failure information to run provenance
 - may expose device configuration snapshots for future provenance views
 
@@ -415,7 +593,7 @@ Dependencies:
 Open questions:
 
 - Which AI actions are suggestion-only?
-- Which AI actions may mutate workspace state after explicit approval?
+- Which AI actions may mutate data-library state after explicit approval?
 - What model/provider/version metadata should be recorded for
   reproducibility?
 - How much prompt or task context can be summarized without storing sensitive

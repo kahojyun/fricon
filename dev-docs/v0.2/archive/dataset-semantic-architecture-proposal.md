@@ -1,18 +1,26 @@
-# Dataset Semantics Architecture Proposal And Roadmap
+# Archived Dataset Semantics Architecture Proposal
 
 ## Status
 
-Historical proposal and roadmap.
+Historical background only.
+
+This file is archived reference material for the v0.1 dataset-semantics work.
+Do not extend it as active v0.2 guidance, and do not create implementation
+issues directly from it. Use `dev-docs/current-dataset-semantics.md` for the
+current implementation contract and the canonical v0.2 documents for future
+measurement-system design.
 
 The durable foundation decisions for `dataset_manifest.json`,
 `__ds_record_id`, the reserved `__ds_` prefix, v1 dtypes, plain Arrow storage,
 minimal axis inference, and the interpretation boundary are accepted in
 `dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`.
 
-The foundation and much of the progressive metadata and scan work have landed.
-Use `dev-docs/current-dataset-semantics.md` for current semantic behavior and
+The foundation and much of the progressive metadata and scan work have landed
+as the v0.1 dataset-semantics baseline. Use
+`dev-docs/current-dataset-semantics.md` for current semantic behavior and
 `dev-docs/current-storage-notes.md` for storage layout facts. This document
-remains useful for rationale, tradeoffs, and deferred design ideas.
+remains useful only for rationale, tradeoffs, and deferred design ideas that
+may be reconsidered during the v0.2 reset.
 
 ## Implementation Snapshot
 
@@ -34,9 +42,15 @@ remains useful for rationale, tradeoffs, and deferred design ideas.
 | Manifest-owned saved/default views                     | Deferred              |
 | Run, measurement, status, and invalidation semantics   | Deferred              |
 
-This note revises the earlier append-only dataset idea for the actual Fricon
-codebase and assumes the product is still pre-adoption, so breaking internal
-changes are acceptable when they produce a cleaner long-term architecture.
+Do not extend this proposal in place. Future dataset, artifact, scan, chart, or
+measurement semantics should be redesigned through the canonical v0.2 documents
+and ADR process. The broader v0.2 reset may revise the dataset artifact, run
+provenance, and breaking-change direction that this dataset-specific proposal
+assumed.
+
+This note originally revised the earlier append-only dataset idea for the actual
+Fricon codebase while the product was still pre-adoption. After v0.1, preserve
+that history here and make new breaking-change decisions through the v0.2 reset.
 
 ## Goal
 
@@ -908,7 +922,9 @@ the dataset does not need to claim a rectangular `planned_shape`.
 The original architecture was shaped as feature layers instead of one broad v1.
 That split is now mostly historical: Feature 1, Feature 2, and the core of
 Feature 3 have landed. Use `dev-docs/current-dataset-semantics.md` for the
-implemented contract.
+implemented contract. Treat the remaining feature notes as roadmap pressure that
+must be reconciled with the v0.2 measurement, parameter, provenance, workflow,
+AI, and device models before new durable contracts land.
 
 ### Landed Foundation
 
@@ -982,16 +998,19 @@ implement them:
 
 ## Worked Use Cases
 
-This section pressure-tests the proposal against the two most important API
-shapes:
+This section pressure-tests dataset-semantics behavior against two API shapes.
+These examples are not the canonical v0.2 measurement API; they explain the
+dataset-level semantics substrate. For the normal v0.2 user-facing path, wrap
+dataset writes in explicit measurement records as described in
+`dev-docs/v0.2/design.md`.
 
-- direct user scripting for simple experiments
+- direct user scripting for simple scratch or legacy dataset writes
 - fully wired execution through a higher-level experiment system
 
 The goal is to keep both paths clean without forcing the same amount of
 ceremony onto both.
 
-### Use Case 1: Direct Pythonic Scanning
+### Use Case 1: Dataset-Level Scratch Or Legacy Scanning
 
 Scenario:
 
@@ -1023,7 +1042,7 @@ with ws.dataset_manager.create("quick_iv_map") as ds:
 
 Desired behavior:
 
-- this remains valid and low-friction
+- this remains valid and low-friction for scratch or low-level dataset writes
 - the user is not required to declare scan axes, logical indices, or view
   definitions before the first row
 - Fricon still creates a semantic dataset, but it does so with conservative
@@ -1040,10 +1059,14 @@ Recommended internal behavior:
     - no durable logical index realization
     - minimal axis inference enabled
 4. Readers and charts may still use minimal axis inference for this dataset.
+   v0.2 measurement datasets intended for live or historical plotting should
+   provide scan schema at creation through the measurement-scoped API instead
+   of relying on this low-level fallback.
 
 Result:
 
-- the user gets the same "just start writing rows" experience as today
+- the user gets the same "just start writing rows" experience as today for
+  scratch or lower-level data capture
 - the dataset is still owned by the new architecture
 - no user-visible semantic burden is introduced for the simple path
 
