@@ -112,6 +112,13 @@ Measurement starts
 Acceptance notes:
 
 - A measurement may produce multiple datasets.
+- Dataset artifacts should be one user-facing logical data table or trace
+  collection in v0.2. If one measurement produces raw data indexed by
+  `(x, y, z)` and an aggregate indexed by `(x, y)`, those should normally be
+  separate dataset artifacts linked to the same measurement.
+- Do not expose multiple named tables or streams inside one dataset artifact as
+  a v0.2 product concept. A later storage/API ADR may still split payloads
+  internally if Arrow files, chunking, or external assets make that useful.
 - A dataset may be created without sample/session context when the measurement
   has none.
 - A dataset may be lower-level or scratch, but the normal public examples
@@ -142,7 +149,7 @@ Product direction for v0.2+:
   trace or array semantics or external asset references, not through ad hoc
   JSON blobs
 - larger images, spectra, waveforms, and binary payloads may be represented as
-  external assets linked from rows or streams
+  external assets linked from rows, traces, or artifacts
 - arbitrary Python objects are not dataset values; users should serialize them
   as parameters, attachments, or external artifacts with clear type metadata
 
@@ -311,7 +318,7 @@ Charts consume resolved dataset interpretation:
 - duplicate policy
 - slice options
 - preferred plot specs
-- live stream positions or historical read ranges
+- live append positions or historical read ranges
 
 Charts should not own dataset semantics. If a user changes a durable display
 default, that should be recorded as a dataset or measurement display setting,
@@ -490,6 +497,8 @@ Acceptance notes:
 - Publication-quality plotting or figure layout.
 - Generic dashboard builder.
 - Full HDF5/NeXus/Labber compatibility layer.
+- User-facing multiple table or named stream containers inside one dataset
+  artifact.
 - Visual sweep builder as the primary acquisition model.
 - Broad hardware driver framework.
 - Automatic notebook state capture.
@@ -503,12 +512,9 @@ These decisions should be confirmed before the dataset storage/API ADRs:
    fixed-shape arrays and variable-length traces, such as expected trace size,
    live-read latency, Python ergonomics, export fidelity, and external asset
    thresholds?
-2. Should v0.2 expose multiple named streams per dataset, such as `primary`,
-   `monitor`, and `baseline`, or keep one stream per dataset and model monitors
-   as separate datasets?
-3. Should durable plot specs be first-class in v0.2, or should v0.2 derive
+2. Should durable plot specs be first-class in v0.2, or should v0.2 derive
    default plots entirely from variable roles and save user plot presets later?
-4. Should lower-level standalone datasets remain a public Python happy path, or
+3. Should lower-level standalone datasets remain a public Python happy path, or
    should they be an advanced API beneath measurement-scoped examples?
-5. What is the minimum acceptable external asset support for v0.2: manifest
+4. What is the minimum acceptable external asset support for v0.2: manifest
    references only, local file attachments, or row-linked external arrays?
