@@ -514,6 +514,11 @@ The clean distinction is:
 This gives users familiar labels while keeping storage, lineage, and analysis
 code reusable.
 
+Focused product requirements for the v0.2 measurement workflow live in
+`measurement-requirements.md`. Use that note to narrow user-visible measurement
+behavior before writing durable storage, API, Desktop, export, or lifecycle
+ADRs.
+
 ## Artifact And Dataset Model
 
 An artifact is a durable output or input linked through provenance.
@@ -533,8 +538,8 @@ such as:
 
 A dataset is an artifact, not the whole measurement record.
 
-Focused product requirements and user stories for dataset artifacts live in
-`dataset-artifact-requirements.md`. Use that note to narrow user-visible
+Focused product requirements and scenario checks for dataset artifacts live in
+`dataset-artifact-requirements.md`. Use that note to narrow dataset-local
 behavior before writing durable storage, API, chart, or export ADRs.
 
 Dataset artifacts should have stable identity, table facts, dataset-local

@@ -65,6 +65,11 @@ It produced datasets.
 Fricon helps me inspect, annotate, recover, reopen, and export them.
 ```
 
+Focused product requirements for this loop live in
+`measurement-requirements.md`. Use that note to narrow user-visible
+measurement behavior before writing durable storage, API, Desktop, export, or
+lifecycle ADRs.
+
 ## v0.x Milestone Language
 
 Use v0.x milestone names in v0.2 planning docs. Avoid separate pre-1.0 release
@@ -106,11 +111,13 @@ Start here for v0.2 planning:
 
 1. `design.md` - canonical v0.2 product and architecture synthesis
 2. `product-direction.md` - supporting product stories and user pain
-3. `dataset-artifact-requirements.md` - focused product requirements and user
-   stories for the first concrete artifact type
-4. `technical-direction.md` - supporting engineering posture and API/runtime
+3. `measurement-requirements.md` - focused product requirements for the
+   central v0.2 measurement workflow
+4. `dataset-artifact-requirements.md` - focused product requirements and
+   scenario checks for the first concrete artifact type
+5. `technical-direction.md` - supporting engineering posture and API/runtime
    direction
-5. `future-concepts.md` - active ledger for lower-confidence or less narrowed
+6. `future-concepts.md` - active ledger for lower-confidence or less narrowed
    ideas
 
 Use current implementation notes only to understand what must be replaced or

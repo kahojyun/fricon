@@ -215,6 +215,11 @@ Python SDK examples should create measurements explicitly but with little
 ceremony. Dataset writers should share the measurement lifecycle so users do
 not have to nest a separate writer context for every output dataset.
 
+Focused measurement product requirements live in
+`measurement-requirements.md`. Treat that note as the product-level source for
+the central measurement workflow before writing storage, API, Desktop, export,
+or lifecycle ADRs.
+
 ### Dataset Artifact
 
 A dataset is a data artifact produced or consumed by work. It can be measured,
@@ -223,9 +228,9 @@ processed, imported, or simulated.
 Datasets must remain directly openable from Python and Fricon Desktop, but they
 should not be the only organizing object.
 
-Focused dataset artifact product requirements and user stories live in
+Focused dataset artifact product requirements and scenario checks live in
 `dataset-artifact-requirements.md`. Treat that note as the product-level source
-for dataset behavior before writing storage, API, chart, or export ADRs.
+for dataset-local behavior before writing storage, API, chart, or export ADRs.
 
 Dataset contents should be appendable while their writer is active and
 immutable after the producing measurement finishes. Corrections should create

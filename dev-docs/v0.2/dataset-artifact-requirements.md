@@ -9,9 +9,9 @@ to align user stories, acceptance criteria, and product boundaries before
 writing ADRs for storage layout, manifest format, service APIs, Python SDK
 types, chart DTOs, live events, or portable exports.
 
-Read `README.md`, `design.md`, and `product-direction.md` first. This note
-narrows the dataset artifact slice inside that broader measurement-centered
-model.
+Read `README.md`, `design.md`, `product-direction.md`, and
+`measurement-requirements.md` first. This note narrows the dataset artifact
+slice inside that broader measurement-centered model.
 
 ## Product Thesis
 
@@ -358,9 +358,13 @@ understand their lab's old storage. Fricon should not depend on LabRAD
 implementation details, ship a Data Vault parser, or promise direct legacy
 browsing as part of the v0.2 product.
 
-## User Stories
+## Dataset Scenario Checks
 
-### Run And Watch A 1D Scan
+These scenarios are not separate product workflows. They are concrete checks
+that the dataset artifact model can support the measurement workflows owned by
+`measurement-requirements.md`.
+
+### 1D Scalar Or Trace Scan
 
 As an experimentalist migrating from Data Vault, I want to create a measurement
 dataset with one independent variable and one or more dependent traces so that I
@@ -373,7 +377,7 @@ Acceptance notes:
   legend.
 - If the script crashes, the partial line remains visible and marked partial.
 
-### Run And Slice A 2D Scan
+### 2D Scan
 
 As an experimentalist, I want to declare two scan axes and one measured value so
 that Fricon can show a live heatmap and let me inspect line cuts without
@@ -386,7 +390,7 @@ Acceptance notes:
 - Repeated points use a visible duplicate policy.
 - The user can switch between heatmap and x/y line cuts.
 
-### Record Mixed Outputs
+### Mixed Dependencies
 
 As an experimentalist, I want one measurement to produce multiple values with
 different dependencies so that I can record a primary signal, monitor channels,
@@ -398,7 +402,7 @@ Acceptance notes:
 - Monitor values can be shown in a table or small status plot.
 - Trace rows can be inspected without breaking the scalar plot.
 
-### Record Adaptive VNA Traces
+### Adaptive VNA Traces
 
 As an experimentalist measuring a cavity, I want to write multiple `(frequency,
 S21)` traces with different sweep ranges, bandwidths, and point counts so that
@@ -414,89 +418,6 @@ Acceptance notes:
 - Fricon does not require padding, resampling, or a shared grid at write time.
 - Later stitching, resampling, or best-trace selection creates analysis output
   or display interpretation, not silent mutation of the recorded trace facts.
-
-### Recover A Partial Measurement
-
-As an experimentalist, I want interrupted data to stay visible and readable so
-that I can decide whether to keep, rerun, export, or invalidate the run.
-
-Acceptance notes:
-
-- The measurement and dataset status explain the interruption.
-- Completed chunks remain readable.
-- Rerun creates a new linked measurement by default.
-- Notes or invalidation events can explain what happened.
-
-### Reopen Data From Python
-
-As an analyst, I want to load a dataset by stable ID, measurement title, or
-export bundle so that I can analyze data without depending on storage paths or
-LabRAD folder names.
-
-Acceptance notes:
-
-- The Python API can return a semantic table.
-- For gridded data, the API can return a grid-like representation with labels,
-  units, and axis metadata; direct xarray conversion is interoperability
-  follow-up unless a v0.2 ADR makes it explicit.
-- For irregular data, the API can return per-dependent arrays with axis values.
-- Labels, units, and metadata remain available.
-
-### Migrate A LabRAD Script
-
-As a lab user, I want to translate a new Data Vault-style dataset declaration
-into Fricon with minimal conceptual change so that I can stop using Data Vault
-for new measurements without rewriting the whole experiment stack.
-
-Acceptance notes:
-
-- LabRAD independent/dependent declarations map to Fricon variables.
-- LabRAD parameters map to typed measurement or dataset metadata.
-- LabRAD comments map to measurement timeline notes.
-- Source paths and numbered dataset names can be recorded as aliases when a
-  user script provides them.
-
-### Watch Multiple Active Measurements
-
-As a lab user, I want the desktop app to show multiple active datasets without
-blocking acquisition so that I can monitor long measurements while starting or
-checking another run.
-
-Acceptance notes:
-
-- The measurement console lists active datasets and statuses.
-- A user can detach data or plot windows.
-- If a plot falls behind, Fricon drops or coalesces preview updates instead of
-  slowing the writer.
-
-### Export For Offline Analysis
-
-As an analyst, I want to export a measurement with its datasets and metadata so
-that I can open it on another computer without setting up the original data
-library.
-
-Acceptance notes:
-
-- The export includes a readable manifest and checksums.
-- The export opens read-only in Python.
-- Convenience CSV or Parquet files do not replace the semantic manifest.
-- Sensitive local paths or provenance are previewed before export.
-
-### Build Future Calibration On Top
-
-As a future calibration workflow author, I want dataset artifacts to expose
-stable semantic variables and provenance links so that an analysis or
-calibration record can consume measured data and produce reviewed parameter
-proposals.
-
-Acceptance notes:
-
-- Completed dataset facts are immutable.
-- Derived artifacts link to their inputs.
-- Corrections, invalidations, and supersession are events or new artifacts, not
-  silent edits.
-- Calibration-specific acceptance, rejection, and parameter-promotion state
-  belongs to calibration records, not dataset artifact requirements.
 
 ## v0.2 Non-Goals
 
