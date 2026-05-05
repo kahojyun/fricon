@@ -369,33 +369,33 @@ v0.2 should not require:
 Suggested staged path:
 
 1. Foundation ADR
-   - Revisit the historical questions this note raised through the current ADR
-     process if dataset artifact identity or semantic manifest boundaries need
-     to change.
-   - Commit to dataset artifact identity, dataset fact invariants, semantic
-     manifest boundaries, and provenance edge direction.
+    - Revisit the historical questions this note raised through the current ADR
+      process if dataset artifact identity or semantic manifest boundaries need
+      to change.
+    - Commit to dataset artifact identity, dataset fact invariants, semantic
+      manifest boundaries, and provenance edge direction.
 
 2. Dataset artifact and semantics foundation
-   - Implement new dataset identity/lifecycle shape.
-   - Implement durable record IDs, manifests, and resolved interpretation.
-   - Preserve low-friction Python writes.
+    - Implement new dataset identity/lifecycle shape.
+    - Implement durable record IDs, manifests, and resolved interpretation.
+    - Preserve low-friction Python writes.
 
 3. Interactive measurement records
-   - Add explicit measurement context.
-   - Link produced datasets through provenance, not ownership.
-   - Keep dataset-only creation as unassigned.
+    - Add explicit measurement context.
+    - Link produced datasets through provenance, not ownership.
+    - Keep dataset-only creation as unassigned.
 
 4. Desktop v0.2 replacement flow
-   - Run-first measurement browsing.
-   - Dataset table/chart/detail views.
-   - Run notes/tags/lifecycle and output-specific dataset exceptions.
-   - Python read snippets.
+    - Run-first measurement browsing.
+    - Dataset table/chart/detail views.
+    - Run notes/tags/lifecycle and output-specific dataset exceptions.
+    - Python read snippets.
 
 5. Later derived-data foundation
-   - Add analysis/import/simulation run taxonomy only when needed.
-   - Add shared input/output provenance edges.
-   - Add parameter proposals and calibration workflow shape after the parameter
-     foundation exists.
+    - Add analysis/import/simulation run taxonomy only when needed.
+    - Add shared input/output provenance edges.
+    - Add parameter proposals and calibration workflow shape after the parameter
+      foundation exists.
 
 ## Open Questions
 

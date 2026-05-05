@@ -307,19 +307,19 @@ may attach domain meaning to tasks and script runs.
 
 ### Terms
 
-| Term                  | Meaning                                                                |
-| --------------------- | ---------------------------------------------------------------------- |
-| `ExperimentRun`       | One scientific experiment attempt.                                     |
-| `AnalysisRun`         | Future record for processing, fitting, summarizing, or deriving data.  |
-| `RunInput`            | Future provenance edge from a run to a consumed dataset, run, parameter snapshot, or artifact. |
-| `RunOutput`           | Future provenance edge from a run to a produced dataset, result, proposal, or artifact. |
+| Term                  | Meaning                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `ExperimentRun`       | One scientific experiment attempt.                                                              |
+| `AnalysisRun`         | Future record for processing, fitting, summarizing, or deriving data.                           |
+| `RunInput`            | Future provenance edge from a run to a consumed dataset, run, parameter snapshot, or artifact.  |
+| `RunOutput`           | Future provenance edge from a run to a produced dataset, result, proposal, or artifact.         |
 | `AnalysisResult`      | Future structured analysis outcome that may support reports, decisions, or parameter proposals. |
-| `TaskQueueEntry`      | One queued executable unit before it starts.                           |
-| `ScriptRun`           | One actual script execution attempt.                                   |
-| `Dataset`             | One data artifact with dataset-local semantics.                        |
-| `DatasetWriteSession` | One append contribution from a script run to a dataset.                |
-| `ResourceRequirement` | A declared need for a named local resource before execution can start. |
-| `ResourceLease`       | A granted shared or exclusive hold on a named local resource.          |
+| `TaskQueueEntry`      | One queued executable unit before it starts.                                                    |
+| `ScriptRun`           | One actual script execution attempt.                                                            |
+| `Dataset`             | One data artifact with dataset-local semantics.                                                 |
+| `DatasetWriteSession` | One append contribution from a script run to a dataset.                                         |
+| `ResourceRequirement` | A declared need for a named local resource before execution can start.                          |
+| `ResourceLease`       | A granted shared or exclusive hold on a named local resource.                                   |
 
 ## Identifier Rules
 

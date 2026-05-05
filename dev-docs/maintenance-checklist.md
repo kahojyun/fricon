@@ -142,16 +142,16 @@ pieces during migration.
 
 Decision guide:
 
-| Change                                                                                      | Version/capability decision                                        |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Add a backward-compatible optional response field and all current clients can ignore it     | Usually no bump; add tests for old/default handling where practical |
-| Add a new optional capability behind negotiation                                             | Add capability; usually no required-version bump                    |
-| Add a required request field or require clients to send new data                            | Bump or require a new capability                                    |
-| Remove, rename, renumber, or change the meaning/type of a public field                      | Bump                                                               |
-| Change protocol handshake, stream sequencing, status semantics, or error meaning            | Bump                                                               |
-| Change dataset binary payload framing, Arrow IPC expectations, or write-session sequencing  | Bump or require a new capability                                    |
-| Internal Rust struct refactor with no wire/protobuf/HTTP/semantic contract change           | No bump                                                            |
-| Tauri/Specta-only command shape change not used by the public service API                   | No service API bump; follow the Tauri/frontend binding checklist    |
+| Change                                                                                     | Version/capability decision                                         |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Add a backward-compatible optional response field and all current clients can ignore it    | Usually no bump; add tests for old/default handling where practical |
+| Add a new optional capability behind negotiation                                           | Add capability; usually no required-version bump                    |
+| Add a required request field or require clients to send new data                           | Bump or require a new capability                                    |
+| Remove, rename, renumber, or change the meaning/type of a public field                     | Bump                                                                |
+| Change protocol handshake, stream sequencing, status semantics, or error meaning           | Bump                                                                |
+| Change dataset binary payload framing, Arrow IPC expectations, or write-session sequencing | Bump or require a new capability                                    |
+| Internal Rust struct refactor with no wire/protobuf/HTTP/semantic contract change          | No bump                                                             |
+| Tauri/Specta-only command shape change not used by the public service API                  | No service API bump; follow the Tauri/frontend binding checklist    |
 
 Examples:
 
