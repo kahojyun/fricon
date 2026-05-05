@@ -58,7 +58,6 @@ relative to the repository root (`<project_root>`), not to this skill directory.
 
 ## Optional Alternatives
 
-- If the repository is managed with Jujutsu, `jj diff --name-only` can replace `git diff --name-only`.
 - If your environment uses nextest, `cargo nextest run` can replace `cargo test --workspace`.
 - If tools are missing locally, run `uv sync --all-groups` once instead of CI-style group-specific syncing.
 
