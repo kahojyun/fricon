@@ -556,10 +556,13 @@ missing, Fricon may generate a guessed schema for scratch or unplotted tables,
 but the guessed shape should not become the preferred path for measurement
 data that users expect to slice, plot, compare, or export reliably.
 
-The active dataset semantic proposal remains relevant for record IDs,
-append-only facts, manifests, and resolved interpretation. Before committing
-more durable dataset APIs or storage contracts, reconcile that work with this
-broader v0.2 data-library and provenance model.
+The landed v0.1 dataset semantics baseline remains relevant for record IDs,
+append-only facts, manifests, and resolved interpretation. Use
+`../current-dataset-semantics.md` for current behavior and
+`../dataset-semantic-architecture-proposal.md` for historical rationale and
+remaining roadmap pressure. Before committing more durable dataset APIs or
+storage contracts, reconcile that work with this broader v0.2 data-library and
+provenance model.
 
 ## Measurement-Scoped Writes
 

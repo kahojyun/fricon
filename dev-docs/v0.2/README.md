@@ -115,10 +115,13 @@ Use current implementation notes only to understand what must be replaced or
 adapted:
 
 - `../current-storage-notes.md`
+- `../current-dataset-semantics.md`
 
-Use active supporting and process notes for design or implementation context:
+Use supporting and process notes for design or implementation context:
 
-- `../dataset-semantic-architecture-proposal.md`
+- `../dataset-semantic-architecture-proposal.md` - historical dataset semantics
+  rationale and remaining roadmap pressure; current behavior is in
+  `../current-dataset-semantics.md`
 - `../database-schema-changes.md`
 - `../maintenance-checklist.md`
 
