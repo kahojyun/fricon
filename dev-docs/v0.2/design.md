@@ -530,6 +530,10 @@ such as:
 
 A dataset is an artifact, not the whole measurement record.
 
+Focused product requirements and user stories for dataset artifacts live in
+`dataset-artifact-requirements.md`. Use that note to narrow user-visible
+behavior before writing durable storage, API, chart, or export ADRs.
+
 Dataset artifacts should have stable identity, table facts, dataset-local
 semantics, and direct Python access. They should not own sample identity,
 measurement intent, parameter history, code state, or calibration decisions.

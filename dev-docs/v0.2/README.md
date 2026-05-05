@@ -106,9 +106,11 @@ Start here for v0.2 planning:
 
 1. `design.md` - canonical v0.2 product and architecture synthesis
 2. `product-direction.md` - supporting product stories and user pain
-3. `technical-direction.md` - supporting engineering posture and API/runtime
+3. `dataset-artifact-requirements.md` - focused product requirements and user
+   stories for the first concrete artifact type
+4. `technical-direction.md` - supporting engineering posture and API/runtime
    direction
-4. `future-concepts.md` - active ledger for lower-confidence or less narrowed
+5. `future-concepts.md` - active ledger for lower-confidence or less narrowed
    ideas
 
 Use current implementation notes only to understand what must be replaced or

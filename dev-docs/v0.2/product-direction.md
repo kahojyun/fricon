@@ -222,6 +222,10 @@ processed, imported, or simulated.
 Datasets must remain directly openable from Python and Fricon Desktop, but they
 should not be the only organizing object.
 
+Focused dataset artifact product requirements and user stories live in
+`dataset-artifact-requirements.md`. Treat that note as the product-level source
+for dataset behavior before writing storage, API, chart, or export ADRs.
+
 Dataset contents should be appendable while their writer is active and
 immutable after the producing measurement finishes. Corrections should create
 derived artifacts or correction records rather than silently editing completed
