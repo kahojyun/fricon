@@ -1,7 +1,6 @@
 import type { Column, ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown, Star, StarOff } from "lucide-react";
 import type { DatasetInfo, DatasetStatus } from "../api/types";
-import type { DatasetColumnMeta } from "../model/datasetColumnMeta";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Checkbox } from "@/shared/ui/checkbox";
@@ -73,7 +72,7 @@ export function createDatasetColumns({
       meta: {
         label: "Favorite",
         hideable: true,
-      } as DatasetColumnMeta,
+      },
       header: () => <span className="sr-only">Favorite</span>,
       cell: ({ row }) => {
         const dataset = row.original;
@@ -114,7 +113,7 @@ export function createDatasetColumns({
       meta: {
         label: "ID",
         hideable: true,
-      } as DatasetColumnMeta,
+      },
       header: ({ column }) => renderSortableHeader({ column, label: "ID" }),
       cell: ({ getValue }) => (
         <div className="font-medium tabular-nums">{getValue<number>()}</div>
@@ -127,7 +126,7 @@ export function createDatasetColumns({
       meta: {
         label: "Name",
         hideable: false,
-      } as DatasetColumnMeta,
+      },
       header: ({ column }) => renderSortableHeader({ column, label: "Name" }),
       cell: ({ getValue }) => {
         const name = getValue<string>();
@@ -149,7 +148,7 @@ export function createDatasetColumns({
       meta: {
         label: "Status",
         hideable: true,
-      } as DatasetColumnMeta,
+      },
       header: "Status",
       cell: ({ getValue }) => (
         <Badge variant={statusVariantMap[getValue<DatasetStatus>()]}>
@@ -166,7 +165,7 @@ export function createDatasetColumns({
         label: "Tags",
         hideable: true,
         defaultVisible: false,
-      } as DatasetColumnMeta,
+      },
       header: "Tags",
       cell: ({ getValue }) => {
         const tags = getValue<string[]>();
@@ -193,7 +192,7 @@ export function createDatasetColumns({
         label: "Created At",
         hideable: true,
         defaultVisible: false,
-      } as DatasetColumnMeta,
+      },
       header: ({ column }) =>
         renderSortableHeader({ column, label: "Created At" }),
       cell: ({ getValue }) => (

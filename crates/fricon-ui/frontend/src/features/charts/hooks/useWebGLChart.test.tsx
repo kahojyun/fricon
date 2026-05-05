@@ -243,12 +243,11 @@ describe("useWebGLChart", () => {
     originalRequestAnimationFrame = globalThis.requestAnimationFrame;
     originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
     vi.spyOn(performance, "now").mockReturnValue(0);
-    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    globalThis.requestAnimationFrame = (callback: FrameRequestCallback) => {
       callback(250);
       return 1;
-    }) as typeof requestAnimationFrame;
-    globalThis.cancelAnimationFrame = (() =>
-      undefined) as typeof cancelAnimationFrame;
+    };
+    globalThis.cancelAnimationFrame = () => undefined;
   });
 
   afterEach(() => {
@@ -525,10 +524,10 @@ describe("useWebGLChart", () => {
     fireEvent.wheel(svg, { clientX: 170, clientY: 90, deltaY: -240 });
 
     const queuedFrames: FrameRequestCallback[] = [];
-    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    globalThis.requestAnimationFrame = (callback: FrameRequestCallback) => {
       queuedFrames.push(callback);
       return queuedFrames.length;
-    }) as typeof requestAnimationFrame;
+    };
 
     fireEvent.dblClick(svg, { clientX: 170, clientY: 90 });
 
