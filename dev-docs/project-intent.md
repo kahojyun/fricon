@@ -71,10 +71,11 @@ work.
 
 Fricon should first become reliable for recording, organizing, inspecting, and
 exporting new measurement records and their table-shaped datasets. Dataset
-semantics still matter, but they are part of the v0.2 measurement foundation:
-explicit scan schema, column meaning, units, and chart interpretation should
-support measurement records instead of becoming a separate gate that postpones
-the measurement model.
+semantics still matter, but the v0.1 semantics baseline is now current
+implementation to preserve and build on, not a separate development track that
+should keep postponing the measurement model. In v0.2, explicit scan schema,
+column meaning, units, and chart interpretation should support measurement
+records.
 
 The first adoption milestone is the v0.2 replacement slice: replacing a simple
 LabRAD Grapher/Data Vault style measurement logger for new measurement work.

@@ -559,8 +559,8 @@ data that users expect to slice, plot, compare, or export reliably.
 The landed v0.1 dataset semantics baseline remains relevant for record IDs,
 append-only facts, manifests, and resolved interpretation. Use
 `../current-dataset-semantics.md` for current behavior and
-`../dataset-semantic-architecture-proposal.md` for historical rationale and
-remaining roadmap pressure. Before committing more durable dataset APIs or
+`archive/dataset-semantic-architecture-proposal.md` for historical rationale
+and remaining roadmap pressure. Before committing more durable dataset APIs or
 storage contracts, reconcile that work with this broader v0.2 data-library and
 provenance model.
 

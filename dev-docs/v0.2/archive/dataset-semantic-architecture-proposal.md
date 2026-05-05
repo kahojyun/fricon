@@ -1,18 +1,26 @@
-# Dataset Semantics Architecture Proposal And Roadmap
+# Archived Dataset Semantics Architecture Proposal
 
 ## Status
 
-Historical proposal and roadmap.
+Historical background only.
+
+This file is archived reference material for the v0.1 dataset-semantics work.
+Do not extend it as active v0.2 guidance, and do not create implementation
+issues directly from it. Use `dev-docs/current-dataset-semantics.md` for the
+current implementation contract and the canonical v0.2 documents for future
+measurement-system design.
 
 The durable foundation decisions for `dataset_manifest.json`,
 `__ds_record_id`, the reserved `__ds_` prefix, v1 dtypes, plain Arrow storage,
 minimal axis inference, and the interpretation boundary are accepted in
 `dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`.
 
-The foundation and much of the progressive metadata and scan work have landed.
-Use `dev-docs/current-dataset-semantics.md` for current semantic behavior and
+The foundation and much of the progressive metadata and scan work have landed
+as the v0.1 dataset-semantics baseline. Use
+`dev-docs/current-dataset-semantics.md` for current semantic behavior and
 `dev-docs/current-storage-notes.md` for storage layout facts. This document
-remains useful for rationale, tradeoffs, and deferred design ideas.
+remains useful only for rationale, tradeoffs, and deferred design ideas that
+may be reconsidered during the v0.2 reset.
 
 ## Implementation Snapshot
 
@@ -34,16 +42,15 @@ remains useful for rationale, tradeoffs, and deferred design ideas.
 | Manifest-owned saved/default views                     | Deferred              |
 | Run, measurement, status, and invalidation semantics   | Deferred              |
 
-Before extending this proposal further, read `dev-docs/v0.2/design.md`. The
-archived background note
-`dev-docs/v0.2/archive/measurement-system-foundation-redesign.md` preserves
-older rationale, but the broader v0.2 reset may revise the dataset artifact,
-run provenance, and breaking-change direction that this dataset-specific
-proposal assumes.
+Do not extend this proposal in place. Future dataset, artifact, scan, chart, or
+measurement semantics should be redesigned through the canonical v0.2 documents
+and ADR process. The broader v0.2 reset may revise the dataset artifact, run
+provenance, and breaking-change direction that this dataset-specific proposal
+assumed.
 
-This note revises the earlier append-only dataset idea for the actual Fricon
-codebase and assumes the product is still pre-adoption, so breaking internal
-changes are acceptable when they produce a cleaner long-term architecture.
+This note originally revised the earlier append-only dataset idea for the actual
+Fricon codebase while the product was still pre-adoption. After v0.1, preserve
+that history here and make new breaking-change decisions through the v0.2 reset.
 
 ## Goal
 

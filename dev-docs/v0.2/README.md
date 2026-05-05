@@ -119,15 +119,13 @@ adapted:
 
 Use supporting and process notes for design or implementation context:
 
-- `../dataset-semantic-architecture-proposal.md` - historical dataset semantics
-  rationale and remaining roadmap pressure; current behavior is in
-  `../current-dataset-semantics.md`
 - `../database-schema-changes.md`
 - `../maintenance-checklist.md`
 
 Use archived proposal inputs only for historical rationale or edge-case context:
 
 - `archive/README.md`
+- `archive/dataset-semantic-architecture-proposal.md`
 - `archive/measurement-system-foundation-redesign.md`
 - `archive/experiment-run-and-runner-design.md`
 - `archive/parameter-management-design.md`

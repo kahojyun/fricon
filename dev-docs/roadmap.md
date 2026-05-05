@@ -27,8 +27,10 @@ Current implemented user-facing behavior is still centered on:
   interpretation
 - Python API, CLI, server process, and desktop dataset explorer surfaces
 
-Use `docs/concepts.md`, `docs/dataset.md`, and
-`dev-docs/current-storage-notes.md` as the source of truth for current behavior.
+Use `docs/concepts.md`, `docs/dataset.md`,
+`dev-docs/current-storage-notes.md`, and
+`dev-docs/current-dataset-semantics.md` as the source of truth for current
+behavior.
 This roadmap includes future product direction and should not be used as proof
 that measurement, parameter, workflow, device, provenance, AI automation, or
 later semantic scan/chart authoring behavior has already landed.
@@ -53,14 +55,8 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
   data-library service model, Fricon Desktop shell direction, local-only v0.2
   scope, future remote/auth boundary, and rewrite strategy.
 
-Active supporting notes:
+Active future concept note:
 
-- `dataset-semantic-architecture-proposal.md` preserves the dataset semantic
-  direction, historical implementation rationale, and remaining roadmap
-  pressure. The durable manifest and resolved interpretation foundation has
-  landed; use `current-dataset-semantics.md` for current behavior, and reconcile
-  later scan authoring, chart migration, and richer semantic workflows with the
-  broader v0.2 reset before implementation.
 - `v0.2/future-concepts.md` preserves lightweight notes for concepts that are
   not yet ready for focused design proposals. Some entries, such as measurement
   records and sample identity, are now partially promoted into v0.2; treat the
@@ -79,6 +75,10 @@ active scope, sequencing, or naming guidance when they conflict with
 - `v0.2/archive/experiment-run-and-runner-design.md` preserves an older runner
   and retry/resume proposal. Treat it as background input for a future rewritten
   runner design, not as active v0.2 implementation guidance.
+- `v0.2/archive/dataset-semantic-architecture-proposal.md` preserves historical
+  dataset semantic rationale and remaining roadmap pressure. The v0.1
+  implementation contract lives in `current-dataset-semantics.md`; treat the
+  archived proposal as reference only.
 - `v0.2/archive/parameter-management-design.md` preserves an older long-term
   parameter registry proposal. Treat it as background input for a future
   rewritten parameter design, not as active v0.2 implementation guidance.
@@ -97,9 +97,10 @@ toward the v0.2 reset unless it is explicitly maintaining current behavior.
 
 v0.2 should replace the old simple logger for new measurement work by recording
 measurements and produced datasets together. Dataset semantics are still
-foundational, but they should be developed as part of the measurement slice:
-explicit scan schema, column metadata, and chart interpretation should make
-live and historical measurement browsing reliable.
+foundational, but the v0.1 semantics work is now a current baseline rather than
+the next product-development focus. New work should concentrate on the v0.2
+measurement reset, using explicit scan schema, column metadata, and chart
+interpretation to make live and historical measurement browsing reliable.
 
 Datasets remain first-class artifacts, while samples, sample sessions,
 measurements, optional parameter snapshots, code provenance summaries,
@@ -376,7 +377,8 @@ measurement plans.
 
 Relevant notes:
 
-- `dataset-semantic-architecture-proposal.md`
+- `current-dataset-semantics.md`
+- `v0.2/archive/dataset-semantic-architecture-proposal.md`
 - `database-schema-changes.md`
 - `release-and-versioning.md`
 

@@ -13,6 +13,7 @@ Read these files only when you need historical rationale or edge-case context:
 
 - `measurement-system-foundation-redesign.md`
 - `experiment-run-and-runner-design.md`
+- `dataset-semantic-architecture-proposal.md`
 - `parameter-management-design.md`
 
 For current v0.2 planning, use:

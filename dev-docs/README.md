@@ -36,7 +36,7 @@ every canonical document.
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
 | Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, `current-dataset-semantics.md`                                        | Implementation plan details unless landed behavior is being documented |
 | v0.2 product or architecture reset          | `v0.2/README.md`                         | `v0.2/design.md`, `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `adr/README.md`       | Treating v0.2 proposal content as current behavior                     |
-| Measurement-system foundation redesign      | `v0.2/design.md`                         | `project-intent.md`, `roadmap.md`, `dataset-semantic-architecture-proposal.md`, `v0.2/archive/README.md`, `adr/README.md` | Treating archived proposal content as active v0.2 guidance             |
+| Measurement-system foundation redesign      | `v0.2/design.md`                         | `project-intent.md`, `roadmap.md`, `current-dataset-semantics.md`, `v0.2/archive/README.md`, `adr/README.md`              | Treating archived proposal content as active v0.2 guidance             |
 | Parameter management product planning       | `v0.2/design.md`                         | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `v0.2/future-concepts.md`, `v0.2/archive/README.md`, `adr/README.md` | Treating archived proposal content as active v0.2 guidance             |
 | Future concept capture                      | `v0.2/future-concepts.md`                | `v0.2/design.md`, `v0.2/product-direction.md`, `v0.2/technical-direction.md`                       | Creating implementation issues before the concept is narrowed          |
 | Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                     | Treating roadmap future concepts as current implementation facts       |
@@ -96,11 +96,6 @@ the behavior has landed.
   technical details, future concepts, distribution surfaces, remote/auth
   boundary, and rewrite strategy. Historical proposal inputs live under
   `v0.2/archive/` and should not override the canonical v0.2 documents.
-- `dataset-semantic-architecture-proposal.md` - dataset-specific semantic
-  proposal, historical implementation rationale, and remaining roadmap pressure.
-  The implemented v0.1 contract lives in `current-dataset-semantics.md`; reconcile
-  future semantic work with the broader v0.2 direction before committing
-  additional durable APIs or storage contracts.
 
 ## Maintenance Rules
 
