@@ -415,6 +415,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#public-dataset-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public dataset contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#apache-arrow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -426,10 +437,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-are-datasets-stored" class="md-nav__link">
+  <a href="#how-datasets-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How are datasets stored?
+        How datasets work
       
     </span>
   </a>
@@ -464,17 +475,6 @@
     <span class="md-ellipsis">
       
         Supported trace variants
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future extensions
       
     </span>
   </a>
@@ -521,6 +521,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#public-dataset-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public dataset contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#apache-arrow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -532,10 +543,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-are-datasets-stored" class="md-nav__link">
+  <a href="#how-datasets-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How are datasets stored?
+        How datasets work
       
     </span>
   </a>
@@ -576,17 +587,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#future-extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future extensions
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -613,8 +613,26 @@
 
 
 <h1 id="dataset">Dataset</h1>
-<p><code>fricon</code> uses <a href="https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc">Arrow IPC format</a> to store datasets. A basic knowledge of Arrow
-data structures can be helpful to understand how <code>fricon</code> works.</p>
+<p><code>fricon</code> datasets are table-shaped data collections. A basic knowledge of Arrow
+data structures can be helpful because the Python API accepts Arrow-compatible
+values and exposes Arrow-style tables.</p>
+<h2 id="public-dataset-contract">Public dataset contract</h2>
+<p>Each dataset contains one table. The first written row defines the table schema.
+Later rows must use the same column names and compatible value types as that
+first row. Missing columns, extra columns, and different value kinds are not
+part of the supported write contract.</p>
+<p>Supported public write values are currently <code>float</code>, <code>int</code> values converted to
+<code>float</code>, <code>complex</code>, and trace values. <code>None</code> and nullable columns are not part
+of the current write contract.</p>
+<p>After writing at least one row, call <code>finish()</code> or <code>close()</code> to complete a
+dataset successfully. A writer used as a context manager calls <code>close()</code> when
+the block exits normally. Calling <code>abort()</code>, raising from the context manager
+block, or dropping a writer before successful completion marks the dataset as
+aborted. Finishing an empty writer does not create a completed dataset.</p>
+<p>Users do not currently declare dataset semantics, scan axes, or logical indices
+through the public API. The exact workspace file layout, internal metadata
+files, chunk file names, and write-buffer thresholds are implementation details
+rather than public storage contracts.</p>
 <h2 id="apache-arrow"><a href="https://arrow.apache.org/docs/index.html">Apache Arrow</a></h2>
 <p>You may be familiar with <a href="https://pandas.pydata.org/">pandas</a>, which is a
 widely-used data manipulation library in Python. Arrow is a similar library
@@ -634,19 +652,16 @@ classes in the python binding of Arrow:</p>
 <li><a class="autorefs autorefs-external" href="https://arrow.apache.org/docs/python/generated/pyarrow.Table.html#pyarrow.Table"><code>pyarrow.Table</code></a>: A helper type to unify representations of single and
   collection of record batches with the same schema.</li>
 </ul>
-<h2 id="how-are-datasets-stored">How are datasets stored?</h2>
-<p>A dataset is exactly one Arrow table stored in <a href="https://arrow.apache.org/docs/format/Columnar.html#serialization-and-interprocess-communication-ipc">Arrow IPC format</a>. When a dataset
-is created, the schema of the table is automatically inferred from the first row
-of data written. This allows for flexible data collection without requiring
-manual schema definition.</p>
+<h2 id="how-datasets-work">How datasets work</h2>
+<p>When a dataset is created, the table schema is automatically inferred from the
+first row of data written. This allows for flexible data collection without
+requiring manual schema definition.</p>
 <h2 id="write-batching">Write batching</h2>
-<p>Dataset writes are buffered on the client and flushed automatically when either
-16 rows have accumulated or 1 second has elapsed since the first buffered row.
-This keeps the write API row-oriented while reducing transport overhead for
-larger ingests. Calling <code>finish()</code>, <code>abort()</code>, or dropping the writer will flush
-any pending rows before the dataset stream is finalized.</p>
+<p>Dataset writes are buffered automatically. This keeps the write API row-oriented
+while reducing transport overhead for larger ingests. The exact buffering
+thresholds are implementation details.</p>
 <h2 id="type-inference">Type inference</h2>
-<p><code>fricon</code> MVP currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:</p>
+<p><code>fricon</code> currently supports a focused set of data types optimized for scientific measurements and signal processing. The following table lists the supported types:</p>
 <table>
 <thead>
 <tr>
@@ -662,6 +677,11 @@ any pending rows before the dataset stream is finalized.</p>
 <td>64-bit floating point numbers</td>
 </tr>
 <tr>
+<td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int"><code>int</code></a></td>
+<td><code>Float64</code></td>
+<td>Converted to 64-bit floating point numbers</td>
+</tr>
+<tr>
 <td><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#complex"><code>complex</code></a></td>
 <td><code>Complex128</code></td>
 <td>128-bit complex numbers (real + imaginary)</td>
@@ -669,23 +689,28 @@ any pending rows before the dataset stream is finalized.</p>
 <tr>
 <td><a class="autorefs autorefs-internal" title="            Trace" href="../api/#fricon.Trace"><code>fricon.Trace</code></a></td>
 <td><code>Trace</code></td>
-<td>Time series data with various x-axis formats</td>
+<td>Time series data with explicit x-axis values</td>
+</tr>
+<tr>
+<td>list, NumPy, Arrow array</td>
+<td><code>Trace</code></td>
+<td>Simple trace with implicit integer x indices</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p><strong>Note</strong>: The MVP version intentionally limits type support to float and complex types for simplicity. Additional types (bool, int, str) will be supported in future releases.</p>
+<p><strong>Note</strong>: The current release intentionally stores scalar columns as float or complex values.</p>
 </blockquote>
 <h3 id="supported-trace-variants">Supported trace variants</h3>
 <p>Trace data supports three different formats depending on how the x-axis (independent variable) is stored:</p>
 <ul>
-<li><strong>SimpleList</strong>: Only y-values are stored, x-values are implicit indices (0, 1, 2, ...)</li>
-<li><strong>FixedStep</strong>: Regular spacing with x₀ (starting point) and step size</li>
-<li><strong>VariableStep</strong>: Arbitrary x-values stored alongside y-values</li>
+<li><strong>SimpleList</strong>: pass a list, NumPy array, or Arrow array as the column value;
+  only y-values are stored, and x-values are implicit indices (0, 1, 2, ...).</li>
+<li><strong>FixedStep</strong>: use <code>fricon.Trace.fixed_step(x0, step, y)</code> for regular
+  spacing with x0 and step size.</li>
+<li><strong>VariableStep</strong>: use <code>fricon.Trace.variable_step(x, y)</code> for arbitrary
+  x-values stored alongside y-values.</li>
 </ul>
-<h3 id="future-extensions">Future extensions</h3>
-<p>Additional data types (bool, int, str, timestamps) will be supported in future versions. The current focus on float, complex, and trace types ensures optimal performance and correctness for the most common scientific use cases.</p>
-<!-- TODO: `pyarrow` and `polars` tips -->
 
 
 
