@@ -1,10 +1,11 @@
 use anyhow::{Context, Result, bail};
 use arrow_array::RecordBatch;
-use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
+use fricon::{DatasetArray, DatasetPhysicalSchema, DatasetPhysicalType};
 
 use super::{
-    XYTraceRoles, compute_group_starts, format_numeric_value, group_ranges, make_group_id_suffix,
-    make_group_label, resolve_xy_trace_roles, row_order_for_group, row_series_id,
+    SemanticRoleColumns, XYTraceRoles, compute_group_starts, format_numeric_value, group_ranges,
+    make_group_id_suffix, make_group_label, resolve_xy_trace_roles, row_order_for_group,
+    row_series_id,
 };
 use crate::features::charts::types::{
     ChartSnapshot, ComplexViewOption, FlatXYSeries, XYChartDataOptions, XYChartSnapshot,
@@ -14,10 +15,12 @@ use crate::features::charts::types::{
 
 pub(crate) fn build_xy_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
+    group_columns: Option<&[usize]>,
     options: &XYChartDataOptions,
 ) -> Result<ChartSnapshot> {
+    let role_columns = SemanticRoleColumns::new(index_columns, group_columns);
     let snapshot = match &options.plot_mode {
         XYPlotModeOptions::QuantityVsSweep {
             quantity,
@@ -25,7 +28,7 @@ pub(crate) fn build_xy_series(
         } => build_quantity_vs_sweep_snapshot(
             batch,
             schema,
-            index_columns,
+            role_columns,
             options.draw_style,
             quantity,
             complex_views.as_deref().unwrap_or(&[]),
@@ -34,7 +37,7 @@ pub(crate) fn build_xy_series(
         XYPlotModeOptions::Xy { x_column, y_column } => build_xy_snapshot(
             batch,
             schema,
-            index_columns,
+            role_columns,
             options.draw_style,
             x_column,
             y_column,
@@ -43,7 +46,7 @@ pub(crate) fn build_xy_series(
         XYPlotModeOptions::ComplexPlane { quantity } => build_complex_plane_snapshot(
             batch,
             schema,
-            index_columns,
+            role_columns,
             options.draw_style,
             quantity,
             &options.trace_roles,
@@ -55,8 +58,8 @@ pub(crate) fn build_xy_series(
 
 fn build_quantity_vs_sweep_snapshot(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    schema: &DatasetPhysicalSchema,
+    role_columns: SemanticRoleColumns<'_>,
     draw_style: XYDrawStyle,
     series_name: &str,
     complex_views: &[ComplexViewOption],
@@ -66,13 +69,13 @@ fn build_quantity_vs_sweep_snapshot(
         .columns()
         .get(series_name)
         .context("Column not found")?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let is_trace = matches!(data_type, DatasetPhysicalType::Trace(_, _));
     let is_complex = data_type.is_complex();
 
     let series = if is_trace {
         build_trace_quantity_vs_sweep_series(batch, series_name, is_complex, complex_views)?
     } else {
-        let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+        let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
         build_scalar_quantity_vs_sweep_series(
             batch,
             schema,
@@ -86,7 +89,7 @@ fn build_quantity_vs_sweep_snapshot(
     let x_name = if is_trace {
         format!("{series_name} - X")
     } else {
-        resolve_quantity_vs_sweep_x_name(schema, index_columns, trace_roles, draw_style)?
+        resolve_quantity_vs_sweep_x_name(schema, role_columns, trace_roles, draw_style)?
     };
 
     Ok(XYChartSnapshot {
@@ -100,8 +103,8 @@ fn build_quantity_vs_sweep_snapshot(
 
 fn build_xy_snapshot(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    schema: &DatasetPhysicalSchema,
+    role_columns: SemanticRoleColumns<'_>,
     draw_style: XYDrawStyle,
     x_column: &str,
     y_column: &str,
@@ -115,13 +118,13 @@ fn build_xy_snapshot(
         .columns()
         .get(y_column)
         .context("Y column not found")?;
-    let x_is_trace = matches!(x_type, DatasetDataType::Trace(_, _));
-    let y_is_trace = matches!(y_type, DatasetDataType::Trace(_, _));
+    let x_is_trace = matches!(x_type, DatasetPhysicalType::Trace(_, _));
+    let y_is_trace = matches!(y_type, DatasetPhysicalType::Trace(_, _));
 
     let series = match (x_is_trace, y_is_trace) {
         (true, true) => build_trace_xy_series(batch, x_column, y_column)?,
         (false, false) => {
-            let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+            let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
             build_scalar_xy_series(batch, schema, x_column, y_column, &roles)?
         }
         _ => bail!("X/Y plot mode requires both columns to be trace or both to be scalar"),
@@ -138,8 +141,8 @@ fn build_xy_snapshot(
 
 fn build_complex_plane_snapshot(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    schema: &DatasetPhysicalSchema,
+    role_columns: SemanticRoleColumns<'_>,
     draw_style: XYDrawStyle,
     series_name: &str,
     trace_roles: &XYTraceRoleOptions,
@@ -148,12 +151,12 @@ fn build_complex_plane_snapshot(
         .columns()
         .get(series_name)
         .context("Column not found")?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let is_trace = matches!(data_type, DatasetPhysicalType::Trace(_, _));
 
     let series = if is_trace {
         build_trace_complex_plane_series(batch, schema, series_name)?
     } else {
-        let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+        let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
         build_scalar_complex_plane_series(batch, schema, series_name, &roles)?
     };
 
@@ -280,14 +283,14 @@ fn build_trace_xy_series(
 
 fn build_trace_complex_plane_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     series_name: &str,
 ) -> Result<Vec<FlatXYSeries>> {
     let data_type = *schema
         .columns()
         .get(series_name)
         .context("Column not found")?;
-    if !matches!(data_type, DatasetDataType::Trace(_, _)) {
+    if !matches!(data_type, DatasetPhysicalType::Trace(_, _)) {
         bail!("Complex plane trace plot mode requires a trace quantity");
     }
 
@@ -326,7 +329,7 @@ fn build_trace_complex_plane_series(
 
 fn build_scalar_quantity_vs_sweep_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     series_name: &str,
     is_complex: bool,
     complex_views: &[ComplexViewOption],
@@ -411,7 +414,7 @@ fn build_scalar_quantity_vs_sweep_series(
 
 fn build_scalar_xy_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     x_column: &str,
     y_column: &str,
     roles: &XYTraceRoles,
@@ -440,7 +443,7 @@ fn build_scalar_xy_series(
 
 fn build_scalar_complex_plane_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     series_name: &str,
     roles: &XYTraceRoles,
 ) -> Result<Vec<FlatXYSeries>> {
@@ -464,7 +467,7 @@ fn build_scalar_complex_plane_series(
 
 fn build_grouped_xy_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     base_label: &str,
     roles: &XYTraceRoles,
     point_at: impl Fn(usize) -> (f64, f64),
@@ -495,12 +498,12 @@ fn build_grouped_xy_series(
 }
 
 fn resolve_quantity_vs_sweep_x_name(
-    schema: &DatasetSchema,
-    index_columns: Option<&[usize]>,
+    schema: &DatasetPhysicalSchema,
+    role_columns: SemanticRoleColumns<'_>,
     trace_roles: &XYTraceRoleOptions,
     draw_style: XYDrawStyle,
 ) -> Result<String> {
-    let roles = resolve_xy_trace_roles(schema, index_columns, trace_roles, draw_style)?;
+    let roles = resolve_xy_trace_roles(schema, role_columns, trace_roles, draw_style)?;
     Ok(match roles.sweep {
         Some(index) => schema
             .columns()
@@ -527,7 +530,7 @@ fn resolved_complex_views(
 
 fn numeric_column_values(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index: usize,
 ) -> Result<Vec<f64>> {
     let name = schema
@@ -651,6 +654,7 @@ mod tests {
                 &batch,
                 &schema,
                 Some(&[0, 1]),
+                Some(&[0, 1]),
                 &XYChartDataOptions {
                     draw_style: XYDrawStyle::Line,
                     plot_mode: XYPlotModeOptions::QuantityVsSweep {
@@ -691,6 +695,7 @@ mod tests {
                 &batch,
                 &schema,
                 Some(&[0, 1]),
+                Some(&[0, 1]),
                 &XYChartDataOptions {
                     draw_style: XYDrawStyle::Points,
                     plot_mode: XYPlotModeOptions::Xy {
@@ -722,6 +727,7 @@ mod tests {
         let result = build_xy_series(
             &batch,
             &schema,
+            Some(&[0]),
             Some(&[0]),
             &XYChartDataOptions {
                 draw_style: XYDrawStyle::Points,

@@ -13,7 +13,7 @@ use crate::dataset::schema::{
         VariableStepTraceArray,
     },
     error::DatasetError,
-    model::{DatasetDataType, DatasetSchema, ScalarKind, TraceKind},
+    model::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind, TraceKind},
 };
 
 #[derive(Debug, Clone)]
@@ -85,18 +85,18 @@ pub enum DatasetScalar {
 
 impl DatasetScalar {
     #[must_use]
-    pub fn data_type(&self) -> DatasetDataType {
+    pub fn data_type(&self) -> DatasetPhysicalType {
         match self {
-            DatasetScalar::Numeric(_) => DatasetDataType::Scalar(ScalarKind::Numeric),
-            DatasetScalar::Complex(_) => DatasetDataType::Scalar(ScalarKind::Complex),
+            DatasetScalar::Numeric(_) => DatasetPhysicalType::Scalar(ScalarKind::Numeric),
+            DatasetScalar::Complex(_) => DatasetPhysicalType::Scalar(ScalarKind::Complex),
             DatasetScalar::SimpleTrace(t) => {
-                DatasetDataType::Trace(TraceKind::Simple, t.scalar_kind())
+                DatasetPhysicalType::Trace(TraceKind::Simple, t.scalar_kind())
             }
             DatasetScalar::FixedStepTrace(t) => {
-                DatasetDataType::Trace(TraceKind::FixedStep, t.scalar_kind())
+                DatasetPhysicalType::Trace(TraceKind::FixedStep, t.scalar_kind())
             }
             DatasetScalar::VariableStepTrace(t) => {
-                DatasetDataType::Trace(TraceKind::VariableStep, t.scalar_kind())
+                DatasetPhysicalType::Trace(TraceKind::VariableStep, t.scalar_kind())
             }
         }
     }
@@ -106,13 +106,13 @@ pub struct DatasetRow(pub IndexMap<String, DatasetScalar>);
 
 impl DatasetRow {
     #[must_use]
-    pub fn to_schema(&self) -> DatasetSchema {
+    pub fn to_schema(&self) -> DatasetPhysicalSchema {
         let columns = self
             .0
             .iter()
             .map(|(name, scalar)| (name.clone(), scalar.data_type()))
             .collect();
-        DatasetSchema::new(columns)
+        DatasetPhysicalSchema::new(columns)
     }
 }
 

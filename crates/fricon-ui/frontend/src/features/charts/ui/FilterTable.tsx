@@ -26,6 +26,7 @@ interface FilterTableProps {
 interface FilterTableColumnProps {
   columnIndex: number;
   field: string;
+  label: string;
   items: ColumnUniqueValue[];
   selectedIndex?: number;
   onSelect: (index: number) => void;
@@ -108,6 +109,7 @@ function handleColumnBoundaryKeyDown(
 function FilterTableColumn({
   columnIndex,
   field,
+  label,
   items,
   selectedIndex,
   onSelect,
@@ -222,7 +224,7 @@ function FilterTableColumn({
         <Table withContainer={false}>
           <TableHeader className="sticky top-0 z-10 border-b bg-background shadow-sm">
             <TableRow>
-              <TableHead className="text-muted-foreground">{field}</TableHead>
+              <TableHead className="text-muted-foreground">{label}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -443,7 +445,7 @@ export function FilterTable({
               <TableRow>
                 {data.fields.map((field) => (
                   <TableHead key={field} className="text-muted-foreground">
-                    {field}
+                    {data.fieldLabels[field] ?? field}
                   </TableHead>
                 ))}
               </TableRow>
@@ -533,6 +535,7 @@ export function FilterTable({
               <FilterTableColumn
                 columnIndex={index}
                 field={field}
+                label={data.fieldLabels[field] ?? field}
                 items={columnUniqueValues[field] ?? []}
                 selectedIndex={selectedValueIndices?.[index]}
                 onSelect={(selectedIndex) =>

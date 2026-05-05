@@ -19,6 +19,31 @@ vi.mock("@/shared/lib/bindings", () => ({
 
 import { getDatasetDetail, listDatasets } from "./client";
 
+const numericSemantic = {
+  valueKind: "numeric" as const,
+  shapeKind: "scalar" as const,
+  role: "value" as const,
+};
+
+const numericAxisSemantic = {
+  ...numericSemantic,
+  role: "logical_index" as const,
+};
+
+const numericCapabilities = {
+  numericCoordinate: true,
+  filterable: true,
+  groupable: true,
+  traceSource: false,
+  complexProjectable: false,
+  plottableValue: true,
+};
+
+const numericAxisCapabilities = {
+  ...numericCapabilities,
+  plottableValue: false,
+};
+
 describe("dataset client", () => {
   beforeEach(() => {
     datasetDetailCommandMock.mockReset();
@@ -94,13 +119,39 @@ describe("dataset client", () => {
             name: "signal",
             label: "Signal",
             unit: "V",
-            isComplex: false,
-            isTrace: false,
-            isIndex: false,
+            semantic: numericSemantic,
+            capabilities: numericCapabilities,
+            isInferredAxis: false,
             hiddenByDefault: true,
             isChartAxisCandidate: true,
           },
         ],
+        chartSemantics: {
+          duplicatePolicy: "latest_by_record_id",
+          indexRealization: "implicit",
+          axes: [
+            {
+              id: "logicalIndex:gate",
+              name: "gate",
+              label: "Gate",
+              kind: "logical_index",
+              semantic: numericAxisSemantic,
+              capabilities: numericAxisCapabilities,
+              isInferredAxis: false,
+            },
+          ],
+          valueColumns: [
+            {
+              id: "column:signal",
+              name: "signal",
+              label: "Signal",
+              semantic: numericSemantic,
+              capabilities: numericCapabilities,
+              hiddenByDefault: true,
+            },
+          ],
+          chartAxisCandidates: [],
+        },
       },
     });
 
@@ -118,13 +169,62 @@ describe("dataset client", () => {
         name: "signal",
         label: "Signal",
         unit: "V",
-        isComplex: false,
-        isTrace: false,
-        isIndex: false,
+        semantic: numericSemantic,
+        capabilities: numericCapabilities,
+        isInferredAxis: false,
         hiddenByDefault: true,
         isChartAxisCandidate: true,
       },
     ]);
+    expect(result.chartSemantics).toEqual({
+      duplicatePolicy: "latest_by_record_id",
+      indexRealization: "implicit",
+      axes: [
+        {
+          id: "logicalIndex:gate",
+          name: "gate",
+          label: "Gate",
+          kind: "logical_index",
+          semantic: numericAxisSemantic,
+          capabilities: numericAxisCapabilities,
+          isInferredAxis: false,
+        },
+      ],
+      valueColumns: [
+        {
+          id: "column:signal",
+          name: "signal",
+          label: "Signal",
+          semantic: numericSemantic,
+          capabilities: numericCapabilities,
+          hiddenByDefault: true,
+        },
+      ],
+      chartAxisCandidates: [],
+    });
+  });
+
+  it("normalizes absent chart semantics to null", async () => {
+    datasetDetailCommandMock.mockResolvedValue({
+      status: "ok",
+      data: {
+        id: 8,
+        name: "Deleted Payload",
+        description: "",
+        favorite: false,
+        tags: [],
+        status: "Completed",
+        createdAt: "2026-01-02T03:04:05Z",
+        trashedAt: null,
+        deletedAt: null,
+        payloadAvailable: false,
+        columns: [],
+      },
+    });
+
+    const result = await getDatasetDetail(8);
+
+    expect(result.chartSemantics).toBeNull();
   });
 
   it("propagates dataset command error envelopes", async () => {

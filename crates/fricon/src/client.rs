@@ -28,7 +28,7 @@ use crate::{
     APP_VERSION, DEFAULT_DATASET_LIST_LIMIT, IPC_PROTOCOL_VERSION,
     dataset::{
         model::{DatasetRecord, DatasetStatus},
-        schema::{DatasetArray, DatasetRow, DatasetSchema},
+        schema::{DatasetArray, DatasetPhysicalSchema, DatasetRow},
         semantics::{ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan},
         storage::logical_index::logical_index_values_schema,
     },
@@ -104,8 +104,8 @@ pub enum ClientError {
     AlreadyFinished,
     #[error("Schema mismatch: expected {expected:?}, got {got:?}")]
     SchemaMismatch {
-        expected: Box<DatasetSchema>,
-        got: Box<DatasetSchema>,
+        expected: Box<DatasetPhysicalSchema>,
+        got: Box<DatasetPhysicalSchema>,
     },
     #[error("Expected dataset in response but none was returned")]
     MissingResponse,
@@ -189,7 +189,7 @@ impl Client {
         name: String,
         description: String,
         tags: Vec<String>,
-        schema: DatasetSchema,
+        schema: DatasetPhysicalSchema,
         column_metadata: Vec<ColumnMetadata>,
         scan_plan: Option<ScanPlan>,
         logical_index_sidecar: bool,
@@ -325,7 +325,7 @@ enum StreamMessage {
 }
 
 pub struct DatasetWriter {
-    schema: DatasetSchema,
+    schema: DatasetPhysicalSchema,
     arrow_schema: SchemaRef,
     scan_plan: Option<ScanPlan>,
     logical_index_sidecar: bool,
@@ -345,7 +345,7 @@ impl DatasetWriter {
         name: String,
         description: String,
         tags: Vec<String>,
-        schema: DatasetSchema,
+        schema: DatasetPhysicalSchema,
         column_metadata: Vec<ColumnMetadata>,
         scan_plan: Option<ScanPlan>,
         logical_index_sidecar: bool,
@@ -477,9 +477,9 @@ impl DatasetWriter {
             .iter()
             .map(|axis| {
                 let value = logical_indices[&axis.name];
-                Arc::new(UInt64Array::from(vec![value; row_count])) as _
+                Ok(Arc::new(UInt64Array::from(vec![value; row_count])) as _)
             })
-            .collect();
+            .collect::<Result<Vec<_>, ClientError>>()?;
         Ok(Some(RecordBatch::try_new(
             logical_index_values_schema(scan_plan),
             arrays,
@@ -518,7 +518,7 @@ impl DatasetWriter {
     }
 
     #[must_use]
-    pub fn schema(&self) -> &DatasetSchema {
+    pub fn schema(&self) -> &DatasetPhysicalSchema {
         &self.schema
     }
 }

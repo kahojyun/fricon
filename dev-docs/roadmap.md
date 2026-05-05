@@ -23,13 +23,15 @@ Current implemented user-facing behavior is still centered on:
 - local workspaces
 - dataset creation, write, list, read, tag, favorite, and delete flows
 - Arrow-compatible table payloads with schema inferred from the first row
+- durable dataset manifests with record IDs and resolved semantic
+  interpretation
 - Python API, CLI, server process, and desktop dataset explorer surfaces
 
 Use `docs/concepts.md`, `docs/dataset.md`, and
 `dev-docs/current-storage-notes.md` as the source of truth for current behavior.
 This roadmap includes future product direction and should not be used as proof
 that measurement, parameter, workflow, device, provenance, AI automation, or
-semantic-manifest behavior has already landed.
+later semantic scan/chart authoring behavior has already landed.
 
 The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
 
@@ -53,12 +55,12 @@ The proposed v0.2 reset is captured under `dev-docs/v0.2/`:
 
 Active supporting notes:
 
-- `dataset-semantic-architecture-proposal.md` defines the detailed dataset
-  semantic direction: explicit dataset semantics, durable manifests, resolved
-  interpretation, and a shaped feature sequence that keeps the foundation
-  separate from later scan and chart migration work. Treat it as proposed
-  design guidance, not current implementation fact, and reconcile it with the
-  broader redesign before implementation.
+- `dataset-semantic-architecture-proposal.md` preserves the dataset semantic
+  direction, historical implementation rationale, and remaining roadmap
+  pressure. The durable manifest and resolved interpretation foundation has
+  landed; use `current-dataset-semantics.md` for current behavior, and reconcile
+  later scan authoring, chart migration, and richer semantic workflows with the
+  broader v0.2 reset before implementation.
 - `v0.2/future-concepts.md` preserves lightweight notes for concepts that are
   not yet ready for focused design proposals. Some entries, such as measurement
   records and sample identity, are now partially promoted into v0.2; treat the
@@ -74,6 +76,9 @@ active scope, sequencing, or naming guidance when they conflict with
 - `v0.2/archive/measurement-system-foundation-redesign.md` preserves an older
   redesign proposal for dataset artifacts, run-like producer/consumer
   provenance, and future calibration foundations.
+- `v0.2/archive/experiment-run-and-runner-design.md` preserves an older runner
+  and retry/resume proposal. Treat it as background input for a future rewritten
+  runner design, not as active v0.2 implementation guidance.
 - `v0.2/archive/parameter-management-design.md` preserves an older long-term
   parameter registry proposal. Treat it as background input for a future
   rewritten parameter design, not as active v0.2 implementation guidance.

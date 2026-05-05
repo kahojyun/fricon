@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
-use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
+use fricon::{DatasetArray, DatasetPhysicalSchema, DatasetPhysicalType};
 use tracing::debug;
 
 use super::{heatmap::build_heatmap_series, last_outer_group_start};
@@ -20,7 +20,7 @@ use crate::features::charts::types::{
 /// Only rows belonging to the very last outer-index group are included.
 pub(crate) fn build_live_heatmap_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     options: &LiveHeatmapOptions,
 ) -> Result<ChartSnapshot> {
@@ -29,7 +29,7 @@ pub(crate) fn build_live_heatmap_series(
         .columns()
         .get(quantity_name)
         .context("Column not found")?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let is_trace = matches!(data_type, DatasetPhysicalType::Trace(_, _));
 
     debug!(
         chart_type = "live_heatmap",
@@ -78,7 +78,7 @@ pub(crate) fn build_live_heatmap_series(
 /// If there is an index column, use it as the Y-axis label per row.
 fn build_trace_live_heatmap(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     index_columns: Option<&[usize]>,
     options: &LiveHeatmapOptions,
 ) -> Result<ChartSnapshot> {
@@ -221,7 +221,7 @@ mod tests {
     fn trace_batch(
         trace_rows: Vec<Vec<f64>>,
         index_values: &[f64],
-    ) -> (RecordBatch, DatasetSchema) {
+    ) -> (RecordBatch, DatasetPhysicalSchema) {
         let trace_array: ArrayRef = if trace_rows.is_empty() {
             let sample: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
                 ScalarArray::from_iter(Vec::<f64>::new()),
@@ -250,20 +250,20 @@ mod tests {
         let mut columns = IndexMap::new();
         columns.insert(
             "idx".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
+            DatasetPhysicalType::Scalar(ScalarKind::Numeric),
         );
         columns.insert(
             "trace".to_string(),
-            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+            DatasetPhysicalType::Trace(TraceKind::Simple, ScalarKind::Numeric),
         );
-        (batch, DatasetSchema::new(columns))
+        (batch, DatasetPhysicalSchema::new(columns))
     }
 
     fn trace_batch_with_two_indices(
         trace_rows: Vec<Vec<f64>>,
         outer_values: &[f64],
         row_values: &[f64],
-    ) -> (RecordBatch, DatasetSchema) {
+    ) -> (RecordBatch, DatasetPhysicalSchema) {
         let trace_array: ArrayRef = if trace_rows.is_empty() {
             let sample: ArrayRef = DatasetArray::from(DatasetScalar::SimpleTrace(
                 ScalarArray::from_iter(Vec::<f64>::new()),
@@ -295,17 +295,17 @@ mod tests {
         let mut columns = IndexMap::new();
         columns.insert(
             "outer".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
+            DatasetPhysicalType::Scalar(ScalarKind::Numeric),
         );
         columns.insert(
             "row".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
+            DatasetPhysicalType::Scalar(ScalarKind::Numeric),
         );
         columns.insert(
             "trace".to_string(),
-            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+            DatasetPhysicalType::Trace(TraceKind::Simple, ScalarKind::Numeric),
         );
-        (batch, DatasetSchema::new(columns))
+        (batch, DatasetPhysicalSchema::new(columns))
     }
 
     /// 9 rows: 3 outer sweeps × 3 inner points.

@@ -2,7 +2,12 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateDatasetInfo } from "../api/client";
 import { datasetKeys } from "../api/queryKeys";
-import type { DatasetDetail, DatasetInfoUpdate } from "../api/types";
+import type {
+  ChartSemanticShapeKind,
+  ChartSemanticValueKind,
+  DatasetDetail,
+  DatasetInfoUpdate,
+} from "../api/types";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -81,6 +86,31 @@ interface DatasetDetailEditorDraft {
   favorite: boolean;
   tagsText: string;
   normalizedTags: string[];
+}
+
+const semanticValueKindLabels: Record<ChartSemanticValueKind, string> = {
+  numeric: "Numeric",
+  categorical: "Categorical",
+  boolean: "Boolean",
+  timestamp: "Timestamp",
+  complex: "Complex",
+  display: "Display",
+};
+
+const semanticShapeKindLabels: Record<ChartSemanticShapeKind, string> = {
+  scalar: "Scalar",
+  trace: "Trace",
+};
+
+const semanticRoleLabels = {
+  value: "Value",
+  logical_index: "Logical index",
+  system: "System",
+  display: "Display",
+} as const;
+
+function semanticValueBadgeVariant(kind: ChartSemanticValueKind) {
+  return kind === "complex" ? "outline" : "secondary";
 }
 
 function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
@@ -319,7 +349,7 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                     <TableHead>Name</TableHead>
                     <TableHead>Label</TableHead>
                     <TableHead>Unit</TableHead>
-                    <TableHead>Index</TableHead>
+                    <TableHead>Role</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Hints</TableHead>
                   </TableRow>
@@ -341,16 +371,17 @@ function DatasetDetailEditor({ datasetId, detail }: DatasetDetailEditorProps) {
                         )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {column.isIndex ? "✓" : ""}
+                        {semanticRoleLabels[column.semantic.role]}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {column.isTrace ? (
-                          <Badge variant="secondary">Trace</Badge>
-                        ) : column.isComplex ? (
-                          <Badge variant="outline">Complex</Badge>
-                        ) : (
-                          <Badge variant="secondary">Scalar</Badge>
-                        )}
+                        <Badge
+                          variant={semanticValueBadgeVariant(
+                            column.semantic.valueKind,
+                          )}
+                        >
+                          {semanticShapeKindLabels[column.semantic.shapeKind]} /{" "}
+                          {semanticValueKindLabels[column.semantic.valueKind]}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

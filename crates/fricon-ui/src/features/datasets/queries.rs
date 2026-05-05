@@ -1,14 +1,15 @@
 use fricon::{
-    DatasetListQuery, InterpretationSource, ReadAppError, ResolvedColumn,
-    dataset::{
-        model::DatasetId,
-        semantics::{DatasetDType, TraceValueDType},
-    },
+    DatasetInterpretation, DatasetListQuery, ReadAppError, ResolvedColumn, ResolvedDuplicatePolicy,
+    ResolvedIndexRealization, ResolvedSemanticReference, dataset::model::DatasetId,
 };
 
 use super::{
     error::UiDatasetError,
-    types::{ColumnInfo, DatasetDetail, DatasetInfo, DatasetWriteStatus},
+    types::{
+        ChartDuplicatePolicy, ChartIndexRealization, ChartSemanticAxis, ChartSemanticAxisKind,
+        ChartSemanticColumn, ChartSemantics, ColumnInfo, DatasetDetail, DatasetInfo,
+        DatasetWriteStatus,
+    },
 };
 use crate::desktop_runtime::session::WorkspaceSession;
 
@@ -52,17 +53,18 @@ pub(crate) async fn get_dataset_detail(
         .get_dataset_including_deleted(DatasetId::Id(id))
         .await?;
     let payload_available = record.metadata.deleted_at.is_none();
-    let columns = if payload_available {
+    let (columns, chart_semantics) = if payload_available {
         let reader = session.dataset(id).await?;
         let interpretation = reader.interpret().map_err(ReadAppError::from)?;
-        let expose_manifest_hints = interpretation.source == InterpretationSource::Manifest;
-        interpretation
+        let columns = interpretation
             .columns
             .iter()
-            .filter_map(|column| column_info_from_resolved_column(column, expose_manifest_hints))
-            .collect()
+            .filter_map(column_info_from_resolved_column)
+            .collect();
+        let chart_semantics = chart_semantics_from_interpretation(&interpretation);
+        (columns, Some(chart_semantics))
     } else {
-        Vec::new()
+        (Vec::new(), None)
     };
 
     Ok(DatasetDetail {
@@ -77,35 +79,97 @@ pub(crate) async fn get_dataset_detail(
         deleted_at: record.metadata.deleted_at,
         payload_available,
         columns,
+        chart_semantics,
     })
 }
 
-fn column_info_from_resolved_column(
-    column: &ResolvedColumn,
-    expose_manifest_hints: bool,
-) -> Option<ColumnInfo> {
+fn chart_semantics_from_interpretation(interpretation: &DatasetInterpretation) -> ChartSemantics {
+    let duplicate_policy = match interpretation.duplicate_policy {
+        ResolvedDuplicatePolicy::LatestByRecordId => ChartDuplicatePolicy::LatestByRecordId,
+        ResolvedDuplicatePolicy::RowOrderPlaceholder => ChartDuplicatePolicy::RowOrderPlaceholder,
+    };
+    let index_realization = match interpretation.index_realization {
+        ResolvedIndexRealization::None => ChartIndexRealization::None,
+        ResolvedIndexRealization::Implicit => ChartIndexRealization::Implicit,
+        ResolvedIndexRealization::Sidecar => ChartIndexRealization::Sidecar,
+    };
+
+    let value_columns = interpretation
+        .value_references
+        .iter()
+        .filter_map(chart_semantic_column)
+        .collect();
+
+    let axes = interpretation
+        .sweep_axes
+        .iter()
+        .map(semantic_axis)
+        .collect();
+
+    let chart_axis_candidates = interpretation
+        .chart_axis_candidates
+        .iter()
+        .map(semantic_axis)
+        .collect();
+
+    ChartSemantics {
+        duplicate_policy,
+        index_realization,
+        axes,
+        value_columns,
+        chart_axis_candidates,
+    }
+}
+
+fn chart_semantic_column(reference: &ResolvedSemanticReference) -> Option<ChartSemanticColumn> {
+    let ResolvedSemanticReference::PhysicalColumn(column) = reference else {
+        return None;
+    };
+    Some(ChartSemanticColumn {
+        id: column.id.clone(),
+        name: column.name.clone(),
+        label: column.label.clone(),
+        semantic: column.semantic.into(),
+        capabilities: column.capabilities.into(),
+        hidden_by_default: column.hidden_by_default,
+    })
+}
+
+fn semantic_axis(reference: &ResolvedSemanticReference) -> ChartSemanticAxis {
+    match reference {
+        ResolvedSemanticReference::PhysicalColumn(column) => ChartSemanticAxis {
+            id: column.id.clone(),
+            name: column.name.clone(),
+            label: column.label.clone(),
+            kind: ChartSemanticAxisKind::Column,
+            semantic: column.semantic.into(),
+            capabilities: column.capabilities.into(),
+            is_inferred_axis: column.is_inferred_axis,
+        },
+        ResolvedSemanticReference::LogicalIndex(axis) => ChartSemanticAxis {
+            id: axis.id.clone(),
+            name: axis.name.clone(),
+            label: axis.label.clone(),
+            kind: ChartSemanticAxisKind::LogicalIndex,
+            semantic: axis.semantic.into(),
+            capabilities: axis.capabilities.into(),
+            is_inferred_axis: axis.is_inferred_axis,
+        },
+    }
+}
+
+fn column_info_from_resolved_column(column: &ResolvedColumn) -> Option<ColumnInfo> {
     column.visible_ordinal?;
     Some(ColumnInfo {
         name: column.name.clone(),
         label: column.label.clone(),
         unit: column.unit.clone(),
-        is_complex: dtype_is_complex(&column.dtype),
-        is_trace: matches!(column.dtype, DatasetDType::Trace { .. }),
-        is_index: column.is_index,
+        semantic: column.semantic.into(),
+        capabilities: column.capabilities.into(),
+        is_inferred_axis: column.is_inferred_axis,
         hidden_by_default: column.hidden_by_default,
-        is_chart_axis_candidate: expose_manifest_hints && column.is_chart_axis_candidate,
+        is_chart_axis_candidate: column.is_chart_axis_candidate,
     })
-}
-
-fn dtype_is_complex(dtype: &DatasetDType) -> bool {
-    matches!(
-        dtype,
-        DatasetDType::Complex128
-            | DatasetDType::Trace {
-                value: TraceValueDType::Complex128,
-                ..
-            }
-    )
 }
 
 pub(crate) async fn get_dataset_write_status(
@@ -119,21 +183,21 @@ pub(crate) async fn get_dataset_write_status(
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, sync::Arc};
-
-    use arrow_array::{Float64Array, RecordBatch};
-    use arrow_ipc::writer::FileWriter;
-    use arrow_schema::{DataType, Field, Schema};
     use fricon::{
         AppManager, Client, DatasetRow, DatasetScalar, ScalarArray, WorkspaceRoot,
-        dataset::semantics::ColumnMetadata, workspace::WorkspacePaths,
+        dataset::semantics::ColumnMetadata,
     };
     use indexmap::IndexMap;
     use num::complex::Complex64;
     use tempfile::TempDir;
 
     use super::{get_dataset_detail, validate_non_negative};
-    use crate::desktop_runtime::session::WorkspaceSession;
+    use crate::{
+        desktop_runtime::session::WorkspaceSession,
+        features::datasets::types::{
+            ChartSemanticRole, ChartSemanticShapeKind, ChartSemanticValueKind,
+        },
+    };
 
     #[test]
     fn validate_non_negative_rejects_negative_values() {
@@ -151,27 +215,74 @@ mod tests {
 
         assert_eq!(detail.columns.len(), 3);
         assert_eq!(detail.columns[0].name, "signal");
+        assert_eq!(
+            detail.columns[0].semantic.value_kind,
+            ChartSemanticValueKind::Numeric
+        );
+        assert_eq!(
+            detail.columns[0].semantic.shape_kind,
+            ChartSemanticShapeKind::Scalar
+        );
         assert_eq!(detail.columns[0].label.as_deref(), Some("Signal"));
         assert_eq!(detail.columns[0].unit.as_deref(), Some("V"));
-        assert!(!detail.columns[0].is_index);
-        assert!(!detail.columns[0].is_trace);
-        assert!(!detail.columns[0].is_complex);
+        assert!(!detail.columns[0].is_inferred_axis);
+        assert!(!detail.columns[0].capabilities.trace_source);
+        assert!(!detail.columns[0].capabilities.complex_projectable);
         assert!(detail.columns[0].hidden_by_default);
         assert!(detail.columns[0].is_chart_axis_candidate);
+        let semantics = detail
+            .chart_semantics
+            .as_ref()
+            .expect("chart semantics should be exposed");
+        assert_eq!(semantics.value_columns.len(), 3);
+        assert_eq!(semantics.value_columns[0].id, "column:signal");
+        assert_eq!(
+            semantics.value_columns[0].semantic.value_kind,
+            ChartSemanticValueKind::Numeric
+        );
+        assert_eq!(semantics.chart_axis_candidates.len(), 2);
+        assert_eq!(semantics.chart_axis_candidates[0].id, "column:signal");
+        assert_eq!(
+            semantics.chart_axis_candidates[0].semantic.value_kind,
+            ChartSemanticValueKind::Numeric
+        );
+        assert!(
+            semantics.chart_axis_candidates[0]
+                .capabilities
+                .numeric_coordinate
+        );
         assert_eq!(detail.columns[1].name, "trace");
+        assert_eq!(
+            detail.columns[1].semantic.shape_kind,
+            ChartSemanticShapeKind::Trace
+        );
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
-        assert!(!detail.columns[1].is_index);
-        assert!(detail.columns[1].is_trace);
-        assert!(!detail.columns[1].is_complex);
+        assert!(!detail.columns[1].is_inferred_axis);
+        assert!(detail.columns[1].capabilities.trace_source);
+        assert!(!detail.columns[1].capabilities.complex_projectable);
         assert!(!detail.columns[1].hidden_by_default);
-        assert!(!detail.columns[1].is_chart_axis_candidate);
+        assert!(detail.columns[1].is_chart_axis_candidate);
+        assert_eq!(semantics.chart_axis_candidates[1].id, "column:trace");
+        assert_eq!(
+            semantics.chart_axis_candidates[1].semantic.shape_kind,
+            ChartSemanticShapeKind::Trace
+        );
+        assert!(
+            !semantics.chart_axis_candidates[1]
+                .capabilities
+                .numeric_coordinate
+        );
         assert_eq!(detail.columns[2].name, "complex");
+        assert_eq!(
+            detail.columns[2].semantic.value_kind,
+            ChartSemanticValueKind::Complex
+        );
         assert_eq!(detail.columns[2].label, None);
         assert_eq!(detail.columns[2].unit, None);
-        assert!(!detail.columns[2].is_index);
-        assert!(!detail.columns[2].is_trace);
-        assert!(detail.columns[2].is_complex);
+        assert!(!detail.columns[2].is_inferred_axis);
+        assert!(!detail.columns[2].capabilities.trace_source);
+        assert!(detail.columns[2].capabilities.complex_projectable);
         assert!(!detail.columns[2].hidden_by_default);
         assert!(!detail.columns[2].is_chart_axis_candidate);
         assert!(
@@ -185,35 +296,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_dataset_detail_uses_legacy_interpretation_when_manifest_is_absent()
+    async fn get_dataset_detail_exposes_inferred_axes_for_simple_semantic_dataset()
     -> anyhow::Result<()> {
-        let (_temp_dir, _app_manager, session, dataset_id) = create_legacy_dataset().await?;
+        let (_temp_dir, _app_manager, session, dataset_id) =
+            create_simple_dataset(simple_rows()).await?;
 
         let detail = get_dataset_detail(&session, dataset_id).await?;
 
         assert_eq!(detail.columns.len(), 3);
         assert_eq!(detail.columns[0].name, "run");
+        assert_eq!(
+            detail.columns[0].semantic.value_kind,
+            ChartSemanticValueKind::Numeric
+        );
+        assert_eq!(
+            detail.columns[0].semantic.role,
+            ChartSemanticRole::LogicalIndex
+        );
         assert_eq!(detail.columns[0].label, None);
         assert_eq!(detail.columns[0].unit, None);
-        assert!(detail.columns[0].is_index);
-        assert!(!detail.columns[0].is_trace);
-        assert!(!detail.columns[0].is_complex);
+        assert!(detail.columns[0].is_inferred_axis);
+        assert!(detail.columns[0].capabilities.numeric_coordinate);
+        assert!(!detail.columns[0].capabilities.plottable_value);
+        assert!(!detail.columns[0].capabilities.trace_source);
+        assert!(!detail.columns[0].capabilities.complex_projectable);
         assert!(!detail.columns[0].hidden_by_default);
         assert!(!detail.columns[0].is_chart_axis_candidate);
         assert_eq!(detail.columns[1].name, "step");
+        assert_eq!(
+            detail.columns[1].semantic.value_kind,
+            ChartSemanticValueKind::Numeric
+        );
+        assert_eq!(
+            detail.columns[1].semantic.role,
+            ChartSemanticRole::LogicalIndex
+        );
         assert_eq!(detail.columns[1].label, None);
         assert_eq!(detail.columns[1].unit, None);
-        assert!(detail.columns[1].is_index);
-        assert!(!detail.columns[1].is_trace);
-        assert!(!detail.columns[1].is_complex);
+        assert!(detail.columns[1].is_inferred_axis);
+        assert!(detail.columns[1].capabilities.numeric_coordinate);
+        assert!(!detail.columns[1].capabilities.plottable_value);
+        assert!(!detail.columns[1].capabilities.trace_source);
+        assert!(!detail.columns[1].capabilities.complex_projectable);
         assert!(!detail.columns[1].hidden_by_default);
         assert!(!detail.columns[1].is_chart_axis_candidate);
+        let semantics = detail
+            .chart_semantics
+            .as_ref()
+            .expect("inferred axis chart semantics should be exposed");
+        assert!(semantics.chart_axis_candidates.is_empty());
+        assert_eq!(
+            semantics
+                .axes
+                .iter()
+                .map(|axis| axis.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["column:run", "column:step"]
+        );
         assert_eq!(detail.columns[2].name, "value");
+        assert_eq!(
+            detail.columns[2].semantic.value_kind,
+            ChartSemanticValueKind::Numeric
+        );
         assert_eq!(detail.columns[2].label, None);
         assert_eq!(detail.columns[2].unit, None);
-        assert!(!detail.columns[2].is_index);
-        assert!(!detail.columns[2].is_trace);
-        assert!(!detail.columns[2].is_complex);
+        assert!(!detail.columns[2].is_inferred_axis);
+        assert!(!detail.columns[2].capabilities.trace_source);
+        assert!(!detail.columns[2].capabilities.complex_projectable);
         assert!(!detail.columns[2].hidden_by_default);
         assert!(!detail.columns[2].is_chart_axis_candidate);
 
@@ -237,13 +386,22 @@ mod tests {
                 String::new(),
                 vec!["test".to_string()],
                 schema,
-                vec![ColumnMetadata {
-                    name: "signal".to_string(),
-                    label: Some("Signal".to_string()),
-                    unit: Some("V".to_string()),
-                    hidden_by_default: true,
-                    chart_axis: true,
-                }],
+                vec![
+                    ColumnMetadata {
+                        name: "signal".to_string(),
+                        label: Some("Signal".to_string()),
+                        unit: Some("V".to_string()),
+                        hidden_by_default: true,
+                        chart_axis: true,
+                    },
+                    ColumnMetadata {
+                        name: "trace".to_string(),
+                        label: None,
+                        unit: None,
+                        hidden_by_default: false,
+                        chart_axis: true,
+                    },
+                ],
                 None,
                 false,
             )
@@ -256,46 +414,34 @@ mod tests {
         Ok((temp_dir, app_manager, session, dataset.id()))
     }
 
-    async fn create_legacy_dataset() -> anyhow::Result<(TempDir, AppManager, WorkspaceSession, i32)>
-    {
+    async fn create_simple_dataset(
+        rows: Vec<DatasetRow>,
+    ) -> anyhow::Result<(TempDir, AppManager, WorkspaceSession, i32)> {
         let temp_dir = TempDir::new()?;
         WorkspaceRoot::create_new(temp_dir.path())?;
-        let app_manager = AppManager::new_with_path(temp_dir.path())?;
-        let session = WorkspaceSession::new(app_manager.handle().clone());
 
-        let record = session
-            .app()
-            .create_empty_dataset("legacy-detail-test".to_string(), String::new(), vec![])
+        let app_manager =
+            AppManager::new_with_path(temp_dir.path())?.start(&tokio::runtime::Handle::current())?;
+        let client = Client::connect(temp_dir.path()).await?;
+
+        let schema = rows[0].to_schema();
+        let mut writer = client
+            .create_dataset(
+                "simple-detail-test".to_string(),
+                String::new(),
+                vec!["test".to_string()],
+                schema,
+                Vec::new(),
+                None,
+                false,
+            )
             .await?;
-        let dataset_dir =
-            WorkspacePaths::new(temp_dir.path()).dataset_path_from_uid(record.metadata.uid);
-        std::fs::remove_file(dataset_dir.join("dataset_manifest.json"))?;
-        write_legacy_arrow_chunk(&dataset_dir)?;
-
-        Ok((temp_dir, app_manager, session, record.id))
-    }
-
-    fn write_legacy_arrow_chunk(dataset_dir: &std::path::Path) -> anyhow::Result<()> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("run", DataType::Float64, false),
-            Field::new("step", DataType::Float64, false),
-            Field::new("value", DataType::Float64, false),
-        ]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(Float64Array::from(vec![1.0, 1.0])),
-                Arc::new(Float64Array::from(vec![0.0, 1.0])),
-                Arc::new(Float64Array::from(vec![10.0, 20.0])),
-            ],
-        )?;
-        let mut writer = FileWriter::try_new(
-            File::create(dataset_dir.join("data_chunk_0.arrow"))?,
-            &schema,
-        )?;
-        writer.write(&batch)?;
-        writer.finish()?;
-        Ok(())
+        for row in rows {
+            writer.write(row).await?;
+        }
+        let dataset = writer.finish().await?;
+        let session = WorkspaceSession::new(app_manager.handle().clone());
+        Ok((temp_dir, app_manager, session, dataset.id()))
     }
 
     fn manifest_rows() -> Vec<DatasetRow> {
@@ -314,5 +460,20 @@ mod tests {
             ),
             ("complex".to_string(), DatasetScalar::Complex(complex)),
         ]))
+    }
+
+    fn simple_rows() -> Vec<DatasetRow> {
+        vec![
+            DatasetRow(IndexMap::from([
+                ("run".to_string(), DatasetScalar::Numeric(1.0)),
+                ("step".to_string(), DatasetScalar::Numeric(0.0)),
+                ("value".to_string(), DatasetScalar::Numeric(10.0)),
+            ])),
+            DatasetRow(IndexMap::from([
+                ("run".to_string(), DatasetScalar::Numeric(1.0)),
+                ("step".to_string(), DatasetScalar::Numeric(1.0)),
+                ("value".to_string(), DatasetScalar::Numeric(20.0)),
+            ])),
+        ]
     }
 }

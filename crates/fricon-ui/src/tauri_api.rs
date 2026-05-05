@@ -173,6 +173,7 @@ impl From<ReadError> for ApiError {
             ReadError::NotFound { .. } => ApiErrorCode::DatasetNotFound,
             ReadError::Deleted { .. } => ApiErrorCode::DatasetDeleted,
             ReadError::EmptyDataset
+            | ReadError::MissingManifest
             | ReadError::Dataset(_)
             | ReadError::Manifest(_)
             | ReadError::DatasetFs(_)

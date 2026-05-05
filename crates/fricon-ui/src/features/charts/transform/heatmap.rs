@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use arrow_array::RecordBatch;
-use fricon::{DatasetArray, DatasetDataType, DatasetSchema};
+use fricon::{DatasetArray, DatasetPhysicalSchema, DatasetPhysicalType};
 
 use crate::features::charts::types::{
     ChartSnapshot, ComplexViewOption, FlatXYZSeries, HeatmapChartDataOptions, HeatmapChartSnapshot,
@@ -9,7 +9,7 @@ use crate::features::charts::types::{
 
 pub(crate) fn build_heatmap_series(
     batch: &RecordBatch,
-    schema: &DatasetSchema,
+    schema: &DatasetPhysicalSchema,
     options: &HeatmapChartDataOptions,
 ) -> Result<ChartSnapshot> {
     let quantity_name = &options.quantity;
@@ -18,7 +18,7 @@ pub(crate) fn build_heatmap_series(
         .columns()
         .get(quantity_name)
         .context("Column not found")?;
-    let is_trace = matches!(data_type, DatasetDataType::Trace(_, _));
+    let is_trace = matches!(data_type, DatasetPhysicalType::Trace(_, _));
     let is_complex = data_type.is_complex();
     let x_name = if is_trace {
         format!("{quantity_name} - X")
@@ -203,8 +203,8 @@ mod tests {
     use arrow_array::{ArrayRef, Float64Array};
     use arrow_schema::{DataType, Field};
     use fricon::{
-        DatasetArray, DatasetDataType, DatasetScalar, DatasetSchema, ScalarArray, ScalarKind,
-        TraceKind,
+        DatasetArray, DatasetPhysicalSchema, DatasetPhysicalType, DatasetScalar, ScalarArray,
+        ScalarKind, TraceKind,
     };
     use indexmap::IndexMap;
 
@@ -327,13 +327,13 @@ mod tests {
         let mut columns = IndexMap::new();
         columns.insert(
             "y".to_string(),
-            DatasetDataType::Scalar(ScalarKind::Numeric),
+            DatasetPhysicalType::Scalar(ScalarKind::Numeric),
         );
         columns.insert(
             "trace".to_string(),
-            DatasetDataType::Trace(TraceKind::Simple, ScalarKind::Numeric),
+            DatasetPhysicalType::Trace(TraceKind::Simple, ScalarKind::Numeric),
         );
-        let schema = DatasetSchema::new(columns);
+        let schema = DatasetPhysicalSchema::new(columns);
 
         let options = HeatmapChartDataOptions {
             quantity: "trace".to_string(),

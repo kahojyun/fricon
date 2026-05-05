@@ -14,8 +14,8 @@ semantics instead of rediscovering interpretation from raw rows.
 
 Implementation should not start until the durable foundation is settled. The
 first decision must cover the v1 manifest shape, system record IDs, reserved
-system fields, dtype vocabulary, Arrow storage direction, compatibility
-fallback, versioning implications, and the boundary between storage,
+system fields, dtype vocabulary, Arrow storage direction, minimal axis
+inference, versioning implications, and the boundary between storage,
 semantics, interpretation, and UI or chart consumers.
 
 ## Decision
@@ -34,6 +34,11 @@ The minimal v1 manifest has these top-level sections:
             "dtype": {
                 "kind": "uint64"
             },
+            "semantic": {
+                "value_kind": "numeric",
+                "shape_kind": "scalar",
+                "role": "system"
+            },
             "system": {
                 "kind": "record_id"
             }
@@ -41,6 +46,11 @@ The minimal v1 manifest has these top-level sections:
         "signal": {
             "dtype": {
                 "kind": "float64"
+            },
+            "semantic": {
+                "value_kind": "numeric",
+                "shape_kind": "scalar",
+                "role": "value"
             }
         }
     },
@@ -54,16 +64,17 @@ The minimal v1 manifest has these top-level sections:
             "kind": "latest_by_record_id"
         }
     },
-    "compatibility": {
-        "allow_inference": true
+    "inference": {
+        "allow_axis_inference": true
     }
 }
 ```
 
-`manifest_version`, `columns`, `realization`, and `compatibility` are required
-for v1. Future or non-minimal semantic datasets may add optional sections such
-as `scan_plan`, `live_defaults`, and `view_defaults`, but those sections are not
-part of the foundation implementation.
+`manifest_version`, `columns`, `realization`, and `inference` are required
+for v1. Every column entry requires both `dtype` and `semantic`. Future or
+non-minimal semantic datasets may add optional sections such as `scan_plan`,
+`live_defaults`, and `view_defaults`, but those sections are not part of the
+foundation implementation.
 
 Manifest enums should use internally tagged JSON objects such as
 `{"kind": "none"}` rather than bare strings when a value may later need fields.
@@ -88,8 +99,8 @@ ordinary Python conveniences. Explicit raw/facts APIs may expose it.
 
 The prefix `__ds_` is reserved for Fricon-owned system fields. User payload
 columns using this prefix are rejected at dataset creation or first-row schema
-freeze time. Existing manifest-free datasets are handled by compatibility
-fallback and are not rewritten solely to enforce this rule.
+freeze time. Existing manifest-free datasets are intentionally unsupported by
+the semantic reader in this PR and are not migrated.
 
 The v1 dtype vocabulary is a constrained Fricon-owned dataset dtype enum with
 Arrow-aligned primitive names and structured business variants. The initial
@@ -110,27 +121,40 @@ Allowed trace axis dtypes are numeric scalar dtypes. Allowed trace value dtypes
 are numeric scalar dtypes and `complex128`. Nested traces are invalid by type,
 not merely by late validation.
 
+Column `semantic` facets describe the durable meaning of the physical dtype:
+
+- `value_kind`: `numeric`, `categorical`, `boolean`, `timestamp`, `complex`, or
+  `display`
+- `shape_kind`: `scalar` or `trace`
+- `role`: `value`, `logical_index`, `system`, or `display`
+
+The physical dtype remains the Arrow storage contract. Semantic facets are
+validated against the dtype but may intentionally refine meaning, such as an
+integer column marked as `categorical`. Chart/rendering capabilities are not
+durable manifest fields; they are derived by resolved interpretation from
+semantic facets and current renderer support.
+
 New semantic datasets should use plain Arrow physical schemas. Fricon-specific
 meaning belongs in `dataset_manifest.json`, not in Arrow extension metadata.
 The intended physical mappings are:
 
 - `complex128` as `struct<real: float64, imag: float64>`
-- simple trace as `list<value>` with an implicit integer sample index axis
+- simple trace as `list<value>` with an implicit `uint64` sample index axis
 - fixed-step trace as `struct<x0: axis, step: axis, y: list<value>>`
 - variable-step trace as `struct<x: list<axis>, y: list<value>>`
 
-Compatibility fallback remains available for datasets without manifests,
-including old fixtures, local test data, and exploratory manifest-free data.
-Fallback inference is not the canonical path for new datasets. Consumers should
-depend on a resolved semantic model, whether that model came from an explicit
-manifest or compatibility inference.
+Minimal axis inference remains available for simple semantic manifests without
+scan plans or explicit column metadata. It preserves the low-friction
+`write(col=...)` path while still requiring a manifest. Manifest-free datasets,
+old fixtures, and exploratory raw Arrow directories are outside this PR's
+compatibility scope.
 
 The compatibility and versioning decisions for the foundation are:
 
 - adding `dataset_manifest.json` and `__ds_record_id` changes durable dataset
   payload rules and must follow the dataset payload layout checklist
-- decide the concrete `WORKSPACE_VERSION` migration at implementation time,
-  based on whether old layout remains fully supported without migration
+- no old-workspace reader compatibility is preserved for manifest-free dataset
+  payloads or earlier v1 manifests without required `semantic` facets in this PR
 - adding semantic creation metadata to Rust IPC requests requires an
   `IPC_PROTOCOL_VERSION` decision; keeping schema in the Arrow stream and
   adding no required wire fields does not by itself require an IPC bump
@@ -143,11 +167,11 @@ The ownership boundary is:
 
 - dataset storage owns Arrow chunk IO, dataset file layout, and payload facts
 - dataset semantics owns manifest serde types, defaulting, validation, and
-  compatibility loading
+  minimal axis inference settings
 - dataset interpretation owns resolved meaning, logical indices, duplicate
   projection, and chart-ready questions
 - UI, chart, and live-view consumers ask interpretation APIs for meaning
-  instead of inferring it from field order, row adjacency, or `isIndex`
+  instead of inferring it from field order, row adjacency, or legacy `isIndex`
 
 Higher-level run, measurement, parameter, provenance, workflow, AI, and device
 manifests remain out of scope for the dataset manifest v1.
@@ -156,7 +180,8 @@ manifests remain out of scope for the dataset manifest v1.
 
 Implementation can start with a narrow foundation: manifest IO, validation,
 record ID materialization, plain Arrow physical schemas for new datasets,
-compatibility fallback for old datasets, and a resolved interpretation API.
+minimal semantic inference for simple datasets, and a resolved interpretation
+API.
 
 Bare Python writes remain low-friction. Users do not need to author raw
 manifests, declare scan plans, or understand record IDs for simple datasets.
@@ -164,6 +189,10 @@ manifests, declare scan plans, or understand record IDs for simple datasets.
 Chart and UI behavior may be preserved temporarily through adapters, but the
 long-term contract is resolved interpretation rather than legacy index-column
 inference.
+
+The temporary `row_order_placeholder` duplicate-policy value belongs to resolved
+interpretation for minimal inferred physical axes only. It is not a manifest v1
+duplicate policy; manifest defaults remain `latest_by_record_id`.
 
 The manifest becomes a compatibility surface. Future changes to required
 manifest fields, system-field semantics, payload schema rules, archive entries,

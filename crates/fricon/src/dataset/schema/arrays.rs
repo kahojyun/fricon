@@ -4,14 +4,12 @@ use arrow_array::{
     Array, ArrayRef, Float64Array, ListArray, StructArray, cast::AsArray, types::Float64Type,
 };
 use arrow_buffer::OffsetBuffer;
-use arrow_schema::extension::ExtensionType;
 use derive_more::From;
 use num::complex::Complex64;
 
 use crate::dataset::schema::{
-    arrow_ext::ComplexType,
     error::DatasetError,
-    model::{DatasetDataType, ScalarKind, TraceKind},
+    model::{DatasetPhysicalType, ScalarKind, TraceKind, complex_fields},
 };
 
 #[derive(Debug, Clone)]
@@ -54,7 +52,7 @@ impl FromIterator<Complex64> for ComplexArray {
             iter.into_iter().map(|c| (c.re, c.im)).unzip();
         let real = Arc::new(Float64Array::from(real_values));
         let imag = Arc::new(Float64Array::from(imag_values));
-        let struct_array = StructArray::new(ComplexType::fields(), vec![real, imag], None);
+        let struct_array = StructArray::new(complex_fields(), vec![real, imag], None);
         ComplexArray(Arc::new(struct_array))
     }
 }
@@ -336,18 +334,18 @@ pub enum DatasetArray {
 
 impl DatasetArray {
     #[must_use]
-    pub fn data_type(&self) -> DatasetDataType {
+    pub fn data_type(&self) -> DatasetPhysicalType {
         match self {
-            DatasetArray::Numeric(_) => DatasetDataType::Scalar(ScalarKind::Numeric),
-            DatasetArray::Complex(_) => DatasetDataType::Scalar(ScalarKind::Complex),
+            DatasetArray::Numeric(_) => DatasetPhysicalType::Scalar(ScalarKind::Numeric),
+            DatasetArray::Complex(_) => DatasetPhysicalType::Scalar(ScalarKind::Complex),
             DatasetArray::SimpleTrace(t) => {
-                DatasetDataType::Trace(TraceKind::Simple, t.scalar_kind())
+                DatasetPhysicalType::Trace(TraceKind::Simple, t.scalar_kind())
             }
             DatasetArray::FixedStepTrace(t) => {
-                DatasetDataType::Trace(TraceKind::FixedStep, t.scalar_kind())
+                DatasetPhysicalType::Trace(TraceKind::FixedStep, t.scalar_kind())
             }
             DatasetArray::VariableStepTrace(t) => {
-                DatasetDataType::Trace(TraceKind::VariableStep, t.scalar_kind())
+                DatasetPhysicalType::Trace(TraceKind::VariableStep, t.scalar_kind())
             }
         }
     }
@@ -423,6 +421,9 @@ impl TryFrom<ArrayRef> for DatasetArray {
                     Ok(DatasetArray::Numeric(Arc::new(array.clone())))
                 }
                 ScalarKind::Complex => Ok(DatasetArray::Complex(value.try_into()?)),
+                ScalarKind::Boolean | ScalarKind::Utf8 | ScalarKind::TimestampUs => {
+                    Err(DatasetError::IncompatibleType)
+                }
             }
         }
     }
@@ -523,7 +524,7 @@ mod tests {
         let parsed = DatasetArray::try_from(array).expect("parse variable-step trace");
         assert_eq!(
             parsed.data_type(),
-            DatasetDataType::Trace(TraceKind::VariableStep, ScalarKind::Numeric)
+            DatasetPhysicalType::Trace(TraceKind::VariableStep, ScalarKind::Numeric)
         );
 
         let (x, y) = parsed
@@ -549,7 +550,7 @@ mod tests {
         let parsed = DatasetArray::try_from(array).expect("parse fixed-step trace");
         assert_eq!(
             parsed.data_type(),
-            DatasetDataType::Trace(TraceKind::FixedStep, ScalarKind::Numeric)
+            DatasetPhysicalType::Trace(TraceKind::FixedStep, ScalarKind::Numeric)
         );
 
         let (x, y) = parsed

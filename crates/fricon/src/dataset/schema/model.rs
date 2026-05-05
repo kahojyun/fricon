@@ -1,14 +1,29 @@
-use std::{fmt, str::FromStr, sync::Arc};
+use std::sync::Arc;
 
-use arrow_schema::{ArrowError, DataType, Field, FieldRef, Schema, extension::ExtensionType};
+use arrow_schema::{DataType, Field, FieldRef, Fields, Schema, TimeUnit};
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use crate::dataset::schema::{arrow_ext::ComplexType, error::DatasetError};
+use crate::dataset::schema::error::DatasetError;
+
+pub(crate) fn complex_fields() -> Fields {
+    vec![
+        Field::new("real", DataType::Float64, false),
+        Field::new("imag", DataType::Float64, false),
+    ]
+    .into()
+}
+
+pub(crate) fn complex_data_type() -> DataType {
+    DataType::Struct(complex_fields())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScalarKind {
     Numeric,
+    Boolean,
+    Utf8,
+    TimestampUs,
     Complex,
 }
 
@@ -16,15 +31,15 @@ impl ScalarKind {
     fn to_data_type(self) -> DataType {
         match self {
             ScalarKind::Numeric => DataType::Float64,
-            ScalarKind::Complex => ComplexType::data_type(),
+            ScalarKind::Boolean => DataType::Boolean,
+            ScalarKind::Utf8 => DataType::Utf8,
+            ScalarKind::TimestampUs => DataType::Timestamp(TimeUnit::Microsecond, None),
+            ScalarKind::Complex => complex_data_type(),
         }
     }
 
     pub fn to_field(self, name: impl Into<String>, nullable: bool) -> Field {
-        match self {
-            ScalarKind::Numeric => Field::new(name, self.to_data_type(), nullable),
-            ScalarKind::Complex => ComplexType::field(name, nullable),
-        }
+        Field::new(name, self.to_data_type(), nullable)
     }
 
     #[must_use]
@@ -45,7 +60,13 @@ impl TryFrom<&DataType> for ScalarKind {
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         if value.is_numeric() {
             Ok(ScalarKind::Numeric)
-        } else if *value == ComplexType::data_type() {
+        } else if matches!(value, DataType::Boolean) {
+            Ok(ScalarKind::Boolean)
+        } else if matches!(value, DataType::Utf8) {
+            Ok(ScalarKind::Utf8)
+        } else if matches!(value, DataType::Timestamp(TimeUnit::Microsecond, None)) {
+            Ok(ScalarKind::TimestampUs)
+        } else if *value == complex_data_type() {
             Ok(ScalarKind::Complex)
         } else {
             Err(DatasetError::IncompatibleType)
@@ -84,7 +105,7 @@ impl TraceKind {
     }
 
     pub fn to_field(self, name: impl Into<String>, item: FieldRef, nullable: bool) -> Field {
-        Field::new(name, self.to_data_type(item), nullable).with_extension_type(self)
+        Field::new(name, self.to_data_type(item), nullable)
     }
 
     #[must_use]
@@ -124,79 +145,27 @@ impl TraceKind {
     }
 }
 
-impl fmt::Display for TraceKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                TraceKind::Simple => "simple",
-                TraceKind::FixedStep => "fixed",
-                TraceKind::VariableStep => "variable",
-            }
-        )
-    }
-}
-
-impl FromStr for TraceKind {
-    type Err = ArrowError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "simple" => Ok(TraceKind::Simple),
-            "fixed" => Ok(TraceKind::FixedStep),
-            "variable" => Ok(TraceKind::VariableStep),
-            _ => Err(ArrowError::ParseError(format!("unknown trace kind {s}"))),
-        }
-    }
-}
-
-impl ExtensionType for TraceKind {
-    const NAME: &'static str = "fricon.trace";
-    type Metadata = Self;
-
-    fn metadata(&self) -> &Self::Metadata {
-        self
-    }
-
-    fn serialize_metadata(&self) -> Option<String> {
-        Some(self.to_string())
-    }
-
-    fn deserialize_metadata(metadata: Option<&str>) -> Result<Self::Metadata, ArrowError> {
-        metadata.map_or_else(
-            || Err(ArrowError::ParseError("Metadata not found".to_string())),
-            str::parse,
-        )
-    }
-
-    fn supports_data_type(&self, data_type: &DataType) -> Result<(), ArrowError> {
-        if TraceKind::parse_data_type(data_type).is_some_and(|(kind, _)| *self == kind) {
+impl TraceKind {
+    pub(crate) fn supports_data_type(self, data_type: &DataType) -> Result<(), DatasetError> {
+        if TraceKind::parse_data_type(data_type).is_some_and(|(kind, _)| self == kind) {
             Ok(())
         } else {
-            Err(ArrowError::InvalidArgumentError(format!(
-                "Trace {self} doesn't support data type {data_type}"
-            )))
+            Err(DatasetError::IncompatibleType)
         }
-    }
-
-    fn try_new(data_type: &DataType, metadata: Self::Metadata) -> Result<Self, ArrowError> {
-        metadata.supports_data_type(data_type)?;
-        Ok(metadata)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DatasetDataType {
+pub enum DatasetPhysicalType {
     Scalar(ScalarKind),
     Trace(TraceKind, ScalarKind),
 }
 
-impl DatasetDataType {
+impl DatasetPhysicalType {
     fn to_field(self, name: impl Into<String>, nullable: bool) -> Field {
         match self {
-            DatasetDataType::Scalar(scalar_kind) => scalar_kind.to_field(name, nullable),
-            DatasetDataType::Trace(trace_kind, scalar_kind) => {
+            DatasetPhysicalType::Scalar(scalar_kind) => scalar_kind.to_field(name, nullable),
+            DatasetPhysicalType::Trace(trace_kind, scalar_kind) => {
                 trace_kind.to_field(name, Arc::new(scalar_kind.to_item_field()), nullable)
             }
         }
@@ -206,37 +175,42 @@ impl DatasetDataType {
     pub fn is_complex(self) -> bool {
         matches!(
             self,
-            DatasetDataType::Scalar(ScalarKind::Complex)
-                | DatasetDataType::Trace(_, ScalarKind::Complex)
+            DatasetPhysicalType::Scalar(ScalarKind::Complex)
+                | DatasetPhysicalType::Trace(_, ScalarKind::Complex)
         )
     }
 }
 
-impl TryFrom<&DataType> for DatasetDataType {
+impl TryFrom<&DataType> for DatasetPhysicalType {
     type Error = DatasetError;
 
     fn try_from(value: &DataType) -> Result<Self, Self::Error> {
         if let Some((trace, field)) = TraceKind::parse_data_type(value) {
-            Ok(DatasetDataType::Trace(trace, field.data_type().try_into()?))
+            let scalar_kind = ScalarKind::try_from(field.data_type())?;
+            if matches!(scalar_kind, ScalarKind::Numeric | ScalarKind::Complex) {
+                Ok(DatasetPhysicalType::Trace(trace, scalar_kind))
+            } else {
+                Err(DatasetError::IncompatibleType)
+            }
         } else {
-            Ok(DatasetDataType::Scalar(value.try_into()?))
+            Ok(DatasetPhysicalType::Scalar(value.try_into()?))
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetSchema {
-    columns: IndexMap<String, DatasetDataType>,
+pub struct DatasetPhysicalSchema {
+    columns: IndexMap<String, DatasetPhysicalType>,
 }
 
-impl DatasetSchema {
+impl DatasetPhysicalSchema {
     #[must_use]
-    pub fn new(columns: IndexMap<String, DatasetDataType>) -> Self {
+    pub fn new(columns: IndexMap<String, DatasetPhysicalType>) -> Self {
         Self { columns }
     }
 
     #[must_use]
-    pub fn columns(&self) -> &IndexMap<String, DatasetDataType> {
+    pub fn columns(&self) -> &IndexMap<String, DatasetPhysicalType> {
         &self.columns
     }
 
@@ -251,7 +225,7 @@ impl DatasetSchema {
     }
 }
 
-impl TryFrom<&Schema> for DatasetSchema {
+impl TryFrom<&Schema> for DatasetPhysicalSchema {
     type Error = DatasetError;
 
     fn try_from(value: &Schema) -> Result<Self, Self::Error> {
@@ -261,7 +235,7 @@ impl TryFrom<&Schema> for DatasetSchema {
             .map(|x| {
                 Ok::<_, DatasetError>((
                     x.name().to_owned(),
-                    DatasetDataType::try_from(x.data_type())?,
+                    DatasetPhysicalType::try_from(x.data_type())?,
                 ))
             })
             .try_collect()?;
@@ -271,9 +245,10 @@ impl TryFrom<&Schema> for DatasetSchema {
 
 #[cfg(test)]
 mod tests {
-    use arrow_schema::{DataType, Field};
+    use arrow_schema::{DataType, Field, extension::EXTENSION_TYPE_NAME_KEY};
+    use indexmap::IndexMap;
 
-    use super::TraceKind;
+    use super::{DatasetPhysicalSchema, DatasetPhysicalType, ScalarKind, TraceKind};
 
     #[test]
     fn trace_kind_parse_variable_step_rejects_nullable_fields() {
@@ -300,5 +275,27 @@ mod tests {
         );
         let parsed = TraceKind::parse_data_type(&data_type).map(|(kind, _)| kind);
         assert_eq!(parsed, None);
+    }
+
+    #[test]
+    fn generated_arrow_schema_uses_plain_physical_fields() {
+        let schema = DatasetPhysicalSchema::new(IndexMap::from([
+            (
+                "complex".to_string(),
+                DatasetPhysicalType::Scalar(ScalarKind::Complex),
+            ),
+            (
+                "trace".to_string(),
+                DatasetPhysicalType::Trace(TraceKind::VariableStep, ScalarKind::Complex),
+            ),
+        ]))
+        .to_arrow_schema();
+
+        assert!(
+            schema
+                .fields()
+                .iter()
+                .all(|field| !field.metadata().contains_key(EXTENSION_TYPE_NAME_KEY))
+        );
     }
 }

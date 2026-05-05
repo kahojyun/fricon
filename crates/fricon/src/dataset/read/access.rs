@@ -3,12 +3,12 @@
 
 use tracing::instrument;
 
+use super::reader::read_required_manifest;
 use crate::{
     dataset::{
         ingest::WriteSessionRegistry,
         model::DatasetId,
         read::{DatasetReadRepository, DatasetReader, ReadError},
-        semantics::read_manifest_optional,
     },
     workspace::WorkspacePaths,
 };
@@ -32,11 +32,8 @@ pub(crate) fn get_dataset_reader(
     // Prefer the active write session so reads observe in-progress data for a
     // dataset that has not yet been finalized to disk.
     if let Some(handle) = write_sessions.get(dataset.id) {
-        Ok(DatasetReader::from_handle(
-            handle,
-            read_manifest_optional(&path)?,
-            Some(path),
-        )?)
+        let manifest = read_required_manifest(&path)?;
+        Ok(DatasetReader::from_handle(handle, manifest, Some(path))?)
     } else {
         Ok(DatasetReader::open_dir(&path)?)
     }

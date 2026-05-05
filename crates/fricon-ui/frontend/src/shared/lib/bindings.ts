@@ -64,13 +64,67 @@ export type ChartCommonOptions = {
 	excludeColumns: string[] | null,
 };
 
+export type ChartDuplicatePolicy = "latest_by_record_id" | "row_order_placeholder";
+
+export type ChartIndexRealization = "none" | "implicit" | "sidecar";
+
+export type ChartSemanticAxis = {
+	id: string,
+	name: string,
+	label: string | null,
+	kind: ChartSemanticAxisKind,
+	semantic: ChartSemanticDescriptor,
+	capabilities: ChartSemanticCapabilities,
+	isInferredAxis: boolean,
+};
+
+export type ChartSemanticAxisKind = "logical_index" | "column";
+
+export type ChartSemanticCapabilities = {
+	numericCoordinate: boolean,
+	filterable: boolean,
+	groupable: boolean,
+	traceSource: boolean,
+	complexProjectable: boolean,
+	plottableValue: boolean,
+};
+
+export type ChartSemanticColumn = {
+	id: string,
+	name: string,
+	label: string | null,
+	semantic: ChartSemanticDescriptor,
+	capabilities: ChartSemanticCapabilities,
+	hiddenByDefault: boolean,
+};
+
+export type ChartSemanticDescriptor = {
+	valueKind: ChartSemanticValueKind,
+	shapeKind: ChartSemanticShapeKind,
+	role: ChartSemanticRole,
+};
+
+export type ChartSemanticRole = "value" | "logical_index" | "system" | "display";
+
+export type ChartSemanticShapeKind = "scalar" | "trace";
+
+export type ChartSemanticValueKind = "numeric" | "categorical" | "boolean" | "timestamp" | "complex" | "display";
+
+export type ChartSemantics = {
+	duplicatePolicy: ChartDuplicatePolicy,
+	indexRealization: ChartIndexRealization,
+	axes: ChartSemanticAxis[],
+	valueColumns: ChartSemanticColumn[],
+	chartAxisCandidates: ChartSemanticAxis[],
+};
+
 export type ColumnInfo = {
 	name: string,
 	label: string | null,
 	unit: string | null,
-	isComplex: boolean,
-	isTrace: boolean,
-	isIndex: boolean,
+	semantic: ChartSemanticDescriptor,
+	capabilities: ChartSemanticCapabilities,
+	isInferredAxis: boolean,
 	hiddenByDefault: boolean,
 	isChartAxisCandidate: boolean,
 };
@@ -132,6 +186,7 @@ export type DatasetDetail = {
 	deletedAt: string | null,
 	payloadAvailable: boolean,
 	columns: ColumnInfo[],
+	chartSemantics: ChartSemantics | null,
 };
 
 export type DatasetFavoriteUpdate = {
@@ -223,6 +278,7 @@ export type Row = {
 
 export type TableData = {
 	fields: string[],
+	fieldLabels: { [key in string]: string },
 	rows: Row[],
 	columnUniqueValues: { [key in string]: ColumnUniqueValue[] },
 };

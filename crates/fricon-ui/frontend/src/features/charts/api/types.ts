@@ -1,5 +1,11 @@
 import type {
   ColumnUniqueValue,
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticValueKind,
+  ChartSemantics,
   DatasetChartDataOptions as WireChartDataOptions,
   DatasetWriteStatus,
   FilterTableOptions,
@@ -15,6 +21,12 @@ import type {
 } from "@/shared/lib/chartTypes";
 
 export type {
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticValueKind,
+  ChartSemantics,
   ColumnUniqueValue,
   DatasetStatus,
   DatasetWriteStatus,
@@ -24,21 +36,26 @@ export type {
 
 export interface ColumnInfo {
   name: string;
-  isComplex: boolean;
-  isTrace: boolean;
-  isIndex: boolean;
+  label?: string | null;
+  semantic: ChartSemanticDescriptor;
+  capabilities: ChartSemanticCapabilities;
+  isInferredAxis: boolean;
+  hiddenByDefault?: boolean;
+  isChartAxisCandidate?: boolean;
 }
 
 export interface DatasetDetail {
   status: DatasetStatus;
   payloadAvailable: boolean;
   columns: ColumnInfo[];
+  chartSemantics?: ChartSemantics | null;
 }
 
 export type ChartViewerAvailability = "loading" | "available" | "tombstone";
 
 export interface FilterTableData {
   fields: string[];
+  fieldLabels: Record<string, string>;
   rows: FilterTableRow[];
   columnUniqueValues: Record<string, ColumnUniqueValue[]>;
 }
@@ -198,6 +215,7 @@ export function normalizeFilterTableData(
   );
   return {
     fields: result.fields,
+    fieldLabels: result.fieldLabels ?? {},
     rows: result.rows,
     columnUniqueValues,
   };

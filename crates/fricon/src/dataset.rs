@@ -13,21 +13,29 @@ mod tag;
 pub use self::{
     events::DatasetEvent,
     interpret::{
-        ColumnMeaning, DatasetInterpretation, InterpretationSource, PhysicalColumnOrdinal,
-        ResolvedColumn, ResolvedDuplicatePolicy, ResolvedIndexRealization,
-        ResolvedLogicalIndexPoint, ResolvedScanAxis, ResolvedScanAxisMode, VisibleColumnOrdinal,
+        ColumnMeaning, DatasetInterpretation, PhysicalColumnOrdinal, ResolvedColumn,
+        ResolvedDuplicatePolicy, ResolvedIndexRealization, ResolvedLogicalIndexPoint,
+        ResolvedLogicalIndexReference, ResolvedPhysicalColumnReference, ResolvedScanAxis,
+        ResolvedScanAxisMode, ResolvedSemanticCapabilities, ResolvedSemanticDescriptor,
+        ResolvedSemanticReference, VisibleColumnOrdinal, logical_index_id, physical_column_id,
     },
     model::{
         DatasetId, DatasetListQuery, DatasetMetadata, DatasetRecord, DatasetSortBy, DatasetStatus,
         DatasetUpdate, SortDirection,
     },
     portability::{ExportedMetadata, FieldDiff, ImportConflict, ImportPreview, PortabilityError},
-    read::{DatasetReader, SelectOptions},
-    schema::{
-        DatasetArray, DatasetDataType, DatasetRow, DatasetScalar, DatasetSchema, FixedStepTrace,
-        ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
+    read::{
+        DatasetReader, ProjectedSemanticAxis, ProjectedSemanticRoles, ProjectedSemanticSource,
+        SelectOptions, SemanticProjectionOptions, project_semantic_source,
     },
-    semantics::{ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan},
+    schema::{
+        DatasetArray, DatasetPhysicalSchema, DatasetPhysicalType, DatasetRow, DatasetScalar,
+        FixedStepTrace, ScalarArray, ScalarKind, TraceKind, VariableStepTrace,
+    },
+    semantics::{
+        ColumnMetadata, ScanAxis, ScanAxisMode, ScanAxisValue, ScanPlan, SemanticDescriptor,
+        SemanticRole, SemanticShapeKind, SemanticValueKind,
+    },
 };
 pub(crate) use self::{
     ingest::{CreateDatasetInput, CreateDatasetRequest},

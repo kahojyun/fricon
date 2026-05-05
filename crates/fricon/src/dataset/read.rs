@@ -3,6 +3,7 @@
 
 mod access;
 mod error;
+mod projection;
 mod reader;
 mod service;
 
@@ -12,7 +13,14 @@ use arrow_array::RecordBatch;
 use uuid::Uuid;
 
 pub(crate) use self::service::DatasetReadService;
-pub use self::{error::ReadError, reader::DatasetReader};
+pub use self::{
+    error::ReadError,
+    projection::{
+        ProjectedSemanticAxis, ProjectedSemanticRoles, ProjectedSemanticSource,
+        SemanticProjectionOptions, project_semantic_source,
+    },
+    reader::DatasetReader,
+};
 use crate::dataset::model::DatasetId;
 
 /// Repository-side location information needed to open a dataset payload.

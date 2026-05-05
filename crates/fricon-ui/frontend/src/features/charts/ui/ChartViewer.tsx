@@ -25,8 +25,10 @@ export function ChartViewer({ datasetId, datasetDetail }: ChartViewerProps) {
         ? "available"
         : "tombstone";
 
-  const columns = datasetDetail?.columns ?? [];
-  const selection = useChartViewerSelection(columns, datasetDetail?.status);
+  const selection = useChartViewerSelection(
+    datasetDetail?.status,
+    datasetDetail?.chartSemantics,
+  );
   const isLiveMode = selection.controlState.isLiveMode;
   const { chartData, chartError, chartInteractionKey, filterTableProps } =
     useChartViewerData({

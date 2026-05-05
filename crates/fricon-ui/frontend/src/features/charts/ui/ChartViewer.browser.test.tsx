@@ -10,7 +10,13 @@ import {
 import userEvent from "@testing-library/user-event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { describe, expect, it, vi } from "vitest";
-import type { DatasetDetail } from "../api/types";
+import {
+  columnId,
+  makeDatasetDetail,
+  makeFilterTableData,
+  makeSemanticCapabilities,
+  makeSemanticDescriptor,
+} from "../test-utils";
 import type { NumericLabelFormatOptions } from "@/shared/lib/chartTypes";
 import {
   encodeChartSnapshotBufferForTest,
@@ -61,13 +67,10 @@ function createQueryClient() {
   });
 }
 
-function makeDetail(overrides: Partial<DatasetDetail> = {}): DatasetDetail {
-  return {
-    status: "Completed",
-    payloadAvailable: true,
-    columns: [],
-    ...overrides,
-  };
+function makeDetail(
+  overrides: Parameters<typeof makeDatasetDetail>[0] = {},
+): ReturnType<typeof makeDatasetDetail> {
+  return makeDatasetDetail(overrides);
 }
 
 async function getSelectTrigger(label: string) {
@@ -88,7 +91,7 @@ describe("ChartViewer", () => {
   it("defaults chart numeric formatting to SI prefix with 4 significant digits", async () => {
     mockIPC((cmd) => {
       if (cmd === "get_filter_table_data") {
-        return { fields: [], rows: [], columnUniqueValues: {} };
+        return makeFilterTableData();
       }
       if (cmd === "dataset_chart_data") {
         return encodeChartSnapshotBufferForTest({
@@ -121,12 +124,13 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "t",
+                isInferredAxis: true,
+              },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -148,7 +152,7 @@ describe("ChartViewer", () => {
   it("updates chart numeric formatting from advanced controls", async () => {
     mockIPC((cmd) => {
       if (cmd === "get_filter_table_data") {
-        return { fields: [], rows: [], columnUniqueValues: {} };
+        return makeFilterTableData();
       }
       if (cmd === "dataset_chart_data") {
         return encodeChartSnapshotBufferForTest({
@@ -182,12 +186,13 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "t",
+                isInferredAxis: true,
+              },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -257,7 +262,7 @@ describe("ChartViewer", () => {
   it("renders chart error alert on query failure", async () => {
     mockIPC((cmd) => {
       if (cmd === "get_filter_table_data") {
-        return { fields: [], rows: [], columnUniqueValues: {} };
+        return makeFilterTableData();
       }
       if (cmd === "dataset_chart_data") {
         throw new Error("Internal Server Error");
@@ -274,8 +279,14 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
-              { name: "v", isComplex: false, isTrace: false, isIndex: false },
+              {
+                name: "t",
+                isInferredAxis: true,
+              },
+              {
+                name: "v",
+                isInferredAxis: false,
+              },
             ],
           })}
         />
@@ -294,16 +305,16 @@ describe("ChartViewer", () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
       if (cmd === "get_filter_table_data") {
-        return {
-          fields: ["idxA", "idxB"],
+        return makeFilterTableData({
+          fields: [columnId("idxA"), columnId("idxB")],
           rows: [
             { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
           ],
           columnUniqueValues: {
-            idxA: [{ index: 1, displayValue: "1" }],
-            idxB: [{ index: 1, displayValue: "10" }],
+            [columnId("idxA")]: [{ index: 1, displayValue: "1" }],
+            [columnId("idxB")]: [{ index: 1, displayValue: "10" }],
           },
-        };
+        });
       }
       if (cmd === "dataset_chart_data") {
         if (payload && typeof payload === "object") {
@@ -336,13 +347,24 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "idxA",
+                isInferredAxis: true,
+              },
+              {
+                name: "idxB",
+                isInferredAxis: true,
+              },
               {
                 name: "trace_signal",
-                isComplex: false,
-                isTrace: true,
-                isIndex: false,
+                semantic: makeSemanticDescriptor({ shapeKind: "trace" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  filterable: false,
+                  groupable: false,
+                  traceSource: true,
+                }),
+                isInferredAxis: false,
               },
             ],
           })}
@@ -366,7 +388,7 @@ describe("ChartViewer", () => {
       };
       expect(options.view).toBe("heatmap");
       expect(options.xColumn).toBeNull();
-      expect(options.yColumn).toBe("idxB");
+      expect(options.yColumn).toBe(columnId("idxB"));
     });
 
     clearMocks();
@@ -378,7 +400,7 @@ describe("ChartViewer", () => {
     mockIPC((cmd) => {
       if (cmd === "get_filter_table_data") {
         filterTableCallCount += 1;
-        return {
+        return makeFilterTableData({
           fields: ["A", "B"],
           rows: [
             { index: 1, displayValues: ["A1", "B1"], valueIndices: [1, 1] },
@@ -395,7 +417,7 @@ describe("ChartViewer", () => {
               { index: 2, displayValue: "B2" },
             ],
           },
-        };
+        });
       }
       if (cmd === "dataset_chart_data") {
         chartCallCount += 1;
@@ -429,12 +451,13 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "t",
+                isInferredAxis: true,
+              },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -470,16 +493,16 @@ describe("ChartViewer", () => {
     const chartPayloads: Record<string, unknown>[] = [];
     mockIPC((cmd, payload) => {
       if (cmd === "get_filter_table_data") {
-        return {
-          fields: ["idxA", "idxB"],
+        return makeFilterTableData({
+          fields: [columnId("idxA"), columnId("idxB")],
           rows: [
             { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
           ],
           columnUniqueValues: {
-            idxA: [{ index: 1, displayValue: "1" }],
-            idxB: [{ index: 1, displayValue: "10" }],
+            [columnId("idxA")]: [{ index: 1, displayValue: "1" }],
+            [columnId("idxB")]: [{ index: 1, displayValue: "10" }],
           },
-        };
+        });
       }
       if (cmd === "dataset_chart_data") {
         if (payload && typeof payload === "object") {
@@ -514,9 +537,23 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
-              { name: "c", isComplex: true, isTrace: false, isIndex: false },
+              {
+                name: "idxA",
+                isInferredAxis: true,
+              },
+              {
+                name: "idxB",
+                isInferredAxis: true,
+              },
+              {
+                name: "c",
+                semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
+                isInferredAxis: false,
+              },
             ],
           })}
         />
@@ -541,8 +578,8 @@ describe("ChartViewer", () => {
       };
       expect(options.view).toBe("xy");
       expect(options.plotMode).toBe("complex_plane");
-      expect(options.sweepIndexColumn).toBe("idxB");
-      expect(options.excludeColumns).toEqual(["idxB"]);
+      expect(options.sweepIndexColumn).toBe(columnId("idxB"));
+      expect(options.excludeColumns).toEqual([columnId("idxB")]);
     });
 
     clearMocks();
@@ -551,16 +588,16 @@ describe("ChartViewer", () => {
   it("does not offer a None sweep axis for quantity-vs-sweep plots", async () => {
     mockIPC((cmd) => {
       if (cmd === "get_filter_table_data") {
-        return {
-          fields: ["idxA", "idxB"],
+        return makeFilterTableData({
+          fields: [columnId("idxA"), columnId("idxB")],
           rows: [
             { index: 1, displayValues: ["1", "10"], valueIndices: [1, 1] },
           ],
           columnUniqueValues: {
-            idxA: [{ index: 1, displayValue: "1" }],
-            idxB: [{ index: 1, displayValue: "10" }],
+            [columnId("idxA")]: [{ index: 1, displayValue: "1" }],
+            [columnId("idxB")]: [{ index: 1, displayValue: "10" }],
           },
-        };
+        });
       }
       if (cmd === "dataset_chart_data") {
         return encodeChartSnapshotBufferForTest({
@@ -592,13 +629,17 @@ describe("ChartViewer", () => {
           datasetId={1}
           datasetDetail={makeDetail({
             columns: [
-              { name: "idxA", isComplex: false, isTrace: false, isIndex: true },
-              { name: "idxB", isComplex: false, isTrace: false, isIndex: true },
+              {
+                name: "idxA",
+                isInferredAxis: true,
+              },
+              {
+                name: "idxB",
+                isInferredAxis: true,
+              },
               {
                 name: "signal",
-                isComplex: false,
-                isTrace: false,
-                isIndex: false,
+                isInferredAxis: false,
               },
             ],
           })}
@@ -665,8 +706,19 @@ describe("ChartViewer", () => {
           datasetDetail={makeDetail({
             status: "Writing",
             columns: [
-              { name: "t", isComplex: false, isTrace: false, isIndex: true },
-              { name: "sig", isComplex: true, isTrace: false, isIndex: false },
+              {
+                name: "t",
+                isInferredAxis: true,
+              },
+              {
+                name: "sig",
+                semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
+                isInferredAxis: false,
+              },
             ],
           })}
         />
@@ -688,7 +740,7 @@ describe("ChartViewer", () => {
       expect(options.view).toBe("xy");
       expect(options.plotMode).toBe("quantity_vs_sweep");
       expect(options.drawStyle).toBe("line");
-      expect(options.sweepIndexColumn).toBe("t");
+      expect(options.sweepIndexColumn).toBe(columnId("t"));
       expect(options.tailCount).toBe(5);
       expect(options.complex_views).toEqual(["real", "imag"]);
     });
@@ -756,27 +808,24 @@ describe("ChartViewer", () => {
             columns: [
               {
                 name: "idx_cycle",
-                isComplex: false,
-                isTrace: false,
-                isIndex: true,
+                isInferredAxis: true,
               },
               {
                 name: "idx_y",
-                isComplex: false,
-                isTrace: false,
-                isIndex: true,
+                isInferredAxis: true,
               },
               {
                 name: "idx_x",
-                isComplex: false,
-                isTrace: false,
-                isIndex: true,
+                isInferredAxis: true,
               },
               {
                 name: "complex_impedance_ohm",
-                isComplex: true,
-                isTrace: false,
-                isIndex: false,
+                semantic: makeSemanticDescriptor({ valueKind: "complex" }),
+                capabilities: makeSemanticCapabilities({
+                  numericCoordinate: false,
+                  complexProjectable: true,
+                }),
+                isInferredAxis: false,
               },
             ],
           })}
@@ -807,8 +856,11 @@ describe("ChartViewer", () => {
       };
       expect(options.plotMode).toBe("complex_plane");
       expect(options.tailCount).toBe(5);
-      expect(options.sweepIndexColumn).toBe("idx_x");
-      expect(options.traceGroupIndexColumns).toEqual(["idx_cycle", "idx_y"]);
+      expect(options.sweepIndexColumn).toBe(columnId("idx_x"));
+      expect(options.traceGroupIndexColumns).toEqual([
+        columnId("idx_cycle"),
+        columnId("idx_y"),
+      ]);
     });
 
     const liveWindowTrigger = await getSelectTrigger("Recent Sweeps");

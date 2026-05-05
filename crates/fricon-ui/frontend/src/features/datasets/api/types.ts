@@ -1,5 +1,13 @@
 import type {
   ColumnInfo as WireColumnInfo,
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticRole,
+  ChartSemanticShapeKind,
+  ChartSemanticValueKind,
+  ChartSemantics,
   DatasetDeleteResult,
   DatasetOperationError,
   DatasetTagBatchResult,
@@ -28,28 +36,19 @@ export type DatasetInfo = Omit<
 
 export type DatasetDetail = Omit<
   WireDatasetDetail,
-  "createdAt" | "trashedAt" | "deletedAt" | "columns"
+  "createdAt" | "trashedAt" | "deletedAt" | "columns" | "chartSemantics"
 > & {
   createdAt: Date;
   trashedAt: Date | null;
   deletedAt: Date | null;
-  columns: DatasetColumnInfo[];
+  columns: WireColumnInfo[];
+  chartSemantics: ChartSemantics | null;
 };
 
 export const DATASET_PAGE_SIZE = 200;
 
-export interface DatasetColumnInfo {
-  name: string;
-  label: string | null;
-  unit: string | null;
-  isComplex: boolean;
-  isTrace: boolean;
-  isIndex: boolean;
-  hiddenByDefault: boolean;
-  isChartAxisCandidate: boolean;
-}
-
-export type ColumnInfo = DatasetColumnInfo;
+export type DatasetColumnInfo = WireColumnInfo;
+export type ColumnInfo = WireColumnInfo;
 
 export type {
   DatasetDeleteResult,
@@ -64,6 +63,14 @@ export type {
   UiImportConflict,
   UiFieldDiff,
   UiExportedMetadata,
+  ChartSemanticAxis,
+  ChartSemanticCapabilities,
+  ChartSemanticColumn,
+  ChartSemanticDescriptor,
+  ChartSemanticRole,
+  ChartSemanticShapeKind,
+  ChartSemanticValueKind,
+  ChartSemantics,
 };
 
 export type DatasetViewMode = "active" | "trash";
@@ -90,19 +97,7 @@ export function normalizeDatasetDetail(
   const normalized = normalizeDatasetDates(value);
   return {
     ...normalized,
-    columns: value.columns.map(normalizeDatasetColumnInfo),
-  };
-}
-
-function normalizeDatasetColumnInfo(value: WireColumnInfo): DatasetColumnInfo {
-  return {
-    name: value.name,
-    label: value.label,
-    unit: value.unit,
-    isComplex: value.isComplex,
-    isTrace: value.isTrace,
-    isIndex: value.isIndex,
-    hiddenByDefault: value.hiddenByDefault,
-    isChartAxisCandidate: value.isChartAxisCandidate,
+    columns: value.columns,
+    chartSemantics: value.chartSemantics ?? null,
   };
 }

@@ -34,7 +34,7 @@ every canonical document.
 | Workspace format or metadata compatibility  | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Architecture background unless boundary design is unclear              |
 | Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`              | Public docs unless behavior is user-visible                            |
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                          | Public docs unless behavior is user-visible                            |
-| Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, dataset semantic proposal status only                                 | Implementation plan details unless landed behavior is being documented |
+| Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, `current-dataset-semantics.md`                                        | Implementation plan details unless landed behavior is being documented |
 | v0.2 product or architecture reset          | `v0.2/README.md`                         | `v0.2/design.md`, `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `adr/README.md`       | Treating v0.2 proposal content as current behavior                     |
 | Measurement-system foundation redesign      | `v0.2/design.md`                         | `project-intent.md`, `roadmap.md`, `dataset-semantic-architecture-proposal.md`, `v0.2/archive/README.md`, `adr/README.md` | Treating archived proposal content as active v0.2 guidance             |
 | Parameter management product planning       | `v0.2/design.md`                         | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `v0.2/future-concepts.md`, `v0.2/archive/README.md`, `adr/README.md` | Treating archived proposal content as active v0.2 guidance             |
@@ -71,6 +71,8 @@ These files describe the current implementation. Update them when the
 implementation changes.
 
 - `current-storage-notes.md` - current workspace and dataset storage details
+- `current-dataset-semantics.md` - current dataset semantic model, writer
+  metadata, reader interpretation, and chart projection behavior
 
 ## Architecture Notes
 
@@ -84,8 +86,9 @@ checklist, policy, or guideline.
 
 ## Proposals
 
-This file describes proposed future direction. Do not treat it as current
-implementation fact unless the implementation has already landed.
+These files describe proposed or historical direction. Do not treat them as
+current implementation fact unless a current implementation note confirms that
+the behavior has landed.
 
 - `v0.2/` - canonical planning directory for the proposed v0.2 reset. It now
   owns the active non-implemented proposal set. Start with `v0.2/design.md` for
@@ -94,8 +97,10 @@ implementation fact unless the implementation has already landed.
   boundary, and rewrite strategy. Historical proposal inputs live under
   `v0.2/archive/` and should not override the canonical v0.2 documents.
 - `dataset-semantic-architecture-proposal.md` - dataset-specific semantic
-  proposal that has active implementation work. Reconcile it with the broader
-  v0.2 direction before committing additional durable APIs or storage contracts.
+  proposal, historical implementation rationale, and remaining roadmap pressure.
+  The implemented v0.1 contract lives in `current-dataset-semantics.md`; reconcile
+  future semantic work with the broader v0.2 direction before committing
+  additional durable APIs or storage contracts.
 
 ## Maintenance Rules
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ColumnInfo, DatasetStatus } from "../api/types";
+import type { ChartSemantics, DatasetStatus } from "../api/types";
 import type {
   ChartView,
   ComplexViewOption,
@@ -46,8 +46,8 @@ export interface ChartViewerControlActions {
 }
 
 export function useChartViewerSelection(
-  columns: ColumnInfo[],
   datasetStatus?: DatasetStatus,
+  chartSemantics?: ChartSemantics | null,
 ) {
   const [view, setView] = useState<ChartView>("xy");
   const [plotMode, setPlotMode] = useState<XYPlotMode>("quantity_vs_sweep");
@@ -91,20 +91,23 @@ export function useChartViewerSelection(
   const isLiveMode =
     currentLiveModeSelection?.value ?? datasetStatus === "Writing";
 
-  const derived = deriveChartViewerState(columns, {
-    view,
-    plotMode,
-    drawStyle,
-    sweepQuantityName,
-    heatmapQuantityName,
-    complexPlaneQuantityName,
-    xyXName,
-    xyYName,
-    heatmapXName,
-    heatmapYName,
-    traceGroupIndexColumnNames,
-    sweepIndexColumnName,
-  });
+  const derived = deriveChartViewerState(
+    {
+      view,
+      plotMode,
+      drawStyle,
+      sweepQuantityName,
+      heatmapQuantityName,
+      complexPlaneQuantityName,
+      xyXName,
+      xyYName,
+      heatmapXName,
+      heatmapYName,
+      traceGroupIndexColumnNames,
+      sweepIndexColumnName,
+    },
+    chartSemantics,
+  );
 
   const controlState: ChartViewerControlState = {
     selectedComplexView,

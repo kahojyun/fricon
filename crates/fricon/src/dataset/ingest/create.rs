@@ -141,7 +141,11 @@ where
     match terminal {
         CreateDatasetInput::Finish => {
             if !manifest_written
-                && let Err(error) = write_empty_manifest(&dataset_path, request.scan_plan.clone())
+                && let Err(error) = write_empty_manifest(
+                    &dataset_path,
+                    request.scan_plan.clone(),
+                    request.logical_index_sidecar,
+                )
             {
                 debug!(error = %error, "Failed to write empty dataset semantic manifest");
                 let _ = repo.update_status(dataset_record.id, DatasetStatus::Aborted);
@@ -211,9 +215,12 @@ fn write_minimal_manifest(
 fn write_empty_manifest(
     dataset_path: &std::path::Path,
     scan_plan: Option<ScanPlan>,
+    logical_index_sidecar: bool,
 ) -> Result<(), IngestError> {
-    let manifest = DatasetSemanticManifest::minimal(std::iter::empty::<(String, ManifestColumn)>())
-        .with_scan_plan(scan_plan);
+    let mut manifest =
+        DatasetSemanticManifest::minimal(std::iter::empty::<(String, ManifestColumn)>());
+    manifest.apply_scan_plan_with_realization(scan_plan, logical_index_sidecar);
+    manifest.validate().map_err(ManifestError::from)?;
     write_manifest(dataset_path, &manifest)?;
     Ok(())
 }
@@ -233,8 +240,8 @@ mod tests {
             events::{DatasetEvent, test_utils::CollectEvents},
             model::{DatasetMetadata, DatasetStatus},
             semantics::{
-                ColumnMetadata, DatasetDType, ManifestError, ManifestValidationError,
-                RECORD_ID_COLUMN, read_manifest,
+                ColumnMetadata, DatasetDType, IndexRealization, ManifestError,
+                ManifestValidationError, RECORD_ID_COLUMN, ScanAxis, ScanAxisValue, read_manifest,
             },
             storage::layout::manifest_path,
         },
@@ -394,6 +401,38 @@ mod tests {
     }
 
     #[test]
+    fn finish_without_batches_preserves_sidecar_scan_realization() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
+        let paths = workspace.paths().clone();
+        let repo = FakeRepo::new();
+        let events = CollectEvents::default();
+        let write_sessions = WriteSessionRegistry::new();
+        let mut request = create_request();
+        request.scan_plan = Some(ScanPlan::new(vec![
+            ScanAxis::static_values("restart", vec![ScanAxisValue::Int(0)]),
+            ScanAxis::implicit_index("step", None),
+        ]));
+        request.logical_index_sidecar = true;
+        let mut inputs = VecDeque::from(vec![CreateDatasetInput::Finish]);
+
+        create_dataset_with(&repo, &paths, &events, &write_sessions, &request, || {
+            inputs.pop_front()
+        })
+        .expect("create empty sidecar dataset");
+
+        let manifest = read_manifest(manifest_path(
+            &paths.dataset_path_from_uid(repo.created_uid()),
+        ))
+        .expect("read manifest");
+        assert_eq!(
+            manifest.realization.index_realization,
+            IndexRealization::Sidecar
+        );
+        manifest.validate().expect("manifest should be valid");
+    }
+
+    #[test]
     fn abort_marks_dataset_aborted() {
         let temp_dir = TempDir::new().expect("temp dir");
         let workspace = WorkspaceRoot::create_new(temp_dir.path()).expect("workspace");
@@ -471,7 +510,7 @@ mod tests {
         );
         assert_eq!(manifest.columns["id"].dtype, DatasetDType::Float64);
         assert!(manifest.realization.append_only);
-        assert!(manifest.compatibility.allow_inference);
+        assert!(manifest.inference.allow_axis_inference);
     }
 
     #[test]

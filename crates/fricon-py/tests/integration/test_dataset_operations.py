@@ -44,6 +44,54 @@ class TestDatasetOperations:
         message = f"Dataset '{name}' did not reach status '{expected_status}' in time"
         raise AssertionError(message)
 
+    @staticmethod
+    def _read_manifest(dataset_path: Path) -> dict[str, object]:
+        return cast(
+            "dict[str, object]",
+            json.loads((dataset_path / "dataset_manifest.json").read_text()),
+        )
+
+    @staticmethod
+    def _semantic(
+        value_kind: str,
+        shape_kind: str = "scalar",
+        role: str = "value",
+    ) -> dict[str, str]:
+        return {
+            "value_kind": value_kind,
+            "shape_kind": shape_kind,
+            "role": role,
+        }
+
+    @staticmethod
+    def _assert_semantic_manifest_defaults(
+        manifest: dict[str, object],
+        *,
+        index_realization: str,
+    ) -> None:
+        assert manifest["manifest_version"] == 1
+        assert "compatibility" not in manifest
+        columns = cast("dict[str, object]", manifest["columns"])
+        assert cast("dict[str, object]", columns["__ds_record_id"]) == {
+            "dtype": {"kind": "uint64"},
+            "semantic": {
+                "value_kind": "numeric",
+                "shape_kind": "scalar",
+                "role": "system",
+            },
+            "system": {"kind": "record_id"},
+        }
+        realization = cast("dict[str, object]", manifest["realization"])
+        assert realization["append_only"] is True
+        assert realization["record_id_column"] == "__ds_record_id"
+        assert realization["index_realization"] == {"kind": index_realization}
+        assert realization["duplicate_resolution_default"] == {
+            "kind": "latest_by_record_id"
+        }
+        assert cast("dict[str, object]", manifest["inference"]) == {
+            "allow_axis_inference": True
+        }
+
     def test_dataset_writer_context_manager(self) -> None:
         """Test dataset writer with context manager."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -89,17 +137,22 @@ class TestDatasetOperations:
                 writer.write(measurement=1.0 + 2.0j, voltage=0.25)
                 dataset = writer.finish()
 
-            manifest_path = Path(dataset.path) / "dataset_manifest.json"
-            manifest = cast("dict[str, object]", json.loads(manifest_path.read_text()))
+            manifest = self._read_manifest(Path(dataset.path))
+            self._assert_semantic_manifest_defaults(
+                manifest,
+                index_realization="none",
+            )
             columns = cast("dict[str, object]", manifest["columns"])
             voltage = cast("dict[str, object]", columns["voltage"])
             assert voltage["dtype"] == {"kind": "float64"}
+            assert voltage["semantic"] == self._semantic("numeric")
             assert voltage["unit"] == "V"
             assert voltage["label"] == "Voltage"
             assert voltage["hidden_by_default"] is True
             assert voltage["chart_axis"] is True
             measurement = cast("dict[str, object]", columns["measurement"])
             assert measurement["dtype"] == {"kind": "complex128"}
+            assert measurement["semantic"] == self._semantic("complex")
             assert dataset.to_arrow().column_names == ["voltage", "measurement"]
 
             server_handle.shutdown()
@@ -118,13 +171,15 @@ class TestDatasetOperations:
                 writer.write(phase=1.5)
                 dataset = writer.finish()
 
-            manifest = cast(
-                "dict[str, object]",
-                json.loads((Path(dataset.path) / "dataset_manifest.json").read_text()),
+            manifest = self._read_manifest(Path(dataset.path))
+            self._assert_semantic_manifest_defaults(
+                manifest,
+                index_realization="none",
             )
             columns = cast("dict[str, object]", manifest["columns"])
             phase = cast("dict[str, object]", columns["phase"])
             assert phase["dtype"] == {"kind": "float64"}
+            assert phase["semantic"] == self._semantic("numeric")
             assert phase["unit"] == "rad"
 
             server_handle.shutdown()
@@ -146,17 +201,35 @@ class TestDatasetOperations:
                 writer.write(signal=1.0)
                 dataset = writer.finish()
 
-            manifest = cast(
-                "dict[str, object]",
-                json.loads((Path(dataset.path) / "dataset_manifest.json").read_text()),
+            manifest = self._read_manifest(Path(dataset.path))
+            self._assert_semantic_manifest_defaults(
+                manifest,
+                index_realization="implicit",
             )
             scan_plan = cast("dict[str, object]", manifest["scan_plan"])
             axes = cast("list[dict[str, object]]", scan_plan["axes"])
-            assert axes[0]["name"] == "gate"
-            assert axes[1]["name"] == "bias"
-            assert cast("dict[str, object]", manifest["realization"])[
-                "index_realization"
-            ] == {"kind": "implicit"}
+            assert axes == [
+                {
+                    "name": "gate",
+                    "mode": {
+                        "kind": "static",
+                        "values": [
+                            {"kind": "float", "value": -0.2},
+                            {"kind": "float", "value": -0.1},
+                        ],
+                    },
+                },
+                {
+                    "name": "bias",
+                    "mode": {
+                        "kind": "static",
+                        "values": [
+                            {"kind": "int", "value": 0},
+                            {"kind": "int", "value": 1},
+                        ],
+                    },
+                },
+            ]
 
             server_handle.shutdown()
             assert not server_handle.is_running
@@ -174,9 +247,10 @@ class TestDatasetOperations:
                 writer.write(loss=1.0)
                 dataset = writer.finish()
 
-            manifest = cast(
-                "dict[str, object]",
-                json.loads((Path(dataset.path) / "dataset_manifest.json").read_text()),
+            manifest = self._read_manifest(Path(dataset.path))
+            self._assert_semantic_manifest_defaults(
+                manifest,
+                index_realization="implicit",
             )
             scan_plan = cast("dict[str, object]", manifest["scan_plan"])
             axes = cast("list[dict[str, object]]", scan_plan["axes"])
@@ -212,13 +286,11 @@ class TestDatasetOperations:
                 dataset = writer.finish()
 
             dataset_path = Path(dataset.path)
-            manifest = cast(
-                "dict[str, object]",
-                json.loads((dataset_path / "dataset_manifest.json").read_text()),
+            manifest = self._read_manifest(dataset_path)
+            self._assert_semantic_manifest_defaults(
+                manifest,
+                index_realization="sidecar",
             )
-            assert cast("dict[str, object]", manifest["realization"])[
-                "index_realization"
-            ] == {"kind": "sidecar"}
             assert (dataset_path / "logical_index_chunk_0.arrow").exists()
             assert "__ds_record_id" not in dataset.to_polars().collect().columns
 
@@ -250,8 +322,6 @@ class TestDatasetOperations:
                 _ = dm.create("empty_scan", scan={})
             with pytest.raises(ValueError, match="static scan axis gate"):
                 _ = dm.create("empty_axis", scan={"gate": []})
-            with pytest.raises(ValueError, match="mixed static and unknown"):
-                _ = dm.create("mixed_axis", scan={"gate": [0.0], "step": None})
             with pytest.raises(ValueError, match="reserved system prefix"):
                 _ = dm.create("reserved_axis", scan={"__ds_step": [0]})
             mapping_axis = cast("list[int]", cast("object", {"k": 1}))
@@ -260,6 +330,51 @@ class TestDatasetOperations:
             set_axis = cast("list[int]", cast("object", {1, 2}))
             with pytest.raises(ValueError, match="must be a sequence"):
                 _ = dm.create("set_axis", scan={"axis": set_axis})
+
+            server_handle.shutdown()
+            assert not server_handle.is_running
+
+    def test_dataset_mixed_static_unknown_scan_uses_sidecar_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_path = Path(tmpdir) / "test_workspace"
+            workspace, server_handle = fricon._core.serve_workspace(workspace_path)
+            dm = workspace.dataset_manager
+
+            with dm.create(
+                "mixed_scan",
+                scan={"gate": [0.0, 1.0], "step": None},
+            ) as writer:
+                writer.write_dict(
+                    {"signal": 1.0},
+                    logical_indices={"gate": 1, "step": 42},
+                )
+                dataset = writer.finish()
+
+            dataset_path = Path(dataset.path)
+            manifest = self._read_manifest(dataset_path)
+            self._assert_semantic_manifest_defaults(
+                manifest,
+                index_realization="sidecar",
+            )
+            scan_plan = cast("dict[str, object]", manifest["scan_plan"])
+            axes = cast("list[dict[str, object]]", scan_plan["axes"])
+            assert axes == [
+                {
+                    "name": "gate",
+                    "mode": {
+                        "kind": "static",
+                        "values": [
+                            {"kind": "float", "value": 0.0},
+                            {"kind": "float", "value": 1.0},
+                        ],
+                    },
+                },
+                {
+                    "name": "step",
+                    "mode": {"kind": "implicit_index"},
+                },
+            ]
+            assert (dataset_path / "logical_index_chunk_0.arrow").exists()
 
             server_handle.shutdown()
             assert not server_handle.is_running
