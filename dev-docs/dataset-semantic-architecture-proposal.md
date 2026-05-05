@@ -1,19 +1,38 @@
-# Dataset Semantics Architecture Proposal
+# Dataset Semantics Architecture Proposal And Roadmap
 
 ## Status
 
-Proposed.
+Historical proposal and roadmap.
 
 The durable foundation decisions for `dataset_manifest.json`,
 `__ds_record_id`, the reserved `__ds_` prefix, v1 dtypes, plain Arrow storage,
 minimal axis inference, and the interpretation boundary are accepted in
 `dev-docs/adr/0002-decide-dataset-semantic-manifest-v1.md`.
 
-Some foundation pieces are now current behavior, including durable manifests,
-record IDs, and resolved interpretation. Treat the remaining scan authoring,
-chart migration, and workflow sections as proposal material unless current code,
-`dev-docs/current-storage-notes.md`, and the relevant checklist confirm they
-have landed.
+The foundation and much of the progressive metadata and scan work have landed.
+Use `dev-docs/current-dataset-semantics.md` for current semantic behavior and
+`dev-docs/current-storage-notes.md` for storage layout facts. This document
+remains useful for rationale, tradeoffs, and deferred design ideas.
+
+## Implementation Snapshot
+
+| Area | Status |
+| --- | --- |
+| Manifest sidecar | Implemented |
+| `__ds_record_id` materialization | Implemented |
+| Reserved `__ds_` prefix | Implemented |
+| Manifest v1 dtype and semantic facets | Implemented |
+| Plain Arrow physical schemas for new semantic datasets | Implemented |
+| Minimal axis inference through resolved interpretation | Implemented |
+| Python `columns=` metadata | Implemented |
+| Python `scan=` metadata | Implemented |
+| `write_dict(..., logical_indices=...)` | Implemented |
+| Logical-index sidecar chunks | Implemented |
+| Dataset detail semantic DTOs | Implemented |
+| Chart projection over resolved semantic sources | Partially implemented |
+| Full reader grid/select API | Deferred |
+| Manifest-owned saved/default views | Deferred |
+| Run, measurement, status, and invalidation semantics | Deferred |
 
 This note revises the earlier append-only dataset idea for the actual Fricon
 codebase and assumes the product is still pre-adoption, so breaking internal
@@ -116,8 +135,8 @@ workspace/
         dataset_manifest.json
         data_chunk_0.arrow
         data_chunk_1.arrow
-        index_chunk_0.arrow      # optional logical-index sidecar
-        index_chunk_1.arrow      # optional logical-index sidecar
+        logical_index_chunk_0.arrow      # optional logical-index sidecar
+        logical_index_chunk_1.arrow      # optional logical-index sidecar
         ...
 ```
 
@@ -884,26 +903,16 @@ __ds_record_id | restart | step
 Charts should treat this as an observed sparse grid. Missing cells are empty;
 the dataset does not need to claim a rectangular `planned_shape`.
 
-## Feature Shaping
+## Feature Shaping Snapshot
 
-The architecture should land as shaped feature layers, not as one broad v1.
-This keeps the current route dataset-first while leaving clean attachment
-points for later experiment, parameter, provenance, workflow, AI, and device
-models.
+The original architecture was shaped as feature layers instead of one broad v1.
+That split is now mostly historical: Feature 1, Feature 2, and the core of
+Feature 3 have landed. Use `dev-docs/current-dataset-semantics.md` for the
+implemented contract.
 
-### Feature 1: Durable Dataset Semantics Foundation
+### Landed Foundation
 
-Classification: `now`.
-
-User value:
-
-- bare Python writes keep working
-- every new dataset gets durable local meaning
-- simple datasets still get inferred axes through their semantic manifests
-- future run, parameter, provenance, and workflow models get a stable dataset
-  anchor without being hidden inside chart heuristics
-
-Scope:
+The durable foundation is implemented:
 
 - chunked append-only Arrow payloads remain the storage substrate
 - `dataset_manifest.json`
@@ -913,111 +922,47 @@ Scope:
   inference settings
 - manifest IO, serde model, validation, and defaulting
 - plain Arrow physical schemas for new semantic datasets
-- explicit missing-manifest errors for datasets without manifests
+- explicit missing-manifest errors for semantic reads without manifests
 - resolved interpretation API for readers and downstream consumers
-- temporary adapters that preserve existing chart and dataset-detail behavior
 
-Out of scope:
+### Landed Progressive Metadata
 
-- new public `columns=` metadata
-- public `scan=`
-- logical-index sidecar chunks
-- full chart/live-view rewrite
-- status, invalidation, or quality-state semantics
-- run, measurement, parameter, provenance, workflow, AI, or device manifests
-
-First success criterion:
-
-- new datasets produce a valid manifest and record IDs; manifest-free datasets
-  fail with a clear missing-manifest error, while simple newly written datasets
-  preserve equivalent user-facing behavior.
-
-ADR need:
-
-- create an ADR before implementation commits to the durable manifest shape,
-  record-id semantics, compatibility policy, and interpretation-layer boundary.
-
-### Feature 2: Progressive Column Metadata API
-
-Classification: `next`, after the foundation can persist and resolve manifest
-column metadata.
-
-User value:
-
-- users can add units, labels, hidden-by-default state, and chart-axis hints
-  without learning scan-plan or manifest vocabulary
-- future parameter and provenance views get consistent display metadata without
-  treating column names as the only source of meaning
-
-Scope:
+The progressive column metadata API is implemented:
 
 - optional `columns=` creation metadata
-- typed Python helpers such as `Column`
-- declared dtypes where useful, while still allowing first-row inference when
-  omitted
+- typed Python helper `Column`
+- declared dtypes for supported payload kinds, while still allowing first-row
+  inference when omitted
 - `unit`, `label`, `hidden_by_default`, and `chart_axis` metadata
 - reader and UI detail surfaces expose resolved column metadata
 
-Out of scope:
+### Landed Scan Semantics
 
-- `scan=`
-- logical-index sidecar chunks
-- parameter schemas or parameter-set versioning
-- user-authored raw manifests
-
-### Feature 3: Explicit Scan Semantics
-
-Classification: `next`.
-
-User value:
-
-- regular ordered scans can be reopened without row-adjacency guesses
-- non-contiguous, resumed, adaptive, and ragged acquisition can be represented
-  durably
-- framework-owned experiment systems can provide exact logical indices without
-  burdening simple Python scripts
-
-Scope:
+The core explicit scan semantics are implemented:
 
 - optional `scan=` creation metadata
+- typed Python helper `IndexAxis`
 - implicit logical-index realization for regular ordered scans
 - unknown-length integer index axes for minimizer-style workflows
 - optional append-only logical-index sidecar chunks
+- `write_dict(..., logical_indices=...)` for explicit durable logical positions
 - duplicate projection using `latest_by_record_id`
-- sparse/ragged grid projection from observed index pairs
-- active-session live grouping that does not require durable `sweep_id` or
-  `frame_id` payload columns
+- sparse/ragged projection support through observed logical index pairs
 
-Out of scope:
+### Partially Landed Consumer Migration
 
-- execution segment tables
-- status-aware duplicate policies
-- expanded planned-point tables
-- a separate durable derived-coordinate model
+Desktop detail and chart data loading consume resolved semantic interpretation
+for the current chart paths. Remaining migration work is about removing
+temporary adapters and expanding first-class reader/chart APIs, not about
+introducing the semantic foundation.
+
+Still incomplete or intentionally deferred:
+
+- full reader APIs such as semantic `grid(...)` and `select(index=...)`
+- manifest-owned saved/default views
+- active-session live grouping as an explicit semantic API
+- public raw/facts APIs for callers that need system columns
 - null-heavy or late-appearing column workflows
-
-### Feature 4: Consumer Migration
-
-Classification: `next`, after the foundation is stable.
-
-User value:
-
-- desktop detail, chart defaults, heatmaps, and live views consume resolved
-  dataset interpretation instead of rediscovering semantics from raw rows
-
-Scope:
-
-- dataset detail DTOs expose resolved semantic fields such as logical index,
-  chart-axis candidate, label, unit, scan axes, and defaults
-- chart transforms consume resolved logical indices and duplicate policy
-- legacy `isIndex` is removed from the UI contract
-- legacy direct use of index-column inference is removed
-
-Out of scope:
-
-- turning the desktop UI into the primary experiment execution engine
-- saved user-owned chart presets or workspace UI state inside the dataset
-  manifest
 
 ### Deferred Concepts
 
