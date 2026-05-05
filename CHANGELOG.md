@@ -4,6 +4,68 @@ All notable changes to this project will be documented in this file.
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.4 (2026-05-05)
+
+### Features
+
+- use binary chart IPC for chart data (#439)
+- add dataset semantic manifest model (#487)
+- add dataset interpretation API (#488)
+- write dataset manifests during ingest (#490)
+- materialize dataset record IDs in storage (#491)
+- update dataset detail interpretation (#492)
+- include dataset manifests in archives (#493)
+- add Python column metadata API (#494)
+- expose column metadata in desktop detail (#495)
+- add explicit scan semantics (#496)
+- add logical-index sidecar chunks (#498)
+- migrate charts to resolved dataset semantics (#511)
+- add dataset semantic manifest architecture (#533)
+
+#### Show dataset column metadata in desktop details
+
+The desktop dataset detail view now shows column labels, units,
+hidden-by-default state, and chart-axis hints from dataset semantics.
+
+#### Add explicit logical scan indices
+
+Datasets can now store explicit per-row logical scan indices through
+`DatasetWriter.write_dict(..., logical_indices=...)`, preserving scan semantics
+for shuffled, sparse, resumed, and duplicate writes without adding index columns
+to the visible payload.
+
+#### Add Python column metadata declarations
+
+Python dataset creation now accepts typed column declarations with units,
+labels, hidden-by-default state, and chart-axis hints that persist in dataset
+manifests.
+
+#### Add explicit dataset semantic facets
+
+Datasets now persist explicit semantic descriptors for columns and expose
+resolved chart capabilities to the desktop UI, so chart and filter options are
+driven by dataset semantics instead of legacy physical-type heuristics.
+
+### Fixes
+
+- update chart viewer refreshes to use write progress events (#417)
+- update tanstack-query monorepo to v5.96.0 (minor) (#419)
+- update tanstack-query monorepo to v5.96.1 (patch) (#421)
+- update documentation for current usage and maintenance (#471)
+- expose dataset semantic facets (#535)
+
+#### Resolve desktop charts from dataset scan semantics
+
+Desktop charts now use explicit dataset scan semantics for default axes,
+filters, heatmaps, and live views, while preserving legacy inferred-index chart
+behavior for older datasets.
+
+#### Correct usage and maintenance documentation
+
+Fix public setup and GUI launch guidance, make the quickstart examples easier
+to copy, and align maintainer documentation with current storage, release, and
+preflight behavior.
+
 ## 0.1.3 (2026-04-14)
 
 ### Features
