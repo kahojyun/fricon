@@ -24,6 +24,11 @@ Post-MVP work should prioritize:
 - managed run second
 - reviewable automation workflow third
 
+Concrete legacy measurement sample analysis suggests read-only comparison, run
+like a previous measurement, and failure investigation should arrive before
+mutation-capable automation. These workflows can build trust from recorded
+facts without taking control of parameters, devices, or code.
+
 The product rule is: the system captures context automatically where practical;
 the user confirms, annotates, or corrects it. Any workflow that mutates
 parameters, setup, devices, code, or data-library state needs explicit preview,

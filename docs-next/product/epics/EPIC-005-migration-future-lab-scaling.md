@@ -16,6 +16,8 @@ becoming a legacy import project or a full automation stack.
 - Source aliases and old-system references as metadata, not primary identity.
 - Honest code provenance for interactive unmanaged Python.
 - Light contextual summaries for setup, environment, procedure, and parameters.
+- Run-bound local configuration snapshots or summaries for files and references
+  that old scripts currently leave in copied folders.
 - Optional sample/session context that can be corrected after a run.
 
 ## Post-MVP Scope
@@ -35,3 +37,4 @@ becoming a legacy import project or a full automation stack.
 - US-016: Record passive procedure context.
 - US-017: Migrate a Data Vault-style script to Fricon writers.
 - US-018: Start new work in Fricon while old history stays in the old system.
+- US-019: Capture run-bound local configuration.

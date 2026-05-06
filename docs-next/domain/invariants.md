@@ -41,6 +41,9 @@ Draft.
 ## Provenance And Audit
 
 - Non-managed code provenance must not be presented as reproducible history.
+- Run-bound local configuration snapshots record selected references, hashes,
+  or summaries only; they must not imply Fricon observed every configuration
+  file the script read.
 - Passive setup/device/environment summaries must not be presented as device
   control or complete reproducibility records.
 - Passive procedure summaries must not be presented as managed execution

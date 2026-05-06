@@ -27,6 +27,7 @@ M1 should prove:
 - readable partial/interrupted measurement data
 - optional passive setup summary
 - optional passive procedure summary
+- optional run-bound local configuration snapshot or summary
 - Python reopen through stable IDs
 - early compatibility negotiation before writes
 
@@ -36,6 +37,7 @@ M1 should prove:
 - direct LabRAD/Data Vault import
 - remote mode
 - full parameter registry
+- automatic tracing of every local configuration file a script reads
 - managed code execution
 - resumable scan-point checkpoint execution
 - user-facing stream concepts inside dataset artifacts

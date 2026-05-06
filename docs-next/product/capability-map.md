@@ -143,6 +143,18 @@ CAP-015: Light parameter context summary without a registry UI.
 - Excludes: global parameter registry, immutable profile binding, override
   semantics, proposal workflow, and calibration promotion.
 
+CAP-033: Run-bound local configuration snapshot.
+
+- Promise: a measurement can bind selected local configuration files,
+  references, hashes, or summaries so later analysis can identify the effective
+  lab-local state without reading copied folders by hand.
+- Includes: user-selected parameter files, registry files, wiring references,
+  line/chip information, demod/readout settings, runner labels, source aliases,
+  privacy-aware export selection, and correction history.
+- Excludes: automatic tracing of every file read, global parameter profiles,
+  calibration promotion, device control, or claiming unmanaged execution was
+  fully reproducible.
+
 CAP-017: Lightweight operator profile and audit actor.
 
 - Promise: notes, corrections, lifecycle events, and exports can name the local
@@ -300,6 +312,6 @@ Use these planning groups when routing product work:
 - MVP measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007,
   CAP-028, CAP-030.
 - Context and provenance: CAP-004, CAP-014, CAP-015, CAP-017, CAP-027,
-  CAP-029.
+  CAP-029, CAP-033.
 - Review and analysis: CAP-008, CAP-009, CAP-010, CAP-011, CAP-016, CAP-026.
 - Post-MVP foundation: CAP-018 through CAP-025, CAP-031, CAP-032.

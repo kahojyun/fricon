@@ -22,7 +22,10 @@ Physical measurement work is hard to make reliable when data, parameters,
 measurement code, setup state, notes, and later analysis live in separate tools
 or informal files. Existing frameworks can help users collect data, but they
 often leave the broader experiment record to conventions that are difficult to
-inspect, compare, migrate, or automate.
+inspect, compare, migrate, or automate. Fricon should replace not only the
+write-to-logger step, but also the informal folder discipline around copied
+measurement code, mutable local JSON configuration, setup sidecars, and later
+analysis handoff.
 
 Fricon should give experimenters one local-first product model for defining,
 running, inspecting, explaining, and reusing measurement work. The long-term
@@ -42,9 +45,10 @@ for new measurements.
 
 Success means a user can start new measurement work in Fricon, write data from
 Python, watch it live, recover partial results, reopen it later, and export it
-without depending on old storage paths. The MVP does not need to import old
-history or emulate LabRAD; old LabRAD, QCoDeS, Labber, or folder-based history
-can remain where it is while new work moves to Fricon.
+without depending on old storage paths or notebook-only reconstruction. The MVP
+does not need to import old history or emulate LabRAD; old LabRAD, QCoDeS,
+Labber, or folder-based history can remain where it is while new work moves to
+Fricon.
 
 ## User Promise
 
@@ -55,6 +59,7 @@ Fricon should help a researcher answer:
 - What datasets and attachments did it produce?
 - Was the run finished, interrupted, failed, invalidated, or recovered?
 - What notes, parameters, code provenance, and setup labels explain it?
+- Which selected local configuration files or summaries were bound to it?
 - How do I inspect it live, reopen it from Python, export it, or recover it?
 
 ## Primary Mental Model
@@ -106,6 +111,9 @@ To meet the MVP goal, the MVP should include:
 - light attachments
 - light contextual summaries for parameters, code provenance, setup,
   environment, and unmanaged procedure context
+- selected run-bound local configuration snapshots or summaries, such as
+  parameter files, registry files, wiring references, line/chip info, or
+  demod/readout settings, without turning MVP into a full parameter registry
 - Python reopen snippets through public APIs
 - a near-term measurement export spec for portable bundles and common analysis
   formats

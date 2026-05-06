@@ -6,17 +6,17 @@ Draft placeholder.
 
 ## Related Capabilities
 
-CAP-010, CAP-011, CAP-026.
+CAP-010, CAP-011, CAP-014, CAP-015, CAP-026, CAP-027, CAP-029, CAP-033.
 
 ## Related User Stories
 
-US-008, US-009, US-013.
+US-008, US-009, US-013, US-019.
 
 ## Related Domain Concepts
 
 Measurement, DatasetArtifact, ExportBundle, DataLibrary,
-ParameterSnapshot, CodeProvenanceSummary, SetupProvenanceSummary,
-Event/AuditRecord.
+ParameterSnapshot, RunConfigSnapshot, CodeProvenanceSummary,
+SetupProvenanceSummary, ProcedureSummary, Event/AuditRecord.
 
 ## Related Docs
 
@@ -25,9 +25,11 @@ Event/AuditRecord.
 - `architecture/storage-model.md`
 - `architecture/compatibility-policy.md`
 - `research/lessons-for-fricon.md`
+- `research/legacy-measurement-sample-lessons.md`
 
 ## ADRs Needed
 
 - export bundle format
 - common analysis format policy
 - export privacy defaults
+- run configuration export selection and privacy policy

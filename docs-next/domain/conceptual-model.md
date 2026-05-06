@@ -15,6 +15,7 @@ DataLibrary
     DatasetArtifact
     AttachmentArtifact
     ParameterSnapshot
+    RunConfigSnapshot
     CodeProvenanceSummary
     SetupProvenanceSummary
     ProcedureSummary
@@ -26,6 +27,7 @@ DataLibrary
     Measurement -> optional SampleSession
     Measurement -> produces -> DatasetArtifact | AttachmentArtifact
     Measurement -> optional ParameterSnapshot
+    Measurement -> optional RunConfigSnapshot
     Measurement -> optional CodeProvenanceSummary
     Measurement -> optional SetupProvenanceSummary
     Measurement -> optional ProcedureSummary
@@ -44,6 +46,7 @@ DataLibrary
 | DatasetArtifact | Typed table facts, append state, scan schema, variable roles, dataset-local display hints. | Sample identity, measurement notes, code provenance, calibration decisions. |
 | AttachmentArtifact | Light measurement files, images, or logs. | Full artifact management or row-linked large binary storage before an ADR. |
 | ParameterSnapshot | Immutable run facts. | Mutable profile management or calibration promotion. |
+| RunConfigSnapshot | Selected local configuration references, snapshots, hashes, and summaries bound to a measurement. | Automatic tracing of every file read, global parameter profiles, device inventory, or reproducibility claims for unmanaged work. |
 | CodeProvenanceSummary | Provenance level and display summary. | Automatic reproducibility claims for unmanaged code. |
 | SetupProvenanceSummary | Passive setup, device, driver, environment, method, or clock facts supplied by the user or integration. | Device control, resource locking, readback enforcement, or reproducibility claims. |
 | ProcedureSummary | Passive summary of unmanaged script, external runner, or declared plan context. | Managed execution, scan-point checkpointing, task scheduling, or device/resource ownership. |

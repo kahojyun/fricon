@@ -20,8 +20,15 @@ logger for new measurements without rewriting the whole experiment stack.
   server.
 - Independent/dependent variable declarations map naturally to Fricon scan
   schema helpers or raw schema.
+- Common writer calls shaped like Data Vault `prepDataset`, `Dataset.add`, or
+  independent/dependent variable setup can be translated without rewriting the
+  whole hardware runner.
 - Labels, units, legends, source aliases, original paths, and old numbered
   titles can be recorded without becoming primary identity.
+- Original Data Vault folder, session, title, numeric ID, and file path can be
+  retained as legacy aliases while stable Fricon IDs remain the reopen path.
+- Run-bound configuration summaries can carry old parameter/registry file
+  references that the old script relied on.
 - The writer model does not block later user-written import scripts, but old
   data import is not part of the migration path for starting new work.
 - The MVP does not ship a built-in Data Vault parser or legacy browser.

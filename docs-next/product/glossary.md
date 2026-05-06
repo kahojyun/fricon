@@ -19,6 +19,10 @@ Accepted.
   to a measurement.
 - Parameter Summary: optional light parameter context recorded for a
   measurement; not a full profile or effective-configuration model.
+- Run Config Snapshot: optional run-bound snapshot, reference, hash set, or
+  summary for selected local files and settings such as parameters, registries,
+  wiring references, line/chip info, demod settings, or external runner config.
+  It is not a global parameter profile or device inventory.
 - Code Provenance Summary: human-readable code context and provenance level.
 - Setup Summary: optional passive setup, device, driver, environment, clock, or
   method context; describes, does not control.

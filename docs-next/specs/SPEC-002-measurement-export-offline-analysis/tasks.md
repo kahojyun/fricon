@@ -14,3 +14,4 @@ Draft placeholder.
 | T-004 | Design direct Python export reader API. | Pending |
 | T-005 | Design privacy preview defaults. | Pending |
 | T-006 | Add validation scenarios for regular grids, partial grids, irregular scans, and variable-length traces. | Pending |
+| T-007 | Define export handling for selected run configuration snapshots, references, hashes, and summaries. | Pending |

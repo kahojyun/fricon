@@ -11,7 +11,7 @@ v0.2 product promise, but it should not be hidden inside the foundation spec.
 
 ## Related Capabilities
 
-CAP-010, CAP-011, CAP-026.
+CAP-010, CAP-011, CAP-014, CAP-015, CAP-026, CAP-027, CAP-029, CAP-033.
 
 ## Requirements To Refine
 
@@ -25,6 +25,7 @@ CAP-010, CAP-011, CAP-026.
 | REQ-006 | Preview sensitive provenance. | Local paths, source computer labels, detailed environment summaries, and dirty code state are opt-in or previewed. |
 | REQ-007 | Preserve passive summaries when selected. | Code provenance, setup summaries, and procedure summaries can travel in the export with privacy preview. |
 | REQ-008 | Preserve internal artifact grouping when needed. | Internal streams/subpayloads remain readable without making stream names the primary user-facing concept. |
+| REQ-009 | Preserve selected run configuration context. | Run-bound configuration snapshots, references, hashes, and summaries can travel with the export when selected, while sensitive local paths, machine names, IP addresses, and source-folder details are previewed. |
 
 ## Non-Goals
 
