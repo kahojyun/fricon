@@ -22,6 +22,10 @@ Update docs in the same change when:
 - a compatibility or migration rule changes
 - a validation requirement changes
 
+Keep docs token-efficient. Avoid large tables and broad duplicated lists. If a
+table starts to grow, split the stable overview from the detailed story, spec,
+or ADR that actually needs the detail.
+
 ## After Implementation
 
 Gate D documentation sync requires:

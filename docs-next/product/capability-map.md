@@ -8,36 +8,53 @@ Draft.
 
 Capability IDs are stable. Do not reuse or renumber them.
 
-## Capabilities
+Keep this file compact. Put detailed acceptance notes in epics, user stories,
+or specs instead of expanding this map into a large table.
 
-| ID | Capability | v0.2 Target | Notes |
-| --- | --- | --- | --- |
-| CAP-001 | Local data library | In scope | One primary local data library per normal lab computer. |
-| CAP-002 | Install and launch local Fricon | In scope | Desktop bundles compatible local service and CLI. |
-| CAP-003 | Python measurement recording | In scope | Explicit but short measurement API. |
-| CAP-004 | Optional sample/session context | In scope | Visible, correctable, not required for quick runs. |
-| CAP-005 | Dataset artifact recording | In scope | Table-shaped facts, append while active, immutable after finish. |
-| CAP-006 | Dataset scan semantics | In scope | Explicit roles and axes for plotted data. |
-| CAP-007 | Live inspection | In scope | Noncritical table, line/scatter, heatmap, trace views. |
-| CAP-008 | Lifecycle and partial recovery | In scope | Active, finished, interrupted, failed, aborted, trashed, recovered. |
-| CAP-009 | Notes, markers, favorites, tags | In scope | Measurement-first annotation. |
-| CAP-010 | Python reopen | In scope | Stable IDs and public SDK snippets. |
-| CAP-011 | Measurement-centered export | In scope | Read-only bundles for offline analysis. |
-| CAP-012 | Backup, restore, migration checkpoints | In scope | User-visible safety paths. |
-| CAP-013 | Compatibility diagnostics | In scope | Client/service/library checks before writes. |
-| CAP-014 | Code provenance summary | In scope | Honest unmanaged/user-supplied/future managed levels. |
-| CAP-015 | Flexible parameter snapshot | In scope | Minimal snapshot without registry/profile UI. |
-| CAP-016 | Light attachments | In scope | Small files, images, logs attached to measurements. |
-| CAP-017 | Operator profile and audit actor | In scope | Lightweight local actor labels, not accounts. |
-| CAP-018 | Read-only remote monitoring | Later | Candidate v0.3. |
-| CAP-019 | Rich sample maps and saved views | Later | Candidate v0.3. |
-| CAP-020 | Measurement-code source setup | Later | Configure/update lab code sources without becoming a Git host. |
-| CAP-021 | Parameter profiles and proposals | Later | Candidate v0.4 automation foundation. |
-| CAP-022 | Analysis and calibration records | Later | Consume artifacts, produce derived artifacts or proposals. |
-| CAP-023 | Managed code snapshots and execution | Later | Requires ADR before implementation. |
-| CAP-024 | Device boundary and managed device communication | Later | Reserve boundary, do not build broad framework in v0.2. |
-| CAP-025 | AI-assisted reviewed automation | Later | Read/suggest first; mutating actions require review and audit. |
-| CAP-026 | Dataset artifact discovery and direct open | In scope | Datasets are first-class searchable/openable artifacts even in a measurement-first UI. |
-| CAP-027 | Passive setup and environment summary | In scope | Optional setup/device/environment facts without device control or reproducibility overclaiming. |
-| CAP-028 | Scan schema authoring helpers | In scope | Short helpers for common scan/trace shapes plus raw schema for advanced cases. |
-| CAP-029 | Passive procedure summary | In scope | Optional unmanaged script, external runner, or declared-plan summary without managed execution. |
+## v0.2 Foundation Capabilities
+
+- CAP-001: Local data library.
+- CAP-002: Install and launch local Fricon.
+- CAP-003: Python measurement recording.
+- CAP-004: Optional, visible, correctable sample/session context.
+- CAP-005: Dataset artifact recording.
+- CAP-006: Dataset scan semantics.
+- CAP-007: Nonblocking live inspection.
+- CAP-008: Lifecycle and readable partial recovery.
+- CAP-009: Notes, markers, favorites, pins, and optional tags.
+- CAP-010: Python reopen through stable IDs and public APIs.
+- CAP-011: Measurement-centered export.
+- CAP-012: Backup, restore, and migration checkpoints.
+- CAP-013: Compatibility diagnostics and fail-before-write checks.
+- CAP-014: Honest code provenance summary.
+- CAP-015: Flexible parameter snapshot without a registry UI.
+- CAP-016: Light measurement attachments.
+- CAP-017: Lightweight operator profile and audit actor.
+- CAP-026: Dataset artifact discovery and direct open.
+- CAP-027: Passive setup and environment summary.
+- CAP-028: Scan schema authoring helpers plus raw schema escape hatch.
+- CAP-029: Passive procedure summary.
+- CAP-030: Migration ergonomics for Data Vault-style new measurement scripts.
+
+## Later Capabilities
+
+- CAP-018: Read-only remote monitoring.
+- CAP-019: Rich sample maps and saved views.
+- CAP-020: Measurement-code source setup and approved code update flows.
+- CAP-021: Parameter profiles and proposals.
+- CAP-022: Analysis and calibration records.
+- CAP-023: Managed code snapshots and execution.
+- CAP-024: Device boundary and managed device communication.
+- CAP-025: AI-assisted reviewed automation.
+
+## Product Grouping
+
+For planning, group capabilities by user outcome:
+
+- Local adoption: CAP-001, CAP-002, CAP-012, CAP-013.
+- New measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007, CAP-028,
+  CAP-030.
+- Context and provenance: CAP-004, CAP-014, CAP-015, CAP-017, CAP-027,
+  CAP-029.
+- Review and analysis: CAP-008, CAP-009, CAP-010, CAP-011, CAP-016, CAP-026.
+- Future automation foundation: CAP-018 through CAP-025.

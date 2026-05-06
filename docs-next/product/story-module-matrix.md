@@ -1,39 +1,44 @@
-# Story Module Matrix
+# Story Module Traceability
 
 ## Status
 
-Draft traceability baseline.
+Draft traceability guide.
+
+## Purpose
+
+Avoid a large story-by-module table. Use this file to route future work to the
+right code areas at epic level. Specs own precise task/file traceability.
 
 ## Module Legend
 
-| Module | Meaning |
-| --- | --- |
-| Core Domain | Rust domain/application model under `crates/fricon/src/**` after reset. |
-| Storage | SQLite/catalog, payload storage, manifests, migrations. |
-| Service API | Local service HTTP/WebSocket/binary endpoints and compatibility negotiation. |
-| Python SDK | `crates/fricon-py` user-facing Python APIs and bindings. |
-| Desktop UI | Tauri shell plus React frontend. |
-| CLI | Setup, diagnostics, service control, developer workflows. |
-| Export | Portable bundle writer/reader and offline viewer path. |
-| Docs | Public docs, docs-next, and migration guidance. |
+- Core Domain: Rust domain/application model under `crates/fricon/src/**`.
+- Storage: catalog, payload storage, manifests, migrations.
+- Service API: local service API, events, compatibility negotiation.
+- Python SDK: `crates/fricon-py`.
+- Desktop UI: Tauri shell and React frontend.
+- CLI: setup, diagnostics, service control.
+- Export: portable bundle writer/reader and offline viewer path.
+- Docs: `docs-next/`, future public docs, and migration guidance.
 
-## Matrix
+## Epic Routing
 
-| Story | Core Domain | Storage | Service API | Python SDK | Desktop UI | CLI | Export | Docs |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| US-001 Install and launch | X |  | X | X | X | X |  | X |
-| US-002 Create/open data library | X | X | X | X | X | X |  | X |
-| US-003 Run measurement | X | X | X | X | X |  |  | X |
-| US-004 Produce dataset artifacts | X | X | X | X | X |  | X | X |
-| US-005 Watch live data | X | X | X |  | X |  |  | X |
-| US-006 Recover partial measurement | X | X | X | X | X | X | X | X |
-| US-007 Annotate at right level | X | X | X | X | X |  | X | X |
-| US-008 Reopen from Python | X | X | X | X |  |  | X | X |
-| US-009 Export measurement | X | X | X | X | X | X | X | X |
-| US-010 Update safely | X | X | X | X | X | X |  | X |
-| US-011 Code provenance | X | X | X | X | X | X | X | X |
-| US-012 Sample/session | X | X | X | X | X |  | X | X |
-| US-013 Dataset direct open | X | X | X | X | X |  | X | X |
-| US-014 Passive setup context | X | X | X | X | X | X | X | X |
-| US-015 Scan schema helpers | X | X | X | X | X |  | X | X |
-| US-016 Passive procedure context | X | X | X | X | X | X | X | X |
+EPIC-001 Local setup and data-library adoption:
+Core Domain, Storage, Service API, Python SDK, Desktop UI, CLI, Docs.
+
+EPIC-002 New measurement logging replacement:
+Core Domain, Storage, Service API, Python SDK, Desktop UI, Docs.
+
+EPIC-003 Measurement console and inspection:
+Core Domain, Service API, Desktop UI, Python SDK for reopen snippets, Docs.
+
+EPIC-004 Recovery, annotation, reopen, and export:
+Core Domain, Storage, Service API, Python SDK, Desktop UI, Export, Docs.
+
+EPIC-005 Migration ergonomics and future lab scaling:
+Python SDK, Desktop UI, Docs, then later Service API, CLI, and Export as
+migration helpers mature.
+
+## Rule
+
+When a story becomes implementation-ready, add precise traceability in the
+owning spec instead of expanding this file into a matrix.

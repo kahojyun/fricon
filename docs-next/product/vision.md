@@ -13,6 +13,12 @@ The first product goal is practical: replace a simple LabRAD Grapher/Data Vault
 style logger for new measurements without building a compatibility layer for
 old storage.
 
+The adoption promise is incremental: users should be able to start new
+measurements in Fricon while old LabRAD, QCoDeS, Labber, or folder-based
+history stays where it is. Fricon may record source aliases and legacy
+references, but v0.2 should not require a historical migration before new data
+collection can move forward.
+
 ## User Promise
 
 Fricon should help a researcher answer:
@@ -61,7 +67,7 @@ The first shipped slice should include:
 - a near-term measurement export spec for portable bundles and common analysis
   formats
 - backup/restore and migration checkpoints
-- guided setup and compatibility diagnostics
+- coherent install/update compatibility and guided setup diagnostics
 
 ## Later Layers
 
@@ -87,6 +93,7 @@ These are important but not first-slice commitments:
 - direct shared-folder access to one editable data library
 - LabRAD Data Vault/Grapher compatibility server
 - built-in legacy Data Vault import or browser
+- requiring full old-history migration before adopting Fricon for new data
 - broad device-driver framework
 - generic workflow DAG engine
 - visual sweep builder as the primary acquisition model

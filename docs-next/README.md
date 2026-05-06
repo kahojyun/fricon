@@ -15,9 +15,11 @@ without mixing:
 - AI-agent process discussion
 - new v0.2+ design decisions
 
-For v0.2+ planning, treat this directory as the starting point. Use
-`dev-docs/` only as source material for current implementation facts,
-historical lessons, and reusable maintenance practice.
+For v0.2+ planning, treat this directory as the starting point.
+`dev-docs/project-intent.md` remains strategic product canon; `docs-next/`
+derives from it and owns the v0.2+ design baseline. Use older `dev-docs/v0.2/`
+proposal files as source material and historical rationale, not as the current
+source of truth.
 
 ## Design Stance
 
@@ -85,3 +87,12 @@ This baseline was bootstrapped from:
 
 If an old proposal conflicts with this baseline, prefer this baseline for v0.2+
 planning unless a newer ADR says otherwise.
+
+## Token-Efficient Documentation
+
+Future AI sessions should be able to read only the relevant files. Prefer:
+
+- compact bullets over large tables
+- epic-level maps over full cross-product matrices
+- separate user-story files for high-value stories only
+- specs for detailed acceptance criteria and validation
