@@ -26,6 +26,7 @@ every canonical document.
 
 ## Agent Starting Points By Change Type
 
+<!-- prettier-ignore -->
 | Change type                                 | Start here                               | Then read                                                                                                                        | Usually avoid                                                          |
 | ------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | SQLite schema visible through Python        | `database-schema-changes.md`             | `maintenance-checklist.md`, `release-and-versioning.md`, Diesel skill                                                            | Dataset semantic proposal files unless semantics are changing          |
