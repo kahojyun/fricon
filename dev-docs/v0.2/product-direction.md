@@ -31,9 +31,10 @@ multi-user lab administration system before they can collect data.
 
 Current v0.2 replacement target: record measurement metadata and produced
 datasets for new measurement work. Users should be able to stop using a simple
-LabRAD Grapher/Data Vault style logger for new measurements. Importing or fully
-browsing legacy LabRAD/Data Vault history is a later migration workflow, not a
-v0.2 requirement.
+LabRAD Grapher/Data Vault style logger for new measurements. Fricon should
+provide generic APIs that users can use to write migration scripts for old data
+when needed, but direct built-in import or full browsing of legacy LabRAD/Data
+Vault history is not a v0.2 product commitment.
 
 ## Main User Pain
 
@@ -214,6 +215,11 @@ Python SDK examples should create measurements explicitly but with little
 ceremony. Dataset writers should share the measurement lifecycle so users do
 not have to nest a separate writer context for every output dataset.
 
+Focused measurement product requirements live in
+`measurement-requirements.md`. Treat that note as the product-level source for
+the central measurement workflow before writing storage, API, Desktop, export,
+or lifecycle ADRs.
+
 ### Dataset Artifact
 
 A dataset is a data artifact produced or consumed by work. It can be measured,
@@ -221,6 +227,10 @@ processed, imported, or simulated.
 
 Datasets must remain directly openable from Python and Fricon Desktop, but they
 should not be the only organizing object.
+
+Focused dataset artifact product requirements and scenario checks live in
+`dataset-artifact-requirements.md`. Treat that note as the product-level source
+for dataset-local behavior before writing storage, API, chart, or export ADRs.
 
 Dataset contents should be appendable while their writer is active and
 immutable after the producing measurement finishes. Corrections should create
@@ -932,7 +942,8 @@ declarative API.
   locked-down Windows lab PCs.
 - Richer search by setup, operator, parameter, method/config, instrument label,
   and calibration state.
-- Import of legacy LabRAD/Data Vault history.
+- Generic import APIs and examples that let users write their own legacy-data
+  migration scripts without Fricon depending on LabRAD/Data Vault internals.
 - Device identity and readback verification.
 - AI-assisted metadata cleanup, reports, and calibration explanations.
 
@@ -958,6 +969,7 @@ declarative API.
   only as a traceability stress test.
 - LabRAD Data Vault/Grapher compatibility layer for old scripts.
 - Full legacy LabRAD/Data Vault import or browsing.
+- Direct built-in Data Vault storage parser or importer.
 - Generic workflow DAG engine as the first automation layer.
 - Remote mode, browser-served UI, or PWA distribution.
 - Shared-folder multi-machine access to the same database-backed data library.

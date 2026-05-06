@@ -236,8 +236,9 @@ contracts.
 Settled v0.2 product decisions:
 
 - v0.2 replaces simple LabRAD Grapher/Data Vault style logging for new
-  measurements. Full legacy import and browsing remain follow-up migration
-  work.
+  measurements. Fricon should expose generic APIs that users can use to write
+  their own legacy import scripts, but direct built-in import or browsing of
+  old LabRAD/Data Vault storage is not a v0.2 product commitment.
 - v0.2 may break the old model freely when compatibility would preserve the
   wrong workspace/dataset-first API, storage, or UI assumptions.
 - After v0.2 is used for real lab data, recorded data durability and migration
@@ -366,8 +367,9 @@ Settled v0.2 product decisions:
 - Automatic calibration, managed/declarative measurement, and Fricon-managed
   device communication are future paths. v0.2 UX stays ordinary Python
   measurement code and record-only at the device boundary.
-- Existing LabRAD scripts should migrate through the Fricon SDK. Do not build a
-  Data Vault/Grapher compatibility layer in v0.2.
+- Existing LabRAD-style measurement scripts should migrate through the Fricon
+  SDK for new measurements. Do not build a Data Vault/Grapher compatibility
+  layer or a Data Vault storage importer in v0.2.
 - Remote access starts later as strict read-only LAN monitoring, browsing, and
   export through the Fricon service. Remote annotations, remote acquisition
   writes, and multi-user semantics are later scope.
@@ -404,7 +406,8 @@ Keep future-only until a narrower design proves the need:
 
 - full multi-user administration, roles, and permission matrices
 - hosted SaaS or distributed database operation
-- full legacy LabRAD/Data Vault import or browsing
+- direct built-in legacy LabRAD/Data Vault import or browsing, including
+  Data Vault-specific storage parsers, unless a later ADR proves a narrow need
 - broad hardware driver framework
 - generic workflow DAG engine
 - automatic notebook state capture
@@ -511,6 +514,11 @@ The clean distinction is:
 This gives users familiar labels while keeping storage, lineage, and analysis
 code reusable.
 
+Focused product requirements for the v0.2 measurement workflow live in
+`measurement-requirements.md`. Use that note to narrow user-visible measurement
+behavior before writing durable storage, API, Desktop, export, or lifecycle
+ADRs.
+
 ## Artifact And Dataset Model
 
 An artifact is a durable output or input linked through provenance.
@@ -529,6 +537,10 @@ such as:
 - future device snapshots and readback summaries
 
 A dataset is an artifact, not the whole measurement record.
+
+Focused product requirements and scenario checks for dataset artifacts live in
+`dataset-artifact-requirements.md`. Use that note to narrow dataset-local
+behavior before writing durable storage, API, chart, or export ADRs.
 
 Dataset artifacts should have stable identity, table facts, dataset-local
 semantics, and direct Python access. They should not own sample identity,
