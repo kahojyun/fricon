@@ -31,5 +31,7 @@ Covered:
 - QCoDeS and LabRAD Data Vault/Grapher
 - Bluesky, Ophyd, Tiled, Databroker, Suitcase
 - Labber and ARTIQ/NIST ARTIQ scan framework
+- Sacred, MLflow, W&B, DVC, Sumatra, ReproZip, Nextflow, and Snakemake
+- EPICS Archiver, Olog, eLabFTW, LabKey, openBIS, and calibration-ledger tools
 
 Synthesis lives in `lessons-for-fricon.md`.
