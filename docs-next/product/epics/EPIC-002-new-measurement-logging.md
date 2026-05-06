@@ -18,8 +18,8 @@ measurement scripts instead of becoming a managed automation framework.
 - Explicit but low-ceremony Python measurement creation.
 - Measurement-scoped dataset artifact writers.
 - Dataset artifacts remain directly searchable and openable.
-- Scan helpers for common 1D/2D/N-D scans and traces, with raw schema for
-  advanced cases.
+- Python-native scan plans or helpers for common 1D/2D/N-D scans and traces,
+  with raw schema for advanced cases.
 - Explicit scan semantics for reliable live and historical plots.
 
 ## Not MVP

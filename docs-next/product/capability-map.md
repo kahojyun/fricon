@@ -96,13 +96,16 @@ CAP-007: Nonblocking live inspection.
   trace inspection, and stale/lag indicators.
 - Excludes: live consumers as required write acknowledgements.
 
-CAP-028: doNd-style scan helpers plus raw schema escape hatch.
+CAP-028: Python-native scan plans plus raw schema escape hatch.
 
-- Promise: common scan shapes are easy to declare in Python while uncommon
-  schemas remain possible.
-- Includes: helper APIs for common 1D, 2D, N-D, and trace cases plus raw schema
-  construction for advanced users.
-- Excludes: a visual sweep builder or managed execution plan.
+- Promise: common scan shapes are easy to declare in ordinary Python while
+  uncommon schemas remain possible.
+- Includes: a low-ceremony scan-plan shape for common 1D, 2D, N-D, and trace
+  cases; dict/literal-friendly authoring where useful; optional convenience
+  helpers; and raw schema construction for advanced users.
+- Excludes: a fixed framework-specific helper name, a framework-specific
+  parameter-object model, treating first-draft helper syntax as accepted
+  without usage feedback, a visual sweep builder, or a managed execution plan.
 
 CAP-030: Migration ergonomics for Data Vault-style new measurement scripts.
 

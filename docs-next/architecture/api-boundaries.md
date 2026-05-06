@@ -54,8 +54,9 @@ Rules:
 - Sample/session context is a resolved default, not hidden provenance.
 - Low-level datasets may exist, but normal examples are measurement-scoped.
 - Dataset artifacts remain searchable/openable first-class records.
-- Scan schema authoring should have helpers for common 1D/2D/N-D scan and
-  trace shapes, plus raw schema APIs for advanced cases.
+- Scan schema authoring should have Python-native scan plans or helpers for
+  common 1D/2D/N-D scan and trace shapes, plus raw schema APIs for advanced
+  cases.
 - Reads use stable IDs and semantic APIs, not storage paths.
 
 ## Compatibility Negotiation

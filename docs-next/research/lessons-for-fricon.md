@@ -74,9 +74,10 @@ Fricon v0.2 should model:
 
 Display hints should stay separate from durable semantic facts.
 
-The public API also needs ergonomic helpers for common scan/trace shapes.
-Raw schema should remain available for advanced cases, but raw schema alone is
-too much ceremony for routine 1D/2D/N-D measurements.
+The public API also needs ergonomic Python-native scan plans or helpers for
+common scan/trace shapes. Raw schema should remain available for advanced
+cases, but raw schema alone is too much ceremony for routine 1D/2D/N-D
+measurements.
 
 ### Internal streams should not become the normal user concept
 

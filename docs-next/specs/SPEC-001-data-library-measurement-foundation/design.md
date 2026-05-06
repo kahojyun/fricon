@@ -77,17 +77,24 @@ with lib.measurement("rabi q3") as meas:
     ds.write(amp=0.1, signal=0.25)
 ```
 
-Common scan and trace schema should also have helper APIs. Exact names are
-unsettled, but the public direction is:
+Common scan and trace schema should also have Python-native scan-plan authoring.
+Exact names and whether the accepted API is dict/literal data, a helper
+function, small builder objects, or multiple entry points are unsettled. The
+public direction is low ceremony for common workflows, then refinement from
+real script and notebook feedback:
 
 ```python
 with lib.measurement("rabi q3") as meas:
-    rabi = meas.scan_1d("rabi", x="amp", y="signal")
+    rabi = meas.scan(
+        "rabi",
+        plan={"axes": [{"name": "amp"}], "measure": ["signal"]},
+    )
     rabi.write(amp=0.1, signal=0.25)
 ```
 
-The helper path should not replace raw schema for irregular/adaptive,
-multi-output, repeated-point, or trace-heavy cases.
+The scan-plan path should not replace raw schema for irregular/adaptive,
+multi-output, repeated-point, or trace-heavy cases. It also should not imply a
+QCoDeS-compatible helper API or parameter-object model.
 
 ## Desktop Shape
 

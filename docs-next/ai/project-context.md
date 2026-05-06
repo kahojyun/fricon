@@ -66,6 +66,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Keep product-level SDK docs focused on usage guidelines and non-binding
   sketches; exact syntax, capture mechanics, and object models belong in later
   ADRs/specs.
+- For common workflows, provide appropriate simplification, but do not freeze
+  the exact simplification shape before real script/notebook feedback.
 - Keep sample/session context optional and correctable.
 - Do not turn sample target binding into a heavy physical-component ontology
   unless a later product decision requires it. Prefer user-defined parameter

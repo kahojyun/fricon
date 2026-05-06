@@ -41,7 +41,7 @@ ProcedureSummary, Event/AuditRecord, OperatorProfile.
 - Pending: scan shape and readable-partial semantics
 - Pending: passive setup summary shape
 - Pending: passive procedure summary shape
-- Pending: scan schema helper API shape
+- Pending: Python-native scan-plan/helper API shape
 - Pending: internal stream/subpayload representation, if needed
 
 ## Affected Modules

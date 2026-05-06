@@ -21,7 +21,7 @@ M1 should prove:
 - measurement-scoped dataset artifact writer
 - dataset artifact direct search/open path
 - explicit scan schema and shape modes for plotted datasets
-- scan schema helpers for common 1D/2D/N-D scans and traces
+- Python-native scan-plan/schema helpers for common 1D/2D/N-D scans and traces
 - internal stream/subpayload policy for dataset artifacts
 - nonblocking live status/event flow
 - readable partial/interrupted measurement data
@@ -69,6 +69,6 @@ M1 is ready to implement when:
 - ADRs exist for storage layout and service API direction
 - lifecycle state vocabulary is accepted
 - scan shape and readable-partial semantics are accepted
-- scan helper and internal stream policies are accepted
+- scan-plan/helper and internal stream policies are accepted
 - tests and validation plan cover Rust, Python, Desktop, and compatibility
 - migration/import stance for pre-v0.2 data is explicit

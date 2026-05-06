@@ -38,7 +38,7 @@ CAP-027, CAP-028, CAP-029.
 | REQ-016 | Support scan and trace shape modes. | Scan schema distinguishes regular grids, partial grids, irregular/adaptive points, repeated points, fixed-shape traces, and variable-length traces. |
 | REQ-017 | Expose readable partial semantics. | Interrupted data reads show partial/missing expected points when schema supports them; v0.2 does not promise execution resume. |
 | REQ-018 | Record passive setup summaries. | Measurements can link optional setup/device/environment/method summaries without device control. |
-| REQ-019 | Provide scan schema authoring helpers. | Common 1D/2D/N-D scan and trace cases have helper APIs; advanced cases can use raw schema. |
+| REQ-019 | Provide scan schema authoring helpers. | Common 1D/2D/N-D scan and trace cases have Python-native scan plans or helpers; advanced cases can use raw schema. Exact helper shape should be refined from usage feedback. |
 | REQ-020 | Record passive procedure summaries. | Measurements can link unmanaged script, external runner, or declared plan summaries without managed execution. |
 | REQ-021 | Allow internal artifact streams below the user concept. | Storage/export/read APIs may model internal streams, but v0.2 UI and public examples keep one dataset artifact as the normal concept. |
 

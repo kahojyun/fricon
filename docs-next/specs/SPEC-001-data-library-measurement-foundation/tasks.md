@@ -13,7 +13,7 @@ Draft. Not implementation-ready until required ADRs are accepted.
 | T-003 | Design service API and compatibility negotiation ADR. | Pending |
 | T-004 | Design dataset artifact storage/API ADR, including variable-length traces. | Pending |
 | T-005 | Design scan shape and readable-partial semantics for regular, partial, irregular, repeated, and trace data. | Pending |
-| T-006 | Design scan schema helper API shape for common 1D/2D/N-D scans and traces. | Pending |
+| T-006 | Design Python-native scan-plan/helper API shape for common 1D/2D/N-D scans and traces. | Pending |
 | T-007 | Decide whether internal stream groups are implementation scope or ADR-reserved only. | Pending |
 | T-008 | Add core domain types for DataLibrary, Measurement, DatasetArtifact, SetupProvenanceSummary, ProcedureSummary, and Event. | Pending |
 | T-009 | Add persistence adapters and migrations for first-slice records. | Pending |

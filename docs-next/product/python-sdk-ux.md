@@ -26,13 +26,18 @@ concepts:
 - a visible notebook context for the current local library and lab context
 - an interactive unmanaged path for exploratory runs
 - an importable decorated managed-run path for higher provenance
-- concise doNd-style helpers for routine scans
+- Python-native scan-plan authoring for routine scans
 - public reopen/export APIs for later analysis
 
 The main ergonomic constraint is low ceremony. Fricon should ask for structure
 only where it changes user understanding: which context is active, whether a
 run is unmanaged or managed, what scan shape should be plotted, and how results
 are reopened later.
+
+For common workflows, Fricon should provide appropriate simplification without
+pretending the right simplification is known before use. The exact API shape
+should be refined from real script and notebook experience, while this
+guideline preserves the product intent.
 
 ## Expected Running Model
 
@@ -51,9 +56,14 @@ into an importable managed-run entry point. The same measurement logic should
 remain normal Python that can be reviewed and tested, but Fricon can run it
 under management when the user opts in.
 
-Routine scans should not force users to build schemas by hand. doNd-style
-helpers should make common scan shapes concise while still leaving manual
+Routine scans should not force users to build schemas by hand. A Python-native
+scan plan should make common scan shapes concise while still leaving manual
 writers and raw schema available for advanced or unusual data.
+
+The product requirement is the low-ceremony scan-plan experience, not a
+specific helper name or a QCoDeS-style parameter-object model. A plan may be
+dict/literal-friendly, a small helper object, a function wrapper, or a mix of
+these after usage feedback and API design are accepted.
 
 ## Low-Ceremony Expectations
 
@@ -96,15 +106,19 @@ with ctx.measurement("gate sweep") as run:
         data.append(gate=gate, current=dmm.read())
 ```
 
-doNd-style helper for a routine scan:
+Python-native scan-plan sketch:
 
 ```python
-result = fc.do2d(
+result = fc.run_scan(
     ctx,
-    x=("gate", gate_values, dac.set_gate),
-    y=("bias", bias_values, dac.set_bias),
-    measure={"current": dmm.read},
     title="gate-bias map",
+    plan={
+        "axes": [
+            {"name": "gate", "values": gate_values, "set": dac.set_gate},
+            {"name": "bias", "values": bias_values, "set": dac.set_bias},
+        ],
+        "measure": {"current": dmm.read},
+    },
 )
 ```
 
@@ -133,8 +147,10 @@ Do not settle these in this guideline:
   managed-run lifecycle protocol
 - dataset-writer object model, storage layout, service transport, or local
   token mechanics
-- full scan-schema representation beyond the need for concise helper UX and a
-  raw escape hatch
+- full scan-schema representation beyond the need for concise scan-plan UX and
+  a raw escape hatch
+- a QCoDeS compatibility layer, fixed borrowed helper name, or
+  parameter-object model
 - scheduler, resource leases, queues, retries, workflow DAGs, or resume
   protocols
 

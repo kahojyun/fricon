@@ -43,7 +43,7 @@ Create focused ADRs before durable v0.2 implementation:
 3. Dataset artifact storage and scan schema representation.
 4. Scan shape and readable-partial semantics.
 5. Measurement lifecycle and event/audit record model.
-6. Scan schema helper API shape.
+6. Python-native scan-plan/helper API shape.
 7. Passive setup and procedure summary shape.
 8. Internal stream/subpayload representation policy.
 9. Export bundle format and privacy preview.

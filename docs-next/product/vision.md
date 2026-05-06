@@ -74,8 +74,13 @@ or notebooks, so SDK ergonomics are product requirements.
 
 At the vision level, the SDK should feel like ordinary Python with low
 ceremony: a visible notebook context, natural interactive unmanaged runs,
-importable managed-run entry points for higher provenance, concise doNd-style
-helpers for routine scans, and public reopen/export APIs for later analysis.
+importable managed-run entry points for higher provenance, Python-native
+scan-plan authoring for routine scans, and public reopen/export APIs for later
+analysis.
+
+Common workflows should have appropriate simplifications, but exact helper
+shapes are not part of the product vision until real usage feedback supports
+them.
 
 Detailed SDK usage guidance lives in `product/python-sdk-ux.md`. Old planning
 snippets under `dev-docs/` should be read as non-binding UX sketches unless an
@@ -93,8 +98,8 @@ To meet the MVP goal, the MVP should include:
 - table-shaped scan and trace data with explicit scan schema for plotted data
 - scan modes for regular grids, partial grids, irregular or adaptive points,
   repeated points, and fixed-shape or variable-length traces
-- short scan-schema helpers for common 1D/2D/N-D scans and traces, plus a raw
-  schema escape hatch for advanced cases
+- low-ceremony scan-plan/schema authoring for common 1D/2D/N-D scans and
+  traces, plus a raw schema escape hatch for advanced cases
 - nonblocking live table and chart inspection
 - measurement lifecycle, notes, events, favorites/pins, trash/recover, and
   readable partial data semantics

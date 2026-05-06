@@ -21,5 +21,5 @@ Draft.
 | RISK-011 | Measurement-first UI hides dataset artifacts. | Analysis/import/export workflows become awkward. | Keep datasets searchable and directly openable with stable handles. |
 | RISK-012 | Scan schema is too rectangular. | Adaptive scans, partial grids, repeated points, and traces do not fit. | Accept explicit scan shape modes before implementation. |
 | RISK-013 | Partial recovery is only a status label. | Users cannot analyze interrupted runs reliably. | Expose readable partial/missing-point semantics before resumable execution. |
-| RISK-014 | Raw schema is too verbose. | Python users avoid Fricon for quick scans. | Provide common scan/trace helpers plus raw schema escape hatch. |
+| RISK-014 | Raw schema is too verbose. | Python users avoid Fricon for quick scans. | Provide Python-native scan plans/helpers plus raw schema escape hatch. |
 | RISK-015 | Streams leak into the v0.2 concept budget. | Users face Bluesky-like complexity too early. | Allow internal streams only behind dataset artifact APIs. |
