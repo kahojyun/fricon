@@ -231,16 +231,22 @@ git diff --exit-code crates/fricon-ui/frontend/src/routeTree.gen.ts
 Use this when changing public docs, developer docs, or repo guidance.
 
 - Keep `docs/` user-facing.
+- Keep `docs-next/` focused on v0.2+ design discussion. Design-only changes in
+  `docs-next/` do not require full implementation checks by default.
 - Put implementation details, architecture notes, and maintenance rules in
   `dev-docs/`.
 - When introducing a checklist, put the canonical version in `dev-docs/` and
   link to it elsewhere.
-- Run:
+- For public `docs/` changes, run:
 
 ```bash
 pnpm run format:check
 uv run --group docs mkdocs build -s -v
 ```
+
+- For `docs-next/` or `dev-docs/` design-only changes, no command is required
+  by default. Run `pnpm run format:check` only when the task asks for
+  formatting validation or dependencies are already available.
 
 ## Release Notes
 

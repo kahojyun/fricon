@@ -18,7 +18,7 @@ Start here when orienting a new human or AI contributor:
 2. `roadmap.md`
 3. `../docs-next/README.md` when working on new v0.2+ reset design
 4. `maintenance-checklist.md`
-5. `pr-preflight-checklist.md`
+5. `pr-preflight-checklist.md` when preparing implementation work
 6. The topic-specific note for the area being changed
 
 For narrow tasks, prefer the task-specific starting points below over reading
@@ -52,7 +52,7 @@ skills, prompts, or contributor notes.
   state, and decision pressure map
 - `maintenance-checklist.md` - coordinated update checklist for cross-boundary
   changes
-- `pr-preflight-checklist.md` - local and pre-PR validation matrix
+- `pr-preflight-checklist.md` - manual implementation pre-PR validation matrix
 - `release-and-versioning.md` - release model, changeset policy, and version
   bump guidance
 - `architecture-guidelines.md` - current implementation architecture rules and

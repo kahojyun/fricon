@@ -2,11 +2,14 @@
 
 ## Status
 
-Canonical testing strategy.
+Manual implementation testing reference. Repository-level CI is currently
+paused during the `docs-next/` v0.2+ design phase.
 
 ## Purpose
 
-This note defines the steady-state automated testing strategy for `fricon`.
+This note defines the intended steady-state testing strategy for `fricon`
+implementation work. It is not an active automation contract while the project
+is focused on `docs-next/` design discussion.
 
 The goal is to keep the test stack layered, explicit, and maintainable:
 
@@ -18,17 +21,16 @@ The goal is to keep the test stack layered, explicit, and maintainable:
 
 The repo uses:
 
-- Rust tests through `cargo nextest` in CI, with doctests kept separate
+- Rust tests through `cargo nextest`, with doctests kept separate
 - Python tests through `uv run pytest`
 - Frontend tests through split Vitest projects:
     - `unit` for fast unit and `jsdom` coverage
     - `browser` for browser-backed UI and integration coverage
 - Desktop smoke coverage through a small WebdriverIO + `tauri-driver` suite on
-  Windows CI
+  Windows
 
 Relevant files:
 
-- `.github/workflows/ci.yml`
 - `.config/nextest.toml`
 - `crates/fricon-ui/frontend/vite.config.ts`
 - `crates/fricon-ui/frontend/.dependency-cruiser.cjs`
@@ -54,11 +56,10 @@ Python API / bindings tests                 -> pytest
 
 ### Rust
 
-`cargo nextest` is the preferred CI runner because it is designed for CI
-execution, supports CI-specific profiles, and keeps room for future run
-partitioning or archiving.
+`cargo nextest` is the preferred batch runner because it supports CI-style
+profiles and keeps room for future run partitioning or archiving.
 
-Steady-state CI command:
+Steady-state strict command:
 
 ```sh
 cargo nextest run --workspace --profile ci
@@ -182,7 +183,7 @@ Keep frontend test commands explicit.
 - `pnpm run test:browser:headed` from repo root is the opt-in headed debug
   variant
 - `pnpm run test:smoke` from repo root runs the desktop smoke suite; the
-  supported CI path is Windows-only
+  supported desktop WebDriver path is Windows-only
 
 Do not rely on the batch `test` script for file filters, watch mode, or
 project selection. When a targeted rerun is needed, choose the test mode first

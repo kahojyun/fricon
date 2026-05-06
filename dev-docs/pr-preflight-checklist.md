@@ -2,13 +2,19 @@
 
 ## Status
 
-Canonical pre-PR validation matrix.
+Manual implementation pre-PR validation matrix. Not required for
+`docs-next/`-only design discussion unless the task explicitly asks for
+validation.
 
 ## Purpose
 
-This is the canonical pre-PR check matrix for local development and PR
-readiness. Skills, agent rules, and contributing docs should link here instead
-of duplicating command lists.
+This is the manual pre-PR check matrix for implementation work. Skills, agent
+rules, and contributing docs should link here instead of duplicating command
+lists.
+
+During the `docs-next/` v0.2+ design phase, choose no-check by default for
+design-only changes. Use this matrix only when implementation files, public
+docs, release notes, or generated artifacts change.
 
 Use one profile per run:
 
@@ -35,6 +41,7 @@ Use the result to choose changed areas:
   `crates/fricon/src/client.rs`, `crates/fricon/src/transport/**`
 - Release notes: `.changeset/**`
 - Public docs: `docs/**`
+- v0.2+ design docs: `docs-next/**`
 - Developer docs-only: `dev-docs/**`, and Markdown-only changes outside
   `.changeset/` that are not public docs
 
@@ -118,6 +125,17 @@ uv run --group docs mkdocs build -s -v
 ```
 
 ### Developer Docs-Only
+
+```bash
+pnpm run format:check
+```
+
+### Docs Next Design-Only
+
+No command is required by default.
+
+Optional, when dependencies are already installed or the task asks for
+formatting validation:
 
 ```bash
 pnpm run format:check
@@ -211,6 +229,16 @@ uv run --group docs mkdocs build -s -v
 ```
 
 ### Developer Docs-Only
+
+```bash
+pnpm run format:check
+```
+
+### Docs Next Design-Only
+
+No command is required by default.
+
+Optional, when preparing a review where formatting consistency matters:
 
 ```bash
 pnpm run format:check

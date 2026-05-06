@@ -2,6 +2,19 @@
 
 Thanks for helping improve Fricon. This document gives a concise, practical guide to get started, build and contribute.
 
+## Current design phase
+
+The active work surface is `docs-next/` design for the v0.2+ reset. Repository
+automation is intentionally minimal in this phase: GitHub Actions, Renovate,
+release publishing, and docs deployment are not active. Basic text and config
+hygiene remains available through `.pre-commit-config.yaml`, but it
+intentionally avoids dependency updates, generated-artifact checks, language
+builds, and test gates.
+
+For `docs-next/`-only design discussion, do not run full Rust, Python, or
+frontend checks by default. Run implementation checks only when implementation
+files are changed or when a task explicitly asks for validation.
+
 ## Quick start
 
 Prerequisites (install the package manager or tooling appropriate for your OS):
@@ -80,6 +93,9 @@ To build and run the Tauri v2 frontend on Linux, install the following system de
 See [Tauri docs](https://tauri.app/start/prerequisites/) for details.
 
 ## Build & test
+
+For `docs-next/`-only changes, no build or test command is required by default.
+The commands below remain available for implementation work.
 
 Rust (workspace):
 
@@ -170,16 +186,16 @@ Docs:
 - Run relevant linters and tests before opening a PR.
 - For frontend work, start with `pnpm run check`, then run narrower commands only if you need to investigate a specific failure.
 
-Before opening a PR, use the canonical preflight matrix in
+Before opening an implementation PR, use the manual preflight matrix in
 `dev-docs/pr-preflight-checklist.md`. For coordinated maintenance items such as
 workspace format, IPC/gRPC, database schema, generated bindings, or release-note
 changes, use `dev-docs/maintenance-checklist.md`.
 
 ## Release workflow
 
-Releases are managed by Knope. See `dev-docs/release-and-versioning.md` for
-the canonical release model, changeset policy, version bump guidance, and
-compatibility decision rules.
+Release automation is paused during the `docs-next` reset design phase. The
+historical release model is documented in `dev-docs/release-and-versioning.md`
+and should be revisited before implementation releases resume.
 
 ## Reporting issues & getting help
 

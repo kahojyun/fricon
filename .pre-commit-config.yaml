@@ -1,9 +1,6 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
-ci:
-  skip:
-    - uv-lock
-    - cargo-fmt
+# Keep this pre-commit-compatible config minimal during the docs-next design
+# phase: basic text/config hygiene only, without language builds, dependency
+# updates, generated-artifact checks, or test gates.
 exclude: |
   (?x)^(
     crates/fricon-ui/icons/.*|
@@ -26,31 +23,3 @@ repos:
     hooks:
       - id: tombi-format
         args: ["--offline"]
-  - repo: https://github.com/crate-ci/typos
-    rev: cf5f1c29a8ac336af8568821ec41919923b05a83  # frozen: v1.45.1
-    hooks:
-      - id: typos
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 6a280ba12b7901e47757c868c8c13c6a624c9ecb  # frozen: 0.11.7
-    hooks:
-      - id: uv-lock
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: d1b833175a5d08a925900115526febd8fe71c98e  # frozen: v0.15.11
-    hooks:
-      - id: ruff-check
-        args: [--fix]
-      - id: ruff-format
-  - repo: https://github.com/sqlfluff/sqlfluff
-    rev: ec5ed61d83ae336c65c4c15396a23772ce9d2fcc  # frozen: 4.1.0
-    hooks:
-      - id: sqlfluff-lint
-      - id: sqlfluff-fix
-  # Copied from maturin repo
-  - repo: local
-    hooks:
-      - id: cargo-fmt # rustup component add rustfmt
-        name: cargo fmt
-        entry: cargo +nightly fmt --all --
-        language: system
-        types: [rust]
-        pass_filenames: false
