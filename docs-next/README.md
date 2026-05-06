@@ -34,6 +34,17 @@ Product planning in this directory uses MVP, post-MVP priority, and ADR-gated
 labels. Do not treat post-MVP priorities as semantic-version labels; compatible
 features may still ship on the same compatible release line.
 
+## Workflow Stance
+
+This directory is currently the primary work surface. Keep discussion changes
+lightweight: do not run full Rust, Python, frontend, release, or docs-deploy
+automation for `docs-next/`-only edits unless a task explicitly asks for it.
+Repository automation such as GitHub Actions, Renovate, release publishing,
+and docs deployment is intentionally paused while the v0.2+ baseline is being
+discussed. Basic text and config hygiene remains available through
+`.pre-commit-config.yaml`, but it should not run dependency updates,
+generated-artifact checks, language builds, or test gates.
+
 ## Scale Classification
 
 Fricon is an S2 medium modular system:

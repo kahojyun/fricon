@@ -2,25 +2,26 @@
 
 ## Status
 
-Canonical release and versioning policy.
+Paused release and versioning reference. Release automation is currently
+removed during the `docs-next/` v0.2+ design phase.
 
 ## Purpose
 
-This note is the canonical release and versioning policy for Fricon. Use it to
-decide when a change needs release notes, how to describe the change, and which
-versioning decisions must be made before merge.
+This note records the historical release and versioning policy for Fricon. Use
+it as reference when implementation releases resume, and update it before
+recreating release automation.
 
 For implementation-side coordination, use `dev-docs/maintenance-checklist.md`.
 
-## Current Release Model
+## Historical Release Model
 
-- Releases are managed by Knope.
+- Releases were managed by Knope.
 - The repository has one unified project version.
 - The canonical Git tag format is `v<version>`.
-- Release preparation happens through the `release` branch and a prepared
+- Release preparation happened through the `release` branch and a prepared
   release PR.
-- Merging the prepared release PR creates the GitHub release and tag.
-- Publishing is currently PyPI-only.
+- Merging the prepared release PR created the GitHub release and tag.
+- Publishing was PyPI-only.
 - Versioned files are defined in `knope.toml`.
 
 ## Changeset Policy
@@ -106,10 +107,9 @@ these changes.
 
 ## Release Workflow Summary
 
-- The release preparation workflow is started manually from `main` and refreshes
-  the prepared release PR from the `release` branch when Knope finds pending
-  release notes.
-- The release preparation workflow depends on the prepared release commit
-  subject `chore: prepare release <version>`.
-- Merging the prepared release PR creates the GitHub release and tag.
-- Publishing remains PyPI-only unless the release workflow is changed.
+No GitHub release or PyPI publishing workflow is active during the `docs-next/`
+design phase.
+
+Before implementation releases resume, decide whether to restore the historical
+Knope flow, replace it, or defer publishing. Then update this file and recreate
+automation from the accepted release decision.
