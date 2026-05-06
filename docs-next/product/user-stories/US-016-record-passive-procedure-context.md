@@ -18,8 +18,8 @@ even before Fricon manages execution.
 
 - A measurement can link an unmanaged script summary, external-runner
   reference, or declared plan summary.
-- Procedure context can mention planned shape, relevant parameters, and
-  external identifiers without becoming a managed plan.
+- Procedure context can mention planned shape and external identifiers without
+  becoming a managed plan.
 - Corrections to procedure context are visible after the run.
 - Procedure context remains distinct from code provenance and setup context.
 

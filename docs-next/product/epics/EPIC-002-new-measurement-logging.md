@@ -10,6 +10,9 @@ Replace the simple LabRAD Data Vault/Grapher loop for new measurements:
 declare measured data, append values from Python, watch it live, and reopen it
 later without manual file/folder discipline.
 
+This is the center of the v0.2 MVP. It should stay close to ordinary Python
+measurement scripts instead of becoming a managed automation framework.
+
 ## v0.2 Scope
 
 - Explicit but low-ceremony Python measurement creation.

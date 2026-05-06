@@ -17,7 +17,8 @@ Accepted.
   dataset-local facts and semantics.
 - Attachment Artifact: small file, image, log, or supporting artifact attached
   to a measurement.
-- Parameter Snapshot: immutable parameter facts captured for a measurement.
+- Parameter Summary: optional light parameter context recorded for a
+  measurement; not a full profile or effective-configuration model.
 - Code Provenance Summary: human-readable code context and provenance level.
 - Setup Summary: optional passive setup, device, driver, environment, clock, or
   method context; describes, does not control.
@@ -34,6 +35,8 @@ Accepted.
 
 - Artifact: durable input or output linked through provenance. Dataset is the
   first concrete type.
+- Parameter Snapshot: immutable parameter facts captured by future parameter
+  profile or managed-run workflows.
 - Parameter Profile: mutable named reference to a useful parameter state.
 - Measurement Code Source: configured upstream source for lab measurement code,
   such as Git/Gitea, package, mirror, or folder.

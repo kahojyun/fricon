@@ -1,4 +1,4 @@
-# US-003: Run An Exploratory Measurement
+# US-003: Run An Interactive Unmanaged Measurement
 
 ## Status
 
@@ -10,14 +10,16 @@ EPIC-002: New measurement logging replacement.
 
 ## Story
 
-As an experimentalist, I want to run a measurement from Python with minimal
-boilerplate so that Fricon records the measurement, produced datasets, optional
-sample/session context, and basic provenance.
+As an experimentalist, I want to run an interactive unmanaged measurement from
+ordinary Python with minimal boilerplate so that Fricon records the measurement,
+produced datasets, optional sample/session context, and honest provenance.
 
 ## Success Criteria
 
 - Measurement creation is explicit but short.
 - Sample/session context is optional and visible.
+- The normal exploratory path does not require Fricon to manage the Python
+  process.
 - Dataset writers share measurement lifecycle in the normal path.
 - Multiple local measurement writers may be active concurrently.
 - A crashed script leaves readable partial data.

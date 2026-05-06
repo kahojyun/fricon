@@ -22,7 +22,8 @@ logger for new measurements without rewriting the whole experiment stack.
   schema helpers or raw schema.
 - Labels, units, legends, source aliases, original paths, and old numbered
   titles can be recorded without becoming primary identity.
-- User-written import scripts can call generic Fricon APIs for old data later.
+- The writer model does not block later user-written import scripts, but old
+  data import is not part of the migration path for starting new work.
 - v0.2 does not ship a built-in Data Vault parser or legacy browser.
 
 ## Not In Scope

@@ -7,7 +7,8 @@ Accepted.
 ## Purpose
 
 Keep the product route readable for future AI sessions. This file is a compact
-map, not the place for full acceptance details.
+map from the product vision to v0.2 stories, not the place for full acceptance
+details.
 
 ## Backbone
 
@@ -25,6 +26,11 @@ Install and set up
 ```
 
 ## v0.2 Product Epics
+
+The v0.2 MVP route is the LabRAD Data Vault/Grapher replacement loop for new
+measurements: write from Python, watch live, recover partial data, reopen, and
+export. The epics below divide that route without making legacy import or
+managed automation part of the MVP.
 
 - EPIC-001: Local setup and data-library adoption.
 - EPIC-002: New measurement logging replacement.
@@ -53,7 +59,7 @@ Foundation:
 
 Measurement loop:
 
-- US-003: Run an exploratory measurement from Python.
+- US-003: Run an interactive unmanaged measurement from Python.
 - US-004: Produce dataset artifacts from a measurement.
 - US-005: Watch and inspect live data.
 - US-015: Declare common scan shapes quickly.
@@ -90,8 +96,13 @@ files concise: they own story-level success criteria, not implementation tasks.
 
 ## Sequencing
 
-M1 should prove enough of US-001 through US-008 to record, inspect, recover, and
-reopen a measurement while preserving first-class dataset discovery.
+M1 should prove enough of US-001 through US-008 and US-015 to record, inspect,
+recover, and reopen a Python measurement while preserving first-class dataset
+discovery.
+
+The full v0.2 MVP also needs US-009 for export and US-017/US-018 to validate
+the incremental adoption posture: users can translate new Data Vault-style
+scripts and keep old history in the old system.
 
 Python SDK UX is part of the product story, not only implementation detail.
 The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;

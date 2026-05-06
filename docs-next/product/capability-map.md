@@ -11,6 +11,13 @@ Capability IDs are stable. Do not reuse or renumber them.
 Keep this file compact. Put detailed acceptance notes in epics, user stories,
 or specs instead of expanding this map into a large table.
 
+## Vision Alignment
+
+The v0.2 capability baseline serves one MVP goal: replace the simple LabRAD
+Data Vault/Grapher loop for new measurements. Capabilities should support that
+loop without importing old history, emulating LabRAD, or pulling v0.3+
+parameter, code-management, runner, device, or automation systems into v0.2.
+
 ## v0.2 Foundation Capabilities
 
 ### Local Adoption
@@ -49,12 +56,13 @@ CAP-013: Compatibility diagnostics and fail-before-write checks.
   library format.
 - Excludes: accepting best-effort writes from unknown or stale clients.
 
-### New Measurement Replacement
+### v0.2 MVP Measurement Replacement
 
 CAP-003: Python measurement recording.
 
-- Promise: a Python script can explicitly create a measurement with low
-  ceremony and append measurement facts through public APIs.
+- Promise: a Python script or notebook can explicitly create an unmanaged
+  measurement with low ceremony and append measurement facts through public
+  APIs.
 - Includes: title, start/end lifecycle, optional context links, concurrent local
   writers, and readable crash outcomes.
 - Excludes: managed runner, task queue, visual sweep builder, and device
@@ -84,10 +92,10 @@ CAP-007: Nonblocking live inspection.
   trace inspection, and stale/lag indicators.
 - Excludes: live consumers as required write acknowledgements.
 
-CAP-028: Scan schema authoring helpers plus raw schema escape hatch.
+CAP-028: doAnd-style scan helpers plus raw schema escape hatch.
 
-- Promise: common scan shapes are easy to declare while uncommon schemas remain
-  possible.
+- Promise: common scan shapes are easy to declare in Python while uncommon
+  schemas remain possible.
 - Includes: helper APIs for common 1D, 2D, N-D, and trace cases plus raw schema
   construction for advanced users.
 - Excludes: a visual sweep builder or managed execution plan.
@@ -119,14 +127,14 @@ CAP-014: Honest code provenance summary.
   signal, user-supplied summary, and privacy-aware export handling.
 - Excludes: automatic notebook state capture and managed code snapshots.
 
-CAP-015: Flexible parameter snapshot without a registry UI.
+CAP-015: Light parameter context summary without a registry UI.
 
-- Promise: a measurement can keep an inspectable parameter snapshot even before
-  Fricon has parameter profiles or calibration workflows.
-- Includes: structured or semi-structured parameter values, units where
-  supplied, and links to measurement context.
-- Excludes: global parameter registry, proposal workflow, and calibration
-  promotion.
+- Promise: a measurement can keep optional parameter context before Fricon has
+  parameter profiles, effective snapshots, or calibration workflows.
+- Includes: user-supplied structured or semi-structured parameter summaries,
+  units where supplied, and links to measurement context.
+- Excludes: global parameter registry, immutable profile binding, override
+  semantics, proposal workflow, and calibration promotion.
 
 CAP-017: Lightweight operator profile and audit actor.
 
@@ -228,7 +236,8 @@ CAP-021: Parameter profiles and proposals.
 
 - Intent: promote repeated parameter snapshots into reusable profiles and
   reviewed proposals.
-- Boundary: v0.2 keeps flexible snapshots without a registry UI.
+- Boundary: v0.2 keeps only light parameter context summaries without a
+  registry UI or effective-configuration model.
 
 CAP-022: Analysis and calibration records.
 
@@ -262,8 +271,8 @@ CAP-025: AI-assisted reviewed automation.
 Use these planning groups when routing product work:
 
 - Local adoption: CAP-001, CAP-002, CAP-012, CAP-013.
-- New measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007, CAP-028,
-  CAP-030.
+- v0.2 MVP measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007,
+  CAP-028, CAP-030.
 - Context and provenance: CAP-004, CAP-014, CAP-015, CAP-017, CAP-027,
   CAP-029.
 - Review and analysis: CAP-008, CAP-009, CAP-010, CAP-011, CAP-016, CAP-026.

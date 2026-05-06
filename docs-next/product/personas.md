@@ -27,14 +27,14 @@ Constraints:
 
 ## P-002 Lab Maintainer
 
-The person who helps keep lab measurement code, setup profiles, and computers
+The person who helps keep lab measurement code, setup context, and computers
 usable.
 
 Needs:
 
 - clear installation and diagnostics
-- explicit split between Fricon install, data-library location, measurement
-  code source, and Python environment
+- explicit split between Fricon install, data-library location, Python
+  environment, and later measurement-code management
 - support for sharing approved measurement code without copying random folders
 - exportable support bundles that are local and redacted by default
 

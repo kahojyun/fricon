@@ -6,21 +6,21 @@ Accepted.
 
 ## Product Goal
 
-Help labs move from copied folders, old loggers, and ad hoc parameter files
-toward a local data-library workflow without forcing a hosted service or a full
-automation stack on day one.
+Help labs adopt Fricon for new measurements while old loggers, copied folders,
+and historical data remain where they are. This epic protects the v0.2 MVP
+from becoming a legacy import project or a full automation stack.
 
 ## v0.2 Scope
 
-- Generic APIs that make user-written import scripts possible later.
-- Source aliases and metadata for old-system references when users bring data
-  forward.
-- Honest code provenance for unmanaged Python.
-- Passive setup, environment, and procedure summaries.
+- Data Vault-style script migration guidance for new measurements.
+- Source aliases and old-system references as metadata, not primary identity.
+- Honest code provenance for interactive unmanaged Python.
+- Light contextual summaries for setup, environment, procedure, and parameters.
 - Optional sample/session context that can be corrected after a run.
 
 ## Later Scope
 
+- User-written import helpers for old data when generic APIs mature.
 - Read-only LAN viewing.
 - Measurement-code source setup and approved code update flows.
 - Rich sample maps, saved views, comparison, and context correction UX.

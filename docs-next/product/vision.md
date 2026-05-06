@@ -76,7 +76,7 @@ ADR accepts exact API syntax.
 
 ## v0.2 MVP Scope
 
-To meet the MVP goal, the first shipped slice should include:
+To meet the MVP goal, v0.2 should include:
 
 - one local data library per normal lab computer
 - explicit measurements
