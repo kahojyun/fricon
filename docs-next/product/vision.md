@@ -11,35 +11,33 @@ scientific measurement work.
 
 ## Long-Term Motivation
 
-Fricon is motivated by a gap in existing physical measurement workflows:
-dataset logging can be usable, but parameter management, measurement-code
-management, environment setup, run provenance, calibration history, and later
-automation often remain fragmented.
+Physical measurement work is hard to make reliable when data, parameters,
+measurement code, setup state, notes, and later analysis live in separate tools
+or informal files. Existing frameworks can help users collect data, but they
+often leave the broader experiment record to conventions that are difficult to
+inspect, compare, migrate, or automate.
 
-Building separate systems on top of existing measurement frameworks tends to
-produce inconsistent user experience and brittle conventions: parameters hide
-in JSON files, code history depends on copied folders or dirty Git checkouts,
-runner facts hide in logs, and provenance is reconstructed after the fact.
+Fricon should give experimenters one local-first product model for defining,
+running, inspecting, explaining, and reusing measurement work. The long-term
+aim is not only to store results, but to make the relationship between a
+measurement, its datasets, its Python code, its context, and its later
+interpretation explicit enough for humans and future automation to trust.
 
-Fricon's long-term goal is a unified local-first experience where measurement
-recording, parameter snapshots, managed code sources, SDK runner capture,
-dataset artifacts, setup state, analysis/calibration records, and reviewed
-automation share one coherent product model.
+The product should stay close to how experimentalists already work: Python
+scripts and notebooks remain first-class, local lab computers remain useful
+without a server account model, and higher-provenance workflows grow from the
+same core experience instead of becoming a separate system.
 
-Dataset artifacts and scan semantics are foundational, but they are not the
-product endpoint. The v0.2 measurement/data-library slice exists to create a
-stable base for the parameter system, measurement-code management, managed
-runner, and calibration/automation layers.
+## v0.2 MVP Goal
 
-The first product goal is practical: replace a simple LabRAD Grapher/Data Vault
-style logger for new measurements without building a compatibility layer for
-old storage.
+The v0.2 MVP goal is practical: replace the simple LabRAD Data Vault/Grapher
+loop for new measurements.
 
-The adoption promise is incremental: users should be able to start new
-measurements in Fricon while old LabRAD, QCoDeS, Labber, or folder-based
-history stays where it is. Fricon may record source aliases and legacy
-references, but v0.2 should not require a historical migration before new data
-collection can move forward.
+Success means a user can start new measurement work in Fricon, write data from
+Python, watch it live, recover partial results, reopen it later, and export it
+without depending on old storage paths. v0.2 does not need to import old
+history or emulate LabRAD; old LabRAD, QCoDeS, Labber, or folder-based history
+can remain where it is while new work moves to Fricon.
 
 ## User Promise
 
@@ -67,30 +65,18 @@ The Python SDK is a primary user experience, not only an implementation API.
 Most experimentalists will define and run measurements through Python scripts
 or notebooks, so SDK ergonomics are product requirements.
 
-The SDK should:
+At the vision level, the SDK should feel like ordinary Python with low
+ceremony: a visible notebook context, natural interactive unmanaged runs,
+importable managed-run entry points for higher provenance, concise doAnd-style
+helpers for routine scans, and public reopen/export APIs for later analysis.
 
-- let users create explicit measurements with low ceremony
-- support a visible notebook context for current library and optional lab
-  context
-- keep interactive unmanaged runs natural for exploratory Python
-- make importable decorated managed runs possible later for higher-provenance
-  work
-- make doAnd-style scan helpers concise enough for routine scripts
-- keep advanced raw schema available when helper APIs are too narrow
-- return users to public Python read/reopen/export APIs instead of storage
-  paths
-- fail before mutation when Desktop, service, data library, CLI, or SDK versions
-  are incompatible
+Detailed SDK usage guidance lives in `product/python-sdk-ux.md`. Old planning
+snippets under `dev-docs/` should be read as non-binding UX sketches unless an
+ADR accepts exact API syntax.
 
-Old planning snippets under `dev-docs/` should be read as UX sketches unless an
-ADR accepts exact syntax. They express user requirements such as explicit
-measurement creation, visible notebook context, interactive unmanaged runs,
-importable decorated managed runs, doAnd-style helper ergonomics, and direct
-Python reopen/export, not final API design.
+## v0.2 MVP Scope
 
-## First v0.2 Slice
-
-The first shipped slice should include:
+To meet the MVP goal, the first shipped slice should include:
 
 - one local data library per normal lab computer
 - explicit measurements
@@ -106,21 +92,18 @@ The first shipped slice should include:
 - measurement lifecycle, notes, events, favorites/pins, trash/recover, and
   readable partial data semantics
 - light attachments
-- optional flexible parameter snapshot
-- honest code provenance summary
-- optional passive setup, device, and environment summary that describes
-  context without controlling devices
-- optional passive procedure summary that records unmanaged script, external
-  runner, or declared plan context without implementing a runner
+- light contextual summaries for parameters, code provenance, setup,
+  environment, and unmanaged procedure context
 - Python reopen snippets through public APIs
 - a near-term measurement export spec for portable bundles and common analysis
   formats
 - backup/restore and migration checkpoints
 - coherent install/update compatibility and guided setup diagnostics
 
-## Later Layers
+## Future Direction
 
-These are important but not first-slice commitments:
+These directions matter to the long-term product, but are not v0.2 MVP
+commitments:
 
 - parameter profiles, proposals, and calibration promotion
 - parameter history, diffs, and proposal review
