@@ -26,7 +26,7 @@ concepts:
 - a visible notebook context for the current local library and lab context
 - an interactive unmanaged path for exploratory runs
 - an importable decorated managed-run path for higher provenance
-- concise doAnd-style helpers for routine scans
+- concise doNd-style helpers for routine scans
 - public reopen/export APIs for later analysis
 
 The main ergonomic constraint is low ceremony. Fricon should ask for structure
@@ -51,7 +51,7 @@ into an importable managed-run entry point. The same measurement logic should
 remain normal Python that can be reviewed and tested, but Fricon can run it
 under management when the user opts in.
 
-Routine scans should not force users to build schemas by hand. doAnd-style
+Routine scans should not force users to build schemas by hand. doNd-style
 helpers should make common scan shapes concise while still leaving manual
 writers and raw schema available for advanced or unusual data.
 
@@ -96,7 +96,7 @@ with ctx.measurement("gate sweep") as run:
         data.append(gate=gate, current=dmm.read())
 ```
 
-doAnd-style helper for a routine scan:
+doNd-style helper for a routine scan:
 
 ```python
 result = fc.do2d(

@@ -96,7 +96,7 @@ CAP-007: Nonblocking live inspection.
   trace inspection, and stale/lag indicators.
 - Excludes: live consumers as required write acknowledgements.
 
-CAP-028: doAnd-style scan helpers plus raw schema escape hatch.
+CAP-028: doNd-style scan helpers plus raw schema escape hatch.
 
 - Promise: common scan shapes are easy to declare in Python while uncommon
   schemas remain possible.

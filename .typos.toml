@@ -1,0 +1,7 @@
+[default.extend-words]
+# QCoDeS-style scan helper family, pronounced "do N-dimensional".
+doNd = "doNd"
+
+[default.extend-identifiers]
+# Keep the exact mixed-case spelling in prose and API sketches.
+doNd = "doNd"

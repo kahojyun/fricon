@@ -74,7 +74,7 @@ or notebooks, so SDK ergonomics are product requirements.
 
 At the vision level, the SDK should feel like ordinary Python with low
 ceremony: a visible notebook context, natural interactive unmanaged runs,
-importable managed-run entry points for higher provenance, concise doAnd-style
+importable managed-run entry points for higher provenance, concise doNd-style
 helpers for routine scans, and public reopen/export APIs for later analysis.
 
 Detailed SDK usage guidance lives in `product/python-sdk-ux.md`. Old planning
