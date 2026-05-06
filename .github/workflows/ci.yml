@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Keep this job name stable because branch protection may require it.
+  check:
+    name: Report Required CI Status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Design phase no-op
+        run: |
+          echo "Full CI is paused during docs-next design discussion."
+          echo "Run implementation checks manually when implementation files change."
