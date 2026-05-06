@@ -55,6 +55,14 @@ confidence labels are a later refinement unless a concrete workflow requires
 them; the first priority is recording the source facts and review decisions
 that calibration and repeat work depend on.
 
+Current imperative lab scripts are valid adoption targets, not design ideals.
+Many routines scan parameters through nested loops and calculate per-device
+writes inside the loop body. Post-MVP Fricon should leave room for a more
+declarative model inspired by UI rendering and infrastructure planning: users
+define how parameters produce expected setup or device state, Fricon computes
+the difference from observed state, previews an ordered or parallel-safe apply
+plan, and records what was intended, written, read back, skipped, or failed.
+
 ## Priority 1: Parameter System
 
 FEPIC-001: Parameter System And Snapshot Binding.
@@ -318,6 +326,9 @@ FEPIC-004: Setup And Calibration State Store/Diff.
 - Users record setup/device/calibration state as structured snapshots and
   ledgers.
 - Fricon can diff and bind state to runs without applying settings to devices.
+- Later, Fricon can separate desired setup/device state from observed
+  setup/device status so managed routines can compute reconciliation plans
+  before touching hardware.
 - Setup snapshots, device snapshots, and calibration ledgers are related but
   distinct: setup records declared or passive context; device snapshots record
   identity and observed/readback facts when available; calibration ledgers
@@ -334,6 +345,9 @@ FEPIC-005: Reviewable Automation Workflow.
   objects, actor, review outcome, and audit events.
 - Automation grows from parameter system and managed run records instead of
   becoming an unrelated workflow engine.
+- Automation may eventually reconcile declared desired state against current
+  state, but only through plans that expose dependencies, parallelization,
+  settle/readback checks, and failure handling.
 - Automation records are distinct from managed measurement execution: reusable
   recipes, previewable proposals, review decisions, and execution records each
   own different facts.
@@ -386,6 +400,22 @@ FUS-013: Preview an automation workflow.
   parameter paths, before/after diffs, and rollback targets before applying
   accepted changes.
 
+FUS-021: Declare expected setup/device state and reconcile it.
+
+- As an experimentalist, I want a managed routine to describe the expected
+  setup or device state derived from parameters so that Fricon can compute
+  what actually needs to change instead of every loop body manually writing
+  every device in sequence.
+- Success: the desired state is a durable plan input separate from observed
+  device/readback status and from completed measurement facts.
+- Success: Fricon previews per-device diffs, skipped no-op writes, ordered
+  dependencies, safe parallel groups, expected settle/readback checks, and
+  abort behavior before applying changes.
+- Success: execution records the intended values, write attempts, readbacks,
+  failures, manual overrides, and any divergence from the approved plan.
+- Success: imperative scripts remain supported for exploratory work and for
+  devices whose side effects are not yet modeled safely.
+
 FUS-014: Review and apply automation proposals.
 
 - As a lab maintainer, I want automation proposals to require explicit review
@@ -422,6 +452,8 @@ Automation requirements:
 - FREQ-015: Automation records must preserve actor, trigger, reviewed plan,
   accepted or rejected changes, execution status, produced artifacts, and audit
   events.
+- FREQ-027: Desired-state routines distinguish desired state, observed/current
+  state, planned actions, attempted writes, readbacks, and final status.
 - FREQ-019: Routine recipes and reviewed replay use parameter snapshots and
   run manifests as inputs. Read-only compare or triage may run first; mutation
   requires preview, review, execution status, and audit records.
@@ -439,6 +471,9 @@ Automation requirements:
   calibration, or replay are recorded as artifacts with source inputs,
   generator/code context, and links to the proposal or run that depends on
   them.
+- FREQ-028: Reconciliation plans may parallelize device writes only when
+  dependency, safety, settle, readback, timeout, and abort semantics are
+  explicit enough for the affected devices and setup.
 
 Not first automation slice:
 
@@ -449,6 +484,8 @@ Not first automation slice:
   behavior are accepted by ADR.
 - Fully automatic calibration writeback before code provenance, parameter
   proposals, calibration evidence, and rollback paths are durable.
+- A general optimizer that rewrites arbitrary imperative scan loops into
+  parallel device operations.
 - Generic workflow DAG engine as the normal way to run ordinary measurements.
 - Cloud-first dashboard, account, or team-permission system.
 

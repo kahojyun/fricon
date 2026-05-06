@@ -78,6 +78,21 @@ Lab state, audit, and calibration references:
 - openBIS data model:
   https://openbis.readthedocs.io/en/20.10.12-plus/user-documentation/advance-features/openbis-data-modelling.html
 
+Modern desired-state and reviewable-apply references:
+
+- React render/state model:
+  https://react.dev/learn/state-as-a-snapshot
+  https://react.dev/learn/render-and-commit
+  https://react.dev/learn/managing-state
+- Terraform plan/apply and dependency graph:
+  https://developer.hashicorp.com/terraform/cli/commands/plan
+  https://developer.hashicorp.com/terraform/cli/commands/apply
+  https://developer.hashicorp.com/terraform/internals/graph
+- Kubernetes desired/current state and controller pattern:
+  https://kubernetes.io/docs/concepts/overview/working-with-objects/
+  https://kubernetes.io/docs/concepts/architecture/controller/
+  https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config
+
 ## Product Lessons
 
 - Parameter drift is a standalone product problem. Post-MVP parameter work
@@ -115,3 +130,31 @@ Lab state, audit, and calibration references:
   as the main user experience. Diffs and named groups matter.
 - Borrow ELN/logbook links and audit primitives, but avoid becoming a full
   ELN, LIMS, or compliance platform.
+- Borrow declarative desired-state thinking from modern UI and infrastructure
+  systems, but translate it carefully for hardware. Instead of writing every
+  device in every nested scan-loop body, a managed routine could compute the
+  expected setup/device state from parameters, diff it against observed state,
+  preview an apply plan, skip no-op writes, and group safe independent writes.
+- Desired-state reconciliation should be a reviewable plan/apply workflow, not
+  hidden magic. A saved plan should record the observed state it was based on,
+  dependencies, expected mutations, readback checks, and failure handling
+  before hardware or active parameter refs are changed.
+- Separate spec/status-style facts. Desired state is intent; observed device
+  state, readbacks, and apply execution status are evidence. Mixing those
+  concepts recreates the old problem where generated config and mutable state
+  become hard to trust.
+- Prefer small specialized controllers or reconcilers over one monolithic
+  workflow engine. Calibration, parameter proposals, setup state, device apply,
+  and routine replay have different safety and audit semantics.
+- Treat long-running or replayable automation like a state machine with durable
+  events. Non-deterministic side effects such as device I/O, time-sensitive
+  readings, random choices, and external services should happen at explicit
+  activity boundaries with recorded inputs and outputs.
+- Use Git-like review habits for lab state: propose, diff, review, apply, and
+  rollback. This maps naturally to parameter proposals, calibration proposals,
+  and setup/device apply plans without requiring a heavyweight permissions
+  system.
+- Use dataflow-style invalidation for derived facts. If a parameter snapshot,
+  code snapshot, calibration record, or generated sidecar changes, derived
+  analysis results and routine previews should be able to show what they depend
+  on and whether they need to be recomputed or reviewed.

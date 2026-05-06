@@ -56,6 +56,13 @@ scripts and notebooks remain first-class, local lab computers remain useful
 without a server account model, and higher-provenance workflows grow from the
 same core experience instead of becoming a separate system.
 
+Staying close to current practice does not mean freezing current practice as
+the ideal model. Post-MVP Fricon should explore declarative, desired-state
+workflows for routines that are currently written as imperative nested loops:
+derive expected setup or device state from parameters, diff it against
+observed state, preview the writes, apply only reviewed and safe changes, and
+record readbacks and failures.
+
 ## MVP Goal
 
 The MVP goal is practical: replace the simple LabRAD Data Vault/Grapher loop
@@ -89,6 +96,8 @@ After the MVP, Fricon should also help answer:
 - Which code source and parameter snapshot did this calibration depend on?
 - Is this calibration result evidence, a reviewed proposal, or an applied
   parameter change?
+- For a managed routine, what setup or device state was desired, what was
+  already current, what did Fricon plan to change, and what actually happened?
 - What did we conclude from this measurement?
 - Can I repeat this work safely, and what will change if I do?
 
@@ -187,7 +196,10 @@ Implementation should follow this order:
   reviews, audits, and applies changes only through explicit safety
   boundaries. Calibration automation should first produce reviewed proposals
   backed by code, parameter, and analysis evidence; direct device or parameter
-  mutation remains a later safety-gated step.
+  mutation remains a later safety-gated step. Desired-state reconciliation for
+  setup/device changes belongs here: useful for reducing imperative loop
+  boilerplate, but only after dependencies, readback, settling, timeout, and
+  abort behavior are explicit.
 
 Sample visualization should stay lightweight until product evidence says
 otherwise. Treat a sample visualizer as a view over parameter snapshots and

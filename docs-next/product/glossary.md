@@ -88,6 +88,15 @@ Accepted.
 - Calibration Proposal: reviewed recommendation from calibration evidence that
   may produce parameter or setup changes after approval. It is not a direct
   edit to active configuration.
+- Desired Setup State: expected setup or device state derived from parameters,
+  routine inputs, and code. It is intent, not proof that hardware changed.
+- Observed Device State: readback/status facts for a device or setup, including
+  source and freshness where practical.
+- Reconciliation Plan: previewed diff from current or observed state to desired
+  state, including ordered actions, no-op writes, safe parallel groups,
+  settle/readback checks, and abort behavior.
+- Apply Execution: audit record for attempting a reconciliation plan, including
+  writes, skipped actions, readbacks, failures, and manual overrides.
 - Routine Recipe: reviewable description of a repeated compare, run, or analyze
   routine that can be previewed before replay.
 - Automation Proposal: previewable plan for a routine or AI-assisted action

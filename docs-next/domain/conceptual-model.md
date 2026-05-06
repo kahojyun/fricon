@@ -74,6 +74,28 @@ one generic snapshot object.
   calibration evidence. It may propose parameter or setup changes after review;
   it must not silently edit an active parameter ref.
 
+## Desired State And Reconciliation Boundaries
+
+A later managed setup/device model can be more declarative than today's
+imperative loop scripts.
+
+- DesiredSetupState: expected setup or device state derived from parameters,
+  routine inputs, and code. It is an intent record, not proof that hardware
+  changed.
+- ObservedDeviceState: readback, status, freshness, and source facts reported
+  by an integration or operator.
+- ReconciliationPlan: diff between desired state and observed/current state,
+  including no-op writes, ordered dependencies, safe parallel groups,
+  settle/readback checks, and abort behavior.
+- ApplyExecution: attempted writes, readbacks, skipped actions, failures,
+  manual overrides, and divergence from the approved plan.
+
+This borrows the useful part of declarative UI and infrastructure systems:
+users describe the expected end state, and the system computes a reviewed plan
+to move current state toward it. It must not hide hardware side effects behind
+an opaque "render" step, and it must not assume device writes are idempotent,
+commutative, or safe to parallelize.
+
 ## Code, Parameter, And Calibration Boundaries
 
 Fricon should keep code, parameter, and calibration facts separate even when a
@@ -133,6 +155,9 @@ DataLibrary
     ScriptRun
     DeviceIdentity
     DeviceSnapshot
+    DesiredSetupState
+    ReconciliationPlan
+    ApplyExecution
     RunManifest(read model)
     Event/AuditRecord
 
@@ -144,6 +169,8 @@ DataLibrary
     CalibrationRecord -> links -> Measurement | AnalysisAttempt | ParameterSnapshot | Artifact
     CalibrationProposal -> cites -> CalibrationRecord | AnalysisAttempt | CodeSnapshot | ParameterSnapshot | Artifact
     CalibrationProposal -> may propose -> ParameterProfile change | Setup change
+    ReconciliationPlan -> compares -> DesiredSetupState | DeviceSnapshot
+    ApplyExecution -> executes -> ReconciliationPlan
 ```
 
 `ActivityRun` is an internal modeling pattern. Users should see concrete words:

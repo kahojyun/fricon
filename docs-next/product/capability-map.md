@@ -295,9 +295,13 @@ CAP-023: Managed code snapshots and execution.
 CAP-024: Device boundary and managed device communication.
 
 - Intent: introduce explicit device identity, configuration, and communication
-  boundaries when Fricon begins controlling instruments.
+  boundaries when Fricon begins controlling instruments, including later
+  desired-state planning, observed-state readback, reconciliation diffs, and
+  reviewed apply plans.
 - Boundary: the MVP may record passive setup/device summaries but does not talk
-  to instruments.
+  to instruments. Post-MVP device apply must not assume writes are safe to
+  parallelize or reorder until dependencies, settling, readback, timeout, and
+  abort behavior are designed.
 
 CAP-025: AI-assisted reviewed automation.
 
@@ -324,10 +328,12 @@ CAP-032: Routine recipes and reviewed replay.
 
 - Intent: capture repeated compare, run, and analyze routines as previewable
   recipes so tedious lab work can be replayed without hidden mutation,
-  especially when calibration results would otherwise rewrite parameter state.
+  especially when calibration results would otherwise rewrite parameter state
+  or imperative loop bodies would repeatedly issue avoidable device writes.
 - Boundary: read-only batch compare or triage can arrive before
   mutation-capable automation; durable mutation requires preview, review,
-  before/after diffs, rollback targets, and audit.
+  before/after diffs, rollback targets, reconciliation/apply records where
+  hardware is involved, and audit.
 
 ## Product Grouping
 

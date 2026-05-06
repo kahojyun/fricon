@@ -116,6 +116,10 @@ Why third:
   confusion: preview the analysis inputs, generated sidecars or derived
   artifacts, fitted values, affected parameter paths, diffs, and rollback path
   before any accepted change is applied.
+- A later managed measurement model can borrow from declarative UI and
+  infrastructure systems: users describe expected parameter-derived setup or
+  device state, Fricon computes a diff from observed state, previews an apply
+  plan, and only then performs safe parallel or ordered writes.
 - AI-assisted workflow is only acceptable after the audit and review model
   exists.
 
@@ -130,16 +134,25 @@ Included concepts:
 - FC-010: AI-assisted automation after the audit model exists.
 - FC-018: Routine recipes, reviewed replay, and batch compare for repetitive
   work after parameter and run facts are trustworthy.
+- FC-019: Desired-state setup/device planning, reconciliation diffs, and
+  reviewed apply plans for routines where imperative nested loops are too
+  error-prone.
 
 Boundary:
 
 - Store and diff setup, device, and calibration state before applying settings
   back to devices.
+- Keep imperative Python scripts valid. Desired-state planning is a higher
+  provenance option for routines that can declare pure parameter-to-state
+  functions and explicit hardware constraints.
 - Calibration workflows should first create durable evidence and proposals.
   Automatic writeback to active parameter refs or devices is a later
   safety-gated capability, not the first automation slice.
 - Device write-back, resumable execution, and AI-assisted mutation need safety,
   readback, partial-failure, and audit ADRs.
+- Reconciliation must not assume device writes are commutative, idempotent, or
+  safe to parallelize. Apply plans need dependency, settling, readback,
+  timeout, and abort semantics before they can reach hardware.
 - Read-only compare, triage, and preview workflows may arrive before
   mutation-capable automation if they reuse the same record and review model.
 - A broad workflow DAG engine is not the normal way to run ordinary

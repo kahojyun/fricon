@@ -144,6 +144,17 @@ evidence, visible before/after diffs, and human approval boundaries.
 Calibration-derived settings should be staged as reviewed proposals before
 they update active parameter refs, setup refs, generated config, or devices.
 
+Fricon should also learn from modern desired-state systems without pretending
+lab hardware is a browser DOM or cloud resource graph. Many current scripts use
+imperative nested loops that calculate and send every device setting inside the
+loop body. For routines that can be modeled safely, a better post-MVP direction
+is declarative: users define how parameters produce expected setup/device
+state, Fricon diffs that desired state against observed/readback state,
+previews an apply plan, skips no-op writes, groups safe independent writes, and
+records intended values, write attempts, readbacks, failures, and overrides.
+This needs explicit dependency, settling, timeout, readback, and abort behavior
+before it can control hardware.
+
 AI-assisted workflows should be designed as assistive automation rather than
 silent authority. AI may help draft snippets, summaries, reports, metadata
 cleanup, parameter comparisons, and workflow proposals, but mutating
@@ -344,6 +355,12 @@ Workflow definitions may eventually orchestrate repeated measurement execution,
 scheduled calibration, parameter optimization, and benchmark runs. These
 capabilities should record workflow versions, triggers, inputs, outputs,
 approval checkpoints, failures, and manual overrides.
+
+When workflow definitions touch setup or devices, prefer a desired-state plus
+reconciliation model over hand-coded command sequences where possible. Desired
+state, observed state, reconciliation plan, and apply execution should be
+separate records. This makes no-op changes, hidden drift, safe parallelism,
+partial failure, and rollback easier to reason about.
 
 AI model integration may eventually automate boring or repetitive work, but
 should not bypass product boundaries. AI-generated changes to data,

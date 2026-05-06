@@ -79,6 +79,10 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   code/source provenance, calibration evidence tied to affected parameter
   paths, run manifests and failure investigation, then reviewed routine replay
   or automation.
+- Desired-state setup/device reconciliation is a later post-MVP improvement
+  for routines that outgrow imperative nested loops. Keep desired state,
+  observed state, reconciliation plans, and apply executions separate, and do
+  not parallelize or reorder device writes without explicit safety semantics.
 - Do not make detailed confidence-label taxonomies the center of post-MVP
   planning. First make code state, effective parameters, calibration evidence,
   before/after diffs, and reviewed application durable.

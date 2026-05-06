@@ -64,6 +64,13 @@ Draft.
   setup refs, devices, or generated config that future runs depend on.
 - The absence of a detailed confidence-label taxonomy must never be used as a
   reason to allow untracked parameter or calibration mutation.
+- Desired setup/device state is intent, not evidence that hardware changed.
+  Observed/readback state and apply execution state must remain separate.
+- Reconciliation plans must preview no-op writes, required writes,
+  dependencies, safe parallel groups, settle/readback checks, timeout behavior,
+  and abort behavior before hardware mutation.
+- Device writes may be reordered or parallelized only when the affected device
+  boundaries explicitly allow it.
 - Mutating actions should record an actor label when practical.
 - AI-assisted mutating actions require explicit review and durable audit
   records.

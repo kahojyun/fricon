@@ -26,6 +26,8 @@ Pause local implementation and update docs when:
 - an AI/calibration/automation feature would mutate data-library state
 - a calibration or analysis workflow would update active parameters, setup
   refs, generated config, or devices without a reviewed proposal/audit path
+- a managed routine introduces desired-state setup/device reconciliation,
+  parallel device apply, readback semantics, or partial-failure handling
 - a spec contradicts an accepted ADR
 
 ## Review Questions Before Implementation
