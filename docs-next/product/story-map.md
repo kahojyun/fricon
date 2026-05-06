@@ -93,5 +93,9 @@ files concise: they own story-level success criteria, not implementation tasks.
 M1 should prove enough of US-001 through US-008 to record, inspect, recover, and
 reopen a measurement while preserving first-class dataset discovery.
 
+Python SDK UX is part of the product story, not only implementation detail.
+The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;
+detailed API signatures and capture mechanics belong in later ADRs/specs.
+
 SPEC-002 owns the export/offline-analysis details. Export remains a v0.2
 product promise; it is split out only to keep SPEC-001 focused.

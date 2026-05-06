@@ -48,13 +48,14 @@ Fricon is an S2 medium modular system:
 4. `product/vision.md`
 5. `product/capability-map.md`
 6. `product/story-map.md`
-7. relevant `product/epics/` and `product/user-stories/`
-8. `domain/conceptual-model.md`
-9. `architecture/system-overview.md`
-10. `architecture/module-boundaries.md`
-11. `architecture/compatibility-policy.md`
-12. `ai/project-context.md`
-13. relevant `specs/`
+7. `product/python-sdk-ux.md` for the Python SDK usage guideline
+8. relevant `product/epics/` and `product/user-stories/`
+9. `domain/conceptual-model.md`
+10. `architecture/system-overview.md`
+11. `architecture/module-boundaries.md`
+12. `architecture/compatibility-policy.md`
+13. `ai/project-context.md`
+14. relevant `specs/`
 
 ## Directory Map
 

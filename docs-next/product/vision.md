@@ -9,6 +9,28 @@ Accepted v0.2+ product baseline.
 Fricon v0.2+ is a local lab data library and automation foundation for
 scientific measurement work.
 
+## Long-Term Motivation
+
+Fricon is motivated by a gap in existing physical measurement workflows:
+dataset logging can be usable, but parameter management, measurement-code
+management, environment setup, run provenance, calibration history, and later
+automation often remain fragmented.
+
+Building separate systems on top of existing measurement frameworks tends to
+produce inconsistent user experience and brittle conventions: parameters hide
+in JSON files, code history depends on copied folders or dirty Git checkouts,
+runner facts hide in logs, and provenance is reconstructed after the fact.
+
+Fricon's long-term goal is a unified local-first experience where measurement
+recording, parameter snapshots, managed code sources, SDK runner capture,
+dataset artifacts, setup state, analysis/calibration records, and reviewed
+automation share one coherent product model.
+
+Dataset artifacts and scan semantics are foundational, but they are not the
+product endpoint. The v0.2 measurement/data-library slice exists to create a
+stable base for the parameter system, measurement-code management, managed
+runner, and calibration/automation layers.
+
 The first product goal is practical: replace a simple LabRAD Grapher/Data Vault
 style logger for new measurements without building a compatibility layer for
 old storage.
@@ -38,6 +60,33 @@ I ran a measurement from Python.
 It produced datasets.
 Fricon helps me inspect, annotate, recover, reopen, and export them.
 ```
+
+## Python SDK Experience
+
+The Python SDK is a primary user experience, not only an implementation API.
+Most experimentalists will define and run measurements through Python scripts
+or notebooks, so SDK ergonomics are product requirements.
+
+The SDK should:
+
+- let users create explicit measurements with low ceremony
+- support a visible notebook context for current library and optional lab
+  context
+- keep interactive unmanaged runs natural for exploratory Python
+- make importable decorated managed runs possible later for higher-provenance
+  work
+- make doAnd-style scan helpers concise enough for routine scripts
+- keep advanced raw schema available when helper APIs are too narrow
+- return users to public Python read/reopen/export APIs instead of storage
+  paths
+- fail before mutation when Desktop, service, data library, CLI, or SDK versions
+  are incompatible
+
+Old planning snippets under `dev-docs/` should be read as UX sketches unless an
+ADR accepts exact syntax. They express user requirements such as explicit
+measurement creation, visible notebook context, interactive unmanaged runs,
+importable decorated managed runs, doAnd-style helper ergonomics, and direct
+Python reopen/export, not final API design.
 
 ## First v0.2 Slice
 
@@ -73,10 +122,14 @@ The first shipped slice should include:
 
 These are important but not first-slice commitments:
 
+- parameter profiles, proposals, and calibration promotion
+- parameter history, diffs, and proposal review
+- managed measurement-code sources and approved-code update flows
+- managed code snapshots and managed script execution
+- SDK runner capture before scheduler/resource queues
+- generated run history, compare, and operator handoff views
 - read-only LAN monitoring
 - richer sample fields and 2D sample maps
-- parameter profiles, proposals, and calibration promotion
-- managed code snapshots and managed script execution
 - managed measurement plans
 - user-facing stream concepts inside dataset artifacts
 - analysis and calibration activity records
