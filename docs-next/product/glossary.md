@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft.
+Accepted.
 
 ## Public v0.2 Terms
 

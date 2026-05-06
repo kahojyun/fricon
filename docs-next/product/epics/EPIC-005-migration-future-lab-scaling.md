@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft.
+Accepted.
 
 ## Product Goal
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft.
+Accepted.
 
 ## P-001 Experimentalist
 

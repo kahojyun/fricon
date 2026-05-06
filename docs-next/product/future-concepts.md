@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft future ledger.
+Accepted future ledger.
 
 ## Purpose
 

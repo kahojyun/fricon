@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft v0.2+ product baseline.
+Accepted v0.2+ product baseline.
 
 ## Thesis
 

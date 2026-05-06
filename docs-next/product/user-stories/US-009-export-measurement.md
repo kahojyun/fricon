@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft. Detailed requirements live in `../../specs/SPEC-002-measurement-export-offline-analysis/`.
+Accepted. Detailed requirements live in `../../specs/SPEC-002-measurement-export-offline-analysis/`.
 
 ## Primary Epic
 

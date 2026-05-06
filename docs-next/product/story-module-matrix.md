@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft traceability guide.
+Accepted traceability guide.
 
 ## Purpose
 
