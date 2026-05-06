@@ -59,6 +59,12 @@ Fricon is expected to provide:
 The product should make common scientific measurement workflows easier while
 remaining scriptable for users who already use Python in their research.
 
+The long-term product should go beyond replacing a logger. After the local
+measurement loop is reliable, Fricon should become local experiment memory: a
+system that records enough facts to explain what happened, compare against
+previous-good runs, hand off state between operators, repeat work with visible
+differences, and automate only through reviewed plans and durable audit records.
+
 ## Product Route
 
 The product route is now the v0.2 measurement-library reset: Python-led,

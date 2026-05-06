@@ -46,11 +46,31 @@ DataLibrary
 | DatasetArtifact | Typed table facts, append state, scan schema, variable roles, dataset-local display hints. | Sample identity, measurement notes, code provenance, calibration decisions. |
 | AttachmentArtifact | Light measurement files, images, or logs. | Full artifact management or row-linked large binary storage before an ADR. |
 | ParameterSnapshot | Immutable run facts. | Mutable profile management or calibration promotion. |
-| RunConfigSnapshot | Selected local configuration references, snapshots, hashes, and summaries bound to a measurement. | Automatic tracing of every file read, global parameter profiles, device inventory, or reproducibility claims for unmanaged work. |
+| RunConfigSnapshot | Selected local configuration references, copied snapshots, hashes, and source labels bound to a measurement. | Effective parameter ownership, code provenance, setup/device identity, procedure intent, run-manifest assembly, automatic tracing of every file read, or reproducibility claims for unmanaged work. |
 | CodeProvenanceSummary | Provenance level and display summary. | Automatic reproducibility claims for unmanaged code. |
 | SetupProvenanceSummary | Passive setup, device, driver, environment, method, or clock facts supplied by the user or integration. | Device control, resource locking, readback enforcement, or reproducibility claims. |
 | ProcedureSummary | Passive summary of unmanaged script, external runner, or declared plan context. | Managed execution, scan-point checkpointing, task scheduling, or device/resource ownership. |
 | Event/AuditRecord | Lifecycle events, notes, corrections, actor labels, system actions. | Fine-grained permission enforcement. |
+
+## Parameter And Configuration Boundaries
+
+MVP configuration capture should not collapse future parameter management into
+one generic snapshot object.
+
+- Parameter context summary: optional user-supplied or imported context for a
+  measurement before profiles, refs, overrides, and proposal workflows exist.
+- ParameterSnapshot: future immutable effective parameter facts resolved from
+  refs, profiles, and overrides.
+- ParameterProfileRef: future mutable named pointer such as `main` or
+  `latest-good`.
+- ParameterProposal: future reviewed change request that may update a named
+  parameter ref after approval.
+- RunConfigSnapshot: selected local file references, copies, hashes, and source
+  labels for lab-local configuration. It does not own effective parameters,
+  code provenance, setup/device identity, or procedure intent.
+- RunManifest: future read model that links available run facts and states
+  coverage/provenance confidence. It does not own or duplicate the facts it
+  presents.
 
 ## Dataset Artifact Shape
 
@@ -84,18 +104,29 @@ DataLibrary
     Artifact(kind: dataset | result | report | log | attachment | parameter_proposal | device_snapshot)
     ParameterProfile
     ParameterSnapshot
+    AnalysisAttempt
+    CalibrationRecord
+    CalibrationProposal
     CodeSnapshot
     ScriptRun
     DeviceIdentity
     DeviceSnapshot
+    RunManifest(read model)
     Event/AuditRecord
 
   links:
     ActivityRun -> consumes -> Artifact | ParameterSnapshot | ActivityRun
     ActivityRun -> produces -> Artifact
     ScriptRun -> optional CodeSnapshot
-    Calibration -> coordinates -> Measurement + Analysis + ParameterProposal
+    AnalysisAttempt -> consumes -> Measurement | Artifact
+    CalibrationRecord -> links -> Measurement | AnalysisAttempt | ParameterSnapshot
+    CalibrationProposal -> may propose -> ParameterProfile change | Setup change
 ```
 
 `ActivityRun` is an internal modeling pattern. Users should see concrete words:
 Measurement, Analysis, Import, Simulation, and Calibration.
+
+Analysis attempts, calibration records, and calibration proposals should remain
+separate concepts. Analysis consumes data and produces results or diagnostics.
+Calibration records describe validity, review state, and affected-run windows.
+Calibration proposals recommend reviewed parameter or setup changes.

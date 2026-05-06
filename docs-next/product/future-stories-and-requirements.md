@@ -18,21 +18,32 @@ compatibility, storage, and API policies allow it.
 
 ## Planning Stance
 
+Post-MVP Fricon should move from data-library replacement toward local
+experiment memory and reviewed action. The product should capture enough facts
+to explain, compare, hand off, replay, and safely automate lab work without
+pretending to own code, parameters, setup, or devices before those boundaries
+are designed.
+
 Post-MVP work should prioritize:
 
 - parameter system first
 - managed run second
 - reviewable automation workflow third
 
-Concrete legacy measurement sample analysis suggests read-only comparison, run
-like a previous measurement, and failure investigation should arrive before
-mutation-capable automation. These workflows can build trust from recorded
-facts without taking control of parameters, devices, or code.
+Analysis of representative legacy measurement workflows suggests read-only
+comparison, run like a previous measurement, and failure investigation should
+arrive before mutation-capable automation. These workflows can build trust from
+recorded facts without taking control of parameters, devices, or code.
 
 The product rule is: the system captures context automatically where practical;
 the user confirms, annotates, or corrects it. Any workflow that mutates
 parameters, setup, devices, code, or data-library state needs explicit preview,
 review, and audit semantics.
+
+Prefer features that make experiments explainable, comparable, repeatable, or
+safely reviewable. Deprioritize features that merely imitate legacy acquisition
+tools, add device control without recorded state, or create automation before
+Fricon can explain the facts automation depends on.
 
 ## Priority 1: Parameter System
 
@@ -78,6 +89,8 @@ FUS-004: Promote a good run into a parameter proposal.
   profile intentionally.
 - Success: promotion records source run, changed fields, reviewer/actor, and
   approval or rejection outcome.
+- Success: proposal review is distinct from run-like-previous convenience; a
+  named parameter ref changes only after explicit review.
 - Success: this is a lightweight proposal flow, not a permissions or compliance
   system.
 
@@ -88,6 +101,10 @@ FUS-008: Run like a previous measurement.
   layout so that repeat work is faster without hiding what changed.
 - Success: reused facts are copied by reference or snapshot, and changes are
   shown before the new run starts.
+- Success: the new run starts from a draft with visible differences from the
+  source run; nothing starts or mutates until the user confirms.
+- Success: unmanaged source facts remain labeled unmanaged instead of being
+  promoted to managed provenance.
 
 FUS-015: Use parameter row keys as visual targets.
 
@@ -146,6 +163,9 @@ FEPIC-002: Managed Code Source And Run Capture.
   summary, stdout/stderr, status, diagnostics, and produced artifacts.
 - Fricon can assemble a compact run manifest for compare, handoff, export, and
   failure investigation.
+- Managed run improves provenance confidence; it does not by itself guarantee
+  scientific reproducibility without parameter, setup/device, environment, and
+  calibration coverage.
 - Ordinary interactive unmanaged Python remains possible, but shows lower
   provenance confidence.
 
@@ -188,6 +208,8 @@ FUS-009: Compare two measurements.
   setup, calibration status, lifecycle, notes, and output artifacts so that I
   can explain why results differ.
 - Success: comparison is generated from recorded facts, not a manual report.
+- Success: a previous-good run can be selected as a baseline, and missing or
+  low-confidence facts are shown rather than hidden.
 
 FUS-010: See operator handoff.
 
@@ -195,16 +217,20 @@ FUS-010: See operator handoff.
   that I can trust the lab computer state before starting work.
 - Success: handoff includes parameter ref changes, setup snapshot changes,
   calibration due/expired state, failed runs, imports, exports, and notes.
+- Success: handoff distinguishes facts, warnings, decisions, and missing
+  provenance so the next operator knows what remains uncertain.
 
 FUS-016: Inspect a run manifest.
 
-- As an experimentalist, I want a single run manifest that links the
+- As an experimentalist, I want a run manifest that links the available
   measurement, parameter snapshot, row/target keys, code/environment summary,
   lifecycle, logs, artifacts, operator, and timestamps so that I can understand
   a run without opening several unrelated stores.
 - Success: the manifest can be opened from Desktop, Python, and export bundles.
 - Success: the manifest states provenance confidence instead of implying that
   unmanaged work was fully captured.
+- Success: the manifest is a composite view over recorded facts; it does not
+  own or duplicate parameter, code, setup, analysis, or artifact records.
 
 FUS-017: Investigate a failed fit or anomalous measurement.
 
@@ -216,6 +242,18 @@ FUS-017: Investigate a failed fit or anomalous measurement.
   input artifacts, method/code reference, quality metrics, failure reason, and
   produced outputs when available.
 - Success: comparison to a previous-good run is generated from recorded facts.
+
+FUS-019: Record measurement intent and outcome.
+
+- As an experimentalist, I want to record the question, intent, outcome, and
+  trust decision for a measurement so that future compare, handoff, and repeat
+  work can use more than raw data and filenames.
+- Success: intent can be recorded before or during a run, and outcome can be
+  recorded after review.
+- Success: outcomes can link to datasets, analysis attempts, notes, and
+  lifecycle events.
+- Success: lightweight labels such as accepted, questionable, invalidated, or
+  repeat-needed can explain review state without becoming a full ELN.
 
 Managed-run requirements:
 
@@ -239,6 +277,9 @@ Managed-run requirements:
 - FREQ-018: Analysis or fit attempts can be represented as investigation
   records with inputs, method/code reference, status, diagnostics, quality
   metrics, failure reason, and outputs when available.
+- FREQ-021: Measurement intent and outcome records preserve question, decision,
+  linked evidence, actor, timestamp, and trust label without turning Fricon into
+  a full ELN.
 
 Not first managed-run slice:
 
@@ -254,6 +295,10 @@ FEPIC-004: Setup And Calibration State Store/Diff.
 - Users record setup/device/calibration state as structured snapshots and
   ledgers.
 - Fricon can diff and bind state to runs without applying settings to devices.
+- Setup snapshots, device snapshots, and calibration ledgers are related but
+  distinct: setup records declared or passive context; device snapshots record
+  identity and observed/readback facts when available; calibration ledgers
+  record validity and review state.
 
 FEPIC-005: Reviewable Automation Workflow.
 
@@ -263,6 +308,9 @@ FEPIC-005: Reviewable Automation Workflow.
   objects, actor, review outcome, and audit events.
 - Automation grows from parameter system and managed run records instead of
   becoming an unrelated workflow engine.
+- Automation records are distinct from managed measurement execution: reusable
+  recipes, previewable proposals, review decisions, and execution records each
+  own different facts.
 
 FUS-011: Store and diff setup snapshots.
 
@@ -271,6 +319,8 @@ FUS-011: Store and diff setup snapshots.
   freshness so that setup drift is inspectable.
 - Success: Fricon can diff snapshots and bind a snapshot to a run without
   controlling devices.
+- Success: readback freshness states whether it is user-supplied,
+  integration-supplied, or device-observed, with source and confidence.
 
 FUS-012: Track calibration state.
 
@@ -287,6 +337,8 @@ FUS-013: Preview an automation workflow.
   not surprise me.
 - Success: preview separates parameter changes, setup/device changes, managed
   runs, analysis steps, calibration proposals, and data-library mutations.
+- Success: preview identifies whether each action is read-only, produces a
+  durable record, mutates Fricon state, or reaches an ADR-gated device boundary.
 
 FUS-014: Review and apply automation proposals.
 
@@ -304,6 +356,8 @@ FUS-018: Replay a routine recipe after review.
   expected artifacts, analysis steps, and durable mutations before execution.
 - Success: read-only batch compare or triage can be useful before
   mutation-capable automation exists.
+- Success: replay records recipe template, automation proposal, review
+  decision, execution status, produced records, and failure handling separately.
 
 Automation requirements:
 
@@ -323,6 +377,9 @@ Automation requirements:
 - FREQ-019: Routine recipes and reviewed replay use parameter snapshots and
   run manifests as inputs. Read-only compare or triage may run first; mutation
   requires preview, review, execution status, and audit records.
+- FREQ-022: AI may summarize, propose, or assist, but mutating actions enter as
+  ordinary reviewed proposals. Durable AI-created conclusions record model or
+  tool provenance and privacy-scoped inputs where practical.
 
 Not first automation slice:
 

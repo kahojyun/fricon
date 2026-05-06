@@ -48,9 +48,16 @@ Draft.
   control or complete reproducibility records.
 - Passive procedure summaries must not be presented as managed execution
   records or resumable plans.
+- Managed-run evidence improves provenance confidence but does not guarantee
+  scientific reproducibility without parameter, setup/device, environment, and
+  calibration coverage.
+- Run manifests link available facts and coverage/confidence signals; they must
+  not silently fill missing context.
 - Mutating actions should record an actor label when practical.
 - AI-assisted mutating actions require explicit review and durable audit
   records.
+- Durable AI-created conclusions should record source/provenance information
+  and privacy-scoped inputs where practical.
 - Corrections preserve history rather than overwriting meaning silently.
 
 ## Export

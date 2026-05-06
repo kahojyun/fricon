@@ -18,6 +18,12 @@ Vault/Grapher loop for new measurements. Capabilities should support that loop
 without importing old history, emulating LabRAD, or pulling post-MVP parameter,
 code-management, runner, device, or automation systems into the MVP.
 
+Post-MVP capabilities should move Fricon from data-library replacement toward
+local experiment memory and reviewed action: durable facts for compare, trust,
+handoff, interpretation, and replay. Device control, sample visualization, and
+AI should not become the long-term center unless they serve that memory and
+review model.
+
 Release versions are not product-horizon labels. Compatible post-MVP
 capabilities may still ship on the same compatible release line; use MVP,
 post-MVP priority, and ADR-gated labels for product planning.
@@ -262,17 +268,19 @@ CAP-021: Parameter profiles and proposals.
 - Boundary: the MVP keeps only light parameter context summaries without a
   registry UI or effective-configuration model.
 
-CAP-022: Analysis and calibration records.
+CAP-022: Analysis, interpretation, and calibration records.
 
-- Intent: model downstream analysis, fit attempts, anomaly review,
-  calibration, and derived-result activity as first-class records.
+- Intent: model downstream analysis, fit attempts, interpretation decisions,
+  anomaly review, calibration, and derived-result activity as first-class
+  records.
 - Boundary: the MVP may export analysis-ready data but does not manage
-  calibration promotion.
+  calibration promotion. Analysis attempts, calibration records, and
+  calibration proposals should have distinct lifecycle and audit meaning.
 
 CAP-023: Managed code snapshots and execution.
 
-- Intent: run selected measurement code under Fricon control with reproducible
-  snapshots and lifecycle supervision.
+- Intent: run selected measurement code under Fricon control with
+  higher-confidence code provenance snapshots and lifecycle supervision.
 - Boundary: the MVP records unmanaged execution context only.
 
 CAP-024: Device boundary and managed device communication.
@@ -287,15 +295,20 @@ CAP-025: AI-assisted reviewed automation.
 - Intent: let AI propose actions or analysis steps that are reviewed before
   mutating the data library.
 - Boundary: the MVP should preserve auditability, not implement mutating AI
-  automation.
+  automation. AI-created durable conclusions should record provenance, and
+  mutating AI actions should enter through the same reviewed proposal path as
+  non-AI automation.
 
 CAP-031: Run manifest and failure investigation.
 
 - Intent: give managed or high-provenance runs a compact manifest linking
   parameter snapshots, target keys, code/environment summary, lifecycle, logs,
-  artifacts, operator, timestamps, and diagnostics.
-- Boundary: the first slice supports compare, handoff, export, and anomaly
-  investigation; it is not a scheduler or resume engine.
+  artifacts, operator, timestamps, diagnostics, previous-good baselines, trust
+  summaries, and handoff state.
+- Boundary: a run manifest is a composite view over available facts, not a
+  duplicate owner of parameter, code, setup, analysis, or artifact records. The
+  first slice supports compare, handoff, export, and anomaly investigation; it
+  is not a scheduler or resume engine.
 
 CAP-032: Routine recipes and reviewed replay.
 

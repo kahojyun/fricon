@@ -58,3 +58,20 @@ Fricon should make the following facts first-class for new work:
 The MVP should still avoid LabRAD emulation, old-history import, broad device
 control, a full parameter registry, and automatic tracing of every file an
 unmanaged script reads.
+
+## Post-MVP Product Pressure
+
+The samples also point beyond the MVP replacement loop:
+
+- Legacy folders are not just storage debt; they are missing experiment memory.
+- Repetition currently depends on copied code, mutable config, and operator
+  recall.
+- Fricon's post-MVP advantage should be reviewed reuse of recorded facts, not
+  emulation of legacy paths.
+- Read-only compare, handoff, run-like-previous drafts, and failure
+  investigation should arrive before mutation-capable automation.
+- Parameter proposals should promote effective settings only after review.
+- Analysis and calibration records should provide evidence for trust decisions
+  before they become automation inputs.
+- Automation should grow from trustworthy manifests, snapshots, diffs, and
+  review records, not from a generic workflow engine.

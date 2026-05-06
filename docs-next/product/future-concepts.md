@@ -13,6 +13,11 @@ These are product priority horizons, not semantic-version promises. Compatible
 capabilities may ship on the same release line as the MVP if the compatibility,
 storage, and API policies allow it.
 
+Post-MVP concepts should move Fricon toward local experiment memory and
+reviewed action. The point is to explain, compare, hand off, repeat, and safely
+automate work from recorded facts, not to imitate legacy acquisition tools or
+make device control, sample visualization, or AI the product center by itself.
+
 ## Promotion Rule
 
 A future concept can move into implementation only after it has a clear story,

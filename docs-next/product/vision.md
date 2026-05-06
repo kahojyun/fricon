@@ -9,6 +9,12 @@ Accepted clean-reset product baseline.
 Fricon is a local lab data library and automation foundation for scientific
 measurement work.
 
+The near-term product proves a better local measurement write, watch, recover,
+reopen, and export loop. The long-term product should become the lab's local
+experiment memory and reviewed action layer: a system of record for measurement
+intent, effective parameters, code provenance, setup state, analysis attempts,
+trust decisions, handoff, and reviewed replay.
+
 ## Planning Language
 
 This document uses MVP, post-MVP, and ADR-gated as product priority labels.
@@ -32,6 +38,11 @@ running, inspecting, explaining, and reusing measurement work. The long-term
 aim is not only to store results, but to make the relationship between a
 measurement, its datasets, its Python code, its context, and its later
 interpretation explicit enough for humans and future automation to trust.
+
+The product should exceed legacy loggers by helping users explain, compare, and
+repeat scientific work from recorded facts. The long-term center is not device
+control, sample visualization, or AI by itself; those capabilities matter when
+they serve trustworthy experiment memory, reviewable changes, and safer reuse.
 
 The product should stay close to how experimentalists already work: Python
 scripts and notebooks remain first-class, local lab computers remain useful
@@ -62,6 +73,15 @@ Fricon should help a researcher answer:
 - Which selected local configuration files or summaries were bound to it?
 - How do I inspect it live, reopen it from Python, export it, or recover it?
 
+After the MVP, Fricon should also help answer:
+
+- What changed since the previous good run?
+- Why did this run succeed, fail, or become questionable?
+- Which parameter, setup, code, analysis, or calibration facts explain the
+  difference?
+- What did we conclude from this measurement?
+- Can I repeat this work safely, and what will change if I do?
+
 ## Primary Mental Model
 
 ```text
@@ -69,6 +89,15 @@ I selected an active sample/session when it mattered.
 I ran a measurement from Python.
 It produced datasets.
 Fricon helps me inspect, annotate, recover, reopen, and export them.
+```
+
+Post-MVP, the product should extend that model:
+
+```text
+I can choose a previous-good run or routine.
+Fricon shows the effective parameters, code, setup, and expected artifacts.
+I review what will change before anything durable is mutated.
+Afterward, Fricon records the outcome, evidence, and handoff state.
 ```
 
 ## Python SDK Experience
@@ -123,14 +152,25 @@ To meet the MVP goal, the MVP should include:
 ## Post-MVP Direction
 
 These priorities matter most after the MVP because they change the experiment
-experience most directly:
+experience most directly. They should be understood as product loops first:
+
+- Explain: run manifests, parameter/code/setup provenance, lifecycle evidence,
+  analysis attempts, and failure or anomaly investigation.
+- Compare: previous-good baselines, drift detection, operator handoff,
+  analysis/calibration status, and visible differences before repeat work.
+- Repeat: run-like-previous drafts, reviewed parameter proposals, routine
+  recipes, and audited automation after the facts are trustworthy.
+
+Implementation should follow this order:
 
 - Priority 1: parameter system for profiles, immutable run-bound snapshots,
   diffs, proposal review, and user-defined table row keys that can later
-  support visualization lookup.
+  support visualization lookup. This enables read-only compare and handoff
+  before mutation-capable automation.
 - Priority 2: managed run for importable SDK runner entry points, code/source
   capture, lifecycle capture, compact run manifests, failure investigation,
-  and generated run history.
+  and generated run history. Managed run raises provenance confidence, but it
+  should not become a scheduler or mandatory execution model first.
 - Priority 3: reviewable routine replay and automation workflow that previews,
   reviews, audits, and applies changes only through explicit safety
   boundaries.
@@ -143,8 +183,10 @@ records for discoverability, but schema evolution, invalid visualizers, and
 visualizer migration policy are later design questions.
 
 Lower-priority or ADR-gated directions include read-only LAN monitoring, richer
-sample-map authoring, analysis/calibration records, device communication,
-resumable execution, user-facing stream concepts, and AI-assisted automation.
+sample-map authoring, device communication, resumable execution, user-facing
+stream concepts, and AI-assisted automation. Analysis and calibration records
+belong on the path to explain/compare/repeat, but mutation-capable calibration
+or device apply remains ADR-gated.
 
 ## Non-Goals For MVP
 

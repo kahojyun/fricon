@@ -38,7 +38,12 @@ M1 should prove:
 - remote mode
 - full parameter registry
 - automatic tracing of every local configuration file a script reads
+- run-like-previous drafts
+- parameter proposals or profile promotion
+- compare/handoff dashboards
+- analysis/calibration records or managed calibration workflows
 - managed code execution
+- reviewable routine replay
 - resumable scan-point checkpoint execution
 - user-facing stream concepts inside dataset artifacts
 - broad device framework

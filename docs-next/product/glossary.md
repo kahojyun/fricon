@@ -34,6 +34,8 @@ Accepted.
   action, or actor-labeled mutation.
 - Export Bundle: read-only portable package for analysis without importing into
   another data library.
+- Export Manifest: read-only package manifest for an export bundle. It records
+  package contents, source identity, format version, and integrity metadata.
 
 ## Later Or Advanced Terms
 
@@ -42,6 +44,12 @@ Accepted.
 - Parameter Snapshot: immutable parameter facts captured by future parameter
   profile or managed-run workflows.
 - Parameter Profile: mutable named reference to a useful parameter state.
+- Parameter Proposal: reviewed request to update a named parameter profile or
+  related setup state from a source run, snapshot, or analysis result.
+- Run Manifest: future read model that links available measurement facts such
+  as parameter snapshot, code/environment summary, setup/procedure context,
+  lifecycle/log events, artifacts, operator, timestamps, trust labels, and
+  provenance confidence. It is not the owner of those facts.
 - Target Key: user-defined parameter table row key or label that a visualization
   may use to locate a sample-map element. It is not durable sample identity by
   itself.
@@ -58,18 +66,26 @@ Accepted.
   such as Git/Gitea, package, mirror, or folder.
 - Code Snapshot: immutable resolved code state used by future managed
   execution.
-- Run Manifest: compact immutable summary linking one run to parameters,
-  code/environment context, lifecycle, logs, artifacts, actor, timestamps, and
-  diagnostics.
 - Analysis: later work that consumes artifacts and may produce results,
   reports, or derived datasets.
 - Analysis/Fit Attempt: recorded analysis execution or fit attempt with inputs,
   method/code reference, status, diagnostics, quality metrics, failure reason,
   and outputs when available.
-- Calibration: later workflow that turns measurements/analysis into parameter
-  proposals or approved updates.
+- Measurement Outcome: lightweight interpretation or trust decision attached to
+  a measurement, such as accepted, questionable, invalidated, or repeat-needed.
+  It is not a full electronic lab notebook entry.
+- Calibration Record: later record of calibration validity, due/expired state,
+  as-found/as-left facts, affected-run windows, and review state.
+- Calibration Proposal: reviewed recommendation that may produce parameter or
+  setup changes.
 - Routine Recipe: reviewable description of a repeated compare, run, or analyze
   routine that can be previewed before replay.
+- Automation Proposal: previewable plan for a routine or AI-assisted action
+  that may read, produce records, or mutate durable state after review.
+- Review Decision: approval or rejection record for an automation proposal,
+  parameter proposal, or calibration proposal.
+- Automation Execution: status record for a reviewed action, including produced
+  records and failure handling.
 
 ## Avoid As Primary MVP User Terms
 

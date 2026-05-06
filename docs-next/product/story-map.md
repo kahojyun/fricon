@@ -111,5 +111,12 @@ Python SDK UX is part of the product story, not only implementation detail.
 The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;
 detailed API signatures and capture mechanics belong in later ADRs/specs.
 
+Post-MVP work should turn the MVP facts into local experiment memory: compare
+against previous-good runs, hand off state to another operator, start a
+run-like-previous draft with visible differences, promote parameter proposals
+after review, capture managed-run provenance, record analysis/calibration
+evidence, and replay routines only through preview and audit. These remain
+outside the MVP story index.
+
 SPEC-002 owns the export/offline-analysis details. Export remains an MVP
 product promise; it is split out only to keep SPEC-001 focused.

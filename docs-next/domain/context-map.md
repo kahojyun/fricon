@@ -31,7 +31,13 @@ Draft.
   must not imply shared identity with the source data library.
 - Future AI, calibration, or automation actions must enter through audited
   domain mutations, not direct storage edits.
+- Run manifests are read models over available facts. They must not become
+  owners of parameter, code, setup, analysis, or artifact records.
+- Export manifests describe package contents and integrity. They must not be
+  confused with run manifests used for compare, handoff, or investigation.
 - Passive setup summaries describe context only. Device control and resource
   ownership belong to later ADR-gated device or runner contexts.
 - Passive procedure summaries describe what was intended or invoked. They do
   not imply managed execution, resume support, or runner ownership.
+- AI may summarize or propose, but mutating AI actions must enter through the
+  same reviewed proposal and audit boundaries as non-AI automation.
