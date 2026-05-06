@@ -258,29 +258,38 @@ CAP-019: Rich sample maps and saved views.
 CAP-020: Measurement-code source setup and approved code update flows.
 
 - Intent: help labs manage code source locations and reviewed updates for
-  measurement scripts.
+  measurement scripts, replacing copied working folders as the normal
+  explanation for where run, analysis, and calibration code came from.
 - Boundary: the MVP records honest provenance but does not own code deployment.
+  Post-MVP code-source management should support calibration evidence and run
+  history before it becomes a scheduler or mandatory execution model.
 
 CAP-021: Parameter profiles and proposals.
 
 - Intent: promote repeated parameter snapshots into reusable profiles and
-  reviewed proposals.
+  reviewed proposals, with diffs and source evidence that make calibration
+  changes inspectable instead of anonymous config-file edits.
 - Boundary: the MVP keeps only light parameter context summaries without a
-  registry UI or effective-configuration model.
+  registry UI or effective-configuration model. Post-MVP calibration-derived
+  values should enter through proposal/audit paths, not direct mutation of
+  active refs.
 
 CAP-022: Analysis, interpretation, and calibration records.
 
 - Intent: model downstream analysis, fit attempts, interpretation decisions,
   anomaly review, calibration, and derived-result activity as first-class
-  records.
+  records that can cite input measurements, code context, parameter snapshots,
+  generated artifacts, fitted values, and affected parameter paths.
 - Boundary: the MVP may export analysis-ready data but does not manage
   calibration promotion. Analysis attempts, calibration records, and
   calibration proposals should have distinct lifecycle and audit meaning.
+  Detailed confidence-label taxonomies are not required before the evidence and
+  proposal model exists.
 
 CAP-023: Managed code snapshots and execution.
 
 - Intent: run selected measurement code under Fricon control with
-  higher-confidence code provenance snapshots and lifecycle supervision.
+  stronger code provenance snapshots and lifecycle supervision.
 - Boundary: the MVP records unmanaged execution context only.
 
 CAP-024: Device boundary and managed device communication.
@@ -303,8 +312,9 @@ CAP-031: Run manifest and failure investigation.
 
 - Intent: give managed or high-provenance runs a compact manifest linking
   parameter snapshots, target keys, code/environment summary, lifecycle, logs,
-  artifacts, operator, timestamps, diagnostics, previous-good baselines, trust
-  summaries, and handoff state.
+  artifacts, operator, timestamps, diagnostics, previous-good baselines,
+  calibration evidence, generated sidecars, review decisions, and handoff
+  state.
 - Boundary: a run manifest is a composite view over available facts, not a
   duplicate owner of parameter, code, setup, analysis, or artifact records. The
   first slice supports compare, handoff, export, and anomaly investigation; it
@@ -313,9 +323,11 @@ CAP-031: Run manifest and failure investigation.
 CAP-032: Routine recipes and reviewed replay.
 
 - Intent: capture repeated compare, run, and analyze routines as previewable
-  recipes so tedious lab work can be replayed without hidden mutation.
+  recipes so tedious lab work can be replayed without hidden mutation,
+  especially when calibration results would otherwise rewrite parameter state.
 - Boundary: read-only batch compare or triage can arrive before
-  mutation-capable automation; durable mutation requires review and audit.
+  mutation-capable automation; durable mutation requires preview, review,
+  before/after diffs, rollback targets, and audit.
 
 ## Product Grouping
 

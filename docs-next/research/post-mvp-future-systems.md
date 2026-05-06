@@ -83,6 +83,10 @@ Lab state, audit, and calibration references:
 - Parameter drift is a standalone product problem. Post-MVP parameter work
   should treat named parameter profiles, immutable snapshots, proposals,
   overrides, and diffs as first-class concepts.
+- Code and parameter drift are coupled in practice. Calibration cannot be
+  reliably automated while fitted values depend on copied measurement folders,
+  mutable config files, notebook-local analysis, or generated sidecars that are
+  not visible in the experiment record.
 - Sample visualization can stay convention-friendly: parameter table row keys
   and user-authored 2D map configs can provide useful target binding without
   forcing a full sample-component ontology early.
@@ -90,12 +94,19 @@ Lab state, audit, and calibration references:
   reliably hand-enter code, parameter, setup, calibration, and environment
   context after every run.
 - Managed code snapshot and runner capture matter early because they create
-  trustworthy history. They should be opt-in at first, not a forced replacement
-  for Python scripts.
-- Provenance confidence must be honest: unmanaged, observed, and managed
-  snapshots are different product states.
+  inspectable history for measurements, analysis, and calibration. They should
+  be opt-in at first, not a forced replacement for Python scripts.
+- Provenance level must be honest: unmanaged, observed, and managed snapshots
+  are different product states.
+- Calibration should first produce evidence and reviewed parameter/setup
+  proposals: source measurements, analysis attempts, code context, fitted
+  values, affected parameter paths, diffs, review outcome, and rollback target
+  where practical.
 - Setup/device/calibration state should start with store, bind, search, and
   diff. Applying settings to devices comes later and needs safety ADRs.
+- Detailed confidence-label schemes are secondary. They should not block the
+  core code/parameter/calibration evidence model, and they can be added later
+  where a concrete workflow needs them.
 - Local-first experiment history aligns better with Fricon than cloud-first ML
   tracking, model registries, or hyperparameter leaderboards.
 - Borrow lifecycle, event, and schema rigor from Bluesky, but avoid exposing

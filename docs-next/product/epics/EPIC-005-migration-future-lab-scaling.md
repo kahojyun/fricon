@@ -25,9 +25,17 @@ becoming a legacy import project or a full automation stack.
 - User-written import helpers for old data when generic APIs mature.
 - Read-only LAN viewing.
 - Measurement-code source setup and approved code update flows.
+- Managed code/source provenance for measurement, analysis, and calibration
+  evidence, replacing copied working folders as the normal explanation for
+  where code came from.
 - Rich sample maps, saved views, comparison, and context correction UX.
-- Parameter profiles, calibration records, managed execution, device
-  communication, and AI-assisted reviewed automation.
+- Parameter profiles, effective snapshots, diffs, proposals, and reviewed
+  application of calibration-derived settings.
+- Calibration records and proposals that preserve source measurements,
+  analysis attempts, generated sidecars, affected parameter paths, diffs, and
+  rollback targets before any active parameter ref changes.
+- Managed execution, device communication, and AI-assisted reviewed automation
+  after the code/parameter evidence model is durable.
 
 ## Key Stories
 

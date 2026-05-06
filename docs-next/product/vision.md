@@ -39,6 +39,13 @@ aim is not only to store results, but to make the relationship between a
 measurement, its datasets, its Python code, its context, and its later
 interpretation explicit enough for humans and future automation to trust.
 
+The highest-value post-MVP problem is the code-and-parameter management loop.
+When measurement code is copied by hand and active parameters are mutable local
+files, calibration becomes difficult to trust and harder to automate safely.
+Fricon should first make code provenance, effective parameter state, diffs,
+reviewed parameter changes, and calibration evidence durable enough that
+experimenters can understand why a result should be trusted.
+
 The product should exceed legacy loggers by helping users explain, compare, and
 repeat scientific work from recorded facts. The long-term center is not device
 control, sample visualization, or AI by itself; those capabilities matter when
@@ -79,6 +86,9 @@ After the MVP, Fricon should also help answer:
 - Why did this run succeed, fail, or become questionable?
 - Which parameter, setup, code, analysis, or calibration facts explain the
   difference?
+- Which code source and parameter snapshot did this calibration depend on?
+- Is this calibration result evidence, a reviewed proposal, or an applied
+  parameter change?
 - What did we conclude from this measurement?
 - Can I repeat this work safely, and what will change if I do?
 
@@ -166,14 +176,18 @@ Implementation should follow this order:
 - Priority 1: parameter system for profiles, immutable run-bound snapshots,
   diffs, proposal review, and user-defined table row keys that can later
   support visualization lookup. This enables read-only compare and handoff
-  before mutation-capable automation.
+  before mutation-capable automation, and it directly addresses the mutable
+  config-file problem that makes calibration hard to trust.
 - Priority 2: managed run for importable SDK runner entry points, code/source
   capture, lifecycle capture, compact run manifests, failure investigation,
-  and generated run history. Managed run raises provenance confidence, but it
-  should not become a scheduler or mandatory execution model first.
+  and generated run history. This is the code-management counterpart to
+  parameter snapshots: it should replace copied-code folders with visible code
+  source context before it becomes a scheduler or mandatory execution model.
 - Priority 3: reviewable routine replay and automation workflow that previews,
   reviews, audits, and applies changes only through explicit safety
-  boundaries.
+  boundaries. Calibration automation should first produce reviewed proposals
+  backed by code, parameter, and analysis evidence; direct device or parameter
+  mutation remains a later safety-gated step.
 
 Sample visualization should stay lightweight until product evidence says
 otherwise. Treat a sample visualizer as a view over parameter snapshots and
@@ -184,9 +198,11 @@ visualizer migration policy are later design questions.
 
 Lower-priority or ADR-gated directions include read-only LAN monitoring, richer
 sample-map authoring, device communication, resumable execution, user-facing
-stream concepts, and AI-assisted automation. Analysis and calibration records
-belong on the path to explain/compare/repeat, but mutation-capable calibration
-or device apply remains ADR-gated.
+stream concepts, and AI-assisted automation. Detailed confidence-label
+taxonomies may be useful later, but they should not block the core design:
+durable code and parameter state, analysis evidence, reviewed calibration
+proposals, and auditable application of accepted changes. Mutation-capable
+calibration or device apply remains ADR-gated.
 
 ## Non-Goals For MVP
 

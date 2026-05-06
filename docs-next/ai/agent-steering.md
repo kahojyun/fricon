@@ -24,6 +24,8 @@ Pause local implementation and update docs when:
 - storage/API compatibility behavior changes
 - a lifecycle or recovery state is added
 - an AI/calibration/automation feature would mutate data-library state
+- a calibration or analysis workflow would update active parameters, setup
+  refs, generated config, or devices without a reviewed proposal/audit path
 - a spec contradicts an accepted ADR
 
 ## Review Questions Before Implementation

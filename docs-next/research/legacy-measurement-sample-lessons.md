@@ -33,6 +33,10 @@ The samples show a working but fragile legacy LabRAD-era pattern:
   demod/readout settings.
 - Plotting and analysis reconstruct scan meaning after the fact from column
   order, filename conventions, sidecars, and notebook-local arrays.
+- Calibration code already contains ad hoc attempts to compare, fit, update, or
+  regenerate settings. The problem is that those outputs are mixed with copied
+  code folders, mutable parameter files, generated sidecars, and operator
+  judgment rather than becoming a reviewed calibration-to-parameter workflow.
 - Partial or interrupted acquisition is treated as a cleanup/debugging problem,
   not as a first-class readable lifecycle state.
 
@@ -66,12 +70,21 @@ The samples also point beyond the MVP replacement loop:
 - Legacy folders are not just storage debt; they are missing experiment memory.
 - Repetition currently depends on copied code, mutable config, and operator
   recall.
+- The most valuable post-MVP improvement is to make code provenance,
+  effective parameter snapshots, generated sidecars, calibration evidence, and
+  accepted parameter changes inspectable together.
 - Fricon's post-MVP advantage should be reviewed reuse of recorded facts, not
   emulation of legacy paths.
 - Read-only compare, handoff, run-like-previous drafts, and failure
   investigation should arrive before mutation-capable automation.
-- Parameter proposals should promote effective settings only after review.
+- Parameter proposals should promote effective or fitted settings only after
+  review, with before/after diffs and rollback targets where practical.
 - Analysis and calibration records should provide evidence for trust decisions
-  before they become automation inputs.
+  and proposed parameter changes before they become automation inputs.
+- Calibration automation should stage proposals instead of directly rewriting
+  active parameter refs or generated config files.
 - Automation should grow from trustworthy manifests, snapshots, diffs, and
   review records, not from a generic workflow engine.
+- Detailed confidence-label taxonomies can wait. The urgent need is durable
+  source facts, visible diffs, reviewed application, and an audit trail that
+  lets an experimenter trust the next run.

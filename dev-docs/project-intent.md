@@ -65,6 +65,14 @@ system that records enough facts to explain what happened, compare against
 previous-good runs, hand off state between operators, repeat work with visible
 differences, and automate only through reviewed plans and durable audit records.
 
+The highest-value post-MVP motivation is the code-and-parameter management
+loop. Copied measurement code, mutable parameter/config files, generated
+sidecars, and notebook-local analysis make calibration hard to trust and harder
+to automate safely. Fricon should first make code provenance, effective
+parameter snapshots, diffs, calibration evidence, and reviewed parameter
+changes durable enough that experimenters can trust the next run. Detailed
+confidence-label schemes can wait until a concrete workflow needs them.
+
 ## Product Route
 
 The product route is now the v0.2 measurement-library reset: Python-led,
@@ -131,7 +139,10 @@ one.
 Workflow automation should be treated as a layer above individual measurements.
 It can eventually coordinate scheduled calibration, optimization, benchmark,
 and repeated measurement tasks, but should rely on clear measurement records,
-parameter snapshots, provenance, and human approval boundaries.
+parameter snapshots, code provenance, generated artifacts, calibration
+evidence, visible before/after diffs, and human approval boundaries.
+Calibration-derived settings should be staged as reviewed proposals before
+they update active parameter refs, setup refs, generated config, or devices.
 
 AI-assisted workflows should be designed as assistive automation rather than
 silent authority. AI may help draft snippets, summaries, reports, metadata

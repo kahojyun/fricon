@@ -48,11 +48,22 @@ Draft.
   control or complete reproducibility records.
 - Passive procedure summaries must not be presented as managed execution
   records or resumable plans.
-- Managed-run evidence improves provenance confidence but does not guarantee
+- Managed-run evidence improves provenance coverage but does not guarantee
   scientific reproducibility without parameter, setup/device, environment, and
   calibration coverage.
-- Run manifests link available facts and coverage/confidence signals; they must
-  not silently fill missing context.
+- Run manifests link available facts and provenance coverage signals; they
+  must not silently fill missing context.
+- Code provenance, generated sidecars, and effective parameter snapshots are
+  separate facts. Linking them for compare or replay must not make any one
+  record the owner of the others.
+- Calibration-derived parameter changes must preserve source measurements,
+  analysis or fit attempts, code context, affected parameter paths,
+  before/after diffs, review outcome, and rollback target where practical
+  before active refs are updated.
+- Calibration automation must not silently mutate active parameter refs,
+  setup refs, devices, or generated config that future runs depend on.
+- The absence of a detailed confidence-label taxonomy must never be used as a
+  reason to allow untracked parameter or calibration mutation.
 - Mutating actions should record an actor label when practical.
 - AI-assisted mutating actions require explicit review and durable audit
   records.

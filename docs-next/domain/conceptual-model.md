@@ -69,8 +69,30 @@ one generic snapshot object.
   labels for lab-local configuration. It does not own effective parameters,
   code provenance, setup/device identity, or procedure intent.
 - RunManifest: future read model that links available run facts and states
-  coverage/provenance confidence. It does not own or duplicate the facts it
-  presents.
+  provenance coverage. It does not own or duplicate the facts it presents.
+- CalibrationProposal: future reviewed recommendation from analysis or
+  calibration evidence. It may propose parameter or setup changes after review;
+  it must not silently edit an active parameter ref.
+
+## Code, Parameter, And Calibration Boundaries
+
+Fricon should keep code, parameter, and calibration facts separate even when a
+future run manifest presents them together.
+
+- Code provenance explains which source, revision, snapshot, or unmanaged
+  summary produced the measurement, analysis, or calibration evidence.
+- Parameter snapshots own effective parameter facts. Parameter refs remain
+  mutable pointers changed through proposal/audit paths.
+- Calibration records describe validity, review state, affected-run windows,
+  and evidence. Calibration proposals connect fitted values to proposed
+  parameter or setup changes.
+- Generated sidecars or derived config files used by analysis or calibration
+  should be artifacts with source inputs and generator context, not invisible
+  files that future runs depend on by accident.
+
+Early calibration automation should therefore stage evidence and proposals
+before applying changes. Direct mutation of active parameter refs, setup refs,
+or devices is a later safety-gated capability.
 
 ## Dataset Artifact Shape
 
@@ -101,7 +123,7 @@ a normal v0.2 user-facing concept.
 DataLibrary
   records:
     ActivityRun(kind: measurement | analysis | import | simulation | calibration)
-    Artifact(kind: dataset | result | report | log | attachment | parameter_proposal | device_snapshot)
+    Artifact(kind: dataset | result | report | log | attachment | generated_sidecar | parameter_proposal | device_snapshot)
     ParameterProfile
     ParameterSnapshot
     AnalysisAttempt
@@ -119,7 +141,8 @@ DataLibrary
     ActivityRun -> produces -> Artifact
     ScriptRun -> optional CodeSnapshot
     AnalysisAttempt -> consumes -> Measurement | Artifact
-    CalibrationRecord -> links -> Measurement | AnalysisAttempt | ParameterSnapshot
+    CalibrationRecord -> links -> Measurement | AnalysisAttempt | ParameterSnapshot | Artifact
+    CalibrationProposal -> cites -> CalibrationRecord | AnalysisAttempt | CodeSnapshot | ParameterSnapshot | Artifact
     CalibrationProposal -> may propose -> ParameterProfile change | Setup change
 ```
 
@@ -129,4 +152,6 @@ Measurement, Analysis, Import, Simulation, and Calibration.
 Analysis attempts, calibration records, and calibration proposals should remain
 separate concepts. Analysis consumes data and produces results or diagnostics.
 Calibration records describe validity, review state, and affected-run windows.
-Calibration proposals recommend reviewed parameter or setup changes.
+Calibration proposals recommend reviewed parameter or setup changes and carry
+the before/after diff, actor/reviewer, outcome, and rollback target where
+practical.

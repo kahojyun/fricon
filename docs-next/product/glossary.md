@@ -45,11 +45,14 @@ Accepted.
   profile or managed-run workflows.
 - Parameter Profile: mutable named reference to a useful parameter state.
 - Parameter Proposal: reviewed request to update a named parameter profile or
-  related setup state from a source run, snapshot, or analysis result.
+  related setup state from a source run, snapshot, analysis result, or
+  calibration result. It carries source evidence and a before/after diff where
+  practical.
 - Run Manifest: future read model that links available measurement facts such
   as parameter snapshot, code/environment summary, setup/procedure context,
-  lifecycle/log events, artifacts, operator, timestamps, trust labels, and
-  provenance confidence. It is not the owner of those facts.
+  lifecycle/log events, artifacts, operator, timestamps, calibration evidence,
+  review decisions, and provenance coverage. It is not the owner of those
+  facts.
 - Target Key: user-defined parameter table row key or label that a visualization
   may use to locate a sample-map element. It is not durable sample identity by
   itself.
@@ -63,9 +66,15 @@ Accepted.
 - Snapshot Query: later product concept for selecting values from a parameter
   snapshot to drive labels, color maps, comparisons, or visualizer state.
 - Measurement Code Source: configured upstream source for lab measurement code,
-  such as Git/Gitea, package, mirror, or folder.
+  such as Git/Gitea, package, mirror, or folder. Post-MVP, this should replace
+  copied working folders as the normal code provenance story for managed
+  measurement, analysis, and calibration work.
 - Code Snapshot: immutable resolved code state used by future managed
-  execution.
+  execution, analysis evidence, or calibration evidence.
+- Generated Sidecar: derived local file, config fragment, waveform, cache, or
+  helper artifact produced by code and later consumed by analysis,
+  calibration, or replay. It should record source inputs and generator context
+  when it affects future interpretation.
 - Analysis: later work that consumes artifacts and may produce results,
   reports, or derived datasets.
 - Analysis/Fit Attempt: recorded analysis execution or fit attempt with inputs,
@@ -76,8 +85,9 @@ Accepted.
   It is not a full electronic lab notebook entry.
 - Calibration Record: later record of calibration validity, due/expired state,
   as-found/as-left facts, affected-run windows, and review state.
-- Calibration Proposal: reviewed recommendation that may produce parameter or
-  setup changes.
+- Calibration Proposal: reviewed recommendation from calibration evidence that
+  may produce parameter or setup changes after approval. It is not a direct
+  edit to active configuration.
 - Routine Recipe: reviewable description of a repeated compare, run, or analyze
   routine that can be previewed before replay.
 - Automation Proposal: previewable plan for a routine or AI-assisted action

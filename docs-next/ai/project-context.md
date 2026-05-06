@@ -76,8 +76,12 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   results. Keep config placement, query syntax, and schema-evolution behavior
   deferred until a focused spec or ADR.
 - Prioritize post-MVP foundations by user pain: parameter diffs and proposals,
-  run manifests and failure investigation, then reviewed routine replay or
-  automation.
+  code/source provenance, calibration evidence tied to affected parameter
+  paths, run manifests and failure investigation, then reviewed routine replay
+  or automation.
+- Do not make detailed confidence-label taxonomies the center of post-MVP
+  planning. First make code state, effective parameters, calibration evidence,
+  before/after diffs, and reviewed application durable.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.

@@ -34,6 +34,9 @@ Why first:
 
 - Fricon's core motivation is dissatisfaction with existing parameter
   management and code management around physical measurements.
+- The most painful legacy failure mode is not a missing label taxonomy; it is
+  copied code and mutable parameter/config files making it unclear which
+  settings a calibration depended on or changed.
 - Parameter state directly shapes whether a completed measurement can be
   understood, compared, repeated, or promoted into better lab practice.
 - Managed runs and automation workflows need a parameter model to avoid
@@ -51,12 +54,17 @@ Boundary:
 - Start with a hybrid parameter tree: flexible structured values first, with
   selected parameters upgraded to typed definitions, units, validation, and UI
   affordances.
-- Use lightweight proposals with actor, reason, and approval history.
+- Use lightweight proposals with actor, reason, approval history, before/after
+  diffs, source evidence, and rollback target where practical.
+- Treat calibration-derived values as proposed parameter changes first. A
+  calibration can produce evidence, fitted values, and affected parameter
+  paths without directly mutating the active profile.
 - Treat sample target binding as a convention first: parameter table row keys
   may be reused by visualization code and snapshot queries, but Fricon does
   not need a mandatory sample-component ontology in the first parameter slice.
 - Do not require a full permissions system, strict global registry, or device
-  write-back for the first parameter slice.
+  write-back for the first parameter slice. A mandatory field-level confidence
+  taxonomy is also deferred unless a concrete workflow proves it is needed.
 
 ## Priority 2: Managed Run
 
@@ -66,6 +74,9 @@ Why second:
   provenance experiment runner when users opt in.
 - Useful run history depends on captured code, parameters, lifecycle, logs, and
   produced artifacts, not manual entry.
+- Calibration evidence needs to cite the code source or code snapshot that
+  produced fitted values; otherwise automated calibration only formalizes the
+  old copied-folder ambiguity.
 - Managed run should grow from ordinary importable Python code, not from a
   separate experiment DSL.
 
@@ -87,6 +98,8 @@ Boundary:
 - Ordinary interactive unmanaged Python remains valid and clearly labeled.
 - Capture enough context for compare and failure investigation before designing
   queues, resumable scan points, or autonomous automation.
+- Managed run should replace copied-code folders as a provenance workflow
+  before it tries to own scheduling or hardware orchestration.
 - Queues, resource leases, retries, workflow DAGs, and resumable execution are
   later or ADR-gated.
 
@@ -99,6 +112,10 @@ Why third:
 - The experiment UX risk is hidden mutation. The product value is preview,
   review, audit, and explicit approval around changes to parameters, setup,
   code, devices, or data-library state.
+- Calibration automation is valuable early only when it reduces parameter
+  confusion: preview the analysis inputs, generated sidecars or derived
+  artifacts, fitted values, affected parameter paths, diffs, and rollback path
+  before any accepted change is applied.
 - AI-assisted workflow is only acceptable after the audit and review model
   exists.
 
@@ -118,6 +135,9 @@ Boundary:
 
 - Store and diff setup, device, and calibration state before applying settings
   back to devices.
+- Calibration workflows should first create durable evidence and proposals.
+  Automatic writeback to active parameter refs or devices is a later
+  safety-gated capability, not the first automation slice.
 - Device write-back, resumable execution, and AI-assisted mutation need safety,
   readback, partial-failure, and audit ADRs.
 - Read-only compare, triage, and preview workflows may arrive before
