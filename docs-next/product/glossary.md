@@ -4,7 +4,7 @@
 
 Accepted.
 
-## Public v0.2 Terms
+## Public MVP Terms
 
 - Data Library: local Fricon root and catalog for measurements, samples,
   artifacts, and provenance.
@@ -47,13 +47,14 @@ Accepted.
 - Calibration: later workflow that turns measurements/analysis into parameter
   proposals or approved updates.
 
-## Avoid As Primary v0.2 User Terms
+## Avoid As Primary MVP User Terms
 
-- Workspace: v0.1 user-facing term. In v0.2+, keep only as historical or
-  internal implementation wording unless an ADR says otherwise.
+- Workspace: v0.1 user-facing term. In the clean-reset product model, keep only
+  as historical or internal implementation wording unless an ADR says
+  otherwise.
 - ActivityRun: internal shared pattern for measurement, analysis, import,
   simulation, and calibration work.
 - Stream: internal or advanced substructure for grouped payloads such as
-  primary/baseline data. Not a first v0.2 user-facing concept.
+  primary/baseline data. Not an MVP user-facing concept.
 - Experiment: informal scientific wording or possible future grouping/template,
   not the first public acquisition record.

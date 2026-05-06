@@ -30,6 +30,10 @@ The reset keeps useful infrastructure where it fits, but it does not preserve
 v0.1 workspace, storage, API, IPC, or desktop navigation compatibility when
 that compatibility would keep the wrong user model alive.
 
+Product planning in this directory uses MVP, post-MVP priority, and ADR-gated
+labels. Do not treat post-MVP priorities as semantic-version labels; compatible
+features may still ship on the same compatible release line.
+
 ## Scale Classification
 
 Fricon is an S2 medium modular system:

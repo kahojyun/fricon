@@ -21,10 +21,14 @@ not as the v0.2+ design source of truth.
 
 ## Product Direction
 
-Fricon v0.2+ is a local lab data library for scientific measurement work.
+Fricon is a local lab data library for scientific measurement work.
 Its long-term motivation is unified parameter management, measurement-code
 management, SDK runner capture, dataset recording, and provenance in one
 local-first product experience.
+
+Product planning uses MVP, post-MVP priority, and ADR-gated labels. Do not
+interpret post-MVP priorities as semantic-version labels; compatible additions
+may remain on the same compatible release line.
 
 Primary user model:
 
@@ -42,13 +46,15 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Do not make Desktop the durable data backend.
 - Do not bypass service compatibility checks for mutating Python APIs.
 - Do not introduce SaaS, accounts, teams, roles, or distributed database
-  behavior for v0.2.
-- Do not implement future runner, device, calibration, or AI mutation systems
+  behavior for the MVP.
+- Do not implement post-MVP runner, device, calibration, or AI mutation systems
   before their ADRs/specs exist.
 
 ## Good Defaults
 
 - Prefer measurement-scoped dataset writers in public examples.
+- Use MVP/post-MVP/ADR-gated for product priority. Do not use `v0.3` or `v0.4`
+  as shorthand for feature horizons.
 - Treat high-impact Python SDK ergonomics as product requirements, not only
   implementation details.
 - Keep product-level SDK docs focused on usage guidelines and non-binding

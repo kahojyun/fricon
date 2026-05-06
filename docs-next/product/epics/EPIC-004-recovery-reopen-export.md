@@ -9,7 +9,7 @@ Accepted.
 Interrupted or completed measurements remain useful. Users can recover context,
 reopen data from Python, and export a measurement for offline analysis.
 
-## v0.2 Scope
+## MVP Scope
 
 - Readable partial data and visible lifecycle state.
 - Trash/recover instead of normal hard delete.
@@ -17,7 +17,7 @@ reopen data from Python, and export a measurement for offline analysis.
 - Measurement-centered export through SPEC-002.
 - Privacy preview for sensitive provenance in exports.
 
-## Not v0.2
+## Not MVP
 
 - Resumable managed execution.
 - Full offline viewer polish before the write/reopen loop works.

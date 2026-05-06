@@ -2,12 +2,19 @@
 
 ## Status
 
-Accepted v0.2+ product baseline.
+Accepted clean-reset product baseline.
 
 ## Thesis
 
-Fricon v0.2+ is a local lab data library and automation foundation for
-scientific measurement work.
+Fricon is a local lab data library and automation foundation for scientific
+measurement work.
+
+## Planning Language
+
+This document uses MVP, post-MVP, and ADR-gated as product priority labels.
+They are not semantic-version labels. Compatible improvements can still ship on
+the same compatible release line when the storage, API, and compatibility
+policies allow it.
 
 ## Long-Term Motivation
 
@@ -28,14 +35,14 @@ scripts and notebooks remain first-class, local lab computers remain useful
 without a server account model, and higher-provenance workflows grow from the
 same core experience instead of becoming a separate system.
 
-## v0.2 MVP Goal
+## MVP Goal
 
-The v0.2 MVP goal is practical: replace the simple LabRAD Data Vault/Grapher
-loop for new measurements.
+The MVP goal is practical: replace the simple LabRAD Data Vault/Grapher loop
+for new measurements.
 
 Success means a user can start new measurement work in Fricon, write data from
 Python, watch it live, recover partial results, reopen it later, and export it
-without depending on old storage paths. v0.2 does not need to import old
+without depending on old storage paths. The MVP does not need to import old
 history or emulate LabRAD; old LabRAD, QCoDeS, Labber, or folder-based history
 can remain where it is while new work moves to Fricon.
 
@@ -74,9 +81,9 @@ Detailed SDK usage guidance lives in `product/python-sdk-ux.md`. Old planning
 snippets under `dev-docs/` should be read as non-binding UX sketches unless an
 ADR accepts exact API syntax.
 
-## v0.2 MVP Scope
+## MVP Scope
 
-To meet the MVP goal, v0.2 should include:
+To meet the MVP goal, the MVP should include:
 
 - one local data library per normal lab computer
 - explicit measurements
@@ -100,9 +107,9 @@ To meet the MVP goal, v0.2 should include:
 - backup/restore and migration checkpoints
 - coherent install/update compatibility and guided setup diagnostics
 
-## Future Direction
+## Post-MVP Direction
 
-These directions matter to the long-term product, but are not v0.2 MVP
+These directions matter to the long-term product, but are not MVP
 commitments:
 
 - parameter profiles, proposals, and calibration promotion
@@ -120,7 +127,7 @@ commitments:
 - resumable managed execution with scan-point checkpoints
 - AI-assisted reviewable automation
 
-## Non-Goals For v0.2
+## Non-Goals For MVP
 
 - hosted SaaS
 - account/team administration

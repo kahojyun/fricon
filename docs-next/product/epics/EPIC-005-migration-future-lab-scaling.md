@@ -7,10 +7,10 @@ Accepted.
 ## Product Goal
 
 Help labs adopt Fricon for new measurements while old loggers, copied folders,
-and historical data remain where they are. This epic protects the v0.2 MVP
-from becoming a legacy import project or a full automation stack.
+and historical data remain where they are. This epic protects the MVP from
+becoming a legacy import project or a full automation stack.
 
-## v0.2 Scope
+## MVP Scope
 
 - Data Vault-style script migration guidance for new measurements.
 - Source aliases and old-system references as metadata, not primary identity.
@@ -18,7 +18,7 @@ from becoming a legacy import project or a full automation stack.
 - Light contextual summaries for setup, environment, procedure, and parameters.
 - Optional sample/session context that can be corrected after a run.
 
-## Later Scope
+## Post-MVP Scope
 
 - User-written import helpers for old data when generic APIs mature.
 - Read-only LAN viewing.

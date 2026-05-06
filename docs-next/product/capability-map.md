@@ -13,12 +13,16 @@ or specs instead of expanding this map into a large table.
 
 ## Vision Alignment
 
-The v0.2 capability baseline serves one MVP goal: replace the simple LabRAD
-Data Vault/Grapher loop for new measurements. Capabilities should support that
-loop without importing old history, emulating LabRAD, or pulling v0.3+
-parameter, code-management, runner, device, or automation systems into v0.2.
+The capability baseline serves one MVP goal: replace the simple LabRAD Data
+Vault/Grapher loop for new measurements. Capabilities should support that loop
+without importing old history, emulating LabRAD, or pulling post-MVP parameter,
+code-management, runner, device, or automation systems into the MVP.
 
-## v0.2 Foundation Capabilities
+Release versions are not product-horizon labels. Compatible post-MVP
+capabilities may still ship on the same compatible release line; use MVP,
+post-MVP priority, and ADR-gated labels for product planning.
+
+## MVP Foundation Capabilities
 
 ### Local Adoption
 
@@ -56,7 +60,7 @@ CAP-013: Compatibility diagnostics and fail-before-write checks.
   library format.
 - Excludes: accepting best-effort writes from unknown or stale clients.
 
-### v0.2 MVP Measurement Replacement
+### MVP Measurement Replacement
 
 CAP-003: Python measurement recording.
 
@@ -211,59 +215,59 @@ CAP-026: Dataset artifact discovery and direct open.
   and direct navigation to table or plot views.
 - Excludes: returning to a dataset-first product model.
 
-## Later Capabilities
+## Post-MVP Capabilities
 
 CAP-018: Read-only remote monitoring.
 
 - Intent: allow trusted users on the lab network to watch measurements without
   editing the data library.
-- Boundary: v0.2 may keep APIs observable, but should not promise remote access
-  or shared editing.
+- Boundary: the MVP may keep APIs observable, but should not promise remote
+  access or shared editing.
 
 CAP-019: Rich sample maps and saved views.
 
 - Intent: support spatial sample maps, richer sample metadata, and saved
   comparison views after the local data-library loop works.
-- Boundary: v0.2 only needs optional sample/session context and correction.
+- Boundary: the MVP only needs optional sample/session context and correction.
 
 CAP-020: Measurement-code source setup and approved code update flows.
 
 - Intent: help labs manage code source locations and reviewed updates for
   measurement scripts.
-- Boundary: v0.2 records honest provenance but does not own code deployment.
+- Boundary: the MVP records honest provenance but does not own code deployment.
 
 CAP-021: Parameter profiles and proposals.
 
 - Intent: promote repeated parameter snapshots into reusable profiles and
   reviewed proposals.
-- Boundary: v0.2 keeps only light parameter context summaries without a
+- Boundary: the MVP keeps only light parameter context summaries without a
   registry UI or effective-configuration model.
 
 CAP-022: Analysis and calibration records.
 
 - Intent: model downstream analysis, calibration, and derived-result activity
   as first-class records.
-- Boundary: v0.2 may export analysis-ready data but does not manage calibration
-  promotion.
+- Boundary: the MVP may export analysis-ready data but does not manage
+  calibration promotion.
 
 CAP-023: Managed code snapshots and execution.
 
 - Intent: run selected measurement code under Fricon control with reproducible
   snapshots and lifecycle supervision.
-- Boundary: v0.2 records unmanaged execution context only.
+- Boundary: the MVP records unmanaged execution context only.
 
 CAP-024: Device boundary and managed device communication.
 
 - Intent: introduce explicit device identity, configuration, and communication
   boundaries when Fricon begins controlling instruments.
-- Boundary: v0.2 may record passive setup/device summaries but does not talk to
-  instruments.
+- Boundary: the MVP may record passive setup/device summaries but does not talk
+  to instruments.
 
 CAP-025: AI-assisted reviewed automation.
 
 - Intent: let AI propose actions or analysis steps that are reviewed before
   mutating the data library.
-- Boundary: v0.2 should preserve auditability, not implement mutating AI
+- Boundary: the MVP should preserve auditability, not implement mutating AI
   automation.
 
 ## Product Grouping
@@ -271,9 +275,9 @@ CAP-025: AI-assisted reviewed automation.
 Use these planning groups when routing product work:
 
 - Local adoption: CAP-001, CAP-002, CAP-012, CAP-013.
-- v0.2 MVP measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007,
+- MVP measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007,
   CAP-028, CAP-030.
 - Context and provenance: CAP-004, CAP-014, CAP-015, CAP-017, CAP-027,
   CAP-029.
 - Review and analysis: CAP-008, CAP-009, CAP-010, CAP-011, CAP-016, CAP-026.
-- Future automation foundation: CAP-018 through CAP-025.
+- Post-MVP foundation: CAP-018 through CAP-025.

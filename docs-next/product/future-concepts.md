@@ -6,8 +6,12 @@ Accepted future ledger.
 
 ## Purpose
 
-Preserve important v0.3+ and v0.4+ direction without letting future systems
-inflate the first v0.2 measurement slice.
+Preserve important post-MVP directions without letting future systems inflate
+the MVP measurement loop.
+
+These are product priority horizons, not semantic-version promises. Compatible
+capabilities may ship on the same release line as the MVP if the compatibility,
+storage, and API policies allow it.
 
 ## Promotion Rule
 
@@ -15,11 +19,11 @@ A future concept can move into implementation only after it has a clear story,
 domain owner, ADR if needed, and does not make the core measurement loop harder
 to use.
 
-## Candidate v0.3 Product Assistance
+## Post-MVP Priority: Product Assistance
 
 - FC-004: Parameter profiles, immutable snapshot binding, history, proposals,
-  and diff views. This is the first v0.3+ product direction because large
-  parameter sets are already a standalone user pain.
+  and diff views. This is the highest-priority post-MVP direction because
+  large parameter sets are already a standalone user pain.
 - FC-003: Measurement-code source setup that replaces copied-code folders with
   approved-code update flows, local checkout/environment guidance, and no
   central Fricon server.
@@ -31,7 +35,7 @@ to use.
   remote writes.
 - FC-002: Rich sample fields, 2D sample maps, and saved views.
 
-## Candidate v0.4 Automation Foundation
+## Post-MVP Priority: Automation Foundation
 
 - FC-005: Analysis records that consume artifacts and produce derived outputs.
 - FC-006: Calibration records with reviewable proposals.
@@ -54,7 +58,7 @@ to use.
 
 ## Interview Direction
 
-Current v0.3+ product bias:
+Current post-MVP product bias:
 
 - Parameter system first.
 - Managed code source and managed run design early.

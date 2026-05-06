@@ -16,7 +16,7 @@ so that migration does not block new data collection.
 
 ## Success Criteria
 
-- v0.2 communicates that old history can stay in the old system.
+- The MVP communicates that old history can stay in the old system.
 - New Fricon measurements may record source aliases or legacy references.
 - Later user-written import scripts can use generic APIs when old data needs to
   move forward.
@@ -24,7 +24,7 @@ so that migration does not block new data collection.
 
 ## Not In Scope
 
-- Built-in legacy import as a v0.2 adoption prerequisite.
+- Built-in legacy import as an MVP adoption prerequisite.
 - Making reopen/export own old-system history migration.
 
 ## Related Capabilities / Specs

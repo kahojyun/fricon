@@ -10,7 +10,7 @@ Fricon Desktop opens to current lab work: active/recent measurements, live
 datasets, quick plots, notes, favorites, partial/failed runs, and direct reopen
 actions.
 
-## v0.2 Scope
+## MVP Scope
 
 - Measurement-first console.
 - Active and recent measurement list.
@@ -18,7 +18,7 @@ actions.
 - Dataset direct-open entry points.
 - Favorites, notes, lifecycle flags, and basic search shortcuts.
 
-## Not v0.2
+## Not MVP
 
 - Publication plotting.
 - Generic dashboard builder.

@@ -10,10 +10,10 @@ Replace the simple LabRAD Data Vault/Grapher loop for new measurements:
 declare measured data, append values from Python, watch it live, and reopen it
 later without manual file/folder discipline.
 
-This is the center of the v0.2 MVP. It should stay close to ordinary Python
+This is the center of the MVP. It should stay close to ordinary Python
 measurement scripts instead of becoming a managed automation framework.
 
-## v0.2 Scope
+## MVP Scope
 
 - Explicit but low-ceremony Python measurement creation.
 - Measurement-scoped dataset artifact writers.
@@ -22,7 +22,7 @@ measurement scripts instead of becoming a managed automation framework.
   advanced cases.
 - Explicit scan semantics for reliable live and historical plots.
 
-## Not v0.2
+## Not MVP
 
 - LabRAD compatibility server or built-in Data Vault parser.
 - Visual sweep builder as the primary acquisition model.
@@ -30,7 +30,7 @@ measurement scripts instead of becoming a managed automation framework.
 
 ## Key Stories
 
-- US-003: Run an exploratory measurement from Python.
+- US-003: Run an interactive unmanaged measurement from Python.
 - US-004: Produce dataset artifacts from a measurement.
 - US-015: Declare common scan shapes quickly.
 

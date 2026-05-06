@@ -2,19 +2,23 @@
 
 ## Status
 
-Proposed v0.3+ planning note.
+Proposed post-MVP planning note.
 
 ## Purpose
 
-Capture candidate v0.3+ user stories and product requirements before they
+Capture candidate post-MVP user stories and product requirements before they
 become accepted product scope.
 
-These items are intentionally outside the accepted v0.2 slice. They exist so
-v0.2 storage, domain, and API choices do not block likely future needs.
+These items are intentionally outside the accepted MVP. They exist so MVP
+storage, domain, and API choices do not block likely future needs.
+
+This file uses priority horizons, not semantic-version labels. A compatible
+feature can still ship on the same release line as the MVP if the relevant
+compatibility, storage, and API policies allow it.
 
 ## Planning Stance
 
-v0.3+ should prioritize:
+Post-MVP work should prioritize:
 
 - parameter system first
 - managed code source and managed run design early
@@ -26,7 +30,7 @@ v0.3+ should prioritize:
 The product rule is: the system captures context automatically where practical;
 the user confirms, annotates, or corrects it.
 
-## Candidate v0.3 Epics
+## Candidate Post-MVP Epics
 
 FEPIC-001: Parameter System And Snapshot Binding.
 
@@ -116,8 +120,8 @@ FUS-007: Run through an opt-in SDK runner.
   lifecycle, warnings, abort/fail reason, and produced artifacts.
 - Success: the unmanaged Python path still works; managed runner is opt-in
   until its safety model is accepted.
-- Success: v0.3 runner does not need queues, resource scheduling, retries, or
-  broad workflow DAG execution.
+- Success: the first managed-runner slice does not need queues, resource
+  scheduling, retries, or broad workflow DAG execution.
 
 FUS-008: Run like a previous measurement.
 
@@ -174,7 +178,8 @@ can compare profile, proposal, effective run snapshot, and override layers.
 
 FREQ-005: Parameter profile updates use lightweight proposals with source run
 or source snapshot, changed fields, actor, reason, approval/rejection outcome,
-and timestamp. They do not require a permissions system in v0.3.
+and timestamp. They do not require a permissions system in the first parameter
+workflow slice.
 
 FREQ-006: Managed code provenance records source URI/path, selected revision,
 dirty state, source hashes where practical, SDK runner entry point, runner
@@ -183,12 +188,12 @@ invocation, and environment summary.
 FREQ-007: Fricon shows provenance confidence instead of claiming
 reproducibility from Git metadata alone.
 
-FREQ-008: v0.3 managed runner minimum is SDK runner integration. It captures
+FREQ-008: The first managed-runner slice is SDK runner integration. It captures
 stdout/stderr excerpts or logs, start/end timestamps, status, abort/fail
 reason, produced artifacts, and diagnostic warnings.
 
-FREQ-009: v0.3 managed runner is not a scheduler. Queues, resource management,
-retries, and workflow DAG execution are later or ADR-gated.
+FREQ-009: The first managed-runner slice is not a scheduler. Queues, resource
+management, retries, and workflow DAG execution are later or ADR-gated.
 
 FREQ-010: Run history and compare views are generated from recorded facts:
 parameters, code, setup, lifecycle events, notes, operator labels, and
@@ -200,8 +205,9 @@ diff before any device write-back is implemented.
 FREQ-012: Device apply, resumable execution, and AI-assisted mutation require
 separate ADRs covering safety, readback, partial failure, and audit behavior.
 
-FREQ-013: v0.3+ remains local-first: no cloud account, hosted dashboard, or
-central Fricon server is required for core parameter or run capture workflows.
+FREQ-013: Post-MVP improvements remain local-first: no cloud account, hosted
+dashboard, or central Fricon server is required for core parameter or run
+capture workflows.
 
 ## Explicit Non-Goals Until ADR-Gated
 

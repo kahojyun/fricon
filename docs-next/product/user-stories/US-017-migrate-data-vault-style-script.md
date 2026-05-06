@@ -24,7 +24,7 @@ logger for new measurements without rewriting the whole experiment stack.
   titles can be recorded without becoming primary identity.
 - The writer model does not block later user-written import scripts, but old
   data import is not part of the migration path for starting new work.
-- v0.2 does not ship a built-in Data Vault parser or legacy browser.
+- The MVP does not ship a built-in Data Vault parser or legacy browser.
 
 ## Not In Scope
 

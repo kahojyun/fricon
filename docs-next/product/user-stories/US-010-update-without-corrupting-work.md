@@ -26,7 +26,7 @@ Python SDK, or library versions.
 
 ## Not In Scope
 
-- Stable third-party protocol commitments before v0.2 is proven.
+- Stable third-party protocol commitments before the MVP is proven.
 - Automatic migration of old v0.1 workspaces or legacy systems.
 
 ## Related Capabilities / Specs

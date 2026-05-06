@@ -7,7 +7,7 @@ Accepted.
 ## Purpose
 
 Keep the product route readable for future AI sessions. This file is a compact
-map from the product vision to v0.2 stories, not the place for full acceptance
+map from the product vision to MVP stories, not the place for full acceptance
 details.
 
 ## Backbone
@@ -25,9 +25,9 @@ Install and set up
   -> export
 ```
 
-## v0.2 Product Epics
+## MVP Product Epics
 
-The v0.2 MVP route is the LabRAD Data Vault/Grapher replacement loop for new
+The MVP route is the LabRAD Data Vault/Grapher replacement loop for new
 measurements: write from Python, watch live, recover partial data, reopen, and
 export. The epics below divide that route without making legacy import or
 managed automation part of the MVP.
@@ -40,7 +40,7 @@ managed automation part of the MVP.
 
 Detailed epic notes live under `product/epics/`.
 
-## v0.2 Story Index
+## MVP Story Index
 
 Ownership rules:
 
@@ -91,7 +91,7 @@ Migration ownership:
 - US-018 is owned by EPIC-005. EPIC-004 owns reopen/export for Fricon data, not
   the product migration posture.
 
-Each v0.2 story has an expanded file under `product/user-stories/`. Keep those
+Each MVP story has an expanded file under `product/user-stories/`. Keep those
 files concise: they own story-level success criteria, not implementation tasks.
 
 ## Sequencing
@@ -100,13 +100,13 @@ M1 should prove enough of US-001 through US-008 and US-015 to record, inspect,
 recover, and reopen a Python measurement while preserving first-class dataset
 discovery.
 
-The full v0.2 MVP also needs US-009 for export and US-017/US-018 to validate
-the incremental adoption posture: users can translate new Data Vault-style
-scripts and keep old history in the old system.
+The full MVP also needs US-009 for export and US-017/US-018 to validate the
+incremental adoption posture: users can translate new Data Vault-style scripts
+and keep old history in the old system.
 
 Python SDK UX is part of the product story, not only implementation detail.
 The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;
 detailed API signatures and capture mechanics belong in later ADRs/specs.
 
-SPEC-002 owns the export/offline-analysis details. Export remains a v0.2
+SPEC-002 owns the export/offline-analysis details. Export remains an MVP
 product promise; it is split out only to keep SPEC-001 focused.
