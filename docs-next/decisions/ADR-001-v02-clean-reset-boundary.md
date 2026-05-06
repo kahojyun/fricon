@@ -1,0 +1,59 @@
+# ADR-001: v0.2 Clean Reset Boundary
+
+## Status
+
+Accepted.
+
+## Context
+
+Fricon v0.1 is a useful prototype, but its user-facing model is
+workspace/dataset-first. The desired v0.2+ product model is a local lab data
+library centered on measurements, dataset artifacts, optional sample/session
+context, lifecycle history, provenance, and export.
+
+The old `dev-docs/` area also mixed current implementation notes, historical
+proposal inputs, AI-agent process guidance, and new v0.2 design direction. That
+made it too easy for future work to preserve v0.1 assumptions accidentally.
+
+## Decision
+
+v0.2 will be designed as a clean reset. It may break pre-v0.2:
+
+- workspace/storage layout
+- public Python workspace/dataset APIs
+- IPC/gRPC/protobuf assumptions
+- desktop dataset-first navigation
+- archive/import/export formats
+- setup/update/service compatibility assumptions
+
+Compatibility with old local test workspaces is not a design constraint unless
+a later ADR defines a narrow migration/import route.
+
+Useful infrastructure may be reused or adapted, but compatibility must not keep
+the wrong user model alive.
+
+## Consequences
+
+- `docs-next/` becomes the v0.2+ design baseline.
+- `dev-docs/` remains useful for current implementation facts and historical
+  rationale, not as the v0.2 source of truth.
+- Early implementation work should prefer replacing current domain boundaries
+  in place over building a permanent parallel `fricon-v2` project.
+- The first v0.2 implementation must still protect data created by v0.2 once
+  real lab data exists.
+
+## Alternatives Considered
+
+- Preserve v0.1 workspace compatibility while adding measurement records. This
+  would reduce short-term breakage but preserve the old organizing model.
+- Fork a separate v2 project. This would isolate experimentation but duplicate
+  build, packaging, testing, and release infrastructure.
+- Keep all planning under `dev-docs/v0.2`. This would continue the current
+  confusion between historical proposals and accepted v0.2+ baseline.
+
+## Revisit Triggers
+
+- Real pre-v0.2 user data appears and needs a migration path.
+- A reusable v0.1 component cannot be adapted without preserving old public
+  semantics.
+- The project adopts a stable post-v0.x compatibility promise.

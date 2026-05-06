@@ -16,8 +16,7 @@ Start here when orienting a new human or AI contributor:
 
 1. `project-intent.md`
 2. `roadmap.md`
-3. `v0.2/README.md` and `v0.2/design.md` when working on the proposed v0.2
-   reset
+3. `../docs-next/README.md` when working on new v0.2+ reset design
 4. `maintenance-checklist.md`
 5. `pr-preflight-checklist.md`
 6. The topic-specific note for the area being changed
@@ -35,10 +34,10 @@ every canonical document.
 | Dataset archive import/export compatibility | `maintenance-checklist.md`               | `current-storage-notes.md`, `release-and-versioning.md`, `pr-preflight-checklist.md`                                             | Public docs unless behavior is user-visible                            |
 | Rust IPC/gRPC contract compatibility        | `maintenance-checklist.md`               | `pr-preflight-checklist.md`, `release-and-versioning.md`                                                                         | Public docs unless behavior is user-visible                            |
 | Public dataset docs update                  | `docs/dataset.md` and `docs/concepts.md` | `current-storage-notes.md`, `current-dataset-semantics.md`                                                                       | Implementation plan details unless landed behavior is being documented |
-| v0.2 product or architecture reset          | `v0.2/README.md`                         | `v0.2/design.md`, `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `adr/README.md`                                    | Treating v0.2 proposal content as current behavior                     |
-| Measurement-system foundation redesign      | `v0.2/design.md`                         | `project-intent.md`, `roadmap.md`, `current-dataset-semantics.md`, `v0.2/archive/README.md`, `adr/README.md`                     | Treating archived proposal content as active v0.2 guidance             |
-| Parameter management product planning       | `v0.2/design.md`                         | `v0.2/product-direction.md`, `v0.2/technical-direction.md`, `v0.2/future-concepts.md`, `v0.2/archive/README.md`, `adr/README.md` | Treating archived proposal content as active v0.2 guidance             |
-| Future concept capture                      | `v0.2/future-concepts.md`                | `v0.2/design.md`, `v0.2/product-direction.md`, `v0.2/technical-direction.md`                                                     | Creating implementation issues before the concept is narrowed          |
+| v0.2+ product or architecture reset         | `../docs-next/README.md`                 | `../docs-next/redesign-from-prototype.md`, `../docs-next/product/vision.md`, `../docs-next/domain/conceptual-model.md`, `../docs-next/architecture/system-overview.md`                         | Treating old v0.2 proposal content as current behavior or source of truth |
+| Measurement-system foundation redesign      | `../docs-next/specs/SPEC-001-data-library-measurement-foundation/requirements.md` | `../docs-next/product/story-map.md`, `../docs-next/domain/lifecycle-model.md`, `../docs-next/architecture/module-boundaries.md` | Treating archived proposal content as active v0.2 guidance             |
+| Parameter management product planning       | `../docs-next/product/future-concepts.md` | `../docs-next/domain/conceptual-model.md`, `../docs-next/product/capability-map.md`, `v0.2/future-concepts.md` as historical input only | Promoting parameter registry work before measurement foundation is accepted |
+| Future concept capture                      | `../docs-next/product/future-concepts.md` | `../docs-next/product/capability-map.md`, `../docs-next/domain/conceptual-model.md`                                               | Creating implementation issues before the concept is narrowed          |
 | Product route or issue planning             | `roadmap.md`                             | `project-intent.md`, proposal or implementation-plan files for affected areas                                                    | Treating roadmap future concepts as current implementation facts       |
 
 ## Canonical Guidance
@@ -74,6 +73,15 @@ implementation changes.
 - `current-dataset-semantics.md` - current dataset semantic model, writer
   metadata, reader interpretation, and chart projection behavior
 
+## v0.2+ Design Baseline
+
+New v0.2+ product, domain, architecture, ADR, traceability, and system-slice
+planning starts in `../docs-next/`.
+
+Use `dev-docs/v0.2/` and `dev-docs/v0.2/archive/` as source inputs and
+historical rationale. They should not override accepted `docs-next/` decisions
+or specs.
+
 ## Architecture Notes
 
 These files are advisory background unless they explicitly point to a canonical
@@ -90,12 +98,10 @@ These files describe proposed or historical direction. Do not treat them as
 current implementation fact unless a current implementation note confirms that
 the behavior has landed.
 
-- `v0.2/` - canonical planning directory for the proposed v0.2 reset. It now
-  owns the active non-implemented proposal set. Start with `v0.2/design.md` for
-  the canonical synthesis, then use the supporting files for product stories,
-  technical details, future concepts, distribution surfaces, remote/auth
-  boundary, and rewrite strategy. Historical proposal inputs live under
-  `v0.2/archive/` and should not override the canonical v0.2 documents.
+- `v0.2/` - historical planning directory for the proposed v0.2 reset. Its
+  contents are source inputs for `../docs-next/`, not the new v0.2+ design
+  baseline. Historical proposal inputs live under `v0.2/archive/` and should
+  not override `docs-next/` decisions or specs.
 
 ## Maintenance Rules
 
