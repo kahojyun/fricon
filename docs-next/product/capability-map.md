@@ -226,9 +226,13 @@ CAP-018: Read-only remote monitoring.
 
 CAP-019: Rich sample maps and saved views.
 
-- Intent: support spatial sample maps, richer sample metadata, and saved
-  comparison views after the local data-library loop works.
+- Intent: support user-defined spatial sample maps, richer sample metadata, and
+  saved comparison views after the local data-library loop works.
 - Boundary: the MVP only needs optional sample/session context and correction.
+  Post-MVP map configs or DSLs may map parameter row keys and user labels to
+  visual regions, and color or label those regions from parameter snapshot
+  queries, but should not force a sample-component ontology. Config placement,
+  query syntax, and schema-evolution behavior need a later spec or ADR.
 
 CAP-020: Measurement-code source setup and approved code update flows.
 
@@ -245,8 +249,8 @@ CAP-021: Parameter profiles and proposals.
 
 CAP-022: Analysis and calibration records.
 
-- Intent: model downstream analysis, calibration, and derived-result activity
-  as first-class records.
+- Intent: model downstream analysis, fit attempts, anomaly review,
+  calibration, and derived-result activity as first-class records.
 - Boundary: the MVP may export analysis-ready data but does not manage
   calibration promotion.
 
@@ -270,6 +274,21 @@ CAP-025: AI-assisted reviewed automation.
 - Boundary: the MVP should preserve auditability, not implement mutating AI
   automation.
 
+CAP-031: Run manifest and failure investigation.
+
+- Intent: give managed or high-provenance runs a compact manifest linking
+  parameter snapshots, target keys, code/environment summary, lifecycle, logs,
+  artifacts, operator, timestamps, and diagnostics.
+- Boundary: the first slice supports compare, handoff, export, and anomaly
+  investigation; it is not a scheduler or resume engine.
+
+CAP-032: Routine recipes and reviewed replay.
+
+- Intent: capture repeated compare, run, and analyze routines as previewable
+  recipes so tedious lab work can be replayed without hidden mutation.
+- Boundary: read-only batch compare or triage can arrive before
+  mutation-capable automation; durable mutation requires review and audit.
+
 ## Product Grouping
 
 Use these planning groups when routing product work:
@@ -280,4 +299,4 @@ Use these planning groups when routing product work:
 - Context and provenance: CAP-004, CAP-014, CAP-015, CAP-017, CAP-027,
   CAP-029.
 - Review and analysis: CAP-008, CAP-009, CAP-010, CAP-011, CAP-016, CAP-026.
-- Post-MVP foundation: CAP-018 through CAP-025.
+- Post-MVP foundation: CAP-018 through CAP-025, CAP-031, CAP-032.

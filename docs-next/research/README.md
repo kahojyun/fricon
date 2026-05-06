@@ -34,4 +34,5 @@ Covered:
 - Sacred, MLflow, W&B, DVC, Sumatra, ReproZip, Nextflow, and Snakemake
 - EPICS Archiver, Olog, eLabFTW, LabKey, openBIS, and calibration-ledger tools
 
-Synthesis lives in `lessons-for-fricon.md`.
+Accepted synthesis lives in `lessons-for-fricon.md`. The broader source list
+and post-MVP planning synthesis live in `post-mvp-future-systems.md`.

@@ -67,6 +67,15 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   sketches; exact syntax, capture mechanics, and object models belong in later
   ADRs/specs.
 - Keep sample/session context optional and correctable.
+- Do not turn sample target binding into a heavy physical-component ontology
+  unless a later product decision requires it. Prefer user-defined parameter
+  row keys plus optional sample-map configs/DSLs.
+- Treat sample visualizers as views over parameter snapshots or snapshot query
+  results. Keep config placement, query syntax, and schema-evolution behavior
+  deferred until a focused spec or ADR.
+- Prioritize post-MVP foundations by user pain: parameter diffs and proposals,
+  run manifests and failure investigation, then reviewed routine replay or
+  automation.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.

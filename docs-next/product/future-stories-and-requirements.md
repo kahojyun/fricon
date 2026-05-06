@@ -39,6 +39,8 @@ FEPIC-001: Parameter System And Snapshot Binding.
 - The base model is a hybrid parameter tree: flexible structured values first,
   with selected parameters upgraded to typed definitions, units, validation,
   display hints, and UI affordances.
+- Table sections can expose user-defined row keys that later visualization
+  tools can treat as target keys.
 
 FUS-001: Maintain named parameter profiles.
 
@@ -82,6 +84,20 @@ FUS-008: Run like a previous measurement.
 - Success: reused facts are copied by reference or snapshot, and changes are
   shown before the new run starts.
 
+FUS-015: Use parameter row keys as visual targets.
+
+- As an experimentalist, I want parameter table row keys to carry enough
+  user-defined target identity that a sample visualization can locate objects
+  without Fricon imposing a sample-component ontology.
+- Success: a row key can be matched to a user-authored sample-map config, DSL,
+  or lab script when such a view exists.
+- Success: color maps and numeric labels can be derived from parameter snapshot
+  queries, not from hardcoded sample object fields.
+- Success: a visualizer definition can be discoverable near the relevant sample
+  or session without making its shape model part of core sample identity.
+- Success: unmatched or ambiguous keys remain visible as data-quality issues,
+  not hidden failures.
+
 Parameter requirements:
 
 - FREQ-001: The parameter model is a hybrid structured tree. Flexible nodes are
@@ -97,6 +113,13 @@ Parameter requirements:
   or source snapshot, changed fields, actor, reason, approval/rejection
   outcome, and timestamp. They do not require a permissions system in the first
   parameter workflow slice.
+- FREQ-016: Parameter table rows can expose stable, user-defined target keys
+  for visualization and compare views. Fricon must not require those keys to
+  imply a first-class physical sample-component model.
+- FREQ-020: Sample visualizers, when introduced, should be modeled as views
+  over parameter snapshots and snapshot query results. Their storage location,
+  query language, and schema-evolution policy remain deferred until a dedicated
+  spec or ADR.
 
 Not first parameter slice:
 
@@ -104,6 +127,9 @@ Not first parameter slice:
 - Strict global registry for every parameter.
 - Permissions, compliance, or multi-user approval system.
 - Automatic tracing of every parameter read without explicit design.
+- Heavyweight sample-component ontology.
+- Mandatory 2D sample-map authoring.
+- Visualizer schema migration or compatibility policy.
 
 ## Priority 2: Managed Run
 
@@ -113,6 +139,8 @@ FEPIC-002: Managed Code Source And Run Capture.
 - Users can mark importable Python entry points for opt-in Fricon management.
 - Fricon can capture code snapshot, SDK runner entry point, environment
   summary, stdout/stderr, status, diagnostics, and produced artifacts.
+- Fricon can assemble a compact run manifest for compare, handoff, export, and
+  failure investigation.
 - Ordinary interactive unmanaged Python remains possible, but shows lower
   provenance confidence.
 
@@ -163,6 +191,27 @@ FUS-010: See operator handoff.
 - Success: handoff includes parameter ref changes, setup snapshot changes,
   calibration due/expired state, failed runs, imports, exports, and notes.
 
+FUS-016: Inspect a run manifest.
+
+- As an experimentalist, I want a single run manifest that links the
+  measurement, parameter snapshot, row/target keys, code/environment summary,
+  lifecycle, logs, artifacts, operator, and timestamps so that I can understand
+  a run without opening several unrelated stores.
+- Success: the manifest can be opened from Desktop, Python, and export bundles.
+- Success: the manifest states provenance confidence instead of implying that
+  unmanaged work was fully captured.
+
+FUS-017: Investigate a failed fit or anomalous measurement.
+
+- As an experimentalist, I want to follow a suspicious result back to inputs,
+  parameter changes, code/environment state, setup labels, logs, and analysis
+  attempts so that tedious failure investigation is not a manual archaeology
+  task.
+- Success: failed or questionable analysis/fit attempts can be recorded with
+  input artifacts, method/code reference, quality metrics, failure reason, and
+  produced outputs when available.
+- Success: comparison to a previous-good run is generated from recorded facts.
+
 Managed-run requirements:
 
 - FREQ-006: Managed code provenance records source URI/path, selected revision,
@@ -178,6 +227,13 @@ Managed-run requirements:
 - FREQ-010: Run history and compare views are generated from recorded facts:
   parameters, code, setup, lifecycle events, notes, operator labels, and
   artifacts.
+- FREQ-017: A run manifest links the durable measurement identity to parameter
+  snapshot/ref facts, row/target keys when present, code/environment summary,
+  lifecycle/log events, artifacts, operator, timestamps, and provenance
+  confidence.
+- FREQ-018: Analysis or fit attempts can be represented as investigation
+  records with inputs, method/code reference, status, diagnostics, quality
+  metrics, failure reason, and outputs when available.
 
 Not first managed-run slice:
 
@@ -234,6 +290,16 @@ FUS-014: Review and apply automation proposals.
 - Success: approval, rejection, actor, reason, timestamp, and affected objects
   are recorded.
 
+FUS-018: Replay a routine recipe after review.
+
+- As an experimentalist, I want common compare, run, and analyze routines to be
+  captured as reviewable recipes so that repetitive work is faster without
+  hiding what will change.
+- Success: preview shows parameter refs or overrides, code entry point,
+  expected artifacts, analysis steps, and durable mutations before execution.
+- Success: read-only batch compare or triage can be useful before
+  mutation-capable automation exists.
+
 Automation requirements:
 
 - FREQ-011: Setup/device/calibration state supports store, bind, search, and
@@ -249,10 +315,15 @@ Automation requirements:
 - FREQ-015: Automation records must preserve actor, trigger, reviewed plan,
   accepted or rejected changes, execution status, produced artifacts, and audit
   events.
+- FREQ-019: Routine recipes and reviewed replay use parameter snapshots and
+  run manifests as inputs. Read-only compare or triage may run first; mutation
+  requires preview, review, execution status, and audit records.
 
 Not first automation slice:
 
 - AI autonomous mutation.
+- Unreviewed recipe replay that mutates parameters, setup, devices, code
+  sources, or data-library state.
 - Device write-back before store/diff, readback, safety, and partial-failure
   behavior are accepted by ADR.
 - Generic workflow DAG engine as the normal way to run ordinary measurements.
@@ -261,7 +332,8 @@ Not first automation slice:
 ## Supporting Candidates
 
 - Read-only LAN monitoring for local lab viewing without remote writes.
-- Rich sample fields, 2D sample maps, and saved comparison views.
+- User-defined 2D sample-map configs/DSLs that map parameter row keys or user
+  labels to visual regions, plus saved comparison views.
 - External large asset references for detector files, images, and waveforms.
 - User-facing dataset streams, if internal stream support proves useful enough
   to expose later.

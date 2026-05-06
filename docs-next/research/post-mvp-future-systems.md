@@ -1,4 +1,4 @@
-# v0.3+ Future-System Research
+# Post-MVP Future Systems Research
 
 ## Status
 
@@ -10,11 +10,12 @@ Draft research synthesis.
 
 ## Purpose
 
-Capture background lessons for v0.3+ parameter systems, managed code snapshots,
-runner capture, setup state, calibration history, and generated run history.
+Capture background lessons for post-MVP parameter systems, managed code
+snapshots, runner capture, setup state, calibration history, and generated run
+history.
 
 This research informs `product/future-stories-and-requirements.md`; it does
-not change accepted v0.2 scope.
+not change accepted MVP scope.
 
 ## Sources
 
@@ -79,9 +80,12 @@ Lab state, audit, and calibration references:
 
 ## Product Lessons
 
-- Parameter drift is a standalone product problem. v0.3+ should treat named
-  parameter profiles, immutable snapshots, proposals, overrides, and diffs as
-  first-class concepts.
+- Parameter drift is a standalone product problem. Post-MVP parameter work
+  should treat named parameter profiles, immutable snapshots, proposals,
+  overrides, and diffs as first-class concepts.
+- Sample visualization can stay convention-friendly: parameter table row keys
+  and user-authored 2D map configs can provide useful target binding without
+  forcing a full sample-component ontology early.
 - Useful run history should be generated from captured facts. Users will not
   reliably hand-enter code, parameter, setup, calibration, and environment
   context after every run.

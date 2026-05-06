@@ -113,15 +113,25 @@ These priorities matter most after the MVP because they change the experiment
 experience most directly:
 
 - Priority 1: parameter system for profiles, immutable run-bound snapshots,
-  diffs, and proposal review.
+  diffs, proposal review, and user-defined table row keys that can later
+  support visualization lookup.
 - Priority 2: managed run for importable SDK runner entry points, code/source
-  capture, lifecycle capture, and generated run history.
-- Priority 3: reviewable automation workflow that previews, reviews, audits,
-  and applies changes only through explicit safety boundaries.
+  capture, lifecycle capture, compact run manifests, failure investigation,
+  and generated run history.
+- Priority 3: reviewable routine replay and automation workflow that previews,
+  reviews, audits, and applies changes only through explicit safety
+  boundaries.
+
+Sample visualization should stay lightweight until product evidence says
+otherwise. Treat a sample visualizer as a view over parameter snapshots and
+snapshot query results, not as proof that Fricon understands the sample's
+physical shape. User-authored 2D sample-map configs/DSLs may live near sample
+records for discoverability, but schema evolution, invalid visualizers, and
+visualizer migration policy are later design questions.
 
 Lower-priority or ADR-gated directions include read-only LAN monitoring, richer
-sample maps, analysis/calibration records, device communication, resumable
-execution, user-facing stream concepts, and AI-assisted automation.
+sample-map authoring, analysis/calibration records, device communication,
+resumable execution, user-facing stream concepts, and AI-assisted automation.
 
 ## Non-Goals For MVP
 

@@ -38,14 +38,34 @@ Accepted.
 - Parameter Snapshot: immutable parameter facts captured by future parameter
   profile or managed-run workflows.
 - Parameter Profile: mutable named reference to a useful parameter state.
+- Target Key: user-defined parameter table row key or label that a visualization
+  may use to locate a sample-map element. It is not durable sample identity by
+  itself.
+- Sample Map Config: user-authored JSON or DSL-style description of a 2D sample
+  layout and optional mapping from target keys or labels to visual regions. It
+  may be stored near a sample for discovery, but its schema compatibility rules
+  are a deferred design topic.
+- Sample Visualizer: user-authored view that renders parameter snapshot query
+  results onto a sample map or other lab-specific visualization. Fricon should
+  not assume it understands the physical sample shape.
+- Snapshot Query: later product concept for selecting values from a parameter
+  snapshot to drive labels, color maps, comparisons, or visualizer state.
 - Measurement Code Source: configured upstream source for lab measurement code,
   such as Git/Gitea, package, mirror, or folder.
 - Code Snapshot: immutable resolved code state used by future managed
   execution.
+- Run Manifest: compact immutable summary linking one run to parameters,
+  code/environment context, lifecycle, logs, artifacts, actor, timestamps, and
+  diagnostics.
 - Analysis: later work that consumes artifacts and may produce results,
   reports, or derived datasets.
+- Analysis/Fit Attempt: recorded analysis execution or fit attempt with inputs,
+  method/code reference, status, diagnostics, quality metrics, failure reason,
+  and outputs when available.
 - Calibration: later workflow that turns measurements/analysis into parameter
   proposals or approved updates.
+- Routine Recipe: reviewable description of a repeated compare, run, or analyze
+  routine that can be previewed before replay.
 
 ## Avoid As Primary MVP User Terms
 
