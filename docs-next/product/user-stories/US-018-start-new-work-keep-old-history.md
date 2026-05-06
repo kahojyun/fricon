@@ -4,13 +4,17 @@
 
 Draft.
 
+## Primary Epic
+
+EPIC-005: Migration ergonomics and future lab scaling.
+
 ## Story
 
 As an experimentalist, I want to start recording new measurements in Fricon
 while old LabRAD, QCoDeS, Labber, or folder-based history remains where it is
 so that migration does not block new data collection.
 
-## Acceptance Notes
+## Success Criteria
 
 - v0.2 communicates that old history can stay in the old system.
 - New Fricon measurements may record source aliases or legacy references.
@@ -18,6 +22,11 @@ so that migration does not block new data collection.
   move forward.
 - Fricon does not require a full historical migration before adoption.
 
-## Related
+## Not In Scope
+
+- Built-in legacy import as a v0.2 adoption prerequisite.
+- Making reopen/export own old-system history migration.
+
+## Related Capabilities / Specs
 
 CAP-001, CAP-011, CAP-026, CAP-030.

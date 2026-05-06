@@ -36,6 +36,15 @@ Detailed epic notes live under `product/epics/`.
 
 ## v0.2 Story Index
 
+Ownership rules:
+
+- Epics own outcomes. A story may affect another epic, but it should have only
+  one primary owner.
+- Keep this index compact. Story-level success criteria live under
+  `product/user-stories/`.
+- Each expanded story file names its primary epic.
+- Put implementation acceptance detail in specs, not in this map.
+
 Foundation:
 
 - US-001: Install and launch Fricon on a lab computer.
@@ -69,8 +78,15 @@ Migration:
 - US-017: Migrate a Data Vault-style script to Fricon writers.
 - US-018: Start new work in Fricon while old history stays in the old system.
 
-Expanded story files live under `product/user-stories/` only when the story is
-important enough to guide product or implementation decisions.
+Migration ownership:
+
+- US-017 is owned by EPIC-005. It pressures EPIC-002 writer ergonomics but does
+  not make EPIC-002 responsible for old-system import.
+- US-018 is owned by EPIC-005. EPIC-004 owns reopen/export for Fricon data, not
+  the product migration posture.
+
+Each v0.2 story has an expanded file under `product/user-stories/`. Keep those
+files concise: they own story-level success criteria, not implementation tasks.
 
 ## Sequencing
 

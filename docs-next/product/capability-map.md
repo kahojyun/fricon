@@ -13,43 +13,253 @@ or specs instead of expanding this map into a large table.
 
 ## v0.2 Foundation Capabilities
 
-- CAP-001: Local data library.
-- CAP-002: Install and launch local Fricon.
-- CAP-003: Python measurement recording.
-- CAP-004: Optional, visible, correctable sample/session context.
-- CAP-005: Dataset artifact recording.
-- CAP-006: Dataset scan semantics.
-- CAP-007: Nonblocking live inspection.
-- CAP-008: Lifecycle and readable partial recovery.
-- CAP-009: Notes, markers, favorites, pins, and optional tags.
-- CAP-010: Python reopen through stable IDs and public APIs.
-- CAP-011: Measurement-centered export.
-- CAP-012: Backup, restore, and migration checkpoints.
-- CAP-013: Compatibility diagnostics and fail-before-write checks.
-- CAP-014: Honest code provenance summary.
-- CAP-015: Flexible parameter snapshot without a registry UI.
-- CAP-016: Light measurement attachments.
-- CAP-017: Lightweight operator profile and audit actor.
-- CAP-026: Dataset artifact discovery and direct open.
-- CAP-027: Passive setup and environment summary.
-- CAP-028: Scan schema authoring helpers plus raw schema escape hatch.
-- CAP-029: Passive procedure summary.
-- CAP-030: Migration ergonomics for Data Vault-style new measurement scripts.
+### Local Adoption
+
+CAP-001: Local data library.
+
+- Promise: one normal lab computer can own a Fricon data library with durable
+  identity, remembered location, and format version.
+- Includes: create/open, recent-library memory, library identity, and clear
+  handling for locked or unsupported libraries.
+- Excludes: hosted service, shared-folder multi-writer database semantics, and
+  multi-user administration.
+
+CAP-002: Install and launch local Fricon.
+
+- Promise: Desktop, bundled service, bundled CLI, and Python SDK are delivered
+  as one coherent local product.
+- Includes: first-run setup, local service startup/connection, and headless
+  Python use when Desktop is closed.
+- Excludes: polished enterprise deployment and third-party service protocol
+  stability.
+
+CAP-012: Backup, restore, and migration checkpoints.
+
+- Promise: format-changing operations have a recovery posture before user data
+  is mutated.
+- Includes: backup/restore guidance, repair or migration checkpoints, and
+  ordinary recoverable cleanup paths.
+- Excludes: full legacy-system migration and distributed backup service.
+
+CAP-013: Compatibility diagnostics and fail-before-write checks.
+
+- Promise: incompatible client, service, or library combinations fail before
+  mutation with actionable diagnostics.
+- Includes: version negotiation for Desktop, service, CLI, Python SDK, and data
+  library format.
+- Excludes: accepting best-effort writes from unknown or stale clients.
+
+### New Measurement Replacement
+
+CAP-003: Python measurement recording.
+
+- Promise: a Python script can explicitly create a measurement with low
+  ceremony and append measurement facts through public APIs.
+- Includes: title, start/end lifecycle, optional context links, concurrent local
+  writers, and readable crash outcomes.
+- Excludes: managed runner, task queue, visual sweep builder, and device
+  control.
+
+CAP-005: Dataset artifact recording.
+
+- Promise: one measurement can produce one or more first-class dataset
+  artifacts with stable IDs and semantic metadata.
+- Includes: measurement-scoped writers, lifecycle sharing by default, and
+  storage/export hooks for internal streams when needed.
+- Excludes: making internal streams the normal user-facing concept.
+
+CAP-006: Dataset scan semantics.
+
+- Promise: plotted datasets carry explicit scan or trace meaning instead of
+  relying on column-position guesses.
+- Includes: variable roles, labels, units, dependencies, axis structure,
+  partial grids, irregular/adaptive points, repeated points, and trace shapes.
+- Excludes: requiring every advanced acquisition to fit a regular grid.
+
+CAP-007: Nonblocking live inspection.
+
+- Promise: Desktop can watch active data without slowing or breaking acquisition
+  writes.
+- Includes: live events, table view, line/scatter plot, basic heatmap, simple
+  trace inspection, and stale/lag indicators.
+- Excludes: live consumers as required write acknowledgements.
+
+CAP-028: Scan schema authoring helpers plus raw schema escape hatch.
+
+- Promise: common scan shapes are easy to declare while uncommon schemas remain
+  possible.
+- Includes: helper APIs for common 1D, 2D, N-D, and trace cases plus raw schema
+  construction for advanced users.
+- Excludes: a visual sweep builder or managed execution plan.
+
+CAP-030: Migration ergonomics for Data Vault-style new measurement scripts.
+
+- Promise: users can translate new Data Vault-style scripts to Fricon writers
+  without a full experiment-stack rewrite.
+- Includes: natural mapping for independent/dependent variables, labels, units,
+  legends, old path aliases, and numbered legacy titles as metadata.
+- Excludes: a LabRAD compatibility server, built-in Data Vault parser, or old
+  history browser.
+
+### Context And Provenance
+
+CAP-004: Optional, visible, correctable sample/session context.
+
+- Promise: sample and sample-session context can explain a measurement when it
+  matters, without blocking quick exploratory work.
+- Includes: optional active context, visible context on creation, and correction
+  after a run.
+- Excludes: requiring a complete sample registry before recording data.
+
+CAP-014: Honest code provenance summary.
+
+- Promise: Fricon records what it can honestly know about unmanaged Python code
+  without pretending it owns execution.
+- Includes: unmanaged labels, optional script path, Git summary, dirty-state
+  signal, user-supplied summary, and privacy-aware export handling.
+- Excludes: automatic notebook state capture and managed code snapshots.
+
+CAP-015: Flexible parameter snapshot without a registry UI.
+
+- Promise: a measurement can keep an inspectable parameter snapshot even before
+  Fricon has parameter profiles or calibration workflows.
+- Includes: structured or semi-structured parameter values, units where
+  supplied, and links to measurement context.
+- Excludes: global parameter registry, proposal workflow, and calibration
+  promotion.
+
+CAP-017: Lightweight operator profile and audit actor.
+
+- Promise: notes, corrections, lifecycle events, and exports can name the local
+  operator or actor responsible.
+- Includes: local operator label, audit actor on events, and correction history.
+- Excludes: accounts, permissions, teams, and identity-provider integration.
+
+CAP-027: Passive setup and environment summary.
+
+- Promise: measurements can record setup, device, method, software, or
+  environment context without controlling the lab setup.
+- Includes: optional labels, freeform summaries, external references, and
+  privacy-aware export selection.
+- Excludes: device identity registry, calibration records, and communication
+  with instruments.
+
+CAP-029: Passive procedure summary.
+
+- Promise: users can describe the procedure that produced data even when Fricon
+  did not execute that procedure.
+- Includes: unmanaged script summary, external-runner reference, declared plan
+  summary, and operator correction.
+- Excludes: managed measurement plans, resumable execution, and scan-point
+  checkpoints.
+
+### Review And Analysis
+
+CAP-008: Lifecycle and readable partial recovery.
+
+- Promise: interrupted or failed work remains understandable and readable.
+- Includes: lifecycle states, partial data reads, missing expected points where
+  schema supports them, trash/recover, and failure/interruption visibility.
+- Excludes: resuming unmanaged execution from the last scan point.
+
+CAP-009: Notes, markers, favorites, pins, and optional tags.
+
+- Promise: users can mark what matters during and after measurement work without
+  turning Fricon into a full ELN.
+- Includes: measurement notes, dataset notes, markers, favorites, pins, optional
+  tags, and correction events.
+- Excludes: publication notebook replacement and rich collaborative review.
+
+CAP-010: Python reopen through stable IDs and public APIs.
+
+- Promise: Python can reopen measurements, dataset artifacts, and exports
+  without depending on storage paths.
+- Includes: stable IDs, typed read APIs, schema-aware reads, partial-data
+  semantics, and Desktop-visible snippets.
+- Excludes: path-based storage contracts and private file layout coupling.
+
+CAP-011: Measurement-centered export.
+
+- Promise: a completed or interrupted measurement can become a portable bundle
+  for offline analysis.
+- Includes: produced datasets, semantic metadata, selected provenance,
+  integrity metadata, and common analysis-oriented output paths.
+- Excludes: importing old history and a fully polished offline Desktop viewer
+  before the write/reopen loop is proven.
+
+CAP-016: Light measurement attachments.
+
+- Promise: a measurement can reference small supporting files needed to
+  understand or analyze the run.
+- Includes: lightweight attachments, labels, source metadata, and export
+  selection.
+- Excludes: large detector-file management and general media asset library.
+
+CAP-026: Dataset artifact discovery and direct open.
+
+- Promise: dataset artifacts remain searchable and directly openable even when
+  the Desktop home is measurement-first.
+- Includes: stable artifact IDs, measurement context, search/open entry points,
+  and direct navigation to table or plot views.
+- Excludes: returning to a dataset-first product model.
 
 ## Later Capabilities
 
-- CAP-018: Read-only remote monitoring.
-- CAP-019: Rich sample maps and saved views.
-- CAP-020: Measurement-code source setup and approved code update flows.
-- CAP-021: Parameter profiles and proposals.
-- CAP-022: Analysis and calibration records.
-- CAP-023: Managed code snapshots and execution.
-- CAP-024: Device boundary and managed device communication.
-- CAP-025: AI-assisted reviewed automation.
+CAP-018: Read-only remote monitoring.
+
+- Intent: allow trusted users on the lab network to watch measurements without
+  editing the data library.
+- Boundary: v0.2 may keep APIs observable, but should not promise remote access
+  or shared editing.
+
+CAP-019: Rich sample maps and saved views.
+
+- Intent: support spatial sample maps, richer sample metadata, and saved
+  comparison views after the local data-library loop works.
+- Boundary: v0.2 only needs optional sample/session context and correction.
+
+CAP-020: Measurement-code source setup and approved code update flows.
+
+- Intent: help labs manage code source locations and reviewed updates for
+  measurement scripts.
+- Boundary: v0.2 records honest provenance but does not own code deployment.
+
+CAP-021: Parameter profiles and proposals.
+
+- Intent: promote repeated parameter snapshots into reusable profiles and
+  reviewed proposals.
+- Boundary: v0.2 keeps flexible snapshots without a registry UI.
+
+CAP-022: Analysis and calibration records.
+
+- Intent: model downstream analysis, calibration, and derived-result activity
+  as first-class records.
+- Boundary: v0.2 may export analysis-ready data but does not manage calibration
+  promotion.
+
+CAP-023: Managed code snapshots and execution.
+
+- Intent: run selected measurement code under Fricon control with reproducible
+  snapshots and lifecycle supervision.
+- Boundary: v0.2 records unmanaged execution context only.
+
+CAP-024: Device boundary and managed device communication.
+
+- Intent: introduce explicit device identity, configuration, and communication
+  boundaries when Fricon begins controlling instruments.
+- Boundary: v0.2 may record passive setup/device summaries but does not talk to
+  instruments.
+
+CAP-025: AI-assisted reviewed automation.
+
+- Intent: let AI propose actions or analysis steps that are reviewed before
+  mutating the data library.
+- Boundary: v0.2 should preserve auditability, not implement mutating AI
+  automation.
 
 ## Product Grouping
 
-For planning, group capabilities by user outcome:
+Use these planning groups when routing product work:
 
 - Local adoption: CAP-001, CAP-002, CAP-012, CAP-013.
 - New measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007, CAP-028,

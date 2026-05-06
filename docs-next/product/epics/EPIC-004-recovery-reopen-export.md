@@ -28,4 +28,3 @@ reopen data from Python, and export a measurement for offline analysis.
 - US-006: Recover a partial measurement.
 - US-008: Reopen measurement outputs from Python.
 - US-009: Export a measurement for offline analysis.
-- US-018: Start new work in Fricon while old history stays in the old system.

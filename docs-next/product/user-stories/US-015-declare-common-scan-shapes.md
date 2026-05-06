@@ -1,0 +1,33 @@
+# US-015: Declare Common Scan Shapes Quickly
+
+## Status
+
+Draft.
+
+## Primary Epic
+
+EPIC-002: New measurement logging replacement.
+
+## Story
+
+As an experimentalist, I want concise helpers for common scan and trace shapes
+so that Fricon data has reliable plotting semantics without making every script
+write raw schema by hand.
+
+## Success Criteria
+
+- Helper APIs cover common 1D, 2D, N-D, fixed-trace, and variable-trace cases.
+- Schema can represent regular grids, partial grids, irregular/adaptive points,
+  repeated points, and missing expected points where meaningful.
+- Advanced users can use raw schema when helpers are too narrow.
+- Live and historical plots rely on schema semantics instead of column order
+  guesses.
+
+## Not In Scope
+
+- Visual sweep builder as the primary acquisition model.
+- Managed execution plans or device control.
+
+## Related Capabilities / Specs
+
+CAP-006, CAP-028, SPEC-001.

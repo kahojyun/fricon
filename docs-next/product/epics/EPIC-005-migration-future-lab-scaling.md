@@ -34,3 +34,4 @@ automation stack on day one.
 - US-014: Record passive setup context.
 - US-016: Record passive procedure context.
 - US-017: Migrate a Data Vault-style script to Fricon writers.
+- US-018: Start new work in Fricon while old history stays in the old system.

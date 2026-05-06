@@ -30,4 +30,9 @@ later without manual file/folder discipline.
 - US-003: Run an exploratory measurement from Python.
 - US-004: Produce dataset artifacts from a measurement.
 - US-015: Declare common scan shapes quickly.
-- US-017: Migrate a Data Vault-style script to Fricon writers.
+
+## Related Migration Pressure
+
+US-017 is owned by EPIC-005. EPIC-002 should stay focused on the new writer
+model, but that model must remain ergonomic enough for Data Vault-style
+measurement scripts to migrate without a full old-system importer.

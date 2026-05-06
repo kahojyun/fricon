@@ -47,12 +47,14 @@ Fricon is an S2 medium modular system:
 3. `decisions/ADR-001-v02-clean-reset-boundary.md`
 4. `product/vision.md`
 5. `product/capability-map.md`
-6. `domain/conceptual-model.md`
-7. `architecture/system-overview.md`
-8. `architecture/module-boundaries.md`
-9. `architecture/compatibility-policy.md`
-10. `ai/project-context.md`
-11. `specs/SPEC-001-data-library-measurement-foundation/`
+6. `product/story-map.md`
+7. relevant `product/epics/` and `product/user-stories/`
+8. `domain/conceptual-model.md`
+9. `architecture/system-overview.md`
+10. `architecture/module-boundaries.md`
+11. `architecture/compatibility-policy.md`
+12. `ai/project-context.md`
+13. relevant `specs/`
 
 ## Directory Map
 
