@@ -33,6 +33,9 @@ A future concept can move into v0.2 implementation only after:
 | FC-008 | Device identity and managed communication | Candidate v0.4+ | Reserve boundary, but do not build broad framework in v0.2. |
 | FC-009 | Managed measurement plans | Candidate v0.4+ | Optional for repeated/automation-heavy work; imperative Python remains valid. |
 | FC-010 | AI-assisted automation | Candidate after audit model | Read/suggest first; mutating actions require explicit review and audit. |
+| FC-011 | Resumable execution checkpoints | Candidate with managed runner | Requires scan-point checkpoint semantics; v0.2 only promises readable partial data. |
+| FC-012 | External large asset references | ADR-gated | Reserve storage/export hooks for detector files, images, and waveforms, but keep scans/traces first. |
+| FC-013 | User-facing dataset streams | Candidate later | v0.2 may allow internal streams, but should not expose streams as a normal user concept. |
 
 ## Historical Inputs
 

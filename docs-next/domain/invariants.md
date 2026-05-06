@@ -21,6 +21,7 @@ Draft.
 - Measurement sample/session links are optional and correctable with history.
 - Measurement lifecycle transitions are recorded as events.
 - Partial/interrupted measurements remain readable.
+- Readable partials are guaranteed before resumable execution is promised.
 - Rerun creates a new linked measurement by default.
 
 ## Dataset Artifact
@@ -31,12 +32,19 @@ Draft.
 - Dataset artifacts do not own sample identity, measurement notes, parameter
   history, or code provenance.
 - Datasets intended for plotting require explicit scan schema at creation time.
+- Scan schema supports regular grids, partial grids, irregular/adaptive points,
+  repeated points, fixed-shape traces, and variable-length traces.
+- Dataset artifacts remain first-class searchable/openable records.
 - System-owned fields use a reserved prefix and are hidden from ordinary reads
   unless explicitly requested.
 
 ## Provenance And Audit
 
 - Non-managed code provenance must not be presented as reproducible history.
+- Passive setup/device/environment summaries must not be presented as device
+  control or complete reproducibility records.
+- Passive procedure summaries must not be presented as managed execution
+  records or resumable plans.
 - Mutating actions should record an actor label when practical.
 - AI-assisted mutating actions require explicit review and durable audit
   records.

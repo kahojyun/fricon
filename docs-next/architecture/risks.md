@@ -18,3 +18,8 @@ Draft.
 | RISK-008 | Old docs continue to guide agents. | Reintroduced v0.1 assumptions. | Route v0.2+ agents through `docs-next/ai/project-context.md`. |
 | RISK-009 | Export scope becomes an archive/import system too early. | Delays core measurement loop. | Start with measurement-centered read-only analysis bundle. |
 | RISK-010 | AI automation mutates state before audit model exists. | Trust and data integrity risk. | Keep AI read/suggest-only until reviewed mutation ADRs exist. |
+| RISK-011 | Measurement-first UI hides dataset artifacts. | Analysis/import/export workflows become awkward. | Keep datasets searchable and directly openable with stable handles. |
+| RISK-012 | Scan schema is too rectangular. | Adaptive scans, partial grids, repeated points, and traces do not fit. | Accept explicit scan shape modes before implementation. |
+| RISK-013 | Partial recovery is only a status label. | Users cannot analyze interrupted runs reliably. | Expose readable partial/missing-point semantics before resumable execution. |
+| RISK-014 | Raw schema is too verbose. | Python users avoid Fricon for quick scans. | Provide common scan/trace helpers plus raw schema escape hatch. |
+| RISK-015 | Streams leak into the v0.2 concept budget. | Users face Bluesky-like complexity too early. | Allow internal streams only behind dataset artifact APIs. |

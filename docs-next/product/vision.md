@@ -40,14 +40,26 @@ The first shipped slice should include:
 - one local data library per normal lab computer
 - explicit measurements
 - optional sample and sample-session context
-- table-shaped dataset artifacts with explicit scan schema for plotted data
+- dataset artifacts that remain directly searchable and openable, even though
+  the Desktop home is measurement-first
+- table-shaped scan and trace data with explicit scan schema for plotted data
+- scan modes for regular grids, partial grids, irregular or adaptive points,
+  repeated points, and fixed-shape or variable-length traces
+- short scan-schema helpers for common 1D/2D/N-D scans and traces, plus a raw
+  schema escape hatch for advanced cases
 - nonblocking live table and chart inspection
-- measurement lifecycle, notes, events, favorites/pins, trash/recover
+- measurement lifecycle, notes, events, favorites/pins, trash/recover, and
+  readable partial data semantics
 - light attachments
 - optional flexible parameter snapshot
 - honest code provenance summary
+- optional passive setup, device, and environment summary that describes
+  context without controlling devices
+- optional passive procedure summary that records unmanaged script, external
+  runner, or declared plan context without implementing a runner
 - Python reopen snippets through public APIs
-- measurement-centered portable export
+- a near-term measurement export spec for portable bundles and common analysis
+  formats
 - backup/restore and migration checkpoints
 - guided setup and compatibility diagnostics
 
@@ -60,8 +72,10 @@ These are important but not first-slice commitments:
 - parameter profiles, proposals, and calibration promotion
 - managed code snapshots and managed script execution
 - managed measurement plans
+- user-facing stream concepts inside dataset artifacts
 - analysis and calibration activity records
 - device identity and communication
+- resumable managed execution with scan-point checkpoints
 - AI-assisted reviewable automation
 
 ## Non-Goals For v0.2

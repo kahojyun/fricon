@@ -28,6 +28,15 @@ First implementation records:
 - optional Sample and SampleSession links
 - optional ParameterSnapshot
 - optional CodeProvenanceSummary
+- optional SetupProvenanceSummary
+- optional ProcedureSummary
+
+DatasetArtifact remains a first-class searchable/openable record. Measurement
+is the primary navigation context, but datasets are not hidden children because
+future analysis, import, and export workflows need direct artifact handles.
+DatasetArtifact may have internal stream-like payload groups in storage/export
+or advanced read APIs, but v0.2 should keep streams out of the normal user
+concept budget.
 
 ## Service Operations
 
@@ -46,6 +55,8 @@ Candidate operation groups:
 - `measurements.list_recent`
 - `measurements.get`
 - `datasets.read_semantic`
+- `datasets.search`
+- `datasets.get`
 - `events.subscribe`
 
 Exact route/transport shape requires an ADR.
@@ -66,6 +77,18 @@ with lib.measurement("rabi q3") as meas:
     ds.write(amp=0.1, signal=0.25)
 ```
 
+Common scan and trace schema should also have helper APIs. Exact names are
+unsettled, but the public direction is:
+
+```python
+with lib.measurement("rabi q3") as meas:
+    rabi = meas.scan_1d("rabi", x="amp", y="signal")
+    rabi.write(amp=0.1, signal=0.25)
+```
+
+The helper path should not replace raw schema for irregular/adaptive,
+multi-output, repeated-point, or trace-heavy cases.
+
 ## Desktop Shape
 
 First screen becomes a measurement console:
@@ -74,6 +97,7 @@ First screen becomes a measurement console:
 - active measurements
 - recent measurements
 - produced datasets
+- dataset search/direct open entry points
 - table/plot actions
 - partial/failed/trash shortcuts
 - diagnostics when service or compatibility checks fail
@@ -85,6 +109,10 @@ Storage ADR must decide physical layout. The design requires only:
 - stable data-library and record identities
 - measurement catalog records
 - dataset payload chunks and semantic schema
+- scan shape modes for regular grids, partial grids, irregular/adaptive
+  points, repeated points, fixed-shape traces, and variable-length traces
+- partial-read semantics for interrupted or incomplete data
+- optional internal stream-like groups for advanced storage/export/read needs
 - event timeline records
 - compatibility version and migration state
 - active writer state sufficient for recovery
@@ -94,5 +122,11 @@ Storage ADR must decide physical layout. The design requires only:
 1. Minimal lifecycle state enum and legal transitions.
 2. Data-library storage layout and pre-v0.2 import stance.
 3. Dataset artifact representation for fixed arrays and variable-length traces.
-4. HTTP/WebSocket/binary API shape and local service discovery.
-5. Actor/token storage and local operator profile scope.
+4. Partial grid, irregular/adaptive, repeated-point, and trace read APIs.
+5. HTTP/WebSocket/binary API shape and local service discovery.
+6. Actor/token storage and local operator profile scope.
+7. Passive setup summary shape and whether future device snapshots need a
+   reserved artifact/reference hook.
+8. Passive procedure summary shape.
+9. Whether internal stream groups are required for first implementation or only
+   reserved in the storage/export ADRs.

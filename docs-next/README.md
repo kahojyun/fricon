@@ -64,6 +64,7 @@ docs-next/
   specs/                System-slice specs derived from the baseline
   implementation-plans/ Milestone plans and quality gates
   postmortems/          Prototype lessons and reset rationale
+  research/             Background research process and accepted lessons
   ai/                   Agent context and documentation update policy
   user/                 Future public documentation plan, not current docs
 ```

@@ -25,6 +25,8 @@ Prefer one browser-capable service contract for Desktop, CLI, and Python SDK:
   reads
 - explicit write sessions with create, append, finish, and abort operations
 - server-side summaries, paging, and downsampling for UI reads
+- semantic read shapes for tables, dependent-with-axes views, regular grids,
+  partial grids, irregular/adaptive points, repeated points, and trace data
 
 The current gRPC path is implementation background, not the preferred durable
 v0.2 public Python contract unless an ADR proves otherwise.
@@ -51,6 +53,9 @@ Rules:
 - Measurement creation is explicit but short.
 - Sample/session context is a resolved default, not hidden provenance.
 - Low-level datasets may exist, but normal examples are measurement-scoped.
+- Dataset artifacts remain searchable/openable first-class records.
+- Scan schema authoring should have helpers for common 1D/2D/N-D scan and
+  trace shapes, plus raw schema APIs for advanced cases.
 - Reads use stable IDs and semantic APIs, not storage paths.
 
 ## Compatibility Negotiation

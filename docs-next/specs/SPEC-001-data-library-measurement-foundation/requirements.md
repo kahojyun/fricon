@@ -13,7 +13,8 @@ inspection, partial recovery, and Python reopen.
 ## Related Capabilities
 
 CAP-001, CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-007, CAP-008,
-CAP-009, CAP-010, CAP-012, CAP-013, CAP-014, CAP-015, CAP-017.
+CAP-009, CAP-010, CAP-012, CAP-013, CAP-014, CAP-015, CAP-017, CAP-026,
+CAP-027, CAP-028, CAP-029.
 
 ## Requirements
 
@@ -33,14 +34,25 @@ CAP-009, CAP-010, CAP-012, CAP-013, CAP-014, CAP-015, CAP-017.
 | REQ-012 | Support trash/recover and backup checkpoint hooks. | Ordinary cleanup is recoverable; migration/repair has checkpoint strategy. |
 | REQ-013 | Record honest code provenance level. | Unmanaged code is labeled unmanaged unless user supplies summary. |
 | REQ-014 | Allow optional flexible parameter snapshot. | Measurement can link a snapshot without global profile registry. |
+| REQ-015 | Keep dataset artifacts first-class. | Dataset artifacts are searchable/openable by stable ID and context even in a measurement-first UI. |
+| REQ-016 | Support scan and trace shape modes. | Scan schema distinguishes regular grids, partial grids, irregular/adaptive points, repeated points, fixed-shape traces, and variable-length traces. |
+| REQ-017 | Expose readable partial semantics. | Interrupted data reads show partial/missing expected points when schema supports them; v0.2 does not promise execution resume. |
+| REQ-018 | Record passive setup summaries. | Measurements can link optional setup/device/environment/method summaries without device control. |
+| REQ-019 | Provide scan schema authoring helpers. | Common 1D/2D/N-D scan and trace cases have helper APIs; advanced cases can use raw schema. |
+| REQ-020 | Record passive procedure summaries. | Measurements can link unmanaged script, external runner, or declared plan summaries without managed execution. |
+| REQ-021 | Allow internal artifact streams below the user concept. | Storage/export/read APIs may model internal streams, but v0.2 UI and public examples keep one dataset artifact as the normal concept. |
 
 ## Non-Goals
 
 - Opening or migrating old v0.1 workspaces by default.
 - Data Vault/Grapher compatibility server or direct legacy importer.
 - Full export bundle format.
+- Resumable managed execution or scan-point checkpoints.
 - Remote access.
 - Managed runner or task queue.
+- User-facing dataset streams as a normal v0.2 concept.
 - Full parameter registry or calibration workflow.
 - Device communication.
+- Large detector-file/image asset management unless a focused ADR pulls a
+  narrow hook into scope.
 - AI mutating automation.

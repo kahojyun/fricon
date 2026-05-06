@@ -33,3 +33,7 @@ Draft traceability baseline.
 | US-010 Update safely | X | X | X | X | X | X |  | X |
 | US-011 Code provenance | X | X | X | X | X | X | X | X |
 | US-012 Sample/session | X | X | X | X | X |  | X | X |
+| US-013 Dataset direct open | X | X | X | X | X |  | X | X |
+| US-014 Passive setup context | X | X | X | X | X | X | X | X |
+| US-015 Scan schema helpers | X | X | X | X | X |  | X | X |
+| US-016 Passive procedure context | X | X | X | X | X | X | X | X |

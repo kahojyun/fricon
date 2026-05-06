@@ -48,9 +48,14 @@ finished | interrupted | failed
 Rules:
 
 - Partial facts remain visible after interruption or failure.
+- Read APIs expose partial or missing expected points when scan schema declares
+  an expected shape.
 - Rerun creates a new linked measurement by default.
 - Appending to an older measurement requires explicit resume intent and
   compatibility checks.
+- Resumable execution is not promised in v0.2. Pause/resume events may be
+  recorded when supplied by external code, but scan-point checkpoint and resume
+  semantics belong to a future managed-runner design.
 - Cleanup uses trash/recover before hard delete.
 
 ## Dataset Artifact Lifecycle
@@ -74,6 +79,8 @@ Rules:
 
 - Facts are appendable while writing.
 - Facts are immutable after complete.
+- Partial grid, irregular/adaptive, repeated-point, and trace semantics are
+  dataset-local read semantics, not only lifecycle labels.
 - Corrections create events or derived artifacts rather than silent fact edits.
 - Live readers tail explicit append positions and may drop preview updates, but
   committed data is never dropped.

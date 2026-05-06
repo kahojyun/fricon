@@ -15,6 +15,8 @@ DataLibrary
   AttachmentArtifact
   ParameterSnapshot
   CodeProvenanceSummary
+  SetupProvenanceSummary
+  ProcedureSummary
   Event/AuditRecord
   OperatorProfile
 ```
@@ -26,7 +28,10 @@ DataLibrary
 | Catalog | Stable record IDs, display names, timestamps, lifecycle state, links. |
 | Dataset payloads | Arrow-compatible chunked facts and append positions. |
 | Dataset semantics | Variable roles, labels, units, scan axes, dependencies, duplicate policy, display hints. |
+| Scan shape semantics | Regular grid, partial grid, irregular/adaptive points, repeated points, fixed arrays, and variable-length traces. |
+| Internal payload grouping | Optional internal stream-like groups for storage/export/read APIs without making streams a normal user concept. |
 | Events | Measurement lifecycle, notes, corrections, export/recovery/system actions. |
+| Provenance summaries | Code provenance, passive setup/device/environment summaries, passive procedure summaries, and optional parameter snapshots. |
 | Checkpoints | Backup/restore and migration safety. |
 | Export manifests | Portable read-only package identity, checksums, selected metadata. |
 
@@ -62,6 +67,9 @@ Storage must expose:
 - data-library layout and migration policy
 - measurement table versus generic activity-run table
 - dataset artifact storage for fixed arrays and variable-length traces
+- scan shape and partial-read semantics
+- internal stream/subpayload representation, if needed
+- external asset/reference hooks for future detector files and images
 - event/audit record schema
 - export bundle format
 - local actor/token storage

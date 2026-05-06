@@ -34,6 +34,8 @@ Fricon Desktop / Python SDK / CLI
 - Python, Desktop, and CLI converge on one service API compatibility boundary.
 - Dataset payload transfer uses binary Arrow-compatible chunks where practical,
   not row-by-row JSON.
+- Measurement-first UI does not remove first-class dataset artifact discovery
+  and direct open flows.
 - Live views are noncritical consumers and must not block acquisition writes.
 - The reset is a domain-model reset, not a mandatory rewrite of every reusable
   infrastructure component.

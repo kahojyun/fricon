@@ -19,6 +19,8 @@ Draft.
 | Parameter Snapshot | Immutable parameter facts captured for a measurement. | Yes, minimal |
 | Parameter Profile | A mutable named reference to a useful parameter state. | Later |
 | Code Provenance Summary | Human-readable summary of code context and provenance level. | Yes |
+| Setup Summary | Optional passive summary of setup, device, driver, environment, clock, or method context. It describes context and does not control devices. | Yes, minimal |
+| Procedure Summary | Optional passive summary of the measurement procedure, such as unmanaged script, external runner, or declared plan context. It does not imply managed execution. | Yes, minimal |
 | Measurement Code Source | Configured upstream source for lab measurement code, such as Git/Gitea, package, mirror, or folder. | Later |
 | Code Snapshot | Immutable resolved code state used by future managed execution. | Later |
 | ActivityRun | Internal shared pattern for measurement, analysis, import, simulation, and calibration work. | No |
@@ -27,4 +29,5 @@ Draft.
 | Operator Profile | Lightweight local actor label for mutating actions on a shared lab computer. | Yes, optional |
 | Event/Audit Record | Timeline record for lifecycle, note, correction, system action, or actor-labeled mutation. | Yes |
 | Export Bundle | Read-only portable package for analysis without importing into another data library. | Yes |
+| Stream | Internal or advanced substructure for grouped payloads such as primary/baseline data. Not a first v0.2 user-facing concept. | No |
 | Experiment | Informal scientific wording or possible future grouping/template. Not the first public acquisition record. | No, informal |

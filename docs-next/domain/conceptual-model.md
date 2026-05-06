@@ -16,6 +16,8 @@ DataLibrary
     AttachmentArtifact
     ParameterSnapshot
     CodeProvenanceSummary
+    SetupProvenanceSummary
+    ProcedureSummary
     Event/AuditRecord
     OperatorProfile
 
@@ -25,6 +27,8 @@ DataLibrary
     Measurement -> produces -> DatasetArtifact | AttachmentArtifact
     Measurement -> optional ParameterSnapshot
     Measurement -> optional CodeProvenanceSummary
+    Measurement -> optional SetupProvenanceSummary
+    Measurement -> optional ProcedureSummary
     Event/AuditRecord -> subject record
     Event/AuditRecord -> optional OperatorProfile or service actor
 ```
@@ -41,7 +45,32 @@ DataLibrary
 | AttachmentArtifact | Light measurement files, images, or logs. | Full artifact management or row-linked large binary storage before an ADR. |
 | ParameterSnapshot | Immutable run facts. | Mutable profile management or calibration promotion. |
 | CodeProvenanceSummary | Provenance level and display summary. | Automatic reproducibility claims for unmanaged code. |
+| SetupProvenanceSummary | Passive setup, device, driver, environment, method, or clock facts supplied by the user or integration. | Device control, resource locking, readback enforcement, or reproducibility claims. |
+| ProcedureSummary | Passive summary of unmanaged script, external runner, or declared plan context. | Managed execution, scan-point checkpointing, task scheduling, or device/resource ownership. |
 | Event/AuditRecord | Lifecycle events, notes, corrections, actor labels, system actions. | Fine-grained permission enforcement. |
+
+## Dataset Artifact Shape
+
+`DatasetArtifact` remains first-class. It is produced by a measurement in the
+normal path, but it can also be imported, derived by future analysis, or opened
+directly from Python/Desktop.
+
+v0.2 should optimize for scan and trace facts:
+
+- regular grids
+- partial grids with missing expected points
+- irregular or adaptive point clouds
+- repeated points with declared duplicate/display policy
+- fixed-shape arrays or traces
+- variable-length traces with their own coordinate values and settings
+
+Large detector files, images, and external binary assets are ADR-gated. The
+model should reserve artifact/reference hooks without making them the first
+v0.2 storage problem.
+
+A dataset artifact is one user-facing artifact. Storage, export, or read APIs
+may model internal stream-like groups when needed, but streams should not become
+a normal v0.2 user-facing concept.
 
 ## Reserved Future Model
 

@@ -35,9 +35,15 @@ Install and set up
 | US-010 | Lab Maintainer | Update without corrupting measurement work. | CAP-012, CAP-013 | Updates and migrations check idle state, fail before writes on incompatibility, and create checkpoints where practical. |
 | US-011 | Lab Maintainer | Record code provenance honestly. | CAP-014, CAP-020 | Non-managed code is marked unmanaged unless the user supplies a label; future managed snapshots are reserved. |
 | US-012 | Experimentalist | Register a sample and sample session when useful. | CAP-004, CAP-019 | Sample/session context is low-friction, visible, and correctable after a run. |
+| US-013 | Analyst | Find and open a dataset artifact directly. | CAP-005, CAP-010, CAP-026 | Dataset artifacts are searchable/openable by ID, title, source alias, measurement, time, and context when available. |
+| US-014 | Experimentalist | Record passive setup context. | CAP-014, CAP-027 | A measurement can include setup/method labels and optional passive device/environment summaries without device control. |
+| US-015 | Experimentalist | Declare common scan shapes quickly. | CAP-006, CAP-028 | Common 1D/2D/N-D scans and traces have helpers; advanced users can provide raw schema. |
+| US-016 | Experimentalist | Record passive procedure context. | CAP-014, CAP-029 | A measurement can record unmanaged script, external runner, or declared-plan summary without managed execution. |
 
 ## Sequencing
 
 M1 foundation should prove US-001 through US-008 enough to record, inspect, and
-reopen a measurement. Export, backup/restore polish, and update flows may start
-as explicit contracts before full UX polish.
+reopen a measurement, while preserving first-class dataset discovery. Export,
+backup/restore polish, and update flows may start as explicit contracts before
+full UX polish. Measurement-centered export should be split into a near-term
+SPEC-002 rather than hidden inside the foundation spec.

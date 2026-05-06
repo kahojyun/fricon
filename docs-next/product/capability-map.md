@@ -37,3 +37,7 @@ Capability IDs are stable. Do not reuse or renumber them.
 | CAP-023 | Managed code snapshots and execution | Later | Requires ADR before implementation. |
 | CAP-024 | Device boundary and managed device communication | Later | Reserve boundary, do not build broad framework in v0.2. |
 | CAP-025 | AI-assisted reviewed automation | Later | Read/suggest first; mutating actions require review and audit. |
+| CAP-026 | Dataset artifact discovery and direct open | In scope | Datasets are first-class searchable/openable artifacts even in a measurement-first UI. |
+| CAP-027 | Passive setup and environment summary | In scope | Optional setup/device/environment facts without device control or reproducibility overclaiming. |
+| CAP-028 | Scan schema authoring helpers | In scope | Short helpers for common scan/trace shapes plus raw schema for advanced cases. |
+| CAP-029 | Passive procedure summary | In scope | Optional unmanaged script, external runner, or declared-plan summary without managed execution. |

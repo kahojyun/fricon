@@ -19,6 +19,9 @@ Python script
   -> service finalizes datasets and lifecycle events
 ```
 
+Dataset artifacts remain directly searchable and openable after this flow. The
+measurement is the primary navigation context, not the only durable handle.
+
 ## Live Read Flow
 
 ```text
@@ -45,6 +48,10 @@ Python SDK
   -> list produced DatasetArtifacts
   -> request semantic table, dependent-with-axes, or grid-like view
 ```
+
+Semantic reads must distinguish complete regular grids from partial grids,
+irregular/adaptive points, repeated points, and trace data where the scan schema
+declares those modes.
 
 ## Export Flow
 
