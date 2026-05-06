@@ -109,23 +109,19 @@ To meet the MVP goal, the MVP should include:
 
 ## Post-MVP Direction
 
-These directions matter to the long-term product, but are not MVP
-commitments:
+These priorities matter most after the MVP because they change the experiment
+experience most directly:
 
-- parameter profiles, proposals, and calibration promotion
-- parameter history, diffs, and proposal review
-- managed measurement-code sources and approved-code update flows
-- managed code snapshots and managed script execution
-- SDK runner capture before scheduler/resource queues
-- generated run history, compare, and operator handoff views
-- read-only LAN monitoring
-- richer sample fields and 2D sample maps
-- managed measurement plans
-- user-facing stream concepts inside dataset artifacts
-- analysis and calibration activity records
-- device identity and communication
-- resumable managed execution with scan-point checkpoints
-- AI-assisted reviewable automation
+- Priority 1: parameter system for profiles, immutable run-bound snapshots,
+  diffs, and proposal review.
+- Priority 2: managed run for importable SDK runner entry points, code/source
+  capture, lifecycle capture, and generated run history.
+- Priority 3: reviewable automation workflow that previews, reviews, audits,
+  and applies changes only through explicit safety boundaries.
+
+Lower-priority or ADR-gated directions include read-only LAN monitoring, richer
+sample maps, analysis/calibration records, device communication, resumable
+execution, user-facing stream concepts, and AI-assisted automation.
 
 ## Non-Goals For MVP
 

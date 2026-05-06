@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed post-MVP planning note.
+Proposed post-MVP planning backlog.
 
 ## Purpose
 
@@ -21,46 +21,24 @@ compatibility, storage, and API policies allow it.
 Post-MVP work should prioritize:
 
 - parameter system first
-- managed code source and managed run design early
-- run history as a generated view over captured facts
-- setup, device, and calibration state as store-and-diff before device apply
-- hybrid parameter tree before strict registry
-- SDK runner before scheduler
+- managed run second
+- reviewable automation workflow third
 
 The product rule is: the system captures context automatically where practical;
-the user confirms, annotates, or corrects it.
+the user confirms, annotates, or corrects it. Any workflow that mutates
+parameters, setup, devices, code, or data-library state needs explicit preview,
+review, and audit semantics.
 
-## Candidate Post-MVP Epics
+## Priority 1: Parameter System
 
 FEPIC-001: Parameter System And Snapshot Binding.
 
 - Users manage large parameter sets as named profiles or refs.
-- Measurement start resolves refs into immutable effective snapshots.
+- Measurement start resolves refs into immutable run-bound snapshots.
 - Diffs explain what changed between runs, profiles, proposals, and overrides.
-- The base model is a structured parameter tree; selected parameters can gain
-  typed definitions, units, validation, and richer UI later.
-
-FEPIC-002: Managed Code Source And Run Capture.
-
-- Users configure measurement code sources without copying folders by hand.
-- Fricon can capture code snapshot, SDK runner entry point, environment
-  summary, stdout/stderr, status, and produced artifacts.
-- Ordinary unmanaged Python remains possible, but shows lower provenance
-  confidence.
-
-FEPIC-003: Measurement History, Compare, And Handoff.
-
-- Measurement history is assembled from parameter snapshots, code snapshots,
-  setup summaries, lifecycle events, operator labels, and artifact links.
-- Users compare runs and see what changed since the last session.
-
-FEPIC-004: Setup And Calibration State Store/Diff.
-
-- Users record setup/device/calibration state as structured snapshots and
-  ledgers.
-- Fricon can diff and bind state to runs without applying settings to devices.
-
-## Candidate User Stories
+- The base model is a hybrid parameter tree: flexible structured values first,
+  with selected parameters upgraded to typed definitions, units, validation,
+  display hints, and UI affordances.
 
 FUS-001: Maintain named parameter profiles.
 
@@ -74,8 +52,8 @@ FUS-001: Maintain named parameter profiles.
 FUS-002: Bind effective parameters at run start.
 
 - As an experimentalist, I want a measurement to capture the resolved parameter
-  snapshot and runtime overrides automatically so that later analysis can
-  explain the exact effective settings.
+  snapshot and runtime overrides so that later analysis can explain the exact
+  effective settings.
 - Success: overrides are separate facts with actor, time, source, and optional
   reason.
 
@@ -95,6 +73,54 @@ FUS-004: Promote a good run into a parameter proposal.
   approval or rejection outcome.
 - Success: this is a lightweight proposal flow, not a permissions or compliance
   system.
+
+FUS-008: Run like a previous measurement.
+
+- As an experimentalist, I want to start from a previous measurement's scan
+  schema, parameter snapshot, code source, sample/session context, and plot
+  layout so that repeat work is faster without hiding what changed.
+- Success: reused facts are copied by reference or snapshot, and changes are
+  shown before the new run starts.
+
+Parameter requirements:
+
+- FREQ-001: The parameter model is a hybrid structured tree. Flexible nodes are
+  valid by default, and selected nodes can carry typed definitions, units,
+  validation, display hints, and documentation.
+- FREQ-002: Named parameter refs resolve to immutable snapshots before a
+  managed or unmanaged measurement records data.
+- FREQ-003: Runtime parameter overrides are recorded separately from profile
+  snapshots, with actor, time, source, and optional reason.
+- FREQ-004: Parameter diffs are path-aware, unit-aware where units exist, and
+  can compare profile, proposal, effective run snapshot, and override layers.
+- FREQ-005: Parameter profile updates use lightweight proposals with source run
+  or source snapshot, changed fields, actor, reason, approval/rejection
+  outcome, and timestamp. They do not require a permissions system in the first
+  parameter workflow slice.
+
+Not first parameter slice:
+
+- Device write-back.
+- Strict global registry for every parameter.
+- Permissions, compliance, or multi-user approval system.
+- Automatic tracing of every parameter read without explicit design.
+
+## Priority 2: Managed Run
+
+FEPIC-002: Managed Code Source And Run Capture.
+
+- Users configure measurement code sources without copying folders by hand.
+- Users can mark importable Python entry points for opt-in Fricon management.
+- Fricon can capture code snapshot, SDK runner entry point, environment
+  summary, stdout/stderr, status, diagnostics, and produced artifacts.
+- Ordinary interactive unmanaged Python remains possible, but shows lower
+  provenance confidence.
+
+FEPIC-003: Measurement History, Compare, And Handoff.
+
+- Measurement history is assembled from parameter snapshots, code snapshots,
+  setup summaries, lifecycle events, operator labels, and artifact links.
+- Users compare runs and see what changed since the last session.
 
 FUS-005: Configure a measurement code source.
 
@@ -123,14 +149,6 @@ FUS-007: Run through an opt-in SDK runner.
 - Success: the first managed-runner slice does not need queues, resource
   scheduling, retries, or broad workflow DAG execution.
 
-FUS-008: Run like a previous measurement.
-
-- As an experimentalist, I want to start from a previous measurement's scan
-  schema, parameter snapshot, code source, sample/session context, and plot
-  layout so that repeat work is faster without hiding what changed.
-- Success: reused facts are copied by reference or snapshot, and changes are
-  shown before the new run starts.
-
 FUS-009: Compare two measurements.
 
 - As an experimentalist, I want to compare runs by parameters, code, sample,
@@ -144,6 +162,46 @@ FUS-010: See operator handoff.
   that I can trust the lab computer state before starting work.
 - Success: handoff includes parameter ref changes, setup snapshot changes,
   calibration due/expired state, failed runs, imports, exports, and notes.
+
+Managed-run requirements:
+
+- FREQ-006: Managed code provenance records source URI/path, selected revision,
+  dirty state, source hashes where practical, SDK runner entry point, runner
+  invocation, and environment summary.
+- FREQ-007: Fricon shows provenance confidence instead of claiming
+  reproducibility from Git metadata alone.
+- FREQ-008: The first managed-runner slice is SDK runner integration. It
+  captures stdout/stderr excerpts or logs, start/end timestamps, status,
+  abort/fail reason, produced artifacts, and diagnostic warnings.
+- FREQ-009: The first managed-runner slice is not a scheduler. Queues, resource
+  management, retries, and workflow DAG execution are later or ADR-gated.
+- FREQ-010: Run history and compare views are generated from recorded facts:
+  parameters, code, setup, lifecycle events, notes, operator labels, and
+  artifacts.
+
+Not first managed-run slice:
+
+- Scheduler, queues, resource leases, broad retry policy, or workflow DAG.
+- Resumable scan-point execution.
+- Making managed execution mandatory for ordinary exploratory scripts.
+- Treating shell-command wrapping as the primary runner UX.
+
+## Priority 3: Reviewable Automation Workflow
+
+FEPIC-004: Setup And Calibration State Store/Diff.
+
+- Users record setup/device/calibration state as structured snapshots and
+  ledgers.
+- Fricon can diff and bind state to runs without applying settings to devices.
+
+FEPIC-005: Reviewable Automation Workflow.
+
+- Users can preview automation actions before they mutate Fricon state, device
+  state, parameter refs, or calibration records.
+- Automation proposals record intended inputs, expected mutations, affected
+  objects, actor, review outcome, and audit events.
+- Automation grows from parameter system and managed run records instead of
+  becoming an unrelated workflow engine.
 
 FUS-011: Store and diff setup snapshots.
 
@@ -161,60 +219,49 @@ FUS-012: Track calibration state.
 - Success: out-of-tolerance records can flag a review window without silently
   invalidating data.
 
-## Candidate Product Requirements
+FUS-013: Preview an automation workflow.
 
-FREQ-001: The parameter model is a hybrid structured tree. Flexible nodes are
-valid by default, and selected nodes can carry typed definitions, units,
-validation, display hints, and documentation.
+- As an experimentalist, I want a proposed automation workflow to show what it
+  will read, run, and mutate before execution so that hidden state changes do
+  not surprise me.
+- Success: preview separates parameter changes, setup/device changes, managed
+  runs, analysis steps, calibration proposals, and data-library mutations.
 
-FREQ-002: Named parameter refs resolve to immutable snapshots before a managed
-or unmanaged measurement records data.
+FUS-014: Review and apply automation proposals.
 
-FREQ-003: Runtime parameter overrides are recorded separately from profile
-snapshots, with actor, time, source, and optional reason.
+- As a lab maintainer, I want automation proposals to require explicit review
+  before mutating durable lab state so that automation remains accountable.
+- Success: approval, rejection, actor, reason, timestamp, and affected objects
+  are recorded.
 
-FREQ-004: Parameter diffs are path-aware, unit-aware where units exist, and
-can compare profile, proposal, effective run snapshot, and override layers.
+Automation requirements:
 
-FREQ-005: Parameter profile updates use lightweight proposals with source run
-or source snapshot, changed fields, actor, reason, approval/rejection outcome,
-and timestamp. They do not require a permissions system in the first parameter
-workflow slice.
+- FREQ-011: Setup/device/calibration state supports store, bind, search, and
+  diff before any device write-back is implemented.
+- FREQ-012: Device apply, resumable execution, and AI-assisted mutation require
+  separate ADRs covering safety, readback, partial failure, and audit behavior.
+- FREQ-013: Post-MVP improvements remain local-first: no cloud account, hosted
+  dashboard, or central Fricon server is required for core parameter, run, or
+  automation workflows.
+- FREQ-014: Reviewable automation must produce a preview of intended reads,
+  writes, device interactions, generated records, and failure handling before
+  mutation starts.
+- FREQ-015: Automation records must preserve actor, trigger, reviewed plan,
+  accepted or rejected changes, execution status, produced artifacts, and audit
+  events.
 
-FREQ-006: Managed code provenance records source URI/path, selected revision,
-dirty state, source hashes where practical, SDK runner entry point, runner
-invocation, and environment summary.
+Not first automation slice:
 
-FREQ-007: Fricon shows provenance confidence instead of claiming
-reproducibility from Git metadata alone.
+- AI autonomous mutation.
+- Device write-back before store/diff, readback, safety, and partial-failure
+  behavior are accepted by ADR.
+- Generic workflow DAG engine as the normal way to run ordinary measurements.
+- Cloud-first dashboard, account, or team-permission system.
 
-FREQ-008: The first managed-runner slice is SDK runner integration. It captures
-stdout/stderr excerpts or logs, start/end timestamps, status, abort/fail
-reason, produced artifacts, and diagnostic warnings.
+## Supporting Candidates
 
-FREQ-009: The first managed-runner slice is not a scheduler. Queues, resource
-management, retries, and workflow DAG execution are later or ADR-gated.
-
-FREQ-010: Run history and compare views are generated from recorded facts:
-parameters, code, setup, lifecycle events, notes, operator labels, and
-artifacts.
-
-FREQ-011: Setup/device/calibration state supports store, bind, search, and
-diff before any device write-back is implemented.
-
-FREQ-012: Device apply, resumable execution, and AI-assisted mutation require
-separate ADRs covering safety, readback, partial failure, and audit behavior.
-
-FREQ-013: Post-MVP improvements remain local-first: no cloud account, hosted
-dashboard, or central Fricon server is required for core parameter or run
-capture workflows.
-
-## Explicit Non-Goals Until ADR-Gated
-
-- Fricon as a full ELN, LIMS, or compliance system.
-- Fricon as a Git host or broad package manager.
-- Cloud-first experiment tracking dashboards.
-- Model registry, hyperparameter leaderboard, or ML sweep controller concepts
-  as primary product nouns.
-- Device write-back before store/diff is useful and safe.
-- Workflow DAG engine as the normal way to run ordinary measurements.
+- Read-only LAN monitoring for local lab viewing without remote writes.
+- Rich sample fields, 2D sample maps, and saved comparison views.
+- External large asset references for detector files, images, and waveforms.
+- User-facing dataset streams, if internal stream support proves useful enough
+  to expose later.

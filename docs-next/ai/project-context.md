@@ -30,6 +30,12 @@ Product planning uses MVP, post-MVP priority, and ADR-gated labels. Do not
 interpret post-MVP priorities as semantic-version labels; compatible additions
 may remain on the same compatible release line.
 
+Post-MVP priority order:
+
+1. Parameter system.
+2. Managed run.
+3. Reviewable automation workflow.
+
 Primary user model:
 
 ```text

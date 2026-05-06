@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted future ledger.
+Accepted post-MVP priority ledger.
 
 ## Purpose
 
@@ -19,23 +19,77 @@ A future concept can move into implementation only after it has a clear story,
 domain owner, ADR if needed, and does not make the core measurement loop harder
 to use.
 
-## Post-MVP Priority: Product Assistance
+The priority order is a planning default, not a release-number commitment. A
+lower-priority item can move earlier only when it is small, compatible, and does
+not weaken the higher-priority product model.
 
-- FC-004: Parameter profiles, immutable snapshot binding, history, proposals,
-  and diff views. This is the highest-priority post-MVP direction because
-  large parameter sets are already a standalone user pain.
+## Priority 1: Parameter System
+
+Why first:
+
+- Fricon's core motivation is dissatisfaction with existing parameter
+  management and code management around physical measurements.
+- Parameter state directly shapes whether a completed measurement can be
+  understood, compared, repeated, or promoted into better lab practice.
+- Managed runs and automation workflows need a parameter model to avoid
+  recording only half of the experiment record.
+
+Included concepts:
+
+- FC-004: Parameter profiles, immutable run-bound snapshot binding, history,
+  proposals, and diff views.
+- FC-014: Measurement history and compare views generated from captured
+  parameter, setup, lifecycle, code, and artifact facts.
+
+Boundary:
+
+- Start with a hybrid parameter tree: flexible structured values first, with
+  selected parameters upgraded to typed definitions, units, validation, and UI
+  affordances.
+- Use lightweight proposals with actor, reason, and approval history.
+- Do not require a full permissions system, strict global registry, or device
+  write-back for the first parameter slice.
+
+## Priority 2: Managed Run
+
+Why second:
+
+- Managed run turns the SDK from an honest unmanaged logger into a higher
+  provenance experiment runner when users opt in.
+- Useful run history depends on captured code, parameters, lifecycle, logs, and
+  produced artifacts, not manual entry.
+- Managed run should grow from ordinary importable Python code, not from a
+  separate experiment DSL.
+
+Included concepts:
+
 - FC-003: Measurement-code source setup that replaces copied-code folders with
   approved-code update flows, local checkout/environment guidance, and no
   central Fricon server.
-- FC-007: Managed code snapshots and opt-in managed run capture. Design early
-  because useful run history depends on automatic capture, not manual entry.
-- FC-014: Measurement history, compare, and operator handoff generated from
-  captured parameter, code, setup, lifecycle, and artifact facts.
-- FC-001: Read-only LAN monitoring for viewing, browsing, and export without
-  remote writes.
-- FC-002: Rich sample fields, 2D sample maps, and saved views.
+- FC-007: Managed code snapshots and opt-in managed run capture.
+- FC-014: Operator handoff and run history views generated from captured facts.
 
-## Post-MVP Priority: Automation Foundation
+Boundary:
+
+- The first managed-run slice is SDK runner integration, not a blind
+  shell-command wrapper and not a scheduler.
+- Ordinary interactive unmanaged Python remains valid and clearly labeled.
+- Queues, resource leases, retries, workflow DAGs, and resumable execution are
+  later or ADR-gated.
+
+## Priority 3: Reviewable Automation Workflow
+
+Why third:
+
+- Automation should reuse the parameter system and managed run record instead
+  of becoming an independent workflow engine.
+- The experiment UX risk is hidden mutation. The product value is preview,
+  review, audit, and explicit approval around changes to parameters, setup,
+  code, devices, or data-library state.
+- AI-assisted workflow is only acceptable after the audit and review model
+  exists.
+
+Included concepts:
 
 - FC-005: Analysis records that consume artifacts and produce derived outputs.
 - FC-006: Calibration records with reviewable proposals.
@@ -43,37 +97,30 @@ to use.
 - FC-009: Managed measurement plans.
 - FC-015: Workflow preview layer for calibration, benchmark, and reviewed
   automation flows.
-
-## Later Or ADR-Gated
-
 - FC-010: AI-assisted automation after the audit model exists.
+
+Boundary:
+
+- Store and diff setup, device, and calibration state before applying settings
+  back to devices.
+- Device write-back, resumable execution, and AI-assisted mutation need safety,
+  readback, partial-failure, and audit ADRs.
+- A broad workflow DAG engine is not the normal way to run ordinary
+  measurements.
+
+## Supporting Or Lower-Priority Concepts
+
+- FC-001: Read-only LAN monitoring for viewing, browsing, and export without
+  remote writes.
+- FC-002: Rich sample fields, 2D sample maps, and saved views.
 - FC-011: Resumable execution checkpoints with a managed runner.
 - FC-012: External large asset references for detector files, images, and
   waveforms.
 - FC-013: User-facing dataset streams, if internal stream support proves useful
   enough to expose later.
-- FC-016: Applying stored parameter or setup state back to devices. Store and
-  diff comes first; write-back needs safety, partial-failure, readback, and
-  audit ADRs.
+- FC-016: Applying stored parameter or setup state back to devices.
 
-## Interview Direction
-
-Current post-MVP product bias:
-
-- Parameter system first.
-- Managed code source and managed run design early.
-- Useful run history is derived from captured facts rather than user-entered
-  history.
-- Lab state starts with store-and-diff, not device apply.
-- Parameter model starts as a hybrid tree: flexible structured snapshots first,
-  with selected parameters upgraded to typed definitions, units, validation,
-  and UI affordances.
-- Managed runner minimum is SDK runner integration, not a blind shell-command
-  wrapper and not a scheduler.
-- Parameter profile changes use light proposals with actor, reason, and
-  approval history, without requiring a full permissions system.
-
-Candidate future stories and requirements live in
+Candidate post-MVP stories and requirements live in
 `product/future-stories-and-requirements.md`.
 
 ## Historical Inputs
