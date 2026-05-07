@@ -7,18 +7,17 @@ Deferred.
 ## Purpose
 
 Avoid creating a large story-by-module table while the project is still in
-product analysis and domain-placeholder staging. This file records only likely
-downstream implementation concerns so future planning can derive traceability
-after product, rebuilt domain, architecture, and required ADR inputs are
-accepted.
+product and initial domain analysis. This file records only likely downstream
+implementation concerns so future planning can derive traceability after
+product, domain, architecture, and required ADR inputs are accepted.
 
 Do not treat this file as an accepted Rust module map, frontend feature map,
 storage/API design, or task/file traceability matrix.
 
 ## Concern Legend
 
-- Product model / future domain model: accepted capabilities, terms, future
-  domain concepts, lifecycles, invariants, and context ownership.
+- Product/domain model: accepted concepts, lifecycles, invariants, and context
+  ownership.
 - Local runtime/API: future architecture for mutation gates, compatibility,
   events, and client access.
 - Storage/export: future architecture for catalog, payloads, migrations,
@@ -33,20 +32,20 @@ storage/API design, or task/file traceability matrix.
 ## Epic Routing
 
 EPIC-001 Local setup and data-library adoption:
-Product model / future domain model, Local runtime/API, Storage/export, Python
-SDK, Desktop, CLI, Docs.
+Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+CLI, Docs.
 
 EPIC-002 New measurement logging replacement:
-Product model / future domain model, Local runtime/API, Storage/export, Python
-SDK, Desktop, Docs.
+Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+Docs.
 
 EPIC-003 Measurement console and inspection:
-Product model / future domain model, Local runtime/API, Python SDK for reopen
-snippets, Desktop, Docs.
+Product/domain model, Local runtime/API, Python SDK for reopen snippets,
+Desktop, Docs.
 
 EPIC-004 Recovery, annotation, reopen, and export:
-Product model / future domain model, Local runtime/API, Storage/export, Python
-SDK, Desktop, Docs.
+Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+Docs.
 
 EPIC-005 Migration ergonomics and future lab scaling:
 Python SDK, Desktop, Docs, then later Local runtime/API, CLI, and

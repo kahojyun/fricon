@@ -33,11 +33,9 @@ the user confirms, annotates, or corrects it. Any workflow that mutates
 parameters, setup, devices, code, or data-library state needs explicit preview,
 review, and audit semantics.
 
-Use `product/glossary.md` for term boundaries while the detailed domain model
-is deferred. This backlog may mention those terms, but it should not become the
-canonical definition for calibration, run manifests, working refs, or
-setup/device reconciliation. Rebuild `docs/domain/` from accepted product
-inputs before treating those concepts as implementation-ready semantics.
+Use `product/glossary.md` for term boundaries. This backlog may mention those
+terms, but it should not become the canonical definition for calibration, run
+manifests, working refs, or setup/device reconciliation.
 
 ## Priority Index
 

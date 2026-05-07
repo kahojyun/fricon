@@ -9,8 +9,6 @@ Accepted.
 For v0.2+ system work:
 
 - read the relevant product, domain, architecture, and ADR documents
-- treat `docs/domain/` as a placeholder until the needed domain baseline is
-  rebuilt from accepted product inputs
 - confirm the spec status is Accepted or the user explicitly permits Draft work
 - update docs first if implementation would contradict accepted direction
 - record non-goals and compatibility impact in the spec

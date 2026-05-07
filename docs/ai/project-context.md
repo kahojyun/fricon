@@ -16,9 +16,9 @@ For v0.2+ work, read:
 6. `docs/architecture/README.md`
 7. `docs/architecture/compatibility-policy.md`
 
-`docs/domain/`, `docs/specs/`, and `docs/implementation-plans/` are sentinels
-only right now. Recreate or read detailed domain/downstream artifacts only when
-that layer is the task and the relevant upstream baseline is accepted or
+`docs/specs/` and `docs/implementation-plans/` are sentinels only
+right now. Recreate or read downstream artifacts only when implementation
+planning is the task and the relevant upstream baseline is accepted or
 explicitly marked with open interview questions.
 
 ## Product Direction
@@ -71,8 +71,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Do not turn sample target binding into a heavy physical-component ontology
   unless a later product decision requires it.
 - For post-MVP parameter, calibration, run-manifest, sample-visualizer, and
-  setup/device reconciliation details, read `product/future-concepts.md`,
-  `product/future-stories-and-requirements.md`, and `product/glossary.md`.
+  setup/device reconciliation details, read `product/future-concepts.md` and
+  `product/glossary.md`.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.

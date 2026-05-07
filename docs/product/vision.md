@@ -49,8 +49,7 @@ The long-term center is not device control, sample visualization, or AI by
 itself. Those capabilities matter when they serve trustworthy experiment
 memory, reviewable changes, and safer reuse. Detailed post-MVP ordering lives
 in `product/future-concepts.md`; future terminology is owned by
-`product/glossary.md` until the domain model is rebuilt from accepted product
-inputs.
+`product/glossary.md` and the domain model.
 
 The product should stay close to how experimentalists already work: Python
 scripts and notebooks remain first-class, local lab computers remain useful
