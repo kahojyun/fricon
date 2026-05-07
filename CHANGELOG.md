@@ -6,7 +6,7 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 This file is historical pre-v0.2 release history. The corresponding
 implementation remains available on the `archive/v0.1` branch. It is not
-product direction for the v0.2 clean reset; use `docs-next/` for current
+product direction for the v0.2 clean reset; use `docs/` for current
 planning.
 
 ## 0.1.4 (2026-05-05)

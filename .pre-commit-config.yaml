@@ -1,4 +1,4 @@
-# Keep this prek-compatible config minimal during the docs-next design phase:
+# Keep this prek-compatible config minimal during the docs design phase:
 # basic text/config hygiene only, without language builds, dependency updates,
 # generated-artifact checks, or test gates.
 repos:

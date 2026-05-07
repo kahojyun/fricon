@@ -27,7 +27,7 @@ storage/API design, or task/file traceability matrix.
 - Desktop: local measurement console, live/history views, setup, diagnostics,
   and dataset artifact discovery.
 - CLI: setup, diagnostics, and local maintenance flows.
-- Docs: `docs-next/`, future public docs, and migration guidance.
+- Docs: `docs/`, future public docs, and migration guidance.
 
 ## Epic Routing
 

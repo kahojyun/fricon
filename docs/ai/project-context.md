@@ -8,22 +8,22 @@ Accepted for v0.2+ planning.
 
 For v0.2+ work, read:
 
-1. `docs-next/README.md`
-2. `docs-next/decisions/ADR-001-v02-clean-reset-boundary.md`
-3. `docs-next/product/vision.md`
-4. `docs-next/product/python-sdk-ux.md` for the Python SDK usage guideline
-5. `docs-next/domain/conceptual-model.md`
-6. `docs-next/architecture/README.md`
-7. `docs-next/architecture/compatibility-policy.md`
+1. `docs/README.md`
+2. `docs/decisions/ADR-001-v02-clean-reset-boundary.md`
+3. `docs/product/vision.md`
+4. `docs/product/python-sdk-ux.md` for the Python SDK usage guideline
+5. `docs/domain/conceptual-model.md`
+6. `docs/architecture/README.md`
+7. `docs/architecture/compatibility-policy.md`
 
-`docs-next/specs/` and `docs-next/implementation-plans/` are sentinels only
+`docs/specs/` and `docs/implementation-plans/` are sentinels only
 right now. Recreate or read downstream artifacts only when implementation
 planning is the task and the relevant upstream baseline is accepted or
 explicitly marked with open interview questions.
 
 Legacy public and developer documentation content has been merged or retired.
 The pre-v0.2 implementation has been removed from this branch and remains on
-`archive/v0.1` for historical reference. Use `docs-next/` for v0.2+ direction.
+`archive/v0.1` for historical reference. Use `docs/` for v0.2+ direction.
 
 ## Product Direction
 

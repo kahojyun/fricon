@@ -6,7 +6,7 @@ Draft process note.
 
 ## Purpose
 
-`docs-next/research/` stores lightweight background research and accepted
+`docs/research/` stores lightweight background research and accepted
 lessons. It should not become an encyclopedia of external measurement
 frameworks.
 

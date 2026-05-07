@@ -13,7 +13,7 @@ domain model.
 
 ## Decision
 
-Use `docs-next/` as the v0.2+ documentation baseline with these artifact
+Use `docs/` as the v0.2+ documentation baseline with these artifact
 classes:
 
 - product: vision, personas, capability map, story map, glossary, traceability

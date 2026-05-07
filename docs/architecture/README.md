@@ -6,7 +6,7 @@ Pre-architecture placeholder.
 
 ## Purpose
 
-`docs-next/architecture/` is not the active design surface yet. Product and
+`docs/architecture/` is not the active design surface yet. Product and
 initial domain analysis are still upstream of architecture. Until those inputs
 are accepted, this directory should only preserve already accepted constraints
 and collect questions for later ADRs or specs.

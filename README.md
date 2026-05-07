@@ -5,13 +5,13 @@ work.
 
 ## Documentation
 
-The active documentation baseline is [docs-next/](docs-next/). It owns the
+The active documentation baseline is [docs/](docs/). It owns the
 v0.2+ clean-reset product, domain, architecture, ADR, research, and agent
 context.
 
 Legacy public and developer documentation content has been merged or retired.
 Treat old workspace/dataset-first behavior as prototype history unless a
-current `docs-next/` document says otherwise.
+current `docs/` document says otherwise.
 
 The pre-v0.2 implementation has been removed from this branch. Use the
 `archive/v0.1` branch for historical code reference.
@@ -28,20 +28,13 @@ Fricon v0.2 is being redesigned around:
 
 ## Quick Start
 
-The repository is in a v0.2 clean-reset planning phase. `docs-next/` work does
+The repository is in a v0.2 clean-reset planning phase. `docs/` work does
 not require dependency installation, a dev workspace, or language builds.
 
 ```bash
 git clone https://github.com/kahojyun/fricon.git
 cd fricon
 ```
-
-For contribution guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the current docs-first workflow and
-rules for reintroducing implementation scaffolding later.
 
 ## License
 

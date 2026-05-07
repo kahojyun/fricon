@@ -1,4 +1,4 @@
-# Fricon Docs Next
+# Fricon Docs
 
 ## Status
 
@@ -6,14 +6,14 @@ Active v0.2+ documentation baseline.
 
 ## Purpose
 
-`docs-next/` is the single documentation directory for the v0.2+ reset. It owns
+`docs/` is the single documentation directory for the v0.2+ reset. It owns
 the active product, domain, architecture, ADR, research, user-documentation
 planning, and AI-agent guidance baseline.
 
 Legacy public and developer documentation content has been merged or retired.
 Do not use old workspace/dataset-first public docs, historical proposal notes,
 or current v0.1 implementation notes as v0.2+ source material unless a current
-`docs-next/` document explicitly reintroduces the idea.
+`docs/` document explicitly reintroduces the idea.
 
 The pre-v0.2 implementation has been removed from this branch and remains
 available on `archive/v0.1` for historical reference.
@@ -35,7 +35,7 @@ features may still ship on the same compatible release line.
 
 This directory is currently the primary work surface. Keep discussion changes
 lightweight: do not run full Rust, Python, frontend, release, or docs-deploy
-automation for `docs-next/`-only edits unless a task explicitly asks for it.
+automation for `docs/`-only edits unless a task explicitly asks for it.
 Repository automation such as implementation CI, dependency updates, release
 publishing, and docs deployment is intentionally paused while the v0.2+
 baseline is being discussed. Basic text and config hygiene remains available
@@ -79,7 +79,7 @@ questions.
 ## Directory Map
 
 ```text
-docs-next/
+docs/
   product/              User goals, capabilities, stories, future ledger, glossary
   domain/               Conceptual model, contexts, lifecycles, invariants
   architecture/         Accepted constraints and deferred ADR questions
@@ -123,7 +123,7 @@ Keep each idea in the narrowest durable owner:
 - `ai/` owns agent routing and update policy, not product or domain rationale.
 
 Detailed editing rules live in `ai/documentation-update-policy.md`; load that
-file only when authoring or reorganizing `docs-next/` documents.
+file only when authoring or reorganizing `docs/` documents.
 
 ## Source Inputs
 
@@ -131,7 +131,7 @@ This baseline was bootstrapped from legacy repository notes that have now been
 merged or retired, including the old public docs, developer notes, current
 implementation notes, v0.2 planning files, and archived proposal inputs.
 
-The current `docs-next/` content is the retained result. If an old proposal
+The current `docs/` content is the retained result. If an old proposal
 from external history or chat conflicts with this baseline, prefer this
 baseline for v0.2+ planning unless a newer ADR says otherwise.
 

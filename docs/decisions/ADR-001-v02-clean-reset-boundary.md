@@ -39,7 +39,7 @@ and domain analysis are not steered by obsolete module boundaries.
 
 ## Consequences
 
-- `docs-next/` becomes the v0.2+ design baseline and the single documentation
+- `docs/` becomes the v0.2+ design baseline and the single documentation
   directory.
 - Legacy public and developer documentation content may be deleted after useful
   product and domain ideas are merged.
