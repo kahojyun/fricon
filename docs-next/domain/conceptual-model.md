@@ -32,7 +32,7 @@ DataLibrary
     Measurement -> optional SetupProvenanceSummary
     Measurement -> optional ProcedureSummary
     Event/AuditRecord -> subject record
-    Event/AuditRecord -> optional OperatorProfile or service actor
+    Event/AuditRecord -> optional OperatorProfile or system actor
 ```
 
 ## Concept Ownership

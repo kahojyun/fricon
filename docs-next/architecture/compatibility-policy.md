@@ -57,9 +57,9 @@ The promise is not:
 | Dimension | Gate |
 | --- | --- |
 | Data-library format | Storage format version and migration state. |
-| Service API | API/protocol version and capability negotiation. |
+| Local runtime/API | API/protocol version and capability negotiation. |
 | Python SDK | Required capability checks before writes. |
-| Desktop/CLI | Bundled with compatible service for normal local flow. |
+| Desktop/CLI | Bundled with compatible local runtime for normal local flow. |
 | Export bundle | Format version and reader compatibility. |
 | Feature support | Capability flags for optional or future features. |
 

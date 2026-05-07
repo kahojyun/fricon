@@ -45,7 +45,7 @@ but the concrete v0.2 module architecture should revalidate them:
 - `crates/fricon/src/dataset/**`: possible reusable dataset payload and
   semantic-validation ideas, with ownership redesign pressure.
 - `crates/fricon/src/transport/**`: current transport background, not an
-  accepted v0.2 service contract.
+  accepted v0.2 runtime/API contract.
 - `crates/fricon-py/**`: current Python binding background; exact v0.2 Python
   API syntax is deferred.
 - `crates/fricon-ui/frontend/src/features/datasets/**`: possible reusable chart

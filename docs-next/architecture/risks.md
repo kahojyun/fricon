@@ -13,7 +13,7 @@ architecture decisions.
 | RISK-002 | Dataset metadata absorbs measurement/sample/provenance meaning again. | Confusing ownership and hard migrations. | Enforce the context map and defer concrete module boundaries until architecture work starts. |
 | RISK-003 | Python SDK ergonomics suffer from too much schema ceremony. | Users stay with old logger. | Keep measurement creation short; require scan schema only for plotted data. |
 | RISK-004 | Live views slow acquisition writes. | Measurement reliability failure. | Make live views noncritical consumers with bounded queues/coalescing. |
-| RISK-005 | Compatibility checks are delayed until after writes. | Corrupted or partial data. | Build client/service/library negotiation early. |
+| RISK-005 | Compatibility checks are delayed until after writes. | Corrupted or partial data. | Build client/runtime/library negotiation early. |
 | RISK-006 | Desktop remains dataset-first. | Product fails to become measurement-centered. | Make measurement console the first Desktop workflow. |
 | RISK-007 | Reset discards reusable infrastructure unnecessarily. | Slower implementation. | Treat reset as domain reset, not total rewrite. |
 | RISK-008 | Old docs continue to guide agents. | Reintroduced v0.1 assumptions. | Route v0.2+ agents through `docs-next/ai/project-context.md`. |

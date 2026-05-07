@@ -49,7 +49,7 @@ generated-artifact checks, language builds, or test gates.
 
 Fricon is an S2 medium modular system:
 
-- Rust core/service code, Python SDK, CLI, and Tauri/React desktop UI interact.
+- Rust core/runtime code, Python SDK, CLI, and Tauri/React desktop UI interact.
 - Data library, measurement, dataset artifact, storage, API, lifecycle,
   provenance, export, and compatibility concepts cross module boundaries.
 - AI-assisted development needs explicit global context, not only local feature

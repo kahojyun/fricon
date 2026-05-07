@@ -16,11 +16,11 @@ Deferred. Product and domain analysis are still upstream of API architecture.
 
 ## Deferred API Questions
 
-- What local service or equivalent local authority coordinates mutating
+- What local runtime or equivalent local authority coordinates mutating
   operations?
 - Which transport should Desktop, Python SDK, and CLI use?
-- Which parts of the service contract are JSON/control, streaming events, or
-  binary payload transfer?
+- Which parts of the local runtime/API contract are JSON/control, streaming
+  events, or binary payload transfer?
 - Which capability/version negotiation is required before measurement creation,
   dataset writing, export, migration, and future managed execution?
 - How should Python SDK examples preserve low ceremony without freezing helper

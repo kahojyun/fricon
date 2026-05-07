@@ -1,43 +1,55 @@
-# Story Module Traceability
+# Story Implementation Routing Placeholder
 
 ## Status
 
-Accepted traceability guide.
+Deferred.
 
 ## Purpose
 
-Avoid a large story-by-module table. Use this file to route future work to the
-right code areas at epic level. Precise task/file traceability belongs in a
-derived implementation artifact after upstream scope is accepted.
+Avoid creating a large story-by-module table while the project is still in
+product and initial domain analysis. This file records only likely downstream
+implementation concerns so future planning can derive traceability after
+product, domain, architecture, and required ADR inputs are accepted.
 
-## Module Legend
+Do not treat this file as an accepted Rust module map, frontend feature map,
+storage/API design, or task/file traceability matrix.
 
-- Core Domain: Rust domain/application model under `crates/fricon/src/**`.
-- Storage: catalog, payload storage, manifests, migrations.
-- Service API: local service API, events, compatibility negotiation.
-- Python SDK: `crates/fricon-py`.
-- Desktop UI: Tauri shell and React frontend.
-- CLI: setup, diagnostics, service control.
-- Export: portable bundle writer/reader and offline viewer path.
+## Concern Legend
+
+- Product/domain model: accepted concepts, lifecycles, invariants, and context
+  ownership.
+- Local runtime/API: future architecture for mutation gates, compatibility,
+  events, and client access.
+- Storage/export: future architecture for catalog, payloads, migrations,
+  checkpoints, and portable bundles.
+- Python SDK: user-facing measurement recording, reopen, export, diagnostics,
+  and notebook-friendly context.
+- Desktop: local measurement console, live/history views, setup, diagnostics,
+  and dataset artifact discovery.
+- CLI: setup, diagnostics, and local maintenance flows.
 - Docs: `docs-next/`, future public docs, and migration guidance.
 
 ## Epic Routing
 
 EPIC-001 Local setup and data-library adoption:
-Core Domain, Storage, Service API, Python SDK, Desktop UI, CLI, Docs.
+Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+CLI, Docs.
 
 EPIC-002 New measurement logging replacement:
-Core Domain, Storage, Service API, Python SDK, Desktop UI, Docs.
+Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+Docs.
 
 EPIC-003 Measurement console and inspection:
-Core Domain, Service API, Desktop UI, Python SDK for reopen snippets, Docs.
+Product/domain model, Local runtime/API, Python SDK for reopen snippets,
+Desktop, Docs.
 
 EPIC-004 Recovery, annotation, reopen, and export:
-Core Domain, Storage, Service API, Python SDK, Desktop UI, Export, Docs.
+Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+Docs.
 
 EPIC-005 Migration ergonomics and future lab scaling:
-Python SDK, Desktop UI, Docs, then later Service API, CLI, and Export as
-migration helpers mature.
+Python SDK, Desktop, Docs, then later Local runtime/API, CLI, and
+Storage/export as migration helpers mature.
 
 ## Rule
 

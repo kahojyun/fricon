@@ -85,9 +85,9 @@ ceremony should be justified by one of these user-visible benefits:
   explain the run
 - reopening or exporting results through stable public APIs
 
-Boilerplate that exists only for transport, storage layout, service startup,
-local tokens, object graph construction, or future parameter machinery should
-stay out of first-contact examples.
+Boilerplate that exists only for transport, storage layout, local runtime
+startup, local tokens, object graph construction, or future parameter machinery
+should stay out of first-contact examples.
 
 ## Illustrative Sketches
 
@@ -155,7 +155,7 @@ Do not settle these in this guideline:
   mechanics
 - code snapshot format, environment capture details, stdout/stderr handling, or
   managed-run lifecycle protocol
-- dataset-writer object model, storage layout, service transport, or local
+- dataset-writer object model, storage layout, runtime transport, or local
   token mechanics
 - full scan-schema representation beyond the need for concise scan-plan UX and
   a raw escape hatch

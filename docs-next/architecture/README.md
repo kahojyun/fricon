@@ -36,8 +36,8 @@ architecture unless an ADR accepts them.
 Answer these only after the relevant product and domain baseline is accepted or
 explicitly marked with open interview questions:
 
-- local service/process model and client discovery
-- service API transport and protocol shape
+- local runtime/process model and client discovery
+- local runtime/API transport and protocol shape
 - binary dataset payload format and chunking
 - storage layout, schema, migrations, and checkpoints
 - event/audit record schema

@@ -23,7 +23,7 @@ Constraints:
 - may work on locked-down or offline machines
 - may pin Python environments with `uv.lock`, virtual environments, or lab
   setup scripts
-- may not update Desktop, service, CLI, and Python SDK together
+- may not update Desktop, local runtime, CLI, and Python SDK together
 
 ## P-002 Lab Maintainer
 

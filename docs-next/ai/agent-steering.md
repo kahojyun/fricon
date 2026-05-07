@@ -41,7 +41,7 @@ Pause local implementation and update docs when:
 - Which capability IDs and story IDs does this work support?
 - Which domain concepts does it touch?
 - Which module owns each concept?
-- What data-library, service API, Python SDK, Desktop, CLI, and export effects
-  exist?
+- What data-library, local runtime/API, Python SDK, Desktop, CLI, and export
+  effects exist?
 - What compatibility checks or migrations are needed?
 - What validation proves the behavior?

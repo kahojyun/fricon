@@ -8,14 +8,14 @@ Accepted.
 
 An experimentalist can install Fricon, create or open one local data library,
 and run Python scripts against it without assembling mismatched Desktop, CLI,
-service, and SDK pieces.
+Python SDK, and local runtime pieces.
 
 ## MVP Scope
 
-- Coherent local Fricon release for Desktop, bundled service, bundled CLI, and
-  Python SDK compatibility.
+- Coherent local Fricon release for Desktop, CLI, Python SDK, and required
+  local runtime components.
 - First-run data-library location choice and durable library identity.
-- Guided diagnostics for service, library, and version mismatch problems.
+- Guided diagnostics for local runtime, library, and version mismatch problems.
 - Basic backup/restore and fail-before-write compatibility checks.
 
 ## Not MVP

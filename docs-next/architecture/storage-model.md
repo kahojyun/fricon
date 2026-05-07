@@ -8,7 +8,7 @@ Deferred. Requires domain acceptance and ADRs before implementation.
 
 The domain model owns logical concepts such as `DataLibrary`, `Sample`,
 `SampleSession`, `Measurement`, `DatasetArtifact`, `AttachmentArtifact`,
-provenance summaries, lifecycle events, and operator or service actors.
+provenance summaries, lifecycle events, and operator or system actors.
 
 Those concepts are not yet storage tables, files, payload groups, manifests, or
 indexes.

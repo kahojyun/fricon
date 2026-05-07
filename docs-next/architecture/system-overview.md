@@ -18,17 +18,17 @@ Product docs currently establish these surfaces and constraints:
 - measurement-first UX with first-class dataset artifact discovery
 - nonblocking live inspection
 
-This is not yet a container model, process model, deployment view, or service
+This is not yet a container model, process model, deployment view, or runtime
 contract.
 
 ## Deferred System Questions
 
-- Is the local Fricon service a required long-lived process, an on-demand local
-  authority, or a packaging/runtime detail?
+- Is the local Fricon runtime a required long-lived service, an on-demand local
+  authority, an embedded component, or a packaging/runtime detail?
 - How do Desktop, Python SDK, and CLI discover and authenticate with the local
   authority?
 - Which responsibilities belong to Desktop shell, browser-capable frontend,
-  Python bindings, CLI, local service, and storage adapters?
+  Python bindings, CLI, local runtime, and storage adapters?
 - Which parts of v0.1 infrastructure should be adapted after the product/domain
   reset?
 - Which diagrams are useful once architecture work starts: C4 system context,
@@ -56,7 +56,7 @@ High redesign risk:
 - desktop dataset-first navigation
 - IPC/protobuf public contract assumptions
 - archive/import/export formats
-- setup/update/service compatibility assumptions
+- setup/update/local-runtime compatibility assumptions
 
 Do not promote reuse candidates into accepted architecture without an ADR or
 implementation-slice design derived from accepted upstream docs.

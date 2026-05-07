@@ -40,12 +40,12 @@ CAP-001: Local data library.
 
 CAP-002: Install and launch local Fricon.
 
-- Promise: Desktop, bundled service, bundled CLI, and Python SDK are delivered
-  as one coherent local product.
-- Includes: first-run setup, local service startup/connection, and headless
-  Python use when Desktop is closed.
-- Excludes: polished enterprise deployment and third-party service protocol
-  stability.
+- Promise: Desktop, CLI, Python SDK, and required local Fricon runtime
+  components are delivered as one coherent local product.
+- Includes: first-run setup, local runtime startup/connection diagnostics, and
+  headless Python use when Desktop is closed.
+- Excludes: polished enterprise deployment and third-party protocol stability.
+  Exact runtime/process packaging belongs to architecture.
 
 CAP-012: Backup, restore, and migration checkpoints.
 
@@ -57,10 +57,10 @@ CAP-012: Backup, restore, and migration checkpoints.
 
 CAP-013: Compatibility diagnostics and fail-before-write checks.
 
-- Promise: incompatible client, service, or library combinations fail before
-  mutation with actionable diagnostics.
-- Includes: version negotiation for Desktop, service, CLI, Python SDK, and data
-  library format.
+- Promise: incompatible client, local runtime, or library combinations fail
+  before mutation with actionable diagnostics.
+- Includes: version negotiation for Desktop, local runtime components, CLI,
+  Python SDK, and data library format.
 - Excludes: accepting best-effort writes from unknown or stale clients.
 
 ### MVP Measurement Replacement
