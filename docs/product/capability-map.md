@@ -221,7 +221,7 @@ CAP-022: Analysis, interpretation, and calibration records.
   generated artifacts, fitted values, and affected parameter paths.
 - Boundary: the MVP may export analysis-ready data but does not manage
   calibration promotion. Detailed calibration workflow semantics belong in the
-  future backlog and domain invariants.
+  future backlog.
 
 CAP-023: Managed code snapshots and execution.
 

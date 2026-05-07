@@ -7,17 +7,16 @@ Deferred.
 ## Purpose
 
 Avoid creating a large story-by-module table while the project is still in
-product and initial domain analysis. This file records only likely downstream
+product analysis. This file records only likely downstream
 implementation concerns so future planning can derive traceability after
-product, domain, architecture, and required ADR inputs are accepted.
+product, architecture, and required ADR inputs are accepted.
 
 Do not treat this file as an accepted Rust module map, frontend feature map,
 storage/API design, or task/file traceability matrix.
 
 ## Concern Legend
 
-- Product/domain model: accepted concepts, lifecycles, invariants, and context
-  ownership.
+- Product model: accepted concepts, lifecycles, and context ownership.
 - Local runtime/API: future architecture for mutation gates, compatibility,
   events, and client access.
 - Storage/export: future architecture for catalog, payloads, migrations,
@@ -32,19 +31,19 @@ storage/API design, or task/file traceability matrix.
 ## Epic Routing
 
 EPIC-001 Local setup and data-library adoption:
-Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+Product model, Local runtime/API, Storage/export, Python SDK, Desktop,
 CLI, Docs.
 
 EPIC-002 New measurement logging replacement:
-Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+Product model, Local runtime/API, Storage/export, Python SDK, Desktop,
 Docs.
 
 EPIC-003 Measurement console and inspection:
-Product/domain model, Local runtime/API, Python SDK for reopen snippets,
+Product model, Local runtime/API, Python SDK for reopen snippets,
 Desktop, Docs.
 
 EPIC-004 Recovery, annotation, reopen, and export:
-Product/domain model, Local runtime/API, Storage/export, Python SDK, Desktop,
+Product model, Local runtime/API, Storage/export, Python SDK, Desktop,
 Docs.
 
 EPIC-005 Migration ergonomics and future lab scaling:

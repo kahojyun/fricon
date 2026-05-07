@@ -25,7 +25,7 @@ make device control, sample visualization, or AI the product center by itself.
 ## Promotion Rule
 
 A future concept can move into implementation only after it has a clear story,
-domain owner, ADR if needed, and does not make the core measurement loop harder
+product owner, ADR if needed, and does not make the core measurement loop harder
 to use.
 
 The priority order is a planning default, not a release-number commitment. A

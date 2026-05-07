@@ -45,8 +45,8 @@ Detailed authoring and ID-allocation workflow is maintained in
 
 - Do not implement major v0.2 features from chat history or archived proposals
   alone.
-- New domain vocabulary must update domain docs before or with implementation.
-- Specs must trace to capabilities, stories, domain concepts, architecture
+- New product terminology must update product docs before or with implementation.
+- Specs must trace to capabilities, stories, product concepts, architecture
   docs, ADRs, modules, tests, compatibility, and non-goals.
 - Superseded planning material should be folded into the owning product,
   domain, ADR, or user-documentation plan, then removed.

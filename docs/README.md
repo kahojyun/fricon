@@ -7,8 +7,8 @@ Active v0.2+ documentation baseline.
 ## Purpose
 
 `docs/` is the single documentation directory for the v0.2+ reset. It owns
-the active product, domain, architecture, ADR, research, user-documentation
-planning, and AI-agent guidance baseline.
+the active product, domain status, architecture, ADR, research,
+user-documentation planning, and AI-agent guidance baseline.
 
 ## Design Stance
 
@@ -27,8 +27,8 @@ features may still ship on the same compatible release line.
 
 This directory is currently the primary work surface. Keep discussion changes
 lightweight. Do not add implementation scaffolding, package locks, generated
-artifacts, or release automation until the accepted product, domain,
-architecture, and ADR baseline calls for them.
+artifacts, or release automation until the accepted product baseline and
+required downstream architecture or ADR inputs call for them.
 
 ## Scale Classification
 
@@ -92,14 +92,14 @@ Keep each idea in the narrowest durable owner:
 - `product/glossary.md` owns public and future terminology.
 - `domain/README.md` owns the current domain-layer status.
 - `architecture/README.md` owns accepted architecture constraints while the
-  project is still in product/domain analysis. Detailed API, storage, module,
+  project is still in product analysis. Detailed API, storage, module,
   runtime, and export shape remains deferred until later ADRs/specs.
 - When active, `specs/` own implementation-slice requirements, design, tasks,
   traceability, and validation derived from upstream sources. They are currently
   sentinels only.
-- While product, domain, architecture, or required ADR boundaries are still
+- While product, architecture, or required ADR boundaries are still
   unsettled, `specs/` and `implementation-plans/` must remain sentinel-only:
-  do not let them introduce product scope, domain vocabulary, or architecture
+  do not let them introduce product scope, product terminology, or architecture
   decisions that are not already owned upstream.
 - `ai/` owns agent routing and update policy, not product or domain rationale.
 

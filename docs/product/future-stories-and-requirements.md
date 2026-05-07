@@ -10,7 +10,7 @@ Capture candidate post-MVP user stories and product requirements before they
 become accepted product scope.
 
 These items are intentionally outside the accepted MVP. They exist so MVP
-storage, domain, and API choices do not block likely future needs.
+storage, product-model, and API choices do not block likely future needs.
 
 This file uses priority horizons, not semantic-version labels. A compatible
 feature can still ship on the same release line as the MVP if the relevant

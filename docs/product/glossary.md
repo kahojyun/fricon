@@ -86,7 +86,7 @@ Accepted.
 - Measurement Outcome: lightweight interpretation or trust decision attached to
   a measurement, such as accepted, questionable, invalidated, or repeat-needed.
   It is not a full electronic lab notebook entry.
-- Calibration: Fricon's accepted domain term for quantum-experiment parameter
+- Calibration: Fricon's accepted product term for quantum-experiment parameter
   calibration unless qualified otherwise. It means measurement plus analysis or
   fit that estimates better sample, qubit, gate, pulse, readout, or analysis
   parameters. It does not mean device desired-state apply/readback by default.
