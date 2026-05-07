@@ -29,6 +29,9 @@ Detailed post-MVP priority and acceptance details live in
 - User-written import helpers for old data when generic APIs mature.
 - Read-only LAN viewing.
 - Measurement-code source setup and approved code update flows.
+- Approved code releases, setup profiles, environment lock files,
+  scan-schema helpers, measurement templates, plot presets, export recipes,
+  and maintainer handoff for local code changes.
 - Managed code/source provenance for measurement, analysis, and calibration.
 - Rich sample maps, saved views, comparison, and context correction UX.
 - Parameter profiles, effective snapshots, diffs, proposals, and reviewed

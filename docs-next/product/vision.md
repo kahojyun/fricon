@@ -165,6 +165,36 @@ To meet the MVP goal, the MVP should include:
 - backup/restore and migration checkpoints
 - coherent install/update compatibility and guided setup diagnostics
 
+## Product Pressure Checks
+
+The old planning notes preserve several concrete user pressures. Keep them at
+product level until architecture or spec work starts:
+
+- Lab computers are often Windows, offline, locked down, or updated on a lab
+  schedule. Fricon should make install, launch, update, and recovery feel like
+  one coherent local product, not a set of separately assembled services and
+  packages.
+- Setup diagnostics should help users distinguish stopped local runtime
+  components, wrong library, locked library, old SDK, incompatible components,
+  migration-required state, and unsafe update timing before they read logs.
+- Export is an analysis workflow, not an archive dump. A user should be able to
+  open a measurement bundle directly from Python, inspect a simple manifest or
+  index preview, and choose whether sensitive paths, code, environment, setup,
+  or sample details are included.
+- Dataset artifact semantics should be checked against real measurement shapes,
+  including adaptive or instrument-tuned traces where each trace may have its
+  own coordinate values, settings, and length.
+- Live inspection should support repeated lab monitoring behavior without
+  becoming part of the write acknowledgement path. Users may need to watch
+  multiple measurements or views at once while acquisition keeps running.
+- Measurement-code and run-configuration ideas should stay focused on the user
+  pain of copied folders, mutable local files, setup sidecars, scan helpers,
+  plot presets, and export recipes. The MVP records honest context; approved
+  code update and managed execution remain post-MVP.
+- Mutating actions should be attributable enough for local lab history, but the
+  MVP must not turn this into accounts, roles, permissions, or remote
+  collaboration.
+
 ## Post-MVP Direction
 
 At the vision level, post-MVP work should extend the MVP facts into three user

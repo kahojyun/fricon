@@ -17,12 +17,16 @@ Python SDK, and local runtime pieces.
 - First-run data-library location choice and durable library identity.
 - Guided diagnostics for local runtime, library, and version mismatch problems.
 - Basic backup/restore and fail-before-write compatibility checks.
+- Product support for common lab-computer constraints, including Windows,
+  offline or locked-down environments, pinned Python environments, and
+  slow-to-update setups.
 
 ## Not MVP
 
 - Hosted service, multi-user administration, or direct shared-folder database
   access.
 - Full auto-update polish or third-party protocol stability.
+- Full enterprise deployment management.
 
 ## Key Stories
 

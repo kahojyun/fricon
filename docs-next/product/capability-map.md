@@ -46,9 +46,12 @@ CAP-002: Install and launch local Fricon.
 - Promise: Desktop, CLI, Python SDK, and required local Fricon runtime
   components are delivered as one coherent local product.
 - Includes: first-run setup, local runtime startup/connection diagnostics, and
-  headless Python use when Desktop is closed.
-- Excludes: polished enterprise deployment and third-party protocol stability.
-  Exact runtime/process packaging belongs to architecture.
+  headless Python use when Desktop is closed. Product analysis should account
+  for Windows lab PCs, locked-down/offline computers, and slow lab update
+  cycles.
+- Excludes: polished enterprise deployment, exact installer mechanics, and
+  third-party protocol stability. Exact runtime/process packaging belongs to
+  later architecture.
 
 CAP-003: Python measurement recording.
 
@@ -89,7 +92,8 @@ CAP-007: Nonblocking live inspection.
 - Promise: Desktop can watch active data without slowing or breaking acquisition
   writes.
 - Includes: live events, table view, line/scatter plot, basic heatmap, simple
-  trace inspection, and stale/lag indicators.
+  trace inspection, stale/lag indicators, and product support for watching
+  multiple relevant measurement or data views at once.
 - Excludes: live consumers as required write acknowledgements.
 
 CAP-008: Lifecycle and readable partial recovery.
@@ -120,7 +124,9 @@ CAP-011: Measurement-centered export.
 - Promise: a completed or interrupted measurement can become a portable bundle
   for offline analysis.
 - Includes: produced datasets, semantic metadata, selected provenance,
-  integrity metadata, and common analysis-oriented output paths.
+  integrity metadata, simple manifest or index preview, direct Python reading,
+  privacy-aware provenance selection, and common analysis-oriented output
+  paths.
 - Excludes: importing old history and a fully polished offline Desktop viewer
   before the write/reopen loop is proven.
 
@@ -137,7 +143,9 @@ CAP-013: Compatibility diagnostics and fail-before-write checks.
 - Promise: incompatible client, local runtime, or library combinations fail
   before mutation with actionable diagnostics.
 - Includes: version negotiation for Desktop, local runtime components, CLI,
-  Python SDK, and data library format.
+  Python SDK, and data library format; diagnostics for stopped runtime
+  components, wrong library, locked library, old SDK, incompatible components,
+  migration-required state, and unsafe update timing.
 - Excludes: accepting best-effort writes from unknown or stale clients.
 
 CAP-014: Honest code provenance summary.
@@ -191,6 +199,9 @@ CAP-020: Measurement-code source setup and approved code update flows.
 - Intent: help labs manage code source locations and reviewed updates for
   measurement scripts, replacing copied working folders as the normal
   explanation for where run, analysis, and calibration code came from.
+- Includes later product pressure from approved releases, setup profiles,
+  environment lock files, scan-schema helpers, measurement templates, plot
+  presets, export recipes, and maintainer handoff for local changes.
 - Boundary: the MVP records honest provenance but does not own code deployment.
   Scheduler or managed-execution behavior belongs to later capabilities.
 

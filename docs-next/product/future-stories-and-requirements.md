@@ -207,6 +207,9 @@ FUS-005: Configure a measurement code source.
   folders as the only code provenance story.
 - Success: source location, selected revision, environment file, and local
   checkout status are visible before a managed run.
+- Success: approved releases, setup profiles, scan-schema helpers,
+  measurement templates, plot presets, export recipes, and local-change handoff
+  can be associated with the code source when those concepts mature.
 - Success: code-source setup can replace copied working folders as the normal
   explanation for where measurement code came from.
 

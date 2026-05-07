@@ -15,6 +15,8 @@ actions.
 - Measurement-first console.
 - Active and recent measurement list.
 - Live table, line/scatter, basic heatmap, and simple trace inspection.
+- Ability to keep multiple relevant measurement, table, plot, or trace views
+  visible while acquisition continues.
 - Dataset direct-open entry points.
 - Favorites, notes, lifecycle flags, and basic search shortcuts.
 

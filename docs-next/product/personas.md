@@ -13,6 +13,8 @@ Needs:
 
 - low-boilerplate Python recording
 - live feedback while a measurement is running
+- the ability to monitor more than one live measurement or view without
+  disturbing acquisition
 - reliable recovery from interrupted runs
 - easy reopening and export for later analysis
 - no requirement to understand Rust, IPC, storage layout, or database internals
@@ -24,6 +26,8 @@ Constraints:
 - may pin Python environments with `uv.lock`, virtual environments, or lab
   setup scripts
 - may not update Desktop, local runtime, CLI, and Python SDK together
+- may need Fricon to fail safely during long-running measurements, exports, or
+  local maintenance work
 
 ## P-002 Lab Maintainer
 
@@ -37,6 +41,11 @@ Needs:
   environment, and later measurement-code management
 - support for sharing approved measurement code without copying random folders
 - exportable support bundles that are local and redacted by default
+- setup/update guidance that works for offline, locked-down, or slow-to-update
+  lab computers
+- user-facing diagnostics before raw logs, especially for stopped runtime
+  components, locked libraries, stale SDKs, incompatible versions, and
+  migration-required states
 
 ## P-003 Analyst
 
@@ -47,8 +56,11 @@ Needs:
 
 - stable IDs and Python reopen snippets
 - direct read access to export bundles
+- simple manifest or index previews in exported bundles
 - metadata and units preserved well enough to understand the data away from the
   acquisition computer
+- privacy-aware export choices for local paths, code provenance, environment
+  summaries, setup details, and sample context
 
 ## P-004 Future Automation Author
 
@@ -60,3 +72,5 @@ Needs:
 - explicit measurement, artifact, parameter, code, and event boundaries
 - audit records for accepted/rejected mutating actions
 - no hidden mutation of completed dataset facts
+- enough local actor attribution to explain who or what changed durable lab
+  state before any future permissions model exists

@@ -19,9 +19,13 @@ that I can decide whether a measurement is working.
 - Live views are noncritical consumers and cannot block writes.
 - Core views are table, line/scatter, basic heatmap, and simple trace
   inspection.
+- Users can keep more than one relevant measurement, table, plot, or trace view
+  visible while acquisition continues.
 - Users can open produced datasets directly when needed.
 - Failed, interrupted, or partial runs are visibly different from completed
   runs.
+- Stale, lagging, or disconnected live views are visible as inspection state,
+  not as write failures.
 
 ## Not In Scope
 

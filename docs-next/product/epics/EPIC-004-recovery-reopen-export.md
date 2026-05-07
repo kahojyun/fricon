@@ -15,6 +15,9 @@ reopen data from Python, and export a measurement for offline analysis.
 - Trash/recover instead of normal hard delete.
 - Python reopen snippets using stable IDs.
 - Measurement-centered read-only export bundles.
+- Direct Python reading of exported bundles without importing into another
+  editable library.
+- Human-readable export manifest or index preview.
 - Privacy preview for sensitive provenance in exports.
 
 ## Not MVP

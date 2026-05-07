@@ -170,6 +170,9 @@ FC-003: Measurement-code source setup.
 
 - Intent: replace copied-code folders with approved-code update flows, local
   checkout/environment guidance, and no central Fricon server.
+- Product pressure: labs may need approved releases, setup profiles,
+  environment lock files, scan-schema helpers, measurement templates, plot
+  presets, export recipes, and maintainer handoff for local changes.
 - Boundary: this manages provenance setup before moving into managed execution.
 
 FC-004: Parameter profiles and run-bound snapshots.

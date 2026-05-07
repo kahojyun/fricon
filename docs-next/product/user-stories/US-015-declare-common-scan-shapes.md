@@ -24,6 +24,9 @@ semantics without making every script write raw schema by hand.
   feedback, not only by borrowed framework API names.
 - Schema can represent regular grids, partial grids, irregular/adaptive points,
   repeated points, and missing expected points where meaningful.
+- Variable-length trace scenarios preserve each trace's own coordinate values,
+  measured values, and per-trace settings instead of forcing padding,
+  resampling, or a fake shared grid at write time.
 - Advanced users can use raw schema when scan-plan helpers are too narrow.
 - Live and historical plots rely on schema semantics instead of column order
   guesses.

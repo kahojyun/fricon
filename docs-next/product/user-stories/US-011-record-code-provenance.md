@@ -22,6 +22,9 @@ trustworthiness without pretending Fricon managed execution.
   be recorded where available.
 - Copied-folder workflows can record a source-root path, folder fingerprint, or
   user-supplied source label without implying managed code history.
+- The product model leaves room for approved code releases, setup profiles,
+  environment lock files, scan helpers, plot presets, export recipes, and
+  maintainer handoff without making them MVP code-management features.
 - Provenance can be previewed or omitted during export when it contains
   sensitive local details.
 - Corrections to provenance are visible as events.
