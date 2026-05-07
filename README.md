@@ -9,13 +9,6 @@ The active documentation baseline is [docs/](docs/). It owns the
 v0.2+ clean-reset product, domain, architecture, ADR, research, and agent
 context.
 
-Legacy public and developer documentation content has been merged or retired.
-Treat old workspace/dataset-first behavior as prototype history unless a
-current `docs/` document says otherwise.
-
-The pre-v0.2 implementation has been removed from this branch. Use the
-`archive/v0.1` branch for historical code reference.
-
 ## Overview
 
 Fricon v0.2 is being redesigned around:

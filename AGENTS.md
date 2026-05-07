@@ -4,8 +4,7 @@
 
 - `docs/` is the single active documentation directory for the v0.2+
   clean reset.
-- The pre-v0.2 implementation has been removed from this branch. Use the
-  `archive/v0.1` branch only as historical reference when explicitly needed.
+- Use `archive/v0.1` only when historical code reference is explicitly needed.
 - `README.md` and this file are lightweight repository scaffolding for the
   planning workspace.
 
@@ -14,9 +13,10 @@
 - Current phase: product analysis and early domain analysis for the v0.2+
   reset. Keep changes focused on `docs/` unless the user explicitly asks
   for repository-structure cleanup.
-- Do not infer v0.2 architecture from the removed v0.1 crates, local skills,
-  scripts, package configs, or module boundaries. Recreate implementation
-  guidance later from accepted product, domain, architecture, and ADR inputs.
+- Do not infer v0.2 architecture from prior implementation scaffolding, local
+  skills, scripts, package configs, or module boundaries. Recreate
+  implementation guidance later from accepted product, domain, architecture,
+  and ADR inputs.
 - Do not install dependencies, regenerate artifacts, or run Rust/Python/Node
   implementation checks for docs-only work.
 - Use `docs/README.md` as the documentation entry point. For agent routing

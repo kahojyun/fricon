@@ -70,4 +70,5 @@ Mark stale documents explicitly:
 - `Deprecated` when retained for history but not guiding new work
 - `Draft` when exploratory
 
-Do not silently delete old planning material unless the user asks for cleanup.
+Do not silently delete superseded planning material unless the user asks for
+cleanup.

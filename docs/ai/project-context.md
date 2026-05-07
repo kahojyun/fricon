@@ -21,10 +21,6 @@ right now. Recreate or read downstream artifacts only when implementation
 planning is the task and the relevant upstream baseline is accepted or
 explicitly marked with open interview questions.
 
-Legacy public and developer documentation content has been merged or retired.
-The pre-v0.2 implementation has been removed from this branch and remains on
-`archive/v0.1` for historical reference. Use `docs/` for v0.2+ direction.
-
 ## Product Direction
 
 Fricon is a local lab data library for scientific measurement work.
@@ -49,7 +45,7 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 
 ## Hard Boundaries
 
-- Do not preserve v0.1 compatibility by default.
+- Do not preserve prior workspace/dataset compatibility by default.
 - Do not make datasets own measurement, sample, parameter, code, or lifecycle
   meaning.
 - Do not make Desktop the durable data backend.

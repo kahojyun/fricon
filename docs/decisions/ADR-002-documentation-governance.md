@@ -13,8 +13,7 @@ domain model.
 
 ## Decision
 
-Use `docs/` as the v0.2+ documentation baseline with these artifact
-classes:
+Use the documentation tree as the v0.2+ baseline with these artifact classes:
 
 - product: vision, personas, capability map, story map, glossary, traceability
 - domain: conceptual model, context map, lifecycle, invariants
@@ -49,10 +48,8 @@ Detailed authoring and ID-allocation workflow is maintained in
 - New domain vocabulary must update domain docs before or with implementation.
 - Specs must trace to capabilities, stories, domain concepts, architecture
   docs, ADRs, modules, tests, compatibility, and non-goals.
-- Historical documents may be deleted after useful product and domain ideas are
-  merged into the accepted baseline. If a historical idea is not worth
-  preserving as product direction, domain boundary, ADR pressure, or user-doc
-  plan, prefer deletion over permanent archival.
+- Superseded planning material should be folded into the owning product,
+  domain, ADR, or user-documentation plan, then removed.
 
 ## Alternatives Considered
 

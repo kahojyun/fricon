@@ -10,22 +10,14 @@ Active v0.2+ documentation baseline.
 the active product, domain, architecture, ADR, research, user-documentation
 planning, and AI-agent guidance baseline.
 
-Legacy public and developer documentation content has been merged or retired.
-Do not use old workspace/dataset-first public docs, historical proposal notes,
-or current v0.1 implementation notes as v0.2+ source material unless a current
-`docs/` document explicitly reintroduces the idea.
-
-The pre-v0.2 implementation has been removed from this branch and remains
-available on `archive/v0.1` for historical reference.
-
 ## Design Stance
 
-Fricon v0.2 is a clean reset from the workspace/dataset-first prototype toward
+Fricon v0.2 is a clean reset toward
 a local lab data library for scientific measurement work.
 
 The reset keeps useful infrastructure where it fits, but it does not preserve
-v0.1 workspace, storage, API, IPC, or desktop navigation compatibility when
-that compatibility would keep the wrong user model alive.
+workspace-first storage, API, IPC, or desktop navigation compatibility when
+that compatibility would keep the wrong product model alive.
 
 Product planning in this directory uses MVP, post-MVP priority, and ADR-gated
 labels. Do not treat post-MVP priorities as semantic-version labels; compatible
@@ -34,18 +26,9 @@ features may still ship on the same compatible release line.
 ## Workflow Stance
 
 This directory is currently the primary work surface. Keep discussion changes
-lightweight: do not run full Rust, Python, frontend, release, or docs-deploy
-automation for `docs/`-only edits unless a task explicitly asks for it.
-Repository automation such as implementation CI, dependency updates, release
-publishing, and docs deployment is intentionally paused while the v0.2+
-baseline is being discussed. Basic text and config hygiene remains available
-through the `prek`-compatible `.pre-commit-config.yaml`, but it should not run
-dependency updates, generated-artifact checks, language builds, or test gates.
-
-Project-specific implementation-era local skills, crate-local agent rules,
-package locks, setup scripts, and release automation configs should not steer
-v0.2 planning. Recreate them later only from accepted product, domain,
-architecture, and ADR inputs.
+lightweight. Do not add implementation scaffolding, package locks, generated
+artifacts, or release automation until the accepted product, domain,
+architecture, and ADR baseline calls for them.
 
 ## Scale Classification
 
@@ -123,17 +106,7 @@ Keep each idea in the narrowest durable owner:
 - `ai/` owns agent routing and update policy, not product or domain rationale.
 
 Detailed editing rules live in `ai/documentation-update-policy.md`; load that
-file only when authoring or reorganizing `docs/` documents.
-
-## Source Inputs
-
-This baseline was bootstrapped from legacy repository notes that have now been
-merged or retired, including the old public docs, developer notes, current
-implementation notes, v0.2 planning files, and archived proposal inputs.
-
-The current `docs/` content is the retained result. If an old proposal
-from external history or chat conflicts with this baseline, prefer this
-baseline for v0.2+ planning unless a newer ADR says otherwise.
+file only when authoring or reorganizing documentation.
 
 ## Token-Efficient Documentation
 

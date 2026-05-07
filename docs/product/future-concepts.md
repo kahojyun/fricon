@@ -291,9 +291,3 @@ FC-019: Desired-state setup/device planning.
 - How visualizers declare the parameter snapshot schema they expect.
 - How Fricon reports, disables, migrates, or versions visualizers when a
   parameter snapshot schema changes.
-
-## Historical Inputs
-
-Legacy future-concept and archived proposal notes were merged into this ledger
-or retired. If historical notes from external history or chat conflict with
-accepted `docs/` documents, the accepted `docs/` document wins.

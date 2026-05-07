@@ -167,8 +167,8 @@ To meet the MVP goal, the MVP should include:
 
 ## Product Pressure Checks
 
-The old planning notes preserve several concrete user pressures. Keep them at
-product level until architecture or spec work starts:
+Keep these concrete user pressures at product level until architecture or spec
+work starts:
 
 - Lab computers are often Windows, offline, locked down, or updated on a lab
   schedule. Fricon should make install, launch, update, and recovery feel like

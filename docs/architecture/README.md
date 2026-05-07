@@ -6,10 +6,10 @@ Pre-architecture placeholder.
 
 ## Purpose
 
-`docs/architecture/` is not the active design surface yet. Product and
-initial domain analysis are still upstream of architecture. Until those inputs
-are accepted, this directory should only preserve already accepted constraints
-and collect questions for later ADRs or specs.
+Architecture is not the active design surface yet. Product and initial domain
+analysis are still upstream. Until those inputs are accepted, this directory
+should only preserve accepted constraints and collect questions for later ADRs
+or specs.
 
 Do not treat transport choices, storage shape, module names, Python API syntax,
 runtime flows, or export format details in this directory as accepted

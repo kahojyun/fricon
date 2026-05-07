@@ -29,8 +29,8 @@ shape the v0.2+ reset.
   samples, sessions, parameters, code provenance, or lifecycle history.
 - Compatibility notes focused on preserving current workspaces before the
   project had real adoption or a stable domain model.
-- v0.2 planning, archived proposals, AI process notes, and current
-  implementation facts accumulated in the same developer-documentation space.
+- v0.2 planning, archived proposals, AI process notes, and implementation
+  facts accumulated in the same planning space.
 - The desktop UI was naturally organized as a dataset explorer instead of a
   measurement console.
 - Protocol and service boundaries were shaped around current IPC/gRPC needs,
@@ -69,7 +69,7 @@ After v0.2 records real lab data, the compatibility promise changes:
 ## Lessons For Future Agents
 
 - Do not implement from archived proposal files directly.
-- Do not treat current v0.1 public docs as v0.2 product direction.
+- Do not treat prototype-facing material as v0.2 product direction.
 - Do not put measurement, sample, parameter, code, or lifecycle meaning into
   dataset-local metadata for convenience.
 - Do not add future runner, device, calibration, or AI automation surfaces

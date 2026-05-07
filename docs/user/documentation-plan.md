@@ -6,9 +6,7 @@ Draft. Do not publish as current behavior.
 
 ## Purpose
 
-Plan future user-facing documentation after v0.2 behavior lands. Legacy public
-docs were removed because they described the retired v0.1 workspace/dataset
-model.
+Plan future user-facing documentation after v0.2 behavior lands.
 
 ## Future Diataxis Split
 

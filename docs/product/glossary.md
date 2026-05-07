@@ -127,9 +127,6 @@ Accepted.
 
 ## Avoid As Primary MVP User Terms
 
-- Workspace: v0.1 user-facing term. In the clean-reset product model, keep only
-  as historical or internal implementation wording unless an ADR says
-  otherwise.
 - ActivityRun: internal shared pattern for measurement, analysis, import,
   simulation, and calibration work.
 - Stream: internal or advanced substructure for grouped payloads such as
