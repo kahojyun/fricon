@@ -32,7 +32,9 @@ The priority order is a planning default, not a release-number commitment. A
 lower-priority item can move earlier only when it is small, compatible, and does
 not weaken the higher-priority product model.
 
-## Priority 1: Parameter System
+## Priority Index
+
+### Priority 1: Parameter System
 
 Why first:
 
@@ -46,12 +48,7 @@ Why first:
 - Managed runs and automation workflows need a parameter model to avoid
   recording only half of the experiment record.
 
-Included concepts:
-
-- FC-004: Parameter profiles, immutable run-bound snapshot binding, history,
-  proposals, diff views, and table row keys usable as lightweight target keys.
-- FC-014: Measurement history and compare views generated from captured
-  parameter, setup, lifecycle, code, and artifact facts.
+Included concepts: FC-004, FC-014.
 
 Boundary:
 
@@ -61,16 +58,16 @@ Boundary:
 - Use lightweight proposals with actor, reason, approval history, before/after
   diffs, source evidence, and rollback target where practical.
 - Treat calibration-derived values as proposed parameter changes first. A
-  calibration can produce evidence, fitted values, and affected parameter
-  paths without directly mutating a durable named profile.
+  calibration can produce evidence, fitted values, and affected parameter paths
+  without directly mutating a durable named profile.
 - Treat sample target binding as a convention first: parameter table row keys
-  may be reused by visualization code and snapshot queries, but Fricon does
-  not need a mandatory sample-component ontology in the first parameter slice.
+  may be reused by visualization code and snapshot queries, but Fricon does not
+  need a mandatory sample-component ontology in the first parameter slice.
 - Do not require a full permissions system, strict global registry, or device
   write-back for the first parameter slice. A mandatory field-level confidence
   taxonomy is also deferred unless a concrete workflow proves it is needed.
 
-## Priority 2: Managed Run
+### Priority 2: Managed Run
 
 Why second:
 
@@ -84,16 +81,7 @@ Why second:
 - Managed run should grow from ordinary importable Python code, not from a
   separate experiment DSL.
 
-Included concepts:
-
-- FC-003: Measurement-code source setup that replaces copied-code folders with
-  approved-code update flows, local checkout/environment guidance, and no
-  central Fricon server.
-- FC-007: Managed code snapshots and opt-in managed run capture.
-- FC-014: Operator handoff and run history views generated from captured facts.
-- FC-017: Run manifest and investigation record linking parameter snapshot,
-  target keys, code/environment summary, lifecycle, logs, artifacts, and
-  failure/anomaly evidence.
+Included concepts: FC-003, FC-007, FC-014, FC-017.
 
 Boundary:
 
@@ -107,7 +95,7 @@ Boundary:
 - Queues, resource leases, retries, workflow DAGs, and resumable execution are
   later or ADR-gated.
 
-## Priority 3: Calibration Chains And Reviewable Automation
+### Priority 3: Calibration Chains And Reviewable Automation
 
 Why third:
 
@@ -127,20 +115,8 @@ Why third:
 - AI-assisted workflow is only acceptable after the audit and review model
   exists.
 
-Included concepts:
-
-- FC-005: Analysis records that consume artifacts and produce derived outputs.
-- FC-006: Calibration records with reviewable proposals.
-- FC-008: Device identity and managed communication.
-- FC-009: Managed measurement plans.
-- FC-015: Workflow preview layer for calibration, benchmark, and reviewed
-  automation flows.
-- FC-010: AI-assisted automation after the audit model exists.
-- FC-018: Routine recipes, reviewed replay, and batch compare for repetitive
-  work after parameter and run facts are trustworthy.
-- FC-019: Desired-state setup/device planning, reconciliation diffs, and
-  reviewed apply plans for routines where imperative nested loops are too
-  error-prone.
+Included concepts: FC-005, FC-006, FC-008, FC-009, FC-010, FC-015, FC-018,
+  FC-019.
 
 Boundary:
 
@@ -150,8 +126,8 @@ Boundary:
   provenance option for routines that can declare pure parameter-to-state
   functions and explicit hardware constraints.
 - Calibration workflows for sample/control parameters should first create
-  durable evidence, fitted values, health decisions, and promotion proposals.
-  A bootstrap calibration sequence should be able to continue through healthy
+  durable evidence, fitted values, health decisions, and promotion proposals. A
+  bootstrap calibration sequence should be able to continue through healthy
   substeps by updating a chain-scoped calibration working ref, without asking
   for approval at every small update. Publishing selected results to durable
   named profiles remains a separate promotion step.
@@ -160,30 +136,150 @@ Boundary:
 - Device write-back, resumable execution, and AI-assisted mutation need safety,
   readback, partial-failure, and audit ADRs.
 - Reconciliation must not assume device writes are commutative, idempotent, or
-  safe to parallelize. Apply plans need dependency, settling, readback,
-  timeout, and abort semantics before they can reach hardware.
+  safe to parallelize. Apply plans need dependency, settling, readback, timeout,
+  and abort semantics before they can reach hardware.
 - Read-only compare, triage, and preview workflows may arrive before
   mutation-capable automation if they reuse the same record and review model.
 - A broad workflow DAG engine is not the normal way to run ordinary
   measurements.
 
-## Supporting Or Lower-Priority Concepts
+### Supporting Or Lower-Priority Concepts
 
-- FC-001: Read-only LAN monitoring for viewing, browsing, and export without
-  remote writes.
-- FC-002: Rich sample fields, user-defined 2D sample-map configs/DSLs, sample
-  visualizers, and saved views. These may map parameter row keys or user labels
-  to visual regions and color/query parameter snapshots without owning sample
-  identity or sample geometry.
-- FC-011: Resumable execution checkpoints with a managed runner.
-- FC-012: External large asset references for detector files, images, and
-  waveforms.
-- FC-013: User-facing dataset streams, if internal stream support proves useful
-  enough to expose later.
-- FC-016: Applying stored parameter or setup state back to devices.
+Included concepts: FC-001, FC-002, FC-011, FC-012, FC-013, FC-016.
 
 Candidate post-MVP stories and requirements live in
 `product/future-stories-and-requirements.md`.
+
+## Future Concept Definitions
+
+FC-001: Read-only LAN monitoring.
+
+- Intent: support viewing, browsing, and export from trusted local-network
+  clients without remote writes.
+- Boundary: this remains outside the MVP data-writing loop.
+
+FC-002: Rich sample maps and saved views.
+
+- Intent: support rich sample fields, user-defined 2D sample-map configs/DSLs,
+  sample visualizers, and saved views.
+- Boundary: sample maps may use parameter row keys or user labels to visual
+  regions and color/query parameter snapshots, but they must not own sample
+  identity or sample geometry by default.
+
+FC-003: Measurement-code source setup.
+
+- Intent: replace copied-code folders with approved-code update flows, local
+  checkout/environment guidance, and no central Fricon server.
+- Boundary: this manages provenance setup before moving into managed execution.
+
+FC-004: Parameter profiles and run-bound snapshots.
+
+- Intent: introduce parameter profiles, immutable run-bound snapshot binding,
+  history, proposals, diff views, and table row keys usable as lightweight
+  target keys.
+- Boundary: start with a hybrid parameter tree and lightweight proposal flow,
+  not a mandatory global registry or device write-back system.
+
+FC-005: Analysis records.
+
+- Intent: represent analysis records that consume artifacts and produce derived
+  outputs.
+- Boundary: analysis records cite inputs and generated outputs without becoming
+  a full publication notebook.
+
+FC-006: Calibration records with reviewable proposals.
+
+- Intent: preserve calibration evidence, fitted values, affected parameter
+  paths, health decisions, and promotion proposals.
+- Boundary: calibration-derived values flow through reviewable proposals or
+  working refs before durable named profiles change.
+
+FC-007: Managed code snapshots and opt-in managed run capture.
+
+- Intent: capture managed code snapshots and run context when users opt in to a
+  higher-provenance SDK runner.
+- Boundary: ordinary interactive unmanaged Python remains valid and labeled.
+
+FC-008: Device identity and managed communication.
+
+- Intent: introduce explicit device identity and managed communication
+  boundaries.
+- Boundary: device write-back requires safety, readback, partial-failure, and
+  audit ADRs.
+
+FC-009: Managed measurement plans.
+
+- Intent: support managed measurement plans for routines that need more
+  structure than ordinary Python logging.
+- Boundary: plans must not make a broad workflow DAG the normal way to run
+  ordinary measurements.
+
+FC-010: AI-assisted automation.
+
+- Intent: allow AI-assisted workflow after the audit and review model exists.
+- Boundary: AI may propose or summarize, but mutation enters through reviewed
+  proposal paths.
+
+FC-011: Resumable execution checkpoints.
+
+- Intent: add resumable execution checkpoints with a managed runner.
+- Boundary: this is later or ADR-gated and should not complicate unmanaged MVP
+  recovery.
+
+FC-012: External large asset references.
+
+- Intent: reference detector files, images, waveforms, and other large external
+  assets.
+- Boundary: this avoids turning the MVP into a general media asset library.
+
+FC-013: User-facing dataset streams.
+
+- Intent: expose user-facing dataset streams if internal stream support proves
+  useful enough.
+- Boundary: streams should not pull the product back to a dataset-first model.
+
+FC-014: Experiment history, compare, and handoff.
+
+- Intent: generate measurement history, compare views, operator handoff, and
+  run history from captured parameter, setup, lifecycle, code, artifact, and
+  operator facts.
+- Boundary: views are generated from recorded facts and should expose missing
+  provenance instead of hiding it.
+
+FC-015: Workflow preview layer.
+
+- Intent: preview calibration, benchmark, and reviewed automation flows before
+  mutation.
+- Boundary: preview must classify intended reads, writes, generated records,
+  durable state changes, and ADR-gated device or OS/network effects.
+
+FC-016: Applying stored state back to devices.
+
+- Intent: apply stored parameter or setup state back to devices.
+- Boundary: apply behavior remains ADR-gated until safety, readback,
+  partial-failure, and audit behavior are accepted.
+
+FC-017: Run manifest and investigation record.
+
+- Intent: link parameter snapshot, target keys, code/environment summary,
+  lifecycle, logs, artifacts, diagnostics, previous-good baselines, and
+  failure/anomaly evidence.
+- Boundary: the manifest is a composite view over available facts, not a
+  duplicate owner of parameter, code, setup, analysis, or artifact records.
+
+FC-018: Routine recipes, reviewed replay, and batch compare.
+
+- Intent: support repetitive work after parameter and run facts are trustworthy.
+- Boundary: read-only batch compare or triage can arrive before
+  mutation-capable automation; durable mutation requires reviewed proposal and
+  audit semantics.
+
+FC-019: Desired-state setup/device planning.
+
+- Intent: support setup/device planning, reconciliation diffs, and reviewed
+  apply plans for routines where imperative nested loops are too error-prone.
+- Boundary: reconciliation must not assume device writes are commutative,
+  idempotent, or safe to parallelize.
 
 ## Deferred Discussion Topics
 
