@@ -4,7 +4,8 @@
 
 - `docs/` is the single active documentation directory for the v0.2+
   clean reset.
-- Use `archive/v0.1` only when historical code reference is explicitly needed.
+- Use the `archive/v0.1` branch only when historical code reference is
+  explicitly needed.
 - `README.md` and this file are lightweight repository scaffolding for the
   planning workspace.
 

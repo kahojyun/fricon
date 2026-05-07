@@ -28,8 +28,9 @@ a later ADR defines a narrow migration/import route.
 Useful infrastructure may be reused or adapted, but compatibility must not keep
 the wrong user model alive.
 
-Historical code is available on `archive/v0.1` for reference only. Current
-product and domain analysis must not be steered by obsolete module boundaries.
+Historical code is available on the `archive/v0.1` branch for reference only.
+Current product and domain analysis must not be steered by obsolete module
+boundaries.
 
 ## Consequences
 
