@@ -9,7 +9,8 @@ Draft.
 - A data library has a generated durable UUID.
 - A data library has a storage/format compatibility version.
 - Mutating clients must pass compatibility checks before writes.
-- The active editable data library is local to the owning machine/service.
+- The active editable data library is local to the owning machine or local
+  runtime.
 - Direct multi-machine shared-folder access to one database-backed data library
   is not supported.
 

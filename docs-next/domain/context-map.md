@@ -16,9 +16,9 @@ Draft.
 | Parameter Management | Future named profiles, immutable effective snapshots, diffs, and reviewed proposals. | ParameterProfile, ParameterSnapshot, ParameterProposal, ParameterRef. | Uses Provenance and Analysis evidence; linked by Measurement, Run Manifest, and Calibration. |
 | Analysis And Calibration | Future analysis attempts, fit outputs, calibration task chains, calibration records, and calibration proposals. | AnalysisAttempt, CalibrationTaskRun, CalibrationChainRun, CalibrationRecord, CalibrationProposal, GeneratedSidecar. | Consumes DatasetArtifact, ParameterSnapshot, CodeSnapshot; may propose Parameter Management changes after review. |
 | Setup/Device Reconciliation | Future desired setup/device state, observed status, reconciliation plans, and apply executions. | DesiredSetupState, ObservedDeviceState, ReconciliationPlan, ApplyExecution. | Consumes ParameterSnapshot, Setup/Device identity, and CodeSnapshot; produces audit events and may bind to Measurement or Routine Replay. |
-| Service/API | Client compatibility, mutations, events, binary payload transfer. | Service API, capability, write session, event stream. | Exposes domain contexts to Desktop, Python SDK, CLI. |
-| Desktop Experience | Measurement console, live views, sample/session UX, diagnostics. | Console, live list, detail, detached view. | Downstream of Service/API. |
-| Python SDK | Measurement creation, dataset writes, reopen, export reads. | Library handle, Measurement handle, Dataset writer. | Downstream of Service/API. |
+| Local Runtime Boundary | Client compatibility, mutation boundary, runtime diagnostics, and event visibility. | Local runtime, capability, mutation gate, event. | Exposes domain contexts to Desktop, Python SDK, CLI; exact process/API shape is downstream architecture. |
+| Desktop Experience | Measurement console, live views, sample/session UX, diagnostics. | Console, live list, detail, detached view. | Downstream of the Local Runtime Boundary. |
+| Python SDK | Measurement creation, dataset recording, reopen, export reads. | Library context, Measurement context, Dataset writer concept. | Downstream of the Local Runtime Boundary; exact object model is downstream API design. |
 | Export | Measurement-centered portable bundles. | ExportBundle, manifest, checksum, offline reader. | Downstream of Measurement and Dataset Artifact. |
 
 ## Anti-Corruption Rules
@@ -28,8 +28,8 @@ Draft.
 - Dataset artifacts remain directly searchable and openable; measurement-first
   navigation must not make datasets invisible implementation details.
 - Desktop UI state must not become the durable data backend.
-- Python SDK convenience APIs must not bypass service compatibility checks for
-  mutating operations.
+- Python SDK convenience APIs must not bypass local runtime compatibility
+  checks for mutating operations.
 - Export bundles carry copies for portability; importing or reading an export
   must not imply shared identity with the source data library.
 - Future AI, calibration, or automation actions must enter through audited

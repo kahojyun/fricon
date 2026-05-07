@@ -49,7 +49,7 @@ generated-artifact checks, language builds, or test gates.
 
 Fricon is an S2 medium modular system:
 
-- Rust core/service code, Python SDK, CLI, and Tauri/React desktop UI interact.
+- Rust core/runtime code, Python SDK, CLI, and Tauri/React desktop UI interact.
 - Data library, measurement, dataset artifact, storage, API, lifecycle,
   provenance, export, and compatibility concepts cross module boundaries.
 - AI-assisted development needs explicit global context, not only local feature
@@ -65,10 +65,9 @@ Fricon is an S2 medium modular system:
 6. `product/python-sdk-ux.md` for the Python SDK usage guideline
 7. relevant `product/epics/` and `product/user-stories/`
 8. `domain/conceptual-model.md`
-9. `architecture/system-overview.md`
-10. `architecture/module-boundaries.md`
-11. `architecture/compatibility-policy.md`
-12. `ai/project-context.md`
+9. `architecture/README.md`
+10. `architecture/compatibility-policy.md`
+11. `ai/project-context.md`
 
 `specs/` and `implementation-plans/` are currently sentinels only. Recreate
 downstream artifacts only when implementation planning is the task and the
@@ -81,7 +80,7 @@ questions.
 docs-next/
   product/              User goals, capabilities, stories, future ledger, glossary
   domain/               Conceptual model, contexts, lifecycles, invariants
-  architecture/         System shape, boundaries, data flow, storage, API
+  architecture/         Accepted constraints and deferred ADR questions
   decisions/            ADRs for durable decisions
   specs/                Sentinel now; later system-slice specs derived from the baseline
   implementation-plans/ Sentinel now; later milestone plans and quality gates
@@ -109,6 +108,9 @@ Keep each idea in the narrowest durable owner:
 - `domain/conceptual-model.md`, `domain/context-map.md`, and
   `domain/invariants.md` own concept relationships, bounded-context routing,
   and hard anti-corruption rules.
+- `architecture/README.md` owns accepted architecture constraints while the
+  project is still in product/domain analysis. Detailed API, storage, module,
+  runtime, and export shape remains deferred until later ADRs/specs.
 - When active, `specs/` own implementation-slice requirements, design, tasks,
   traceability, and validation derived from upstream sources. They are currently
   sentinels only.

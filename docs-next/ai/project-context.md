@@ -13,7 +13,8 @@ For v0.2+ work, read:
 3. `docs-next/product/vision.md`
 4. `docs-next/product/python-sdk-ux.md` for the Python SDK usage guideline
 5. `docs-next/domain/conceptual-model.md`
-6. `docs-next/architecture/module-boundaries.md`
+6. `docs-next/architecture/README.md`
+7. `docs-next/architecture/compatibility-policy.md`
 
 `docs-next/specs/` and `docs-next/implementation-plans/` are sentinels only
 right now. Recreate or read downstream artifacts only when implementation
@@ -51,7 +52,7 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Do not make datasets own measurement, sample, parameter, code, or lifecycle
   meaning.
 - Do not make Desktop the durable data backend.
-- Do not bypass service compatibility checks for mutating Python APIs.
+- Do not bypass local runtime compatibility checks for mutating Python APIs.
 - Do not introduce SaaS, accounts, teams, roles, or distributed database
   behavior for the MVP.
 - Do not implement post-MVP runner, device, calibration, or AI mutation systems
@@ -78,5 +79,5 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.
-- Use ADRs for storage, service API, export format, and compatibility
+- Use ADRs for storage, local runtime/API, export format, and compatibility
   decisions before durable implementation.

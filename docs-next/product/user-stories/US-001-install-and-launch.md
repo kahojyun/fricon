@@ -16,12 +16,12 @@ local data library without assembling incompatible pieces by hand.
 
 ## Success Criteria
 
-- Fricon Desktop, bundled service, bundled CLI, and Python SDK compatibility are
+- Fricon Desktop, CLI, Python SDK, and required local runtime compatibility are
   visible as one product set.
 - First-run setup asks for the data-library location.
 - Python scripts can run headlessly when Desktop is closed.
-- Diagnostics explain stopped service, wrong library, locked library, old SDK,
-  incompatible service, or migration-required states.
+- Diagnostics explain stopped local runtime components, wrong library, locked
+  library, old SDK, incompatible components, or migration-required states.
 
 ## Not In Scope
 
