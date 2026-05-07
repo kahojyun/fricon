@@ -136,6 +136,24 @@ Detailed SDK usage guidance lives in `product/python-sdk-ux.md`. Historical
 planning snippets should be read as non-binding UX sketches unless an ADR
 accepts exact API syntax.
 
+## Measurement Code Shape
+
+At product level, measurement code means the user-authored Python that creates
+or explains measurement work. In the MVP, this mainly includes ordinary Python
+scripts, notebook cell flows, Data Vault-style translated scripts, and copied
+lab working folders. Fricon should record honest context for these forms
+without pretending it owns their execution.
+
+The MVP code promise is provenance, not code management. Fricon may record an
+unmanaged label, optional script or notebook path, Git summary, dirty-state
+signal, copied-folder/source-root label, user summary, and export privacy
+choice. It should not claim automatic notebook capture, approved code releases,
+deployment, immutable code snapshots, or managed execution.
+
+Post-MVP code management should grow toward configured measurement code
+sources, approved update flows, importable managed-run entry points, and code
+snapshots only after the product facts and review boundaries are clear.
+
 ## MVP Scope
 
 To meet the MVP goal, the MVP should include:
