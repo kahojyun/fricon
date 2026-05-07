@@ -71,9 +71,10 @@ Fricon is an S2 medium modular system:
 12. `architecture/compatibility-policy.md`
 13. `ai/project-context.md`
 
-Read `specs/` and `implementation-plans/` only when implementation planning is
-the task and the relevant upstream baseline is accepted or explicitly marked
-with open interview questions.
+`specs/` and `implementation-plans/` are currently sentinels only. Recreate
+downstream artifacts only when implementation planning is the task and the
+relevant upstream baseline is accepted or explicitly marked with open interview
+questions.
 
 ## Directory Map
 
@@ -84,8 +85,8 @@ docs-next/
   domain/               Conceptual model, contexts, lifecycles, invariants
   architecture/         System shape, boundaries, data flow, storage, API
   decisions/            ADRs for durable decisions
-  specs/                System-slice specs derived from the baseline
-  implementation-plans/ Milestone plans and quality gates
+  specs/                Sentinel now; later system-slice specs derived from the baseline
+  implementation-plans/ Sentinel now; later milestone plans and quality gates
   postmortems/          Prototype lessons and reset rationale
   research/             Background research process and accepted lessons
   ai/                   Agent context and documentation update policy
@@ -104,16 +105,17 @@ Keep each idea in the narrowest durable owner:
   and requirements. It should reference the priority ledger instead of restating
   its rationale.
 - `product/capability-map.md` owns stable capability IDs and compact scope
-  boundaries. Detailed acceptance notes belong in stories, ADRs, or derived
-  specs after upstream acceptance.
+  boundaries. Detailed acceptance notes belong in stories or ADRs; derived
+  specs may add implementation acceptance after upstream acceptance.
 - `product/glossary.md` owns public and future terminology.
 - `domain/conceptual-model.md`, `domain/context-map.md`, and
   `domain/invariants.md` own concept relationships, bounded-context routing,
   and hard anti-corruption rules.
-- `specs/` own implementation-slice requirements, design, tasks,
-  traceability, and validation.
+- When active, `specs/` own implementation-slice requirements, design, tasks,
+  traceability, and validation derived from upstream sources. They are currently
+  sentinels only.
 - While product, domain, architecture, or required ADR boundaries are still
-  unsettled, `specs/` and `implementation-plans/` must remain downstream shells:
+  unsettled, `specs/` and `implementation-plans/` must remain sentinel-only:
   do not let them introduce product scope, domain vocabulary, or architecture
   decisions that are not already owned upstream.
 - `ai/` owns agent routing and update policy, not product or domain rationale.

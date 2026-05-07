@@ -12,7 +12,7 @@ Draft.
 | Domain noun or ownership question | `domain/conceptual-model.md`, `domain/context-map.md` |
 | Storage/API/protocol decision | `architecture/storage-model.md`, `architecture/api-boundaries.md`, ADRs |
 | Compatibility question | `architecture/compatibility-policy.md`, `decisions/ADR-001-v02-clean-reset-boundary.md` |
-| Implementation planning | First confirm accepted product/domain/architecture/ADR inputs, then read derived `specs/` and `implementation-plans/` |
+| Implementation planning | First confirm accepted product/domain/architecture/ADR inputs, then recreate or read derived `specs/` and `implementation-plans/`; they are sentinel-only right now |
 | Current v0.1 behavior | `dev-docs/current-*.md`, public `docs/`, and code |
 
 ## When To Pause And Update Docs
