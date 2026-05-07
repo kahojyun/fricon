@@ -34,6 +34,6 @@ explain which lab-local state was active without reading copied folders by hand.
 - Device control, hardware inventory, or claiming unmanaged execution is fully
   reproducible.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-015, CAP-027, CAP-029, CAP-033, SPEC-001, SPEC-002.
+CAP-015, CAP-027, CAP-029, CAP-033.

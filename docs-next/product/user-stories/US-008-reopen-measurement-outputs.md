@@ -28,6 +28,6 @@ remembering storage paths.
 - Treating the private storage layout as a public API.
 - Importing old legacy-system data before new Fricon outputs can be reopened.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-010, CAP-026, SPEC-001.
+CAP-010, CAP-026.

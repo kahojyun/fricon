@@ -29,6 +29,6 @@ local data library without assembling incompatible pieces by hand.
   editing.
 - Enterprise deployment polish before the local loop works.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-001, CAP-002, CAP-013, SPEC-001.
+CAP-001, CAP-002, CAP-013.

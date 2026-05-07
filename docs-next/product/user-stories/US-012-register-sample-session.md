@@ -29,6 +29,6 @@ identity matters, without blocking exploratory measurements.
 - Requiring a complete sample registry before recording data.
 - Rich sample maps, saved views, or spatial comparison workflows.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-004, SPEC-001.
+CAP-004.

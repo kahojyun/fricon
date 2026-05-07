@@ -29,6 +29,6 @@ produced datasets, optional sample/session context, and honest provenance.
 - Managed runner, task queue, visual sweep builder, or device control.
 - Automatic notebook state capture.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-003, CAP-004, CAP-005, CAP-008, SPEC-001.
+CAP-003, CAP-004, CAP-005, CAP-008.

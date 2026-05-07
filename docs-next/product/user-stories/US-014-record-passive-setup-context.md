@@ -33,6 +33,6 @@ practical context without requiring Fricon to control instruments.
 - Device communication, calibration registry, or managed hardware inventory.
 - Claiming setup context is complete when it is only a passive summary.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-027, SPEC-001.
+CAP-027.

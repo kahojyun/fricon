@@ -29,6 +29,6 @@ Python SDK, or library versions.
 - Stable third-party protocol commitments before the MVP is proven.
 - Automatic migration of old v0.1 workspaces or legacy systems.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-012, CAP-013, SPEC-001.
+CAP-012, CAP-013.

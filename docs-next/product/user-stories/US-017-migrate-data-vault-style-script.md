@@ -38,6 +38,6 @@ logger for new measurements without rewriting the whole experiment stack.
 - Built-in LabRAD Data Vault parser, compatibility server, or legacy browser.
 - Requiring old data to migrate before new Fricon measurements can start.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
 CAP-003, CAP-006, CAP-028, CAP-030.

@@ -29,6 +29,6 @@ folder cleanup problem.
 - Resuming unmanaged Python execution from the last scan point.
 - Hiding incomplete state to make partial data look complete.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-008, CAP-010, SPEC-001.
+CAP-008, CAP-010.

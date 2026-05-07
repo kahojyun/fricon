@@ -27,6 +27,6 @@ need to inspect or analyze.
 - Returning to a dataset-first Desktop home screen.
 - Treating internal artifact streams as first-class navigation targets.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-010, CAP-026, SPEC-001.
+CAP-010, CAP-026.

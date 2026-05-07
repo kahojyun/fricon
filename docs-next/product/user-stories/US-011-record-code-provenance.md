@@ -31,6 +31,6 @@ trustworthiness without pretending Fricon managed execution.
 - Automatic notebook state capture.
 - Managed code snapshots, deployment, or approved update flows.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-014, CAP-017, SPEC-001.
+CAP-014, CAP-017.

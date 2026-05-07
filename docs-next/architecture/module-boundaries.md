@@ -12,7 +12,7 @@ Draft.
 | `measurement` | Measurement records, lifecycle, produced artifact links, notes/events, sample/session links. | Dataset facts, chart projection, global parameter profile mutation. |
 | `dataset_artifact` | Artifact identity, append sessions, Arrow-compatible facts, variable roles, scan schema, semantic reads. | Measurement intent, sample identity, code provenance. |
 | `sample_context` | Samples, sessions, active context, correction history. | Measurement execution or dataset facts. |
-| `provenance` | Parameter snapshots, code provenance summaries, actor/event records. | Managed runner internals until ADR-gated. |
+| `provenance` | Parameter summaries, run-bound configuration snapshots, code provenance summaries, passive setup/procedure summaries, actor/event records. | Effective parameter snapshots, profile management, or managed runner internals until ADR-gated. |
 | `export` | Measurement-centered bundle writing/reading, manifest, checksums, privacy preview. | Source data-library mutation after export. |
 | `service_api` | HTTP/control API, live events, binary payload endpoints, capability negotiation. | Domain decisions hidden in transport DTOs. |
 | `desktop_console` | Measurement console and live/history interaction model. | Durable storage or business orchestration. |

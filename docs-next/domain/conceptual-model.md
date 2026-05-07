@@ -14,7 +14,7 @@ DataLibrary
     Measurement
     DatasetArtifact
     AttachmentArtifact
-    ParameterSnapshot
+    ParameterSummary
     RunConfigSnapshot
     CodeProvenanceSummary
     SetupProvenanceSummary
@@ -26,7 +26,7 @@ DataLibrary
     SampleSession -> Sample
     Measurement -> optional SampleSession
     Measurement -> produces -> DatasetArtifact | AttachmentArtifact
-    Measurement -> optional ParameterSnapshot
+    Measurement -> optional ParameterSummary
     Measurement -> optional RunConfigSnapshot
     Measurement -> optional CodeProvenanceSummary
     Measurement -> optional SetupProvenanceSummary
@@ -45,7 +45,7 @@ DataLibrary
 | Measurement | Data-taking intent, lifecycle, context links, produced artifacts, notes, favorites, parameter/code links. | Dataset payload facts, global parameter profile mutation, device communication. |
 | DatasetArtifact | Typed table facts, append state, scan schema, variable roles, dataset-local display hints. | Sample identity, measurement notes, code provenance, calibration decisions. |
 | AttachmentArtifact | Light measurement files, images, or logs. | Full artifact management or row-linked large binary storage before an ADR. |
-| ParameterSnapshot | Immutable run facts. | Mutable profile management or calibration promotion. |
+| ParameterSummary | Optional light parameter context recorded for a measurement before effective parameter snapshots exist. | Global parameter profiles, immutable effective parameter ownership, override semantics, or calibration promotion. |
 | RunConfigSnapshot | Selected local configuration references, copied snapshots, hashes, and source labels bound to a measurement. | Effective parameter ownership, code provenance, setup/device identity, procedure intent, run-manifest assembly, automatic tracing of every file read, or reproducibility claims for unmanaged work. |
 | CodeProvenanceSummary | Provenance level and display summary. | Automatic reproducibility claims for unmanaged code. |
 | SetupProvenanceSummary | Passive setup, device, driver, environment, method, or clock facts supplied by the user or integration. | Device control, resource locking, readback enforcement, or reproducibility claims. |
@@ -58,7 +58,7 @@ MVP configuration capture should not collapse future parameter management into
 one generic snapshot object. `product/glossary.md` owns term definitions; this
 section owns the concept split.
 
-- Parameter context summary: optional user-supplied or imported context for a
+- ParameterSummary: optional user-supplied or imported context for a
   measurement before profiles, refs, overrides, and proposal workflows exist.
 - ParameterSnapshot: future immutable effective parameter facts resolved from
   refs, profiles, and overrides.
