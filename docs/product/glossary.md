@@ -44,7 +44,8 @@ Accepted.
 - Export Bundle: read-only portable package for analysis without importing into
   another data library.
 - Export Manifest: read-only package manifest for an export bundle. It records
-  package contents, source identity, format version, and integrity metadata.
+  package contents, source library identity, export identity, format version,
+  stable record IDs, checksums, and integrity metadata.
 
 ## Later Or Advanced Terms
 
