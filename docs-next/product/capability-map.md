@@ -18,11 +18,8 @@ Vault/Grapher loop for new measurements. Capabilities should support that loop
 without importing old history, emulating LabRAD, or pulling post-MVP parameter,
 code-management, runner, device, or automation systems into the MVP.
 
-Post-MVP capabilities should move Fricon from data-library replacement toward
-local experiment memory and reviewed action: durable facts for compare, trust,
-handoff, interpretation, and replay. Device control, sample visualization, and
-AI should not become the long-term center unless they serve that memory and
-review model.
+Post-MVP capability ordering is owned by `product/future-concepts.md`. This map
+keeps stable IDs and compact scope boundaries only.
 
 Release versions are not product-horizon labels. Compatible post-MVP
 capabilities may still ship on the same compatible release line; use MVP,
@@ -250,10 +247,7 @@ CAP-019: Rich sample maps and saved views.
 - Intent: support user-defined spatial sample maps, richer sample metadata, and
   saved comparison views after the local data-library loop works.
 - Boundary: the MVP only needs optional sample/session context and correction.
-  Post-MVP map configs or DSLs may map parameter row keys and user labels to
-  visual regions, and color or label those regions from parameter snapshot
-  queries, but should not force a sample-component ontology. Config placement,
-  query syntax, and schema-evolution behavior need a later spec or ADR.
+  Post-MVP map details belong in a dedicated spec or ADR.
 
 CAP-020: Measurement-code source setup and approved code update flows.
 
@@ -261,8 +255,7 @@ CAP-020: Measurement-code source setup and approved code update flows.
   measurement scripts, replacing copied working folders as the normal
   explanation for where run, analysis, and calibration code came from.
 - Boundary: the MVP records honest provenance but does not own code deployment.
-  Post-MVP code-source management should support calibration evidence and run
-  history before it becomes a scheduler or mandatory execution model.
+  Scheduler or managed-execution behavior belongs to later capabilities.
 
 CAP-021: Parameter profiles and proposals.
 
@@ -270,9 +263,7 @@ CAP-021: Parameter profiles and proposals.
   reviewed proposals, with diffs and source evidence that make calibration
   changes inspectable instead of anonymous config-file edits.
 - Boundary: the MVP keeps only light parameter context summaries without a
-  registry UI or effective-configuration model. Post-MVP calibration-derived
-  values should enter through proposal/audit paths, not direct mutation of
-  active refs.
+  registry UI or effective-configuration model.
 
 CAP-022: Analysis, interpretation, and calibration records.
 
@@ -281,10 +272,8 @@ CAP-022: Analysis, interpretation, and calibration records.
   records that can cite input measurements, code context, parameter snapshots,
   generated artifacts, fitted values, and affected parameter paths.
 - Boundary: the MVP may export analysis-ready data but does not manage
-  calibration promotion. Analysis attempts, calibration records, and
-  calibration proposals should have distinct lifecycle and audit meaning.
-  Calibration task health/confidence gates are useful before a broad
-  confidence-label taxonomy exists.
+  calibration promotion. Detailed calibration workflow semantics belong in the
+  future backlog and domain invariants.
 
 CAP-023: Managed code snapshots and execution.
 
@@ -299,9 +288,7 @@ CAP-024: Device boundary and managed device communication.
   desired-state planning, observed-state readback, reconciliation diffs, and
   reviewed apply plans.
 - Boundary: the MVP may record passive setup/device summaries but does not talk
-  to instruments. Post-MVP device apply must not assume writes are safe to
-  parallelize or reorder until dependencies, settling, readback, timeout, and
-  abort behavior are designed.
+  to instruments. Device apply is ADR-gated.
 
 CAP-025: AI-assisted reviewed automation.
 
@@ -321,8 +308,7 @@ CAP-031: Run manifest and failure investigation.
   state.
 - Boundary: a run manifest is a composite view over available facts, not a
   duplicate owner of parameter, code, setup, analysis, or artifact records. The
-  first slice supports compare, handoff, export, and anomaly investigation; it
-  is not a scheduler or resume engine.
+  first slice supports compare, handoff, export, and anomaly investigation.
 
 CAP-032: Routine recipes and reviewed replay.
 
@@ -332,9 +318,8 @@ CAP-032: Routine recipes and reviewed replay.
   reviewed promotion to durable parameter refs, or when imperative loop bodies
   would repeatedly issue avoidable device writes.
 - Boundary: read-only batch compare or triage can arrive before
-  mutation-capable automation; durable mutation requires preview, review,
-  before/after diffs, rollback targets, reconciliation/apply records where
-  hardware is involved, and audit.
+  mutation-capable automation; durable mutation requires the reviewed proposal
+  and audit model described by future specs and ADRs.
 
 ## Product Grouping
 

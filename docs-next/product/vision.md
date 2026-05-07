@@ -39,23 +39,17 @@ aim is not only to store results, but to make the relationship between a
 measurement, its datasets, its Python code, its context, and its later
 interpretation explicit enough for humans and future automation to trust.
 
-The highest-value post-MVP problem is the code-and-parameter management loop.
-When measurement code is copied by hand and active parameters are mutable local
-files, calibration becomes difficult to trust and harder to automate safely.
-Fricon should first make code provenance, effective parameter state, diffs,
-reviewed parameter changes, and calibration evidence durable enough that
-experimenters can understand why a result should be trusted.
+The highest-value post-MVP lesson from legacy workflows is the code-and-parameter
+management loop: copied code, mutable local configuration, generated sidecars,
+and notebook-local analysis make calibration hard to trust. Fricon should first
+make the recorded facts durable enough to explain, compare, hand off, repeat,
+and then safely automate work.
 
-Calibration should remain the primary domain term because quantum
-experimenters use it for this workflow. In Fricon, unqualified calibration
-means estimating better sample, qubit, gate, pulse, readout, fit, or analysis
-parameters from measurement evidence. Instrument calibration and setup/device
-desired-state reconciliation are qualified, separate meanings.
-
-The product should exceed legacy loggers by helping users explain, compare, and
-repeat scientific work from recorded facts. The long-term center is not device
-control, sample visualization, or AI by itself; those capabilities matter when
-they serve trustworthy experiment memory, reviewable changes, and safer reuse.
+The long-term center is not device control, sample visualization, or AI by
+itself. Those capabilities matter when they serve trustworthy experiment
+memory, reviewable changes, and safer reuse. Detailed post-MVP ordering lives
+in `product/future-concepts.md`; future terminology is owned by
+`product/glossary.md` and the domain model.
 
 The product should stay close to how experimentalists already work: Python
 scripts and notebooks remain first-class, local lab computers remain useful
@@ -63,11 +57,8 @@ without a server account model, and higher-provenance workflows grow from the
 same core experience instead of becoming a separate system.
 
 Staying close to current practice does not mean freezing current practice as
-the ideal model. Post-MVP Fricon should explore declarative, desired-state
-workflows for routines that are currently written as imperative nested loops:
-derive expected setup or device state from parameters, diff it against
-observed state, preview the writes, apply only reviewed and safe changes, and
-record readbacks and failures.
+the ideal model. Post-MVP Fricon can introduce higher-provenance workflows, but
+only after the relevant facts, review boundaries, and safety model are explicit.
 
 ## MVP Goal
 
@@ -176,8 +167,8 @@ To meet the MVP goal, the MVP should include:
 
 ## Post-MVP Direction
 
-These priorities matter most after the MVP because they change the experiment
-experience most directly. They should be understood as product loops first:
+At the vision level, post-MVP work should extend the MVP facts into three user
+loops:
 
 - Explain: run manifests, parameter/code/setup provenance, lifecycle evidence,
   analysis attempts, and failure or anomaly investigation.
@@ -186,27 +177,11 @@ experience most directly. They should be understood as product loops first:
 - Repeat: run-like-previous drafts, reviewed parameter proposals, routine
   recipes, and audited automation after the facts are trustworthy.
 
-Implementation should follow this order:
+Implementation should follow the accepted priority ledger:
 
-- Priority 1: parameter system for profiles, immutable run-bound snapshots,
-  diffs, proposal review, and user-defined table row keys that can later
-  support visualization lookup. This enables read-only compare and handoff
-  before mutation-capable automation, and it directly addresses the mutable
-  config-file problem that makes calibration hard to trust.
-- Priority 2: managed run for importable SDK runner entry points, code/source
-  capture, lifecycle capture, compact run manifests, failure investigation,
-  and generated run history. This is the code-management counterpart to
-  parameter snapshots: it should replace copied-code folders with visible code
-  source context before it becomes a scheduler or mandatory execution model.
-- Priority 3: calibration chains, reviewable routine replay, and automation
-  workflow that previews, reviews, audits, and applies changes only through
-  explicit safety boundaries. Calibration automation should first support
-  task-chain evidence, health checks, retries, pause points, chain-scoped
-  working parameter refs, and reviewed promotion of final or durable parameter
-  changes. Desired-state reconciliation for setup/device changes is a separate
-  later capability: useful for reducing imperative loop boilerplate, but only
-  after dependencies, readback, settling, timeout, and abort behavior are
-  explicit.
+- parameter system first
+- managed run second
+- calibration chains and reviewable automation third
 
 Sample visualization should stay lightweight until product evidence says
 otherwise. Treat a sample visualizer as a view over parameter snapshots and
@@ -217,11 +192,7 @@ visualizer migration policy are later design questions.
 
 Lower-priority or ADR-gated directions include read-only LAN monitoring, richer
 sample-map authoring, device communication, resumable execution, user-facing
-stream concepts, and AI-assisted automation. Detailed confidence-label
-taxonomies may be useful later, but they should not block the core design.
-Calibration task health/confidence gates are narrower and more important than
-a broad label taxonomy: they help decide whether a bootstrap calibration should
-continue, retry, pause, or ask for review. Mutation-capable calibration or
+stream concepts, and AI-assisted automation. Mutation-capable calibration or
 device apply remains ADR-gated.
 
 ## Non-Goals For MVP

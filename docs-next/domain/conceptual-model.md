@@ -55,7 +55,8 @@ DataLibrary
 ## Parameter And Configuration Boundaries
 
 MVP configuration capture should not collapse future parameter management into
-one generic snapshot object.
+one generic snapshot object. `product/glossary.md` owns term definitions; this
+section owns the concept split.
 
 - Parameter context summary: optional user-supplied or imported context for a
   measurement before profiles, refs, overrides, and proposal workflows exist.
@@ -94,11 +95,8 @@ imperative loop scripts.
 - ApplyExecution: attempted writes, readbacks, skipped actions, failures,
   manual overrides, and divergence from the approved plan.
 
-This borrows the useful part of declarative UI and infrastructure systems:
-users describe the expected end state, and the system computes a reviewed plan
-to move current state toward it. It must not hide hardware side effects behind
-an opaque "render" step, and it must not assume device writes are idempotent,
-commutative, or safe to parallelize.
+Detailed reconciliation safety rules belong in `domain/invariants.md` and later
+device/setup ADRs.
 
 ## Code, Parameter, And Calibration Boundaries
 
@@ -120,12 +118,8 @@ calibration and Setup/Device Reconciliation for desired-state apply/readback.
   should be artifacts with source inputs and generator context, not invisible
   files that future runs depend on by accident.
 
-Calibration automation should therefore record evidence, task-chain state,
-health decisions, retries, pause/review points, and promotion proposals.
-Small tasks in an approved calibration chain may update a chain-scoped
-calibration working ref for later tasks to consume. Publishing the final or
-selected chain results to durable named refs remains a separate promotion step.
-Device/setup reconciliation is a separate safety-gated capability.
+Detailed calibration-chain and mutation rules belong in `domain/invariants.md`
+and the post-MVP backlog.
 
 ## Dataset Artifact Shape
 
@@ -195,13 +189,8 @@ DataLibrary
 `ActivityRun` is an internal modeling pattern. Users should see concrete words:
 Measurement, Analysis, Import, Simulation, and Calibration.
 
-Analysis attempts, calibration records, and calibration proposals should remain
-separate concepts. Analysis consumes data and produces results or diagnostics.
-Calibration records describe validity, review state, and affected-run windows.
-Calibration task runs describe a small calibration step, its fitted values,
-diagnostics, health decision, and any chain-scoped working-ref update.
-Calibration chain runs describe ordered bootstrap calibration work with
-dependencies, retries, pause/review decisions, and intermediate working state.
-Calibration proposals recommend reviewed durable parameter changes and carry
-the before/after diff, actor/reviewer, outcome, and rollback target where
-practical.
+Analysis attempts, calibration records, calibration task runs, calibration
+chain runs, and calibration proposals remain separate concepts. Their user
+stories and requirements live in
+`product/future-stories-and-requirements.md`; their hard anti-corruption rules
+live in `domain/invariants.md`.

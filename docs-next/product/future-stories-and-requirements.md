@@ -18,11 +18,9 @@ compatibility, storage, and API policies allow it.
 
 ## Planning Stance
 
-Post-MVP Fricon should move from data-library replacement toward local
-experiment memory and reviewed action. The product should capture enough facts
-to explain, compare, hand off, replay, and safely automate lab work without
-pretending to own code, parameters, setup, or devices before those boundaries
-are designed.
+`product/future-concepts.md` owns the accepted post-MVP priority ledger and
+rationale. This backlog expands that ledger into candidate future epics,
+stories, and requirements.
 
 Post-MVP work should prioritize:
 
@@ -30,47 +28,15 @@ Post-MVP work should prioritize:
 - managed run second
 - calibration chains and reviewable automation third
 
-Analysis of representative legacy measurement workflows suggests read-only
-comparison, run like a previous measurement, and failure investigation should
-arrive before mutation-capable automation. These workflows can build trust from
-recorded facts without taking control of parameters, devices, or code.
-
-The dominant pain is code and parameter management disorder. Copied measurement
-folders, mutable parameter files, generated sidecars, and notebook-local
-analysis make it hard to know which settings produced a calibration result.
-Post-MVP Fricon should therefore prioritize durable code provenance, effective
-parameter snapshots, parameter diffs, analysis evidence, and reviewed
-calibration proposals before investing in broad automation.
-
-Calibration is the accepted domain term because quantum experimenters use it
-for this workflow. In this backlog, unqualified calibration means estimating
-better sample, qubit, gate, pulse, readout, fit, or analysis parameters from
-measurement evidence. Use qualified terms for other meanings: instrument
-calibration for hardware/setup calibration, and setup/device reconciliation
-for desired-state apply/readback workflows.
-
 The product rule is: the system captures context automatically where practical;
 the user confirms, annotates, or corrects it. Any workflow that mutates
 parameters, setup, devices, code, or data-library state needs explicit preview,
 review, and audit semantics.
 
-Prefer features that make experiments explainable, comparable, repeatable, or
-safely reviewable. Deprioritize features that merely imitate legacy acquisition
-tools, add device control without recorded state, or create automation before
-Fricon can explain the facts automation depends on. Detailed field-level
-confidence labels are a later refinement unless a concrete workflow requires
-them. Calibration task health/confidence gates are a concrete workflow need,
-but broad confidence taxonomies for every field are not. The first priority is
-recording the source facts and review decisions that calibration and repeat
-work depend on.
-
-Current imperative lab scripts are valid adoption targets, not design ideals.
-Many routines scan parameters through nested loops and calculate per-device
-writes inside the loop body. Post-MVP Fricon should leave room for a more
-declarative model inspired by UI rendering and infrastructure planning: users
-define how parameters produce expected setup or device state, Fricon computes
-the difference from observed state, previews an ordered or parallel-safe apply
-plan, and records what was intended, written, read back, skipped, or failed.
+Use `product/glossary.md` and `domain/conceptual-model.md` for term
+boundaries. This backlog may mention those terms, but it should not become the
+canonical definition for calibration, run manifests, working refs, or
+setup/device reconciliation.
 
 ## Priority 1: Parameter System
 

@@ -9,6 +9,10 @@ Accepted post-MVP priority ledger.
 Preserve important post-MVP directions without letting future systems inflate
 the MVP measurement loop.
 
+This file owns the accepted priority order for post-MVP concepts. Candidate
+stories and requirement details live in
+`product/future-stories-and-requirements.md`.
+
 These are product priority horizons, not semantic-version promises. Compatible
 capabilities may ship on the same release line as the MVP if the compatibility,
 storage, and API policies allow it.

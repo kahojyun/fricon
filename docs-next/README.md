@@ -89,6 +89,27 @@ docs-next/
   user/                 Future public documentation plan, not current docs
 ```
 
+## Source-Of-Truth Ownership
+
+Keep each idea in the narrowest durable owner:
+
+- `product/vision.md` owns the accepted product thesis, MVP goal, user promise,
+  and high-level product horizons.
+- `product/future-concepts.md` owns the accepted post-MVP priority ledger and
+  promotion rule.
+- `product/future-stories-and-requirements.md` owns proposed future user stories
+  and requirements. It should reference the priority ledger instead of restating
+  its rationale.
+- `product/capability-map.md` owns stable capability IDs and compact scope
+  boundaries. Detailed acceptance notes belong in stories, specs, or ADRs.
+- `product/glossary.md` owns public and future terminology.
+- `domain/conceptual-model.md`, `domain/context-map.md`, and
+  `domain/invariants.md` own concept relationships, bounded-context routing,
+  and hard anti-corruption rules.
+- `specs/` own implementation-slice requirements, design, tasks,
+  traceability, and validation.
+- `ai/` owns agent routing and update policy, not product or domain rationale.
+
 ## Source Inputs
 
 This baseline was bootstrapped from:
