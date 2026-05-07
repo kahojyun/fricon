@@ -30,6 +30,12 @@ concepts:
 - Python-native scan-plan authoring for routine scans
 - public reopen/export APIs for later analysis
 
+The notebook-friendly reusable context/handle style is part of the product
+experience: a user should be able to establish the current local library and
+optional lab context once, inspect it in a notebook, reset it when needed, and
+pass it explicitly to measurement helpers. This does not accept a specific
+entry-point name such as `fricon.library()` or `fc.open()`.
+
 The main ergonomic constraint is low ceremony. Fricon should ask for structure
 only where it changes user understanding: which context is active, whether a
 run is unmanaged or managed, which selected local configuration helps explain

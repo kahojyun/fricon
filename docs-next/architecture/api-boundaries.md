@@ -1,74 +1,42 @@
-# API Boundaries
+# Deferred API Boundary Questions
 
 ## Status
 
-Draft.
+Deferred. Product and domain analysis are still upstream of API architecture.
 
-## Public Surfaces
+## Upstream Product Inputs
 
-| Surface | Purpose | v0.2 Stability Posture |
-| --- | --- | --- |
-| Fricon Desktop | Primary GUI for local measurement console, browsing, diagnostics, export. | Product surface, but UI can change during v0.x. |
-| Python SDK | Primary acquisition and analysis API. | Ergonomic but not strict pre-1.0 API stability. Fail before writes on incompatibility. |
-| CLI | Setup, diagnostics, service control, developer workflows. | Narrow public surface. |
-| Export Bundle Reader | Read-only offline analysis. | Format versioned from first implementation. |
-| Local Service API | Shared client/service contract. | Internal Fricon contract first; no third-party long-term stability promise in v0.2. |
+- The Python SDK is a primary user experience.
+- Notebook-friendly, ordinary-Python use with a visible reusable context/handle
+  is an accepted product experience direction.
+- Exact Python names, signatures, context-manager syntax, decorator syntax,
+  writer object model, and capture mechanics are deferred.
+- Python reopen/export should use stable public APIs, not storage paths.
+- Mutating clients must fail compatibility checks before writes.
 
-## Service Contract Direction
+## Deferred API Questions
 
-Prefer one browser-capable service contract for Desktop, CLI, and Python SDK:
+- What local service or equivalent local authority coordinates mutating
+  operations?
+- Which transport should Desktop, Python SDK, and CLI use?
+- Which parts of the service contract are JSON/control, streaming events, or
+  binary payload transfer?
+- Which capability/version negotiation is required before measurement creation,
+  dataset writing, export, migration, and future managed execution?
+- How should Python SDK examples preserve low ceremony without freezing helper
+  names too early?
+- Which read APIs expose semantic tables, axes, grids, partial grids,
+  irregular/adaptive points, repeated points, and traces?
+- Which API surfaces, if any, receive pre-1.0 compatibility promises?
 
-- JSON HTTP for metadata, control, compatibility negotiation, diagnostics, and
-  ordinary mutations
-- WebSocket or SSE for live measurement, dataset, and service status events
-- binary Arrow IPC or Arrow-compatible chunk endpoints for dataset writes and
-  reads
-- explicit write sessions with create, append, finish, and abort operations
+## Candidate Inputs For Later ADRs
+
+These are historical or plausible directions only:
+
+- current v0.1 gRPC/protobuf code
+- browser-capable HTTP/event-stream APIs
+- binary Arrow-compatible dataset payload endpoints
+- explicit write-session operations
 - server-side summaries, paging, and downsampling for UI reads
-- semantic read shapes for tables, dependent-with-axes views, regular grids,
-  partial grids, irregular/adaptive points, repeated points, and trace data
 
-The current gRPC path is implementation background, not the preferred durable
-v0.2 public Python contract unless an ADR proves otherwise.
-
-## Python API Direction
-
-Draft shape:
-
-```python
-lib = fricon.library()
-lib.use_context(sample="qpu-017", session="cooldown-2026-05")
-
-with lib.measurement("rabi q3") as meas:
-    rabi = meas.dataset(
-        "rabi",
-        scan={"independent": "amp", "dependent": "signal"},
-    )
-    rabi.write(amp=0.1, signal=0.25)
-```
-
-Rules:
-
-- `fricon.library()` returns a reusable handle.
-- Measurement creation is explicit but short.
-- Sample/session context is a resolved default, not hidden provenance.
-- Low-level datasets may exist, but normal examples are measurement-scoped.
-- Dataset artifacts remain searchable/openable first-class records.
-- Scan schema authoring should have Python-native scan plans or helpers for
-  common 1D/2D/N-D scan and trace shapes, plus raw schema APIs for advanced
-  cases.
-- Reads use stable IDs and semantic APIs, not storage paths.
-
-## Compatibility Negotiation
-
-Before writes, clients and service negotiate:
-
-- service API/protocol version
-- data-library format version
-- client capabilities
-- write capability
-- measurement creation capability
-- export/migration capability where relevant
-
-Read-only operations may be allowed during limited mismatches if explicitly
-safe.
+Do not promote any candidate to accepted architecture without an ADR.

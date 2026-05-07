@@ -1,51 +1,53 @@
-# Module Boundaries
+# Deferred Module Boundary Questions
 
 ## Status
 
-Draft.
+Deferred. Domain context boundaries are still upstream of concrete module
+architecture.
 
-## Target Feature Slices
+## Upstream Domain Inputs
 
-| Slice | Owns | Does Not Own |
-| --- | --- | --- |
-| `data_library` | Library identity, opening, compatibility, checkpoints, backup/restore. | Measurement lifecycle or dataset payload semantics. |
-| `measurement` | Measurement records, lifecycle, produced artifact links, notes/events, sample/session links. | Dataset facts, chart projection, global parameter profile mutation. |
-| `dataset_artifact` | Artifact identity, append sessions, Arrow-compatible facts, variable roles, scan schema, semantic reads. | Measurement intent, sample identity, code provenance. |
-| `sample_context` | Samples, sessions, active context, correction history. | Measurement execution or dataset facts. |
-| `provenance` | Parameter summaries, run-bound configuration snapshots, code provenance summaries, passive setup/procedure summaries, actor/event records. | Effective parameter snapshots, profile management, or managed runner internals until ADR-gated. |
-| `export` | Measurement-centered bundle writing/reading, manifest, checksums, privacy preview. | Source data-library mutation after export. |
-| `service_api` | HTTP/control API, live events, binary payload endpoints, capability negotiation. | Domain decisions hidden in transport DTOs. |
-| `desktop_console` | Measurement console and live/history interaction model. | Durable storage or business orchestration. |
-| `python_sdk` | User-facing Python ergonomics and diagnostics. | Bypassing service compatibility for writes. |
+`domain/context-map.md` owns bounded-context routing and anti-corruption rules.
+Concrete crate, module, package, and frontend feature boundaries should be
+derived later from accepted product/domain inputs and ADRs.
 
-## Dependency Direction
+## Deferred Boundary Questions
 
-```text
-composition/app
-  -> services + adapters
-services
-  -> domain types + feature-defined ports
-adapters
-  -> domain types + database/filesystem/transport/runtime
-```
+- Which Rust modules should own data-library, measurement, dataset artifact,
+  sample context, provenance, export, and compatibility behavior?
+- Which boundaries are real domain boundaries versus implementation folders?
+- Which ports/adapters are needed for storage, transport, filesystem, runtime,
+  and Desktop shell integration?
+- Which frontend code must remain browser-capable, and which code is specific
+  to Tauri shell behavior?
+- Which current v0.1 modules can be adapted without preserving old public
+  semantics?
+- Which boundaries deserve traits because there are multiple plausible
+  implementations?
 
-## Boundary Rules
+## Guardrails To Revalidate
 
-- Core/service code must not import Diesel schema modules directly.
-- Transport handlers parse transport shape, call services, and map errors.
-- Feature events are separate from UI shell commands and transport event DTOs.
-- Frontend feature code should remain browser-capable where practical.
-- Tauri-specific file dialogs, launch behavior, updater, diagnostics, and
-  shell integration stay behind shell adapters.
+These were useful v0.1 implementation guidelines and remain likely defaults,
+but the concrete v0.2 module architecture should revalidate them:
+
+- Keep storage schema details behind storage adapters.
+- Keep transport DTOs from becoming hidden owners of domain decisions.
+- Keep feature events separate from UI shell commands and transport event DTOs.
+- Keep frontend feature code browser-capable where practical.
+- Keep Tauri-specific file dialogs, launch behavior, updater, diagnostics, and
+  shell integration behind shell adapters.
 - Add traits only for real boundaries or multiple plausible implementations.
 
-## Current-to-Target Mapping
+## Candidate Inputs For Later Architecture Work
 
-| Current Area | v0.2 Treatment |
-| --- | --- |
-| `crates/fricon/src/workspace.rs` | Replace user-facing workspace with data library. Reuse only low-level patterns that fit. |
-| `crates/fricon/src/dataset/**` | Split into dataset artifact facts, semantics, live append, and artifact boundary. |
-| `crates/fricon/src/transport/**` | Treat gRPC/IPC as migration background; design one service API contract by ADR. |
-| `crates/fricon-py/**` | Redesign public API around `fricon.library()` and measurement-scoped writes. |
-| `crates/fricon-ui/frontend/src/features/datasets/**` | Move first-screen UX toward measurement console; keep chart code where model-compatible. |
-| `crates/fricon-ui/src/features/**` | Keep vertical slice discipline; replace dataset-first Tauri command assumptions. |
+- `crates/fricon/src/workspace.rs`: current workspace implementation, not a
+  v0.2 product concept.
+- `crates/fricon/src/dataset/**`: possible reusable dataset payload and
+  semantic-validation ideas, with ownership redesign pressure.
+- `crates/fricon/src/transport/**`: current transport background, not an
+  accepted v0.2 service contract.
+- `crates/fricon-py/**`: current Python binding background; exact v0.2 Python
+  API syntax is deferred.
+- `crates/fricon-ui/frontend/src/features/datasets/**`: possible reusable chart
+  and table code after model changes.
+- `crates/fricon-ui/src/features/**`: current shell integration background.

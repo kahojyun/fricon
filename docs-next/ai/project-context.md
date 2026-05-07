@@ -13,7 +13,8 @@ For v0.2+ work, read:
 3. `docs-next/product/vision.md`
 4. `docs-next/product/python-sdk-ux.md` for the Python SDK usage guideline
 5. `docs-next/domain/conceptual-model.md`
-6. `docs-next/architecture/module-boundaries.md`
+6. `docs-next/architecture/README.md`
+7. `docs-next/architecture/compatibility-policy.md`
 
 `docs-next/specs/` and `docs-next/implementation-plans/` are sentinels only
 right now. Recreate or read downstream artifacts only when implementation

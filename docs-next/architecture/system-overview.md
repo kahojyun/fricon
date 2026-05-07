@@ -1,44 +1,38 @@
-# System Overview
+# Deferred System Overview Questions
 
 ## Status
 
-Draft v0.2+ architecture baseline.
+Deferred. `docs-next/architecture/README.md` owns the current pre-architecture
+stance.
 
-## C4: System Context
+## Current Product Context
 
-```text
-Experimentalist / Analyst / Lab Maintainer
-  -> Fricon Desktop
-  -> fricon Python SDK
-  -> fricon CLI
+Product docs currently establish these surfaces and constraints:
 
-Fricon Desktop / Python SDK / CLI
-  -> local Fricon service
-  -> one local Fricon data library
-```
+- Fricon Desktop
+- Python SDK
+- CLI
+- one local data library per normal lab computer
+- local-first operation
+- compatibility checks before mutating writes
+- measurement-first UX with first-class dataset artifact discovery
+- nonblocking live inspection
 
-## Target Containers
+This is not yet a container model, process model, deployment view, or service
+contract.
 
-| Container | Responsibility | Notes |
-| --- | --- | --- |
-| Fricon Desktop | Local GUI, measurement console, live/history views, setup, diagnostics, export/offline viewer shell. | Tauri shell plus browser-capable React app. |
-| Python SDK | Measurement creation, dataset writes, reopen, export reads, service discovery diagnostics. | First-class acquisition surface. |
-| CLI | Setup, diagnostics, service control, developer workflows. | Not the broad ordinary-user workflow surface. |
-| Local Service | Compatibility gate, data-library coordination, catalog, writes, live events, export, migration. | Authoritative data backend. |
-| Data Library Storage | SQLite/catalog, artifact payloads, manifests, events, checkpoints. | Local only in v0.2. |
+## Deferred System Questions
 
-## Key Architecture Decisions To Preserve
-
-- The local service owns coordinated data-library mutations.
-- Desktop may launch or supervise the service but does not own durable data.
-- Python, Desktop, and CLI converge on one service API compatibility boundary.
-- Dataset payload transfer uses binary Arrow-compatible chunks where practical,
-  not row-by-row JSON.
-- Measurement-first UI does not remove first-class dataset artifact discovery
-  and direct open flows.
-- Live views are noncritical consumers and must not block acquisition writes.
-- The reset is a domain-model reset, not a mandatory rewrite of every reusable
-  infrastructure component.
+- Is the local Fricon service a required long-lived process, an on-demand local
+  authority, or a packaging/runtime detail?
+- How do Desktop, Python SDK, and CLI discover and authenticate with the local
+  authority?
+- Which responsibilities belong to Desktop shell, browser-capable frontend,
+  Python bindings, CLI, local service, and storage adapters?
+- Which parts of v0.1 infrastructure should be adapted after the product/domain
+  reset?
+- Which diagrams are useful once architecture work starts: C4 system context,
+  containers, components, or runtime views?
 
 ## Current Implementation Relationship
 
@@ -63,3 +57,6 @@ High redesign risk:
 - IPC/protobuf public contract assumptions
 - archive/import/export formats
 - setup/update/service compatibility assumptions
+
+Do not promote reuse candidates into accepted architecture without an ADR or
+implementation-slice design derived from accepted upstream docs.

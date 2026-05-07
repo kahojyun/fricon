@@ -1,76 +1,37 @@
-# Data Flow
+# Deferred Runtime Flow Questions
 
 ## Status
 
-Draft.
+Deferred. Product stories and domain lifecycles are still upstream of runtime
+architecture.
 
-## Measurement Write Flow
+## Upstream Flow Owners
 
-```text
-Python script
-  -> Python SDK creates Measurement
-  -> local service checks client/service/data-library compatibility
-  -> service records Measurement and optional context/provenance
-  -> SDK declares DatasetArtifact writer with scan schema
-  -> SDK appends Arrow-compatible payload chunks
-  -> service persists facts and emits live events
-  -> Desktop subscribes and renders nonblocking previews
-  -> SDK finishes Measurement
-  -> service finalizes datasets and lifecycle events
-```
+- `product/story-map.md` owns the user route.
+- `domain/lifecycle-model.md` owns lifecycle states and transition rules.
+- `domain/invariants.md` owns hard data and provenance rules.
+- Later specs should own implementation-slice acceptance and validation.
 
-Dataset artifacts remain directly searchable and openable after this flow. The
-measurement is the primary navigation context, not the only durable handle.
+## Deferred Runtime Questions
 
-## Live Read Flow
+- What is the exact write-session lifecycle for measurement creation, dataset
+  declaration, append, finish, interruption, and abort?
+- Which operations are synchronous acknowledgements versus eventual live
+  preview events?
+- How are committed append positions or event sequence IDs represented?
+- How do live readers coalesce or drop previews without dropping committed
+  data?
+- How do Python reopen APIs request semantic tables, axes, grids, partial
+  grids, irregular/adaptive points, repeated points, and traces?
+- Which export operations require an idle state, read-safe state, checkpoint,
+  or privacy preview?
+- How do updates and migrations report blockers and recovery guidance?
 
-```text
-Desktop live console
-  -> subscribe to service events
-  -> receive measurement and dataset summaries
-  -> request paged/downsampled semantic reads
-  -> render table/chart views
-```
+## Accepted Flow Constraints
 
-Rules:
-
-- Live readers use explicit append positions or event sequence IDs.
-- Preview updates may be coalesced or dropped under load.
-- Committed data is never dropped.
-- Rendering errors do not fail acquisition writes.
-
-## Python Reopen Flow
-
-```text
-Python SDK
-  -> connect/discover local service
-  -> get Measurement by stable ID/search result
-  -> list produced DatasetArtifacts
-  -> request semantic table, dependent-with-axes, or grid-like view
-```
-
-Semantic reads must distinguish complete regular grids from partial grids,
-irregular/adaptive points, repeated points, and trace data where the scan schema
-declares those modes.
-
-## Export Flow
-
-```text
-User selects Measurement
-  -> service validates idle/read-safe state
-  -> export writer gathers selected metadata and artifacts
-  -> privacy preview handles sensitive provenance
-  -> bundle manifest/checksums/common files are written
-  -> Python or Desktop opens bundle read-only without importing
-```
-
-## Migration/Update Flow
-
-```text
-update or data-library format change
-  -> client asks service for safe_to_update / safe_to_migrate
-  -> service reports blockers
-  -> if idle: create checkpoint where practical
-  -> run migration
-  -> report success or recovery guidance
-```
+- Mutating clients fail compatibility checks before writes.
+- Live inspection must not block acquisition writes.
+- Committed data is not dropped because a live consumer is slow or broken.
+- Partial/interrupted measurements remain readable.
+- Dataset artifacts remain directly searchable and openable after a
+  measurement flow.

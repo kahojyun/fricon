@@ -1,0 +1,58 @@
+# Architecture Notes
+
+## Status
+
+Pre-architecture placeholder.
+
+## Purpose
+
+`docs-next/architecture/` is not the active design surface yet. Product and
+initial domain analysis are still upstream of architecture. Until those inputs
+are accepted, this directory should only preserve already accepted constraints
+and collect questions for later ADRs or specs.
+
+Do not treat transport choices, storage shape, module names, Python API syntax,
+runtime flows, or export format details in this directory as accepted
+architecture unless an ADR accepts them.
+
+## Accepted Constraints
+
+- v0.2 is a clean reset from the pre-v0.2 workspace/dataset-first model.
+- Fricon remains local-first for the MVP; hosted SaaS, accounts, teams,
+  permissions, and distributed database semantics are out of scope.
+- Mutating clients must fail compatibility checks before writing to a data
+  library.
+- Desktop UI state must not become the durable data backend.
+- Live inspection must not block acquisition writes.
+- Measurement-first UX must not hide dataset artifacts; datasets remain
+  searchable and directly openable.
+- Dataset artifacts must not own measurement, sample, lifecycle, parameter,
+  code, or provenance meaning.
+- Post-MVP runner, device, calibration, and AI mutation systems require later
+  ADRs/specs before implementation.
+
+## Deferred Architecture Questions
+
+Answer these only after the relevant product and domain baseline is accepted or
+explicitly marked with open interview questions:
+
+- local service/process model and client discovery
+- service API transport and protocol shape
+- binary dataset payload format and chunking
+- storage layout, schema, migrations, and checkpoints
+- event/audit record schema
+- Python SDK exact names, signatures, context mechanics, and writer object model
+- export bundle format and offline-reader responsibilities
+- concrete Rust crate/module boundaries
+- Desktop shell versus browser-capable frontend boundaries
+- migration/import routes for any real pre-v0.2 data
+
+## Current Files
+
+- `compatibility-policy.md` owns the accepted clean-reset compatibility policy
+  and draft future compatibility gates.
+- `api-boundaries.md`, `storage-model.md`, `module-boundaries.md`,
+  `data-flow.md`, and `system-overview.md` are deferred-question notes, not
+  architecture decisions.
+- `risks.md` tracks early design risks that should stay visible while product,
+  domain, and architecture mature.

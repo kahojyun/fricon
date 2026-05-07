@@ -10,7 +10,8 @@ Draft.
 | --- | --- |
 | Product direction | `product/vision.md`, `product/capability-map.md`, `product/story-map.md` |
 | Domain noun or ownership question | `domain/conceptual-model.md`, `domain/context-map.md` |
-| Storage/API/protocol decision | `architecture/storage-model.md`, `architecture/api-boundaries.md`, ADRs |
+| Architecture question | `architecture/README.md`, then accepted product/domain docs |
+| Storage/API/protocol decision | First confirm product/domain inputs, then use `architecture/storage-model.md`, `architecture/api-boundaries.md`, and ADRs as deferred-question notes |
 | Compatibility question | `architecture/compatibility-policy.md`, `decisions/ADR-001-v02-clean-reset-boundary.md` |
 | Implementation planning | First confirm accepted product/domain/architecture/ADR inputs, then recreate or read derived `specs/` and `implementation-plans/`; they are sentinel-only right now |
 | Current v0.1 behavior | `dev-docs/current-*.md`, public `docs/`, and code |
