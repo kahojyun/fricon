@@ -23,11 +23,20 @@ Accepted.
   summary for selected local files and settings such as parameters, registries,
   wiring references, line/chip info, demod settings, or external runner config.
   It is not a global parameter profile or device inventory.
-- Code Provenance Summary: human-readable code context and provenance level.
+- Code Provenance Summary: MVP record of what Fricon can honestly know about
+  measurement code, such as unmanaged label, optional script/notebook path, Git
+  summary, dirty-state signal, copied-folder/source-root label, or
+  user-supplied explanation. It is not a managed code snapshot or approval
+  record.
 - Setup Summary: optional passive setup, device, driver, environment, clock, or
   method context; describes, does not control.
 - Procedure Summary: optional passive procedure context such as unmanaged
   script, external runner, or declared plan; does not imply managed execution.
+- Measurement Code: user-authored Python that creates, runs, analyzes, or helps
+  explain a measurement. In the MVP this usually means an ordinary script,
+  notebook cell flow, Data Vault-style translated script, or copied lab folder.
+  Fricon records honest provenance for it; it does not package, approve,
+  deploy, snapshot, or execute the code unless later managed-run features exist.
 - Operator Profile: lightweight local actor label for mutating actions on a
   shared lab computer.
 - Event/Audit Record: timeline record for lifecycle, note, correction, system
@@ -35,7 +44,8 @@ Accepted.
 - Export Bundle: read-only portable package for analysis without importing into
   another data library.
 - Export Manifest: read-only package manifest for an export bundle. It records
-  package contents, source identity, format version, and integrity metadata.
+  package contents, source library identity, export identity, format version,
+  stable record IDs, checksums, and integrity metadata.
 
 ## Later Or Advanced Terms
 
@@ -69,11 +79,17 @@ Accepted.
 - Snapshot Query: later product concept for selecting values from a parameter
   snapshot to drive labels, color maps, comparisons, or visualizer state.
 - Measurement Code Source: configured upstream source for lab measurement code,
-  such as Git/Gitea, package, mirror, or folder. Post-MVP, this should replace
-  copied working folders as the normal code provenance story for managed
-  measurement, analysis, and calibration work.
+  such as a Git/Gitea repository, package, mirror, or maintained local folder.
+  Post-MVP, this should replace copied working folders as the normal code
+  provenance story for managed measurement, analysis, and calibration work.
+- Managed Run Entry Point: importable Python function, module entry point, or
+  small SDK-integrated wrapper selected for opt-in Fricon-managed execution. It
+  is not a scheduler job, visual workflow, shell-command launcher, or generic
+  automation recipe by itself.
 - Code Snapshot: immutable resolved code state used by future managed
-  execution, analysis evidence, or calibration evidence.
+  execution, analysis evidence, or calibration evidence. It may include source
+  revision, selected file hashes, dirty-state summary, runner entry point, and
+  environment hints where practical.
 - Generated Sidecar: derived local file, config fragment, waveform, cache, or
   helper artifact produced by code and later consumed by analysis,
   calibration, or replay. It should record source inputs and generator context
@@ -86,7 +102,7 @@ Accepted.
 - Measurement Outcome: lightweight interpretation or trust decision attached to
   a measurement, such as accepted, questionable, invalidated, or repeat-needed.
   It is not a full electronic lab notebook entry.
-- Calibration: Fricon's accepted domain term for quantum-experiment parameter
+- Calibration: Fricon's accepted product term for quantum-experiment parameter
   calibration unless qualified otherwise. It means measurement plus analysis or
   fit that estimates better sample, qubit, gate, pulse, readout, or analysis
   parameters. It does not mean device desired-state apply/readback by default.

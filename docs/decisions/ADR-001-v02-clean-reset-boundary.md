@@ -29,14 +29,11 @@ Useful infrastructure may be reused or adapted, but compatibility must not keep
 the wrong user model alive.
 
 Historical code is available on the `archive/v0.1` branch for reference only.
-Current product and domain analysis must not be steered by obsolete module
-boundaries.
+Current documentation must not be steered by obsolete module boundaries.
 
 ## Consequences
 
 - The documentation tree becomes the v0.2+ design baseline.
-- Project-specific implementation scaffolding should be recreated later from
-  accepted product, domain, architecture, and ADR inputs.
 - Early implementation work should prefer replacing current domain boundaries
   in place over building a permanent parallel `fricon-v2` project.
 - The first v0.2 implementation must still protect data created by v0.2 once

@@ -153,7 +153,8 @@ CAP-014: Honest code provenance summary.
 - Promise: Fricon records what it can honestly know about unmanaged Python code
   without pretending it owns execution.
 - Includes: unmanaged labels, optional script path, Git summary, dirty-state
-  signal, user-supplied summary, and privacy-aware export handling.
+  signal, copied-folder or source-root label, user-supplied summary, and
+  privacy-aware export handling.
 - Excludes: automatic notebook state capture and managed code snapshots.
 
 CAP-015: Light parameter context summary without a registry UI.
@@ -199,9 +200,11 @@ CAP-020: Measurement-code source setup and approved code update flows.
 - Intent: help labs manage code source locations and reviewed updates for
   measurement scripts, replacing copied working folders as the normal
   explanation for where run, analysis, and calibration code came from.
-- Includes later product pressure from approved releases, setup profiles,
-  environment lock files, scan-schema helpers, measurement templates, plot
-  presets, export recipes, and maintainer handoff for local changes.
+- Includes later product pressure from local folders, Git/Gitea repositories,
+  mirrored repositories, packages, importable Python entry points, approved
+  releases, setup profiles, environment lock files, scan-schema helpers,
+  measurement templates, plot presets, export recipes, and maintainer handoff
+  for local changes.
 - Boundary: the MVP records honest provenance but does not own code deployment.
   Scheduler or managed-execution behavior belongs to later capabilities.
 
@@ -221,12 +224,15 @@ CAP-022: Analysis, interpretation, and calibration records.
   generated artifacts, fitted values, and affected parameter paths.
 - Boundary: the MVP may export analysis-ready data but does not manage
   calibration promotion. Detailed calibration workflow semantics belong in the
-  future backlog and domain invariants.
+  future backlog.
 
 CAP-023: Managed code snapshots and execution.
 
 - Intent: run selected measurement code under Fricon control with stronger code
   provenance snapshots and lifecycle supervision.
+- Boundary: managed code starts from selected importable Python entry points or
+  SDK-integrated wrappers, not a general scheduler, shell-command runner, or
+  workflow DAG.
 - Boundary: the MVP records unmanaged execution context only.
 
 CAP-024: Device boundary and managed device communication.

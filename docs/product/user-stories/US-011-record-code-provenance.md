@@ -22,6 +22,10 @@ trustworthiness without pretending Fricon managed execution.
   be recorded where available.
 - Copied-folder workflows can record a source-root path, folder fingerprint, or
   user-supplied source label without implying managed code history.
+- Code provenance is distinct from passive procedure context and run-bound
+  local configuration: code provenance explains where the Python/user code came
+  from, procedure context explains what was intended or invoked, and run config
+  explains selected files or settings that were active.
 - The product model leaves room for approved code releases, setup profiles,
   environment lock files, scan helpers, plot presets, export recipes, and
   maintainer handoff without making them MVP code-management features.

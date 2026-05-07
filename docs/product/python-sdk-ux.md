@@ -41,6 +41,13 @@ only where it changes user understanding: which context is active, whether a
 run is unmanaged or managed, which selected local configuration helps explain
 the run, what scan shape should be plotted, and how results are reopened later.
 
+In this guideline, measurement code remains ordinary Python first: notebooks,
+scripts, translated Data Vault-style scripts, importable functions, and local
+lab folders are all plausible shapes. The MVP should record honest provenance
+for those shapes. Managed-run entry points, code snapshots, approved code
+sources, and update flows are post-MVP product directions, not accepted SDK API
+mechanics.
+
 For common workflows, Fricon should provide appropriate simplification without
 pretending the right simplification is known before use. The exact API shape
 should be refined from real script and notebook experience, while this

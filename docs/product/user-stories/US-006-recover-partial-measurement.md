@@ -16,12 +16,15 @@ folder cleanup problem.
 
 ## Success Criteria
 
-- Measurement lifecycle shows interrupted, failed, invalidated, recovered, or
-  completed state clearly.
+- Measurement lifecycle shows interrupted, failed, aborted, invalidated,
+  superseded, recovered, or completed state clearly.
 - Partial dataset artifacts can be reopened and inspected through public read
   APIs.
 - Missing expected points are represented when the scan schema supports that
   interpretation.
+- Rerun creates a new linked measurement by default.
+- Appending to an older measurement requires explicit resume intent and
+  compatibility checks.
 - Ordinary cleanup uses trash/recover instead of immediate hard delete.
 
 ## Not In Scope

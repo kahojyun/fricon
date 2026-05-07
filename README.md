@@ -6,8 +6,8 @@ work.
 ## Documentation
 
 The active documentation baseline is [docs/](docs/). It owns the
-v0.2+ clean-reset product, domain, architecture, ADR, research, and agent
-context.
+v0.2+ clean-reset product, domain status, architecture, ADR, research, and
+agent context.
 
 ## Overview
 

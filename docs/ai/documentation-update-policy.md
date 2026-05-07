@@ -8,7 +8,8 @@ Accepted.
 
 For v0.2+ system work:
 
-- read the relevant product, domain, architecture, and ADR documents
+- read the relevant product, architecture, ADR, and current domain-status
+  documents
 - confirm the spec status is Accepted or the user explicitly permits Draft work
 - update docs first if implementation would contradict accepted direction
 - record non-goals and compatibility impact in the spec

@@ -100,7 +100,7 @@ files concise: they own story-level success criteria, not implementation tasks.
 The earliest implementation slice should prove enough of US-001 through US-008
 and US-015 to record, inspect, recover, and reopen a Python measurement while
 preserving first-class dataset discovery. The milestone plan should be derived
-after the product, domain, architecture, and required ADRs are accepted.
+after the product baseline and required architecture or ADR inputs are accepted.
 
 The full MVP also needs US-009 for export, US-017/US-018 to validate the
 incremental adoption posture, and US-019 to make copied local configuration
@@ -117,5 +117,5 @@ reviewed action. Those priorities are outside the MVP story index and are owned
 by `product/future-concepts.md`.
 
 Export remains an MVP product promise. Detailed export/offline-analysis
-requirements should be derived in a later spec after the export domain,
-architecture, and ADR boundaries are accepted.
+requirements should be derived in a later spec after the product, architecture,
+and ADR boundaries are accepted.

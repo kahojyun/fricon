@@ -7,8 +7,8 @@ Active v0.2+ documentation baseline.
 ## Purpose
 
 `docs/` is the single documentation directory for the v0.2+ reset. It owns
-the active product, domain, architecture, ADR, research, user-documentation
-planning, and AI-agent guidance baseline.
+the active product, domain status, architecture, ADR, research,
+user-documentation planning, and AI-agent guidance baseline.
 
 ## Design Stance
 
@@ -27,8 +27,8 @@ features may still ship on the same compatible release line.
 
 This directory is currently the primary work surface. Keep discussion changes
 lightweight. Do not add implementation scaffolding, package locks, generated
-artifacts, or release automation until the accepted product, domain,
-architecture, and ADR baseline calls for them.
+artifacts, or release automation until the accepted product baseline and
+required downstream architecture or ADR inputs call for them.
 
 ## Scale Classification
 
@@ -49,7 +49,7 @@ Fricon is an S2 medium modular system:
 5. `product/story-map.md`
 6. `product/python-sdk-ux.md` for the Python SDK usage guideline
 7. relevant `product/epics/` and `product/user-stories/`
-8. `domain/conceptual-model.md`
+8. `domain/README.md`
 9. `architecture/README.md`
 10. `architecture/compatibility-policy.md`
 11. `ai/project-context.md`
@@ -64,7 +64,7 @@ questions.
 ```text
 docs/
   product/              User goals, capabilities, stories, future ledger, glossary
-  domain/               Conceptual model, contexts, lifecycles, invariants
+  domain/               Current domain-layer status
   architecture/         Accepted constraints and deferred ADR questions
   decisions/            ADRs for durable decisions
   specs/                Sentinel now; later system-slice specs derived from the baseline
@@ -90,18 +90,16 @@ Keep each idea in the narrowest durable owner:
   boundaries. Detailed acceptance notes belong in stories or ADRs; derived
   specs may add implementation acceptance after upstream acceptance.
 - `product/glossary.md` owns public and future terminology.
-- `domain/conceptual-model.md`, `domain/context-map.md`, and
-  `domain/invariants.md` own concept relationships, bounded-context routing,
-  and hard anti-corruption rules.
+- `domain/README.md` owns the current domain-layer status.
 - `architecture/README.md` owns accepted architecture constraints while the
-  project is still in product/domain analysis. Detailed API, storage, module,
+  project is still in product analysis. Detailed API, storage, module,
   runtime, and export shape remains deferred until later ADRs/specs.
 - When active, `specs/` own implementation-slice requirements, design, tasks,
   traceability, and validation derived from upstream sources. They are currently
   sentinels only.
-- While product, domain, architecture, or required ADR boundaries are still
+- While product, architecture, or required ADR boundaries are still
   unsettled, `specs/` and `implementation-plans/` must remain sentinel-only:
-  do not let them introduce product scope, domain vocabulary, or architecture
+  do not let them introduce product scope, product terminology, or architecture
   decisions that are not already owned upstream.
 - `ai/` owns agent routing and update policy, not product or domain rationale.
 

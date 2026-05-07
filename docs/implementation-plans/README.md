@@ -11,8 +11,8 @@ required ADR boundaries are still unsettled.
 
 Implementation plans may be recreated only after a derived spec has accepted
 requirements, design, traceability, and validation. A plan should sequence
-implementation work; it must not introduce product scope, domain vocabulary,
-architecture decisions, or non-goals on its own.
+implementation work; it must not introduce product scope, product terminology,
+domain terminology, architecture decisions, or non-goals on its own.
 
 ## Recreation Criteria
 

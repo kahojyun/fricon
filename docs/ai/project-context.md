@@ -12,7 +12,7 @@ For v0.2+ work, read:
 2. `docs/decisions/ADR-001-v02-clean-reset-boundary.md`
 3. `docs/product/vision.md`
 4. `docs/product/python-sdk-ux.md` for the Python SDK usage guideline
-5. `docs/domain/conceptual-model.md`
+5. `docs/domain/README.md`
 6. `docs/architecture/README.md`
 7. `docs/architecture/compatibility-policy.md`
 
@@ -71,8 +71,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Do not turn sample target binding into a heavy physical-component ontology
   unless a later product decision requires it.
 - For post-MVP parameter, calibration, run-manifest, sample-visualizer, and
-  setup/device reconciliation details, read `product/future-concepts.md`,
-  `product/glossary.md`, and `domain/invariants.md`.
+  setup/device reconciliation details, read `product/future-concepts.md` and
+  `product/glossary.md`.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.
