@@ -30,11 +30,8 @@ Product planning uses MVP, post-MVP priority, and ADR-gated labels. Do not
 interpret post-MVP priorities as semantic-version labels; compatible additions
 may remain on the same compatible release line.
 
-Post-MVP priority order:
-
-1. Parameter system.
-2. Managed run.
-3. Reviewable automation workflow.
+Post-MVP priority order and rationale are owned by
+`product/future-concepts.md`.
 
 Primary user model:
 
@@ -70,14 +67,10 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   the exact simplification shape before real script/notebook feedback.
 - Keep sample/session context optional and correctable.
 - Do not turn sample target binding into a heavy physical-component ontology
-  unless a later product decision requires it. Prefer user-defined parameter
-  row keys plus optional sample-map configs/DSLs.
-- Treat sample visualizers as views over parameter snapshots or snapshot query
-  results. Keep config placement, query syntax, and schema-evolution behavior
-  deferred until a focused spec or ADR.
-- Prioritize post-MVP foundations by user pain: parameter diffs and proposals,
-  run manifests and failure investigation, then reviewed routine replay or
-  automation.
+  unless a later product decision requires it.
+- For post-MVP parameter, calibration, run-manifest, sample-visualizer, and
+  setup/device reconciliation details, read `product/future-concepts.md`,
+  `product/glossary.md`, and `domain/invariants.md`.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.

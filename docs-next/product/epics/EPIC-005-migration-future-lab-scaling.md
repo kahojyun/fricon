@@ -16,16 +16,26 @@ becoming a legacy import project or a full automation stack.
 - Source aliases and old-system references as metadata, not primary identity.
 - Honest code provenance for interactive unmanaged Python.
 - Light contextual summaries for setup, environment, procedure, and parameters.
+- Run-bound local configuration snapshots or summaries for files and references
+  that old scripts currently leave in copied folders.
 - Optional sample/session context that can be corrected after a run.
 
 ## Post-MVP Scope
 
+Detailed post-MVP priority and acceptance details live in
+`product/future-concepts.md` and
+`product/future-stories-and-requirements.md`.
+
 - User-written import helpers for old data when generic APIs mature.
 - Read-only LAN viewing.
 - Measurement-code source setup and approved code update flows.
+- Managed code/source provenance for measurement, analysis, and calibration.
 - Rich sample maps, saved views, comparison, and context correction UX.
-- Parameter profiles, calibration records, managed execution, device
-  communication, and AI-assisted reviewed automation.
+- Parameter profiles, effective snapshots, diffs, proposals, and reviewed
+  durable promotion of calibration-derived settings.
+- Calibration records, chains, working refs, health gates, and proposals.
+- Managed execution, device communication, and AI-assisted reviewed automation
+  after the code/parameter evidence model is durable.
 
 ## Key Stories
 
@@ -35,3 +45,4 @@ becoming a legacy import project or a full automation stack.
 - US-016: Record passive procedure context.
 - US-017: Migrate a Data Vault-style script to Fricon writers.
 - US-018: Start new work in Fricon while old history stays in the old system.
+- US-019: Capture run-bound local configuration.

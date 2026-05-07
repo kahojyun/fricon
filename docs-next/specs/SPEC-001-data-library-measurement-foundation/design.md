@@ -2,7 +2,13 @@
 
 ## Status
 
-Draft.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+Product and domain documents own scope while v0.2+ analysis is still in
+progress. This design records likely implementation pressure only; re-sync it
+after the product/domain baseline and required ADRs are accepted.
 
 ## Design Summary
 

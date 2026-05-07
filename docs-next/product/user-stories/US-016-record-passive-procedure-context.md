@@ -20,6 +20,9 @@ even before Fricon manages execution.
   reference, or declared plan summary.
 - Procedure context can mention planned shape and external identifiers without
   becoming a managed plan.
+- Procedure context can record runner name/version, external run identifier,
+  readout timing summary, demod settings summary, validity-mask semantics, or
+  shot-group meaning when supplied by the user or integration.
 - Corrections to procedure context are visible after the run.
 - Procedure context remains distinct from code provenance and setup context.
 

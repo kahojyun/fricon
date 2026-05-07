@@ -20,6 +20,8 @@ importing the data first.
 - Produced datasets and semantic metadata are included.
 - Common analysis files are included where practical, but the Fricon manifest
   remains the source of meaning.
+- Selected code, setup, procedure, and run-bound configuration summaries can be
+  included so the bundle explains the measurement without old local folders.
 - Sensitive provenance is previewed or opt-in.
 - Python can open the bundle directly.
 

@@ -2,7 +2,8 @@
 
 ## Status
 
-Draft placeholder.
+Draft placeholder. Not implementation-ready until product/domain scope and
+required ADRs are accepted.
 
 ## Tasks
 

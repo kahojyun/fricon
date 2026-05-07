@@ -2,7 +2,13 @@
 
 ## Status
 
-Draft.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+Product and domain documents own scope while v0.2+ analysis is still in
+progress. This file is a candidate first-slice shape, not an accepted
+implementation contract.
 
 ## Purpose
 
@@ -52,6 +58,7 @@ CAP-027, CAP-028, CAP-029.
 - Managed runner or task queue.
 - User-facing dataset streams as a normal v0.2 concept.
 - Full parameter registry or calibration workflow.
+- Automatic tracing of every file a script reads.
 - Device communication.
 - Large detector-file/image asset management unless a focused ADR pulls a
   narrow hook into scope.

@@ -26,13 +26,14 @@ concepts:
 - a visible notebook context for the current local library and lab context
 - an interactive unmanaged path for exploratory runs
 - an importable decorated managed-run path for higher provenance
+- a lightweight way to bind selected local configuration context to a run
 - Python-native scan-plan authoring for routine scans
 - public reopen/export APIs for later analysis
 
 The main ergonomic constraint is low ceremony. Fricon should ask for structure
 only where it changes user understanding: which context is active, whether a
-run is unmanaged or managed, what scan shape should be plotted, and how results
-are reopened later.
+run is unmanaged or managed, which selected local configuration helps explain
+the run, what scan shape should be plotted, and how results are reopened later.
 
 For common workflows, Fricon should provide appropriate simplification without
 pretending the right simplification is known before use. The exact API shape
@@ -74,6 +75,8 @@ ceremony should be justified by one of these user-visible benefits:
 - creating a real measurement rather than a loose file or anonymous table
 - declaring scan shape so live and historical plots know what the axes mean
 - choosing unmanaged versus managed execution honestly
+- binding selected local configuration context when copied files or sidecars
+  explain the run
 - reopening or exporting results through stable public APIs
 
 Boilerplate that exists only for transport, storage layout, service startup,
@@ -142,7 +145,8 @@ Do not settle these in this guideline:
 
 - exact Python names, decorator syntax, context-manager syntax, or function
   signatures
-- parameter binding, parameter capture, override, or snapshot mechanics
+- parameter binding, parameter capture, override, run configuration, or snapshot
+  mechanics
 - code snapshot format, environment capture details, stdout/stderr handling, or
   managed-run lifecycle protocol
 - dataset-writer object model, storage layout, service transport, or local

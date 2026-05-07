@@ -9,9 +9,15 @@ Draft placeholder.
 Define the near-term export slice that follows SPEC-001. Export is part of the
 v0.2 product promise, but it should not be hidden inside the foundation spec.
 
+## Planning Boundary
+
+Product and domain documents own scope while v0.2+ analysis is still in
+progress. This file is a placeholder for later export planning, not an accepted
+implementation contract.
+
 ## Related Capabilities
 
-CAP-010, CAP-011, CAP-026.
+CAP-010, CAP-011, CAP-014, CAP-015, CAP-026, CAP-027, CAP-029.
 
 ## Requirements To Refine
 

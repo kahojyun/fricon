@@ -59,6 +59,26 @@ Fricon is expected to provide:
 The product should make common scientific measurement workflows easier while
 remaining scriptable for users who already use Python in their research.
 
+The long-term product should go beyond replacing a logger. After the local
+measurement loop is reliable, Fricon should become local experiment memory: a
+system that records enough facts to explain what happened, compare against
+previous-good runs, hand off state between operators, repeat work with visible
+differences, and automate only through reviewed plans and durable audit records.
+
+The highest-value post-MVP motivation is the code-and-parameter management
+loop. Copied measurement code, mutable parameter/config files, generated
+sidecars, and notebook-local analysis make calibration hard to trust and harder
+to automate safely. Fricon should first make code provenance, effective
+parameter snapshots, diffs, calibration evidence, and reviewed parameter
+changes durable enough that experimenters can trust the next run. Detailed
+field-level confidence-label schemes can wait, but calibration task
+health/confidence gates are part of the post-MVP automation motivation.
+
+Use Calibration as the normal domain term for quantum-experiment parameter
+calibration. Qualify other meanings explicitly: instrument calibration for
+hardware/setup calibration, and setup/device reconciliation for desired-state
+apply/readback workflows.
+
 ## Product Route
 
 The product route is now the v0.2 measurement-library reset: Python-led,
@@ -125,7 +145,22 @@ one.
 Workflow automation should be treated as a layer above individual measurements.
 It can eventually coordinate scheduled calibration, optimization, benchmark,
 and repeated measurement tasks, but should rely on clear measurement records,
-parameter snapshots, provenance, and human approval boundaries.
+parameter snapshots, code provenance, generated artifacts, calibration
+evidence, visible before/after diffs, and human approval boundaries.
+Small calibration tasks may update chain-scoped working parameter refs for
+later steps. Publishing selected calibration results to durable named refs,
+setup refs, generated config, or devices should remain explicit and auditable.
+
+Fricon should also learn from modern desired-state systems without pretending
+lab hardware is a browser DOM or cloud resource graph. Many current scripts use
+imperative nested loops that calculate and send every device setting inside the
+loop body. For routines that can be modeled safely, a better post-MVP direction
+is declarative: users define how parameters produce expected setup/device
+state, Fricon diffs that desired state against observed/readback state,
+previews an apply plan, skips no-op writes, groups safe independent writes, and
+records intended values, write attempts, readbacks, failures, and overrides.
+This needs explicit dependency, settling, timeout, readback, and abort behavior
+before it can control hardware.
 
 AI-assisted workflows should be designed as assistive automation rather than
 silent authority. AI may help draft snippets, summaries, reports, metadata
@@ -327,6 +362,12 @@ Workflow definitions may eventually orchestrate repeated measurement execution,
 scheduled calibration, parameter optimization, and benchmark runs. These
 capabilities should record workflow versions, triggers, inputs, outputs,
 approval checkpoints, failures, and manual overrides.
+
+When workflow definitions touch setup or devices, prefer a desired-state plus
+reconciliation model over hand-coded command sequences where possible. Desired
+state, observed state, reconciliation plan, and apply execution should be
+separate records. This makes no-op changes, hidden drift, safe parallelism,
+partial failure, and rollback easier to reason about.
 
 AI model integration may eventually automate boring or repetitive work, but
 should not bypass product boundaries. AI-generated changes to data,

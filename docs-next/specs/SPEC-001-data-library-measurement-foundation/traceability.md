@@ -2,7 +2,13 @@
 
 ## Status
 
-Draft.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+Traceability is provisional until product/domain scope and required ADRs are
+accepted. Do not use this file as the source of truth for whether a product
+story belongs to M1.
 
 ## Related Capabilities
 

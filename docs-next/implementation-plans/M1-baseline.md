@@ -2,7 +2,14 @@
 
 ## Status
 
-Draft implementation plan.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+This file is a downstream milestone landing area. Until the product and domain
+baselines are accepted, `product/`, `domain/`, and ADRs own scope. Re-sync this
+plan after `SPEC-001` is accepted instead of treating the current bullets as an
+implementation commitment.
 
 ## Goal
 
@@ -36,7 +43,13 @@ M1 should prove:
 - direct LabRAD/Data Vault import
 - remote mode
 - full parameter registry
+- automatic tracing of every local configuration file a script reads
+- run-like-previous drafts
+- parameter proposals or profile promotion
+- compare/handoff dashboards
+- analysis/calibration records or managed calibration workflows
 - managed code execution
+- reviewable routine replay
 - resumable scan-point checkpoint execution
 - user-facing stream concepts inside dataset artifacts
 - broad device framework

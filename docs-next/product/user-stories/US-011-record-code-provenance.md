@@ -20,6 +20,8 @@ trustworthiness without pretending Fricon managed execution.
   execution.
 - Optional script path, Git revision, dirty-state signal, and user summary can
   be recorded where available.
+- Copied-folder workflows can record a source-root path, folder fingerprint, or
+  user-supplied source label without implying managed code history.
 - Provenance can be previewed or omitted during export when it contains
   sensitive local details.
 - Corrections to provenance are visible as events.

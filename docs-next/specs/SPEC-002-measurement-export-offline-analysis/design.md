@@ -4,6 +4,11 @@
 
 Draft placeholder.
 
+## Planning Boundary
+
+Product and domain documents own scope while v0.2+ analysis is still in
+progress. This design records a likely export direction only.
+
 ## Direction
 
 Treat export bundles as read-only analysis packages:

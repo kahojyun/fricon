@@ -20,6 +20,11 @@ practical context without requiring Fricon to control instruments.
   environment labels and summaries.
 - Context may be user-supplied, imported from an external reference, or
   corrected after the run.
+- Structured passive context can include runner labels, device-map labels,
+  wiring/config references, software environment notes, machine labels, and
+  selected network or address summaries when the user chooses to record them.
+- Setup context can link to a run-bound local configuration summary without
+  making that summary a managed hardware inventory.
 - Export previews sensitive local paths, machine names, or environment details.
 - Passive setup context is clearly separate from device control.
 

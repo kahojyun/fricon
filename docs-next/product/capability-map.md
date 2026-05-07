@@ -18,6 +18,9 @@ Vault/Grapher loop for new measurements. Capabilities should support that loop
 without importing old history, emulating LabRAD, or pulling post-MVP parameter,
 code-management, runner, device, or automation systems into the MVP.
 
+Post-MVP capability ordering is owned by `product/future-concepts.md`. This map
+keeps stable IDs and compact scope boundaries only.
+
 Release versions are not product-horizon labels. Compatible post-MVP
 capabilities may still ship on the same compatible release line; use MVP,
 post-MVP priority, and ADR-gated labels for product planning.
@@ -143,6 +146,18 @@ CAP-015: Light parameter context summary without a registry UI.
 - Excludes: global parameter registry, immutable profile binding, override
   semantics, proposal workflow, and calibration promotion.
 
+CAP-033: Run-bound local configuration snapshot.
+
+- Promise: a measurement can bind selected local configuration files,
+  references, hashes, or summaries so later analysis can identify the effective
+  lab-local state without reading copied folders by hand.
+- Includes: user-selected parameter files, registry files, wiring references,
+  line/chip information, demod/readout settings, runner labels, source aliases,
+  privacy-aware export selection, and correction history.
+- Excludes: automatic tracing of every file read, global parameter profiles,
+  calibration promotion, device control, or claiming unmanaged execution was
+  fully reproducible.
+
 CAP-017: Lightweight operator profile and audit actor.
 
 - Promise: notes, corrections, lifecycle events, and exports can name the local
@@ -232,65 +247,79 @@ CAP-019: Rich sample maps and saved views.
 - Intent: support user-defined spatial sample maps, richer sample metadata, and
   saved comparison views after the local data-library loop works.
 - Boundary: the MVP only needs optional sample/session context and correction.
-  Post-MVP map configs or DSLs may map parameter row keys and user labels to
-  visual regions, and color or label those regions from parameter snapshot
-  queries, but should not force a sample-component ontology. Config placement,
-  query syntax, and schema-evolution behavior need a later spec or ADR.
+  Post-MVP map details belong in a dedicated spec or ADR.
 
 CAP-020: Measurement-code source setup and approved code update flows.
 
 - Intent: help labs manage code source locations and reviewed updates for
-  measurement scripts.
+  measurement scripts, replacing copied working folders as the normal
+  explanation for where run, analysis, and calibration code came from.
 - Boundary: the MVP records honest provenance but does not own code deployment.
+  Scheduler or managed-execution behavior belongs to later capabilities.
 
 CAP-021: Parameter profiles and proposals.
 
 - Intent: promote repeated parameter snapshots into reusable profiles and
-  reviewed proposals.
+  reviewed proposals, with diffs and source evidence that make calibration
+  changes inspectable instead of anonymous config-file edits.
 - Boundary: the MVP keeps only light parameter context summaries without a
   registry UI or effective-configuration model.
 
-CAP-022: Analysis and calibration records.
+CAP-022: Analysis, interpretation, and calibration records.
 
-- Intent: model downstream analysis, fit attempts, anomaly review,
-  calibration, and derived-result activity as first-class records.
+- Intent: model downstream analysis, fit attempts, interpretation decisions,
+  anomaly review, calibration, and derived-result activity as first-class
+  records that can cite input measurements, code context, parameter snapshots,
+  generated artifacts, fitted values, and affected parameter paths.
 - Boundary: the MVP may export analysis-ready data but does not manage
-  calibration promotion.
+  calibration promotion. Detailed calibration workflow semantics belong in the
+  future backlog and domain invariants.
 
 CAP-023: Managed code snapshots and execution.
 
-- Intent: run selected measurement code under Fricon control with reproducible
-  snapshots and lifecycle supervision.
+- Intent: run selected measurement code under Fricon control with
+  stronger code provenance snapshots and lifecycle supervision.
 - Boundary: the MVP records unmanaged execution context only.
 
 CAP-024: Device boundary and managed device communication.
 
 - Intent: introduce explicit device identity, configuration, and communication
-  boundaries when Fricon begins controlling instruments.
+  boundaries when Fricon begins controlling instruments, including later
+  desired-state planning, observed-state readback, reconciliation diffs, and
+  reviewed apply plans.
 - Boundary: the MVP may record passive setup/device summaries but does not talk
-  to instruments.
+  to instruments. Device apply is ADR-gated.
 
 CAP-025: AI-assisted reviewed automation.
 
 - Intent: let AI propose actions or analysis steps that are reviewed before
   mutating the data library.
 - Boundary: the MVP should preserve auditability, not implement mutating AI
-  automation.
+  automation. AI-created durable conclusions should record provenance, and
+  mutating AI actions should enter through the same reviewed proposal path as
+  non-AI automation.
 
 CAP-031: Run manifest and failure investigation.
 
 - Intent: give managed or high-provenance runs a compact manifest linking
   parameter snapshots, target keys, code/environment summary, lifecycle, logs,
-  artifacts, operator, timestamps, and diagnostics.
-- Boundary: the first slice supports compare, handoff, export, and anomaly
-  investigation; it is not a scheduler or resume engine.
+  artifacts, operator, timestamps, diagnostics, previous-good baselines,
+  calibration evidence, generated sidecars, review decisions, and handoff
+  state.
+- Boundary: a run manifest is a composite view over available facts, not a
+  duplicate owner of parameter, code, setup, analysis, or artifact records. The
+  first slice supports compare, handoff, export, and anomaly investigation.
 
 CAP-032: Routine recipes and reviewed replay.
 
 - Intent: capture repeated compare, run, and analyze routines as previewable
-  recipes so tedious lab work can be replayed without hidden mutation.
+  recipes so tedious lab work can be replayed without hidden mutation,
+  especially when calibration chains need working refs, health gates, and
+  reviewed promotion to durable parameter refs, or when imperative loop bodies
+  would repeatedly issue avoidable device writes.
 - Boundary: read-only batch compare or triage can arrive before
-  mutation-capable automation; durable mutation requires review and audit.
+  mutation-capable automation; durable mutation requires the reviewed proposal
+  and audit model described by future specs and ADRs.
 
 ## Product Grouping
 
@@ -300,6 +329,6 @@ Use these planning groups when routing product work:
 - MVP measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007,
   CAP-028, CAP-030.
 - Context and provenance: CAP-004, CAP-014, CAP-015, CAP-017, CAP-027,
-  CAP-029.
+  CAP-029, CAP-033.
 - Review and analysis: CAP-008, CAP-009, CAP-010, CAP-011, CAP-016, CAP-026.
 - Post-MVP foundation: CAP-018 through CAP-025, CAP-031, CAP-032.

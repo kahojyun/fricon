@@ -71,6 +71,7 @@ Context and provenance:
 - US-012: Register a sample and sample session when useful.
 - US-014: Record passive setup context.
 - US-016: Record passive procedure context.
+- US-019: Capture run-bound local configuration.
 
 Recovery and analysis:
 
@@ -100,13 +101,19 @@ M1 should prove enough of US-001 through US-008 and US-015 to record, inspect,
 recover, and reopen a Python measurement while preserving first-class dataset
 discovery.
 
-The full MVP also needs US-009 for export and US-017/US-018 to validate the
-incremental adoption posture: users can translate new Data Vault-style scripts
-and keep old history in the old system.
+The full MVP also needs US-009 for export, US-017/US-018 to validate the
+incremental adoption posture, and US-019 to make copied local configuration
+visible: users can translate new Data Vault-style scripts, keep old history in
+the old system, and bind the run-relevant files or summaries that old scripts
+currently leave in folders and operator memory.
 
 Python SDK UX is part of the product story, not only implementation detail.
 The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;
 detailed API signatures and capture mechanics belong in later ADRs/specs.
+
+Post-MVP work should turn the MVP facts into local experiment memory and
+reviewed action. Those priorities are outside the MVP story index and are owned
+by `product/future-concepts.md`.
 
 SPEC-002 owns the export/offline-analysis details. Export remains an MVP
 product promise; it is split out only to keep SPEC-001 focused.
