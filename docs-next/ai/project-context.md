@@ -34,7 +34,7 @@ Post-MVP priority order:
 
 1. Parameter system.
 2. Managed run.
-3. Reviewable automation workflow.
+3. Calibration chains and reviewable automation.
 
 Primary user model:
 
@@ -77,8 +77,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   deferred until a focused spec or ADR.
 - Prioritize post-MVP foundations by user pain: parameter diffs and proposals,
   code/source provenance, calibration evidence tied to affected parameter
-  paths, run manifests and failure investigation, then reviewed routine replay
-  or automation.
+  paths, run manifests and failure investigation, then calibration chains,
+  reviewed routine replay, or automation.
 - Desired-state setup/device reconciliation is a later post-MVP improvement
   for routines that outgrow imperative nested loops. Keep desired state,
   observed state, reconciliation plans, and apply executions separate, and do

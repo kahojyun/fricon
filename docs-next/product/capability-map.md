@@ -328,8 +328,9 @@ CAP-032: Routine recipes and reviewed replay.
 
 - Intent: capture repeated compare, run, and analyze routines as previewable
   recipes so tedious lab work can be replayed without hidden mutation,
-  especially when calibration results would otherwise rewrite parameter state
-  or imperative loop bodies would repeatedly issue avoidable device writes.
+  especially when calibration chains need working refs, health gates, and
+  reviewed promotion to durable parameter refs, or when imperative loop bodies
+  would repeatedly issue avoidable device writes.
 - Boundary: read-only batch compare or triage can arrive before
   mutation-capable automation; durable mutation requires preview, review,
   before/after diffs, rollback targets, reconciliation/apply records where

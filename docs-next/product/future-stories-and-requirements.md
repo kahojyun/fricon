@@ -28,7 +28,7 @@ Post-MVP work should prioritize:
 
 - parameter system first
 - managed run second
-- reviewable automation workflow third
+- calibration chains and reviewable automation third
 
 Analysis of representative legacy measurement workflows suggests read-only
 comparison, run like a previous measurement, and failure investigation should
@@ -329,7 +329,7 @@ Not first managed-run slice:
 - Making managed execution mandatory for ordinary exploratory scripts.
 - Treating shell-command wrapping as the primary runner UX.
 
-## Priority 3: Reviewable Automation Workflow
+## Priority 3: Calibration Chains And Reviewable Automation
 
 FEPIC-004: Setup And Calibration State Store/Diff.
 
@@ -349,7 +349,7 @@ FEPIC-004: Setup And Calibration State Store/Diff.
   decisions, and promoted parameter changes inspectable enough that users can
   trust the next run.
 
-FEPIC-005: Reviewable Automation Workflow.
+FEPIC-005: Calibration Chains And Reviewable Automation Workflow.
 
 - Users can preview automation actions before they mutate durable Fricon state,
   device state, named parameter refs, or calibration records.

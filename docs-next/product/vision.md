@@ -198,14 +198,15 @@ Implementation should follow this order:
   and generated run history. This is the code-management counterpart to
   parameter snapshots: it should replace copied-code folders with visible code
   source context before it becomes a scheduler or mandatory execution model.
-- Priority 3: reviewable routine replay and automation workflow that previews,
-  reviews, audits, and applies changes only through explicit safety
-  boundaries. Calibration automation should first support task-chain evidence,
-  health checks, retries, pause points, chain-scoped working parameter refs,
-  and reviewed promotion of final or durable parameter changes. Desired-state
-  reconciliation for setup/device changes is a separate later capability:
-  useful for reducing imperative loop boilerplate, but only after dependencies,
-  readback, settling, timeout, and abort behavior are explicit.
+- Priority 3: calibration chains, reviewable routine replay, and automation
+  workflow that previews, reviews, audits, and applies changes only through
+  explicit safety boundaries. Calibration automation should first support
+  task-chain evidence, health checks, retries, pause points, chain-scoped
+  working parameter refs, and reviewed promotion of final or durable parameter
+  changes. Desired-state reconciliation for setup/device changes is a separate
+  later capability: useful for reducing imperative loop boilerplate, but only
+  after dependencies, readback, settling, timeout, and abort behavior are
+  explicit.
 
 Sample visualization should stay lightweight until product evidence says
 otherwise. Treat a sample visualizer as a view over parameter snapshots and

@@ -103,7 +103,7 @@ Boundary:
 - Queues, resource leases, retries, workflow DAGs, and resumable execution are
   later or ADR-gated.
 
-## Priority 3: Reviewable Automation Workflow
+## Priority 3: Calibration Chains And Reviewable Automation
 
 Why third:
 
