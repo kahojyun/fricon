@@ -47,12 +47,13 @@ explicitly marked with open interview questions:
 - Desktop shell versus browser-capable frontend boundaries
 - migration/import routes for any real pre-v0.2 data
 
+Do not create or expand architecture detail files until product and domain
+baselines are accepted and the user explicitly starts architecture design.
+
 ## Current Files
 
 - `compatibility-policy.md` owns the accepted clean-reset compatibility policy
   and draft future compatibility gates.
-- `api-boundaries.md`, `storage-model.md`, `module-boundaries.md`,
-  `data-flow.md`, and `system-overview.md` are deferred-question notes, not
-  architecture decisions.
-- `risks.md` tracks early design risks that should stay visible while product,
-  domain, and architecture mature.
+- Detailed API, storage, runtime flow, system overview, module boundary, and
+  architecture risk files are intentionally absent during product/domain
+  analysis.
