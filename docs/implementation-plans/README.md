@@ -6,13 +6,13 @@ Sentinel. No active milestone implementation plans.
 
 ## Rule
 
-Do not create milestone plans while product, architecture, specs, or
+Do not create milestone plans while product, domain, architecture, specs, or
 required ADR boundaries are still unsettled.
 
 Implementation plans may be recreated only after a derived spec has accepted
 requirements, design, traceability, and validation. A plan should sequence
 implementation work; it must not introduce product scope, product terminology,
-architecture decisions, or non-goals on its own.
+domain terminology, architecture decisions, or non-goals on its own.
 
 ## Recreation Criteria
 
