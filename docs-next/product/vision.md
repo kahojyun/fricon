@@ -132,9 +132,9 @@ Common workflows should have appropriate simplifications, but exact helper
 shapes are not part of the product vision until real usage feedback supports
 them.
 
-Detailed SDK usage guidance lives in `product/python-sdk-ux.md`. Old planning
-snippets under `dev-docs/` should be read as non-binding UX sketches unless an
-ADR accepts exact API syntax.
+Detailed SDK usage guidance lives in `product/python-sdk-ux.md`. Historical
+planning snippets should be read as non-binding UX sketches unless an ADR
+accepts exact API syntax.
 
 ## MVP Scope
 

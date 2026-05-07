@@ -28,8 +28,9 @@ Use this skill for Fricon database schema work that should be driven by Diesel C
 ## Workflow
 
 1. Read `references/fricon-database.md` for project-specific paths and
-   commands, then apply the database schema section in
-   `<project_root>/dev-docs/maintenance-checklist.md`.
+   commands. If the schema change affects accepted v0.2+ domain,
+   compatibility, or user-visible behavior, update `docs-next/` or add an ADR
+   before treating the change as durable.
 2. Inspect the existing owning slice under `crates/fricon/src/database` before designing schema changes.
 3. Create a migration with Diesel CLI:
 
@@ -59,8 +60,8 @@ diesel migration redo
 
 ## Validation
 
-Use the database schema checklist in
-`<project_root>/dev-docs/maintenance-checklist.md`.
+Run focused Rust/database validation for the changed slice, and apply the
+repository preflight skill before PR readiness.
 
 ## When To Be Careful
 

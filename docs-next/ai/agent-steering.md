@@ -14,7 +14,7 @@ Draft.
 | Storage/API/protocol decision | First confirm product/domain inputs; use `architecture/README.md` and ADRs, and do not create detailed architecture files until architecture design starts |
 | Compatibility question | `architecture/compatibility-policy.md`, `decisions/ADR-001-v02-clean-reset-boundary.md` |
 | Implementation planning | First confirm accepted product/domain/architecture/ADR inputs, then recreate or read derived `specs/` and `implementation-plans/`; they are sentinel-only right now |
-| Current v0.1 behavior | `dev-docs/current-*.md`, public `docs/`, and code |
+| Current v0.1 behavior | Code and tests only; old docs were retired during the v0.2 reset |
 
 ## When To Pause And Update Docs
 

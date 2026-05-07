@@ -21,8 +21,9 @@ right now. Recreate or read downstream artifacts only when implementation
 planning is the task and the relevant upstream baseline is accepted or
 explicitly marked with open interview questions.
 
-Use `dev-docs/` for current implementation details and historical rationale,
-not as the v0.2+ design source of truth.
+Legacy public and developer documentation content has been merged or retired.
+Use code for current implementation facts and `docs-next/` for v0.2+
+direction.
 
 ## Product Direction
 

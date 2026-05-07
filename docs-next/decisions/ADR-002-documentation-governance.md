@@ -49,8 +49,10 @@ Detailed authoring and ID-allocation workflow is maintained in
 - New domain vocabulary must update domain docs before or with implementation.
 - Specs must trace to capabilities, stories, domain concepts, architecture
   docs, ADRs, modules, tests, compatibility, and non-goals.
-- Old documents are not deleted by default; supersede or deprecate them with
-  status and links.
+- Historical documents may be deleted after useful product and domain ideas are
+  merged into the accepted baseline. If a historical idea is not worth
+  preserving as product direction, domain boundary, ADR pressure, or user-doc
+  plan, prefer deletion over permanent archival.
 
 ## Alternatives Considered
 

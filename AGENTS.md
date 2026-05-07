@@ -6,10 +6,9 @@
 - Frontend is under `crates/fricon-ui/frontend`.
 - `examples/` contains runnable examples.
 - `scripts/` contains development helpers.
-- `docs/` contains public user-facing documentation sources.
-- `dev-docs/` contains internal developer notes, implementation details,
-  architecture notes, and maintenance guidance that should not be published as
-  user-facing docs.
+- `docs-next/` is the single documentation directory for the v0.2+ clean reset.
+  It contains product, domain, architecture, ADR, research, AI-agent, and
+  future public-documentation planning.
 
 ## Repo-Wide Rules
 
@@ -21,10 +20,8 @@
   created through `fricon init`.
 - Keep setup lazy: run `uv sync`, `uv run maturin develop`, `pnpm install`, and
   broader builds only when the task actually needs them.
-- Use `dev-docs/maintenance-checklist.md` as the canonical source for
-  coordinated maintenance checklists, and use
-  `dev-docs/pr-preflight-checklist.md` as the manual implementation pre-PR
-  check matrix when preparing implementation work.
+- Use `docs-next/README.md` as the documentation entry point. For agent routing
+  and documentation update policy, use `docs-next/ai/`.
 - Users interact with this repo through the Python API, CLI, and desktop UI. Internal Rust APIs between crates have no stability guarantees and may be aggressively refactored or broken when it improves the architecture.
 - Use non-`mod.rs` layout for Rust modules (`foo.rs` plus optional `foo/*.rs` submodules).
 - Rust use nightly rustfmt: `cargo +nightly fmt`.
@@ -41,8 +38,10 @@
   passing file filters through the batch `test` script.
   Desktop smoke is supported on Windows only; Tauri does not provide desktop
   WebDriver support on macOS.
-- For workspace format changes and Rust IPC/gRPC contract changes, follow the
-  relevant sections in `dev-docs/maintenance-checklist.md`.
+- For data-library format, local runtime/API, IPC/protocol, export, or
+  compatibility changes, confirm the accepted product/domain baseline first and
+  update `docs-next/architecture/compatibility-policy.md` or add an ADR before
+  durable implementation.
 - Follow the existing vertical slice boundaries and add code within the owning domain/feature. Keep boundaries and data ownership clear, and avoid cross-feature or cross-layer shortcuts.
 - Keep internal structure lightweight: prefer straightforward local implementations, feature-local duplication, and explicit types over premature shared abstractions or generic extension points.
 - Add traits only for real boundaries or capabilities with multiple plausible implementations, not as a default pattern for mocking.

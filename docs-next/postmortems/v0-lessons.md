@@ -30,7 +30,7 @@ shape the v0.2+ reset.
 - Compatibility notes focused on preserving current workspaces before the
   project had real adoption or a stable domain model.
 - v0.2 planning, archived proposals, AI process notes, and current
-  implementation facts accumulated in the same `dev-docs/` space.
+  implementation facts accumulated in the same developer-documentation space.
 - The desktop UI was naturally organized as a dataset explorer instead of a
   measurement console.
 - Protocol and service boundaries were shaped around current IPC/gRPC needs,

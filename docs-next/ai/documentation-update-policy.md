@@ -57,7 +57,8 @@ Gate D documentation sync requires:
 
 - spec tasks reflect actual status
 - traceability lists affected modules/files at the right granularity
-- public docs are updated if implemented behavior is user-visible
+- future user docs or the user-documentation plan are updated if implemented
+  behavior is user-visible
 - architecture docs or ADRs reflect significant deviations
 - stale docs are listed with next actions if immediate update is not possible
 

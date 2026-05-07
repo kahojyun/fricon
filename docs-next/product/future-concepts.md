@@ -294,6 +294,6 @@ FC-019: Desired-state setup/device planning.
 
 ## Historical Inputs
 
-Use `dev-docs/v0.2/future-concepts.md` and files under
-`dev-docs/v0.2/archive/` as source material only. If they conflict with
+Legacy future-concept and archived proposal notes were merged into this ledger
+or retired. If historical notes from external history or chat conflict with
 accepted `docs-next/` documents, the accepted `docs-next/` document wins.

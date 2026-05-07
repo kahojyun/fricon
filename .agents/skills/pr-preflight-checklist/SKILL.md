@@ -20,8 +20,8 @@ relative to the repository root (`<project_root>`), not to this skill directory.
 2. Choose profile:
    - `quick` for normal local development loops (default)
    - `strict` once before opening/updating a PR
-3. Map changed files to checks using the repository-root file
-   `<project_root>/dev-docs/pr-preflight-checklist.md`.
+3. Map changed files to checks using `AGENTS.md`, crate-local `AGENTS.md`
+   files, and the changed surface.
 4. Run selected checks in fail-fast order:
    - run format and static checks first
    - for frontend changes, prefer `pnpm run check` as the default combined gate
@@ -30,9 +30,9 @@ relative to the repository root (`<project_root>`), not to this skill directory.
    - for targeted frontend reruns, pass file filters to `test:unit` or `test:browser` instead of the batch `test` script
    - build/test next
    - strict-only checks last (dependency/license checks included)
-5. For release notes, generated bindings, workspace format changes, database
-   migrations, or IPC/gRPC compatibility changes, apply the relevant section in
-   the repository-root file `<project_root>/dev-docs/maintenance-checklist.md`.
+5. For generated bindings, data-library format changes, database migrations,
+   IPC/protocol compatibility changes, or user-visible behavior changes, update
+   the relevant `docs-next/` baseline or ADR before treating the work as ready.
 6. Re-run failed checks after fixes, then run the selected profile once end-to-end.
 7. Report results with explicit pass/fail status and any remaining risk.
 
@@ -52,9 +52,9 @@ relative to the repository root (`<project_root>`), not to this skill directory.
 - Do not place templates, README files, or other helper Markdown files inside
   the repository-root `.changeset/` directory; Knope treats them as real
   changesets. `.changeset/.gitkeep` is acceptable.
-- Workspace, IPC/gRPC, database, generated binding, and release-note
-  maintenance rules live in the repository-root file
-  `<project_root>/dev-docs/maintenance-checklist.md`.
+- Data-library format, IPC/protocol, database, generated binding, and
+  user-visible compatibility changes must be reflected in `docs-next/` when
+  they affect accepted direction or compatibility promises.
 
 ## Optional Alternatives
 
@@ -75,5 +75,7 @@ Return a concise preflight summary with:
 
 Repository-root files:
 
-- `<project_root>/dev-docs/pr-preflight-checklist.md`
-- `<project_root>/dev-docs/maintenance-checklist.md`
+- `<project_root>/AGENTS.md`
+- `<project_root>/docs-next/README.md`
+- `<project_root>/docs-next/ai/documentation-update-policy.md`
+- `<project_root>/docs-next/architecture/compatibility-policy.md`

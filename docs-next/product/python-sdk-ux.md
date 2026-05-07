@@ -11,8 +11,8 @@ without prematurely accepting exact API syntax, parameter-capture mechanics, or
 runner internals.
 
 Most Fricon users will define and execute experiments through Python scripts or
-notebooks. The SDK is therefore a primary product surface. Old code sketches in
-`dev-docs/` should be interpreted as UX sketches unless an ADR accepts exact
+notebooks. The SDK is therefore a primary product surface. Historical code
+sketches should be interpreted as UX sketches unless an ADR accepts exact
 syntax.
 
 This file is intentionally not a detailed API design. It records only the SDK

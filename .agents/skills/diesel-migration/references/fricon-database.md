@@ -55,5 +55,6 @@ cargo install diesel_cli --no-default-features --features sqlite
 
 ## Verification
 
-Use the database schema checklist in
-`<project_root>/dev-docs/maintenance-checklist.md`.
+Use focused Rust/database validation for the changed slice. If a schema change
+affects v0.2+ accepted direction, update `docs-next/` or add an ADR before
+treating the migration as durable.

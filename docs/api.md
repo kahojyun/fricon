@@ -1,3 +1,0 @@
-# API index
-
-::: fricon

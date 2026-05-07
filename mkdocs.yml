@@ -1,5 +1,6 @@
 site_name: Fricon
 repo_url: https://github.com/kahojyun/fricon
+docs_dir: docs-next
 theme:
   name: material
   palette:

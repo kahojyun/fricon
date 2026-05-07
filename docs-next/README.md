@@ -2,24 +2,18 @@
 
 ## Status
 
-Draft v0.2+ documentation baseline.
+Active v0.2+ documentation baseline.
 
 ## Purpose
 
-`docs-next/` is the clean design workspace for the v0.2+ reset. It exists so
-new product, domain, architecture, and implementation planning can move forward
-without mixing:
+`docs-next/` is the single documentation directory for the v0.2+ reset. It owns
+the active product, domain, architecture, ADR, research, user-documentation
+planning, and AI-agent guidance baseline.
 
-- current v0.1 implementation facts
-- historical proposal notes
-- AI-agent process discussion
-- new v0.2+ design decisions
-
-For v0.2+ planning, treat this directory as the starting point.
-`dev-docs/project-intent.md` remains strategic product canon; `docs-next/`
-derives from it and owns the v0.2+ design baseline. Use older `dev-docs/v0.2/`
-proposal files as source material and historical rationale, not as the current
-source of truth.
+Legacy public and developer documentation content has been merged or retired.
+Do not use old workspace/dataset-first public docs, historical proposal notes,
+or current v0.1 implementation notes as v0.2+ source material unless a current
+`docs-next/` document explicitly reintroduces the idea.
 
 ## Design Stance
 
@@ -125,20 +119,13 @@ file only when authoring or reorganizing `docs-next/` documents.
 
 ## Source Inputs
 
-This baseline was bootstrapped from:
+This baseline was bootstrapped from legacy repository notes that have now been
+merged or retired, including the old public docs, developer notes, current
+implementation notes, v0.2 planning files, and archived proposal inputs.
 
-- `README.md`
-- `docs/`
-- `dev-docs/project-intent.md`
-- `dev-docs/roadmap.md`
-- `dev-docs/current-storage-notes.md`
-- `dev-docs/current-dataset-semantics.md`
-- `dev-docs/architecture-guidelines.md`
-- `dev-docs/v0.2/`
-- `dev-docs/v0.2/archive/`
-
-If an old proposal conflicts with this baseline, prefer this baseline for v0.2+
-planning unless a newer ADR says otherwise.
+The current `docs-next/` content is the retained result. If an old proposal
+from external history or chat conflicts with this baseline, prefer this
+baseline for v0.2+ planning unless a newer ADR says otherwise.
 
 ## Token-Efficient Documentation
 

@@ -11,9 +11,10 @@ workspace/dataset-first. The desired v0.2+ product model is a local lab data
 library centered on measurements, dataset artifacts, optional sample/session
 context, lifecycle history, provenance, and export.
 
-The old `dev-docs/` area also mixed current implementation notes, historical
-proposal inputs, AI-agent process guidance, and new v0.2 design direction. That
-made it too easy for future work to preserve v0.1 assumptions accidentally.
+The old developer-documentation area also mixed current implementation notes,
+historical proposal inputs, AI-agent process guidance, and new v0.2 design
+direction. That made it too easy for future work to preserve v0.1 assumptions
+accidentally.
 
 ## Decision
 
@@ -34,9 +35,10 @@ the wrong user model alive.
 
 ## Consequences
 
-- `docs-next/` becomes the v0.2+ design baseline.
-- `dev-docs/` remains useful for current implementation facts and historical
-  rationale, not as the v0.2 source of truth.
+- `docs-next/` becomes the v0.2+ design baseline and the single documentation
+  directory.
+- Legacy public and developer documentation content may be deleted after useful
+  product and domain ideas are merged.
 - Early implementation work should prefer replacing current domain boundaries
   in place over building a permanent parallel `fricon-v2` project.
 - The first v0.2 implementation must still protect data created by v0.2 once
@@ -48,8 +50,9 @@ the wrong user model alive.
   would reduce short-term breakage but preserve the old organizing model.
 - Fork a separate v2 project. This would isolate experimentation but duplicate
   build, packaging, testing, and release infrastructure.
-- Keep all planning under `dev-docs/v0.2`. This would continue the current
-  confusion between historical proposals and accepted v0.2+ baseline.
+- Keep all planning under the old v0.2 developer-doc area. This would continue
+  the current confusion between historical proposals and accepted v0.2+
+  baseline.
 
 ## Revisit Triggers
 
