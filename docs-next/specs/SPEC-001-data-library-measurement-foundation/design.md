@@ -2,7 +2,13 @@
 
 ## Status
 
-Draft.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+Product and domain documents own scope while v0.2+ analysis is still in
+progress. This design records likely implementation pressure only; re-sync it
+after the product/domain baseline and required ADRs are accepted.
 
 ## Design Summary
 
@@ -27,7 +33,6 @@ First implementation records:
 - Event/AuditRecord
 - optional Sample and SampleSession links
 - optional ParameterSnapshot
-- optional RunConfigSnapshot
 - optional CodeProvenanceSummary
 - optional SetupProvenanceSummary
 - optional ProcedureSummary
@@ -49,7 +54,6 @@ Candidate operation groups:
 - `measurements.finish`
 - `measurements.abort`
 - `measurements.record_event`
-- `measurements.attach_run_config`
 - `datasets.create_writer`
 - `datasets.append`
 - `datasets.finish`
@@ -122,8 +126,6 @@ Storage ADR must decide physical layout. The design requires only:
   points, repeated points, fixed-shape traces, and variable-length traces
 - partial-read semantics for interrupted or incomplete data
 - optional internal stream-like groups for advanced storage/export/read needs
-- optional run-bound local configuration references, snapshots, hashes, or
-  summaries
 - event timeline records
 - compatibility version and migration state
 - active writer state sufficient for recovery
@@ -141,5 +143,3 @@ Storage ADR must decide physical layout. The design requires only:
 8. Passive procedure summary shape.
 9. Whether internal stream groups are required for first implementation or only
    reserved in the storage/export ADRs.
-10. Run configuration snapshot shape: inline summary, copied file, hash-only
-    reference, external URI, or a mix.

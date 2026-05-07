@@ -4,19 +4,25 @@
 
 Draft placeholder.
 
+## Planning Boundary
+
+Traceability is provisional until product/domain scope and required ADRs are
+accepted. Do not use this file as the source of truth for whether a product
+story belongs to the export slice.
+
 ## Related Capabilities
 
-CAP-010, CAP-011, CAP-014, CAP-015, CAP-026, CAP-027, CAP-029, CAP-033.
+CAP-010, CAP-011, CAP-014, CAP-015, CAP-026, CAP-027, CAP-029.
 
 ## Related User Stories
 
-US-008, US-009, US-013, US-019.
+US-008, US-009, US-013.
 
 ## Related Domain Concepts
 
 Measurement, DatasetArtifact, ExportBundle, DataLibrary,
-ParameterSnapshot, RunConfigSnapshot, CodeProvenanceSummary,
-SetupProvenanceSummary, ProcedureSummary, Event/AuditRecord.
+ParameterSnapshot, CodeProvenanceSummary, SetupProvenanceSummary,
+ProcedureSummary, Event/AuditRecord.
 
 ## Related Docs
 
@@ -32,4 +38,3 @@ SetupProvenanceSummary, ProcedureSummary, Event/AuditRecord.
 - export bundle format
 - common analysis format policy
 - export privacy defaults
-- run configuration export selection and privacy policy

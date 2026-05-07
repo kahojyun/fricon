@@ -2,7 +2,14 @@
 
 ## Status
 
-Draft implementation plan.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+This file is a downstream milestone landing area. Until the product and domain
+baselines are accepted, `product/`, `domain/`, and ADRs own scope. Re-sync this
+plan after `SPEC-001` is accepted instead of treating the current bullets as an
+implementation commitment.
 
 ## Goal
 
@@ -27,7 +34,6 @@ M1 should prove:
 - readable partial/interrupted measurement data
 - optional passive setup summary
 - optional passive procedure summary
-- optional run-bound local configuration snapshot or summary
 - Python reopen through stable IDs
 - early compatibility negotiation before writes
 

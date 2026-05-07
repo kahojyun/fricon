@@ -2,7 +2,13 @@
 
 ## Status
 
-Draft.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+Product and domain documents own scope while v0.2+ analysis is still in
+progress. This file is a candidate first-slice shape, not an accepted
+implementation contract.
 
 ## Purpose
 
@@ -14,7 +20,7 @@ inspection, partial recovery, and Python reopen.
 
 CAP-001, CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-007, CAP-008,
 CAP-009, CAP-010, CAP-012, CAP-013, CAP-014, CAP-015, CAP-017, CAP-026,
-CAP-027, CAP-028, CAP-029, CAP-033.
+CAP-027, CAP-028, CAP-029.
 
 ## Requirements
 
@@ -41,7 +47,6 @@ CAP-027, CAP-028, CAP-029, CAP-033.
 | REQ-019 | Provide scan schema authoring helpers. | Common 1D/2D/N-D scan and trace cases have Python-native scan plans or helpers; advanced cases can use raw schema. Exact helper shape should be refined from usage feedback. |
 | REQ-020 | Record passive procedure summaries. | Measurements can link unmanaged script, external runner, or declared plan summaries without managed execution. |
 | REQ-021 | Allow internal artifact streams below the user concept. | Storage/export/read APIs may model internal streams, but v0.2 UI and public examples keep one dataset artifact as the normal concept. |
-| REQ-022 | Capture run-bound local configuration. | Measurements can attach selected local configuration references, snapshots, hashes, or summaries with privacy-aware export handling and correction history. |
 
 ## Non-Goals
 

@@ -2,24 +2,30 @@
 
 ## Status
 
-Draft.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+Traceability is provisional until product/domain scope and required ADRs are
+accepted. Do not use this file as the source of truth for whether a product
+story belongs to M1.
 
 ## Related Capabilities
 
 CAP-001, CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-007, CAP-008,
 CAP-009, CAP-010, CAP-012, CAP-013, CAP-014, CAP-015, CAP-017, CAP-026,
-CAP-027, CAP-028, CAP-029, CAP-033.
+CAP-027, CAP-028, CAP-029.
 
 ## Related User Stories
 
 US-001, US-002, US-003, US-004, US-005, US-006, US-007, US-008, US-010,
-US-011, US-012, US-013, US-014, US-015, US-016, US-019.
+US-011, US-012, US-013, US-014, US-015, US-016.
 
 ## Related Domain Concepts
 
 DataLibrary, Measurement, DatasetArtifact, Sample, SampleSession,
 ParameterSnapshot, CodeProvenanceSummary, SetupProvenanceSummary,
-RunConfigSnapshot, ProcedureSummary, Event/AuditRecord, OperatorProfile.
+ProcedureSummary, Event/AuditRecord, OperatorProfile.
 
 ## Related Architecture Docs
 
@@ -43,7 +49,6 @@ RunConfigSnapshot, ProcedureSummary, Event/AuditRecord, OperatorProfile.
 - Pending: passive procedure summary shape
 - Pending: Python-native scan-plan/helper API shape
 - Pending: internal stream/subpayload representation, if needed
-- Pending: run-bound local configuration snapshot shape
 
 ## Affected Modules
 

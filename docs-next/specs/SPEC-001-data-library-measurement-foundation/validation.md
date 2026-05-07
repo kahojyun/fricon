@@ -2,7 +2,12 @@
 
 ## Status
 
-Draft.
+Draft placeholder. Not implementation-ready.
+
+## Planning Boundary
+
+Validation scenarios are candidate checks for later implementation planning.
+Re-sync them after product/domain scope and required ADRs are accepted.
 
 ## Validation Strategy
 
