@@ -74,5 +74,6 @@ After v0.2 records real lab data, the compatibility promise changes:
   dataset-local metadata for convenience.
 - Do not add future runner, device, calibration, or AI automation surfaces
   before the measurement foundation is coherent.
-- If a local feature introduces a new domain noun, update `docs/domain/`
+- If a local feature introduces a new domain noun, first place the product term
+  or scope decision in `docs/product/`; rebuild the relevant domain baseline
   and traceability before implementation.

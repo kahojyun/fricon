@@ -16,7 +16,9 @@ domain model.
 Use the documentation tree as the v0.2+ baseline with these artifact classes:
 
 - product: vision, personas, capability map, story map, glossary, traceability
-- domain: conceptual model, context map, lifecycle, invariants
+- domain: conceptual model, context map, lifecycle, invariants; during early
+  product correction, this layer may be a README sentinel until rebuilt from
+  accepted product inputs
 - architecture: overview, module boundaries, data flow, API/storage,
   compatibility, risks
 - decisions: ADRs for durable decisions
@@ -45,7 +47,8 @@ Detailed authoring and ID-allocation workflow is maintained in
 
 - Do not implement major v0.2 features from chat history or archived proposals
   alone.
-- New domain vocabulary must update domain docs before or with implementation.
+- New domain vocabulary must update product terminology first, then rebuild or
+  update domain docs before or with implementation.
 - Specs must trace to capabilities, stories, domain concepts, architecture
   docs, ADRs, modules, tests, compatibility, and non-goals.
 - Superseded planning material should be folded into the owning product,
@@ -56,7 +59,7 @@ Detailed authoring and ID-allocation workflow is maintained in
 - Keep only a roadmap and issue list. This is too weak for cross-module
   semantics.
 - Put all design detail in ADRs. ADRs are good for decisions but poor as the
-  full product/domain model.
+  full product and domain model.
 - Put all design detail in implementation specs. Specs become too local and
   make global concepts hard to find.
 

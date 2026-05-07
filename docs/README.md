@@ -7,8 +7,9 @@ Active v0.2+ documentation baseline.
 ## Purpose
 
 `docs/` is the single documentation directory for the v0.2+ reset. It owns
-the active product, domain, architecture, ADR, research, user-documentation
-planning, and AI-agent guidance baseline.
+the active product, architecture constraints, ADR, research, user-documentation
+planning, and AI-agent guidance baseline. The detailed domain baseline is
+deliberately deferred while product analysis is still being corrected.
 
 ## Design Stance
 
@@ -23,11 +24,15 @@ Product planning in this directory uses MVP, post-MVP priority, and ADR-gated
 labels. Do not treat post-MVP priorities as semantic-version labels; compatible
 features may still ship on the same compatible release line.
 
+The active analysis surface is currently the product layer. `domain/` remains a
+placeholder until product scope, terminology, and future priority boundaries
+are stable enough to rebuild a lean conceptual model.
+
 ## Workflow Stance
 
 This directory is currently the primary work surface. Keep discussion changes
 lightweight. Do not add implementation scaffolding, package locks, generated
-artifacts, or release automation until the accepted product, domain,
+artifacts, or release automation until the accepted product, rebuilt domain,
 architecture, and ADR baseline calls for them.
 
 ## Scale Classification
@@ -49,22 +54,22 @@ Fricon is an S2 medium modular system:
 5. `product/story-map.md`
 6. `product/python-sdk-ux.md` for the Python SDK usage guideline
 7. relevant `product/epics/` and `product/user-stories/`
-8. `domain/conceptual-model.md`
+8. `domain/README.md`
 9. `architecture/README.md`
 10. `architecture/compatibility-policy.md`
 11. `ai/project-context.md`
 
-`specs/` and `implementation-plans/` are currently sentinels only. Recreate
-downstream artifacts only when implementation planning is the task and the
-relevant upstream baseline is accepted or explicitly marked with open interview
-questions.
+`domain/`, `specs/`, and `implementation-plans/` are currently sentinels only.
+Recreate domain or downstream artifacts only when that layer is the task and
+the relevant upstream baseline is accepted or explicitly marked with open
+interview questions.
 
 ## Directory Map
 
 ```text
 docs/
   product/              User goals, capabilities, stories, future ledger, glossary
-  domain/               Conceptual model, contexts, lifecycles, invariants
+  domain/               Placeholder for the future conceptual model rebuild
   architecture/         Accepted constraints and deferred ADR questions
   decisions/            ADRs for durable decisions
   specs/                Sentinel now; later system-slice specs derived from the baseline
@@ -89,20 +94,22 @@ Keep each idea in the narrowest durable owner:
 - `product/capability-map.md` owns stable capability IDs and compact scope
   boundaries. Detailed acceptance notes belong in stories or ADRs; derived
   specs may add implementation acceptance after upstream acceptance.
-- `product/glossary.md` owns public and future terminology.
-- `domain/conceptual-model.md`, `domain/context-map.md`, and
-  `domain/invariants.md` own concept relationships, bounded-context routing,
-  and hard anti-corruption rules.
+- `product/glossary.md` owns public and future terminology while the domain
+  baseline is deferred.
+- `domain/README.md` owns the domain deferment policy. Detailed concept
+  relationships, bounded-context routing, lifecycle semantics, and invariants
+  must be rebuilt from accepted product inputs before they become source of
+  truth.
 - `architecture/README.md` owns accepted architecture constraints while the
-  project is still in product/domain analysis. Detailed API, storage, module,
+  project is still in product analysis. Detailed API, storage, module,
   runtime, and export shape remains deferred until later ADRs/specs.
 - When active, `specs/` own implementation-slice requirements, design, tasks,
   traceability, and validation derived from upstream sources. They are currently
   sentinels only.
 - While product, domain, architecture, or required ADR boundaries are still
-  unsettled, `specs/` and `implementation-plans/` must remain sentinel-only:
-  do not let them introduce product scope, domain vocabulary, or architecture
-  decisions that are not already owned upstream.
+  unsettled, `domain/`, `specs/`, and `implementation-plans/` must remain
+  sentinel-only: do not let them introduce product scope, domain vocabulary, or
+  architecture decisions that are not already owned upstream.
 - `ai/` owns agent routing and update policy, not product or domain rationale.
 
 Detailed editing rules live in `ai/documentation-update-policy.md`; load that

@@ -6,8 +6,9 @@ Pre-architecture placeholder.
 
 ## Purpose
 
-Architecture is not the active design surface yet. Product and initial domain
-analysis are still upstream. Until those inputs are accepted, this directory
+Architecture is not the active design surface yet. Product analysis and the
+future domain rebuild are still upstream. Until those inputs are accepted, this
+directory
 should only preserve accepted constraints and collect questions for later ADRs
 or specs.
 
@@ -33,8 +34,8 @@ architecture unless an ADR accepts them.
 
 ## Deferred Architecture Questions
 
-Answer these only after the relevant product and domain baseline is accepted or
-explicitly marked with open interview questions:
+Answer these only after the relevant product baseline and rebuilt domain
+baseline are accepted or explicitly marked with open interview questions:
 
 - local runtime/process model and client discovery
 - local runtime/API transport and protocol shape
@@ -47,13 +48,14 @@ explicitly marked with open interview questions:
 - Desktop shell versus browser-capable frontend boundaries
 - migration/import routes for any real pre-v0.2 data
 
-Do not create or expand architecture detail files until product and domain
-baselines are accepted and the user explicitly starts architecture design.
+Do not create or expand architecture detail files until product inputs are
+accepted, the needed domain baseline has been rebuilt, and the user explicitly
+starts architecture design.
 
 ## Current Files
 
 - `compatibility-policy.md` owns the accepted clean-reset compatibility policy
   and draft future compatibility gates.
 - Detailed API, storage, runtime flow, system overview, module boundary, and
-  architecture risk files are intentionally absent during product/domain
-  analysis.
+  architecture risk files are intentionally absent during product analysis and
+  domain-placeholder staging.

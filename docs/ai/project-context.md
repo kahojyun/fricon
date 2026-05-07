@@ -12,13 +12,13 @@ For v0.2+ work, read:
 2. `docs/decisions/ADR-001-v02-clean-reset-boundary.md`
 3. `docs/product/vision.md`
 4. `docs/product/python-sdk-ux.md` for the Python SDK usage guideline
-5. `docs/domain/conceptual-model.md`
+5. `docs/domain/README.md`
 6. `docs/architecture/README.md`
 7. `docs/architecture/compatibility-policy.md`
 
-`docs/specs/` and `docs/implementation-plans/` are sentinels only
-right now. Recreate or read downstream artifacts only when implementation
-planning is the task and the relevant upstream baseline is accepted or
+`docs/domain/`, `docs/specs/`, and `docs/implementation-plans/` are sentinels
+only right now. Recreate or read detailed domain/downstream artifacts only when
+that layer is the task and the relevant upstream baseline is accepted or
 explicitly marked with open interview questions.
 
 ## Product Direction
@@ -72,7 +72,7 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   unless a later product decision requires it.
 - For post-MVP parameter, calibration, run-manifest, sample-visualizer, and
   setup/device reconciliation details, read `product/future-concepts.md`,
-  `product/glossary.md`, and `domain/invariants.md`.
+  `product/future-stories-and-requirements.md`, and `product/glossary.md`.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.
