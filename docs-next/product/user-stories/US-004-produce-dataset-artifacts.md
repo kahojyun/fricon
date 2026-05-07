@@ -28,6 +28,6 @@ losing direct dataset access.
 - Making internal streams the normal user-facing product model.
 - Requiring one measurement to have exactly one dataset.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-005, CAP-006, CAP-026, CAP-028, SPEC-001.
+CAP-005, CAP-006, CAP-026, CAP-028.

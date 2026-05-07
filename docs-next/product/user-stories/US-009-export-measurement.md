@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Detailed requirements live in `../../specs/SPEC-002-measurement-export-offline-analysis/`.
+Accepted.
 
 ## Primary Epic
 
@@ -30,6 +30,6 @@ importing the data first.
 - Importing the bundle into another editable data library as the default path.
 - Legacy Data Vault, Labber, or HDF5 compatibility layers.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-010, CAP-011, SPEC-002.
+CAP-010, CAP-011.

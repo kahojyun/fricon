@@ -27,6 +27,6 @@ so that migration does not block new data collection.
 - Built-in legacy import as an MVP adoption prerequisite.
 - Making reopen/export own old-system history migration.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
 CAP-001, CAP-011, CAP-026, CAP-030.

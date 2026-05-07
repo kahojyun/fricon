@@ -2,16 +2,14 @@
 
 ## Status
 
-Draft placeholder. Not implementation-ready until product/domain scope and
-required ADRs are accepted.
+Draft downstream shell. Not implementation-ready until product/domain scope,
+architecture boundaries, requirements, design, and required ADRs are accepted.
 
 ## Tasks
 
-| ID | Task | Status |
-| --- | --- | --- |
-| T-001 | Write export bundle format ADR. | Pending |
-| T-002 | Define semantic manifest subset for exports. | Pending |
-| T-003 | Decide common analysis formats for v0.2. | Pending |
-| T-004 | Design direct Python export reader API. | Pending |
-| T-005 | Design privacy preview defaults. | Pending |
-| T-006 | Add validation scenarios for regular grids, partial grids, irregular scans, and variable-length traces. | Pending |
+No implementation tasks are accepted in this file yet.
+
+Generate tasks only after this spec has accepted requirements, design,
+traceability, and validation. If task drafting reveals missing product scope,
+domain vocabulary, export architecture, or ADR decisions, interview for the
+decision and update the upstream owner before adding tasks here.

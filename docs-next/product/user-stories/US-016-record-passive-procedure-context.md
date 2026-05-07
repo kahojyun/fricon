@@ -31,6 +31,6 @@ even before Fricon manages execution.
 - Managed measurement plans, task queues, or scan-point checkpoints.
 - Claiming Fricon executed steps it only observed or recorded.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-029, SPEC-001.
+CAP-029.

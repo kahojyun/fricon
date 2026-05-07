@@ -7,7 +7,8 @@ Accepted traceability guide.
 ## Purpose
 
 Avoid a large story-by-module table. Use this file to route future work to the
-right code areas at epic level. Specs own precise task/file traceability.
+right code areas at epic level. Precise task/file traceability belongs in a
+derived implementation artifact after upstream scope is accepted.
 
 ## Module Legend
 
@@ -40,5 +41,5 @@ migration helpers mature.
 
 ## Rule
 
-When a story becomes implementation-ready, add precise traceability in the
-owning spec instead of expanding this file into a matrix.
+When a story becomes implementation-ready, add precise traceability downstream
+instead of expanding this file into a matrix.

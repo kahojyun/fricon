@@ -35,6 +35,6 @@ semantics without making every script write raw schema by hand.
 - A fixed framework-specific helper name or QCoDeS-style parameter-object
   model.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-006, CAP-028, SPEC-001.
+CAP-006, CAP-028.

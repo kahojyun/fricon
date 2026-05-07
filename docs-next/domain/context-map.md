@@ -9,10 +9,10 @@ Draft.
 | Context | Responsibility | Primary Terms | Upstream/Downstream |
 | --- | --- | --- | --- |
 | Data Library | Local root, identity, catalog, compatibility, backup/restore. | DataLibrary, format version, checkpoint. | Upstream to all data contexts. |
-| Measurement | Data-taking records, lifecycle, annotations, produced artifacts, context links. | Measurement, lifecycle, note, marker, event. | Uses Sample, DatasetArtifact, ParameterSnapshot, CodeProvenanceSummary. |
+| Measurement | Data-taking records, lifecycle, annotations, produced artifacts, context links. | Measurement, lifecycle, note, marker, event. | Uses Sample, DatasetArtifact, ParameterSummary, RunConfigSnapshot, CodeProvenanceSummary. |
 | Dataset Artifact | Table facts, schema, scan semantics, projections, live append state. | DatasetArtifact, variable, role, scan schema, projection. | Produced by Measurement; read by Desktop, Python, Export, Analysis later. |
 | Sample Context | Samples, sample sessions, active context, corrections. | Sample, SampleSession, active context. | Used by Measurement and views. |
-| Provenance | Code provenance, setup summaries, procedure summaries, parameter snapshot, actor/event records. | CodeProvenanceSummary, SetupProvenanceSummary, ProcedureSummary, ParameterSnapshot, Actor, Event. | Linked by Measurement; extended by future runner/calibration. |
+| Provenance | Code provenance, parameter summaries, run-bound configuration snapshots, setup summaries, procedure summaries, actor/event records. | CodeProvenanceSummary, ParameterSummary, RunConfigSnapshot, SetupProvenanceSummary, ProcedureSummary, Actor, Event. | Linked by Measurement; extended by future runner/calibration. |
 | Parameter Management | Future named profiles, immutable effective snapshots, diffs, and reviewed proposals. | ParameterProfile, ParameterSnapshot, ParameterProposal, ParameterRef. | Uses Provenance and Analysis evidence; linked by Measurement, Run Manifest, and Calibration. |
 | Analysis And Calibration | Future analysis attempts, fit outputs, calibration task chains, calibration records, and calibration proposals. | AnalysisAttempt, CalibrationTaskRun, CalibrationChainRun, CalibrationRecord, CalibrationProposal, GeneratedSidecar. | Consumes DatasetArtifact, ParameterSnapshot, CodeSnapshot; may propose Parameter Management changes after review. |
 | Setup/Device Reconciliation | Future desired setup/device state, observed status, reconciliation plans, and apply executions. | DesiredSetupState, ObservedDeviceState, ReconciliationPlan, ApplyExecution. | Consumes ParameterSnapshot, Setup/Device identity, and CodeSnapshot; produces audit events and may bind to Measurement or Routine Replay. |
@@ -60,5 +60,8 @@ Draft.
   ownership belong to later ADR-gated device or runner contexts.
 - Passive procedure summaries describe what was intended or invoked. They do
   not imply managed execution, resume support, or runner ownership.
+- MVP parameter summaries and run-bound configuration snapshots are lightweight
+  context records. They must not be treated as future effective parameter
+  snapshots or global parameter-profile bindings.
 - AI may summarize or propose, but mutating AI actions must enter through the
   same reviewed proposal and audit boundaries as non-AI automation.

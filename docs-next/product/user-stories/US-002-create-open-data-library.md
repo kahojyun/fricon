@@ -30,6 +30,6 @@ durable home.
 - Multiple writers directly editing the same shared-folder database.
 - Hosted or account-based library ownership.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-001, CAP-012, CAP-013, SPEC-001.
+CAP-001, CAP-012, CAP-013.

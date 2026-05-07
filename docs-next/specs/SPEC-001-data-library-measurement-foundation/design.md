@@ -2,144 +2,30 @@
 
 ## Status
 
-Draft placeholder. Not implementation-ready.
+Draft downstream shell. Not implementation-ready.
 
 ## Planning Boundary
 
-Product and domain documents own scope while v0.2+ analysis is still in
-progress. This design records likely implementation pressure only; re-sync it
-after the product/domain baseline and required ADRs are accepted.
+Product, domain, architecture, and ADR documents own design boundaries while
+v0.2+ analysis is still in progress. This file must not settle domain records,
+API routes, Python syntax, Desktop views, storage shape, or validation scenarios
+before those choices are accepted upstream.
 
-## Design Summary
+## Design Status
 
-Build a thin but coherent v0.2 backbone:
+No implementation design is accepted in this file yet.
 
-```text
-Python SDK / Desktop / CLI
-  -> local service API
-  -> data library
-  -> measurement
-  -> dataset artifacts
-  -> live events and semantic reads
-```
+When this spec is ready to draft, derive the design from:
 
-## Domain Records
-
-First implementation records:
-
-- DataLibrary
-- Measurement
-- DatasetArtifact
-- Event/AuditRecord
-- optional Sample and SampleSession links
-- optional ParameterSnapshot
-- optional CodeProvenanceSummary
-- optional SetupProvenanceSummary
-- optional ProcedureSummary
-
-DatasetArtifact remains a first-class searchable/openable record. Measurement
-is the primary navigation context, but datasets are not hidden children because
-future analysis, import, and export workflows need direct artifact handles.
-DatasetArtifact may have internal stream-like payload groups in storage/export
-or advanced read APIs, but v0.2 should keep streams out of the normal user
-concept budget.
-
-## Service Operations
-
-Candidate operation groups:
-
-- `library.open_or_create`
-- `compatibility.negotiate`
-- `measurements.create`
-- `measurements.finish`
-- `measurements.abort`
-- `measurements.record_event`
-- `datasets.create_writer`
-- `datasets.append`
-- `datasets.finish`
-- `datasets.abort`
-- `measurements.list_recent`
-- `measurements.get`
-- `datasets.read_semantic`
-- `datasets.search`
-- `datasets.get`
-- `events.subscribe`
-
-Exact route/transport shape requires an ADR.
-
-## Python Shape
-
-Draft user-facing shape:
-
-```python
-lib = fricon.library()
-lib.use_context(sample="sample-a", session="cooldown-2026-05")
-
-with lib.measurement("rabi q3") as meas:
-    ds = meas.dataset(
-        "rabi",
-        scan={"independent": "amp", "dependent": "signal"},
-    )
-    ds.write(amp=0.1, signal=0.25)
-```
-
-Common scan and trace schema should also have Python-native scan-plan authoring.
-Exact names and whether the accepted API is dict/literal data, a helper
-function, small builder objects, or multiple entry points are unsettled. The
-public direction is low ceremony for common workflows, then refinement from
-real script and notebook feedback:
-
-```python
-with lib.measurement("rabi q3") as meas:
-    rabi = meas.scan(
-        "rabi",
-        plan={"axes": [{"name": "amp"}], "measure": ["signal"]},
-    )
-    rabi.write(amp=0.1, signal=0.25)
-```
-
-The scan-plan path should not replace raw schema for irregular/adaptive,
-multi-output, repeated-point, or trace-heavy cases. It also should not imply a
-QCoDeS-compatible helper API or parameter-object model.
-
-## Desktop Shape
-
-First screen becomes a measurement console:
-
-- active sample/session context
-- active measurements
-- recent measurements
-- produced datasets
-- dataset search/direct open entry points
-- table/plot actions
-- partial/failed/trash shortcuts
-- diagnostics when service or compatibility checks fail
-
-## Storage Shape
-
-Storage ADR must decide physical layout. The design requires only:
-
-- stable data-library and record identities
-- measurement catalog records
-- dataset payload chunks and semantic schema
-- scan shape modes for regular grids, partial grids, irregular/adaptive
-  points, repeated points, fixed-shape traces, and variable-length traces
-- partial-read semantics for interrupted or incomplete data
-- optional internal stream-like groups for advanced storage/export/read needs
-- event timeline records
-- compatibility version and migration state
-- active writer state sufficient for recovery
+- accepted requirements in this spec
+- `domain/conceptual-model.md`, `domain/context-map.md`,
+  `domain/lifecycle-model.md`, and `domain/invariants.md`
+- `architecture/module-boundaries.md`, `architecture/storage-model.md`,
+  `architecture/api-boundaries.md`, and `architecture/data-flow.md`
+- accepted storage, service API, lifecycle, dataset artifact, and compatibility
+  ADRs
 
 ## Open Design Questions
 
-1. Minimal lifecycle state enum and legal transitions.
-2. Data-library storage layout and pre-v0.2 import stance.
-3. Dataset artifact representation for fixed arrays and variable-length traces.
-4. Partial grid, irregular/adaptive, repeated-point, and trace read APIs.
-5. HTTP/WebSocket/binary API shape and local service discovery.
-6. Actor/token storage and local operator profile scope.
-7. Passive setup summary shape and whether future device snapshots need a
-   reserved artifact/reference hook.
-8. Passive procedure summary shape.
-9. Whether internal stream groups are required for first implementation or only
-   reserved in the storage/export ADRs.
+Do not answer open product/domain/architecture questions here. Interview for
+the decision and update the upstream owner first; then re-derive this design.

@@ -13,7 +13,8 @@ DataLibrary
   Measurement
   DatasetArtifact
   AttachmentArtifact
-  ParameterSnapshot
+  ParameterSummary
+  RunConfigSnapshot
   CodeProvenanceSummary
   SetupProvenanceSummary
   ProcedureSummary
@@ -31,7 +32,7 @@ DataLibrary
 | Scan shape semantics | Regular grid, partial grid, irregular/adaptive points, repeated points, fixed arrays, and variable-length traces. |
 | Internal payload grouping | Optional internal stream-like groups for storage/export/read APIs without making streams a normal user concept. |
 | Events | Measurement lifecycle, notes, corrections, export/recovery/system actions. |
-| Provenance summaries | Code provenance, passive setup/device/environment summaries, passive procedure summaries, and optional parameter snapshots. |
+| Provenance summaries | Parameter summaries, run-bound configuration snapshots, code provenance, passive setup/device/environment summaries, and passive procedure summaries. |
 | Checkpoints | Backup/restore and migration safety. |
 | Export manifests | Portable read-only package identity, checksums, selected metadata. |
 

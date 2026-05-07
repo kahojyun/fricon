@@ -70,7 +70,10 @@ Fricon is an S2 medium modular system:
 11. `architecture/module-boundaries.md`
 12. `architecture/compatibility-policy.md`
 13. `ai/project-context.md`
-14. relevant `specs/`
+
+Read `specs/` and `implementation-plans/` only when implementation planning is
+the task and the relevant upstream baseline is accepted or explicitly marked
+with open interview questions.
 
 ## Directory Map
 
@@ -101,13 +104,18 @@ Keep each idea in the narrowest durable owner:
   and requirements. It should reference the priority ledger instead of restating
   its rationale.
 - `product/capability-map.md` owns stable capability IDs and compact scope
-  boundaries. Detailed acceptance notes belong in stories, specs, or ADRs.
+  boundaries. Detailed acceptance notes belong in stories, ADRs, or derived
+  specs after upstream acceptance.
 - `product/glossary.md` owns public and future terminology.
 - `domain/conceptual-model.md`, `domain/context-map.md`, and
   `domain/invariants.md` own concept relationships, bounded-context routing,
   and hard anti-corruption rules.
 - `specs/` own implementation-slice requirements, design, tasks,
   traceability, and validation.
+- While product, domain, architecture, or required ADR boundaries are still
+  unsettled, `specs/` and `implementation-plans/` must remain downstream shells:
+  do not let them introduce product scope, domain vocabulary, or architecture
+  decisions that are not already owned upstream.
 - `ai/` owns agent routing and update policy, not product or domain rationale.
 
 ## Source Inputs

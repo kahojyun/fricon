@@ -14,7 +14,10 @@ For v0.2+ work, read:
 4. `docs-next/product/python-sdk-ux.md` for the Python SDK usage guideline
 5. `docs-next/domain/conceptual-model.md`
 6. `docs-next/architecture/module-boundaries.md`
-7. the relevant spec under `docs-next/specs/`
+
+Read specs only when implementation planning is the task and the relevant
+upstream baseline is accepted or explicitly marked with open interview
+questions.
 
 Use `dev-docs/` for current implementation details and historical rationale,
 not as the v0.2+ design source of truth.

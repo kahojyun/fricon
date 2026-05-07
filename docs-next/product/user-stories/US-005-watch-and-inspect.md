@@ -27,6 +27,6 @@ that I can decide whether a measurement is working.
 
 - Publication plotting, generic dashboard building, or rich comparison views.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-007, CAP-008, CAP-026, SPEC-001.
+CAP-007, CAP-008, CAP-026.

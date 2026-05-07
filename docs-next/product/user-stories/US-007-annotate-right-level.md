@@ -27,6 +27,6 @@ does not stay only in memory.
 - Full electronic lab notebook replacement.
 - Collaborative review, permissions, or publication workflow.
 
-## Related Capabilities / Specs
+## Related Capabilities
 
-CAP-009, CAP-017, SPEC-001.
+CAP-009, CAP-017.

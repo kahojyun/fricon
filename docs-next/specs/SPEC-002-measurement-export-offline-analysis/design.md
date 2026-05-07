@@ -2,38 +2,25 @@
 
 ## Status
 
-Draft placeholder.
+Draft downstream shell. Not implementation-ready.
 
 ## Planning Boundary
 
-Product and domain documents own scope while v0.2+ analysis is still in
-progress. This design records a likely export direction only.
+Product, domain, architecture, and ADR documents own export design boundaries
+while v0.2+ analysis is still in progress. This file must not settle export
+format, manifest shape, privacy defaults, common-file policy, Python reader API,
+or Desktop offline behavior before those choices are accepted upstream.
 
-## Direction
+## Design Status
 
-Treat export bundles as read-only analysis packages:
+No implementation design is accepted in this file yet.
 
-```text
-Measurement
-  -> manifest and source identity
-  -> produced dataset artifacts
-  -> selected sample/session context
-  -> notes/events and lifecycle state
-  -> parameter/code/setup summaries selected for export
-  -> checksums
-  -> common tabular files where practical
-  -> Python loader snippets
-```
-
-The Fricon manifest remains the source of meaning. CSV or similar common files
-are convenience outputs and may be lossy.
+When this spec is ready to draft, derive the design from accepted requirements,
+`domain/context-map.md`, `domain/invariants.md`,
+`architecture/module-boundaries.md`, `architecture/data-flow.md`,
+`architecture/storage-model.md`, and export-related ADRs.
 
 ## Open Questions
 
-1. Bundle extension and physical layout.
-2. Which common formats are required in v0.2.
-3. How to represent variable-length traces and partial grids in common formats.
-4. Direct Python reader API.
-5. Privacy preview UX and defaults.
-6. Whether Desktop opens bundles without a running local service in v0.2 or a
-   later polish slice.
+Do not answer open product/domain/architecture questions here. Interview for
+the decision and update the upstream owner first; then re-derive this design.

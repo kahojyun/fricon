@@ -14,7 +14,7 @@ reopen data from Python, and export a measurement for offline analysis.
 - Readable partial data and visible lifecycle state.
 - Trash/recover instead of normal hard delete.
 - Python reopen snippets using stable IDs.
-- Measurement-centered export through SPEC-002.
+- Measurement-centered read-only export bundles.
 - Privacy preview for sensitive provenance in exports.
 
 ## Not MVP

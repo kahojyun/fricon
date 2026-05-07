@@ -2,39 +2,27 @@
 
 ## Status
 
-Draft placeholder.
+Draft downstream shell. Not implementation-ready.
 
 ## Planning Boundary
 
-Traceability is provisional until product/domain scope and required ADRs are
-accepted. Do not use this file as the source of truth for whether a product
-story belongs to the export slice.
+Traceability is intentionally empty until product/domain scope, export
+architecture boundaries, and required ADRs are accepted. Do not use this file as
+the source of truth for whether a product story belongs to the export slice.
 
-## Related Capabilities
+## Derivation Rule
 
-CAP-010, CAP-011, CAP-014, CAP-015, CAP-026, CAP-027, CAP-029.
+When this spec becomes implementation-ready, derive traceability from accepted
+upstream documents:
 
-## Related User Stories
+- capability IDs
+- user story IDs
+- domain concepts
+- architecture docs
+- ADRs
+- affected modules
+- compatibility and migration impact
+- validation links
 
-US-008, US-009, US-013.
-
-## Related Domain Concepts
-
-Measurement, DatasetArtifact, ExportBundle, DataLibrary,
-ParameterSnapshot, CodeProvenanceSummary, SetupProvenanceSummary,
-ProcedureSummary, Event/AuditRecord.
-
-## Related Docs
-
-- `product/story-map.md`
-- `domain/conceptual-model.md`
-- `architecture/storage-model.md`
-- `architecture/compatibility-policy.md`
-- `research/lessons-for-fricon.md`
-- `research/legacy-measurement-sample-lessons.md`
-
-## ADRs Needed
-
-- export bundle format
-- common analysis format policy
-- export privacy defaults
+If any mapping requires a new decision, interview for the decision and update
+the upstream owner before recording traceability here.

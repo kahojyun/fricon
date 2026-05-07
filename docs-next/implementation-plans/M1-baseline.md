@@ -2,86 +2,49 @@
 
 ## Status
 
-Draft placeholder. Not implementation-ready.
+Draft downstream shell. Not implementation-ready.
 
 ## Planning Boundary
 
-This file is a downstream milestone landing area. Until the product and domain
-baselines are accepted, `product/`, `domain/`, and ADRs own scope. Re-sync this
-plan after `SPEC-001` is accepted instead of treating the current bullets as an
-implementation commitment.
+This file is a milestone landing area, not a source of product or domain scope.
+Until the product, domain, architecture, and required ADR boundaries are
+accepted, upstream documents own vocabulary, scope, non-goals, and sequencing.
+
+Do not add capability lists, domain records, API/storage choices, validation
+scenarios, or work sequences here to answer unsettled upstream questions. If a
+milestone question reveals missing scope or vocabulary, interview for the
+decision and update the upstream owner first.
 
 ## Goal
 
-Build the first coherent v0.2 foundation for a local data library with
-measurement-scoped dataset artifacts, enough lifecycle/provenance to recover
-and inspect runs, and enough service/API shape to avoid another dataset-first
-dead end.
+Track readiness for the first v0.2 implementation milestone after it can be
+derived from accepted upstream material.
 
-## Scope
+## Upstream Inputs
 
-M1 should prove:
-
-- local data library identity and open/create flow
-- explicit measurement record
-- optional sample/session link
-- measurement-scoped dataset artifact writer
-- dataset artifact direct search/open path
-- explicit scan schema and shape modes for plotted datasets
-- Python-native scan-plan/schema helpers for common 1D/2D/N-D scans and traces
-- internal stream/subpayload policy for dataset artifacts
-- nonblocking live status/event flow
-- readable partial/interrupted measurement data
-- optional passive setup summary
-- optional passive procedure summary
-- Python reopen through stable IDs
-- early compatibility negotiation before writes
-
-## Out Of Scope
-
-- full legacy workspace migration
-- direct LabRAD/Data Vault import
-- remote mode
-- full parameter registry
-- automatic tracing of every local configuration file a script reads
-- run-like-previous drafts
-- parameter proposals or profile promotion
-- compare/handoff dashboards
-- analysis/calibration records or managed calibration workflows
-- managed code execution
-- reviewable routine replay
-- resumable scan-point checkpoint execution
-- user-facing stream concepts inside dataset artifacts
-- broad device framework
-- large external detector-file/image management
-- calibration workflows
-- AI mutating automation
-
-## Suggested Work Sequence
-
-1. Accept or revise ADRs for reset, data-library storage, service API, and
-   dataset artifact storage.
-2. Finalize `SPEC-001-data-library-measurement-foundation`.
-3. Create vertical slices for data library, measurement, dataset artifact, and
-   service API.
-4. Implement Python measurement writer ergonomics against the service.
-5. Replace the Desktop first screen with a measurement console skeleton.
-6. Add dataset direct search/open entry points.
-7. Add live read path and nonblocking chart/table preview.
-8. Add lifecycle, readable partial data, and trash/recover basics.
-9. Add Python reopen snippets and semantic read APIs.
-10. Split measurement-centered export into SPEC-002 and keep it aligned with
-    SPEC-001 semantic reads.
-11. Add focused validation and docs sync.
+- `product/vision.md`
+- `product/capability-map.md`
+- `product/story-map.md`
+- relevant `product/user-stories/`
+- `product/python-sdk-ux.md`
+- `domain/conceptual-model.md`
+- `domain/context-map.md`
+- `domain/lifecycle-model.md`
+- `domain/invariants.md`
+- `architecture/system-overview.md`
+- `architecture/module-boundaries.md`
+- `architecture/storage-model.md`
+- `architecture/api-boundaries.md`
+- `architecture/compatibility-policy.md`
+- accepted ADRs
 
 ## Readiness Gate
 
-M1 is ready to implement when:
+M1 is ready to plan when:
 
-- `SPEC-001` status is Accepted
-- ADRs exist for storage layout and service API direction
-- lifecycle state vocabulary is accepted
-- scan shape and readable-partial semantics are accepted
-- scan-plan/helper and internal stream policies are accepted
-- tests and validation plan cover Rust, Python, Desktop, and compatibility
-- migration/import stance for pre-v0.2 data is explicit
+- upstream product and domain scope is accepted or explicitly marked with open
+  interview questions
+- required architecture and compatibility ADRs are accepted
+- a derived spec has accepted requirements, design, traceability, and validation
+- implementation tasks are generated from that accepted spec, not from this file
+- migration/import stance for pre-v0.2 data is explicit upstream
