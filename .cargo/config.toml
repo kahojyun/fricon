@@ -1,5 +1,0 @@
-include = [
-  { path = "config.shared.toml" },
-  { path = "config.worktree.toml", optional = true },
-  { path = "config.user.toml", optional = true },
-]

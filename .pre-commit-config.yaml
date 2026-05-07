@@ -1,15 +1,6 @@
-# Keep this pre-commit-compatible config minimal during the docs-next design
-# phase: basic text/config hygiene only, without language builds, dependency
-# updates, generated-artifact checks, or test gates.
-exclude: |
-  (?x)^(
-    crates/fricon-ui/icons/.*|
-    crates/fricon-ui/frontend/src/shared/lib/bindings\.ts|
-    crates/fricon-ui/frontend/src/routeTree\.gen\.ts|
-    crates/fricon/src/database/schema\.rs|
-    Cargo\.lock|
-    uv\.lock
-  )$
+# Keep this prek-compatible config minimal during the docs design phase:
+# basic text/config hygiene only, without language builds, dependency updates,
+# generated-artifact checks, or test gates.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0

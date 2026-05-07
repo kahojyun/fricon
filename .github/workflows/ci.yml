@@ -19,7 +19,6 @@ jobs:
     name: Report Required CI Status
     runs-on: ubuntu-latest
     steps:
-      - name: Design phase no-op
+      - name: Planning phase no-op
         run: |
-          echo "Full CI is paused during docs-next design discussion."
-          echo "Run implementation checks manually when implementation files change."
+          echo "CI is intentionally minimal during v0.2 documentation planning."
