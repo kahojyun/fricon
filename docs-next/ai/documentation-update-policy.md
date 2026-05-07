@@ -26,6 +26,31 @@ Keep docs token-efficient. Avoid large tables and broad duplicated lists. If a
 table starts to grow, split the stable overview from the detailed story, spec,
 or ADR that actually needs the detail.
 
+## Numbered ID Management
+
+Stable numbered IDs must be easy to allocate without scanning unrelated
+priority lists.
+
+- For substantial entries, prefer one file per ID in a directory whose filenames
+  sort numerically, like `product/user-stories/US-001-...md`.
+- For short entries kept in one file, keep the authoritative definitions in
+  ascending ID order within that file.
+- Put unstable ordering concerns such as priority, release slice, or milestone
+  sequence in separate index sections that reference IDs.
+- To allocate a new ID, list or search only the owning directory/file, choose
+  the lowest unused number after the current maximum for that prefix, and never
+  fill an old gap by reusing a removed ID.
+- When a numbered entry moves between priority or milestone groups, update the
+  index reference only; do not move the definition unless the owning file's ID
+  order requires it.
+
+## Compact Authoring
+
+- Keep top-level maps short enough for future AI sessions to skim.
+- Split detailed acceptance criteria into the owning story, spec, or ADR.
+- Prefer ID indexes over duplicated tables when the same entries need multiple
+  views.
+
 ## After Implementation
 
 Gate D documentation sync requires:

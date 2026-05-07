@@ -39,6 +39,9 @@ Important IDs are stable:
 - ADR-### for decisions
 - M# for milestones
 
+Detailed authoring and ID-allocation workflow is maintained in
+`ai/documentation-update-policy.md`.
+
 ## Consequences
 
 - Do not implement major v0.2 features from chat history or archived proposals

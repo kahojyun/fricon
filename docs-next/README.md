@@ -120,6 +120,9 @@ Keep each idea in the narrowest durable owner:
   decisions that are not already owned upstream.
 - `ai/` owns agent routing and update policy, not product or domain rationale.
 
+Detailed editing rules live in `ai/documentation-update-policy.md`; load that
+file only when authoring or reorganizing `docs-next/` documents.
+
 ## Source Inputs
 
 This baseline was bootstrapped from:
