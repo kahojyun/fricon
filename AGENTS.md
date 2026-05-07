@@ -2,46 +2,27 @@
 
 ## Scope
 
-- Rust crates are under `crates/`: `fricon`, `fricon-py`, `fricon-ui`.
-- Frontend is under `crates/fricon-ui/frontend`.
-- `examples/` contains runnable examples.
-- `scripts/` contains development helpers.
-- `docs-next/` is the single documentation directory for the v0.2+ clean reset.
-  It contains product, domain, architecture, ADR, research, AI-agent, and
-  future public-documentation planning.
+- `docs-next/` is the single active documentation directory for the v0.2+
+  clean reset.
+- The pre-v0.2 implementation has been removed from this branch. Use the
+  `archive/v0.1` branch only as historical reference when explicitly needed.
+- `README.md`, `CONTRIBUTING.md`, `mkdocs.yml`, and this file are lightweight
+  repository scaffolding for the planning workspace.
 
 ## Repo-Wide Rules
 
-- Current phase: `docs-next/` v0.2+ design discussion is the primary work
-  surface. Keep design-only changes lightweight: do not install dependencies,
-  run full Rust/Python/frontend checks, regenerate product artifacts, or touch
-  release/update automation unless the task explicitly needs it.
-- Use `python3 scripts/setup-dev.py` only when you need the dev workspace
-  created through `fricon init`.
-- Keep setup lazy: run `uv sync`, `uv run maturin develop`, `pnpm install`, and
-  broader builds only when the task actually needs them.
+- Current phase: product analysis and early domain analysis for the v0.2+
+  reset. Keep changes focused on `docs-next/` unless the user explicitly asks
+  for repository-structure cleanup.
+- Do not infer v0.2 architecture from the removed v0.1 crates, local skills,
+  scripts, package configs, or module boundaries. Recreate implementation
+  guidance later from accepted product, domain, architecture, and ADR inputs.
+- Do not install dependencies, regenerate artifacts, or run Rust/Python/Node
+  implementation checks for docs-only work.
 - Use `docs-next/README.md` as the documentation entry point. For agent routing
   and documentation update policy, use `docs-next/ai/`.
-- Users interact with this repo through the Python API, CLI, and desktop UI. Internal Rust APIs between crates have no stability guarantees and may be aggressively refactored or broken when it improves the architecture.
-- Use non-`mod.rs` layout for Rust modules (`foo.rs` plus optional `foo/*.rs` submodules).
-- Rust use nightly rustfmt: `cargo +nightly fmt`.
-- Python bindings and tests (from repo root):
-  run `uv run maturin develop` before `uv run pytest` when Rust bindings may be stale.
-- Frontend checks (from repo root):
-  use `pnpm run check` as the default quality gate for frontend implementation
-  changes.
-  Use `pnpm run test` for the full frontend batch,
-  `pnpm run test:unit` for unit/jsdom tests,
-  `pnpm run test:browser` for browser-mode tests, and
-  `pnpm run test:smoke` for the desktop smoke suite.
-  For targeted reruns, call `test:unit` or `test:browser` directly instead of
-  passing file filters through the batch `test` script.
-  Desktop smoke is supported on Windows only; Tauri does not provide desktop
-  WebDriver support on macOS.
-- For data-library format, local runtime/API, IPC/protocol, export, or
-  compatibility changes, confirm the accepted product/domain baseline first and
+- For future data-library format, local runtime/API, IPC/protocol, export, or
+  compatibility decisions, confirm accepted product/domain inputs first and
   update `docs-next/architecture/compatibility-policy.md` or add an ADR before
   durable implementation.
-- Follow the existing vertical slice boundaries and add code within the owning domain/feature. Keep boundaries and data ownership clear, and avoid cross-feature or cross-layer shortcuts.
-- Keep internal structure lightweight: prefer straightforward local implementations, feature-local duplication, and explicit types over premature shared abstractions or generic extension points.
-- Add traits only for real boundaries or capabilities with multiple plausible implementations, not as a default pattern for mocking.
+- Use `prek` when running the local hook config.

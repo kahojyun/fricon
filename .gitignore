@@ -1,72 +1,27 @@
-# ===================================
-# Build & Artifacts
-# ===================================
-dist/
-target/
+# Rendered docs and local reports
 site/
+dist/
 coverage/
 
-# ===================================
-# Dependencies
-# ===================================
-# Node
+# Local dependency/cache directories
 node_modules/
 .pnpm-store/
-
-# Python
+.venv/
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-*.dSYM
-*.pdb
-*.dwp
-
-# ===================================
-# Development & Cache
-# ===================================
-# fricon test workspace
-.dev/
-
-# Rust
-.cargo/*
-!.cargo/config.toml
-!.cargo/config.shared.toml
-
-# Python
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
-.venv/
 
-# Node
-.eslintcache
-**/__screenshots__/
-**/.vitest-attachments/
-
-# Editor & Tool cache
-.serena/
-.qoder/
-
-# ===================================
-# Configuration & Secrets
-# ===================================
-# Environment variables
+# Local environment and secrets
 .env
 .env.*
-!.env.example
 
-# ===================================
-# Editors & IDEs
-# ===================================
+# Editor and tool state
 .vscode/
 .idea/
 .zed/
-.lazy.lua
 .jj/
-
-# ===================================
-# Generated Files
-# ===================================
-components.d.ts
-**/gen/schemas/
+.serena/
+.qoder/
+.DS_Store

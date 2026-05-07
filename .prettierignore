@@ -1,8 +1,0 @@
-pnpm-lock.yaml
-.github/instructions
-.pre-commit-config.yaml
-CHANGELOG.md
-docs-next/
-.agents
-routeTree.gen.ts
-crates/fricon-ui/frontend/src/shared/lib/bindings.ts

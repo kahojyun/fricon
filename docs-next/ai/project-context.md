@@ -22,8 +22,8 @@ planning is the task and the relevant upstream baseline is accepted or
 explicitly marked with open interview questions.
 
 Legacy public and developer documentation content has been merged or retired.
-Use code for current implementation facts and `docs-next/` for v0.2+
-direction.
+The pre-v0.2 implementation has been removed from this branch and remains on
+`archive/v0.1` for historical reference. Use `docs-next/` for v0.2+ direction.
 
 ## Product Direction
 

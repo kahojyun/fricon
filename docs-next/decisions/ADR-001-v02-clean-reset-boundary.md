@@ -33,12 +33,18 @@ a later ADR defines a narrow migration/import route.
 Useful infrastructure may be reused or adapted, but compatibility must not keep
 the wrong user model alive.
 
+The pre-v0.2 implementation is archived on the `archive/v0.1` branch. The
+current branch may remove v0.1 code and implementation scaffolding so product
+and domain analysis are not steered by obsolete module boundaries.
+
 ## Consequences
 
 - `docs-next/` becomes the v0.2+ design baseline and the single documentation
   directory.
 - Legacy public and developer documentation content may be deleted after useful
   product and domain ideas are merged.
+- Pre-v0.2 implementation code and project-specific implementation scaffolding
+  may be deleted from the active branch after an archive branch exists.
 - Early implementation work should prefer replacing current domain boundaries
   in place over building a permanent parallel `fricon-v2` project.
 - The first v0.2 implementation must still protect data created by v0.2 once

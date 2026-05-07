@@ -15,6 +15,9 @@ Do not use old workspace/dataset-first public docs, historical proposal notes,
 or current v0.1 implementation notes as v0.2+ source material unless a current
 `docs-next/` document explicitly reintroduces the idea.
 
+The pre-v0.2 implementation has been removed from this branch and remains
+available on `archive/v0.1` for historical reference.
+
 ## Design Stance
 
 Fricon v0.2 is a clean reset from the workspace/dataset-first prototype toward
@@ -33,17 +36,22 @@ features may still ship on the same compatible release line.
 This directory is currently the primary work surface. Keep discussion changes
 lightweight: do not run full Rust, Python, frontend, release, or docs-deploy
 automation for `docs-next/`-only edits unless a task explicitly asks for it.
-Repository automation such as GitHub Actions, Renovate, release publishing,
-and docs deployment is intentionally paused while the v0.2+ baseline is being
-discussed. Basic text and config hygiene remains available through
-`.pre-commit-config.yaml`, but it should not run dependency updates,
-generated-artifact checks, language builds, or test gates.
+Repository automation such as implementation CI, dependency updates, release
+publishing, and docs deployment is intentionally paused while the v0.2+
+baseline is being discussed. Basic text and config hygiene remains available
+through the `prek`-compatible `.pre-commit-config.yaml`, but it should not run
+dependency updates, generated-artifact checks, language builds, or test gates.
+
+Project-specific implementation-era local skills, crate-local agent rules,
+package locks, setup scripts, and release automation configs should not steer
+v0.2 planning. Recreate them later only from accepted product, domain,
+architecture, and ADR inputs.
 
 ## Scale Classification
 
 Fricon is an S2 medium modular system:
 
-- Rust core/runtime code, Python SDK, CLI, and Tauri/React desktop UI interact.
+- The intended product spans a local runtime, Python SDK, CLI, and Desktop UI.
 - Data library, measurement, dataset artifact, storage, API, lifecycle,
   provenance, export, and compatibility concepts cross module boundaries.
 - AI-assisted development needs explicit global context, not only local feature

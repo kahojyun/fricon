@@ -13,6 +13,9 @@ Legacy public and developer documentation content has been merged or retired.
 Treat old workspace/dataset-first behavior as prototype history unless a
 current `docs-next/` document says otherwise.
 
+The pre-v0.2 implementation has been removed from this branch. Use the
+`archive/v0.1` branch for historical code reference.
+
 ## Overview
 
 Fricon v0.2 is being redesigned around:
@@ -25,19 +28,20 @@ Fricon v0.2 is being redesigned around:
 
 ## Quick Start
 
-The repository is in a v0.2 clean-reset planning phase. For development setup,
-see [CONTRIBUTING.md](CONTRIBUTING.md).
+The repository is in a v0.2 clean-reset planning phase. `docs-next/` work does
+not require dependency installation, a dev workspace, or language builds.
 
 ```bash
 git clone https://github.com/kahojyun/fricon.git
 cd fricon
-python3 scripts/setup-dev.py
 ```
+
+For contribution guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development environment setup,
-building components, testing, and contribution workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the current docs-first workflow and
+rules for reintroducing implementation scaffolding later.
 
 ## License
 

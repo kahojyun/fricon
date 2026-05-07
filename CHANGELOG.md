@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+This file is historical pre-v0.2 release history. The corresponding
+implementation remains available on the `archive/v0.1` branch. It is not
+product direction for the v0.2 clean reset; use `docs-next/` for current
+planning.
+
 ## 0.1.4 (2026-05-05)
 
 ### Features
