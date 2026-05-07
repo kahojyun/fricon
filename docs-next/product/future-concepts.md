@@ -58,7 +58,7 @@ Boundary:
   diffs, source evidence, and rollback target where practical.
 - Treat calibration-derived values as proposed parameter changes first. A
   calibration can produce evidence, fitted values, and affected parameter
-  paths without directly mutating the active profile.
+  paths without directly mutating a durable named profile.
 - Treat sample target binding as a convention first: parameter table row keys
   may be reused by visualization code and snapshot queries, but Fricon does
   not need a mandatory sample-component ontology in the first parameter slice.
@@ -114,8 +114,8 @@ Why third:
   code, devices, or data-library state.
 - Calibration automation is valuable early only when it reduces parameter
   confusion: preview the analysis inputs, generated sidecars or derived
-  artifacts, fitted values, affected parameter paths, diffs, and rollback path
-  before any accepted change is applied.
+  artifacts, fitted values, affected parameter paths, task health, retry or
+  pause decisions, and rollback path before durable changes are promoted.
 - A later managed measurement model can borrow from declarative UI and
   infrastructure systems: users describe expected parameter-derived setup or
   device state, Fricon computes a diff from observed state, previews an apply
@@ -145,9 +145,14 @@ Boundary:
 - Keep imperative Python scripts valid. Desired-state planning is a higher
   provenance option for routines that can declare pure parameter-to-state
   functions and explicit hardware constraints.
-- Calibration workflows should first create durable evidence and proposals.
-  Automatic writeback to active parameter refs or devices is a later
-  safety-gated capability, not the first automation slice.
+- Calibration workflows for sample/control parameters should first create
+  durable evidence, fitted values, health decisions, and promotion proposals.
+  A bootstrap calibration sequence should be able to continue through healthy
+  substeps by updating a chain-scoped calibration working ref, without asking
+  for approval at every small update. Publishing selected results to durable
+  named profiles remains a separate promotion step.
+- Instrument/device calibration and desired-state device apply are separate
+  device/setup capabilities with their own safety model.
 - Device write-back, resumable execution, and AI-assisted mutation need safety,
   readback, partial-failure, and audit ADRs.
 - Reconciliation must not assume device writes are commutative, idempotent, or

@@ -113,15 +113,21 @@ Modern desired-state and reviewable-apply references:
   be opt-in at first, not a forced replacement for Python scripts.
 - Provenance level must be honest: unmanaged, observed, and managed snapshots
   are different product states.
-- Calibration should first produce evidence and reviewed parameter/setup
-  proposals: source measurements, analysis attempts, code context, fitted
-  values, affected parameter paths, diffs, review outcome, and rollback target
-  where practical.
+- Experiment-parameter calibration should first produce evidence, fitted
+  values, chain-scoped working-ref updates, health decisions, retries, and
+  pause/review reasons. Durable named profile promotion can then carry source
+  measurements, analysis attempts, code context, affected parameter paths,
+  diffs, review outcome, and rollback target where practical.
+- Keep Calibration as the field-standard product term, but qualify other
+  meanings. Instrument calibration and setup/device reconciliation have
+  different safety, readback, and audit semantics from qubit/gate/readout
+  parameter calibration.
 - Setup/device/calibration state should start with store, bind, search, and
   diff. Applying settings to devices comes later and needs safety ADRs.
-- Detailed confidence-label schemes are secondary. They should not block the
-  core code/parameter/calibration evidence model, and they can be added later
-  where a concrete workflow needs them.
+- Broad confidence-label schemes are secondary. Calibration task
+  health/confidence gates are different: they are a concrete automation
+  requirement for deciding whether a bootstrap calibration should continue,
+  retry, pause, or ask for review.
 - Local-first experiment history aligns better with Fricon than cloud-first ML
   tracking, model registries, or hyperparameter leaderboards.
 - Borrow lifecycle, event, and schema rigor from Bluesky, but avoid exposing
@@ -138,7 +144,7 @@ Modern desired-state and reviewable-apply references:
 - Desired-state reconciliation should be a reviewable plan/apply workflow, not
   hidden magic. A saved plan should record the observed state it was based on,
   dependencies, expected mutations, readback checks, and failure handling
-  before hardware or active parameter refs are changed.
+  before hardware or durable named parameter refs are changed.
 - Separate spec/status-style facts. Desired state is intent; observed device
   state, readbacks, and apply execution status are evidence. Mixing those
   concepts recreates the old problem where generated config and mutable state

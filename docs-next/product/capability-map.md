@@ -283,8 +283,8 @@ CAP-022: Analysis, interpretation, and calibration records.
 - Boundary: the MVP may export analysis-ready data but does not manage
   calibration promotion. Analysis attempts, calibration records, and
   calibration proposals should have distinct lifecycle and audit meaning.
-  Detailed confidence-label taxonomies are not required before the evidence and
-  proposal model exists.
+  Calibration task health/confidence gates are useful before a broad
+  confidence-label taxonomy exists.
 
 CAP-023: Managed code snapshots and execution.
 

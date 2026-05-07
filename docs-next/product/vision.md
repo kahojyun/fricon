@@ -46,6 +46,12 @@ Fricon should first make code provenance, effective parameter state, diffs,
 reviewed parameter changes, and calibration evidence durable enough that
 experimenters can understand why a result should be trusted.
 
+Calibration should remain the primary domain term because quantum
+experimenters use it for this workflow. In Fricon, unqualified calibration
+means estimating better sample, qubit, gate, pulse, readout, fit, or analysis
+parameters from measurement evidence. Instrument calibration and setup/device
+desired-state reconciliation are qualified, separate meanings.
+
 The product should exceed legacy loggers by helping users explain, compare, and
 repeat scientific work from recorded facts. The long-term center is not device
 control, sample visualization, or AI by itself; those capabilities matter when
@@ -94,8 +100,8 @@ After the MVP, Fricon should also help answer:
 - Which parameter, setup, code, analysis, or calibration facts explain the
   difference?
 - Which code source and parameter snapshot did this calibration depend on?
-- Is this calibration result evidence, a reviewed proposal, or an applied
-  parameter change?
+- Did each calibration task look healthy, need retry, pause for review, or
+  produce fitted parameters that should update a parameter snapshot/profile?
 - For a managed routine, what setup or device state was desired, what was
   already current, what did Fricon plan to change, and what actually happened?
 - What did we conclude from this measurement?
@@ -194,12 +200,12 @@ Implementation should follow this order:
   source context before it becomes a scheduler or mandatory execution model.
 - Priority 3: reviewable routine replay and automation workflow that previews,
   reviews, audits, and applies changes only through explicit safety
-  boundaries. Calibration automation should first produce reviewed proposals
-  backed by code, parameter, and analysis evidence; direct device or parameter
-  mutation remains a later safety-gated step. Desired-state reconciliation for
-  setup/device changes belongs here: useful for reducing imperative loop
-  boilerplate, but only after dependencies, readback, settling, timeout, and
-  abort behavior are explicit.
+  boundaries. Calibration automation should first support task-chain evidence,
+  health checks, retries, pause points, chain-scoped working parameter refs,
+  and reviewed promotion of final or durable parameter changes. Desired-state
+  reconciliation for setup/device changes is a separate later capability:
+  useful for reducing imperative loop boilerplate, but only after dependencies,
+  readback, settling, timeout, and abort behavior are explicit.
 
 Sample visualization should stay lightweight until product evidence says
 otherwise. Treat a sample visualizer as a view over parameter snapshots and
@@ -211,10 +217,11 @@ visualizer migration policy are later design questions.
 Lower-priority or ADR-gated directions include read-only LAN monitoring, richer
 sample-map authoring, device communication, resumable execution, user-facing
 stream concepts, and AI-assisted automation. Detailed confidence-label
-taxonomies may be useful later, but they should not block the core design:
-durable code and parameter state, analysis evidence, reviewed calibration
-proposals, and auditable application of accepted changes. Mutation-capable
-calibration or device apply remains ADR-gated.
+taxonomies may be useful later, but they should not block the core design.
+Calibration task health/confidence gates are narrower and more important than
+a broad label taxonomy: they help decide whether a bootstrap calibration should
+continue, retry, pause, or ask for review. Mutation-capable calibration or
+device apply remains ADR-gated.
 
 ## Non-Goals For MVP
 

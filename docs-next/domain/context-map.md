@@ -14,7 +14,7 @@ Draft.
 | Sample Context | Samples, sample sessions, active context, corrections. | Sample, SampleSession, active context. | Used by Measurement and views. |
 | Provenance | Code provenance, setup summaries, procedure summaries, parameter snapshot, actor/event records. | CodeProvenanceSummary, SetupProvenanceSummary, ProcedureSummary, ParameterSnapshot, Actor, Event. | Linked by Measurement; extended by future runner/calibration. |
 | Parameter Management | Future named profiles, immutable effective snapshots, diffs, and reviewed proposals. | ParameterProfile, ParameterSnapshot, ParameterProposal, ParameterRef. | Uses Provenance and Analysis evidence; linked by Measurement, Run Manifest, and Calibration. |
-| Analysis And Calibration | Future analysis attempts, fit outputs, calibration records, and calibration proposals. | AnalysisAttempt, CalibrationRecord, CalibrationProposal, GeneratedSidecar. | Consumes DatasetArtifact, ParameterSnapshot, CodeSnapshot; may propose Parameter Management or Setup changes after review. |
+| Analysis And Calibration | Future analysis attempts, fit outputs, calibration task chains, calibration records, and calibration proposals. | AnalysisAttempt, CalibrationTaskRun, CalibrationChainRun, CalibrationRecord, CalibrationProposal, GeneratedSidecar. | Consumes DatasetArtifact, ParameterSnapshot, CodeSnapshot; may propose Parameter Management changes after review. |
 | Setup/Device Reconciliation | Future desired setup/device state, observed status, reconciliation plans, and apply executions. | DesiredSetupState, ObservedDeviceState, ReconciliationPlan, ApplyExecution. | Consumes ParameterSnapshot, Setup/Device identity, and CodeSnapshot; produces audit events and may bind to Measurement or Routine Replay. |
 | Service/API | Client compatibility, mutations, events, binary payload transfer. | Service API, capability, write session, event stream. | Exposes domain contexts to Desktop, Python SDK, CLI. |
 | Desktop Experience | Measurement console, live views, sample/session UX, diagnostics. | Console, live list, detail, detached view. | Downstream of Service/API. |
@@ -34,8 +34,13 @@ Draft.
   must not imply shared identity with the source data library.
 - Future AI, calibration, or automation actions must enter through audited
   domain mutations, not direct storage edits.
-- Calibration automation must not update active parameter refs directly. It
-  should create evidence and reviewed parameter or calibration proposals first.
+- Calibration automation must not update named parameter refs directly. It
+  should create task evidence, health decisions, chain state, and reviewed
+  parameter or calibration proposals for durable promotion.
+- Healthy tasks in an approved calibration chain may update a chain-scoped
+  calibration working ref for later tasks without requiring review after every
+  small step, but the chain must record working-ref revisions, health-gate
+  decisions, retries, pause/review reasons, and final promotion outcome.
 - Code provenance and parameter snapshots remain separate facts. A run manifest
   may link them, but it must not merge code source, generated config, and
   effective parameter state into one opaque blob.

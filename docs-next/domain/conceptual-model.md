@@ -63,6 +63,10 @@ one generic snapshot object.
   refs, profiles, and overrides.
 - ParameterProfileRef: future mutable named pointer such as `main` or
   `latest-good`.
+- CalibrationWorkingRef: future chain-scoped mutable pointer used inside an
+  approved calibration chain. Small calibration tasks may update it so later
+  tasks consume the latest fitted values without publishing those values as
+  durable lab state.
 - ParameterProposal: future reviewed change request that may update a named
   parameter ref after approval.
 - RunConfigSnapshot: selected local file references, copies, hashes, and source
@@ -71,8 +75,8 @@ one generic snapshot object.
 - RunManifest: future read model that links available run facts and states
   provenance coverage. It does not own or duplicate the facts it presents.
 - CalibrationProposal: future reviewed recommendation from analysis or
-  calibration evidence. It may propose parameter or setup changes after review;
-  it must not silently edit an active parameter ref.
+  calibration evidence. It may propose durable parameter/profile changes after
+  review; it must not silently edit a named parameter ref.
 
 ## Desired State And Reconciliation Boundaries
 
@@ -101,20 +105,27 @@ commutative, or safe to parallelize.
 Fricon should keep code, parameter, and calibration facts separate even when a
 future run manifest presents them together.
 
+Use Calibration as the unqualified domain term for quantum-experiment
+parameter calibration. Use Instrument Calibration for hardware/setup
+calibration and Setup/Device Reconciliation for desired-state apply/readback.
+
 - Code provenance explains which source, revision, snapshot, or unmanaged
   summary produced the measurement, analysis, or calibration evidence.
 - Parameter snapshots own effective parameter facts. Parameter refs remain
   mutable pointers changed through proposal/audit paths.
-- Calibration records describe validity, review state, affected-run windows,
-  and evidence. Calibration proposals connect fitted values to proposed
-  parameter or setup changes.
+- Calibration records describe validity, review state, task health,
+  affected-run windows, and evidence. Calibration proposals connect fitted
+  sample/control-parameter values to proposed durable parameter changes.
 - Generated sidecars or derived config files used by analysis or calibration
   should be artifacts with source inputs and generator context, not invisible
   files that future runs depend on by accident.
 
-Early calibration automation should therefore stage evidence and proposals
-before applying changes. Direct mutation of active parameter refs, setup refs,
-or devices is a later safety-gated capability.
+Calibration automation should therefore record evidence, task-chain state,
+health decisions, retries, pause/review points, and promotion proposals.
+Small tasks in an approved calibration chain may update a chain-scoped
+calibration working ref for later tasks to consume. Publishing the final or
+selected chain results to durable named refs remains a separate promotion step.
+Device/setup reconciliation is a separate safety-gated capability.
 
 ## Dataset Artifact Shape
 
@@ -148,9 +159,12 @@ DataLibrary
     Artifact(kind: dataset | result | report | log | attachment | generated_sidecar | parameter_proposal | device_snapshot)
     ParameterProfile
     ParameterSnapshot
+    CalibrationWorkingRef
     AnalysisAttempt
     CalibrationRecord
     CalibrationProposal
+    CalibrationTaskRun
+    CalibrationChainRun
     CodeSnapshot
     ScriptRun
     DeviceIdentity
@@ -167,8 +181,13 @@ DataLibrary
     ScriptRun -> optional CodeSnapshot
     AnalysisAttempt -> consumes -> Measurement | Artifact
     CalibrationRecord -> links -> Measurement | AnalysisAttempt | ParameterSnapshot | Artifact
-    CalibrationProposal -> cites -> CalibrationRecord | AnalysisAttempt | CodeSnapshot | ParameterSnapshot | Artifact
-    CalibrationProposal -> may propose -> ParameterProfile change | Setup change
+    CalibrationTaskRun -> consumes -> Measurement | AnalysisAttempt | ParameterSnapshot | Artifact
+    CalibrationTaskRun -> produces -> fitted values | diagnostics | health decision
+    CalibrationTaskRun -> may update -> CalibrationWorkingRef
+    CalibrationChainRun -> contains -> CalibrationTaskRun
+    CalibrationChainRun -> owns -> CalibrationWorkingRef
+    CalibrationProposal -> cites -> CalibrationRecord | CalibrationChainRun | AnalysisAttempt | CodeSnapshot | ParameterSnapshot | Artifact
+    CalibrationProposal -> may propose -> ParameterProfile change
     ReconciliationPlan -> compares -> DesiredSetupState | DeviceSnapshot
     ApplyExecution -> executes -> ReconciliationPlan
 ```
@@ -179,6 +198,10 @@ Measurement, Analysis, Import, Simulation, and Calibration.
 Analysis attempts, calibration records, and calibration proposals should remain
 separate concepts. Analysis consumes data and produces results or diagnostics.
 Calibration records describe validity, review state, and affected-run windows.
-Calibration proposals recommend reviewed parameter or setup changes and carry
+Calibration task runs describe a small calibration step, its fitted values,
+diagnostics, health decision, and any chain-scoped working-ref update.
+Calibration chain runs describe ordered bootstrap calibration work with
+dependencies, retries, pause/review decisions, and intermediate working state.
+Calibration proposals recommend reviewed durable parameter changes and carry
 the before/after diff, actor/reviewer, outcome, and rollback target where
 practical.

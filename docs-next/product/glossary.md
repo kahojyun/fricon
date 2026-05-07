@@ -44,6 +44,9 @@ Accepted.
 - Parameter Snapshot: immutable parameter facts captured by future parameter
   profile or managed-run workflows.
 - Parameter Profile: mutable named reference to a useful parameter state.
+- Calibration Working Ref: chain-scoped mutable parameter reference updated by
+  small calibration tasks so later tasks can consume the latest fitted values.
+  It is not a durable published profile such as `latest-good`.
 - Parameter Proposal: reviewed request to update a named parameter profile or
   related setup state from a source run, snapshot, analysis result, or
   calibration result. It carries source evidence and a before/after diff where
@@ -83,11 +86,27 @@ Accepted.
 - Measurement Outcome: lightweight interpretation or trust decision attached to
   a measurement, such as accepted, questionable, invalidated, or repeat-needed.
   It is not a full electronic lab notebook entry.
-- Calibration Record: later record of calibration validity, due/expired state,
-  as-found/as-left facts, affected-run windows, and review state.
+- Calibration: Fricon's accepted domain term for quantum-experiment parameter
+  calibration unless qualified otherwise. It means measurement plus analysis or
+  fit that estimates better sample, qubit, gate, pulse, readout, or analysis
+  parameters. It does not mean device desired-state apply/readback by default.
+- Calibration Record: later record of calibration evidence, task health,
+  fitted values, affected-run windows, and review state.
+- Calibration Task Run: one small calibration step with source measurements,
+  fitted values, diagnostics, health decision, and optional update to a
+  calibration working ref.
+- Calibration Chain Run: ordered bootstrap, daily, or targeted calibration
+  sequence composed of task runs, working-ref revisions, dependencies, retries,
+  pauses, and final promotion outcome.
 - Calibration Proposal: reviewed recommendation from calibration evidence that
-  may produce parameter or setup changes after approval. It is not a direct
-  edit to active configuration.
+  may publish selected chain results to a durable parameter profile/ref after
+  approval. It is not a direct edit to active configuration.
+- Calibration Promotion: publishing selected calibration working-ref results to
+  a durable named parameter profile/ref with source evidence, diff, actor, and
+  rollback target where practical.
+- Instrument Calibration: calibration of instruments, electronics, device
+  chain, timing, or setup infrastructure. Use this qualified term when the
+  workflow is about hardware/setup state rather than experiment parameters.
 - Desired Setup State: expected setup or device state derived from parameters,
   routine inputs, and code. It is intent, not proof that hardware changed.
 - Observed Device State: readback/status facts for a device or setup, including

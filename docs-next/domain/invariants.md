@@ -56,12 +56,16 @@ Draft.
 - Code provenance, generated sidecars, and effective parameter snapshots are
   separate facts. Linking them for compare or replay must not make any one
   record the owner of the others.
-- Calibration-derived parameter changes must preserve source measurements,
-  analysis or fit attempts, code context, affected parameter paths,
-  before/after diffs, review outcome, and rollback target where practical
-  before active refs are updated.
-- Calibration automation must not silently mutate active parameter refs,
-  setup refs, devices, or generated config that future runs depend on.
+- Calibration-derived durable parameter changes must preserve source
+  measurements, analysis or fit attempts, code context, affected parameter
+  paths, health assessments, before/after diffs, review outcome, and rollback
+  target where practical before named refs are updated.
+- Calibration task chains may update chain-scoped calibration working refs
+  without per-step manual approval, but they must record task order,
+  dependencies, working-ref revisions, health-gate decisions, retries,
+  pause/review reasons, and final promotion outcome.
+- Calibration automation must not silently mutate named parameter refs, setup
+  refs, devices, or generated config that future runs depend on.
 - The absence of a detailed confidence-label taxonomy must never be used as a
   reason to allow untracked parameter or calibration mutation.
 - Desired setup/device state is intent, not evidence that hardware changed.

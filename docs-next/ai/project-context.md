@@ -85,7 +85,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   not parallelize or reorder device writes without explicit safety semantics.
 - Do not make detailed confidence-label taxonomies the center of post-MVP
   planning. First make code state, effective parameters, calibration evidence,
-  before/after diffs, and reviewed application durable.
+  calibration task health/confidence gates, before/after diffs, and reviewed
+  durable promotion paths.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.

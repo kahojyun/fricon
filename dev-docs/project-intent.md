@@ -71,7 +71,13 @@ sidecars, and notebook-local analysis make calibration hard to trust and harder
 to automate safely. Fricon should first make code provenance, effective
 parameter snapshots, diffs, calibration evidence, and reviewed parameter
 changes durable enough that experimenters can trust the next run. Detailed
-confidence-label schemes can wait until a concrete workflow needs them.
+field-level confidence-label schemes can wait, but calibration task
+health/confidence gates are part of the post-MVP automation motivation.
+
+Use Calibration as the normal domain term for quantum-experiment parameter
+calibration. Qualify other meanings explicitly: instrument calibration for
+hardware/setup calibration, and setup/device reconciliation for desired-state
+apply/readback workflows.
 
 ## Product Route
 
@@ -141,8 +147,9 @@ It can eventually coordinate scheduled calibration, optimization, benchmark,
 and repeated measurement tasks, but should rely on clear measurement records,
 parameter snapshots, code provenance, generated artifacts, calibration
 evidence, visible before/after diffs, and human approval boundaries.
-Calibration-derived settings should be staged as reviewed proposals before
-they update active parameter refs, setup refs, generated config, or devices.
+Small calibration tasks may update chain-scoped working parameter refs for
+later steps. Publishing selected calibration results to durable named refs,
+setup refs, generated config, or devices should remain explicit and auditable.
 
 Fricon should also learn from modern desired-state systems without pretending
 lab hardware is a browser DOM or cloud resource graph. Many current scripts use

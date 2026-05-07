@@ -42,6 +42,13 @@ Post-MVP Fricon should therefore prioritize durable code provenance, effective
 parameter snapshots, parameter diffs, analysis evidence, and reviewed
 calibration proposals before investing in broad automation.
 
+Calibration is the accepted domain term because quantum experimenters use it
+for this workflow. In this backlog, unqualified calibration means estimating
+better sample, qubit, gate, pulse, readout, fit, or analysis parameters from
+measurement evidence. Use qualified terms for other meanings: instrument
+calibration for hardware/setup calibration, and setup/device reconciliation
+for desired-state apply/readback workflows.
+
 The product rule is: the system captures context automatically where practical;
 the user confirms, annotates, or corrects it. Any workflow that mutates
 parameters, setup, devices, code, or data-library state needs explicit preview,
@@ -52,8 +59,10 @@ safely reviewable. Deprioritize features that merely imitate legacy acquisition
 tools, add device control without recorded state, or create automation before
 Fricon can explain the facts automation depends on. Detailed field-level
 confidence labels are a later refinement unless a concrete workflow requires
-them; the first priority is recording the source facts and review decisions
-that calibration and repeat work depend on.
+them. Calibration task health/confidence gates are a concrete workflow need,
+but broad confidence taxonomies for every field are not. The first priority is
+recording the source facts and review decisions that calibration and repeat
+work depend on.
 
 Current imperative lab scripts are valid adoption targets, not design ideals.
 Many routines scan parameters through nested loops and calculate per-device
@@ -158,8 +167,9 @@ Parameter requirements:
   outcome, and timestamp. They do not require a permissions system in the first
   parameter workflow slice.
 - FREQ-023: Calibration-derived parameter changes must flow through parameter
-  proposals or calibration proposals. Direct edits to active parameter refs
-  should not be the normal automation path.
+  proposals, calibration proposals, or chain-scoped calibration working refs.
+  Direct edits to durable named parameter refs should not be the normal
+  automation path.
 - FREQ-016: Parameter table rows can expose stable, user-defined target keys
   for visualization and compare views. Fricon must not require those keys to
   imply a first-class physical sample-component model.
@@ -323,24 +333,26 @@ Not first managed-run slice:
 
 FEPIC-004: Setup And Calibration State Store/Diff.
 
-- Users record setup/device/calibration state as structured snapshots and
-  ledgers.
+- Users record setup/device state and calibration-task evidence as structured
+  snapshots and ledgers.
 - Fricon can diff and bind state to runs without applying settings to devices.
 - Later, Fricon can separate desired setup/device state from observed
   setup/device status so managed routines can compute reconciliation plans
   before touching hardware.
-- Setup snapshots, device snapshots, and calibration ledgers are related but
-  distinct: setup records declared or passive context; device snapshots record
-  identity and observed/readback facts when available; calibration ledgers
-  record validity and review state.
+- Setup snapshots, device snapshots, calibration task records, and calibration
+  ledgers are related but distinct: setup records declared or passive context;
+  device snapshots record identity and observed/readback facts when available;
+  calibration task records preserve measurement evidence, fitted values,
+  diagnostics, and health decisions.
 - The first calibration-state value is not autonomous device control. It is
-  making calibration evidence, affected parameters, and applied changes
-  inspectable enough that users can trust the next run.
+  making calibration evidence, affected parameters, task health, retry/pause
+  decisions, and promoted parameter changes inspectable enough that users can
+  trust the next run.
 
 FEPIC-005: Reviewable Automation Workflow.
 
-- Users can preview automation actions before they mutate Fricon state, device
-  state, parameter refs, or calibration records.
+- Users can preview automation actions before they mutate durable Fricon state,
+  device state, named parameter refs, or calibration records.
 - Automation proposals record intended inputs, expected mutations, affected
   objects, actor, review outcome, and audit events.
 - Automation grows from parameter system and managed run records instead of
@@ -364,28 +376,38 @@ FUS-011: Store and diff setup snapshots.
 
 FUS-012: Track calibration state.
 
-- As an experimentalist, I want calibration records with due dates,
-  certificates, as-found/as-left values, pass/fail status, and affected-run
-  links so that questionable data can be reviewed.
-- Success: out-of-tolerance records can flag a review window without silently
-  invalidating data.
+- As an experimentalist, I want calibration records with source measurements,
+  fitted values, diagnostics, health decisions, and affected-run links so that
+  questionable data can be reviewed.
+- Success: records can distinguish sample/control-parameter calibration from
+  instrument/device calibration.
+- Success: unhealthy or out-of-family task results can pause a calibration
+  chain, request review, retry a previous step, or flag a review window without
+  silently invalidating data.
 - Success: a calibration record can link to the parameter proposal or
   calibration proposal that applied its derived settings.
-- Success: fit quality, residuals, warnings, and manual rationale can be
-  preserved when they materially affect whether a calibration should be used.
+- Success: fit quality, residuals, warnings, statistical checks, AI or algorithm
+  assessment, and manual rationale can be preserved when they materially affect
+  whether a calibration should be used.
 
-FUS-020: Stage calibration results before applying parameter changes.
+FUS-020: Run a bootstrap calibration chain with health gates.
 
-- As an experimentalist, I want fitted calibration outputs to become reviewed
-  proposals before they update active parameters so that automation does not
-  silently overwrite the state future runs depend on.
-- Success: a proposal records source measurements, analysis attempts, fitted
+- As an experimentalist, I want a calibration sequence made of smaller
+  calibration tasks to continue automatically through healthy intermediate
+  results, but pause, retry, or ask for review when a task result looks wrong.
+- Success: each task records source measurements, analysis attempts, fitted
   values, generated sidecars or derived artifacts where relevant, affected
-  parameter paths, before/after diff, code context, and reviewer/actor.
-- Success: acceptance creates or updates the target parameter profile/ref
-  through the same proposal/audit path as manual parameter promotion.
-- Success: rejection or deferral preserves the evidence without mutating active
-  parameter state.
+  parameter paths, code context, task status, and health assessment.
+- Success: task health can be assessed by deterministic checks, statistical
+  thresholds, operator rules, or AI assistance with recorded provenance.
+- Success: each healthy small task can update a chain-scoped calibration
+  working ref that later tasks consume, without requiring operator approval
+  after every small update.
+- Success: durable promotion to a named parameter profile/ref records the final
+  diff from the source working ref, source task chain, reviewer/actor where
+  required, and rollback target.
+- Success: rejection, retry, or deferral preserves evidence without mutating
+  durable named parameter state.
 
 FUS-013: Preview an automation workflow.
 
@@ -397,8 +419,8 @@ FUS-013: Preview an automation workflow.
 - Success: preview identifies whether each action is read-only, produces a
   durable record, mutates Fricon state, or reaches an ADR-gated device boundary.
 - Success: calibration automation previews generated artifacts, affected
-  parameter paths, before/after diffs, and rollback targets before applying
-  accepted changes.
+  parameter paths, task-chain health gates, before/after diffs for durable
+  promotion, and rollback targets before applying accepted durable changes.
 
 FUS-021: Declare expected setup/device state and reconcile it.
 
@@ -461,8 +483,12 @@ Automation requirements:
   ordinary reviewed proposals. Durable AI-created conclusions record model or
   tool provenance and privacy-scoped inputs where practical.
 - FREQ-024: Calibration proposals preserve source measurements, analysis
-  attempts, fitted values, affected parameter paths, before/after diffs, code
-  context, review outcome, and rollback target where practical.
+  attempts, fitted values, affected parameter paths, task health assessments,
+  before/after diffs for durable promotion, code context, review outcome, and
+  rollback target where practical.
+- FREQ-029: Bootstrap calibration chains preserve task order, dependencies,
+  chain-scoped working-ref revisions, health-gate decisions, retries,
+  pause/review reasons, and final promotion outcome.
 - FREQ-025: Automation previews classify intended effects at least as
   read-only inspection, derived artifact creation, data-library mutation,
   parameter/profile mutation, device/hardware mutation, or ADR-gated
