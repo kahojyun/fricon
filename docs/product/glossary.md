@@ -13,8 +13,9 @@ Draft pending terminology revalidation.
   sample.
 - Measurement: data-taking attempt that may produce artifacts and carry
   context, lifecycle, notes, parameters, and code provenance.
-- Dataset Artifact: table-shaped artifact produced or consumed by work; owns
-  dataset-local facts and semantics.
+- Dataset Artifact: structured artifact produced or consumed by work; owns
+  dataset-local facts and semantics such as scan axes, step records, output
+  values, arrays, or traces.
 - Attachment Artifact: small file, image, log, or supporting artifact attached
   to a measurement.
 - Parameter Summary: optional light parameter context recorded for a
@@ -25,9 +26,9 @@ Draft pending terminology revalidation.
   It is not a global parameter profile or device inventory.
 - Code Provenance Summary: initial adoption record of what Fricon can honestly
   know about measurement code, such as unmanaged label, optional
-  script/notebook path, Git summary, dirty-state signal,
-  copied-folder/source-root label, or user-supplied explanation. It is not a
-  managed code snapshot or approval record.
+  script/notebook path, copied-folder/source-root label, optional Git summary
+  where meaningful, or user-supplied explanation. It is not a managed code
+  snapshot or approval record.
 - Setup Summary: optional passive setup, device, driver, environment, clock, or
   method context; describes, does not control.
 - Procedure Summary: optional passive procedure context such as unmanaged
@@ -43,7 +44,7 @@ Draft pending terminology revalidation.
 - Event/Audit Record: timeline record for lifecycle, note, correction, system
   action, or actor-labeled mutation.
 - Export Bundle: read-only portable package for analysis without importing into
-  another data library.
+  another data library or running the acquisition-time local runtime.
 - Export Manifest: read-only package manifest for an export bundle. It records
   package contents, source library identity, export identity, format version,
   stable record IDs, checksums, and integrity metadata.
@@ -151,3 +152,6 @@ Draft pending terminology revalidation.
   primary/baseline data. Not user-facing initial adoption terminology.
 - Experiment: informal scientific wording or possible future grouping/template,
   not the first public acquisition record.
+- Channel or Log: useful comparison terms from other measurement tools, but
+  not accepted Fricon object names until dataset and plotting terminology is
+  revalidated.

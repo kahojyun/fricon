@@ -29,12 +29,18 @@ concepts:
 - a lightweight way to bind selected local configuration context to a run
 - Python-native scan-plan authoring for routine scans
 - public reopen/export APIs for later analysis
+- a simple migration path where Data Vault-style scripts rewrite the recording
+  section instead of depending on a LabRAD compatibility layer
 
 The notebook-friendly reusable context/handle style is part of the product
 experience: a user should be able to establish the current local library and
 optional lab context once, inspect it in a notebook, reset it when needed, and
 pass it explicitly to measurement helpers. This does not accept a specific
 entry-point name such as `fricon.library()` or `fc.open()`.
+
+Notebook or process session association may be useful for monitor-window reuse
+and runtime connection behavior, but it should not become a user-facing product
+concept unless later design evidence requires it.
 
 The main ergonomic constraint is low ceremony. Fricon should ask for structure
 only where it changes user understanding: which context is active, whether a
@@ -47,6 +53,11 @@ lab folders are all plausible shapes. The initial adoption slice should record
 honest provenance for those shapes. Managed-run entry points, code snapshots,
 approved code sources, and update flows are strategic follow-on product
 directions, not accepted SDK API mechanics.
+
+Initial migration should be a small explicit rewrite of writer calls. Fricon
+should not depend on LabRAD internals, LabRAD services, or LabRAD's unit system
+for the first slice because local installations may diverge from upstream and
+legacy unit objects may not map cleanly.
 
 For common workflows, Fricon should provide appropriate simplification without
 pretending the right simplification is known before use. The exact API shape
@@ -91,6 +102,8 @@ ceremony should be justified by one of these user-visible benefits:
 - binding selected local configuration context when copied files or sidecars
   explain the run
 - reopening or exporting results through stable public APIs
+- exporting to a portable Fricon package that can be read on another computer
+  with a lightweight Python reader
 
 Boilerplate that exists only for transport, storage layout, local runtime
 startup, local tokens, object graph construction, or future parameter machinery
@@ -168,6 +181,8 @@ Do not settle these in this guideline:
   a raw escape hatch
 - a QCoDeS compatibility layer, fixed borrowed helper name, or
   parameter-object model
+- a LabRAD compatibility layer, LabRAD-dependent helper module, or LabRAD unit
+  adapter
 - scheduler, resource leases, queues, retries, workflow DAGs, or resume
   protocols
 

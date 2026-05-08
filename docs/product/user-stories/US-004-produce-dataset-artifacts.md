@@ -11,13 +11,14 @@ EPIC-002: New measurement logging replacement.
 ## Story
 
 As a Measurement Run Operator, I want one measurement to produce one or more
-dataset artifacts so that related tables, scans, or traces stay connected
-without losing direct dataset access.
+dataset artifacts so that related scans, step records, arrays, or traces stay
+connected without losing direct dataset access.
 
 ## Success Criteria
 
 - A measurement can create multiple dataset artifacts with stable IDs.
-- Dataset artifacts carry scan or trace schema where plotting semantics matter.
+- Dataset artifacts carry scan, step-record, array, or trace schema where
+  plotting and slicing semantics matter.
 - Dataset writers share measurement lifecycle by default while remaining
   individually discoverable.
 - Dataset facts are appendable while a writer is active and immutable after the

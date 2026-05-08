@@ -14,8 +14,11 @@ actions.
 
 - Measurement-first console.
 - Active and recent measurement list.
-- Live table, line/scatter, basic heatmap, and simple trace inspection.
-- Ability to keep multiple relevant measurement, table, plot, or trace views
+- Live monitor views for line/scatter, basic heatmap, selected output channel
+  or log views, and simple trace inspection.
+- Selector or index views for choosing datasets, scan parameters, timestamps,
+  and trace/log records.
+- Ability to keep multiple relevant measurement, monitor, plot, or trace views
   visible while acquisition continues.
 - Dataset direct-open entry points.
 - Favorites, notes, lifecycle flags, and basic search shortcuts.
@@ -23,6 +26,7 @@ actions.
 ## Not Initial Adoption
 
 - Publication plotting.
+- Running user plotting code inside Fricon.
 - Generic dashboard builder.
 - Rich saved views and comparison workflows beyond the minimal console.
 

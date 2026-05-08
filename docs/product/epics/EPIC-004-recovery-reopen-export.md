@@ -15,8 +15,9 @@ reopen data from Python, and export a measurement for offline analysis.
 - Trash/recover instead of normal hard delete.
 - Python reopen snippets using stable IDs.
 - Measurement-centered read-only export bundles.
-- Direct Python reading of exported bundles without importing into another
-  editable library.
+- Lightweight Python reader for exported bundles without importing into another
+  editable library or running the acquisition-time local runtime.
+- Analysis-friendly reads into common Python objects where appropriate.
 - Human-readable export manifest or index preview.
 - Privacy preview for sensitive provenance in exports.
 
@@ -25,6 +26,8 @@ reopen data from Python, and export a measurement for offline analysis.
 - Resumable managed execution.
 - Full offline viewer polish before the write/reopen loop works.
 - Importing old history as a built-in migration path.
+- First-slice report or presentation generation.
+- Mandatory generic CSV, Parquet, or NumPy exports before demand is validated.
 
 ## Key Stories
 

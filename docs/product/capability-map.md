@@ -7,9 +7,10 @@ Draft pending product-analysis revalidation.
 ## Vision Alignment
 
 The capability baseline should be revalidated against one initial adoption
-goal: replace the simple LabRAD Data Vault/Grapher loop for new measurements.
-Capabilities in the first adoption slice should support that loop without
-importing old history, emulating LabRAD, or pulling strategic follow-on
+goal: replace the simple LabRAD Data Vault/Grapher loop for new interactive
+measurements and portable later analysis. Capabilities in the first adoption
+slice should support that loop without importing old history, emulating LabRAD,
+running user plotting code, generating reports, or pulling strategic follow-on
 parameter, code-management, runner, device, or automation systems into the
 first release path.
 
@@ -63,9 +64,10 @@ CAP-003: Python measurement recording.
   measurement with low ceremony and append measurement facts through public
   APIs.
 - Includes: title, start/end lifecycle, optional context links, concurrent local
-  writers, and readable crash outcomes.
-- Excludes: managed runner, task queue, visual sweep builder, and device
-  control.
+  writers, readable crash outcomes, and simple recording-section rewrites for
+  Data Vault-style scripts.
+- Excludes: managed runner, task queue, visual sweep builder, LabRAD
+  compatibility layer, and device control.
 
 CAP-004: Optional, visible, correctable sample/session context.
 
@@ -88,17 +90,23 @@ CAP-006: Dataset scan semantics.
 - Promise: plotted datasets carry explicit scan or trace meaning instead of
   relying on column-position guesses.
 - Includes: variable roles, labels, units, dependencies, axis structure,
-  partial grids, irregular/adaptive points, repeated points, and trace shapes.
-- Excludes: requiring every advanced acquisition to fit a regular grid.
+  partial grids, irregular/adaptive points, logical step records, per-step
+  parameters, selectable log or trace collections, fixed-shape traces, and
+  variable-length traces.
+- Excludes: requiring every advanced acquisition to fit a regular grid or
+  requiring optional units and labels when the schema remains interpretable.
 
 CAP-007: Nonblocking live inspection.
 
 - Promise: Desktop can watch active data without slowing or breaking acquisition
   writes.
-- Includes: live events, table view, line/scatter plot, basic heatmap, simple
-  trace inspection, stale/lag indicators, and product support for watching
-  multiple relevant measurement or data views at once.
-- Excludes: live consumers as required write acknowledgements.
+- Includes: live events, line/scatter plot, basic heatmap, selected output
+  channel or log viewing, simple trace inspection, stale/lag indicators, and
+  product support for watching multiple relevant measurement or data views at
+  once.
+- Excludes: live consumers as required write acknowledgements, running user
+  plotting code, and making full table browsing the primary live monitor
+  surface.
 
 CAP-008: Lifecycle and readable partial recovery.
 
@@ -120,7 +128,8 @@ CAP-010: Python reopen through stable IDs and public APIs.
 - Promise: Python can reopen measurements, dataset artifacts, and exports
   without depending on storage paths.
 - Includes: stable IDs, typed read APIs, schema-aware reads, partial-data
-  semantics, and Desktop-visible snippets.
+  semantics, Desktop-visible snippets, and analysis-friendly reads into common
+  Python objects such as NumPy, pandas, or Polars where appropriate.
 - Excludes: path-based storage contracts and private file layout coupling.
 
 CAP-011: Measurement-centered export.
@@ -129,10 +138,12 @@ CAP-011: Measurement-centered export.
   for offline analysis.
 - Includes: produced datasets, semantic metadata, selected provenance,
   integrity metadata, simple manifest or index preview, direct Python reading,
-  privacy-aware provenance selection, and common analysis-oriented output
-  paths.
-- Excludes: importing old history and a fully polished offline Desktop viewer
-  before the write/reopen loop is proven.
+  privacy-aware provenance selection, and a lightweight Python reader that does
+  not require running the acquisition-time local runtime or Desktop.
+- Excludes: importing old history, first-slice report generation, a fully
+  polished offline Desktop viewer before the write/reopen loop is proven, and
+  promising generic CSV, Parquet, or NumPy exports before real demand is
+  validated.
 
 CAP-012: Backup, restore, and migration checkpoints.
 
@@ -156,9 +167,10 @@ CAP-014: Honest code provenance summary.
 
 - Promise: Fricon records what it can honestly know about unmanaged Python code
   without pretending it owns execution.
-- Includes: unmanaged labels, optional script path, Git summary, dirty-state
-  signal, copied-folder or source-root label, user-supplied summary, and
-  privacy-aware export handling.
+- Includes: unmanaged labels, optional script path, copied-folder or
+  source-root label, user-supplied summary, selected local configuration
+  snapshots, optional Git summary where meaningful, and privacy-aware export
+  handling.
 - Excludes: automatic notebook state capture and managed code snapshots.
 
 CAP-015: Light parameter context summary without a registry UI.
@@ -301,9 +313,11 @@ CAP-030: Migration ergonomics for Data Vault-style new measurement scripts.
 - Promise: users can translate new Data Vault-style scripts to Fricon writers
   without a full experiment-stack rewrite.
 - Includes: natural mapping for independent/dependent variables, labels, units,
-  legends, old path aliases, and numbered legacy titles as metadata.
-- Excludes: a LabRAD compatibility server, built-in Data Vault parser, or old
-  history browser.
+  legends, old path aliases, numbered legacy titles as metadata, and migration
+  guide examples for non-obvious shapes such as N-D sweeps, coarse/fine trace
+  collections, and irregular optimizer logs.
+- Excludes: a LabRAD compatibility server, LabRAD-dependent helper module,
+  built-in Data Vault parser, or old history browser.
 
 CAP-031: Run manifest and failure investigation.
 

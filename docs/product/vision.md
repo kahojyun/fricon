@@ -9,11 +9,20 @@ High-confidence product input; derived scope pending revalidation.
 Fricon is a local lab data library and automation foundation for scientific
 measurement work.
 
-The near-term product proves a better local measurement write, watch, recover,
-reopen, and export loop. The long-term product should become the lab's local
-experiment memory and reviewed action layer: a system of record for measurement
-intent, effective parameters, code provenance, setup state, analysis attempts,
-trust decisions, handoff, and reviewed replay.
+The near-term product replaces the fragile Data Vault/Grapher-centered loop
+for new interactive measurement work with a maintained local system for
+recording, monitoring, reopening, and exporting experiment data. The long-term
+product should become the lab's local experiment memory and reviewed action
+layer: a system of record for measurement intent, effective parameters, code
+provenance, setup state, analysis attempts, trust decisions, handoff, and
+reviewed replay.
+
+## Problem Statement
+
+For the initial adoption slice, Fricon replaces the fragile
+Data Vault/Grapher-centered measurement loop with a maintained local system for
+recording, monitoring, reopening, and exporting new interactive experiment
+data.
 
 ## Planning Language
 
@@ -46,6 +55,15 @@ inspect, compare, migrate, or automate. Fricon should replace not only the
 write-to-logger step, but also the informal folder discipline around copied
 measurement code, mutable local JSON configuration, setup sidecars, and later
 analysis handoff.
+
+The adoption pain is not that notebook-based exploration is inherently wrong.
+Interactive scripts and notebooks can be the comfortable way to try an
+experiment. The failure appears when useful work has to survive beyond one
+person, one lab computer, one copied code folder, one Conda environment, or one
+uninterrupted storage session. Multiple machines may contain similar-looking
+measurement-code folders, waveform helpers, and analysis utilities whose real
+differences are hard to identify. Collaboration then depends on personal
+discipline instead of a maintained product model.
 
 Fricon should give experimenters one local-first product model for defining,
 running, inspecting, explaining, and reusing measurement work. The long-term
@@ -107,14 +125,18 @@ initial adoption concept without explicit product and architecture review.
 ## Initial Adoption Goal
 
 The initial adoption goal is practical: replace the simple LabRAD Data
-Vault/Grapher loop for new measurements.
+Vault/Grapher loop for new interactive measurements and portable later
+analysis.
 
 Success means a user can start new measurement work in Fricon, write data from
-Python, watch it live, recover partial results, reopen it later, and export it
-without depending on old storage paths or notebook-only reconstruction. The
-initial adoption slice does not need to import old history or emulate LabRAD;
-old LabRAD, QCoDeS, Labber, or folder-based history can remain where it is
-while new work moves to Fricon.
+Python, watch live plots, run multiple independent experiments without
+unnecessary global-session interference, recover partial results, reopen data
+later, and export it to another computer for analysis without depending on old
+storage paths or notebook-only reconstruction. The initial adoption slice does
+not need to import old history, emulate LabRAD, or ship a LabRAD compatibility
+layer; old LabRAD, QCoDeS, Labber, or folder-based history can remain where it
+is while new work moves to Fricon through small explicit recording-code
+rewrites.
 
 ## User Promise
 
@@ -126,7 +148,10 @@ Fricon should help a researcher answer:
 - Was the run finished, interrupted, failed, invalidated, or recovered?
 - What notes, parameters, code provenance, and setup labels explain it?
 - Which selected local configuration files or summaries were bound to it?
+- Can I run another experiment without this one interfering with it?
 - How do I inspect it live, reopen it from Python, export it, or recover it?
+- Can I analyze the exported result on another computer without recreating the
+  acquisition runtime?
 
 Strategic follow-on slices should also help answer:
 
@@ -172,6 +197,12 @@ importable managed-run entry points for higher provenance, Python-native
 scan-plan authoring for routine scans, and public reopen/export APIs for later
 analysis.
 
+For the first adoption slice, migration from Data Vault-style scripts should
+mean a simple rewrite of the recording section, not emulation of LabRAD or its
+unit system. Users should be able to keep experiment logic, instrument calls,
+waveform generation, and analysis utilities outside Fricon while replacing the
+writer and live-inspection path.
+
 Common workflows should have appropriate simplifications, but exact helper
 shapes are not part of the product vision until real usage feedback supports
 them.
@@ -189,10 +220,13 @@ translated scripts, and copied lab working folders. Fricon should record honest
 context for these forms without pretending it owns their execution.
 
 The initial adoption code promise is provenance, not code management. Fricon
-may record an unmanaged label, optional script or notebook path, Git summary,
-dirty-state signal, copied-folder/source-root label, user summary, and export
-privacy choice. It should not claim automatic notebook capture, approved code
-releases, deployment, immutable code snapshots, or managed execution.
+may record an unmanaged label, optional script or notebook path, copied-folder
+or source-root label, user summary, selected local configuration snapshots, and
+export privacy choice. Git state can be recorded when it is meaningful, but it
+is not a first-slice success requirement because many lab folders are old
+copies or machine-local working trees. Fricon should not claim automatic
+notebook capture, approved code releases, deployment, immutable code snapshots,
+or managed execution.
 
 Strategic follow-on code management should grow toward configured measurement
 code sources, approved update flows, importable managed-run entry points, and
@@ -207,26 +241,38 @@ To meet the initial adoption goal, the first adoption slice should include:
 - optional sample and sample-session context
 - dataset artifacts that remain directly searchable and openable, even though
   the Desktop home is measurement-first
-- table-shaped scan and trace data with explicit scan schema for plotted data
-- scan modes for regular grids, partial grids, irregular or adaptive points,
-  repeated points, and fixed-shape or variable-length traces
-- low-ceremony scan-plan/schema authoring for common 1D/2D/N-D scans and
-  traces, plus a raw schema escape hatch for advanced cases
-- nonblocking live table and chart inspection
+- declared scan datasets for common 1D, 2D, and N-D sweeps
+- step or record datasets for irregular workflows such as minimizers, adaptive
+  scans, and instrument-driven coarse/fine passes where each step may carry
+  parameters and one or more scalar, array, or trace results
+- selectable collections of logs or traces so users can compare coarse/fine
+  passes or variable-length optimizer traces without hard-coding those
+  experiment types into the product model
+- low-ceremony scan-plan/schema authoring for common scans and traces, plus a
+  raw schema escape hatch for advanced cases
+- nonblocking live monitor views for current 1D line/scatter, 2D heatmap, and
+  selected output channels or logs
+- richer historical browsing and selector views that do not need to be live
+  auto-refresh surfaces
 - measurement lifecycle, notes, events, favorites/pins, trash/recover, and
   readable partial data semantics
 - light attachments
 - light contextual summaries for parameters, code provenance, setup,
   environment, and unmanaged procedure context
-- selected run-bound local configuration snapshots or summaries, such as
-  parameter files, registry files, wiring references, line/chip info, or
-  demod/readout settings, without turning initial adoption into a full
-  parameter registry
+- selected run-bound local configuration copies, snapshots, references, or
+  summaries, such as parameter files, registry files, wiring references,
+  line/chip info, or demod/readout settings, without turning initial adoption
+  into a full parameter registry
 - Python reopen snippets through public APIs
-- a near-term measurement export spec for portable bundles and common analysis
-  formats
+- a portable Fricon package readable by a lightweight Python reader without
+  running the acquisition-time local runtime or Desktop
+- analysis-friendly reads into common Python objects such as NumPy, pandas, or
+  Polars where appropriate
 - backup/restore and migration checkpoints
 - coherent install/update compatibility and guided setup diagnostics
+- migration documentation for non-obvious script shapes, including N-D sweeps,
+  VNA-like coarse/fine trace collections, minimizer-style irregular traces, and
+  a realistic Data Vault-style recording rewrite
 
 ## Product Pressure Checks
 
@@ -247,13 +293,23 @@ work starts:
 - Dataset artifact semantics should be checked against real measurement shapes,
   including adaptive or instrument-tuned traces where each trace may have its
   own coordinate values, settings, and length.
+- Required metadata should stay limited to facts needed for later
+  interpretation, slicing, and plotting. Labels, units, notes, sample/session
+  context, operator labels, and free-form JSON are valuable examples and
+  optional records, not reasons to block ordinary writes when absent.
 - Live inspection should support repeated lab monitoring behavior without
   becoming part of the write acknowledgement path. Users may need to watch
-  multiple measurements or views at once while acquisition keeps running.
+  multiple independent measurements or views at once while acquisition keeps
+  running. The Desktop should remain measurement-first; live monitors can be
+  opened from measurement, dataset, or session context rather than assuming one
+  global active experiment.
 - Measurement-code and run-configuration ideas should stay focused on the user
   pain of copied folders, mutable local files, setup sidecars, scan helpers,
   plot presets, and export recipes. Initial adoption records honest context;
   approved code update and managed execution remain strategic follow-on.
+- Fricon should not run user plotting code in the first slice. Users can reopen
+  data from Python and build custom plots themselves; built-in live plotting
+  should focus on common measurement monitor views.
 - Mutating actions should be attributable enough for local lab history, but the
   first adoption slice must not turn this into accounts, roles, permissions, or
   remote collaboration.
@@ -298,8 +354,11 @@ device apply remains ADR-gated.
 - distributed database semantics
 - direct shared-folder access to one editable data library
 - LabRAD Data Vault/Grapher compatibility server
+- built-in LabRAD-dependent helper module or unit-system adapter
 - built-in legacy Data Vault import or browser
 - requiring full old-history migration before adopting Fricon for new data
+- first-slice report or presentation generation
+- running user plotting code inside Fricon
 - broad device-driver framework
 - generic workflow DAG engine
 - visual sweep builder as the primary acquisition model

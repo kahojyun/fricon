@@ -17,9 +17,10 @@ stack.
 - Source aliases and old-system references as metadata, not primary identity.
 - Honest code provenance for interactive unmanaged Python.
 - Light contextual summaries for setup, environment, procedure, and parameters.
-- Run-bound local configuration snapshots or summaries for files and references
-  that old scripts currently leave in copied folders.
+- Run-bound local configuration copies, snapshots, references, or summaries for
+  files and references that old scripts currently leave in copied folders.
 - Optional sample/session context that can be corrected after a run.
+- No built-in LabRAD dependency, compatibility layer, or unit adapter.
 
 ## Strategic Follow-On Scope
 

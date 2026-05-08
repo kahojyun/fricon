@@ -21,6 +21,8 @@ depend on remembering storage paths.
   by stable IDs.
 - Reopened data preserves scan schema, units, labels, lifecycle state, and
   partial-data semantics.
+- Reopened data can be converted into analysis-friendly Python objects such as
+  NumPy, pandas, or Polars where appropriate for the dataset shape.
 - Path-based access is not the documented normal path.
 
 ## Not In Scope

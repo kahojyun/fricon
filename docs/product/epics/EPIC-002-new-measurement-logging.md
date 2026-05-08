@@ -6,9 +6,9 @@ Draft pending product-analysis revalidation.
 
 ## Product Goal
 
-Replace the simple LabRAD Data Vault/Grapher loop for new measurements:
-declare measured data, append values from Python, watch it live, and reopen it
-later without manual file/folder discipline.
+Replace the simple LabRAD Data Vault/Grapher loop for new interactive
+measurements: declare measured data, append values from Python, watch live
+monitor plots, and reopen it later without manual file/folder discipline.
 
 This is the center of the initial adoption slice. It should stay close to
 ordinary Python measurement scripts instead of becoming a managed automation
@@ -19,13 +19,14 @@ framework.
 - Explicit but low-ceremony Python measurement creation.
 - Measurement-scoped dataset artifact writers.
 - Dataset artifacts remain directly searchable and openable.
-- Python-native scan plans or helpers for common 1D/2D/N-D scans and traces,
-  with raw schema for advanced cases.
+- Python-native scan plans or helpers for common 1D/2D/N-D scans, irregular
+  step records, and traces, with raw schema for advanced cases.
 - Explicit scan semantics for reliable live and historical plots.
 
 ## Not Initial Adoption
 
-- LabRAD compatibility server or built-in Data Vault parser.
+- LabRAD compatibility server, LabRAD-dependent helper module, or built-in
+  Data Vault parser.
 - Visual sweep builder as the primary acquisition model.
 - Full managed runner, device control, or parameter registry.
 
