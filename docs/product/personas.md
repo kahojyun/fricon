@@ -12,8 +12,9 @@ notebooks, LabRAD Data Vault, mutable `parameters.json`/`registry.json` files,
 wiring spreadsheets, generated sidecars, calibration scripts, hardware
 bring-up helpers, backups, and report artifacts.
 
-The personas describe recurring product roles. One person may move between
-roles during a single day.
+The personas describe recurring product responsibilities, not fixed job titles.
+One person may move between roles during a single day. A workflow should still
+name the role whose decision, risk, or user outcome it primarily serves.
 
 ## Story Role Routing
 
@@ -21,14 +22,19 @@ Existing user stories may use broad legacy wording such as "experimentalist".
 When stories are revised, choose the most specific primary persona from this
 file instead of preserving old role wording by default.
 
+When several roles participate, use the accountable role as the story's primary
+persona and mention supporting roles in notes or acceptance criteria. Do not
+hide a Fricon technical, analyst, calibration, or measurement-stack concern
+behind the generic experimentalist role.
+
 Use the personas this way:
 
 - Use P-001 Experimentalist for ordinary measurement operation: running,
   watching, annotating, recovering, reopening, or exporting new measurement
   work.
-- Use P-002 Lab Maintainer for installation, diagnostics, local runtime
-  health, environment setup, migration guidance, support bundles, shared code
-  setup, and post-MVP review of proposals that mutate durable lab state.
+- Use P-002 Fricon Technical Maintainer for Fricon development, deployment,
+  installation, diagnostics, local runtime health, environment setup, migration
+  guidance, support bundles, and shared code setup.
 - Use P-003 Analyst for reopen, analysis, reports, derived artifacts,
   downstream handoff, mapping/classification provenance, and interpretation
   context.
@@ -41,8 +47,26 @@ Use the personas this way:
   pulse rules, plotting utilities, and report/export recipes.
 
 Do not add a separate future-automation persona unless a future product slice
-uncovers a distinct person with needs that are not already covered by the lab
-maintainer, calibration steward, or measurement stack author roles.
+uncovers a distinct person with needs that are not already covered by the
+Fricon technical maintainer, calibration steward, or measurement stack author
+roles.
+
+## Role Boundary Principles
+
+- Roles are responsibility views. A person can switch roles, but each product
+  workflow should make the active responsibility explicit.
+- MVP stories should prefer the role that directly experiences the MVP problem.
+  Post-MVP stories should prefer the role that reviews or owns the durable
+  state change.
+- Legacy compatibility belongs at role boundaries as aliases, context,
+  attachments, summaries, or evidence. It should not create a new role unless
+  it creates a durable product responsibility.
+- If a story asks Fricon to mutate durable lab state, the responsible role is
+  never only P-001 Experimentalist. Use the domain owner for the decision:
+  P-004 for parameter or calibration proposals, P-005 for managed-routine or
+  measurement-code proposal shape, and P-003 for durable analysis or
+  interpretation records. P-002 contributes technical guardrails when a
+  proposal depends on Fricon runtime, update, library, or environment safety.
 
 ## P-001 Experimentalist
 
@@ -50,6 +74,16 @@ Researchers with entry-level Python ability who run measurement scripts or
 notebooks on lab computers. They may use routines written by a more advanced
 lab member and may only know enough Python to change a scan range, select
 qubits, rerun a cell, or add a note.
+
+Primary responsibilities:
+
+- start and run ordinary unmanaged measurements from Python scripts or
+  notebooks
+- watch live data and inspect recent measurement outputs
+- add lightweight notes, markers, sample/session context, and corrections
+- recover, reopen, and export their own measurements for later work
+- supply enough local context to explain the run without understanding every
+  implementation detail
 
 Needs:
 
@@ -85,10 +119,43 @@ Observed real-case pressures:
 - interrupted sweeps and long-running saves need readable partial state, not
   only a final success/failure bit
 
-## P-002 Lab Maintainer
+Not responsible for:
 
-The person who helps keep lab measurement code, setup context, and computers
-usable.
+- maintaining shared measurement-code sources, runner integrations, or lab
+  package environments
+- choosing whether calibration-derived values become accepted working
+  parameters
+- diagnosing every stopped local service, stale SDK, locked library, or
+  generated sidecar problem
+- making Fricon-managed execution or automation review decisions
+
+Common overlaps:
+
+- uses scripts, scan helpers, and report recipes maintained by P-005
+- asks P-002 for setup, launch, environment, or support-bundle help
+- hands completed or partial runs to P-003 for analysis and reporting
+- becomes P-004 only when evaluating calibration evidence or accepting
+  parameter changes
+
+## P-002 Fricon Technical Maintainer
+
+The person who develops, deploys, updates, diagnoses, and supports Fricon for a
+lab's local computers and data libraries. This role owns Fricon technical
+readiness and integration support, not scientific measurement logic,
+calibration decisions, or analysis conclusions.
+
+Primary responsibilities:
+
+- keep Fricon installation, local runtime components, data libraries, Python
+  environments, and update paths usable on lab computers
+- diagnose setup, compatibility, migration, and support problems before users
+  read raw logs
+- help labs migrate gradually from old LabRAD/Data Vault, folder, and parameter
+  file workflows into Fricon
+- define safe support and sharing practices for local code sources and
+  environment setup
+- provide technical guardrails for post-MVP proposals when Fricon runtime,
+  update, data-library, or environment safety matters
 
 Needs:
 
@@ -109,14 +176,59 @@ Needs:
   environments, and generated sidecars were expected during a run
 - migration guidance that lets old LabRAD/Data Vault history remain in place
   while new work records honest Fricon context
-- post-MVP review responsibility for parameter, calibration, managed-routine,
-  or automation proposals before they mutate durable lab state
+- technical readiness checks for proposals that depend on local runtime,
+  update timing, data-library compatibility, or environment state
+
+Constraints:
+
+- may support Windows, offline, locked-down, or slow-to-update lab computers
+- may not be the person who wrote the measurement script or understands the
+  scientific intent of a run
+- may need redacted support bundles because paths, IP addresses, machine names,
+  environment details, and setup files can be sensitive
+- may need Fricon to fail before mutation when components, SDKs, or libraries
+  are incompatible
+
+Not responsible for:
+
+- operating every measurement run
+- writing the measurement stack, pulse rules, runner integrations, or analysis
+  code as a product responsibility
+- deciding scientific interpretation or whether a fitted value is physically
+  trustworthy
+- approving parameter, calibration, managed-routine, or analysis proposals as
+  the domain owner
+- turning mutable local parameter files into accepted calibration outcomes
+  without P-004 ownership
+
+Common overlaps:
+
+- supports P-001 when setup or update problems block measurement work
+- supports P-005 by making shared code sources and environments usable
+- can block or flag proposals that are technically unsafe because of update
+  policy, runtime state, environment state, or data-library compatibility
+- relies on P-004 for calibration-specific acceptance, rejection, and rollback
+  decisions
 
 ## P-003 Analyst
 
 The person who reopens completed measurements for notebooks, reports, or HPC
 analysis. In practice, this role often produces secondary artifacts such as fit
 results, plots, `.npy` or `.json` derived data, spreadsheets, and slide decks.
+
+Primary responsibilities:
+
+- reopen completed, interrupted, or exported measurements through stable
+  Fricon APIs and IDs
+- inspect datasets, scan schema, metadata, lifecycle, and selected provenance
+- produce analysis outputs, derived data, plots, reports, and presentation
+  artifacts
+- preserve links from derived artifacts back to source measurements,
+  parameters, code/procedure context, and manual judgment
+- validate supplied mapping, readout-classification, shot-group, or
+  detector/observable context for advanced workflows
+- review durable analysis, interpretation, or report records when they become
+  Fricon-managed evidence instead of notebook-local outputs
 
 Needs:
 
@@ -138,6 +250,32 @@ Needs:
   advanced workflows where simulation qubits, physical qubits, shot groups,
   detector events, and fitted metrics must stay aligned
 
+Constraints:
+
+- may work away from the acquisition computer or after the run has finished
+- may need export bundles that redact sensitive paths, setup details, code
+  summaries, environment data, or sample context
+- may need to distinguish raw measurement facts from notebook-local analysis
+  state and manually edited outputs
+- may need Fricon to preserve enough context even before analysis records are
+  first-class post-MVP objects
+
+Not responsible for:
+
+- operating acquisition or keeping live instruments safe
+- maintaining lab runtime, SDK, or package environments
+- accepting calibration-derived values into the working parameter state
+- approving managed routine or measurement-code changes
+- writing or deploying the shared measurement stack, even if analysis code
+  uses it
+
+Common overlaps:
+
+- consumes measurements produced by P-001
+- may produce evidence that P-004 uses for parameter decisions
+- may use report/export recipes maintained by P-005
+- may ask P-002 for export privacy or support-bundle guidance
+
 ## P-004 Calibration and Parameter Steward
 
 A current lab user who tunes readout, pulse, coupler, crosstalk, demodulation,
@@ -145,6 +283,21 @@ feedback, or hardware bring-up parameters and decides whether fitted values
 should become the next working local configuration. This role may be the
 experimentalist on a small team, but the product pressure is distinct from
 ordinary data collection.
+
+Primary responsibilities:
+
+- run or supervise calibration work that produces evidence, fitted values, and
+  affected parameter paths
+- decide which effective configuration or prior-good state a calibration
+  depends on
+- evaluate calibration health, safety gates, fit quality, retry/pause needs,
+  and manual inspection flags
+- mark calibration results as exploratory, accepted, rejected, superseded, or
+  needing review
+- decide whether proposed parameter changes should become working state, and
+  preserve rollback evidence where practical
+- review parameter, calibration, and calibration-derived mutation proposals
+  before they change durable working state
 
 Needs:
 
@@ -178,11 +331,44 @@ Constraints:
 - should not need Fricon to own device control before Fricon can record the
   calibration evidence honestly
 
+Not responsible for:
+
+- keeping Fricon installed, updated, and diagnosable across lab computers
+- writing every measurement helper, runner integration, or report generator
+  used by calibration routines
+- making generic automation architecture decisions outside calibration and
+  parameter review boundaries
+- treating mutable JSON files or generated sidecars as the long-term source of
+  truth once Fricon has parameter snapshots and proposals
+
+Common overlaps:
+
+- may be the same person as P-001 during daily calibration work
+- depends on P-005 for calibration routines, scan helpers, and code provenance
+  integration
+- may use P-003 analysis outputs as calibration evidence
+- relies on P-002 for technical readiness checks when calibration proposals
+  affect runtime, update, environment, or data-library compatibility
+
 ## P-005 Measurement Stack Author
 
 An advanced Python user who writes or maintains reusable measurement scripts,
 scan helpers, pulse-generation rules, runner integrations, plotting utilities,
 or export/report recipes used by other lab members.
+
+Primary responsibilities:
+
+- write and maintain user-authored Python code that creates, explains, or
+  post-processes measurement work
+- integrate Fricon recording into existing scripts, notebooks, Data
+  Vault-style helpers, runners, and scan utilities
+- declare scan axes, dependencies, trace shapes, repeated shots, validity
+  masks, runner identifiers, and procedure summaries from code
+- provide reusable plot, report, export, or generated-artifact recipes that
+  other roles can run
+- preserve honest code provenance without claiming Fricon managed execution
+- review managed-routine, measurement-code source, SDK integration, and
+  generated-artifact recipe proposals for technical shape and provenance
 
 Needs:
 
@@ -205,3 +391,22 @@ Constraints:
   guarantee for unmanaged execution
 - may create post-MVP pressure for approved code sources, managed entry points,
   templates, and reviewed updates, but those are not MVP promises
+
+Not responsible for:
+
+- routine operation of every measurement that uses their code
+- maintaining Fricon installation, runtime health, or lab update policy as a
+  product responsibility
+- deciding whether calibration-derived values become accepted working
+  parameters
+- approving scientific analysis conclusions or calibration health decisions
+- making notebooks, copied folders, generated circuits, or report decks the
+  canonical system of record
+
+Common overlaps:
+
+- enables P-001 by making scripts and helpers easier to run and record
+- helps P-003 produce traceable analysis and report artifacts
+- helps P-004 produce calibration evidence and parameter-change proposals
+- works with P-002 when shared code sources, package environments, or managed
+  entry points become lab-maintained assets

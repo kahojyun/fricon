@@ -306,10 +306,17 @@ FUS-013: Preview an automation workflow.
 
 FUS-014: Review and apply automation proposals.
 
-- As a lab maintainer, I want automation proposals to require explicit review
-  before mutating durable lab state so that automation remains accountable.
+- As the accountable domain owner, I want mutation-capable automation proposals
+  to require explicit review before changing durable Fricon state so that
+  automation remains accountable.
 - Success: approval, rejection, actor, reason, timestamp, and affected objects
   are recorded.
+- Success: review routes to the role that owns the affected state: P-004 for
+  parameter or calibration proposals, P-005 for managed-routine or
+  measurement-code proposal shape, and P-003 for durable analysis or
+  interpretation records. P-002 supplies technical readiness checks when the
+  proposal depends on runtime, update, environment, or data-library safety, but
+  is not the default domain approver.
 
 FUS-015: Use parameter row keys as visual targets.
 
