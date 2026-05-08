@@ -63,19 +63,18 @@ measurement-code proposal shape, and P-003 for durable analysis or
 interpretation records. P-002 contributes technical guardrails when runtime,
 update, library, or environment safety matters.
 
-Physical setup, instrument, wiring, and device-state stewardship is a deferred
-role pressure, not an accepted core persona yet. MVP stories should record it
-as passive setup context or run-bound local configuration. Post-MVP stories may
-need a separate Setup / Instrument Steward if setup or device state becomes an
-independent reviewed mutation boundary. Do not silently route physical
-setup/device ownership to P-002; P-002 owns software-system readiness.
+Physical setup, instrument, wiring, and device-state ownership is a distinct
+future boundary. MVP stories record those facts as passive setup context or
+run-bound local configuration. If later workflows review or mutate setup or
+device state, route that decision to an explicit setup/device owner rather than
+to P-002 by default; P-002 owns software-system readiness.
 
 ## P-001 Measurement Run Operator
 
 The role active when a lab user runs a measurement script or notebook on a lab
 computer. The person may be an experimentalist, student, or senior researcher,
-but this product role is limited to operating and understanding a measurement
-run.
+but the product responsibility is operating and understanding a measurement
+run, not every decision in the experiment.
 
 Goals:
 
@@ -126,7 +125,7 @@ Context and pressure:
 - must handle sensitive local paths, machine names, IP addresses, environment
   details, and setup files carefully
 - may diagnose OS, package, service, import, driver-path, and runner-launch
-  problems without knowing the scientific purpose of the routine
+  problems from a software-system perspective
 - contributes technical readiness checks when a proposal depends on runtime,
   update timing, data-library compatibility, or environment state
 
@@ -223,10 +222,9 @@ Goals:
 
 Context and pressure:
 
-- may be comfortable editing Python without owning the whole local runtime,
-  package, deployment, or diagnostic environment
 - writes routines that other users may run without understanding every
   dependency
+- may rely on P-002 for runtime, package, deployment, or diagnostic support
 - needs migration ergonomics that do not require rewriting the whole
   measurement stack at once
 - creates post-MVP pressure for approved code sources, managed entry points,
