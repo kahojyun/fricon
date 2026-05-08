@@ -46,6 +46,8 @@ Ownership rules:
 
 - Epics own outcomes. A story may affect another epic, but it should have only
   one primary owner.
+- Story persona wording follows `product/personas.md`; use the role that owns
+  the outcome instead of a broad lab identity.
 - Keep this index compact. Story-level success criteria live under
   `product/user-stories/`.
 - Each expanded story file names its primary epic.

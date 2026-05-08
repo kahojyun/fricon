@@ -10,9 +10,9 @@ EPIC-004: Recovery, annotation, reopen, and export.
 
 ## Story
 
-As an experimentalist, I want interrupted or failed measurements to remain
-readable so that a crash does not turn useful partial data into an opaque
-folder cleanup problem.
+As a Measurement Run Operator, I want interrupted or failed measurements to
+remain readable so that a crash does not turn useful partial data into an
+opaque folder cleanup problem.
 
 ## Success Criteria
 

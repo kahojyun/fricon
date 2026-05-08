@@ -163,8 +163,9 @@ FEPIC-005: Calibration Chains And Reviewable Automation Workflow.
 
 FUS-001: Maintain named parameter profiles.
 
-- As an experimentalist, I want refs such as `main`, `latest-good`, or
-  `cooldown-2026-05` so that large parameter sets have memorable identities.
+- As an Effective Configuration & Calibration Steward, I want refs such as
+  `main`, `latest-good`, or `cooldown-2026-05` so that large parameter sets
+  have memorable identities.
 - Success: refs can move, but each run records the immutable snapshot revision
   actually used.
 - Success: ordinary parameters can remain flexible tree nodes; important
@@ -172,24 +173,25 @@ FUS-001: Maintain named parameter profiles.
 
 FUS-002: Bind effective parameters at run start.
 
-- As an experimentalist, I want a measurement to capture the resolved parameter
-  snapshot and runtime overrides so that later analysis can explain the exact
-  effective settings.
+- As an Effective Configuration & Calibration Steward, I want a measurement to
+  capture the resolved parameter snapshot and runtime overrides so that later
+  analysis can explain the exact effective settings.
 - Success: overrides are separate facts with actor, time, source, and optional
   reason.
 
 FUS-003: Compare parameters across runs and proposals.
 
-- As an experimentalist, I want to diff two runs, snapshots, or profiles so
-  that I can find parameter drift without reading JSON files by hand.
+- As an Effective Configuration & Calibration Steward, I want to diff two runs,
+  snapshots, or profiles so that I can find parameter drift without reading
+  JSON files by hand.
 - Success: diffs preserve path, value, unit, source profile, override status,
   actor, and linked run or proposal.
 
 FUS-004: Promote a good run into a parameter proposal.
 
-- As an experimentalist, I want to turn the effective settings from a successful
-  run into a reviewed proposal so that useful adjustments can become a named
-  profile intentionally.
+- As an Effective Configuration & Calibration Steward, I want to turn the
+  effective settings from a successful run into a reviewed proposal so that
+  useful adjustments can become a named profile intentionally.
 - Success: promotion records source run, changed fields, reviewer/actor, and
   approval or rejection outcome.
 - Success: promotion can cite analysis or calibration evidence when the source
@@ -201,9 +203,9 @@ FUS-004: Promote a good run into a parameter proposal.
 
 FUS-005: Configure a measurement code source.
 
-- As an experimentalist, I want to register a local or remote code source,
-  entry point, and environment hint so that Fricon can stop relying on copied
-  folders as the only code provenance story.
+- As a Local Measurement System Maintainer, I want to register a local or
+  remote code source, entry point, and environment hint so that Fricon can stop
+  relying on copied folders as the only code provenance story.
 - Success: source location, selected revision, environment file, and local
   checkout status are visible before a managed run.
 - Success: approved releases, setup profiles, scan-schema helpers,
@@ -214,8 +216,8 @@ FUS-005: Configure a measurement code source.
 
 FUS-006: Capture a managed code snapshot.
 
-- As an experimentalist, I want Fricon to capture Git commit, dirty state,
-  source hashes, dependency summary, SDK runner entry point, and runner
+- As a Measurement Method Author, I want Fricon to capture Git commit, dirty
+  state, source hashes, dependency summary, SDK runner entry point, and runner
   invocation when it starts a managed run so that measurement history is not
   hand-entered.
 - Success: provenance level is visible as unmanaged, observed, or managed
@@ -225,9 +227,10 @@ FUS-006: Capture a managed code snapshot.
 
 FUS-007: Run through an opt-in SDK runner.
 
-- As an experimentalist, I want selected scripts to integrate with a Fricon SDK
-  runner so that Fricon can capture parameters, code snapshot, stdout, stderr,
-  lifecycle, warnings, abort/fail reason, and produced artifacts.
+- As a Measurement Method Author, I want selected scripts to integrate with a
+  Fricon SDK runner so that Fricon can capture parameters, code snapshot,
+  stdout, stderr, lifecycle, warnings, abort/fail reason, and produced
+  artifacts.
 - Success: the unmanaged Python path still works; managed runner is opt-in
   until its safety model is accepted.
 - Success: the first managed-runner slice does not need queues, resource
@@ -235,9 +238,9 @@ FUS-007: Run through an opt-in SDK runner.
 
 FUS-008: Run like a previous measurement.
 
-- As an experimentalist, I want to start from a previous measurement's scan
-  schema, parameter snapshot, code source, sample/session context, and plot
-  layout so that repeat work is faster without hiding what changed.
+- As a Measurement Run Operator, I want to start from a previous measurement's
+  scan schema, parameter snapshot, code source, sample/session context, and
+  plot layout so that repeat work is faster without hiding what changed.
 - Success: reused facts are copied by reference or snapshot, and changes are
   shown before the new run starts.
 - Success: the new run starts from a draft with visible differences from the
@@ -249,17 +252,18 @@ FUS-008: Run like a previous measurement.
 
 FUS-009: Compare two measurements.
 
-- As an experimentalist, I want to compare runs by parameters, code, sample,
-  setup, calibration status, lifecycle, notes, and output artifacts so that I
-  can explain why results differ.
+- As an Experimental Data Analyst, I want to compare runs by parameters, code,
+  sample, setup, calibration status, lifecycle, notes, and output artifacts so
+  that I can explain why results differ.
 - Success: comparison is generated from recorded facts, not a manual report.
 - Success: a previous-good run can be selected as a baseline, and missing or
   incomplete facts are shown rather than hidden.
 
 FUS-010: See operator handoff.
 
-- As a shared-lab user, I want to see what changed since my last session so
-  that I can trust the lab computer state before starting work.
+- As a Measurement Run Operator on a shared lab computer, I want to see what
+  changed since my last session so that I can trust the lab computer state
+  before starting work.
 - Success: handoff includes parameter ref changes, setup snapshot changes,
   calibration due/expired state, failed runs, imports, exports, and notes.
 - Success: handoff distinguishes facts, warnings, decisions, and missing
@@ -267,8 +271,8 @@ FUS-010: See operator handoff.
 
 FUS-011: Store and diff setup snapshots.
 
-- As an experimentalist, I want structured setup snapshots for devices,
-  software, firmware, driver versions, connection labels, and readback
+- As an accountable setup/device owner, I want structured setup snapshots for
+  devices, software, firmware, driver versions, connection labels, and readback
   freshness so that setup drift is inspectable.
 - Success: Fricon can diff snapshots and bind a snapshot to a run without
   controlling devices.
@@ -277,9 +281,9 @@ FUS-011: Store and diff setup snapshots.
 
 FUS-012: Track calibration state.
 
-- As an experimentalist, I want calibration records with source measurements,
-  fitted values, diagnostics, health decisions, and affected-run links so that
-  questionable data can be reviewed.
+- As an Effective Configuration & Calibration Steward, I want calibration
+  records with source measurements, fitted values, diagnostics, health
+  decisions, and affected-run links so that questionable data can be reviewed.
 - Success: records can distinguish sample/control-parameter calibration from
   instrument/device calibration.
 - Success: unhealthy or out-of-family task results can pause a calibration
@@ -293,9 +297,9 @@ FUS-012: Track calibration state.
 
 FUS-013: Preview an automation workflow.
 
-- As an experimentalist, I want a proposed automation workflow to show what it
-  will read, run, and mutate before execution so that hidden state changes do
-  not surprise me.
+- As an accountable domain owner, I want a proposed automation workflow to show
+  what it will read, run, and mutate before execution so that hidden state
+  changes do not surprise me.
 - Success: preview separates parameter changes, setup/device changes, managed
   runs, analysis steps, calibration proposals, and data-library mutations.
 - Success: preview identifies whether each action is read-only, produces a
@@ -306,7 +310,7 @@ FUS-013: Preview an automation workflow.
 
 FUS-014: Review and apply automation proposals.
 
-- As the accountable domain owner, I want mutation-capable automation proposals
+- As an accountable domain owner, I want mutation-capable automation proposals
   to require explicit review before changing durable Fricon state so that
   automation remains accountable.
 - Success: approval, rejection, actor, reason, timestamp, and affected objects
@@ -318,14 +322,16 @@ FUS-014: Review and apply automation proposals.
   when the proposal depends on runtime, update, environment, or data-library
   safety, but is not the default domain approver.
 - Success: setup or device-state mutation stays ADR-gated and must name an
-  explicit accountable setup/device owner once that role is accepted; it is not
-  routed to P-002 merely because local system readiness is involved.
+  explicit accountable setup/device owner once setup/device mutation is in
+  scope; it is not routed to P-002 merely because local system readiness is
+  involved.
 
 FUS-015: Use parameter row keys as visual targets.
 
-- As an experimentalist, I want parameter table row keys to carry enough
-  user-defined target identity that a sample visualization can locate objects
-  without Fricon imposing a sample-component ontology.
+- As an Effective Configuration & Calibration Steward, I want parameter table
+  row keys to carry enough user-defined target identity that a sample
+  visualization can locate objects without Fricon imposing a sample-component
+  ontology.
 - Success: a row key can be matched to a user-authored sample-map config, DSL,
   or lab script when such a view exists.
 - Success: color maps and numeric labels can be derived from parameter snapshot
@@ -337,10 +343,10 @@ FUS-015: Use parameter row keys as visual targets.
 
 FUS-016: Inspect a run manifest.
 
-- As an experimentalist, I want a run manifest that links the available
-  measurement, parameter snapshot, row/target keys, code/environment summary,
-  lifecycle, logs, artifacts, operator, and timestamps so that I can understand
-  a run without opening several unrelated stores.
+- As an Experimental Data Analyst, I want a run manifest that links the
+  available measurement, parameter snapshot, row/target keys, code/environment
+  summary, lifecycle, logs, artifacts, operator, and timestamps so that I can
+  understand a run without opening several unrelated stores.
 - Success: the manifest can be opened from Desktop, Python, and export bundles.
 - Success: the manifest states provenance coverage instead of implying that
   unmanaged work was fully captured.
@@ -349,10 +355,10 @@ FUS-016: Inspect a run manifest.
 
 FUS-017: Investigate a failed fit or anomalous measurement.
 
-- As an experimentalist, I want to follow a suspicious result back to inputs,
-  parameter changes, code/environment state, setup labels, logs, and analysis
-  attempts so that tedious failure investigation is not a manual archaeology
-  task.
+- As an Experimental Data Analyst, I want to follow a suspicious result back to
+  inputs, parameter changes, code/environment state, setup labels, logs, and
+  analysis attempts so that tedious failure investigation is not a manual
+  archaeology task.
 - Success: failed or questionable analysis/fit attempts can be recorded with
   input artifacts, method/code reference, quality metrics, failure reason, and
   produced outputs when available.
@@ -362,9 +368,9 @@ FUS-017: Investigate a failed fit or anomalous measurement.
 
 FUS-018: Replay a routine recipe after review.
 
-- As an experimentalist, I want common compare, run, and analyze routines to be
-  captured as reviewable recipes so that repetitive work is faster without
-  hiding what will change.
+- As a Measurement Method Author, I want common compare, run, and analyze
+  routines to be captured as reviewable recipes so that repetitive work is
+  faster without hiding what will change.
 - Success: preview shows parameter refs or overrides, code entry point,
   expected artifacts, analysis steps, and durable mutations before execution.
 - Success: replay states which routine/code version, parameter snapshot,
@@ -376,9 +382,9 @@ FUS-018: Replay a routine recipe after review.
 
 FUS-019: Record measurement intent and outcome.
 
-- As an experimentalist, I want to record the question, intent, outcome, and
-  trust decision for a measurement so that future compare, handoff, and repeat
-  work can use more than raw data and filenames.
+- As an Experimental Data Analyst, I want to record the question, intent,
+  outcome, and trust decision for a measurement so that future compare,
+  handoff, and repeat work can use more than raw data and filenames.
 - Success: intent can be recorded before or during a run, and outcome can be
   recorded after review.
 - Success: outcomes can link to datasets, analysis attempts, notes, and
@@ -388,9 +394,10 @@ FUS-019: Record measurement intent and outcome.
 
 FUS-020: Run a bootstrap calibration chain with health gates.
 
-- As an experimentalist, I want a calibration sequence made of smaller
-  calibration tasks to continue automatically through healthy intermediate
-  results, but pause, retry, or ask for review when a task result looks wrong.
+- As an Effective Configuration & Calibration Steward, I want a calibration
+  sequence made of smaller calibration tasks to continue automatically through
+  healthy intermediate results, but pause, retry, or ask for review when a task
+  result looks wrong.
 - Success: each task records source measurements, analysis attempts, fitted
   values, generated sidecars or derived artifacts where relevant, affected
   parameter paths, code context, task status, and health assessment.
@@ -407,10 +414,10 @@ FUS-020: Run a bootstrap calibration chain with health gates.
 
 FUS-021: Declare expected setup/device state and reconcile it.
 
-- As an experimentalist, I want a managed routine to describe the expected
-  setup or device state derived from parameters so that Fricon can compute
-  what actually needs to change instead of every loop body manually writing
-  every device in sequence.
+- As an accountable setup/device owner, I want a managed routine to describe
+  the expected setup or device state derived from parameters so that Fricon can
+  compute what actually needs to change instead of every loop body manually
+  writing every device in sequence.
 - Success: the desired state is a durable plan input separate from observed
   device/readback status and from completed measurement facts.
 - Success: Fricon previews per-device diffs, skipped no-op writes, ordered

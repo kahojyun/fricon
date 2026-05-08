@@ -10,9 +10,9 @@ EPIC-002: New measurement logging replacement.
 
 ## Story
 
-As an experimentalist, I want one measurement to produce one or more dataset
-artifacts so that related tables, scans, or traces stay connected without
-losing direct dataset access.
+As a Measurement Run Operator, I want one measurement to produce one or more
+dataset artifacts so that related tables, scans, or traces stay connected
+without losing direct dataset access.
 
 ## Success Criteria
 

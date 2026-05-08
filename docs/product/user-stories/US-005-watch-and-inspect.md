@@ -10,8 +10,8 @@ EPIC-003: Measurement console and inspection.
 
 ## Story
 
-As an experimentalist, I want local live and historical table/chart views so
-that I can decide whether a measurement is working.
+As a Measurement Run Operator, I want local live and historical table/chart
+views so that I can decide whether a measurement is working.
 
 ## Success Criteria
 

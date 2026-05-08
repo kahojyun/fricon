@@ -10,9 +10,9 @@ EPIC-003: Measurement console and inspection.
 
 ## Story
 
-As an experimentalist, I want to add notes, markers, favorites, pins, and small
-corrections at the measurement or dataset level so that important lab context
-does not stay only in memory.
+As a Measurement Run Operator, I want to add notes, markers, favorites, pins,
+and small corrections at the measurement or dataset level so that important lab
+context does not stay only in memory.
 
 ## Success Criteria
 

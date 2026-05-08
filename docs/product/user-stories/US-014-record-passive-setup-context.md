@@ -10,9 +10,9 @@ EPIC-005: Migration ergonomics and future lab scaling.
 
 ## Story
 
-As an experimentalist, I want to record light setup, device, method, software,
-or environment summaries for a measurement so that future analysis has
-practical context without requiring Fricon to control instruments.
+As a Measurement Run Operator, I want to record light setup, device, method,
+software, or environment summaries for a measurement so that future analysis
+has practical context without requiring Fricon to control instruments.
 
 ## Success Criteria
 

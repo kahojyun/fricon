@@ -10,9 +10,9 @@ EPIC-005: Migration ergonomics and future lab scaling.
 
 ## Story
 
-As an experimentalist, I want to start recording new measurements in Fricon
-while old LabRAD, QCoDeS, Labber, or folder-based history remains where it is
-so that migration does not block new data collection.
+As a Measurement Run Operator, I want to start recording new measurements in
+Fricon while old LabRAD, QCoDeS, Labber, or folder-based history remains where
+it is so that migration does not block new data collection.
 
 ## Success Criteria
 

@@ -10,9 +10,10 @@ EPIC-005: Migration ergonomics and future lab scaling.
 
 ## Story
 
-As a lab user, I want to translate a new Data Vault-style measurement script
-into Fricon with minimal conceptual change so that I can stop using the old
-logger for new measurements without rewriting the whole experiment stack.
+As a Measurement Method Author, I want to translate a new Data Vault-style
+measurement script into Fricon with minimal conceptual change so that the lab
+can stop using the old logger for new measurements without rewriting the whole
+experiment stack.
 
 ## Success Criteria
 

@@ -10,9 +10,9 @@ EPIC-004: Recovery, annotation, reopen, and export.
 
 ## Story
 
-As an experimentalist, I want to export a complete measurement bundle so that I
-can analyze it on another computer without setting up a Fricon data library or
-importing the data first.
+As an Experimental Data Analyst, I want to export a complete measurement bundle
+so that I can analyze it on another computer without setting up a Fricon data
+library or importing the data first.
 
 ## Success Criteria
 
