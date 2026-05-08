@@ -77,7 +77,7 @@ run, not every decision in the experiment.
 
 Goals:
 
-- start, watch, annotate, recover, reopen, and export measurement runs
+- start, watch, annotate, recover, and hand off measurement runs
 - understand the active sample/session, measurement name, scan shape, units,
   and selected local context without learning Fricon internals
 - preserve useful partial results when scripts interrupt or long saves fail
