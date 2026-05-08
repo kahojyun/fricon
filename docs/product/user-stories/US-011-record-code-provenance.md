@@ -28,8 +28,8 @@ judge trustworthiness without pretending Fricon managed execution.
   explains selected files or settings that were active.
 - The product model leaves room for approved code releases, setup profiles,
   environment lock files, scan helpers, plot presets, export recipes, and
-  handoff to a Local Measurement System Maintainer without making them MVP
-  code-management features.
+  handoff to a Local Measurement System Maintainer without making them initial
+  adoption code-management features.
 - Provenance can be previewed or omitted during export when it contains
   sensitive local details.
 - Corrections to provenance are visible as events.

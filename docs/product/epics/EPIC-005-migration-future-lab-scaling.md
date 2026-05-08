@@ -7,10 +7,11 @@ Draft pending product-analysis revalidation.
 ## Product Goal
 
 Help labs adopt Fricon for new measurements while old loggers, copied folders,
-and historical data remain where they are. This epic protects the MVP from
-becoming a legacy import project or a full automation stack.
+and historical data remain where they are. This epic protects the initial
+adoption slice from becoming a legacy import project or a full automation
+stack.
 
-## MVP Scope
+## Initial Adoption Scope
 
 - Data Vault-style script migration guidance for new measurements.
 - Source aliases and old-system references as metadata, not primary identity.
@@ -20,9 +21,9 @@ becoming a legacy import project or a full automation stack.
   that old scripts currently leave in copied folders.
 - Optional sample/session context that can be corrected after a run.
 
-## Post-MVP Scope
+## Strategic Follow-On Scope
 
-Detailed post-MVP priority and acceptance details live in
+Detailed strategic follow-on priority and acceptance details live in
 `product/future-concepts.md` and
 `product/future-stories-and-requirements.md`.
 

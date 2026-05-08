@@ -19,8 +19,10 @@ The reset keeps useful infrastructure where it fits, but it does not preserve
 workspace-first storage, API, IPC, or desktop navigation compatibility when
 that compatibility would keep the wrong product model alive.
 
-Product planning in this directory uses MVP, post-MVP priority, and ADR-gated
-labels. Do not treat post-MVP priorities as semantic-version labels; compatible
+Product planning in this directory uses initial adoption, strategic follow-on,
+and ADR-gated labels. Initial adoption is the first usable migration slice, not
+a statement that later product-core capabilities are less important. Do not
+treat strategic follow-on priorities as semantic-version labels; compatible
 features may still ship on the same compatible release line.
 
 ## Workflow Stance
@@ -82,8 +84,8 @@ docs/
 
 Keep each idea in the narrowest durable owner:
 
-- `product/vision.md` owns the current high-confidence product thesis, MVP
-  goal, user promise, and high-level product horizons.
+- `product/vision.md` owns the current high-confidence product thesis, initial
+  adoption goal, user promise, and high-level product horizons.
 - `product/personas.md` owns the current high-confidence product-role model.
 - `product/product-analysis-progress.md` owns product-analysis confidence,
   progress, and revalidation order.
@@ -92,7 +94,7 @@ Keep each idea in the narrowest durable owner:
   the current high-confidence product inputs.
 - `product/future-concepts.md` and
   `product/future-stories-and-requirements.md` are backlog material until the
-  MVP product baseline is revalidated.
+  initial adoption product baseline is revalidated.
 - `product/glossary.md` is a provisional terminology helper until capability
   and story revalidation settles the active product language.
 - `domain/README.md` owns the current domain-layer status.

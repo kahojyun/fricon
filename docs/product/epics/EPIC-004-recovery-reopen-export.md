@@ -9,7 +9,7 @@ Draft pending product-analysis revalidation.
 Interrupted or completed measurements remain useful. Users can recover context,
 reopen data from Python, and export a measurement for offline analysis.
 
-## MVP Scope
+## Initial Adoption Scope
 
 - Readable partial data and visible lifecycle state.
 - Trash/recover instead of normal hard delete.
@@ -20,7 +20,7 @@ reopen data from Python, and export a measurement for offline analysis.
 - Human-readable export manifest or index preview.
 - Privacy preview for sensitive provenance in exports.
 
-## Not MVP
+## Not Initial Adoption
 
 - Resumable managed execution.
 - Full offline viewer polish before the write/reopen loop works.

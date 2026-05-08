@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted clean-reset product baseline.
+High-confidence product input; derived scope pending revalidation.
 
 ## Thesis
 
@@ -17,10 +17,24 @@ trust decisions, handoff, and reviewed replay.
 
 ## Planning Language
 
-This document uses MVP, post-MVP, and ADR-gated as product priority labels.
-They are not semantic-version labels. Compatible improvements can still ship on
-the same compatible release line when the storage, API, and compatibility
-policies allow it.
+This document uses planning horizons, not semantic-version labels.
+
+Initial Adoption Slice means the first practical Fricon release path that lets
+a lab start new measurement work with a useful write, watch, recover, reopen,
+and export loop. It is not a claim that other capabilities are less important.
+It comes first because it can provide standalone value while generating real
+Fricon records and usage feedback.
+
+Strategic Follow-On means product-core capabilities that remain central to
+Fricon's thesis, but are sequenced after the initial adoption slice because
+they depend on accepted product evidence, domain semantics, architecture
+decisions, or safety and review boundaries. Parameter management, managed run,
+calibration evidence, and reviewed automation belong here by dependency, not by
+importance.
+
+ADR-gated means a direction may be valuable, but should not become durable
+product scope before its compatibility, safety, data semantics, or architecture
+decision is recorded.
 
 ## Long-Term Motivation
 
@@ -39,7 +53,7 @@ aim is not only to store results, but to make the relationship between a
 measurement, its datasets, its Python code, its context, and its later
 interpretation explicit enough for humans and future automation to trust.
 
-The highest-value post-MVP lesson from legacy workflows is the code-and-parameter
+The highest-value later lesson from legacy workflows is the code-and-parameter
 management loop: copied code, mutable local configuration, generated sidecars,
 and notebook-local analysis make calibration hard to trust. Fricon should first
 make the recorded facts durable enough to explain, compare, hand off, repeat,
@@ -47,8 +61,8 @@ and then safely automate work.
 
 The long-term center is not device control, sample visualization, or AI by
 itself. Those capabilities matter when they serve trustworthy experiment
-memory, reviewable changes, and safer reuse. Detailed post-MVP ordering lives
-in `product/future-concepts.md`; future terminology is owned by
+memory, reviewable changes, and safer reuse. Strategic follow-on ordering is a
+draft hypothesis in `product/future-concepts.md`; future terminology lives in
 `product/glossary.md`.
 
 The product should stay close to how experimentalists already work: Python
@@ -57,8 +71,9 @@ without a server account model, and higher-provenance workflows grow from the
 same core experience instead of becoming a separate system.
 
 Staying close to current practice does not mean freezing current practice as
-the ideal model. Post-MVP Fricon can introduce higher-provenance workflows, but
-only after the relevant facts, review boundaries, and safety model are explicit.
+the ideal model. Later Fricon slices can introduce higher-provenance workflows,
+but only after the relevant facts, review boundaries, and safety model are
+explicit.
 
 ## Adoption Strategy
 
@@ -87,19 +102,19 @@ Transition features should point toward the full Fricon workflow:
   handoff artifacts rather than the system of record
 
 If a legacy need cannot fit one of these bridge forms, it should not become an
-MVP product concept without explicit product and architecture review.
+initial adoption concept without explicit product and architecture review.
 
-## MVP Goal
+## Initial Adoption Goal
 
-The MVP goal is practical: replace the simple LabRAD Data Vault/Grapher loop
-for new measurements.
+The initial adoption goal is practical: replace the simple LabRAD Data
+Vault/Grapher loop for new measurements.
 
 Success means a user can start new measurement work in Fricon, write data from
 Python, watch it live, recover partial results, reopen it later, and export it
-without depending on old storage paths or notebook-only reconstruction. The MVP
-does not need to import old history or emulate LabRAD; old LabRAD, QCoDeS,
-Labber, or folder-based history can remain where it is while new work moves to
-Fricon.
+without depending on old storage paths or notebook-only reconstruction. The
+initial adoption slice does not need to import old history or emulate LabRAD;
+old LabRAD, QCoDeS, Labber, or folder-based history can remain where it is
+while new work moves to Fricon.
 
 ## User Promise
 
@@ -113,7 +128,7 @@ Fricon should help a researcher answer:
 - Which selected local configuration files or summaries were bound to it?
 - How do I inspect it live, reopen it from Python, export it, or recover it?
 
-After the MVP, Fricon should also help answer:
+Strategic follow-on slices should also help answer:
 
 - What changed since the previous good run?
 - Why did this run succeed, fail, or become questionable?
@@ -136,7 +151,7 @@ It produced datasets.
 Fricon helps me inspect, annotate, recover, reopen, and export them.
 ```
 
-Post-MVP, the product should extend that model:
+Strategic follow-on slices should extend that model:
 
 ```text
 I can choose a previous-good run or routine.
@@ -168,24 +183,24 @@ accepts exact API syntax.
 ## Measurement Code Shape
 
 At product level, measurement code means the user-authored Python that creates
-or explains measurement work. In the MVP, this mainly includes ordinary Python
-scripts, notebook cell flows, Data Vault-style translated scripts, and copied
-lab working folders. Fricon should record honest context for these forms
-without pretending it owns their execution.
+or explains measurement work. In the initial adoption slice, this mainly
+includes ordinary Python scripts, notebook cell flows, Data Vault-style
+translated scripts, and copied lab working folders. Fricon should record honest
+context for these forms without pretending it owns their execution.
 
-The MVP code promise is provenance, not code management. Fricon may record an
-unmanaged label, optional script or notebook path, Git summary, dirty-state
-signal, copied-folder/source-root label, user summary, and export privacy
-choice. It should not claim automatic notebook capture, approved code releases,
-deployment, immutable code snapshots, or managed execution.
+The initial adoption code promise is provenance, not code management. Fricon
+may record an unmanaged label, optional script or notebook path, Git summary,
+dirty-state signal, copied-folder/source-root label, user summary, and export
+privacy choice. It should not claim automatic notebook capture, approved code
+releases, deployment, immutable code snapshots, or managed execution.
 
-Post-MVP code management should grow toward configured measurement code
-sources, approved update flows, importable managed-run entry points, and code
-snapshots only after the product facts and review boundaries are clear.
+Strategic follow-on code management should grow toward configured measurement
+code sources, approved update flows, importable managed-run entry points, and
+code snapshots only after the product facts and review boundaries are clear.
 
-## MVP Scope
+## Initial Adoption Scope
 
-To meet the MVP goal, the MVP should include:
+To meet the initial adoption goal, the first adoption slice should include:
 
 - one local data library per normal lab computer
 - explicit measurements
@@ -205,7 +220,8 @@ To meet the MVP goal, the MVP should include:
   environment, and unmanaged procedure context
 - selected run-bound local configuration snapshots or summaries, such as
   parameter files, registry files, wiring references, line/chip info, or
-  demod/readout settings, without turning MVP into a full parameter registry
+  demod/readout settings, without turning initial adoption into a full
+  parameter registry
 - Python reopen snippets through public APIs
 - a near-term measurement export spec for portable bundles and common analysis
   formats
@@ -236,16 +252,16 @@ work starts:
   multiple measurements or views at once while acquisition keeps running.
 - Measurement-code and run-configuration ideas should stay focused on the user
   pain of copied folders, mutable local files, setup sidecars, scan helpers,
-  plot presets, and export recipes. The MVP records honest context; approved
-  code update and managed execution remain post-MVP.
+  plot presets, and export recipes. Initial adoption records honest context;
+  approved code update and managed execution remain strategic follow-on.
 - Mutating actions should be attributable enough for local lab history, but the
-  MVP must not turn this into accounts, roles, permissions, or remote
-  collaboration.
+  first adoption slice must not turn this into accounts, roles, permissions, or
+  remote collaboration.
 
-## Post-MVP Direction
+## Strategic Follow-On Direction
 
-At the vision level, post-MVP work should extend the MVP facts into three user
-loops:
+At the vision level, strategic follow-on work should extend the facts recorded
+during initial adoption into three user loops:
 
 - Explain: run manifests, parameter/code/setup provenance, lifecycle evidence,
   analysis attempts, and failure or anomaly investigation.
@@ -254,8 +270,9 @@ loops:
 - Repeat: run-like-previous drafts, reviewed parameter proposals, routine
   recipes, and audited automation after the facts are trustworthy.
 
-Implementation should not treat post-MVP ordering as accepted until the product
-baseline is revalidated. The current post-MVP priority hypothesis is:
+Implementation should not treat strategic follow-on ordering as accepted until
+the product baseline is revalidated. The current strategic follow-on priority
+hypothesis is:
 
 - parameter system first
 - managed run second
@@ -273,7 +290,7 @@ sample-map authoring, device communication, resumable execution, user-facing
 stream concepts, and AI-assisted automation. Mutation-capable calibration or
 device apply remains ADR-gated.
 
-## Non-Goals For MVP
+## Non-Goals For Initial Adoption
 
 - hosted SaaS
 - account/team administration

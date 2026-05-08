@@ -7,8 +7,8 @@ Draft pending product-analysis revalidation.
 ## Purpose
 
 Keep the product route readable for future AI sessions. This file is a compact
-map from the product vision to MVP stories, not the place for full acceptance
-details.
+map from the product vision to initial adoption stories, not the place for full
+acceptance details.
 
 ## Backbone
 
@@ -25,12 +25,12 @@ Install and set up
   -> export
 ```
 
-## MVP Product Epics
+## Initial Adoption Product Epics
 
-The MVP route is the LabRAD Data Vault/Grapher replacement loop for new
-measurements: write from Python, watch live, recover partial data, reopen, and
-export. The epics below divide that route without making legacy import or
-managed automation part of the MVP.
+The initial adoption route is the LabRAD Data Vault/Grapher replacement loop
+for new measurements: write from Python, watch live, recover partial data,
+reopen, and export. The epics below divide that route without making legacy
+import or managed automation part of the first adoption slice.
 
 - EPIC-001: Local setup and data-library adoption.
 - EPIC-002: New measurement logging replacement.
@@ -40,7 +40,7 @@ managed automation part of the MVP.
 
 Detailed epic notes live under `product/epics/`.
 
-## MVP Story Index
+## Initial Adoption Story Index
 
 Ownership rules:
 
@@ -94,8 +94,9 @@ Migration ownership:
 - US-018 is owned by EPIC-005. EPIC-004 owns reopen/export for Fricon data, not
   the product migration posture.
 
-Each MVP story has an expanded file under `product/user-stories/`. Keep those
-files concise: they own story-level success criteria, not implementation tasks.
+Each initial adoption story has an expanded file under `product/user-stories/`.
+Keep those files concise: they own story-level success criteria, not
+implementation tasks.
 
 ## Sequencing
 
@@ -104,20 +105,21 @@ and US-015 to record, inspect, recover, and reopen a Python measurement while
 preserving first-class dataset discovery. The milestone plan should be derived
 after the product baseline and required architecture or ADR inputs are accepted.
 
-The full MVP also needs US-009 for export, US-017/US-018 to validate the
-incremental adoption posture, and US-019 to make copied local configuration
-visible: users can translate new Data Vault-style scripts, keep old history in
-the old system, and bind the run-relevant files or summaries that old scripts
-currently leave in folders and operator memory.
+The full initial adoption slice also needs US-009 for export, US-017/US-018 to
+validate the incremental adoption posture, and US-019 to make copied local
+configuration visible. Users should be able to translate new Data Vault-style
+scripts, keep old history in the old system, and bind the run-relevant files or
+summaries that old scripts currently leave in folders and operator memory.
 
 Python SDK UX is part of the product story, not only implementation detail.
 The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;
 detailed API signatures and capture mechanics belong in later ADRs/specs.
 
-Post-MVP work should turn the MVP facts into local experiment memory and
-reviewed action. Those priorities are outside the MVP story index and are owned
-by `product/future-concepts.md`.
+Strategic follow-on work should turn initial adoption facts into local
+experiment memory and reviewed action. Those priorities are outside the initial
+adoption story index and live as draft backlog context in
+`product/future-concepts.md`.
 
-Export remains an MVP product promise. Detailed export/offline-analysis
-requirements should be derived in a later spec after the product, architecture,
-and ADR boundaries are accepted.
+Export remains an initial adoption product promise. Detailed
+export/offline-analysis requirements should be derived in a later spec after
+the product, architecture, and ADR boundaries are accepted.

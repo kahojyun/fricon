@@ -18,8 +18,9 @@ architecture unless an ADR accepts them.
 ## Accepted Constraints
 
 - v0.2 is a clean reset from the pre-v0.2 workspace/dataset-first model.
-- Fricon remains local-first for the MVP; hosted SaaS, accounts, teams,
-  permissions, and distributed database semantics are out of scope.
+- Fricon remains local-first for the initial adoption slice; hosted SaaS,
+  accounts, teams, permissions, and distributed database semantics are out of
+  scope.
 - Mutating clients must fail compatibility checks before writing to a data
   library.
 - Desktop UI state must not become the durable data backend.
@@ -28,8 +29,8 @@ architecture unless an ADR accepts them.
   searchable and directly openable.
 - Dataset artifacts must not own measurement, sample, lifecycle, parameter,
   code, or provenance meaning.
-- Post-MVP runner, device, calibration, and AI mutation systems require later
-  ADRs/specs before implementation.
+- Strategic follow-on runner, device, calibration, and AI mutation systems
+  require later ADRs/specs before implementation.
 
 ## Deferred Architecture Questions
 

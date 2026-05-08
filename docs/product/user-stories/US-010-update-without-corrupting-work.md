@@ -27,11 +27,11 @@ Desktop, local runtime, CLI, Python SDK, or library versions.
   imports, exports, or repair work without explicit user intent.
 - Users can defer update work until the local measurement environment is idle.
 - Locked-down lab-computer needs such as offline installers, rollback, or
-  side-by-side installs remain product pressure, not MVP polish.
+  side-by-side installs remain product pressure, not initial adoption polish.
 
 ## Not In Scope
 
-- Stable third-party protocol commitments before the MVP is proven.
+- Stable third-party protocol commitments before initial adoption is proven.
 - Automatic migration of old v0.1 workspaces or legacy systems.
 - Silent auto-update while measurement work is active.
 

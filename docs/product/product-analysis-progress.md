@@ -70,10 +70,10 @@ Downstream material not ready for implementation use:
 | Use case discovery | Draft, mostly derived from older docs | Rebuild through capability and story-map review. |
 | Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
 | Value proposition | Clear internally | Write a short external-facing value statement later. |
-| Scope definition | Draft despite detailed text | Revalidate MVP, post-MVP, and rejected scope from current inputs. |
+| Scope definition | Draft despite detailed text | Revalidate initial adoption, strategic follow-on, and rejected scope from current inputs. |
 | Core workflow | Draft | Rebuild after capability revalidation. |
 | Capability map | Next critical target | Review each capability as keep, revise, defer, or reject. |
-| MVP definition | Draft | Accept only after capability and story map are rederived. |
+| Initial adoption definition | Draft | Accept only after capability and story map are rederived. |
 | Success metrics | Missing | Define measurable product and validation signals. |
 | Risks and assumptions | Partial | Add an explicit assumption and validation register. |
 | Validation plan | Missing | Define interviews, prototype checks, and migration-script trials. |
@@ -92,7 +92,8 @@ The next product-analysis task should be a systematic review of
 - Keep: directly supported by `vision.md`, `personas.md`, and current case
   evidence.
 - Revise: direction is useful but wording, scope, or boundary is stale.
-- Defer: plausible future direction, but not MVP product baseline.
+- Defer: plausible future direction, but not part of the initial adoption
+  product baseline.
 - Reject: old planning residue or inconsistent with the current direction.
 
 After that review, rebuild `product/story-map.md`, then revalidate epics and

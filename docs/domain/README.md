@@ -19,7 +19,7 @@ an accepted conceptual model.
 During the current phase:
 
 - `docs/product/vision.md` owns the current high-confidence product thesis,
-  MVP goal, user promise, and high-level horizons.
+  initial adoption goal, user promise, and high-level horizons.
 - `docs/product/personas.md` owns the current high-confidence product-role
   model.
 - `docs/product/product-analysis-progress.md` owns product-analysis confidence,
@@ -31,12 +31,13 @@ During the current phase:
   revalidation.
 - `docs/product/future-concepts.md` and
   `docs/product/future-stories-and-requirements.md` are backlog context pending
-  MVP baseline revalidation.
+  initial adoption baseline revalidation.
 - `docs/architecture/README.md` owns only accepted architecture constraints and
   deferred architecture questions.
 
-If a topic is about what users need, product priority, MVP versus post-MVP
-scope, or acceptable user-facing promises, keep it in `docs/product/`.
+If a topic is about what users need, product priority, initial adoption versus
+strategic follow-on scope, or acceptable user-facing promises, keep it in
+`docs/product/`.
 
 If a topic is about transport, storage, process boundaries, API shape, module
 names, export format, or migration mechanics, keep it out of `docs/domain/`

@@ -32,7 +32,8 @@ experiment stack.
   references that the old script relied on.
 - The writer model does not block later user-written import scripts, but old
   data import is not part of the migration path for starting new work.
-- The MVP does not ship a built-in Data Vault parser or legacy browser.
+- The initial adoption slice does not ship a built-in Data Vault parser or
+  legacy browser.
 
 ## Not In Scope
 
