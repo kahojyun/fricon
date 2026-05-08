@@ -67,6 +67,13 @@ roles.
   measurement-code proposal shape, and P-003 for durable analysis or
   interpretation records. P-002 contributes technical guardrails when a
   proposal depends on Fricon runtime, update, library, or environment safety.
+- Prefer positive ownership over negative exclusions. The sections below state
+  what each role needs and does; avoid writing stories that define a persona
+  mainly by listing other roles' work.
+- Keep the key boundaries simple: P-001 operates measurement work, P-002 keeps
+  Fricon technically usable, P-003 owns analysis and report provenance, P-004
+  owns calibration and parameter-state decisions, and P-005 owns reusable
+  measurement-code and routine shape.
 
 ## P-001 Experimentalist
 
@@ -119,16 +126,6 @@ Observed real-case pressures:
 - interrupted sweeps and long-running saves need readable partial state, not
   only a final success/failure bit
 
-Not responsible for:
-
-- maintaining shared measurement-code sources, runner integrations, or lab
-  package environments
-- choosing whether calibration-derived values become accepted working
-  parameters
-- diagnosing every stopped local service, stale SDK, locked library, or
-  generated sidecar problem
-- making Fricon-managed execution or automation review decisions
-
 Common overlaps:
 
 - uses scripts, scan helpers, and report recipes maintained by P-005
@@ -140,9 +137,9 @@ Common overlaps:
 ## P-002 Fricon Technical Maintainer
 
 The person who develops, deploys, updates, diagnoses, and supports Fricon for a
-lab's local computers and data libraries. This role owns Fricon technical
-readiness and integration support, not scientific measurement logic,
-calibration decisions, or analysis conclusions.
+lab's local computers and data libraries. This role focuses on Fricon technical
+readiness, local integration, diagnostics, and migration support for the lab
+environment.
 
 Primary responsibilities:
 
@@ -188,18 +185,6 @@ Constraints:
   environment details, and setup files can be sensitive
 - may need Fricon to fail before mutation when components, SDKs, or libraries
   are incompatible
-
-Not responsible for:
-
-- operating every measurement run
-- writing the measurement stack, pulse rules, runner integrations, or analysis
-  code as a product responsibility
-- deciding scientific interpretation or whether a fitted value is physically
-  trustworthy
-- approving parameter, calibration, managed-routine, or analysis proposals as
-  the domain owner
-- turning mutable local parameter files into accepted calibration outcomes
-  without P-004 ownership
 
 Common overlaps:
 
@@ -259,15 +244,6 @@ Constraints:
   state and manually edited outputs
 - may need Fricon to preserve enough context even before analysis records are
   first-class post-MVP objects
-
-Not responsible for:
-
-- operating acquisition or keeping live instruments safe
-- maintaining lab runtime, SDK, or package environments
-- accepting calibration-derived values into the working parameter state
-- approving managed routine or measurement-code changes
-- writing or deploying the shared measurement stack, even if analysis code
-  uses it
 
 Common overlaps:
 
@@ -331,16 +307,6 @@ Constraints:
 - should not need Fricon to own device control before Fricon can record the
   calibration evidence honestly
 
-Not responsible for:
-
-- keeping Fricon installed, updated, and diagnosable across lab computers
-- writing every measurement helper, runner integration, or report generator
-  used by calibration routines
-- making generic automation architecture decisions outside calibration and
-  parameter review boundaries
-- treating mutable JSON files or generated sidecars as the long-term source of
-  truth once Fricon has parameter snapshots and proposals
-
 Common overlaps:
 
 - may be the same person as P-001 during daily calibration work
@@ -391,17 +357,6 @@ Constraints:
   guarantee for unmanaged execution
 - may create post-MVP pressure for approved code sources, managed entry points,
   templates, and reviewed updates, but those are not MVP promises
-
-Not responsible for:
-
-- routine operation of every measurement that uses their code
-- maintaining Fricon installation, runtime health, or lab update policy as a
-  product responsibility
-- deciding whether calibration-derived values become accepted working
-  parameters
-- approving scientific analysis conclusions or calibration health decisions
-- making notebooks, copied folders, generated circuits, or report decks the
-  canonical system of record
 
 Common overlaps:
 
