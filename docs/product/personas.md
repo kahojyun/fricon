@@ -15,6 +15,35 @@ bring-up helpers, backups, and report artifacts.
 The personas describe recurring product roles. One person may move between
 roles during a single day.
 
+## Story Role Routing
+
+Existing user stories may use broad legacy wording such as "experimentalist".
+When stories are revised, choose the most specific primary persona from this
+file instead of preserving old role wording by default.
+
+Use the personas this way:
+
+- Use P-001 Experimentalist for ordinary measurement operation: running,
+  watching, annotating, recovering, reopening, or exporting new measurement
+  work.
+- Use P-002 Lab Maintainer for installation, diagnostics, local runtime
+  health, environment setup, migration guidance, support bundles, shared code
+  setup, and post-MVP review of proposals that mutate durable lab state.
+- Use P-003 Analyst for reopen, analysis, reports, derived artifacts,
+  downstream handoff, mapping/classification provenance, and interpretation
+  context.
+- Use P-004 Calibration and Parameter Steward for calibration evidence,
+  effective configuration selection, parameter diffs, fitted values,
+  accepted/rejected calibration outcomes, and hardware or instrument
+  calibration evidence.
+- Use P-005 Measurement Stack Author for SDK shape, script migration,
+  Data Vault-style helper translation, scan helpers, runner integrations,
+  pulse rules, plotting utilities, and report/export recipes.
+
+Do not add a separate future-automation persona unless a future product slice
+uncovers a distinct person with needs that are not already covered by the lab
+maintainer, calibration steward, or measurement stack author roles.
+
 ## P-001 Experimentalist
 
 Researchers with entry-level Python ability who run measurement scripts or
@@ -80,6 +109,8 @@ Needs:
   environments, and generated sidecars were expected during a run
 - migration guidance that lets old LabRAD/Data Vault history remain in place
   while new work records honest Fricon context
+- post-MVP review responsibility for parameter, calibration, managed-routine,
+  or automation proposals before they mutate durable lab state
 
 ## P-003 Analyst
 
@@ -107,20 +138,7 @@ Needs:
   advanced workflows where simulation qubits, physical qubits, shot groups,
   detector events, and fitted metrics must stay aligned
 
-## P-004 Future Automation Author
-
-A later user or maintainer who builds calibration, managed execution, or
-AI-assisted workflows.
-
-Needs:
-
-- explicit measurement, artifact, parameter, code, and event boundaries
-- audit records for accepted/rejected mutating actions
-- no hidden mutation of completed dataset facts
-- enough local actor attribution to explain who or what changed durable lab
-  state before any future permissions model exists
-
-## P-005 Calibration and Parameter Steward
+## P-004 Calibration and Parameter Steward
 
 A current lab user who tunes readout, pulse, coupler, crosstalk, demodulation,
 feedback, or hardware bring-up parameters and decides whether fitted values
@@ -160,7 +178,7 @@ Constraints:
 - should not need Fricon to own device control before Fricon can record the
   calibration evidence honestly
 
-## P-006 Measurement Stack Author
+## P-005 Measurement Stack Author
 
 An advanced Python user who writes or maintains reusable measurement scripts,
 scan helpers, pulse-generation rules, runner integrations, plotting utilities,
