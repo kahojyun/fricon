@@ -39,27 +39,38 @@ roles during a single day.
 
 Choose the persona that owns the story's main outcome:
 
-- P-001 Measurement Operator: ordinary measurement-run operation and recovery.
-- P-002 Fricon Technical Maintainer: Fricon deployment, local runtime health,
+- P-001 Measurement Run Operator: ordinary measurement-run operation and
+  recovery.
+- P-002 Local Measurement System Maintainer: Fricon deployment, local runtime
+  health, data libraries, Python/package environments, code-source setup,
   diagnostics, migration support, and technical readiness.
-- P-003 Analyst: reopening, analysis, reports, derived artifacts, downstream
-  handoff, and interpretation provenance.
-- P-004 Calibration and Parameter Steward: calibration evidence, parameter
-  state, fitted values, effective configuration, and rollback decisions.
-- P-005 Measurement Stack Author: reusable measurement code, SDK shape, scan
-  helpers, runner integration, plotting utilities, and report/export recipes.
+- P-003 Experimental Data Analyst: reopening, analysis, reports, derived
+  artifacts, downstream handoff, and interpretation provenance.
+- P-004 Effective Configuration & Calibration Steward: effective
+  configuration, calibration evidence, parameter state, fitted values, and
+  rollback decisions.
+- P-005 Measurement Method Author: reusable measurement methods, script and
+  routine shape, SDK usage, scan helpers, runner integration, plotting
+  utilities, and report/export recipes.
 
 When several roles participate, use the accountable role as the story's
 primary persona and mention supporting roles in notes or acceptance criteria.
 
 If a story asks Fricon to mutate durable lab state, the accountable role is
 never only P-001. Route the decision to the state owner: P-004 for parameter
-or calibration proposals, P-005 for managed-routine or measurement-code
-proposal shape, and P-003 for durable analysis or interpretation records.
-P-002 contributes technical guardrails when runtime, update, library, or
-environment safety matters.
+or effective-configuration proposals, P-005 for managed-routine or
+measurement-code proposal shape, and P-003 for durable analysis or
+interpretation records. P-002 contributes technical guardrails when runtime,
+update, library, or environment safety matters.
 
-## P-001 Measurement Operator
+Physical setup, instrument, wiring, and device-state stewardship is a deferred
+role pressure, not an accepted core persona yet. MVP stories should record it
+as passive setup context or run-bound local configuration. Post-MVP stories may
+need a separate Setup / Instrument Steward if setup or device state becomes an
+independent reviewed mutation boundary. Do not silently route physical
+setup/device ownership to P-002; P-002 owns software-system readiness.
+
+## P-001 Measurement Run Operator
 
 The role active when a lab user runs a measurement script or notebook on a lab
 computer. The person may be an experimentalist, student, or senior researcher,
@@ -84,21 +95,25 @@ Context and pressure:
 Common switches:
 
 - switches to P-004 when calibration evidence or fitted values are being judged
-  for working parameter state
+  for working effective configuration or parameter state
 - switches to P-003 when the main work is analysis, reporting, or interpreting
   derived artifacts after acquisition
 - depends on P-005 for reusable routines and P-002 when setup or update
   problems block measurement work
 
-## P-002 Fricon Technical Maintainer
+## P-002 Local Measurement System Maintainer
 
-The person who develops, deploys, updates, diagnoses, and supports Fricon for a
-lab's local computers and data libraries.
+The role active when someone makes the local Fricon-backed measurement software
+system runnable on lab computers. This includes Fricon, local runtime
+components, data libraries, Python/package environments, configured code
+sources, update paths, diagnostics, and migration support. Its expertise is
+system readiness, not experiment design.
 
 Goals:
 
-- keep Fricon installation, local runtime components, data libraries, Python
-  environments, and update paths technically usable
+- keep the local measurement software system runnable, including Fricon,
+  runtime components, data libraries, Python/package environments, configured
+  code sources, and update paths
 - make setup, compatibility, migration, and support problems diagnosable
   before users read raw logs
 - help labs adopt Fricon gradually while old LabRAD/Data Vault, folder, and
@@ -110,17 +125,19 @@ Context and pressure:
   pinned to lab-specific Python environments
 - must handle sensitive local paths, machine names, IP addresses, environment
   details, and setup files carefully
+- may diagnose OS, package, service, import, driver-path, and runner-launch
+  problems without knowing the scientific purpose of the routine
 - contributes technical readiness checks when a proposal depends on runtime,
   update timing, data-library compatibility, or environment state
 
 Common switches:
 
-- works with P-005 when shared code sources or package environments become
-  lab-maintained assets
+- works with P-005 to make authored methods runnable through maintained local
+  code sources, package environments, and setup profiles
 - relies on P-004 or P-003 for scientific acceptance of calibration,
   parameter, analysis, or interpretation outcomes
 
-## P-003 Analyst
+## P-003 Experimental Data Analyst
 
 The person who reopens completed measurements for notebooks, reports, or HPC
 analysis. This role often produces secondary artifacts such as fit results,
@@ -147,15 +164,16 @@ Common switches:
 
 - consumes measurements produced by P-001
 - switches to P-004 when analysis output becomes evidence for accepting,
-  rejecting, or rolling back calibration-derived parameter state
+  rejecting, or rolling back calibration-derived effective configuration or
+  parameter state
 - uses report/export recipes maintained by P-005
 
-## P-004 Calibration and Parameter Steward
+## P-004 Effective Configuration & Calibration Steward
 
 The role active when measurement evidence and analysis outputs are evaluated
-as calibration evidence for working parameter state. This may happen before,
-during, or after calibration measurements, and the same person may also be the
-measurement operator or analyst.
+as calibration evidence for working effective configuration or parameter state.
+This may happen before, during, or after calibration measurements, and the same
+person may also be the measurement run operator or experimental data analyst.
 
 Goals:
 
@@ -165,6 +183,8 @@ Goals:
   needs, and manual inspection flags
 - mark calibration results as exploratory, accepted, rejected, superseded, or
   needing review, with rollback context where practical
+- preserve the distinction between parameter/configuration decisions and
+  physical setup or device-state ownership
 
 Context and pressure:
 
@@ -184,11 +204,13 @@ Common switches:
 - uses P-002 technical readiness checks when calibration proposals affect
   runtime, update, environment, or data-library compatibility
 
-## P-005 Measurement Stack Author
+## P-005 Measurement Method Author
 
-An advanced Python user who writes or maintains reusable measurement scripts,
-scan helpers, pulse-generation rules, runner integrations, plotting utilities,
-or export/report recipes used by other lab members.
+The lab user who writes or maintains reusable measurement methods that other
+lab members run: scripts, scan helpers, pulse-generation rules, runner
+integrations, plotting utilities, or export/report recipes. This role
+understands how the experiment should be expressed in code, but may rely on
+P-002 for packaging, environments, deployment, and local system diagnostics.
 
 Goals:
 
@@ -201,6 +223,8 @@ Goals:
 
 Context and pressure:
 
+- may be comfortable editing Python without owning the whole local runtime,
+  package, deployment, or diagnostic environment
 - writes routines that other users may run without understanding every
   dependency
 - needs migration ergonomics that do not require rewriting the whole
@@ -213,3 +237,5 @@ Common switches:
 - enables P-001 by making scripts and helpers easier to run and record
 - helps P-003 produce traceable analysis and report artifacts
 - helps P-004 produce calibration evidence and parameter-change proposals
+- works with P-002 when methods need maintained code sources, package
+  environments, setup profiles, or managed entry points

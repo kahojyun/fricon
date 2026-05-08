@@ -312,11 +312,14 @@ FUS-014: Review and apply automation proposals.
 - Success: approval, rejection, actor, reason, timestamp, and affected objects
   are recorded.
 - Success: review routes to the role that owns the affected state: P-004 for
-  parameter or calibration proposals, P-005 for managed-routine or
-  measurement-code proposal shape, and P-003 for durable analysis or
-  interpretation records. P-002 supplies technical readiness checks when the
-  proposal depends on runtime, update, environment, or data-library safety, but
-  is not the default domain approver.
+  parameter, effective-configuration, or calibration proposals, P-005 for
+  managed-routine or measurement-code proposal shape, and P-003 for durable
+  analysis or interpretation records. P-002 supplies technical readiness checks
+  when the proposal depends on runtime, update, environment, or data-library
+  safety, but is not the default domain approver.
+- Success: setup or device-state mutation stays ADR-gated and must name an
+  explicit accountable setup/device owner once that role is accepted; it is not
+  routed to P-002 merely because local system readiness is involved.
 
 FUS-015: Use parameter row keys as visual targets.
 
