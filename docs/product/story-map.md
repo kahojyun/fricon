@@ -28,9 +28,11 @@ Install and set up
 ## Initial Adoption Product Epics
 
 The initial adoption route is the LabRAD Data Vault/Grapher replacement loop
-for new measurements: write from Python, watch live, recover partial data,
-reopen, and export. The epics below divide that route without making legacy
-import or managed automation part of the first adoption slice.
+for new interactive measurements: write from Python, watch live monitor plots,
+recover partial data, reopen, and export for analysis on another machine. The
+epics below divide that route without making legacy import, LabRAD emulation,
+report generation, user plotting code, or managed automation part of the first
+adoption slice.
 
 - EPIC-001: Local setup and data-library adoption.
 - EPIC-002: New measurement logging replacement.
@@ -109,7 +111,9 @@ The full initial adoption slice also needs US-009 for export, US-017/US-018 to
 validate the incremental adoption posture, and US-019 to make copied local
 configuration visible. Users should be able to translate new Data Vault-style
 scripts, keep old history in the old system, and bind the run-relevant files or
-summaries that old scripts currently leave in folders and operator memory.
+summaries that old scripts currently leave in folders and operator memory. This
+means a small explicit rewrite of the recording section, not a built-in LabRAD
+compatibility layer.
 
 Python SDK UX is part of the product story, not only implementation detail.
 The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;
@@ -120,6 +124,8 @@ experiment memory and reviewed action. Those priorities are outside the initial
 adoption story index and live as draft backlog context in
 `product/future-concepts.md`.
 
-Export remains an initial adoption product promise. Detailed
-export/offline-analysis requirements should be derived in a later spec after
-the product, architecture, and ADR boundaries are accepted.
+Export remains an initial adoption product promise. A portable Fricon package
+with a lightweight Python reader is the current baseline; CSV, Parquet, NumPy,
+or other generic export formats should be added when real user demand justifies
+them. Detailed export/offline-analysis requirements should be derived in a
+later spec after the product, architecture, and ADR boundaries are accepted.

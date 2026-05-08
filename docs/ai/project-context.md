@@ -22,9 +22,9 @@ capabilities, stories, epics, or strategic follow-on backlog material.
 Primary user model:
 
 ```text
-I ran a measurement.
+I ran an interactive measurement from Python.
 It produced datasets.
-Fricon helps me inspect, annotate, recover, reopen, and export them.
+Fricon helps me monitor, recover, reopen, and export them.
 ```
 
 ## Hard Boundaries
@@ -38,6 +38,11 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Do not bypass local runtime compatibility checks for mutating Python APIs.
 - Do not introduce SaaS, accounts, teams, roles, or distributed database
   behavior for the initial adoption slice.
+- Do not add LabRAD-dependent compatibility helpers, Data Vault parsers, or
+  unit-system adapters to the initial adoption slice.
+- Do not make first-slice adoption depend on report generation, user plotting
+  code execution, code deployment, Conda environment management, or calibration
+  automation.
 - Do not implement strategic follow-on runner, device, calibration, or AI
   mutation systems before their ADRs/specs exist.
 
@@ -64,6 +69,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   terminology context.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
+- Treat Git metadata as optional context for initial adoption, not a
+  reproducibility promise or a required provenance source.
 - Use events for lifecycle, notes, corrections, and audit history.
 - Use ADRs for storage, local runtime/API, export format, and compatibility
   decisions before durable implementation.

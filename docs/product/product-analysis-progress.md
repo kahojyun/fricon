@@ -66,8 +66,8 @@ Downstream material not ready for implementation use:
 
 | Step | Current State | Next Analysis Action |
 | --- | --- | --- |
-| Problem framing | Strong but should be summarized more sharply | Add a concise problem hypothesis if needed. |
-| User and role analysis | Strong current baseline | Keep refining only when new case evidence appears. |
+| Problem framing | Strong; sharpened around maintained Data Vault/Grapher replacement for new interactive work | Rebuild the initial adoption story backbone from this framing. |
+| User and role analysis | Strong current baseline with first-adoption emphasis on P-001 and P-003 | Keep refining only when new case evidence appears. |
 | Use case discovery | Partial | Reconstruct the initial adoption journey from `vision.md`, `personas.md`, and case evidence. |
 | Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
 | Value proposition | Clear internally | Write a short external-facing value statement later. |
@@ -80,6 +80,7 @@ Downstream material not ready for implementation use:
 | Risks and assumptions | Partial | Add an explicit assumption and validation register. |
 | Validation plan | Missing | Define interviews, prototype checks, and migration-script trials. |
 | Product requirements | Not implementation-ready | Derive later from accepted journeys, stories, capabilities, and validation results. |
+| Older backlog review | Partial | Keep strategic follow-on docs as backlog only; revalidate managed run, calibration, Git-heavy provenance, report artifacts, and generic export formats before promoting them. |
 | Domain analysis | Deferred | Start only after the product analysis baseline is stable. |
 | Architecture inputs | Deferred | Start only after product and domain baselines are stable. |
 
@@ -88,12 +89,11 @@ Downstream material not ready for implementation use:
 Use the current product documents as input evidence, not as the analysis order.
 The next work should proceed from user work to product capabilities:
 
-1. Write or confirm the concise problem hypothesis.
-2. Define the initial adoption journey and story backbone.
-3. Rebuild `product/story-map.md` from that backbone.
-4. Recheck epics and user stories against the rebuilt story map.
-5. Derive `product/capability-map.md` from the accepted stories.
-6. Add success signals, assumptions, and validation tasks.
+1. Define the initial adoption journey and story backbone.
+2. Rebuild `product/story-map.md` from that backbone.
+3. Recheck epics and user stories against the rebuilt story map.
+4. Derive `product/capability-map.md` from the accepted stories.
+5. Add success signals, assumptions, and validation tasks.
 
 Capability review should follow story analysis. A capability without story or
 journey support should be deferred, rewritten as a backlog hypothesis, or

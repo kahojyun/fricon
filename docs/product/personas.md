@@ -68,6 +68,22 @@ context or run-bound local configuration. If later workflows review or mutate
 setup or device state, route that decision to an explicit setup/device owner
 rather than to P-002 by default; P-002 owns software-system readiness.
 
+## First Adoption Role Emphasis
+
+The first adoption slice is primarily for P-001 and P-003: an experimenter
+running interactive scripts or notebooks, then reopening or exporting the
+result for later analysis on another machine.
+
+P-005 and P-002 are supporting pressures for initial adoption. Fricon should be
+easy for a method author or AI-assisted migration guide to apply to existing
+recording sections, and it should be installable on constrained lab computers,
+but the first slice should not try to standardize lab-wide code deployment,
+manage Conda environments, or replace waveform and analysis utility stacks.
+
+P-004 remains strategically important, but first adoption treats calibration
+notebooks as ordinary measurement work unless product evidence shows that a
+minimal calibration-specific record removes user code burden.
+
 ## P-001 Measurement Run Operator
 
 The role active when a lab user runs a measurement script or notebook on a lab
@@ -91,6 +107,9 @@ Context and pressure:
   folders, dated backups, and mutable local configuration during migration
 - needs Fricon to make ordinary measurement work safer without forcing managed
   execution first
+- should be able to run multiple independent measurements without accidental
+  global-session interference or one monitor window assuming there is only one
+  active experiment
 
 Common switches:
 
@@ -140,14 +159,18 @@ Common switches:
 
 ## P-003 Experimental Data Analyst
 
-The person who reopens completed measurements for notebooks, reports, or HPC
-analysis. This role often produces secondary artifacts such as fit results,
-plots, `.npy` or `.json` derived data, spreadsheets, and slide decks.
+The person who reopens completed measurements for notebooks, local analysis, or
+HPC analysis. This role often produces secondary artifacts such as fit results,
+plots, `.npy` or `.json` derived data, spreadsheets, and later reports.
 
 Goals:
 
 - reopen completed, interrupted, or exported measurements through stable IDs
   and APIs
+- read portable Fricon packages on another computer through a lightweight
+  Python reader without recreating the acquisition-time local runtime
+- load measurement data into analysis-friendly Python objects such as NumPy,
+  pandas, or Polars where appropriate
 - preserve links from derived artifacts back to source measurements,
   parameters, code/procedure context, and manual judgment
 - keep mapping, readout-classification, shot-group, detector, or observable
@@ -160,6 +183,9 @@ Context and pressure:
   code summaries, environment data, or sample context
 - must distinguish recorded measurement facts from notebook-local analysis
   state and manually edited outputs
+- does not need first-slice report or presentation generation from Fricon;
+  screenshots, exported images, and custom plotting scripts can remain outside
+  the product until real demand requires more
 
 Common switches:
 
@@ -222,6 +248,8 @@ Goals:
   masks, runner identifiers, and procedure summaries from code
 - preserve honest code provenance without claiming Fricon managed execution
   guarantees it does not yet provide
+- help users migrate by rewriting recording sections with small, explicit
+  Fricon calls rather than depending on a built-in LabRAD compatibility layer
 
 Context and pressure:
 

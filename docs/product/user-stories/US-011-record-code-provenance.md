@@ -18,8 +18,8 @@ judge trustworthiness without pretending Fricon managed execution.
 
 - Unmanaged Python is labeled as unmanaged unless Fricon actually controls
   execution.
-- Optional script path, Git revision, dirty-state signal, and user summary can
-  be recorded where available.
+- Optional script path, copied-folder/source label, user summary, and Git
+  revision only where meaningful can be recorded where available.
 - Copied-folder workflows can record a source-root path, folder fingerprint, or
   user-supplied source label without implying managed code history.
 - Code provenance is distinct from passive procedure context and run-bound

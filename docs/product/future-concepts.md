@@ -23,6 +23,11 @@ and reviewed action: explain, compare, hand off, repeat, and safely automate
 work from recorded facts, not imitate legacy acquisition tools or make device
 control, sample visualization, or AI the product center by itself.
 
+The latest first-slice interview did not promote any concept in this file into
+initial adoption. Parameter systems, managed runs, calibration records, report
+artifacts, and Git-heavy provenance remain backlog pressure until the
+Data Vault/Grapher replacement loop is validated.
+
 ## Promotion Rule
 
 A future concept can move into implementation only after it has a clear story,

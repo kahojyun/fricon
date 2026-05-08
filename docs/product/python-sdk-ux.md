@@ -20,21 +20,29 @@ shapes that would be expensive to change after users build habits around them.
 
 ## Usage Stance
 
-Fricon should feel like ordinary Python with a small number of explicit product
-concepts:
+For initial adoption, Fricon should feel like ordinary Python with a small
+number of explicit product concepts:
 
 - a visible notebook context for the current local library and lab context
 - an interactive unmanaged path for exploratory runs
-- an importable decorated managed-run path for higher provenance
 - a lightweight way to bind selected local configuration context to a run
 - Python-native scan-plan authoring for routine scans
 - public reopen/export APIs for later analysis
+- a simple migration path where Data Vault-style scripts rewrite the recording
+  section instead of depending on a LabRAD compatibility layer
+
+Importable managed-run entry points are a strategic follow-on SDK direction,
+not part of the first-slice migration promise.
 
 The notebook-friendly reusable context/handle style is part of the product
 experience: a user should be able to establish the current local library and
 optional lab context once, inspect it in a notebook, reset it when needed, and
 pass it explicitly to measurement helpers. This does not accept a specific
 entry-point name such as `fricon.library()` or `fc.open()`.
+
+Notebook or process session association may be useful for monitor-window reuse
+and runtime connection behavior, but it should not become a user-facing product
+concept unless later design evidence requires it.
 
 The main ergonomic constraint is low ceremony. Fricon should ask for structure
 only where it changes user understanding: which context is active, whether a
@@ -47,6 +55,11 @@ lab folders are all plausible shapes. The initial adoption slice should record
 honest provenance for those shapes. Managed-run entry points, code snapshots,
 approved code sources, and update flows are strategic follow-on product
 directions, not accepted SDK API mechanics.
+
+Initial migration should be a small explicit rewrite of writer calls. Fricon
+should not depend on LabRAD internals, LabRAD services, or LabRAD's unit system
+for the first slice because local installations may diverge from upstream and
+legacy unit objects may not map cleanly.
 
 For common workflows, Fricon should provide appropriate simplification without
 pretending the right simplification is known before use. The exact API shape
@@ -65,10 +78,9 @@ control, and Fricon records measurements, datasets, notes, lifecycle, and
 honest provenance as the script runs. This keeps notebooks, debugging, and
 manual device work natural.
 
-When users want higher provenance, they should be able to move selected code
-into an importable managed-run entry point. The same measurement logic should
-remain normal Python that can be reviewed and tested, but Fricon can run it
-under management when the user opts in.
+Strategic follow-on managed runs should let users move selected code into
+importable entry points while keeping the measurement logic normal Python. That
+later path should not make managed execution mandatory for exploratory scripts.
 
 Routine scans should not force users to build schemas by hand. A Python-native
 scan plan should make common scan shapes concise while still leaving manual
@@ -87,10 +99,13 @@ ceremony should be justified by one of these user-visible benefits:
 - selecting or inspecting the current library and lab context
 - creating a real measurement rather than a loose file or anonymous table
 - declaring scan shape so live and historical plots know what the axes mean
-- choosing unmanaged versus managed execution honestly
+- labeling unmanaged execution honestly, and later choosing managed execution
+  only when that feature exists
 - binding selected local configuration context when copied files or sidecars
   explain the run
 - reopening or exporting results through stable public APIs
+- exporting to a portable Fricon package that can be read on another computer
+  with a lightweight Python reader
 
 Boilerplate that exists only for transport, storage layout, local runtime
 startup, local tokens, object graph construction, or future parameter machinery
@@ -138,7 +153,7 @@ result = fc.run_scan(
 )
 ```
 
-Importable managed-run entry point:
+Strategic follow-on managed-run sketch:
 
 ```python
 import fricon as fc
@@ -168,6 +183,8 @@ Do not settle these in this guideline:
   a raw escape hatch
 - a QCoDeS compatibility layer, fixed borrowed helper name, or
   parameter-object model
+- a LabRAD compatibility layer, LabRAD-dependent helper module, or LabRAD unit
+  adapter
 - scheduler, resource leases, queues, retries, workflow DAGs, or resume
   protocols
 

@@ -16,14 +16,16 @@ plotting semantics without making every script write raw schema by hand.
 
 ## Success Criteria
 
-- Scan-plan authoring covers common 1D, 2D, N-D, fixed-trace, and
-  variable-trace cases.
+- Scan-plan authoring covers common 1D, 2D, N-D, fixed-trace,
+  variable-trace, and irregular step-record cases.
 - Dict/literal-friendly plans are acceptable if they keep axes, setters,
   measured values, labels, and units readable in ordinary Python.
 - The accepted simplification shape is informed by real scripts/notebooks and
   feedback, not only by borrowed framework API names.
 - Schema can represent regular grids, partial grids, irregular/adaptive points,
-  repeated points, and missing expected points where meaningful.
+  per-step parameters, and missing expected points where meaningful. Repeated
+  points should remain representable, but they do not need a special first
+  experience before real demand appears.
 - Variable-length trace scenarios preserve each trace's own coordinate values,
   measured values, and per-trace settings instead of forcing padding,
   resampling, or a fake shared grid at write time.

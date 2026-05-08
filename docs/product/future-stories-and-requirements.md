@@ -24,6 +24,11 @@ ledger and rationale. This backlog expands that ledger into candidate future
 epics, stories, and requirements. Treat both files as backlog context until the
 initial adoption product baseline is revalidated.
 
+The latest first-slice interview kept this backlog out of initial adoption.
+Do not use this file to justify first-slice report generation, managed
+execution, calibration-specific records, Git-dependent reproducibility, generic
+export formats, or code/environment standardization.
+
 Strategic follow-on work should prioritize:
 
 - parameter system first
