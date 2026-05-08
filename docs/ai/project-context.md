@@ -2,43 +2,22 @@
 
 ## Status
 
-Draft pending product-analysis revalidation.
+Draft pending greenfield product-analysis baseline.
 
-## Start Here
+## Assumption
 
-For v0.2+ work, read:
+Read `docs/README.md` first. It owns the documentation reading order,
+source-of-truth map, and current product-analysis status.
 
-1. `docs/README.md`
-2. `docs/decisions/ADR-001-v02-clean-reset-boundary.md`
-3. `docs/product/vision.md`
-4. `docs/product/personas.md`
-5. `docs/product/product-analysis-progress.md`
-6. `docs/product/python-sdk-ux.md` for the Python SDK usage guideline
-7. `docs/domain/README.md`
-8. `docs/architecture/README.md`
-9. `docs/architecture/compatibility-policy.md`
+This file is only an agent overlay: it records operating reminders that are
+easy to forget during AI-assisted work. Do not duplicate the README here.
 
-`docs/specs/` and `docs/implementation-plans/` are sentinels only
-right now. Recreate or read downstream artifacts only when implementation
-planning is the task and the relevant upstream baseline is accepted or
-explicitly marked with open interview questions.
+## Current Working Model
 
-## Product Direction
-
-Fricon is currently being revalidated as a local lab data library for
-scientific measurement work. Treat `product/vision.md` and
-`product/personas.md` as the strongest current product inputs. Treat
-capabilities, stories, epics, and future backlog docs as draft derived material
-until `product/product-analysis-progress.md` says they have been revalidated.
-
-Product planning uses initial adoption, strategic follow-on, and ADR-gated
-labels. Initial adoption means the first usable migration slice, not the set of
-all important Fricon capabilities. Do not interpret strategic follow-on
-priorities as semantic-version labels; compatible additions may remain on the
-same compatible release line.
-
-Strategic follow-on priority order and rationale are draft backlog material
-until the initial adoption product baseline is revalidated.
+The current high-confidence product inputs are `product/vision.md` and
+`product/personas.md`. Use `product/product-analysis-progress.md` to understand
+which greenfield analysis steps are complete before relying on derived
+capabilities, stories, epics, or strategic follow-on backlog material.
 
 Primary user model:
 
@@ -51,6 +30,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 ## Hard Boundaries
 
 - Do not preserve prior workspace/dataset compatibility by default.
+- Do not treat draft capabilities, stories, epics, or backlog items as
+  implementation-ready.
 - Do not make datasets own measurement, sample, parameter, code, or lifecycle
   meaning.
 - Do not make Desktop the durable data backend.
@@ -65,6 +46,8 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Prefer measurement-scoped dataset writers in public examples.
 - Use initial adoption, strategic follow-on, and ADR-gated for product
   priority. Do not use `v0.3` or `v0.4` as shorthand for feature horizons.
+- Start product analysis from user journeys and story backbone before deriving
+  capabilities.
 - Treat high-impact Python SDK ergonomics as product requirements, not only
   implementation details.
 - Keep product-level SDK docs focused on usage guidelines and non-binding

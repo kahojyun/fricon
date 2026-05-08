@@ -28,10 +28,10 @@ features may still ship on the same compatible release line.
 ## Workflow Stance
 
 This directory is currently the primary work surface. The product baseline is
-being revalidated from the current greenfield direction. Keep discussion
-changes lightweight. Do not add implementation scaffolding, package locks,
-generated artifacts, or release automation until the accepted product baseline
-and required downstream architecture or ADR inputs call for them.
+being rebuilt from the current greenfield analysis. Keep discussion changes
+lightweight. Do not add implementation scaffolding, package locks, generated
+artifacts, or release automation until the accepted product baseline and
+required downstream architecture or ADR inputs call for them.
 
 ## Scale Classification
 
@@ -87,16 +87,16 @@ Keep each idea in the narrowest durable owner:
 - `product/vision.md` owns the current high-confidence product thesis, initial
   adoption goal, user promise, and high-level product horizons.
 - `product/personas.md` owns the current high-confidence product-role model.
-- `product/product-analysis-progress.md` owns product-analysis confidence,
-  progress, and revalidation order.
+- `product/product-analysis-progress.md` owns product-analysis progress,
+  document confidence, open questions, and the next analysis sequence.
 - `product/capability-map.md`, `product/story-map.md`, `product/epics/`, and
-  `product/user-stories/` are draft derived artifacts until revalidated from
-  the current high-confidence product inputs.
+  `product/user-stories/` are draft derived artifacts until they are rederived
+  or checked against the current greenfield analysis.
 - `product/future-concepts.md` and
   `product/future-stories-and-requirements.md` are backlog material until the
-  initial adoption product baseline is revalidated.
+  initial adoption product baseline is stable.
 - `product/glossary.md` is a provisional terminology helper until capability
-  and story revalidation settles the active product language.
+  and story analysis settles the active product language.
 - `domain/README.md` owns the current domain-layer status.
 - `architecture/README.md` owns accepted architecture constraints while the
   project is still in product analysis. Detailed API, storage, module,

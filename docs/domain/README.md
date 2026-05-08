@@ -22,16 +22,16 @@ During the current phase:
   initial adoption goal, user promise, and high-level horizons.
 - `docs/product/personas.md` owns the current high-confidence product-role
   model.
-- `docs/product/product-analysis-progress.md` owns product-analysis confidence,
-  progress, and revalidation order.
+- `docs/product/product-analysis-progress.md` owns product-analysis progress,
+  document confidence, open questions, and the next analysis sequence.
 - `docs/product/capability-map.md`, `docs/product/story-map.md`,
   `docs/product/epics/`, and `docs/product/user-stories/` are draft derived
-  material pending product-analysis revalidation.
-- `docs/product/glossary.md` is draft terminology context pending
-  revalidation.
+  material pending greenfield analysis.
+- `docs/product/glossary.md` is draft terminology context pending product
+  analysis.
 - `docs/product/future-concepts.md` and
   `docs/product/future-stories-and-requirements.md` are backlog context pending
-  initial adoption baseline revalidation.
+  a stable initial adoption baseline.
 - `docs/architecture/README.md` owns only accepted architecture constraints and
   deferred architecture questions.
 
@@ -46,9 +46,9 @@ until architecture or ADR work starts.
 ## Domain Rebuild Trigger
 
 Recreate detailed domain docs only after the relevant product inputs are
-accepted or explicitly marked with open questions. During the current
-revalidation phase, use `docs/product/product-analysis-progress.md` to decide
-whether a product input is ready to support domain work.
+accepted or explicitly marked with open questions. During the current analysis
+phase, use `docs/product/product-analysis-progress.md` to decide whether a
+product input is ready to support domain work.
 
 The first rebuilt domain baseline should be lean and should answer only:
 
@@ -67,4 +67,4 @@ Expected future files, when the phase starts:
 
 Do not restore the old migrated draft files as active sources of truth. Mine
 git history only when explicitly asked for historical reference, then rederive
-domain content from revalidated product documents.
+domain content from accepted greenfield product documents.
