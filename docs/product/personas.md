@@ -48,9 +48,9 @@ Choose the persona that owns the story's main outcome:
   artifacts, downstream handoff, and interpretation provenance.
 - P-004 Effective Configuration Steward: effective configuration, calibration
   evidence, parameter state, fitted values, and rollback decisions.
-- P-005 Measurement Method Author: reusable measurement methods, script and
-  routine shape, SDK usage, scan helpers, runner integration, plotting
-  utilities, and report/export recipes.
+- P-005 Measurement Method Author: measurement-method code, script and routine
+  shape, SDK usage, scan helpers, runner integration, plotting utilities, and
+  report/export recipes.
 
 When several roles participate, use the accountable role as the story's
 primary persona and mention supporting roles in notes or acceptance criteria.
@@ -78,8 +78,10 @@ run, not every decision in the experiment.
 Goals:
 
 - start, watch, annotate, recover, and hand off measurement runs
-- understand the active sample/session, measurement name, scan shape, units,
-  and selected local context without learning Fricon internals
+- choose or adjust run-specific inputs such as scan ranges, selected targets,
+  and context labels
+- understand the active measurement name, scan shape, units, and selected local
+  context without learning Fricon internals
 - preserve useful partial results when scripts interrupt or long saves fail
 
 Context and pressure:
@@ -96,8 +98,9 @@ Common switches:
   for working effective configuration or parameter state
 - switches to P-003 when the main work is analysis, reporting, or interpreting
   derived artifacts after acquisition
-- depends on P-005 for reusable routines and P-002 when setup or update
-  problems block measurement work
+- switches to P-005 when changing measurement-method code, scan-helper
+  semantics, procedure summaries, or dataset schema
+- depends on P-002 when setup or update problems block measurement work
 
 ## P-002 Local Measurement System Maintainer
 
@@ -204,16 +207,17 @@ Common switches:
 
 ## P-005 Measurement Method Author
 
-The lab user who writes or maintains reusable measurement methods that other
-lab members run: scripts, scan helpers, pulse-generation rules, runner
-integrations, plotting utilities, or export/report recipes. This role
-understands how the experiment should be expressed in code, but may rely on
-P-002 for packaging, environments, deployment, and local system diagnostics.
+The role active when a lab user writes or maintains code that expresses a
+measurement method, from exploratory script blocks to reusable routines:
+scripts, scan helpers, pulse-generation rules, runner integrations, plotting
+utilities, or export/report recipes. This role understands how the experiment
+should be expressed in code, but may rely on P-002 for packaging,
+environments, deployment, and local system diagnostics.
 
 Goals:
 
-- integrate Fricon recording into existing scripts, notebooks, Data
-  Vault-style helpers, runners, and scan utilities
+- integrate Fricon recording into exploratory scripts, notebooks, Data
+  Vault-style helpers, reusable routines, runners, and scan utilities
 - declare scan axes, dependencies, trace shapes, repeated shots, validity
   masks, runner identifiers, and procedure summaries from code
 - preserve honest code provenance without claiming Fricon managed execution
@@ -221,8 +225,8 @@ Goals:
 
 Context and pressure:
 
-- writes routines that other users may run without understanding every
-  dependency
+- may write quick internal script blocks or routines that other users later run
+  without understanding every dependency
 - may rely on P-002 for runtime, package, deployment, or diagnostic support
 - needs migration ergonomics that do not require rewriting the whole
   measurement stack at once
