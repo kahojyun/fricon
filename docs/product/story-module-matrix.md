@@ -2,7 +2,7 @@
 
 ## Status
 
-Deferred.
+Deferred pending product-analysis revalidation.
 
 ## Purpose
 

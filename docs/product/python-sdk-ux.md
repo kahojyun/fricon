@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed product-level SDK usage guideline.
+Draft pending SDK experience revalidation.
 
 ## Purpose
 
@@ -43,10 +43,10 @@ the run, what scan shape should be plotted, and how results are reopened later.
 
 In this guideline, measurement code remains ordinary Python first: notebooks,
 scripts, translated Data Vault-style scripts, importable functions, and local
-lab folders are all plausible shapes. The MVP should record honest provenance
-for those shapes. Managed-run entry points, code snapshots, approved code
-sources, and update flows are post-MVP product directions, not accepted SDK API
-mechanics.
+lab folders are all plausible shapes. The initial adoption slice should record
+honest provenance for those shapes. Managed-run entry points, code snapshots,
+approved code sources, and update flows are strategic follow-on product
+directions, not accepted SDK API mechanics.
 
 For common workflows, Fricon should provide appropriate simplification without
 pretending the right simplification is known before use. The exact API shape

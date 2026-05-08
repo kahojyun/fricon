@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Draft pending product-analysis revalidation.
 
 ## Product Goal
 
@@ -10,7 +10,7 @@ A Local Measurement System Maintainer can install Fricon, create or open one
 local data library, and keep Python scripts runnable against it without
 assembling mismatched Desktop, CLI, Python SDK, and local runtime pieces.
 
-## MVP Scope
+## Initial Adoption Scope
 
 - Coherent local Fricon release for Desktop, CLI, Python SDK, and required
   local runtime components.
@@ -21,7 +21,7 @@ assembling mismatched Desktop, CLI, Python SDK, and local runtime pieces.
   offline or locked-down environments, pinned Python environments, and
   slow-to-update setups.
 
-## Not MVP
+## Not Initial Adoption
 
 - Hosted service, multi-user administration, or direct shared-folder database
   access.

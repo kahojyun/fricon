@@ -18,19 +18,26 @@ an accepted conceptual model.
 
 During the current phase:
 
-- `docs/product/vision.md` owns the product thesis, MVP goal, user promise, and
-  high-level horizons.
-- `docs/product/capability-map.md` owns accepted capability IDs and compact
-  scope boundaries.
-- `docs/product/glossary.md` owns current public and future terminology.
-- `docs/product/future-concepts.md` owns post-MVP priority order and rationale.
-- `docs/product/future-stories-and-requirements.md` owns proposed future
-  stories and requirements.
+- `docs/product/vision.md` owns the current high-confidence product thesis,
+  initial adoption goal, user promise, and high-level horizons.
+- `docs/product/personas.md` owns the current high-confidence product-role
+  model.
+- `docs/product/product-analysis-progress.md` owns product-analysis progress,
+  document confidence, open questions, and the next analysis sequence.
+- `docs/product/capability-map.md`, `docs/product/story-map.md`,
+  `docs/product/epics/`, and `docs/product/user-stories/` are draft derived
+  material pending greenfield analysis.
+- `docs/product/glossary.md` is draft terminology context pending product
+  analysis.
+- `docs/product/future-concepts.md` and
+  `docs/product/future-stories-and-requirements.md` are backlog context pending
+  a stable initial adoption baseline.
 - `docs/architecture/README.md` owns only accepted architecture constraints and
   deferred architecture questions.
 
-If a topic is about what users need, product priority, MVP versus post-MVP
-scope, or acceptable user-facing promises, keep it in `docs/product/`.
+If a topic is about what users need, product priority, initial adoption versus
+strategic follow-on scope, or acceptable user-facing promises, keep it in
+`docs/product/`.
 
 If a topic is about transport, storage, process boundaries, API shape, module
 names, export format, or migration mechanics, keep it out of `docs/domain/`
@@ -39,7 +46,9 @@ until architecture or ADR work starts.
 ## Domain Rebuild Trigger
 
 Recreate detailed domain docs only after the relevant product inputs are
-accepted or explicitly marked with open questions.
+accepted or explicitly marked with open questions. During the current analysis
+phase, use `docs/product/product-analysis-progress.md` to decide whether a
+product input is ready to support domain work.
 
 The first rebuilt domain baseline should be lean and should answer only:
 
@@ -58,4 +67,4 @@ Expected future files, when the phase starts:
 
 Do not restore the old migrated draft files as active sources of truth. Mine
 git history only when explicitly asked for historical reference, then rederive
-domain content from accepted product documents.
+domain content from accepted greenfield product documents.

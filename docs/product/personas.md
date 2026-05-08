@@ -63,10 +63,10 @@ interpretation records. P-002 contributes technical guardrails when runtime,
 update, library, or environment safety matters.
 
 Physical setup, instrument, wiring, and device-state ownership is a distinct
-future boundary. MVP stories record those facts as passive setup context or
-run-bound local configuration. If later workflows review or mutate setup or
-device state, route that decision to an explicit setup/device owner rather than
-to P-002 by default; P-002 owns software-system readiness.
+future boundary. Initial adoption stories record those facts as passive setup
+context or run-bound local configuration. If later workflows review or mutate
+setup or device state, route that decision to an explicit setup/device owner
+rather than to P-002 by default; P-002 owns software-system readiness.
 
 ## P-001 Measurement Run Operator
 
@@ -230,8 +230,8 @@ Context and pressure:
 - may rely on P-002 for runtime, package, deployment, or diagnostic support
 - needs migration ergonomics that do not require rewriting the whole
   measurement stack at once
-- creates post-MVP pressure for approved code sources, managed entry points,
-  templates, and reviewed updates
+- creates strategic follow-on pressure for approved code sources, managed
+  entry points, templates, and reviewed updates
 
 Common switches:
 

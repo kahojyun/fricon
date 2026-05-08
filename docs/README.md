@@ -2,13 +2,13 @@
 
 ## Status
 
-Active v0.2+ documentation baseline.
+Active documentation workspace; product baseline under revalidation.
 
 ## Purpose
 
 `docs/` is the single documentation directory for the v0.2+ reset. It owns
-the active product, domain status, architecture, ADR, research,
-user-documentation planning, and AI-agent guidance baseline.
+the active product-analysis workspace, domain status, architecture constraints,
+ADR, research, user-documentation planning, and AI-agent guidance baseline.
 
 ## Design Stance
 
@@ -19,13 +19,16 @@ The reset keeps useful infrastructure where it fits, but it does not preserve
 workspace-first storage, API, IPC, or desktop navigation compatibility when
 that compatibility would keep the wrong product model alive.
 
-Product planning in this directory uses MVP, post-MVP priority, and ADR-gated
-labels. Do not treat post-MVP priorities as semantic-version labels; compatible
+Product planning in this directory uses initial adoption, strategic follow-on,
+and ADR-gated labels. Initial adoption is the first usable migration slice, not
+a statement that later product-core capabilities are less important. Do not
+treat strategic follow-on priorities as semantic-version labels; compatible
 features may still ship on the same compatible release line.
 
 ## Workflow Stance
 
-This directory is currently the primary work surface. Keep discussion changes
+This directory is currently the primary work surface. The product baseline is
+being rebuilt from the current greenfield analysis. Keep discussion changes
 lightweight. Do not add implementation scaffolding, package locks, generated
 artifacts, or release automation until the accepted product baseline and
 required downstream architecture or ADR inputs call for them.
@@ -45,14 +48,16 @@ Fricon is an S2 medium modular system:
 1. `postmortems/v0-lessons.md`
 2. `decisions/ADR-001-v02-clean-reset-boundary.md`
 3. `product/vision.md`
-4. `product/capability-map.md`
-5. `product/story-map.md`
-6. `product/python-sdk-ux.md` for the Python SDK usage guideline
-7. relevant `product/epics/` and `product/user-stories/`
-8. `domain/README.md`
-9. `architecture/README.md`
-10. `architecture/compatibility-policy.md`
-11. `ai/project-context.md`
+4. `product/personas.md`
+5. `product/product-analysis-progress.md`
+6. `product/capability-map.md`
+7. `product/story-map.md`
+8. `product/python-sdk-ux.md` for the Python SDK usage guideline
+9. relevant `product/epics/` and `product/user-stories/`
+10. `domain/README.md`
+11. `architecture/README.md`
+12. `architecture/compatibility-policy.md`
+13. `ai/project-context.md`
 
 `specs/` and `implementation-plans/` are currently sentinels only. Recreate
 downstream artifacts only when implementation planning is the task and the
@@ -63,7 +68,7 @@ questions.
 
 ```text
 docs/
-  product/              User goals, capabilities, stories, future ledger, glossary
+  product/              Product analysis, user goals, capabilities, stories, glossary
   domain/               Current domain-layer status
   architecture/         Accepted constraints and deferred ADR questions
   decisions/            ADRs for durable decisions
@@ -79,17 +84,19 @@ docs/
 
 Keep each idea in the narrowest durable owner:
 
-- `product/vision.md` owns the accepted product thesis, MVP goal, user promise,
-  and high-level product horizons.
-- `product/future-concepts.md` owns the accepted post-MVP priority ledger and
-  promotion rule.
-- `product/future-stories-and-requirements.md` owns proposed future user stories
-  and requirements. It should reference the priority ledger instead of restating
-  its rationale.
-- `product/capability-map.md` owns stable capability IDs and compact scope
-  boundaries. Detailed acceptance notes belong in stories or ADRs; derived
-  specs may add implementation acceptance after upstream acceptance.
-- `product/glossary.md` owns public and future terminology.
+- `product/vision.md` owns the current high-confidence product thesis, initial
+  adoption goal, user promise, and high-level product horizons.
+- `product/personas.md` owns the current high-confidence product-role model.
+- `product/product-analysis-progress.md` owns product-analysis progress,
+  document confidence, open questions, and the next analysis sequence.
+- `product/capability-map.md`, `product/story-map.md`, `product/epics/`, and
+  `product/user-stories/` are draft derived artifacts until they are rederived
+  or checked against the current greenfield analysis.
+- `product/future-concepts.md` and
+  `product/future-stories-and-requirements.md` are backlog material until the
+  initial adoption product baseline is stable.
+- `product/glossary.md` is a provisional terminology helper until capability
+  and story analysis settles the active product language.
 - `domain/README.md` owns the current domain-layer status.
 - `architecture/README.md` owns accepted architecture constraints while the
   project is still in product analysis. Detailed API, storage, module,

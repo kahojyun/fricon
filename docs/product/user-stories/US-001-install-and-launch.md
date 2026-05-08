@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Draft pending product-analysis revalidation.
 
 ## Primary Epic
 
@@ -33,7 +33,7 @@ incompatible pieces by hand.
 - Hosted service, multi-user administration, or direct shared-folder database
   editing.
 - Enterprise deployment polish before the local loop works.
-- Full source-code or Python-environment management during the MVP.
+- Full source-code or Python-environment management during initial adoption.
 
 ## Related Capabilities
 

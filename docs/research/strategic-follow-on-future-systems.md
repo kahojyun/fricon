@@ -1,4 +1,4 @@
-# Post-MVP Future Systems Research
+# Strategic Follow-On Future Systems Research
 
 ## Status
 
@@ -10,12 +10,12 @@ Draft research synthesis.
 
 ## Purpose
 
-Capture background lessons for post-MVP parameter systems, managed code
-snapshots, runner capture, setup state, calibration history, and generated run
-history.
+Capture background lessons for strategic follow-on parameter systems, managed
+code snapshots, runner capture, setup state, calibration history, and generated
+run history.
 
 This research informs `product/future-stories-and-requirements.md`; it does
-not change accepted MVP scope.
+not change initial adoption scope.
 
 ## Sources
 
@@ -95,9 +95,9 @@ Modern desired-state and reviewable-apply references:
 
 ## Product Lessons
 
-- Parameter drift is a standalone product problem. Post-MVP parameter work
-  should treat named parameter profiles, immutable snapshots, proposals,
-  overrides, and diffs as first-class concepts.
+- Parameter drift is a standalone product problem. Strategic follow-on
+  parameter work should treat named parameter profiles, immutable snapshots,
+  proposals, overrides, and diffs as first-class concepts.
 - Code and parameter drift are coupled in practice. Calibration cannot be
   reliably automated while fitted values depend on copied measurement folders,
   mutable config files, notebook-local analysis, or generated sidecars that are

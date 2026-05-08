@@ -2,33 +2,37 @@
 
 ## Status
 
-Accepted.
+Draft pending product-analysis revalidation.
 
 ## Vision Alignment
 
-The capability baseline serves one MVP goal: replace the simple LabRAD Data
-Vault/Grapher loop for new measurements. Capabilities should support that loop
-without importing old history, emulating LabRAD, or pulling post-MVP parameter,
-code-management, runner, device, or automation systems into the MVP.
+The capability baseline should be revalidated against one initial adoption
+goal: replace the simple LabRAD Data Vault/Grapher loop for new measurements.
+Capabilities in the first adoption slice should support that loop without
+importing old history, emulating LabRAD, or pulling strategic follow-on
+parameter, code-management, runner, device, or automation systems into the
+first release path.
 
-Post-MVP capability ordering is owned by `product/future-concepts.md`. This map
-keeps stable IDs and compact scope boundaries only.
+Strategic follow-on capability ordering is draft backlog context in
+`product/future-concepts.md`. This map keeps stable IDs and compact scope
+boundaries only.
 
-Release versions are not product-horizon labels. Compatible post-MVP
-capabilities may still ship on the same compatible release line; use MVP,
-post-MVP priority, and ADR-gated labels for product planning.
+Release versions are not product-horizon labels. Compatible strategic
+follow-on capabilities may still ship on the same compatible release line; use
+initial adoption, strategic follow-on, and ADR-gated labels for product
+planning.
 
 ## Product Grouping
 
 Use these planning groups when routing product work:
 
 - Local adoption: CAP-001, CAP-002, CAP-012, CAP-013.
-- MVP measurement replacement: CAP-003, CAP-005, CAP-006, CAP-007, CAP-028,
-  CAP-030.
+- Initial adoption measurement replacement: CAP-003, CAP-005, CAP-006,
+  CAP-007, CAP-028, CAP-030.
 - Context and provenance: CAP-004, CAP-014, CAP-015, CAP-017, CAP-027,
   CAP-029, CAP-033.
 - Review and analysis: CAP-008, CAP-009, CAP-010, CAP-011, CAP-016, CAP-026.
-- Post-MVP foundation: CAP-018 through CAP-025, CAP-031, CAP-032.
+- Strategic follow-on foundation: CAP-018 through CAP-025, CAP-031, CAP-032.
 
 ## Capability Definitions
 
@@ -185,15 +189,16 @@ CAP-018: Read-only remote monitoring.
 
 - Intent: allow trusted users on the lab network to watch measurements without
   editing the data library.
-- Boundary: the MVP may keep APIs observable, but should not promise remote
-  access or shared editing.
+- Boundary: the initial adoption slice may keep APIs observable, but should not
+  promise remote access or shared editing.
 
 CAP-019: Rich sample maps and saved views.
 
 - Intent: support user-defined spatial sample maps, richer sample metadata, and
   saved comparison views after the local data-library loop works.
-- Boundary: the MVP only needs optional sample/session context and correction.
-  Post-MVP map details belong in a dedicated spec or ADR.
+- Boundary: initial adoption only needs optional sample/session context and
+  correction. Strategic follow-on map details belong in a dedicated spec or
+  ADR.
 
 CAP-020: Measurement-code source setup and approved code update flows.
 
@@ -205,16 +210,17 @@ CAP-020: Measurement-code source setup and approved code update flows.
   releases, setup profiles, environment lock files, scan-schema helpers,
   measurement templates, plot presets, export recipes, and maintainer handoff
   for local changes.
-- Boundary: the MVP records honest provenance but does not own code deployment.
-  Scheduler or managed-execution behavior belongs to later capabilities.
+- Boundary: initial adoption records honest provenance but does not own code
+  deployment. Scheduler or managed-execution behavior belongs to later
+  capabilities.
 
 CAP-021: Parameter profiles and proposals.
 
 - Intent: promote repeated parameter snapshots into reusable profiles and
   reviewed proposals, with diffs and source evidence that make calibration
   changes inspectable instead of anonymous config-file edits.
-- Boundary: the MVP keeps only light parameter context summaries without a
-  registry UI or effective-configuration model.
+- Boundary: initial adoption keeps only light parameter context summaries,
+  without a registry UI or effective-configuration model.
 
 CAP-022: Analysis, interpretation, and calibration records.
 
@@ -222,7 +228,7 @@ CAP-022: Analysis, interpretation, and calibration records.
   anomaly review, calibration, and derived-result activity as first-class
   records that can cite input measurements, code context, parameter snapshots,
   generated artifacts, fitted values, and affected parameter paths.
-- Boundary: the MVP may export analysis-ready data but does not manage
+- Boundary: initial adoption may export analysis-ready data but does not manage
   calibration promotion. Detailed calibration workflow semantics belong in the
   future backlog.
 
@@ -233,7 +239,7 @@ CAP-023: Managed code snapshots and execution.
 - Boundary: managed code starts from selected importable Python entry points or
   SDK-integrated wrappers, not a general scheduler, shell-command runner, or
   workflow DAG.
-- Boundary: the MVP records unmanaged execution context only.
+- Boundary: initial adoption records unmanaged execution context only.
 
 CAP-024: Device boundary and managed device communication.
 
@@ -241,17 +247,17 @@ CAP-024: Device boundary and managed device communication.
   boundaries when Fricon begins controlling instruments, including later
   desired-state planning, observed-state readback, reconciliation diffs, and
   reviewed apply plans.
-- Boundary: the MVP may record passive setup/device summaries but does not talk
-  to instruments. Device apply is ADR-gated.
+- Boundary: initial adoption may record passive setup/device summaries but does
+  not talk to instruments. Device apply is ADR-gated.
 
 CAP-025: AI-assisted reviewed automation.
 
 - Intent: let AI propose actions or analysis steps that are reviewed before
   mutating the data library.
-- Boundary: the MVP should preserve auditability, not implement mutating AI
-  automation. AI-created durable conclusions should record provenance, and
-  mutating AI actions should enter through the same reviewed proposal path as
-  non-AI automation.
+- Boundary: initial adoption should preserve auditability, not implement
+  mutating AI automation. AI-created durable conclusions should record
+  provenance, and mutating AI actions should enter through the same reviewed
+  proposal path as non-AI automation.
 
 CAP-026: Dataset artifact discovery and direct open.
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Draft pending product-analysis revalidation.
 
 ## Primary Epic
 
@@ -16,7 +16,7 @@ it is so that migration does not block new data collection.
 
 ## Success Criteria
 
-- The MVP communicates that old history can stay in the old system.
+- Initial adoption communicates that old history can stay in the old system.
 - New Fricon measurements may record source aliases or legacy references.
 - Later user-written import scripts can use generic APIs when old data needs to
   move forward.
@@ -24,7 +24,7 @@ it is so that migration does not block new data collection.
 
 ## Not In Scope
 
-- Built-in legacy import as an MVP adoption prerequisite.
+- Built-in legacy import as a prerequisite for initial adoption.
 - Making reopen/export own old-system history migration.
 
 ## Related Capabilities

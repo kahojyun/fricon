@@ -35,6 +35,7 @@ Covered:
 - EPICS Archiver, Olog, eLabFTW, LabKey, openBIS, and calibration-ledger tools
 
 Accepted synthesis lives in `lessons-for-fricon.md`. The broader source list
-and post-MVP planning synthesis live in `post-mvp-future-systems.md`.
+and strategic follow-on planning synthesis live in
+`strategic-follow-on-future-systems.md`.
 Concrete migration pressure from local legacy measurement sample work
 directories lives in `legacy-measurement-sample-lessons.md`.

@@ -2,38 +2,22 @@
 
 ## Status
 
-Accepted for v0.2+ planning.
+Draft pending greenfield product-analysis baseline.
 
-## Start Here
+## Assumption
 
-For v0.2+ work, read:
+Read `docs/README.md` first. It owns the documentation reading order,
+source-of-truth map, and current product-analysis status.
 
-1. `docs/README.md`
-2. `docs/decisions/ADR-001-v02-clean-reset-boundary.md`
-3. `docs/product/vision.md`
-4. `docs/product/python-sdk-ux.md` for the Python SDK usage guideline
-5. `docs/domain/README.md`
-6. `docs/architecture/README.md`
-7. `docs/architecture/compatibility-policy.md`
+This file is only an agent overlay: it records operating reminders that are
+easy to forget during AI-assisted work. Do not duplicate the README here.
 
-`docs/specs/` and `docs/implementation-plans/` are sentinels only
-right now. Recreate or read downstream artifacts only when implementation
-planning is the task and the relevant upstream baseline is accepted or
-explicitly marked with open interview questions.
+## Current Working Model
 
-## Product Direction
-
-Fricon is a local lab data library for scientific measurement work.
-Its long-term motivation is unified parameter management, measurement-code
-management, SDK runner capture, dataset recording, and provenance in one
-local-first product experience.
-
-Product planning uses MVP, post-MVP priority, and ADR-gated labels. Do not
-interpret post-MVP priorities as semantic-version labels; compatible additions
-may remain on the same compatible release line.
-
-Post-MVP priority order and rationale are owned by
-`product/future-concepts.md`.
+The current high-confidence product inputs are `product/vision.md` and
+`product/personas.md`. Use `product/product-analysis-progress.md` to understand
+which greenfield analysis steps are complete before relying on derived
+capabilities, stories, epics, or strategic follow-on backlog material.
 
 Primary user model:
 
@@ -46,20 +30,24 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 ## Hard Boundaries
 
 - Do not preserve prior workspace/dataset compatibility by default.
+- Do not treat draft capabilities, stories, epics, or backlog items as
+  implementation-ready.
 - Do not make datasets own measurement, sample, parameter, code, or lifecycle
   meaning.
 - Do not make Desktop the durable data backend.
 - Do not bypass local runtime compatibility checks for mutating Python APIs.
 - Do not introduce SaaS, accounts, teams, roles, or distributed database
-  behavior for the MVP.
-- Do not implement post-MVP runner, device, calibration, or AI mutation systems
-  before their ADRs/specs exist.
+  behavior for the initial adoption slice.
+- Do not implement strategic follow-on runner, device, calibration, or AI
+  mutation systems before their ADRs/specs exist.
 
 ## Good Defaults
 
 - Prefer measurement-scoped dataset writers in public examples.
-- Use MVP/post-MVP/ADR-gated for product priority. Do not use `v0.3` or `v0.4`
-  as shorthand for feature horizons.
+- Use initial adoption, strategic follow-on, and ADR-gated for product
+  priority. Do not use `v0.3` or `v0.4` as shorthand for feature horizons.
+- Start product analysis from user journeys and story backbone before deriving
+  capabilities.
 - Treat high-impact Python SDK ergonomics as product requirements, not only
   implementation details.
 - Keep product-level SDK docs focused on usage guidelines and non-binding
@@ -70,9 +58,10 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
 - Keep sample/session context optional and correctable.
 - Do not turn sample target binding into a heavy physical-component ontology
   unless a later product decision requires it.
-- For post-MVP parameter, calibration, run-manifest, sample-visualizer, and
-  setup/device reconciliation details, read `product/future-concepts.md` and
-  `product/glossary.md`.
+- For strategic follow-on parameter, calibration, run-manifest,
+  sample-visualizer, and setup/device reconciliation details, read
+  `product/future-concepts.md` and `product/glossary.md` as draft backlog and
+  terminology context.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.

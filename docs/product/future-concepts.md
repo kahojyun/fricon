@@ -2,25 +2,26 @@
 
 ## Status
 
-Accepted post-MVP priority ledger.
+Draft pending strategic follow-on product revalidation.
 
 ## Purpose
 
-Preserve important post-MVP directions without letting future systems inflate
-the MVP measurement loop.
+Preserve candidate strategic follow-on directions without letting future
+systems inflate the initial adoption measurement loop.
 
-This file owns the accepted priority order for post-MVP concepts. Candidate
-stories and requirement details live in
+This file records a prior priority order for strategic follow-on concepts.
+Candidate stories and requirement details live in
 `product/future-stories-and-requirements.md`.
 
 These are product priority horizons, not semantic-version promises. Compatible
-capabilities may ship on the same release line as the MVP if the compatibility,
-storage, and API policies allow it.
+capabilities may ship on the same release line as the initial adoption slice
+when compatibility, storage, and API policies allow it.
 
-Post-MVP concepts should move Fricon toward local experiment memory and
-reviewed action. The point is to explain, compare, hand off, repeat, and safely
-automate work from recorded facts, not to imitate legacy acquisition tools or
-make device control, sample visualization, or AI the product center by itself.
+Strategic follow-on concepts should be revalidated after the initial adoption
+product baseline is settled. The intended direction is local experiment memory
+and reviewed action: explain, compare, hand off, repeat, and safely automate
+work from recorded facts, not imitate legacy acquisition tools or make device
+control, sample visualization, or AI the product center by itself.
 
 ## Promotion Rule
 
@@ -147,7 +148,7 @@ Boundary:
 
 Included concepts: FC-001, FC-002, FC-011, FC-012, FC-013, FC-016.
 
-Candidate post-MVP stories and requirements live in
+Candidate strategic follow-on stories and requirements live in
 `product/future-stories-and-requirements.md`.
 
 ## Future Concept Definitions
@@ -156,7 +157,7 @@ FC-001: Read-only LAN monitoring.
 
 - Intent: support viewing, browsing, and export from trusted local-network
   clients without remote writes.
-- Boundary: this remains outside the MVP data-writing loop.
+- Boundary: this remains outside the initial adoption data-writing loop.
 
 FC-002: Rich sample maps and saved views.
 
@@ -226,14 +227,15 @@ FC-010: AI-assisted automation.
 FC-011: Resumable execution checkpoints.
 
 - Intent: add resumable execution checkpoints with a managed runner.
-- Boundary: this is later or ADR-gated and should not complicate unmanaged MVP
-  recovery.
+- Boundary: this is later or ADR-gated and should not complicate unmanaged
+  initial adoption recovery.
 
 FC-012: External large asset references.
 
 - Intent: reference detector files, images, waveforms, and other large external
   assets.
-- Boundary: this avoids turning the MVP into a general media asset library.
+- Boundary: this avoids turning the initial adoption slice into a general media
+  asset library.
 
 FC-013: User-facing dataset streams.
 

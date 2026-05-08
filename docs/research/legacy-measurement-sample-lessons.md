@@ -102,22 +102,22 @@ Fricon should make the following facts first-class for new work:
   parameters, code/procedure context, and fitted values they used.
 - Measurement-centered export that carries semantic context, not just bytes.
 
-The MVP should still avoid LabRAD emulation, old-history import, broad device
-control, a full parameter registry, and automatic tracing of every file an
-unmanaged script reads.
+The initial adoption slice should still avoid LabRAD emulation, old-history
+import, broad device control, a full parameter registry, and automatic tracing
+of every file an unmanaged script reads.
 
-## Post-MVP Product Pressure
+## Strategic Follow-On Product Pressure
 
-The samples also point beyond the MVP replacement loop:
+The samples also point beyond the initial adoption replacement loop:
 
 - Legacy folders are not just storage debt; they are missing experiment memory.
 - Repetition currently depends on copied code, mutable config, and operator
   recall.
-- The most valuable post-MVP improvement is to make code provenance,
+- The most valuable strategic follow-on improvement is to make code provenance,
   effective parameter snapshots, generated sidecars, calibration evidence, and
   accepted parameter changes inspectable together.
-- Fricon's post-MVP advantage should be reviewed reuse of recorded facts, not
-  emulation of legacy paths.
+- Fricon's strategic follow-on advantage should be reviewed reuse of recorded
+  facts, not emulation of legacy paths.
 - Read-only compare, handoff, run-like-previous drafts, and failure
   investigation should arrive before mutation-capable automation.
 - Parameter proposals should promote effective or fitted settings only after
