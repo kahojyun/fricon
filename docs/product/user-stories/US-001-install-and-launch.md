@@ -10,9 +10,10 @@ EPIC-001: Local setup and data-library adoption.
 
 ## Story
 
-As an experimentalist, I want one clear way to install and launch Fricon on a
-lab computer so that I can open Fricon Desktop and use the Python SDK against a
-local data library without assembling incompatible pieces by hand.
+As a Local Measurement System Maintainer, I want one clear way to install and
+launch Fricon on a lab computer so that measurement users can open Fricon
+Desktop and use the Python SDK against a local data library without assembling
+incompatible pieces by hand.
 
 ## Success Criteria
 
@@ -25,7 +26,7 @@ local data library without assembling incompatible pieces by hand.
 - Diagnostics explain stopped local runtime components, wrong library, locked
   library, old SDK, incompatible components, or migration-required states.
 - Local support information can be exported in a redacted, user-approved form
-  when a maintainer needs to debug setup problems.
+  when a Local Measurement System Maintainer needs to debug setup problems.
 
 ## Not In Scope
 

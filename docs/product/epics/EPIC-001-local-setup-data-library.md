@@ -6,9 +6,9 @@ Accepted.
 
 ## Product Goal
 
-An experimentalist can install Fricon, create or open one local data library,
-and run Python scripts against it without assembling mismatched Desktop, CLI,
-Python SDK, and local runtime pieces.
+A Local Measurement System Maintainer can install Fricon, create or open one
+local data library, and keep Python scripts runnable against it without
+assembling mismatched Desktop, CLI, Python SDK, and local runtime pieces.
 
 ## MVP Scope
 

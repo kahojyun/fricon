@@ -10,9 +10,10 @@ EPIC-002: New measurement logging replacement.
 
 ## Story
 
-As an experimentalist, I want to run an interactive unmanaged measurement from
-ordinary Python with minimal boilerplate so that Fricon records the measurement,
-produced datasets, optional sample/session context, and honest provenance.
+As a Measurement Run Operator, I want to run an interactive unmanaged
+measurement from ordinary Python with minimal boilerplate so that Fricon records
+the measurement, produced datasets, optional sample/session context, and honest
+provenance.
 
 ## Success Criteria
 

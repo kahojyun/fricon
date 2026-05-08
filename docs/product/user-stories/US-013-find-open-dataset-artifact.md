@@ -10,9 +10,9 @@ EPIC-003: Measurement console and inspection.
 
 ## Story
 
-As an experimentalist, I want to find and open a produced dataset artifact
-directly so that measurement-first navigation does not hide the actual data I
-need to inspect or analyze.
+As an Experimental Data Analyst, I want to find and open a produced dataset
+artifact directly so that measurement-first navigation does not hide the actual
+data I need to inspect or analyze.
 
 ## Success Criteria
 

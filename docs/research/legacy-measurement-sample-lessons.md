@@ -6,7 +6,7 @@ Draft research synthesis.
 
 ## Review Date
 
-2026-05-07.
+2026-05-08.
 
 ## Sources
 
@@ -37,8 +37,44 @@ The samples show a working but fragile legacy LabRAD-era pattern:
   regenerate settings. The problem is that those outputs are mixed with copied
   code folders, mutable parameter files, generated sidecars, and operator
   judgment rather than becoming a reviewed calibration-to-parameter workflow.
+- Hardware bring-up and instrument calibration are part of the same local
+  evidence problem: routines may depend on physical addresses, live output
+  state, stop/clear commands, offsets, powers, frequencies, timestamps, and
+  later conversion into setting files.
+- Analysis handoff is not only Python reopen. The samples also produce
+  spreadsheet summaries, presentation decks, plot images, derived arrays, and
+  JSON outputs that need traceable links back to input measurements and fitted
+  values.
+- Advanced feedback and error-correction analysis depends on fragile mappings:
+  simulation qubits to physical qubits, readout order, shot groups, IQ
+  classification centers, detector events, and observable outputs.
 - Partial or interrupted acquisition is treated as a cleanup/debugging problem,
   not as a first-class readable lifecycle state.
+
+## Follow-Up Persona Pressures
+
+A later review of the same sample set clarified several user roles behind the
+general migration pressure:
+
+- Calibration and parameter stewardship is current daily work, not only future
+  automation. Single-qubit calibration, two-qubit gate calibration, readout
+  optimization, feedback tuning, crosstalk work, and hardware bring-up all need
+  evidence capture before Fricon owns execution.
+- Effective configuration selection is a user problem. When dated parameter
+  files, registry backups, lock files, wiring sheets, generated line/chip
+  summaries, and temporary sidecars coexist, Fricon should help record which
+  state was selected and warn when the context is ambiguous or stale.
+- Analysis and reporting users need provenance for secondary artifacts. Fit
+  results, plots, spreadsheet rows, presentation slides, and derived data files
+  should cite the measurement, selected parameters, code/procedure context, and
+  any manual judgment they depend on.
+- Advanced experiment analysts need mapping and classification provenance.
+  Feedback or error-correction workflows should preserve supplied
+  sim-to-physical mappings, readout classification inputs, retraining notes,
+  shot grouping, detector/observable formatting, and manual inspection flags.
+- Measurement stack authors are a distinct current role. They maintain scan
+  helpers, pulse rules, runner integrations, plotting utilities, and report
+  generators that other users run without understanding every dependency.
 
 ## Lessons For Fricon
 
@@ -57,6 +93,13 @@ Fricon should make the following facts first-class for new work:
 - Passive setup and procedure summaries.
 - Run-bound local configuration snapshots or summaries for selected parameter,
   registry, wiring, line/chip, demod/readout, and runner configuration.
+- Effective-configuration selection notes and ambiguity/staleness warnings when
+  several local files or generated sidecars could plausibly explain a run.
+- Optional procedure context for hardware bring-up, instrument calibration,
+  readout classification, sim-to-physical mapping, and other unmanaged routine
+  facts supplied by the user or integration.
+- Links from derived artifacts and reports back to the measurements,
+  parameters, code/procedure context, and fitted values they used.
 - Measurement-centered export that carries semantic context, not just bytes.
 
 The MVP should still avoid LabRAD emulation, old-history import, broad device
@@ -81,6 +124,9 @@ The samples also point beyond the MVP replacement loop:
   review, with before/after diffs and rollback targets where practical.
 - Analysis and calibration records should provide evidence for trust decisions
   and proposed parameter changes before they become automation inputs.
+- Report and derived-artifact records should preserve both visual outputs and
+  numeric rationale, including anomaly/status labels when supplied by analysis
+  tools.
 - Calibration automation should use chain-scoped working refs or staged
   proposals instead of directly rewriting durable named parameter refs or
   generated config files.

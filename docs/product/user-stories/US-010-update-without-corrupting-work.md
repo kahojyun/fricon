@@ -10,9 +10,9 @@ EPIC-001: Local setup and data-library adoption.
 
 ## Story
 
-As an experimentalist, I want Fricon updates and format changes to fail safely
-so that measurement work is not corrupted by mismatched Desktop, local runtime,
-CLI, Python SDK, or library versions.
+As a Local Measurement System Maintainer, I want Fricon updates and format
+changes to fail safely so that measurement work is not corrupted by mismatched
+Desktop, local runtime, CLI, Python SDK, or library versions.
 
 ## Success Criteria
 

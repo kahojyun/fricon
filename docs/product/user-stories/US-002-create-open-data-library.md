@@ -10,9 +10,9 @@ EPIC-001: Local setup and data-library adoption.
 
 ## Story
 
-As an experimentalist, I want to create or open one local Fricon data library
-for my lab computer so that measurements, datasets, notes, and context have a
-durable home.
+As a Local Measurement System Maintainer, I want to create or open one local
+Fricon data library for a lab computer so that measurements, datasets, notes,
+and context have a durable home.
 
 ## Success Criteria
 

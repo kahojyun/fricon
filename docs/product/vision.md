@@ -60,6 +60,35 @@ Staying close to current practice does not mean freezing current practice as
 the ideal model. Post-MVP Fricon can introduce higher-provenance workflows, but
 only after the relevant facts, review boundaries, and safety model are explicit.
 
+## Adoption Strategy
+
+Fricon is intended for gradual lab adoption. A lab should be able to keep old
+runners, notebooks, LabRAD/Data Vault history, local parameter files, generated
+sidecars, and folder-based workflows while new measurement work moves into
+Fricon.
+
+This does not mean Fricon should preserve every legacy mechanism as a
+first-class product model. Legacy paths, numeric IDs, copied folders, mutable
+configuration files, generated sidecars, and notebook-local analysis should
+enter Fricon as aliases, context, attachments, summaries, or evidence. The
+canonical product model should stay centered on measurements, dataset
+artifacts, lifecycle, scan schema, provenance, selected configuration context,
+exports, and later reviewed parameter and calibration workflows.
+
+Transition features should point toward the full Fricon workflow:
+
+- legacy aliases become stable Fricon IDs
+- mutable configuration files become effective snapshots, profiles, and
+  reviewed proposals
+- copied folders become code provenance or configured measurement-code sources
+- unmanaged calibration scripts become calibration evidence and reviewed
+  parameter changes
+- notebooks, spreadsheets, and presentation decks become traceable analysis or
+  handoff artifacts rather than the system of record
+
+If a legacy need cannot fit one of these bridge forms, it should not become an
+MVP product concept without explicit product and architecture review.
+
 ## MVP Goal
 
 The MVP goal is practical: replace the simple LabRAD Data Vault/Grapher loop

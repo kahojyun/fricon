@@ -10,9 +10,9 @@ EPIC-002: New measurement logging replacement.
 
 ## Story
 
-As an experimentalist, I want concise Python-native scan plans or helpers for
-common scan and trace shapes so that Fricon data has reliable plotting
-semantics without making every script write raw schema by hand.
+As a Measurement Method Author, I want concise Python-native scan plans or
+helpers for common scan and trace shapes so that Fricon data has reliable
+plotting semantics without making every script write raw schema by hand.
 
 ## Success Criteria
 

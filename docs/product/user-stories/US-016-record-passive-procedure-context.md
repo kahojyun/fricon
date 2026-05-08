@@ -10,9 +10,9 @@ EPIC-005: Migration ergonomics and future lab scaling.
 
 ## Story
 
-As an experimentalist, I want to record an unmanaged script, external runner,
-or declared procedure summary so that the measurement has procedural context
-even before Fricon manages execution.
+As a Measurement Method Author, I want to record an unmanaged script, external
+runner, or declared procedure summary so that the measurement has procedural
+context even before Fricon manages execution.
 
 ## Success Criteria
 

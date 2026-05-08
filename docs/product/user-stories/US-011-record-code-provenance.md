@@ -10,9 +10,9 @@ EPIC-005: Migration ergonomics and future lab scaling.
 
 ## Story
 
-As an experimentalist, I want Fricon to record what it can honestly know about
-the code that produced a measurement so that later analysis can judge
-trustworthiness without pretending Fricon managed execution.
+As a Measurement Method Author, I want Fricon to record what it can honestly
+know about the code that produced a measurement so that later analysis can
+judge trustworthiness without pretending Fricon managed execution.
 
 ## Success Criteria
 
@@ -28,7 +28,8 @@ trustworthiness without pretending Fricon managed execution.
   explains selected files or settings that were active.
 - The product model leaves room for approved code releases, setup profiles,
   environment lock files, scan helpers, plot presets, export recipes, and
-  maintainer handoff without making them MVP code-management features.
+  handoff to a Local Measurement System Maintainer without making them MVP
+  code-management features.
 - Provenance can be previewed or omitted during export when it contains
   sensitive local details.
 - Corrections to provenance are visible as events.

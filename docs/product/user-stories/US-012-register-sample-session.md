@@ -10,9 +10,9 @@ EPIC-005: Migration ergonomics and future lab scaling.
 
 ## Story
 
-As an experimentalist, I want to attach optional sample or sample-session
-context to a measurement so that data is easier to interpret when sample
-identity matters, without blocking exploratory measurements.
+As a Measurement Run Operator, I want to attach optional sample or
+sample-session context to a measurement so that data is easier to interpret
+when sample identity matters, without blocking exploratory measurements.
 
 ## Success Criteria
 

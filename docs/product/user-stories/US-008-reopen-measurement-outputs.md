@@ -10,9 +10,9 @@ EPIC-004: Recovery, annotation, reopen, and export.
 
 ## Story
 
-As an experimentalist, I want to reopen a measurement or one of its dataset
-artifacts from Python by stable ID so that later analysis does not depend on
-remembering storage paths.
+As an Experimental Data Analyst, I want to reopen a measurement or one of its
+dataset artifacts from Python by stable ID so that later analysis does not
+depend on remembering storage paths.
 
 ## Success Criteria
 
