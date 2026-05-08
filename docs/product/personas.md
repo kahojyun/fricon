@@ -39,7 +39,7 @@ roles during a single day.
 
 Choose the persona that owns the story's main outcome:
 
-- P-001 Experimentalist: ordinary measurement operation and recovery.
+- P-001 Measurement Operator: ordinary measurement-run operation and recovery.
 - P-002 Fricon Technical Maintainer: Fricon deployment, local runtime health,
   diagnostics, migration support, and technical readiness.
 - P-003 Analyst: reopening, analysis, reports, derived artifacts, downstream
@@ -59,16 +59,16 @@ proposal shape, and P-003 for durable analysis or interpretation records.
 P-002 contributes technical guardrails when runtime, update, library, or
 environment safety matters.
 
-## P-001 Experimentalist
+## P-001 Measurement Operator
 
-Researchers with entry-level Python ability who run measurement scripts or
-notebooks on lab computers. They may use routines written by a more advanced
-lab member and may only know enough Python to change a scan range, select
-qubits, rerun a cell, or add a note.
+The role active when a lab user runs a measurement script or notebook on a lab
+computer. The person may be an experimentalist, student, or senior researcher,
+but this product role is limited to operating and understanding a measurement
+run.
 
 Goals:
 
-- start, watch, annotate, recover, reopen, and export measurement work
+- start, watch, annotate, recover, reopen, and export measurement runs
 - understand the active sample/session, measurement name, scan shape, units,
   and selected local context without learning Fricon internals
 - preserve useful partial results when scripts interrupt or long saves fail
@@ -83,8 +83,10 @@ Context and pressure:
 
 Common switches:
 
-- becomes P-004 when deciding whether calibration results should change working
-  parameter state
+- switches to P-004 when calibration evidence or fitted values are being judged
+  for working parameter state
+- switches to P-003 when the main work is analysis, reporting, or interpreting
+  derived artifacts after acquisition
 - depends on P-005 for reusable routines and P-002 when setup or update
   problems block measurement work
 
@@ -144,21 +146,23 @@ Context and pressure:
 Common switches:
 
 - consumes measurements produced by P-001
-- may provide evidence that P-004 uses for parameter or calibration decisions
+- switches to P-004 when analysis output becomes evidence for accepting,
+  rejecting, or rolling back calibration-derived parameter state
 - uses report/export recipes maintained by P-005
 
 ## P-004 Calibration and Parameter Steward
 
-A lab member who tunes readout, pulse, coupler, crosstalk, demodulation,
-feedback, hardware bring-up, or related parameters and decides whether fitted
-values should become the next working local configuration.
+The role active when measurement evidence and analysis outputs are evaluated
+as calibration evidence for working parameter state. This may happen before,
+during, or after calibration measurements, and the same person may also be the
+measurement operator or analyst.
 
 Goals:
 
 - decide which effective configuration or prior-good state calibration work
   depends on
-- evaluate calibration evidence, fit quality, health gates, retry/pause needs,
-  and manual inspection flags
+- evaluate calibration evidence, fitted values, health gates, retry/pause
+  needs, and manual inspection flags
 - mark calibration results as exploratory, accepted, rejected, superseded, or
   needing review, with rollback context where practical
 
@@ -173,7 +177,9 @@ Context and pressure:
 
 Common switches:
 
-- may be the same person as P-001 during daily calibration work
+- uses P-001 for the run-operation part of calibration work
+- uses P-003 when fitted outputs, plots, or derived artifacts need analysis
+  provenance before a calibration decision
 - depends on P-005 for calibration routines and code provenance
 - uses P-002 technical readiness checks when calibration proposals affect
   runtime, update, environment, or data-library compatibility
