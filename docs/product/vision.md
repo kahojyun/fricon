@@ -254,7 +254,8 @@ loops:
 - Repeat: run-like-previous drafts, reviewed parameter proposals, routine
   recipes, and audited automation after the facts are trustworthy.
 
-Implementation should follow the accepted priority ledger:
+Implementation should not treat post-MVP ordering as accepted until the product
+baseline is revalidated. The current post-MVP priority hypothesis is:
 
 - parameter system first
 - managed run second

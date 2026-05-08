@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Draft pending terminology revalidation.
 
 ## Public MVP Terms
 

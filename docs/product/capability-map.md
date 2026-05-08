@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Draft pending product-analysis revalidation.
 
 ## Vision Alignment
 

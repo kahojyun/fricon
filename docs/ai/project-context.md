@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for v0.2+ planning.
+Draft pending product-analysis revalidation.
 
 ## Start Here
 
@@ -11,10 +11,12 @@ For v0.2+ work, read:
 1. `docs/README.md`
 2. `docs/decisions/ADR-001-v02-clean-reset-boundary.md`
 3. `docs/product/vision.md`
-4. `docs/product/python-sdk-ux.md` for the Python SDK usage guideline
-5. `docs/domain/README.md`
-6. `docs/architecture/README.md`
-7. `docs/architecture/compatibility-policy.md`
+4. `docs/product/personas.md`
+5. `docs/product/product-analysis-progress.md`
+6. `docs/product/python-sdk-ux.md` for the Python SDK usage guideline
+7. `docs/domain/README.md`
+8. `docs/architecture/README.md`
+9. `docs/architecture/compatibility-policy.md`
 
 `docs/specs/` and `docs/implementation-plans/` are sentinels only
 right now. Recreate or read downstream artifacts only when implementation
@@ -23,17 +25,18 @@ explicitly marked with open interview questions.
 
 ## Product Direction
 
-Fricon is a local lab data library for scientific measurement work.
-Its long-term motivation is unified parameter management, measurement-code
-management, SDK runner capture, dataset recording, and provenance in one
-local-first product experience.
+Fricon is currently being revalidated as a local lab data library for
+scientific measurement work. Treat `product/vision.md` and
+`product/personas.md` as the strongest current product inputs. Treat
+capabilities, stories, epics, and future backlog docs as draft derived material
+until `product/product-analysis-progress.md` says they have been revalidated.
 
 Product planning uses MVP, post-MVP priority, and ADR-gated labels. Do not
 interpret post-MVP priorities as semantic-version labels; compatible additions
 may remain on the same compatible release line.
 
-Post-MVP priority order and rationale are owned by
-`product/future-concepts.md`.
+Post-MVP priority order and rationale are draft backlog material until the MVP
+product baseline is revalidated.
 
 Primary user model:
 
@@ -72,7 +75,7 @@ Fricon helps me inspect, annotate, recover, reopen, and export them.
   unless a later product decision requires it.
 - For post-MVP parameter, calibration, run-manifest, sample-visualizer, and
   setup/device reconciliation details, read `product/future-concepts.md` and
-  `product/glossary.md`.
+  `product/glossary.md` as draft backlog and terminology context.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Use events for lifecycle, notes, corrections, and audit history.

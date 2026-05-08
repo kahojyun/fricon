@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed product-level SDK usage guideline.
+Draft pending SDK experience revalidation.
 
 ## Purpose
 

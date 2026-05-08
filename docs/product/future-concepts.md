@@ -2,14 +2,14 @@
 
 ## Status
 
-Accepted post-MVP priority ledger.
+Draft pending post-MVP product revalidation.
 
 ## Purpose
 
-Preserve important post-MVP directions without letting future systems inflate
+Preserve candidate post-MVP directions without letting future systems inflate
 the MVP measurement loop.
 
-This file owns the accepted priority order for post-MVP concepts. Candidate
+This file records a prior priority order for post-MVP concepts. Candidate
 stories and requirement details live in
 `product/future-stories-and-requirements.md`.
 
@@ -17,10 +17,11 @@ These are product priority horizons, not semantic-version promises. Compatible
 capabilities may ship on the same release line as the MVP if the compatibility,
 storage, and API policies allow it.
 
-Post-MVP concepts should move Fricon toward local experiment memory and
-reviewed action. The point is to explain, compare, hand off, repeat, and safely
-automate work from recorded facts, not to imitate legacy acquisition tools or
-make device control, sample visualization, or AI the product center by itself.
+Post-MVP concepts should be revalidated after the MVP product baseline is
+settled. The intended direction is local experiment memory and reviewed action:
+explain, compare, hand off, repeat, and safely automate work from recorded
+facts, not imitate legacy acquisition tools or make device control, sample
+visualization, or AI the product center by itself.
 
 ## Promotion Rule
 

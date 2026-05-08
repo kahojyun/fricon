@@ -2,15 +2,16 @@
 
 ## Status
 
-Proposed post-MVP planning backlog.
+Draft pending post-MVP product revalidation.
 
 ## Purpose
 
 Capture candidate post-MVP user stories and product requirements before they
 become accepted product scope.
 
-These items are intentionally outside the accepted MVP. They exist so MVP
-storage, product-model, and API choices do not block likely future needs.
+These items are intentionally outside the current MVP hypothesis. They exist so
+MVP storage, product-model, and API choices do not block likely future needs
+after the MVP baseline is revalidated.
 
 This file uses priority horizons, not semantic-version labels. A compatible
 feature can still ship on the same release line as the MVP if the relevant
@@ -18,9 +19,10 @@ compatibility, storage, and API policies allow it.
 
 ## Planning Stance
 
-`product/future-concepts.md` owns the accepted post-MVP priority ledger and
+`product/future-concepts.md` records a prior post-MVP priority ledger and
 rationale. This backlog expands that ledger into candidate future epics,
-stories, and requirements.
+stories, and requirements. Treat both files as backlog context until the MVP
+product baseline is revalidated.
 
 Post-MVP work should prioritize:
 
