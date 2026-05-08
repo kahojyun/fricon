@@ -46,9 +46,8 @@ Choose the persona that owns the story's main outcome:
   diagnostics, migration support, and technical readiness.
 - P-003 Experimental Data Analyst: reopening, analysis, reports, derived
   artifacts, downstream handoff, and interpretation provenance.
-- P-004 Effective Configuration & Calibration Steward: effective
-  configuration, calibration evidence, parameter state, fitted values, and
-  rollback decisions.
+- P-004 Effective Configuration Steward: effective configuration, calibration
+  evidence, parameter state, fitted values, and rollback decisions.
 - P-005 Measurement Method Author: reusable measurement methods, script and
   routine shape, SDK usage, scan helpers, runner integration, plotting
   utilities, and report/export recipes.
@@ -167,10 +166,10 @@ Common switches:
   parameter state
 - uses report/export recipes maintained by P-005
 
-## P-004 Effective Configuration & Calibration Steward
+## P-004 Effective Configuration Steward
 
-The role active when measurement evidence and analysis outputs are evaluated
-as calibration evidence for working effective configuration or parameter state.
+The role active when measurement evidence, analysis outputs, and calibration
+results are evaluated for working effective configuration or parameter state.
 This may happen before, during, or after calibration measurements, and the same
 person may also be the measurement run operator or experimental data analyst.
 

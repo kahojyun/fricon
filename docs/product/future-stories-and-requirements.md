@@ -163,9 +163,9 @@ FEPIC-005: Calibration Chains And Reviewable Automation Workflow.
 
 FUS-001: Maintain named parameter profiles.
 
-- As an Effective Configuration & Calibration Steward, I want refs such as
-  `main`, `latest-good`, or `cooldown-2026-05` so that large parameter sets
-  have memorable identities.
+- As an Effective Configuration Steward, I want refs such as `main`,
+  `latest-good`, or `cooldown-2026-05` so that large parameter sets have
+  memorable identities.
 - Success: refs can move, but each run records the immutable snapshot revision
   actually used.
 - Success: ordinary parameters can remain flexible tree nodes; important
@@ -173,25 +173,25 @@ FUS-001: Maintain named parameter profiles.
 
 FUS-002: Bind effective parameters at run start.
 
-- As an Effective Configuration & Calibration Steward, I want a measurement to
-  capture the resolved parameter snapshot and runtime overrides so that later
-  analysis can explain the exact effective settings.
+- As an Effective Configuration Steward, I want a measurement to capture the
+  resolved parameter snapshot and runtime overrides so that later analysis can
+  explain the exact effective settings.
 - Success: overrides are separate facts with actor, time, source, and optional
   reason.
 
 FUS-003: Compare parameters across runs and proposals.
 
-- As an Effective Configuration & Calibration Steward, I want to diff two runs,
-  snapshots, or profiles so that I can find parameter drift without reading
-  JSON files by hand.
+- As an Effective Configuration Steward, I want to diff two runs, snapshots, or
+  profiles so that I can find parameter drift without reading JSON files by
+  hand.
 - Success: diffs preserve path, value, unit, source profile, override status,
   actor, and linked run or proposal.
 
 FUS-004: Promote a good run into a parameter proposal.
 
-- As an Effective Configuration & Calibration Steward, I want to turn the
-  effective settings from a successful run into a reviewed proposal so that
-  useful adjustments can become a named profile intentionally.
+- As an Effective Configuration Steward, I want to turn the effective settings
+  from a successful run into a reviewed proposal so that useful adjustments can
+  become a named profile intentionally.
 - Success: promotion records source run, changed fields, reviewer/actor, and
   approval or rejection outcome.
 - Success: promotion can cite analysis or calibration evidence when the source
@@ -281,9 +281,9 @@ FUS-011: Store and diff setup snapshots.
 
 FUS-012: Track calibration state.
 
-- As an Effective Configuration & Calibration Steward, I want calibration
-  records with source measurements, fitted values, diagnostics, health
-  decisions, and affected-run links so that questionable data can be reviewed.
+- As an Effective Configuration Steward, I want calibration records with source
+  measurements, fitted values, diagnostics, health decisions, and affected-run
+  links so that questionable data can be reviewed.
 - Success: records can distinguish sample/control-parameter calibration from
   instrument/device calibration.
 - Success: unhealthy or out-of-family task results can pause a calibration
@@ -328,10 +328,9 @@ FUS-014: Review and apply automation proposals.
 
 FUS-015: Use parameter row keys as visual targets.
 
-- As an Effective Configuration & Calibration Steward, I want parameter table
-  row keys to carry enough user-defined target identity that a sample
-  visualization can locate objects without Fricon imposing a sample-component
-  ontology.
+- As an Effective Configuration Steward, I want parameter table row keys to
+  carry enough user-defined target identity that a sample visualization can
+  locate objects without Fricon imposing a sample-component ontology.
 - Success: a row key can be matched to a user-authored sample-map config, DSL,
   or lab script when such a view exists.
 - Success: color maps and numeric labels can be derived from parameter snapshot
@@ -394,10 +393,10 @@ FUS-019: Record measurement intent and outcome.
 
 FUS-020: Run a bootstrap calibration chain with health gates.
 
-- As an Effective Configuration & Calibration Steward, I want a calibration
-  sequence made of smaller calibration tasks to continue automatically through
-  healthy intermediate results, but pause, retry, or ask for review when a task
-  result looks wrong.
+- As an Effective Configuration Steward, I want a calibration sequence made of
+  smaller calibration tasks to continue automatically through healthy
+  intermediate results, but pause, retry, or ask for review when a task result
+  looks wrong.
 - Success: each task records source measurements, analysis attempts, fitted
   values, generated sidecars or derived artifacts where relevant, affected
   parameter paths, code context, task status, and health assessment.

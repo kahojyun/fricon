@@ -10,10 +10,10 @@ EPIC-005: Migration ergonomics and future lab scaling.
 
 ## Story
 
-As an Effective Configuration & Calibration Steward, I want to bind selected
-local configuration files, references, hashes, or summaries to a measurement so
-that later analysis can explain which lab-local state was active without
-reading copied folders by hand.
+As an Effective Configuration Steward, I want to bind selected local
+configuration files, references, hashes, or summaries to a measurement so that
+later analysis can explain which lab-local state was active without reading
+copied folders by hand.
 
 ## Success Criteria
 
