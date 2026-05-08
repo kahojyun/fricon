@@ -87,23 +87,21 @@ CAP-005: Dataset artifact recording.
 
 CAP-006: Dataset scan semantics.
 
-- Promise: plotted datasets carry explicit scan or trace meaning instead of
-  relying on column-position guesses.
-- Includes: variable roles, labels, units, dependencies, axis structure,
-  partial grids, irregular/adaptive points, logical step records, per-step
-  parameters, selectable log or trace collections, fixed-shape traces, and
-  variable-length traces.
-- Excludes: requiring every advanced acquisition to fit a regular grid or
-  requiring optional units and labels when the schema remains interpretable.
+- Promise: plotted datasets carry enough schema for slicing and plotting
+  without relying on column-position guesses.
+- Includes: variable roles, dependencies, axis structure, partial grids,
+  irregular/adaptive points, logical step records, per-step parameters,
+  selectable trace collections, fixed-shape traces, and variable-length traces.
+- Excludes: requiring every advanced acquisition to fit a regular grid, or
+  blocking writes only because optional units or labels are absent.
 
 CAP-007: Nonblocking live inspection.
 
 - Promise: Desktop can watch active data without slowing or breaking acquisition
   writes.
-- Includes: live events, line/scatter plot, basic heatmap, selected output
-  channel or log viewing, simple trace inspection, stale/lag indicators, and
-  product support for watching multiple relevant measurement or data views at
-  once.
+- Includes: live events, line/scatter plot, basic heatmap, selected output or
+  trace views, simple trace inspection, stale/lag indicators, and product
+  support for watching multiple relevant measurement or data views at once.
 - Excludes: live consumers as required write acknowledgements, running user
   plotting code, and making full table browsing the primary live monitor
   surface.
@@ -276,7 +274,7 @@ CAP-026: Dataset artifact discovery and direct open.
 - Promise: dataset artifacts remain searchable and directly openable even when
   the Desktop home is measurement-first.
 - Includes: stable artifact IDs, measurement context, search/open entry points,
-  and direct navigation to table or plot views.
+  and direct navigation to selector, plot, or trace views.
 - Excludes: returning to a dataset-first product model.
 
 CAP-027: Passive setup and environment summary.
@@ -292,9 +290,10 @@ CAP-028: Python-native scan plans plus raw schema escape hatch.
 
 - Promise: common scan shapes are easy to declare in ordinary Python while
   uncommon schemas remain possible.
-- Includes: a low-ceremony scan-plan shape for common 1D, 2D, N-D, and trace
-  cases; dict/literal-friendly authoring where useful; optional convenience
-  helpers; and raw schema construction for advanced users.
+- Includes: low-ceremony scan/schema authoring for common 1D, 2D, N-D,
+  irregular step-record, and trace cases; dict/literal-friendly authoring where
+  useful; optional convenience helpers; and raw schema construction for
+  advanced users.
 - Excludes: a fixed framework-specific helper name, a framework-specific
   parameter-object model, treating first-draft helper syntax as accepted
   without usage feedback, a visual sweep builder, or a managed execution plan.
@@ -315,7 +314,7 @@ CAP-030: Migration ergonomics for Data Vault-style new measurement scripts.
 - Includes: natural mapping for independent/dependent variables, labels, units,
   legends, old path aliases, numbered legacy titles as metadata, and migration
   guide examples for non-obvious shapes such as N-D sweeps, coarse/fine trace
-  collections, and irregular optimizer logs.
+  collections, and irregular optimizer records.
 - Excludes: a LabRAD compatibility server, LabRAD-dependent helper module,
   built-in Data Vault parser, or old history browser.
 
@@ -327,8 +326,9 @@ CAP-031: Run manifest and failure investigation.
   calibration evidence, generated sidecars, review decisions, and handoff
   state.
 - Boundary: a run manifest is a composite view over available facts, not a
-  duplicate owner of parameter, code, setup, analysis, or artifact records. The
-  first slice supports compare, handoff, export, and anomaly investigation.
+  duplicate owner of parameter, code, setup, analysis, or artifact records.
+  Initial adoption should record facts that later support compare, handoff, and
+  anomaly investigation without accepting a run-manifest model yet.
 
 CAP-032: Routine recipes and reviewed replay.
 

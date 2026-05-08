@@ -111,9 +111,9 @@ The full initial adoption slice also needs US-009 for export, US-017/US-018 to
 validate the incremental adoption posture, and US-019 to make copied local
 configuration visible. Users should be able to translate new Data Vault-style
 scripts, keep old history in the old system, and bind the run-relevant files or
-summaries that old scripts currently leave in folders and operator memory.
-Translation means a small explicit rewrite of the recording section, not a
-built-in LabRAD compatibility layer.
+summaries that old scripts currently leave in folders and operator memory. This
+means a small explicit rewrite of the recording section, not a built-in LabRAD
+compatibility layer.
 
 Python SDK UX is part of the product story, not only implementation detail.
 The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;

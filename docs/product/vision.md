@@ -6,23 +6,20 @@ High-confidence product input; derived scope pending revalidation.
 
 ## Thesis
 
-Fricon is a local lab data library and automation foundation for scientific
-measurement work.
+Fricon is a local lab data library for scientific measurement work.
 
-The near-term product replaces the fragile Data Vault/Grapher-centered loop
-for new interactive measurement work with a maintained local system for
-recording, monitoring, reopening, and exporting experiment data. The long-term
-product should become the lab's local experiment memory and reviewed action
-layer: a system of record for measurement intent, effective parameters, code
-provenance, setup state, analysis attempts, trust decisions, handoff, and
+The first product target is a maintained replacement for the fragile
+Data Vault/Grapher-centered loop around new interactive measurements. The
+long-term product should become the lab's local experiment memory and reviewed
+action layer: a system of record for measurement intent, effective parameters,
+code provenance, setup state, analysis attempts, trust decisions, handoff, and
 reviewed replay.
 
 ## Problem Statement
 
-For the initial adoption slice, Fricon replaces the fragile
-Data Vault/Grapher-centered measurement loop with a maintained local system for
-recording, monitoring, reopening, and exporting new interactive experiment
-data.
+For initial adoption, Fricon helps users record, monitor, reopen, and export
+new interactive experiment data without relying on unmaintained LabRAD
+Data Vault/Grapher behavior or notebook-only reconstruction.
 
 ## Planning Language
 
@@ -50,48 +47,23 @@ decision is recorded.
 Physical measurement work is hard to make reliable when data, parameters,
 measurement code, setup state, notes, and later analysis live in separate tools
 or informal files. Existing frameworks can help users collect data, but they
-often leave the broader experiment record to conventions that are difficult to
-inspect, compare, migrate, or automate. Fricon should replace not only the
-write-to-logger step, but also the informal folder discipline around copied
-measurement code, mutable local JSON configuration, setup sidecars, and later
-analysis handoff.
+often leave the broader experiment record to folder conventions, copied code,
+mutable JSON files, sidecars, notebooks, and operator memory.
 
-The adoption pain is not that notebook-based exploration is inherently wrong.
-Interactive scripts and notebooks can be the comfortable way to try an
-experiment. The failure appears when useful work has to survive beyond one
-person, one lab computer, one copied code folder, one Conda environment, or one
-uninterrupted storage session. Multiple machines may contain similar-looking
-measurement-code folders, waveform helpers, and analysis utilities whose real
-differences are hard to identify. Collaboration then depends on personal
-discipline instead of a maintained product model.
+Notebook-based exploration is not the problem. It is often the most comfortable
+way to try an experiment. The failure appears when useful work has to survive
+beyond one person, one lab computer, one copied code folder, one Conda
+environment, or one uninterrupted storage session.
 
-Fricon should give experimenters one local-first product model for defining,
-running, inspecting, explaining, and reusing measurement work. The long-term
-aim is not only to store results, but to make the relationship between a
-measurement, its datasets, its Python code, its context, and its later
-interpretation explicit enough for humans and future automation to trust.
+Fricon should give experimenters a local-first product model for recording,
+inspecting, explaining, and reusing measurement work. The long-term center is
+trustworthy experiment memory and reviewed reuse, not device control, sample
+visualization, or AI by itself.
 
-The highest-value later lesson from legacy workflows is the code-and-parameter
-management loop: copied code, mutable local configuration, generated sidecars,
-and notebook-local analysis make calibration hard to trust. Fricon should first
-make the recorded facts durable enough to explain, compare, hand off, repeat,
-and then safely automate work.
-
-The long-term center is not device control, sample visualization, or AI by
-itself. Those capabilities matter when they serve trustworthy experiment
-memory, reviewable changes, and safer reuse. Strategic follow-on ordering is a
-draft hypothesis in `product/future-concepts.md`; future terminology lives in
-`product/glossary.md`.
-
-The product should stay close to how experimentalists already work: Python
-scripts and notebooks remain first-class, local lab computers remain useful
-without a server account model, and higher-provenance workflows grow from the
-same core experience instead of becoming a separate system.
-
-Staying close to current practice does not mean freezing current practice as
-the ideal model. Later Fricon slices can introduce higher-provenance workflows,
-but only after the relevant facts, review boundaries, and safety model are
-explicit.
+The product should stay close to current practice: Python scripts and notebooks
+remain first-class, local lab computers remain useful without a server account
+model, and higher-provenance workflows grow from recorded facts and explicit
+review boundaries.
 
 ## Adoption Strategy
 
@@ -108,16 +80,17 @@ canonical product model should stay centered on measurements, dataset
 artifacts, lifecycle, scan schema, provenance, selected configuration context,
 exports, and later reviewed parameter and calibration workflows.
 
-Transition features should point toward the full Fricon workflow:
+Transition features should point toward later Fricon workflows:
 
 - legacy aliases become stable Fricon IDs
-- mutable configuration files become effective snapshots, profiles, and
-  reviewed proposals
-- copied folders become code provenance or configured measurement-code sources
-- unmanaged calibration scripts become calibration evidence and reviewed
-  parameter changes
-- notebooks, spreadsheets, and presentation decks become traceable analysis or
-  handoff artifacts rather than the system of record
+- selected mutable configuration files become run-bound context first, and may
+  later become effective snapshots, profiles, or reviewed proposals
+- copied folders become honest code provenance first, and may later become
+  configured measurement-code sources
+- unmanaged calibration scripts remain ordinary measurements first, and may
+  later become calibration evidence or reviewed parameter changes
+- notebooks, spreadsheets, and reports may become traceable analysis or
+  handoff artifacts later, but they are not first-slice reporting scope
 
 If a legacy need cannot fit one of these bridge forms, it should not become an
 initial adoption concept without explicit product and architecture review.
@@ -153,15 +126,15 @@ Fricon should help a researcher answer:
 - Can I analyze the exported result on another computer without recreating the
   acquisition runtime?
 
-Strategic follow-on slices should also help answer:
+Strategic follow-on slices can later help answer:
 
 - What changed since the previous good run?
 - Why did this run succeed, fail, or become questionable?
 - Which parameter, setup, code, analysis, or calibration facts explain the
   difference?
 - Which code source and parameter snapshot did this calibration depend on?
-- Did each calibration task look healthy, need retry, pause for review, or
-  produce fitted parameters that should update a parameter snapshot/profile?
+- Did calibration evidence look healthy, need retry, pause for review, or
+  justify a proposed parameter update?
 - For a managed routine, what setup or device state was desired, what was
   already current, what did Fricon plan to change, and what actually happened?
 - What did we conclude from this measurement?
@@ -191,11 +164,11 @@ The Python SDK is a primary user experience, not only an implementation API.
 Most experimentalists will define and run measurements through Python scripts
 or notebooks, so SDK ergonomics are product requirements.
 
-At the vision level, the SDK should feel like ordinary Python with low
+For initial adoption, the SDK should feel like ordinary Python with low
 ceremony: a visible notebook context, natural interactive unmanaged runs,
-importable managed-run entry points for higher provenance, Python-native
-scan-plan authoring for routine scans, and public reopen/export APIs for later
-analysis.
+Python-native scan/schema authoring, and public reopen/export APIs for later
+analysis. Importable managed-run entry points are strategic follow-on, not part
+of the first-slice migration promise.
 
 For the first adoption slice, migration from Data Vault-style scripts should
 mean a simple rewrite of the recording section, not emulation of LabRAD or its
@@ -228,9 +201,9 @@ copies or machine-local working trees. Fricon should not claim automatic
 notebook capture, approved code releases, deployment, immutable code snapshots,
 or managed execution.
 
-Strategic follow-on code management should grow toward configured measurement
+Strategic follow-on code management can grow toward configured measurement
 code sources, approved update flows, importable managed-run entry points, and
-code snapshots only after the product facts and review boundaries are clear.
+code snapshots after the product facts and review boundaries are clear.
 
 ## Initial Adoption Scope
 
@@ -245,13 +218,13 @@ To meet the initial adoption goal, the first adoption slice should include:
 - step or record datasets for irregular workflows such as minimizers, adaptive
   scans, and instrument-driven coarse/fine passes where each step may carry
   parameters and one or more scalar, array, or trace results
-- selectable collections of logs or traces so users can compare coarse/fine
+- selectable trace or output collections so users can compare coarse/fine
   passes or variable-length optimizer traces without hard-coding those
   experiment types into the product model
 - low-ceremony scan-plan/schema authoring for common scans and traces, plus a
   raw schema escape hatch for advanced cases
 - nonblocking live monitor views for current 1D line/scatter, 2D heatmap, and
-  selected output channels or logs
+  selected outputs or traces
 - richer historical browsing and selector views that do not need to be live
   auto-refresh surfaces
 - measurement lifecycle, notes, events, favorites/pins, trash/recover, and
@@ -316,8 +289,8 @@ work starts:
 
 ## Strategic Follow-On Direction
 
-At the vision level, strategic follow-on work should extend the facts recorded
-during initial adoption into three user loops:
+Strategic follow-on work should extend the facts recorded during initial
+adoption into three user loops:
 
 - Explain: run manifests, parameter/code/setup provenance, lifecycle evidence,
   analysis attempts, and failure or anomaly investigation.

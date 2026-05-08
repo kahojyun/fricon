@@ -20,17 +20,19 @@ shapes that would be expensive to change after users build habits around them.
 
 ## Usage Stance
 
-Fricon should feel like ordinary Python with a small number of explicit product
-concepts:
+For initial adoption, Fricon should feel like ordinary Python with a small
+number of explicit product concepts:
 
 - a visible notebook context for the current local library and lab context
 - an interactive unmanaged path for exploratory runs
-- an importable decorated managed-run path for higher provenance
 - a lightweight way to bind selected local configuration context to a run
 - Python-native scan-plan authoring for routine scans
 - public reopen/export APIs for later analysis
 - a simple migration path where Data Vault-style scripts rewrite the recording
   section instead of depending on a LabRAD compatibility layer
+
+Importable managed-run entry points are a strategic follow-on SDK direction,
+not part of the first-slice migration promise.
 
 The notebook-friendly reusable context/handle style is part of the product
 experience: a user should be able to establish the current local library and
@@ -76,10 +78,9 @@ control, and Fricon records measurements, datasets, notes, lifecycle, and
 honest provenance as the script runs. This keeps notebooks, debugging, and
 manual device work natural.
 
-When users want higher provenance, they should be able to move selected code
-into an importable managed-run entry point. The same measurement logic should
-remain normal Python that can be reviewed and tested, but Fricon can run it
-under management when the user opts in.
+Strategic follow-on managed runs should let users move selected code into
+importable entry points while keeping the measurement logic normal Python. That
+later path should not make managed execution mandatory for exploratory scripts.
 
 Routine scans should not force users to build schemas by hand. A Python-native
 scan plan should make common scan shapes concise while still leaving manual
@@ -98,7 +99,8 @@ ceremony should be justified by one of these user-visible benefits:
 - selecting or inspecting the current library and lab context
 - creating a real measurement rather than a loose file or anonymous table
 - declaring scan shape so live and historical plots know what the axes mean
-- choosing unmanaged versus managed execution honestly
+- labeling unmanaged execution honestly, and later choosing managed execution
+  only when that feature exists
 - binding selected local configuration context when copied files or sidecars
   explain the run
 - reopening or exporting results through stable public APIs
@@ -151,7 +153,7 @@ result = fc.run_scan(
 )
 ```
 
-Importable managed-run entry point:
+Strategic follow-on managed-run sketch:
 
 ```python
 import fricon as fc

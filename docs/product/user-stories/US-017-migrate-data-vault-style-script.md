@@ -25,7 +25,7 @@ experiment stack.
   independent/dependent variable setup can be translated without rewriting the
   whole hardware runner.
 - Migration documentation covers non-obvious patterns, such as N-D scans,
-  VNA-like coarse/fine trace collections, and minimizer-style irregular logs,
+  VNA-like coarse/fine trace collections, and minimizer-style irregular records,
   rather than many near-duplicate 1D and 2D examples.
 - Labels, units, legends, source aliases, original paths, and old numbered
   titles can be recorded without becoming primary identity.

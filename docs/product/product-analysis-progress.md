@@ -80,6 +80,7 @@ Downstream material not ready for implementation use:
 | Risks and assumptions | Partial | Add an explicit assumption and validation register. |
 | Validation plan | Missing | Define interviews, prototype checks, and migration-script trials. |
 | Product requirements | Not implementation-ready | Derive later from accepted journeys, stories, capabilities, and validation results. |
+| Older backlog review | Partial | Keep strategic follow-on docs as backlog only; revalidate managed run, calibration, Git-heavy provenance, report artifacts, and generic export formats before promoting them. |
 | Domain analysis | Deferred | Start only after the product analysis baseline is stable. |
 | Architecture inputs | Deferred | Start only after product and domain baselines are stable. |
 

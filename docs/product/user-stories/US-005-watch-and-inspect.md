@@ -17,8 +17,8 @@ inspection views so that I can decide whether a measurement is working.
 
 - Desktop starts from a measurement console.
 - Live views are noncritical consumers and cannot block writes.
-- Core live monitor views are line/scatter, basic heatmap, selected output
-  channel or log views, and simple trace inspection.
+- Core live monitor views are line/scatter, basic heatmap, selected outputs,
+  and simple trace inspection.
 - Selector or index views can show scan parameters, timestamps, and dataset or
   trace choices without making raw table browsing the primary monitor
   experience.

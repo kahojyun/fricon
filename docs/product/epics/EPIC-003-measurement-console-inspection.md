@@ -14,10 +14,10 @@ actions.
 
 - Measurement-first console.
 - Active and recent measurement list.
-- Live monitor views for line/scatter, basic heatmap, selected output channel
-  or log views, and simple trace inspection.
+- Live monitor views for line/scatter, basic heatmap, selected outputs, and
+  simple trace inspection.
 - Selector or index views for choosing datasets, scan parameters, timestamps,
-  and trace/log records.
+  and trace records.
 - Ability to keep multiple relevant measurement, monitor, plot, or trace views
   visible while acquisition continues.
 - Dataset direct-open entry points.
