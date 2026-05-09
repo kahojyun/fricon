@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft pending product-analysis revalidation.
+Draft pending product-analysis revalidation; first interview pass added.
 
 ## Purpose
 
@@ -16,14 +16,87 @@ acceptance details.
 Install and set up
   -> create/open data library
   -> optionally set sample/session context
-  -> run Python measurement
-  -> record dataset artifacts
+  -> run unmanaged Python measurement
+  -> declare scan, step, array, or trace shape
+  -> record dataset artifacts incrementally
   -> inspect live
   -> finish/recover
-  -> annotate
+  -> annotate or bind selected local context
   -> reopen in Python
   -> export
 ```
+
+## Candidate Initial Adoption Journey
+
+This journey is based on the first interview pass and redacted legacy sample
+pressure. It is still draft; it should guide the next interview pass before
+capabilities are rederived.
+
+The concrete first-adoption case is a simple VNA S21 measurement. The user
+keeps existing instrument calls, waveform generation, notebooks, local
+parameter files, plotting utilities, and calibration helpers outside Fricon.
+Fricon takes over the maintained measurement-data loop: record a measurement,
+write dataset artifacts, show enough live inspection, preserve partial data,
+reopen outputs from Python, and export a portable result for analysis.
+
+The normal run shape is:
+
+1. A user starts from an ordinary Python notebook or script and opens a local
+   Fricon library.
+2. The user optionally selects minimal context, such as a sample, cooldown,
+   session, or human-readable note. Physical setup details are helpful
+   evidence, but not required to start the run.
+3. The script creates an unmanaged measurement and declares the expected data
+   shape. For the VNA case, outer sweep axes may include DC voltage and VNA
+   power, while each row carries a trace with its own frequency axis and S21
+   values.
+4. The script appends data durably as acquisition proceeds. First-adoption
+   dataset shapes must cover regular grids, partial grids, trace-valued
+   records, IQ averages or I/Q channels, single-shot arrays or labels, and
+   irregular minimizer steps.
+5. Desktop live inspection shows the latest useful view without becoming part
+   of the write path. Essential views are recent 1D lines, basic 2D heatmaps,
+   selected trace inspection, and IQ scatter plots for single-shot/readout
+   work.
+6. If the script stops, crashes, or is interrupted, data already written stays
+   readable through the browser/viewer and public read APIs. Fricon should not
+   hide partial state or silently discard written records.
+7. The user can attach selected local context such as parameter files,
+   registry files, wiring references, demod/readout settings, script labels, or
+   notes. These are evidence for interpretation, not a guarantee that Fricon
+   knows the physical setup or wiring is current.
+8. Later, an analyst opens the measurement or dataset by stable ID, ideally by
+   copying a reader snippet from the UI. The minimum useful read result is a
+   table or table-like object containing sweep parameters and measured results,
+   plus access to preserved attached files.
+9. Export remains a handoff path for analysis on another computer. The first
+   export promise is a portable Fricon package plus reader APIs, not broad
+   report generation or legacy-system import.
+
+The first success standard is reliability and easy reopen: Fricon is worth
+continuing to use if it can keep running, record measurement identity and
+produced data, preserve written partials, show the data in a browser/viewer,
+and provide copyable Python reader snippets for measurements and datasets.
+
+## Backbone Implications From Interview
+
+- Dataset artifacts must cover trace-valued outputs, not only scalar dependent
+  columns. VNA frequency is often an inner trace coordinate, while bias, power,
+  or other settings may be outer sweep axes or run metadata.
+- Complex-like values are common in readout and VNA workflows. First adoption
+  may store them as explicit I/Q or magnitude/phase channels if that keeps
+  reading and plotting clear, but the product language should not pretend they
+  are ordinary scalar-only measurements.
+- IQ scatter is a native inspection need, especially for single-shot data and
+  readout classification work.
+- Optimizer or minimizer traces should be easy to record as irregular step
+  records. Legacy print-only optimizer evidence is a migration pain point.
+- Setup, wiring, and mutable configuration are useful context but weak truth
+  sources. The initial slice should preserve selected files and summaries,
+  show ambiguity or staleness where possible, and avoid claiming device-control
+  or reproducibility guarantees.
+- The UI must treat copyable reader snippets as a first-adoption product
+  affordance, not only a developer convenience.
 
 ## Initial Adoption Product Epics
 
