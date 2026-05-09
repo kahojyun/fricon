@@ -101,8 +101,9 @@ CAP-007: Nonblocking live inspection.
 - Promise: Desktop can watch active data without slowing or breaking acquisition
   writes.
 - Includes: live events, line/scatter plot, basic heatmap, selected output or
-  trace views, simple trace inspection, stale/lag indicators, and product
-  support for watching multiple relevant measurement or data views at once.
+  trace views, simple trace inspection, complex-aware views where schema
+  supports them, stale/lag indicators, and product support for watching
+  multiple relevant measurement or data views at once.
 - Excludes: live consumers as required write acknowledgements, running user
   plotting code, and making full table browsing the primary live monitor
   surface.
@@ -127,9 +128,11 @@ CAP-010: Python reopen through stable IDs and public APIs.
 - Promise: Python can reopen measurements, dataset artifacts, and exports
   without depending on storage paths.
 - Includes: stable IDs, typed read APIs, schema-aware reads, partial-data
-  semantics, Desktop-visible snippets, and analysis-friendly reads into common
-  Python objects such as NumPy, pandas, or Polars where appropriate.
-- Excludes: path-based storage contracts and private file layout coupling.
+  semantics, fast ID copy, Desktop-visible snippets, and analysis-friendly
+  reads into common Python objects or views such as NumPy, pandas, Polars, or
+  xarray-like labeled arrays where appropriate.
+- Excludes: path-based storage contracts, private file layout coupling, and
+  committing the internal storage model to a specific analysis framework.
 
 CAP-011: Measurement-centered export.
 
@@ -277,7 +280,8 @@ CAP-026: Dataset artifact discovery and direct open.
 - Promise: dataset artifacts remain searchable and directly openable even when
   the Desktop home is measurement-first.
 - Includes: stable artifact IDs, measurement context, search/open entry points,
-  and direct navigation to selector, plot, or trace views.
+  right-click or keyboard shortcut copy actions, and direct navigation to
+  selector, plot, or trace views.
 - Excludes: returning to a dataset-first product model.
 
 CAP-027: Passive setup and environment summary.

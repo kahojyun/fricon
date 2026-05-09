@@ -20,7 +20,11 @@ data I need to inspect or analyze.
 - Direct-open routes show the artifact with its parent measurement context.
 - Table and plot views can start from the artifact, not only from the parent
   measurement.
+- Dataset rows and detail pages support fast stable-ID copy through a
+  right-click menu and keyboard shortcut.
 - Reopen snippets can target a dataset artifact when that is the useful unit.
+- Reader, export, or plot snippets may live in an advanced menu if stable-ID
+  copy is the common fast path.
 
 ## Not In Scope
 

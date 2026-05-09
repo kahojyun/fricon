@@ -2,8 +2,8 @@
 
 ## Status
 
-Draft pending product-analysis revalidation; first and second interview passes
-added.
+Draft pending product-analysis revalidation; first through third interview
+passes added.
 
 ## Purpose
 
@@ -29,7 +29,7 @@ Install and set up
 
 ## Candidate Initial Adoption Journey
 
-This journey is based on the first two interview passes and redacted legacy
+This journey is based on the first three interview passes and redacted legacy
 sample pressure. It is still draft; it should guide story recheck before
 capabilities are rederived.
 
@@ -72,6 +72,10 @@ The normal run shape is:
    path should make stable IDs easy to copy, preferably with keyboard
    shortcuts. Reader snippets remain useful, but can live behind an advanced
    menu once the normal analysis code only needs the input ID to change.
+   Reader APIs should offer natural views for the analysis task: nested trace
+   records for trace-aware tables, expanded or long tables for row-oriented
+   tools, ndarray-like shot data for IQ analysis, and labeled array views when
+   traces are rectangular enough.
 9. Export remains a handoff path for analysis on another computer. The first
    export promise is a portable Fricon package plus reader APIs, not broad
    report generation or legacy-system import.
@@ -105,6 +109,11 @@ Fast stable-ID copy is the minimum copy affordance for first adoption.
 - The UI must treat stable-ID copy as a first-adoption product affordance, not
   only a developer convenience. Richer reader, export, or plot snippets can be
   advanced actions.
+- Reopen/read APIs should expose multiple analysis views when the dataset
+  shape calls for them, rather than forcing all trace, IQ, and minimizer data
+  into one table convention.
+- First adoption can keep context attachments as a plain list. Attachment role
+  taxonomy is not yet justified by the initial adoption journey.
 
 ## Initial Adoption Product Epics
 

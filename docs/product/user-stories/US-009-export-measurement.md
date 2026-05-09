@@ -27,7 +27,8 @@ library or importing the data first.
 - Sensitive provenance is previewed or opt-in, including local paths, code
   details, environment summaries, source computer labels, setup details, and
   extended sample metadata.
-- Python can open the bundle directly.
+- Python can open the bundle directly through reader views consistent with
+  local reopen APIs where practical.
 - A read-only Desktop bundle viewer remains useful product pressure, but full
   viewer polish can follow after the write/reopen/export loop works.
 

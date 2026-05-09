@@ -26,6 +26,9 @@ without reading copied folders by hand.
   routine measurements.
 - Fricon preserves and returns attached files in their original user-supplied
   form.
+- A plain attachment list is enough for first adoption; role labels such as
+  trusted evidence, user-provided context, or opaque attachment can wait for
+  stronger product evidence.
 - Fricon records enough source identity to distinguish a copied file, a source
   path reference, a content hash, and a user-entered summary.
 - Fricon can provide simple text preview or a way to open files in an external
@@ -42,6 +45,7 @@ without reading copied folders by hand.
 
 - Automatic tracing of every file a script reads.
 - Whole-notebook capture as the normal first-slice provenance mechanism.
+- Attachment role taxonomy as a first-slice requirement.
 - Parsing or normalizing arbitrary user parameter files.
 - Judging freshness or correctness of opaque setup, wiring, or instrument
   context from file contents alone.

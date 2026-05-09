@@ -26,7 +26,7 @@ The most carefully reviewed current inputs are:
   user-supplied sample codebase review.
 - `product/personas.md`, refined from the same case-study pressure and current
   product-role thinking.
-- a first interview pass on the initial adoption journey, using a simple VNA
+- three interview passes on the initial adoption journey, using a simple VNA
   S21 scan and related readout/minimizer cases as redacted case evidence.
 
 Other product documents should be treated as draft derived material until they
@@ -70,11 +70,11 @@ Downstream material not ready for implementation use:
 | --- | --- | --- |
 | Problem framing | Strong; sharpened around maintained Data Vault/Grapher replacement for new interactive work | Rebuild the initial adoption story backbone from this framing. |
 | User and role analysis | Strong current baseline with first-adoption emphasis on P-001 and P-003 | Keep refining only when new case evidence appears. |
-| Use case discovery | In progress after two interview rounds | Recheck the draft story map and affected user stories against the VNA/readout backbone. |
+| Use case discovery | In progress after three interview rounds | Recheck the draft story map and affected user stories against the VNA/readout backbone. |
 | Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
 | Value proposition | Clear internally | Write a short external-facing value statement later. |
 | Core workflow | Candidate backbone strengthened | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
-| Story map | Draft, second interview pass added | Recheck affected epics and user stories before deriving capabilities. |
+| Story map | Draft, third interview pass added | Recheck affected epics and user stories before deriving capabilities. |
 | Capability map | Draft, mostly derived from older docs | Derive capabilities from accepted journeys and stories, then cross-check for gaps. |
 | Scope definition | Draft despite detailed text | Separate initial adoption, strategic follow-on, ADR-gated, and rejected scope after story/capability analysis. |
 | Initial adoption definition | Draft with first success standard | Accept only after the journey, story map, and supporting capabilities cohere. |
@@ -224,6 +224,89 @@ Remaining open questions:
   plain attachment list enough?
 - Which keyboard shortcuts and browser locations should expose fast stable-ID
   copy?
+
+### 2026-05-09: Initial Adoption Journey, Round 3
+
+Evidence type:
+
+- follow-up user interview focused on reader views, IQ/minimizer read shapes,
+  attachment roles, and browser copy UX
+- focused framework pressure check over common Python analysis libraries
+- redacted sample-code pressure check over legacy trace plotting,
+  heatmap-building, IQ analysis, classifier tuning, and optimizer analysis
+
+Refined product expectations:
+
+- VNA trace reading should start from user analysis tasks, not from cloning the
+  old pipeline. Important tasks include plotting selected sweep traces in one
+  line plot, combining or comparing coarse/fine trace ranges, and building 2D
+  heatmaps from sweep-plus-trace data.
+- The reader should support a natural query path for trace-bearing tables.
+  Nested table views are promising for Polars-like workflows, while pandas and
+  NumPy users may need expanded table or array-oriented views.
+- Reader APIs should expose alternate views rather than force one shape for
+  every analysis: record-centric nested trace tables, exploded trace tables,
+  sample-level long tables, ndarray-oriented views, and xarray-like views when
+  the data is rectangular enough.
+- IQ single-shot data should be easy to read as ndarray-like data with sweep
+  dimensions first and the shot dimension last where shape permits. This
+  supports SNR analysis, error-rate estimation, and classifier-parameter
+  improvement with NumPy-style processing.
+- Minimizer records can stay simpler than measurement traces. The minimum
+  useful read shape is a step table for plotting parameter and objective
+  evolution, plus a convenient best-parameter summary by outer sweep condition
+  when minimization runs inside another sweep.
+- A plain attachment list is enough for first adoption. Lightweight attachment
+  role labels can wait until evidence shows users need them.
+- Labber-like right-click menu actions plus keyboard shortcuts are a good model
+  for fast stable-ID copy in the browser.
+
+Framework pressure check:
+
+- Polars-style nested list, array, and struct data is a plausible fit for
+  record-centric trace tables with queryable nested payloads.
+- pandas is better treated as an interoperability view, often expanded or
+  indexed, rather than as the only natural home for ragged nested traces.
+- NumPy is most useful for dense arrays such as IQ shot tensors or regularized
+  trace cubes, not for all reader-facing tabular metadata.
+- xarray-like labeled data is useful when traces form rectangular
+  multidimensional arrays with shared coordinates, but it should not be the
+  only view for ragged or per-record trace axes.
+
+Sample-code pressure check:
+
+- Existing VNA analysis rebuilds heatmaps by sorting tabular rows, deriving
+  unique axes, and reshaping measured values; Fricon should make this easier
+  when schema supports it and should expose missing, duplicate, ragged, or
+  incomplete cells explicitly.
+- Coarse/fine trace use is a reader workflow: combine, compare, crop, fit, or
+  overlay trace ranges while preserving segment provenance.
+- IQ analysis often rotates and projects complex shot clouds, builds
+  histograms, fits lobes, estimates SNR/error/fidelity, and adjusts classifier
+  parameters. First adoption should make the raw shaped shot arrays and
+  scatter/histogram inspection easy; durable classifier-tuning workflows can
+  remain later analysis or derived-artifact pressure.
+- Optimizer analysis needs visible step records and selected best values more
+  urgently than a heavy optimizer-specific product model.
+
+Round 3 implications for story recheck:
+
+- US-008 should describe multiple reader views for trace, IQ, and minimizer
+  data without committing the internal storage model to Polars, pandas, NumPy,
+  or xarray.
+- US-013 should include right-click menu and keyboard shortcut copy actions for
+  stable measurement and dataset IDs.
+- US-019 should keep first adoption at a plain attachment list rather than
+  introducing attachment role taxonomy now.
+
+Remaining open questions:
+
+- Which reader views must be first-contact defaults, and which can be
+  alternate conversion methods?
+- Should trace concatenation/coarse-fine overlay be a reader helper, a Desktop
+  historical inspection action, or both?
+- Which minimizer best-value summary is general enough for first adoption:
+  last accepted point, best objective, or user-selected point?
 
 ## Downstream Guardrail
 

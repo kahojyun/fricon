@@ -22,6 +22,11 @@ inspection views so that I can decide whether a measurement is working.
 - Trace inspection can show complex-valued data through appropriate
   magnitude/phase or I/Q views when the dataset semantics support it.
 - IQ scatter is a native inspection view for single-shot or readout data.
+- Historical inspection can build basic heatmaps from sweep-plus-trace data
+  when schema supports it, while making missing, duplicate, ragged, or
+  incomplete cells visible.
+- Historical trace inspection can compare or overlay selected trace segments,
+  including coarse/fine ranges, without mutating the recorded data.
 - Selector or index views can show scan parameters, timestamps, and dataset or
   trace choices without making raw table browsing the primary monitor
   experience.

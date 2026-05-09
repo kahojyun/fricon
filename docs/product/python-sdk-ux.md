@@ -142,6 +142,26 @@ existing reader call. Full reader snippets, export-reader snippets, and plot
 snippets are still useful, but they do not need to be the fastest path if ID
 copy is reliable and discoverable.
 
+Reader APIs should provide task-oriented views rather than force one universal
+shape. Trace-bearing datasets may need a record-centric nested table for
+querying outer sweep metadata and trace payloads, an exploded trace table, an
+opt-in sample-level long table, and an xarray-like labeled view when axes are
+rectangular enough. pandas/NumPy-oriented workflows may prefer expanded tables
+or arrays, while Polars-like workflows may naturally query nested table data.
+This is reader UX pressure, not an accepted internal storage model.
+
+IQ single-shot reads should make ndarray-style analysis easy when the data is
+shape-compatible: sweep dimensions first, shot dimension last, with labels and
+metadata available for prepared states, channels, and classification context.
+Minimizer reads can be simpler: a step table for parameter/objective evolution
+and a best-parameter summary by outer sweep condition are enough for first
+adoption unless later evidence says otherwise.
+
+Trace readers should support common downstream actions without copying old
+plotting pipelines: selecting traces from a sweep, drawing several traces in
+one line plot, building 2D heatmaps from sweep-plus-trace data, and combining
+or comparing coarse/fine trace ranges while preserving source segment context.
+
 ## Illustrative Sketches
 
 These sketches are non-binding. They show the desired user feel, not accepted
