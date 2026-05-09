@@ -16,9 +16,12 @@ depend on remembering storage paths.
 
 ## Success Criteria
 
+- Desktop and CLI can copy stable measurement and dataset IDs as a fast path.
 - Desktop and CLI can show copyable Python reopen snippets.
 - Public read APIs can open measurements, dataset artifacts, and partial data
   by stable IDs.
+- Reopen snippets are allowed to be advanced actions if copying the stable ID
+  into an existing reader call is the normal analyst workflow.
 - Reopened data preserves scan schema, units, labels, lifecycle state, and
   partial-data semantics.
 - Reopened data can be converted into analysis-friendly Python objects such as

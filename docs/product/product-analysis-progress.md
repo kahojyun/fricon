@@ -70,11 +70,11 @@ Downstream material not ready for implementation use:
 | --- | --- | --- |
 | Problem framing | Strong; sharpened around maintained Data Vault/Grapher replacement for new interactive work | Rebuild the initial adoption story backbone from this framing. |
 | User and role analysis | Strong current baseline with first-adoption emphasis on P-001 and P-003 | Keep refining only when new case evidence appears. |
-| Use case discovery | In progress | Continue interview from the VNA/readout first-adoption case and resolve the open journey questions below. |
+| Use case discovery | In progress after two interview rounds | Recheck the draft story map and affected user stories against the VNA/readout backbone. |
 | Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
 | Value proposition | Clear internally | Write a short external-facing value statement later. |
-| Core workflow | Candidate backbone drafted | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
-| Story map | Draft, first interview pass added | Rebuild from the accepted story backbone and role goals after the next interview pass. |
+| Core workflow | Candidate backbone strengthened | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
+| Story map | Draft, second interview pass added | Recheck affected epics and user stories before deriving capabilities. |
 | Capability map | Draft, mostly derived from older docs | Derive capabilities from accepted journeys and stories, then cross-check for gaps. |
 | Scope definition | Draft despite detailed text | Separate initial adoption, strategic follow-on, ADR-gated, and rejected scope after story/capability analysis. |
 | Initial adoption definition | Draft with first success standard | Accept only after the journey, story map, and supporting capabilities cohere. |
@@ -152,7 +152,7 @@ Candidate success standard:
   makes the data easy to inspect in the browser/viewer, and lets the user copy
   a measurement or dataset reader snippet for later Python analysis.
 
-Open questions for the next interview pass:
+Questions carried into Round 2:
 
 - Which exact first-contact writer shape is acceptable for a VNA trace inside
   an outer voltage/power sweep?
@@ -167,6 +167,63 @@ Open questions for the next interview pass:
 - Which UI copy actions are required for first adoption: copy measurement
   reader snippet, copy dataset reader snippet, copy stable ID, or copy export
   reader snippet?
+
+### 2026-05-09: Initial Adoption Journey, Round 2
+
+Evidence type:
+
+- follow-up user interview focused on trace writing, complex values, reader
+  ergonomics, context evidence, browser display, and copy actions
+
+Refined product expectations:
+
+- A dedicated trace-writing path is preferred over forcing all trace data into
+  flat row appends. The user expects a Labber-like trace concept where a record
+  can carry trace data as explicit coordinate/value arrays or as compact
+  start/delta/value data.
+- The writer shape should handle multiple different traces within the same
+  outer sweep record.
+- Complex values should be first-class product data so Fricon can provide
+  targeted magnitude/phase views without asking users or plots to infer
+  relationships from channel naming conventions.
+- The fastest reopen path may only need a stable ID, or a small open-reader
+  snippet with the ID as the input that users edit later. After analysis code
+  stabilizes, users mostly change the input ID rather than the reopen code.
+- The most realistic run-bound context attachments are mutable parameter files
+  and instrument information. Whole-notebook capture is low-value for initial
+  adoption because outputs can bloat measurement folders, cleaning outputs is
+  hard, and the saved notebook still may not recover the variable state users
+  actually need.
+- First adoption should be skeptical about Fricon detecting stale or ambiguous
+  setup/configuration facts. If Fricon does not understand user-provided setup
+  context, it should avoid pretending it can judge freshness or correctness.
+- Fast-path UI copy should prioritize copying stable IDs, preferably with
+  keyboard shortcuts. Richer reader, export, or plot snippets can live behind
+  advanced menus.
+
+Round 2 implications for story recheck:
+
+- US-004 and US-015 should explicitly keep trace-valued records and multiple
+  traces per record in scope without accepting exact API syntax.
+- US-005 should preserve complex-aware magnitude/phase views and IQ scatter as
+  native inspection expectations.
+- US-008 should make stable ID copy a first-path action, with reader snippets
+  still useful but not required as the only normal path.
+- US-019 should avoid automatic stale/ambiguous setup judgments unless Fricon
+  has explicit evidence to support them.
+
+Remaining open questions:
+
+- Which concrete trace-reader views are needed first for VNA traces: nested
+  trace objects, table with array columns, xarray-like data, or all of these as
+  alternate views?
+- What is the minimum acceptable reader shape for IQ single-shot arrays and
+  minimizer step records?
+- Should first adoption include a lightweight context role label such as
+  trusted run evidence, user-provided context, or opaque attachment, or is a
+  plain attachment list enough?
+- Which keyboard shortcuts and browser locations should expose fast stable-ID
+  copy?
 
 ## Downstream Guardrail
 

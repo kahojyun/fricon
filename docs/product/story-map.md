@@ -2,7 +2,8 @@
 
 ## Status
 
-Draft pending product-analysis revalidation; first interview pass added.
+Draft pending product-analysis revalidation; first and second interview passes
+added.
 
 ## Purpose
 
@@ -28,8 +29,8 @@ Install and set up
 
 ## Candidate Initial Adoption Journey
 
-This journey is based on the first interview pass and redacted legacy sample
-pressure. It is still draft; it should guide the next interview pass before
+This journey is based on the first two interview passes and redacted legacy
+sample pressure. It is still draft; it should guide story recheck before
 capabilities are rederived.
 
 The concrete first-adoption case is a simple VNA S21 measurement. The user
@@ -48,8 +49,10 @@ The normal run shape is:
    evidence, but not required to start the run.
 3. The script creates an unmanaged measurement and declares the expected data
    shape. For the VNA case, outer sweep axes may include DC voltage and VNA
-   power, while each row carries a trace with its own frequency axis and S21
-   values.
+   power, while each record carries one or more traces with their own
+   coordinate axes and S21 values. The preferred product feel is a dedicated
+   trace-writing concept, not forcing users to flatten every trace point into
+   one row.
 4. The script appends data durably as acquisition proceeds. First-adoption
    dataset shapes must cover regular grids, partial grids, trace-valued
    records, IQ averages or I/Q channels, single-shot arrays or labels, and
@@ -65,10 +68,10 @@ The normal run shape is:
    registry files, wiring references, demod/readout settings, script labels, or
    notes. These are evidence for interpretation, not a guarantee that Fricon
    knows the physical setup or wiring is current.
-8. Later, an analyst opens the measurement or dataset by stable ID, ideally by
-   copying a reader snippet from the UI. The minimum useful read result is a
-   table or table-like object containing sweep parameters and measured results,
-   plus access to preserved attached files.
+8. Later, an analyst opens the measurement or dataset by stable ID. The fast
+   path should make stable IDs easy to copy, preferably with keyboard
+   shortcuts. Reader snippets remain useful, but can live behind an advanced
+   menu once the normal analysis code only needs the input ID to change.
 9. Export remains a handoff path for analysis on another computer. The first
    export promise is a portable Fricon package plus reader APIs, not broad
    report generation or legacy-system import.
@@ -77,26 +80,31 @@ The first success standard is reliability and easy reopen: Fricon is worth
 continuing to use if it can keep running, record measurement identity and
 produced data, preserve written partials, show the data in a browser/viewer,
 and provide copyable Python reader snippets for measurements and datasets.
+Fast stable-ID copy is the minimum copy affordance for first adoption.
 
 ## Backbone Implications From Interview
 
 - Dataset artifacts must cover trace-valued outputs, not only scalar dependent
   columns. VNA frequency is often an inner trace coordinate, while bias, power,
   or other settings may be outer sweep axes or run metadata.
-- Complex-like values are common in readout and VNA workflows. First adoption
-  may store them as explicit I/Q or magnitude/phase channels if that keeps
-  reading and plotting clear, but the product language should not pretend they
-  are ordinary scalar-only measurements.
+- Trace writing should be a dedicated product concept. A first-contact writer
+  should support explicit coordinate/value arrays and compact start/delta/value
+  forms where appropriate, and it should not rule out multiple different traces
+  in one outer sweep record.
+- Complex values should be first-class product data. Magnitude/phase and I/Q
+  views should be derived from known data semantics, not naming conventions
+  that users or plots must reverse-engineer.
 - IQ scatter is a native inspection need, especially for single-shot data and
   readout classification work.
 - Optimizer or minimizer traces should be easy to record as irregular step
   records. Legacy print-only optimizer evidence is a migration pain point.
 - Setup, wiring, and mutable configuration are useful context but weak truth
-  sources. The initial slice should preserve selected files and summaries,
-  show ambiguity or staleness where possible, and avoid claiming device-control
-  or reproducibility guarantees.
-- The UI must treat copyable reader snippets as a first-adoption product
-  affordance, not only a developer convenience.
+  sources. The initial slice should preserve selected files and summaries, but
+  should not claim it can detect stale or ambiguous setup context unless it has
+  explicit evidence for that judgment.
+- The UI must treat stable-ID copy as a first-adoption product affordance, not
+  only a developer convenience. Richer reader, export, or plot snippets can be
+  advanced actions.
 
 ## Initial Adoption Product Epics
 

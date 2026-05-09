@@ -27,6 +27,9 @@ number of explicit product concepts:
 - an interactive unmanaged path for exploratory runs
 - a lightweight way to bind selected local configuration context to a run
 - Python-native scan-plan authoring for routine scans
+- a dedicated trace-writing path for trace-valued records inside outer sweeps
+- first-class complex values so SDK, readers, and plots can expose meaningful
+  magnitude/phase or I/Q views from data semantics
 - public reopen/export APIs for later analysis
 - a simple migration path where Data Vault-style scripts rewrite the recording
   section instead of depending on a LabRAD compatibility layer
@@ -91,6 +94,12 @@ specific helper name or a QCoDeS-style parameter-object model. A plan may be
 dict/literal-friendly, a small helper object, a function wrapper, or a mix of
 these after usage feedback and API design are accepted.
 
+Trace-valued records need their own low-ceremony path. The product expectation
+is that a user can append an outer sweep record with one or more traces,
+including explicit coordinate/value arrays or compact regular-coordinate
+forms, without manually flattening every trace point into scalar table rows.
+The exact names and object model remain deferred.
+
 ## Low-Ceremony Expectations
 
 Every public example should be readable as ordinary Python. Fricon-specific
@@ -103,13 +112,35 @@ ceremony should be justified by one of these user-visible benefits:
   only when that feature exists
 - binding selected local configuration context when copied files or sidecars
   explain the run
-- reopening or exporting results through stable public APIs
+- reopening or exporting results through stable public APIs and stable IDs
+- copying or reusing stable IDs as the normal input users change in later
+  analysis code
 - exporting to a portable Fricon package that can be read on another computer
   with a lightweight Python reader
 
 Boilerplate that exists only for transport, storage layout, local runtime
 startup, local tokens, object graph construction, or future parameter machinery
 should stay out of first-contact examples.
+
+## Trace And Reopen Expectations
+
+Trace support is part of the SDK experience, not only a storage concern. For a
+VNA-style scan, users should be able to write an outer record such as voltage
+and power plus trace payloads whose coordinates and values are known to
+Fricon. Some traces have explicit coordinate arrays, while others are naturally
+described by a start value, delta, and value array. A record may need more than
+one trace.
+
+Complex values should be preserved as complex values at product level. First
+adoption can expose I/Q or magnitude/phase views for plotting and reading, but
+those views should come from first-class complex semantics rather than naming
+conventions.
+
+Reader ergonomics should account for stable analysis code. Users may copy a
+stable measurement or dataset ID from Desktop or CLI and paste it into an
+existing reader call. Full reader snippets, export-reader snippets, and plot
+snippets are still useful, but they do not need to be the fastest path if ID
+copy is reliable and discoverable.
 
 ## Illustrative Sketches
 

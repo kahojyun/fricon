@@ -18,6 +18,9 @@ plotting semantics without making every script write raw schema by hand.
 
 - Scan-plan authoring covers common 1D, 2D, N-D, fixed-trace,
   variable-trace, and irregular step-record cases.
+- Trace-valued scan helpers should make it natural to append one outer sweep
+  record with one or more traces, rather than forcing users to flatten every
+  trace point into scalar rows.
 - Dict/literal-friendly plans are acceptable if they keep axes, setters,
   measured values, labels, and units readable in ordinary Python.
 - The accepted simplification shape is informed by real scripts/notebooks and
@@ -29,6 +32,9 @@ plotting semantics without making every script write raw schema by hand.
 - Variable-length trace scenarios preserve each trace's own coordinate values,
   measured values, and per-trace settings instead of forcing padding,
   resampling, or a fake shared grid at write time.
+- Regular-coordinate traces can be described compactly when a start value and
+  step size are enough, while explicit coordinate arrays remain available for
+  irregular trace axes.
 - Advanced users can use raw schema when scan-plan helpers are too narrow.
 - Live and historical plots rely on schema semantics instead of column order
   guesses.

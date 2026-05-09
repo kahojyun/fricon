@@ -19,6 +19,9 @@ inspection views so that I can decide whether a measurement is working.
 - Live views are noncritical consumers and cannot block writes.
 - Core live monitor views are line/scatter, basic heatmap, selected outputs,
   and simple trace inspection.
+- Trace inspection can show complex-valued data through appropriate
+  magnitude/phase or I/Q views when the dataset semantics support it.
+- IQ scatter is a native inspection view for single-shot or readout data.
 - Selector or index views can show scan parameters, timestamps, and dataset or
   trace choices without making raw table browsing the primary monitor
   experience.

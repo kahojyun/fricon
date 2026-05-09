@@ -21,6 +21,9 @@ without reading copied folders by hand.
 - Attached files can include `parameters.json`, `registry.json`, wiring sheets,
   line/chip info, demod settings, readout settings, or external runner
   configuration.
+- First adoption prioritizes mutable parameter files and instrument
+  information because these are the most likely context users will attach to
+  routine measurements.
 - Fricon preserves and returns attached files in their original user-supplied
   form.
 - Fricon records enough source identity to distinguish a copied file, a source
@@ -28,6 +31,9 @@ without reading copied folders by hand.
 - Fricon can provide simple text preview or a way to open files in an external
   editor where practical, without parsing the file into Fricon-owned parameter
   semantics.
+- Fricon does not automatically mark user-provided setup or wiring context as
+  stale, ambiguous, or trusted unless it has explicit evidence for that
+  judgment.
 - Corrections to configuration context are visible as events.
 - Export previews sensitive local paths, machine names, IP addresses, and other
   local setup details before including them.
@@ -35,7 +41,10 @@ without reading copied folders by hand.
 ## Not In Scope
 
 - Automatic tracing of every file a script reads.
+- Whole-notebook capture as the normal first-slice provenance mechanism.
 - Parsing or normalizing arbitrary user parameter files.
+- Judging freshness or correctness of opaque setup, wiring, or instrument
+  context from file contents alone.
 - Global parameter profiles, proposal workflows, or calibration promotion.
 - Device control, hardware inventory, or claiming unmanaged execution is fully
   reproducible.

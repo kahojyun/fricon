@@ -19,6 +19,11 @@ connected without losing direct dataset access.
 - A measurement can create multiple dataset artifacts with stable IDs.
 - Dataset artifacts carry scan, step-record, array, or trace schema where
   plotting and slicing semantics matter.
+- Trace-valued records can carry explicit coordinate/value arrays or compact
+  regular-coordinate descriptions, and a single outer sweep record can contain
+  more than one trace.
+- Complex values are preserved as first-class data so magnitude/phase or I/Q
+  views can be derived from data semantics instead of channel-name guesses.
 - Dataset writers share measurement lifecycle by default while remaining
   individually discoverable.
 - Dataset facts are appendable while a writer is active and immutable after the
