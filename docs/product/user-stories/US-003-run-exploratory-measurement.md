@@ -22,6 +22,8 @@ provenance.
 - The normal exploratory path does not require Fricon to manage the Python
   process.
 - Dataset writers share measurement lifecycle in the normal path.
+- Trace-valued, array-valued, and step-record writers can be used from the
+  unmanaged path without switching to managed execution.
 - Multiple local measurement writers may be active concurrently.
 - A crashed script leaves readable partial data.
 

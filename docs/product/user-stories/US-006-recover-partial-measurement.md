@@ -20,6 +20,8 @@ opaque folder cleanup problem.
   superseded, recovered, or completed state clearly.
 - Partial dataset artifacts can be reopened and inspected through public read
   APIs.
+- Written trace records, IQ arrays, and irregular step records remain readable
+  when the script stops before the measurement is completed.
 - Missing expected points are represented when the scan schema supports that
   interpretation.
 - Rerun creates a new linked measurement by default.

@@ -19,8 +19,12 @@ stack.
 - Light contextual summaries for setup, environment, procedure, and parameters.
 - Run-bound local configuration copies, snapshots, references, or summaries for
   files and references that old scripts currently leave in copied folders.
+- Plain attachment lists for first adoption, without requiring an attachment
+  role taxonomy.
 - Optional sample/session context that can be corrected after a run.
 - No built-in LabRAD dependency, compatibility layer, or unit adapter.
+- No claim that Fricon can judge opaque setup, wiring, or instrument context as
+  fresh, stale, trusted, or ambiguous without explicit evidence.
 
 ## Strategic Follow-On Scope
 
@@ -41,6 +45,13 @@ Detailed strategic follow-on priority and acceptance details live in
 - Calibration records, chains, working refs, health gates, and proposals.
 - Managed execution, device communication, and AI-assisted reviewed automation
   after the code/parameter evidence model is durable.
+
+## Not Initial Adoption
+
+- Whole-notebook capture as the normal provenance mechanism.
+- Parsing arbitrary parameter, registry, wiring, or instrument files into a
+  Fricon-owned truth model.
+- Attachment role taxonomy unless later product evidence shows it is needed.
 
 ## Key Stories
 

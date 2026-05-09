@@ -25,6 +25,8 @@ has practical context without requiring Fricon to control instruments.
   selected network or address summaries when the user chooses to record them.
 - Setup context can link to a run-bound local configuration summary without
   making that summary a managed hardware inventory.
+- Opaque setup, wiring, or instrument context is shown as user-provided context
+  unless Fricon has explicit evidence to judge it.
 - Export previews sensitive local paths, machine names, or environment details.
 - Passive setup context is clearly separate from device control.
 
@@ -32,6 +34,8 @@ has practical context without requiring Fricon to control instruments.
 
 - Device communication, calibration registry, or managed hardware inventory.
 - Claiming setup context is complete when it is only a passive summary.
+- Automatically judging user-supplied setup context as fresh, stale, trusted,
+  or ambiguous from opaque file contents alone.
 
 ## Related Capabilities
 

@@ -27,6 +27,8 @@ experiment stack.
 - Migration documentation covers non-obvious patterns, such as N-D scans,
   VNA-like coarse/fine trace collections, and minimizer-style irregular records,
   rather than many near-duplicate 1D and 2D examples.
+- Migration examples include trace-valued records and first-class complex data
+  where the old workflow used VNA S21 or IQ-like values.
 - Labels, units, legends, source aliases, original paths, and old numbered
   titles can be recorded without becoming primary identity.
 - Original Data Vault folder, session, title, numeric ID, and file path can be

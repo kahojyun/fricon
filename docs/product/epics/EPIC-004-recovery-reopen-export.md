@@ -13,11 +13,18 @@ reopen data from Python, and export a measurement for offline analysis.
 
 - Readable partial data and visible lifecycle state.
 - Trash/recover instead of normal hard delete.
-- Python reopen snippets using stable IDs.
+- Fast stable-ID copy, with Python reopen snippets available as supporting
+  actions.
+- Task-oriented Python reader views for trace, IQ single-shot, and minimizer
+  data where dataset shape supports them.
 - Measurement-centered read-only export bundles.
 - Lightweight Python reader for exported bundles without importing into another
   editable library or running the acquisition-time local runtime.
 - Analysis-friendly reads into common Python objects where appropriate.
+- Analysis-friendly read views that may include nested trace tables, exploded
+  or long tables, ndarray-like shot arrays, minimizer step tables, best-value
+  summaries, and xarray-like labeled arrays when the data is rectangular
+  enough.
 - Human-readable export manifest or index preview.
 - Privacy preview for sensitive provenance in exports.
 
@@ -28,6 +35,8 @@ reopen data from Python, and export a measurement for offline analysis.
 - Importing old history as a built-in migration path.
 - First-slice report or presentation generation.
 - Mandatory generic CSV, Parquet, or NumPy exports before demand is validated.
+- Committing Fricon's internal storage model to a specific Python analysis
+  framework.
 
 ## Key Stories
 

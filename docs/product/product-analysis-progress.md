@@ -28,6 +28,8 @@ The most carefully reviewed current inputs are:
   product-role thinking.
 - three interview passes on the initial adoption journey, using a simple VNA
   S21 scan and related readout/minimizer cases as redacted case evidence.
+- a first recheck of the draft story map, epics, and affected user stories
+  against that interview backbone.
 
 Other product documents should be treated as draft derived material until they
 are rederived or checked against the current greenfield analysis.
@@ -70,12 +72,12 @@ Downstream material not ready for implementation use:
 | --- | --- | --- |
 | Problem framing | Strong; sharpened around maintained Data Vault/Grapher replacement for new interactive work | Rebuild the initial adoption story backbone from this framing. |
 | User and role analysis | Strong current baseline with first-adoption emphasis on P-001 and P-003 | Keep refining only when new case evidence appears. |
-| Use case discovery | In progress after three interview rounds | Recheck the draft story map and affected user stories against the VNA/readout backbone. |
+| Use case discovery | Candidate journey and story recheck completed | Use the rechecked stories to derive the capability map. |
 | Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
 | Value proposition | Clear internally | Write a short external-facing value statement later. |
-| Core workflow | Candidate backbone strengthened | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
-| Story map | Draft, third interview pass added | Recheck affected epics and user stories before deriving capabilities. |
-| Capability map | Draft, mostly derived from older docs | Derive capabilities from accepted journeys and stories, then cross-check for gaps. |
+| Core workflow | Candidate backbone strengthened and story-checked | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
+| Story map | Draft, epics and affected stories rechecked | Derive capabilities from the rechecked story backbone. |
+| Capability map | Draft with partial alignment edits | Derive capabilities from accepted journeys and stories, then cross-check for gaps. |
 | Scope definition | Draft despite detailed text | Separate initial adoption, strategic follow-on, ADR-gated, and rejected scope after story/capability analysis. |
 | Initial adoption definition | Draft with first success standard | Accept only after the journey, story map, and supporting capabilities cohere. |
 | Success metrics | Missing | Define measurable product and validation signals. |
@@ -89,13 +91,16 @@ Downstream material not ready for implementation use:
 ## Next Analysis Sequence
 
 Use the current product documents as input evidence, not as the analysis order.
-The next work should proceed from user work to product capabilities:
+The work should proceed from user work to product capabilities:
 
 1. Define the initial adoption journey and story backbone.
 2. Rebuild `product/story-map.md` from that backbone.
 3. Recheck epics and user stories against the rebuilt story map.
 4. Derive `product/capability-map.md` from the accepted stories.
 5. Add success signals, assumptions, and validation tasks.
+
+Steps 1 through 3 now have a candidate pass from the VNA/readout interview
+backbone. Step 4 is the next active analysis step.
 
 Capability review should follow story analysis. A capability without story or
 journey support should be deferred, rewritten as a backlog hypothesis, or
@@ -307,6 +312,41 @@ Remaining open questions:
   historical inspection action, or both?
 - Which minimizer best-value summary is general enough for first adoption:
   last accepted point, best objective, or user-selected point?
+
+## Story Recheck Log
+
+### 2026-05-09: Initial Adoption Story Recheck
+
+Scope:
+
+- rechecked the draft story map, EPIC-002 through EPIC-005, and user stories
+  touched by the VNA/readout backbone
+- left EPIC-001 and setup/library stories mostly unchanged because they already
+  support the initial adoption path without changing the measurement semantics
+
+Recheck outcomes:
+
+- EPIC-002 now carries dedicated trace-valued records, multiple traces per
+  outer sweep record, and first-class complex values as initial adoption
+  pressure.
+- EPIC-003 now carries complex-aware inspection, IQ scatter, historical
+  sweep-plus-trace heatmap pressure, coarse/fine trace comparison pressure, and
+  fast stable-ID copy from dataset surfaces.
+- EPIC-004 now carries stable-ID copy as the fast reopen path, task-oriented
+  reader views, IQ ndarray-like reads, minimizer step tables, and best-value
+  summaries without committing storage to a specific analysis framework.
+- EPIC-005 now carries plain attachment lists for first adoption, no
+  whole-notebook capture as the normal provenance path, and no automatic
+  freshness/trust judgment for opaque setup or configuration context.
+- Affected user stories were updated to keep trace/IQ/minimizer expectations
+  visible at story level while leaving API signatures, storage layout, and
+  architecture decisions deferred.
+
+Next analysis action:
+
+- derive and cross-check `product/capability-map.md` from the rechecked story
+  backbone, then separate initial adoption, strategic follow-on, ADR-gated, and
+  rejected scope.
 
 ## Downstream Guardrail
 
