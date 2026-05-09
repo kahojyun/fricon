@@ -8,11 +8,11 @@ Accepted.
 
 These personas are lightweight product-role archetypes for Fricon planning.
 They are not fictional biographies, job titles, a permission model, or a
-replacement for user stories.
+replacement for story-map and capability-map work.
 
 Use this document to decide whose goal, risk, or decision a product slice
-serves. Put concrete capabilities, success criteria, and edge cases in user
-stories, future requirements, or domain documents.
+serves. Put concrete capabilities, success criteria, and edge cases in the
+story map, capability map, future backlog, specs, or domain documents.
 
 ## Grounding
 
@@ -29,7 +29,8 @@ roles during a single day.
 
 - Keep each persona short, research-backed, and easy to remember.
 - Describe stable goals, behavior patterns, context, and decision pressure.
-- Do not repeat feature requirements that belong in user stories.
+- Do not repeat feature requirements that belong in story maps, capability
+  maps, specs, or ADRs.
 - Use story modifiers for temporary contexts such as first-time use, offline
   operation, locked-down machines, interrupted runs, or migration work.
 - Add a new persona only when research shows a durable product responsibility
@@ -40,7 +41,7 @@ roles during a single day.
 Choose the persona that owns the story's main outcome:
 
 - P-001 Measurement Run Operator: ordinary measurement-run operation and
-  recovery.
+  checkpoint-safe data readability after ordinary interruptions.
 - P-002 Local Measurement System Maintainer: Fricon deployment, local runtime
   health, data libraries, Python/package environments, code-source setup,
   diagnostics, migration support, and technical readiness.
@@ -63,16 +64,18 @@ interpretation records. P-002 contributes technical guardrails when runtime,
 update, library, or environment safety matters.
 
 Physical setup, instrument, wiring, and device-state ownership is a distinct
-future boundary. Initial adoption stories record those facts as passive setup
-context or run-bound local configuration. If later workflows review or mutate
-setup or device state, route that decision to an explicit setup/device owner
-rather than to P-002 by default; P-002 owns software-system readiness.
+future boundary. Initial adoption records those facts as passive setup context,
+user-supplied attributes, notes, attachments, or run-bound local configuration
+files. If later workflows review or mutate setup or device state, route that
+decision to an explicit setup/device owner rather than to P-002 by default;
+P-002 owns software-system readiness.
 
 ## First Adoption Role Emphasis
 
 The first adoption slice is primarily for P-001 and P-003: an experimenter
-running interactive scripts or notebooks, then reopening or exporting the
-result for later analysis on another machine.
+running interactive scripts or notebooks, then reopening the result for later
+analysis through stable IDs and public reader APIs. Portable export and remote
+handoff remain follow-on pressure after local reopen is reliable.
 
 P-005 and P-002 are supporting pressures for initial adoption. Fricon should be
 easy for a method author or AI-assisted migration guide to apply to existing
@@ -97,12 +100,13 @@ run, not every decision in the experiment.
 
 Goals:
 
-- start, watch, annotate, recover, and hand off measurement runs
+- start, watch, annotate, preserve, and later hand off measurement runs
 - choose or adjust run-specific inputs such as scan ranges, selected targets,
   and context labels
 - understand the active measurement name, scan shape, units, and selected local
   context without learning Fricon internals
-- preserve useful partial results when scripts interrupt or long saves fail
+- preserve already-written data when users interrupt a run or a notebook kernel
+  fails
 
 Context and pressure:
 
@@ -169,10 +173,10 @@ plots, `.npy` or `.json` derived data, spreadsheets, and later reports.
 
 Goals:
 
-- reopen completed, interrupted, or exported measurements through stable IDs
-  and APIs
-- read portable Fricon packages on another computer through a lightweight
-  Python reader without recreating the acquisition-time local runtime
+- reopen completed or interrupted measurements through stable IDs and APIs
+- later, read portable Fricon packages on another computer through a
+  lightweight Python reader without recreating the acquisition-time local
+  runtime
 - load measurement data into analysis-friendly Python objects such as NumPy,
   pandas, or Polars where appropriate
 - preserve links from derived artifacts back to source measurements,

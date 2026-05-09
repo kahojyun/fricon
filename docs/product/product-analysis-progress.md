@@ -28,8 +28,8 @@ The most carefully reviewed current inputs are:
   product-role thinking.
 - three interview passes on the initial adoption journey, using a simple VNA
   S21 scan and related readout/minimizer cases as redacted case evidence.
-- a first recheck of the draft story map, epics, and affected user stories
-  against that interview backbone.
+- a cleanup pass that replaced older numbered epic, story, capability, and
+  future-story artifacts with unnumbered active maps and backlog categories.
 
 Other product documents should be treated as draft derived material until they
 are rederived or checked against the current greenfield analysis.
@@ -50,13 +50,13 @@ Draft derived product artifacts:
 
 - `product/capability-map.md`
 - `product/story-map.md`
-- `product/epics/`
-- `product/user-stories/`
+- `product/old-numbered-artifacts.md` for deprecation context only
 
 Strategic follow-on backlog material:
 
 - `product/future-concepts.md`
-- `product/future-stories-and-requirements.md`
+- `product/future-stories-and-requirements.md` is deprecated and points to the
+  unnumbered future backlog
 
 Downstream material not ready for implementation use:
 
@@ -72,13 +72,13 @@ Downstream material not ready for implementation use:
 | --- | --- | --- |
 | Problem framing | Strong; sharpened around maintained Data Vault/Grapher replacement for new interactive work | Rebuild the initial adoption story backbone from this framing. |
 | User and role analysis | Strong current baseline with first-adoption emphasis on P-001 and P-003 | Keep refining only when new case evidence appears. |
-| Use case discovery | Candidate journey and story recheck completed | Use the rechecked stories to derive the capability map. |
+| Use case discovery | Candidate journey complete and old IDs removed | Use the ID-free story map and capability map as the next product-analysis baseline. |
 | Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
 | Value proposition | Clear internally | Write a short external-facing value statement later. |
 | Core workflow | Candidate backbone strengthened and story-checked | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
-| Story map | Draft, epics and affected stories rechecked | Derive capabilities from the rechecked story backbone. |
-| Capability map | Draft with partial alignment edits | Derive capabilities from accepted journeys and stories, then cross-check for gaps. |
-| Scope definition | Draft despite detailed text | Separate initial adoption, strategic follow-on, ADR-gated, and rejected scope after story/capability analysis. |
+| Story map | Rewritten without old story or epic IDs | Challenge first-slice scope and validate against another concrete migration case before accepting. |
+| Capability map | Rewritten without old capability IDs | Cross-check for gaps and excess against the ID-free story map. |
+| Scope definition | Narrower but still draft | Separate first usable slice, follow-on backlog, ADR-gated, and rejected scope after capability review. |
 | Initial adoption definition | Draft with first success standard | Accept only after the journey, story map, and supporting capabilities cohere. |
 | Success metrics | Missing | Define measurable product and validation signals. |
 | Risks and assumptions | Partial | Add an explicit assumption and validation register. |
@@ -95,16 +95,17 @@ The work should proceed from user work to product capabilities:
 
 1. Define the initial adoption journey and story backbone.
 2. Rebuild `product/story-map.md` from that backbone.
-3. Recheck epics and user stories against the rebuilt story map.
-4. Derive `product/capability-map.md` from the accepted stories.
+3. Rebuild `product/capability-map.md` from the story map.
+4. Separate first usable slice, follow-on backlog, ADR-gated, and rejected scope.
 5. Add success signals, assumptions, and validation tasks.
 
-Steps 1 through 3 now have a candidate pass from the VNA/readout interview
-backbone. Step 4 is the next active analysis step.
+Steps 1 through 3 now have a candidate ID-free pass from the VNA/readout
+interview backbone. Step 4 is the next active analysis step.
 
 Capability review should follow story analysis. A capability without story or
-journey support should be deferred, rewritten as a backlog hypothesis, or
-rejected as old planning residue.
+journey support should be deferred, rewritten as an unnumbered backlog
+hypothesis, or rejected as old planning residue. Do not reintroduce old
+numbered product IDs.
 
 ## Interview Evidence Log
 
@@ -122,9 +123,10 @@ Candidate first adoption case:
 - a simple VNA S21 measurement where existing Python code sweeps DC voltage and
   VNA power while recording VNA-returned S21 traces
 - Fricon replaces the measurement record, dataset artifact, live inspection,
-  partial-read, reopen, and export loop while instrument calls, waveform
-  generation, LabRAD-era services, notebooks, plotting utilities, parameter
-  files, and calibration helpers can remain outside Fricon
+  checkpoint-safe partial-read, and reopen loop while instrument calls,
+  waveform generation, LabRAD-era services, notebooks, plotting utilities,
+  parameter files, and calibration helpers can remain outside Fricon. Export
+  follows local reopen rather than defining the first adoption path.
 
 Observed data-shape pressure:
 
@@ -206,16 +208,16 @@ Refined product expectations:
   keyboard shortcuts. Richer reader, export, or plot snippets can live behind
   advanced menus.
 
-Round 2 implications for story recheck:
+Round 2 implications that were incorporated into the ID-free story map:
 
-- US-004 and US-015 should explicitly keep trace-valued records and multiple
-  traces per record in scope without accepting exact API syntax.
-- US-005 should preserve complex-aware magnitude/phase views and IQ scatter as
-  native inspection expectations.
-- US-008 should make stable ID copy a first-path action, with reader snippets
-  still useful but not required as the only normal path.
-- US-019 should avoid automatic stale/ambiguous setup judgments unless Fricon
-  has explicit evidence to support them.
+- trace-valued records and multiple traces per record are product pressure
+  without accepting exact API syntax
+- complex-aware magnitude/phase views and IQ scatter are native inspection
+  expectations
+- stable ID copy is a first-path action, while reader snippets can be advanced
+  actions
+- automatic stale/ambiguous setup judgments are out of scope unless Fricon has
+  explicit evidence to support them
 
 Remaining open questions:
 
@@ -257,10 +259,10 @@ Refined product expectations:
   dimensions first and the shot dimension last where shape permits. This
   supports SNR analysis, error-rate estimation, and classifier-parameter
   improvement with NumPy-style processing.
-- Minimizer records can stay simpler than measurement traces. The minimum
-  useful read shape is a step table for plotting parameter and objective
-  evolution, plus a convenient best-parameter summary by outer sweep condition
-  when minimization runs inside another sweep.
+- Minimizer records can stay simpler than measurement traces. The first useful
+  read shape is a generic step table for plotting parameter and objective
+  evolution. Best-parameter summaries by outer sweep condition can stay as
+  later helper logic unless a broader reader need validates them.
 - A plain attachment list is enough for first adoption. Lightweight attachment
   role labels can wait until evidence shows users need them.
 - Labber-like right-click menu actions plus keyboard shortcuts are a good model
@@ -294,15 +296,15 @@ Sample-code pressure check:
 - Optimizer analysis needs visible step records and selected best values more
   urgently than a heavy optimizer-specific product model.
 
-Round 3 implications for story recheck:
+Round 3 implications that were incorporated into the ID-free story map:
 
-- US-008 should describe multiple reader views for trace, IQ, and minimizer
-  data without committing the internal storage model to Polars, pandas, NumPy,
-  or xarray.
-- US-013 should include right-click menu and keyboard shortcut copy actions for
-  stable measurement and dataset IDs.
-- US-019 should keep first adoption at a plain attachment list rather than
-  introducing attachment role taxonomy now.
+- reader expectations should describe trace, IQ, and generic irregular data
+  without committing the internal storage model to Polars, pandas, NumPy, or
+  xarray
+- right-click menu and keyboard shortcut copy actions are good browser UX for
+  stable measurement and dataset IDs
+- first adoption should keep attachments as a plain list rather than
+  introducing attachment role taxonomy
 
 Remaining open questions:
 
@@ -310,43 +312,34 @@ Remaining open questions:
   alternate conversion methods?
 - Should trace concatenation/coarse-fine overlay be a reader helper, a Desktop
   historical inspection action, or both?
-- Which minimizer best-value summary is general enough for first adoption:
-  last accepted point, best objective, or user-selected point?
+- Is any minimizer best-value summary general enough to promote later, or
+  should this remain user helper code over generic step tables?
 
-## Story Recheck Log
+## Story And Capability Cleanup Log
 
-### 2026-05-09: Initial Adoption Story Recheck
+### 2026-05-09: Remove Older Draft IDs
 
 Scope:
 
-- rechecked the draft story map, EPIC-002 through EPIC-005, and user stories
-  touched by the VNA/readout backbone
-- left EPIC-001 and setup/library stories mostly unchanged because they already
-  support the initial adoption path without changing the measurement semantics
+- replaced older numbered epic, story, capability, and story-module artifacts
+  with unnumbered active maps
+- collapsed numbered strategic follow-on stories and requirements into an
+  unnumbered future backlog
+- kept a short deprecation note in `old-numbered-artifacts.md`
 
-Recheck outcomes:
+Cleanup outcomes:
 
-- EPIC-002 now carries dedicated trace-valued records, multiple traces per
-  outer sweep record, and first-class complex values as initial adoption
-  pressure.
-- EPIC-003 now carries complex-aware inspection, IQ scatter, historical
-  sweep-plus-trace heatmap pressure, coarse/fine trace comparison pressure, and
-  fast stable-ID copy from dataset surfaces.
-- EPIC-004 now carries stable-ID copy as the fast reopen path, task-oriented
-  reader views, IQ ndarray-like reads, minimizer step tables, and best-value
-  summaries without committing storage to a specific analysis framework.
-- EPIC-005 now carries plain attachment lists for first adoption, no
-  whole-notebook capture as the normal provenance path, and no automatic
-  freshness/trust judgment for opaque setup or configuration context.
-- Affected user stories were updated to keep trace/IQ/minimizer expectations
-  visible at story level while leaving API signatures, storage layout, and
-  architecture decisions deferred.
+- `story-map.md` now owns the current unnumbered story backbone.
+- `capability-map.md` now owns the current unnumbered capability baseline.
+- Older numbered files under product epics, user stories, and the story-module
+  matrix are removed from the active docs path.
+- `future-concepts.md` now owns unnumbered strategic follow-on categories.
+- `future-stories-and-requirements.md` is deprecated.
 
 Next analysis action:
 
-- derive and cross-check `product/capability-map.md` from the rechecked story
-  backbone, then separate initial adoption, strategic follow-on, ADR-gated, and
-  rejected scope.
+- challenge and validate the ID-free first usable slice, then add success
+  signals, assumptions, and validation tasks.
 
 ## Downstream Guardrail
 

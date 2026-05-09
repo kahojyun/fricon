@@ -30,7 +30,7 @@ number of explicit product concepts:
 - a dedicated trace-writing path for trace-valued records inside outer sweeps
 - first-class complex values so SDK, readers, and plots can expose meaningful
   magnitude/phase or I/Q views from data semantics
-- public reopen/export APIs for later analysis
+- public reopen APIs for later analysis
 - a simple migration path where Data Vault-style scripts rewrite the recording
   section instead of depending on a LabRAD compatibility layer
 
@@ -112,11 +112,11 @@ ceremony should be justified by one of these user-visible benefits:
   only when that feature exists
 - binding selected local configuration context when copied files or sidecars
   explain the run
-- reopening or exporting results through stable public APIs and stable IDs
+- reopening results through stable public APIs and stable IDs
 - copying or reusing stable IDs as the normal input users change in later
   analysis code
-- exporting to a portable Fricon package that can be read on another computer
-  with a lightweight Python reader
+- leaving room for later export APIs without making export the first SDK
+  success path
 
 Boilerplate that exists only for transport, storage layout, local runtime
 startup, local tokens, object graph construction, or future parameter machinery
@@ -139,28 +139,28 @@ conventions.
 Reader ergonomics should account for stable analysis code. Users may copy a
 stable measurement or dataset ID from Desktop or CLI and paste it into an
 existing reader call. Full reader snippets, export-reader snippets, and plot
-snippets are still useful, but they do not need to be the fastest path if ID
-copy is reliable and discoverable.
+snippets are still useful later, but they do not need to be the fastest path if
+ID copy is reliable and discoverable.
 
-Reader APIs should provide task-oriented views rather than force one universal
-shape. Trace-bearing datasets may need a record-centric nested table for
-querying outer sweep metadata and trace payloads, an exploded trace table, an
-opt-in sample-level long table, and an xarray-like labeled view when axes are
-rectangular enough. pandas/NumPy-oriented workflows may prefer expanded tables
-or arrays, while Polars-like workflows may naturally query nested table data.
-This is reader UX pressure, not an accepted internal storage model.
+Reader APIs should start with a generic, predictable view that users can wrap
+for experiment-specific analysis. Trace-bearing datasets may later need a
+record-centric nested table, an exploded trace table, an opt-in sample-level
+long table, or a labeled array view when axes are rectangular enough. These
+are reader UX pressures, not first-slice promises or an accepted internal
+storage model.
 
 IQ single-shot reads should make ndarray-style analysis easy when the data is
 shape-compatible: sweep dimensions first, shot dimension last, with labels and
 metadata available for prepared states, channels, and classification context.
-Minimizer reads can be simpler: a step table for parameter/objective evolution
-and a best-parameter summary by outer sweep condition are enough for first
-adoption unless later evidence says otherwise.
+Generic irregular or ragged step reads can cover minimizer output at first.
+Fricon should not add minimizer-specific product behavior before managed
+measurement or parameter workflows need it.
 
 Trace readers should support common downstream actions without copying old
 plotting pipelines: selecting traces from a sweep, drawing several traces in
-one line plot, building 2D heatmaps from sweep-plus-trace data, and combining
-or comparing coarse/fine trace ranges while preserving source segment context.
+one line plot, and building 2D heatmaps from sweep-plus-trace data. Combining
+or comparing coarse/fine trace ranges can start as user-side helper logic and
+move into Fricon later if repeated use justifies it.
 
 ## Illustrative Sketches
 

@@ -17,19 +17,22 @@ reviewed replay.
 
 ## Problem Statement
 
-For initial adoption, Fricon helps users record, monitor, reopen, and export
-new interactive experiment data without relying on unmaintained LabRAD
-Data Vault/Grapher behavior or notebook-only reconstruction.
+For initial adoption, Fricon helps users record, monitor, and reopen new
+interactive experiment data without relying on unmaintained LabRAD
+Data Vault/Grapher behavior or notebook-only reconstruction. Export remains
+important, but should follow from a reliable reopen path rather than lead the
+first usable slice.
 
 ## Planning Language
 
 This document uses planning horizons, not semantic-version labels.
 
 Initial Adoption Slice means the first practical Fricon release path that lets
-a lab start new measurement work with a useful write, watch, recover, reopen,
-and export loop. It is not a claim that other capabilities are less important.
-It comes first because it can provide standalone value while generating real
-Fricon records and usage feedback.
+a lab start new measurement work with a useful write, watch, checkpoint-safe
+read, and reopen loop. It is not a claim that other capabilities are less
+important. It comes first because it can provide standalone value while
+generating real Fricon records and usage feedback. Portable export can follow
+once local reopen semantics are reliable.
 
 Strategic Follow-On means product-core capabilities that remain central to
 Fricon's thesis, but are sequenced after the initial adoption slice because
@@ -77,8 +80,8 @@ first-class product model. Legacy paths, numeric IDs, copied folders, mutable
 configuration files, generated sidecars, and notebook-local analysis should
 enter Fricon as aliases, context, attachments, summaries, or evidence. The
 canonical product model should stay centered on measurements, dataset
-artifacts, lifecycle, scan schema, provenance, selected configuration context,
-exports, and later reviewed parameter and calibration workflows.
+artifacts, lifecycle, scan schema, provenance, selected software-visible
+context, later exports, and later reviewed parameter and calibration workflows.
 
 Transition features should point toward later Fricon workflows:
 
@@ -103,11 +106,13 @@ analysis.
 
 Success means a user can start new measurement work in Fricon, write data from
 Python, watch live plots, run multiple independent experiments without
-unnecessary global-session interference, recover partial results, reopen data
-later, and export it to another computer for analysis without depending on old
-storage paths or notebook-only reconstruction. The initial adoption slice does
-not need to import old history, emulate LabRAD, or ship a LabRAD compatibility
-layer; old LabRAD, QCoDeS, Labber, or folder-based history can remain where it
+unnecessary global-session interference, keep already-written checkpoints
+readable after user interruption or notebook-kernel failure, and reopen data
+later without depending on old storage paths or notebook-only reconstruction.
+The initial adoption slice does not need to import old history, emulate LabRAD,
+ship a LabRAD compatibility layer, guarantee hard-crash recovery beyond later
+durable-write decisions, or provide polished export before local reopen works
+well. Old LabRAD, QCoDeS, Labber, or folder-based history can remain where it
 is while new work moves to Fricon through small explicit recording-code
 rewrites.
 
@@ -119,12 +124,15 @@ Fricon should help a researcher answer:
 - Which sample or session was active, if any?
 - What datasets and attachments did it produce?
 - Was the run finished, interrupted, failed, invalidated, or recovered?
-- What notes, parameters, code provenance, and setup labels explain it?
-- Which selected local configuration files or summaries were bound to it?
+- What notes, user-supplied attributes, code provenance, and software-visible
+  context explain it?
+- Which selected local configuration files or summaries were bound to it as
+  evidence, without pretending Fricon understands all physical setup context?
 - Can I run another experiment without this one interfering with it?
-- How do I inspect it live, reopen it from Python, export it, or recover it?
-- Can I analyze the exported result on another computer without recreating the
-  acquisition runtime?
+- How do I inspect it live, reopen it from Python, or read already-written data
+  after an interruption?
+- Later, can I export or hand off the result without recreating the acquisition
+  runtime?
 
 Strategic follow-on slices can later help answer:
 
@@ -145,7 +153,7 @@ Strategic follow-on slices can later help answer:
 ```text
 I ran a measurement from Python.
 It produced datasets.
-Fricon helps me monitor, inspect, recover, reopen, and export them.
+Fricon helps me monitor, inspect, and reopen them.
 ```
 
 Optional sample or session context can replace folder-path habits for grouping
@@ -170,9 +178,9 @@ or notebooks, so SDK ergonomics are product requirements.
 
 For initial adoption, the SDK should feel like ordinary Python with low
 ceremony: a visible notebook context, natural interactive unmanaged runs,
-Python-native scan/schema authoring, and public reopen/export APIs for later
-analysis. Importable managed-run entry points are strategic follow-on, not part
-of the first-slice migration promise.
+Python-native scan/schema authoring, and public reopen APIs for later analysis.
+Importable managed-run entry points and polished export flows are follow-on
+directions, not part of the first usable migration promise.
 
 For the first adoption slice, migration from Data Vault-style scripts should
 mean a simple rewrite of the recording section, not emulation of LabRAD or its
@@ -219,39 +227,46 @@ To meet the initial adoption goal, the first adoption slice should include:
 - dataset artifacts that remain directly searchable and openable, even though
   the Desktop home is measurement-first
 - declared scan datasets for common 1D, 2D, and N-D sweeps
-- step or record datasets for irregular workflows such as minimizers, adaptive
-  scans, and instrument-driven coarse/fine passes where each step may carry
-  parameters and one or more scalar, array, or trace results
+- step or record datasets for irregular workflows, adaptive scans, and
+  instrument-driven coarse/fine passes where each step may carry parameters
+  and one or more scalar, array, or trace results. Minimizers should start as
+  ordinary ragged or step records rather than special first-slice product
+  concepts
 - selectable trace or output collections so users can compare coarse/fine
   passes or variable-length optimizer traces without hard-coding those
   experiment types into the product model
 - low-ceremony scan-plan/schema authoring for common scans and traces, plus a
   raw schema escape hatch for advanced cases
-- nonblocking live monitor views for current 1D line/scatter, 2D heatmap, and
-  selected outputs or traces
+- nonblocking live monitor views for current 1D line/scatter, simple 2D
+  heatmap, IQ scatter, and selected output or trace channels. Live monitor
+  controls should stay simple; detailed row selection, overlays, and richer
+  analysis belong in a fuller viewer or Python scripts
 - richer historical browsing and selector views that do not need to be live
-  auto-refresh surfaces
+  auto-refresh surfaces. These can grow over time, but are an obvious
+  scope-expansion risk
 - measurement lifecycle, notes, events, favorites/pins, trash/recover, and
-  readable partial data semantics
+  checkpoint-safe readable data after user interruption or notebook-kernel
+  failure
 - light attachments
-- light contextual summaries for parameters, code provenance, setup,
-  environment, and unmanaged procedure context
+- light user-supplied attributes or notes for physical setup context, and
+  honest software-visible context such as code provenance, selected files,
+  environment labels, and unmanaged procedure summaries
 - selected run-bound local configuration copies, such as parameter files,
   registry files, wiring references, line/chip info, or demod/readout settings.
   Fricon should preserve and return these files in their original user-supplied
   form, with simple text preview or a way to open them in an external editor
-  where practical, without turning initial adoption into a parameter parser or
-  registry
-- Python reopen snippets through public APIs
-- a portable Fricon package readable by a lightweight Python reader without
-  running the acquisition-time local runtime or Desktop
-- analysis-friendly reads into common Python objects such as NumPy, pandas, or
-  Polars where appropriate
+  where practical, without turning initial adoption into a parameter parser,
+  registry, or source of truth for physical setup
+- Python reopen through stable IDs and public APIs
+- a generic reader path good enough for users to build experiment-specific
+  helpers around. First-slice reader UX should support core tasks before
+  promising many polished framework-specific views
+- analysis-friendly local reads into common Python objects where appropriate
 - backup/restore and migration checkpoints
 - coherent install/update compatibility and guided setup diagnostics
 - migration documentation for non-obvious script shapes, including N-D sweeps,
-  VNA-like coarse/fine trace collections, minimizer-style irregular traces, and
-  a realistic Data Vault-style recording rewrite
+  VNA-like coarse/fine trace collections, generic irregular step records, and a
+  realistic Data Vault-style recording rewrite
 
 ## Product Pressure Checks
 
@@ -265,13 +280,12 @@ work starts:
 - Setup diagnostics should help users distinguish stopped local runtime
   components, wrong library, locked library, old SDK, incompatible components,
   migration-required state, and unsafe update timing before they read logs.
-- Export is an analysis workflow, not an archive dump. A user should be able to
-  open a measurement bundle directly from Python, inspect a simple manifest or
-  index preview, and choose whether sensitive paths, code, environment, setup,
-  or sample details are included.
-- Generic export formats should be demand-driven. The first export promise is a
-  Fricon package plus reader APIs that load data into NumPy, pandas, Polars, or
-  similar analysis objects.
+- Export is an analysis workflow, not an archive dump, but it can follow after
+  local reopen is solid. Early users can reopen data from Python and export the
+  analysis-specific format or metadata they need themselves.
+- Generic export formats should be demand-driven. A Fricon package plus
+  lightweight reader remains the likely later baseline, but should not outrank
+  reliable local reopen in the first usable slice.
 - Dataset artifact semantics should be checked against real measurement shapes,
   including adaptive or instrument-tuned traces where each trace may have its
   own coordinate values, settings, and length.
@@ -287,8 +301,9 @@ work starts:
   global active experiment.
 - Measurement-code and run-configuration ideas should stay focused on the user
   pain of copied folders, mutable local files, setup sidecars, scan helpers,
-  plot presets, and export recipes. Initial adoption records honest context;
-  approved code update and managed execution remain strategic follow-on.
+  plot presets, and export recipes. Initial adoption records honest
+  software-visible context and user-supplied notes or attributes; approved code
+  update, parameter systems, and managed execution remain strategic follow-on.
 - Fricon should not run user plotting code in the first slice. Users can reopen
   data from Python and build custom plots themselves; built-in live plotting
   should focus on common measurement monitor views.
@@ -345,4 +360,8 @@ device apply remains ADR-gated.
 - generic workflow DAG engine
 - visual sweep builder as the primary acquisition model
 - automatic notebook state capture
+- hard-crash or power-loss recovery beyond accepted durable-write behavior
+- parsing arbitrary setup, wiring, registry, or parameter files into trusted
+  Fricon-owned truth
+- polished portable export before local reopen works well
 - AI actions that mutate data-library state without explicit review and audit

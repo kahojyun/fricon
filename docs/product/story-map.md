@@ -2,222 +2,198 @@
 
 ## Status
 
-Draft pending product-analysis revalidation; first through third interview
-passes added.
+Draft rederived from current high-confidence inputs; no stable story IDs.
 
 ## Purpose
 
-Keep the product route readable for future AI sessions. This file is a compact
-map from the product vision to initial adoption stories, not the place for full
-acceptance details.
+Keep the current initial-adoption route readable without preserving older draft
+story or epic IDs. Do not use this file as implementation requirements until
+the product baseline, capability map, and validation posture are accepted.
 
-## Backbone
+## Current Evidence Basis
+
+This map is based on:
+
+- `vision.md`
+- `personas.md`
+- the VNA S21, IQ/readout, and generic irregular-step interview evidence in
+  `product-analysis-progress.md`
+- redacted sample-code pressure from legacy measurement workflows
+- the scope challenge that narrowed first adoption to write, simple live
+  inspection, checkpoint-safe reads, and reopen
+
+Older numbered epics and user stories were draft derived material. They are no
+longer part of the active product route and should not be treated as stable
+IDs.
+
+## Initial Adoption Backbone
 
 ```text
-Install and set up
-  -> create/open data library
-  -> optionally set sample/session context
-  -> run unmanaged Python measurement
-  -> declare scan, step, array, or trace shape
-  -> record dataset artifacts incrementally
-  -> inspect live
-  -> finish/recover
-  -> annotate or bind selected local context
-  -> reopen in Python
-  -> export
+install and launch local Fricon
+  -> create or open one local data library
+  -> start ordinary Python measurement code
+  -> declare enough dataset shape for plotting and reading
+  -> append checkpointed measurement data
+  -> inspect simple live views
+  -> preserve already-written data after ordinary interruption cases
+  -> reopen measurement or dataset by stable ID
+  -> migrate the next simple script without making old workflows harder
 ```
 
-## Candidate Initial Adoption Journey
+Export, fuller viewer workflows, parameter systems, managed code, and device
+communication are follow-on paths. They should not block the first usable
+write/watch/reopen loop.
 
-This journey is based on the first three interview passes and redacted legacy
-sample pressure. It is still draft; it should guide story recheck before
-capabilities are rederived.
+## Initial Adoption Story Slices
 
-The concrete first-adoption case is a simple VNA S21 measurement. The user
-keeps existing instrument calls, waveform generation, notebooks, local
-parameter files, plotting utilities, and calibration helpers outside Fricon.
-Fricon takes over the maintained measurement-data loop: record a measurement,
-write dataset artifacts, show enough live inspection, preserve partial data,
-reopen outputs from Python, and export a portable result for analysis.
+### Local Product Readiness
 
-The normal run shape is:
+Users need Fricon Desktop, CLI, Python SDK, and required local runtime pieces to
+behave like one coherent local product on a normal lab computer. Setup should
+support constrained lab machines, including offline, locked-down, Windows, or
+pinned-environment situations where practical.
 
-1. A user starts from an ordinary Python notebook or script and opens a local
-   Fricon library.
-2. The user optionally selects minimal context, such as a sample, cooldown,
-   session, or human-readable note. Physical setup details are helpful
-   evidence, but not required to start the run.
-3. The script creates an unmanaged measurement and declares the expected data
-   shape. For the VNA case, outer sweep axes may include DC voltage and VNA
-   power, while each record carries one or more traces with their own
-   coordinate axes and S21 values. The preferred product feel is a dedicated
-   trace-writing concept, not forcing users to flatten every trace point into
-   one row.
-4. The script appends data durably as acquisition proceeds. First-adoption
-   dataset shapes must cover regular grids, partial grids, trace-valued
-   records, IQ averages or I/Q channels, single-shot arrays or labels, and
-   irregular minimizer steps.
-5. Desktop live inspection shows the latest useful view without becoming part
-   of the write path. Essential views are recent 1D lines, basic 2D heatmaps,
-   selected trace inspection, and IQ scatter plots for single-shot/readout
-   work.
-6. If the script stops, crashes, or is interrupted, data already written stays
-   readable through the browser/viewer and public read APIs. Fricon should not
-   hide partial state or silently discard written records.
-7. The user can attach selected local context such as parameter files,
-   registry files, wiring references, demod/readout settings, script labels, or
-   notes. These are evidence for interpretation, not a guarantee that Fricon
-   knows the physical setup or wiring is current.
-8. Later, an analyst opens the measurement or dataset by stable ID. The fast
-   path should make stable IDs easy to copy, preferably with keyboard
-   shortcuts. Reader snippets remain useful, but can live behind an advanced
-   menu once the normal analysis code only needs the input ID to change.
-   Reader APIs should offer natural views for the analysis task: nested trace
-   records for trace-aware tables, expanded or long tables for row-oriented
-   tools, ndarray-like shot data for IQ analysis, and labeled array views when
-   traces are rectangular enough.
-9. Export remains a handoff path for analysis on another computer. The first
-   export promise is a portable Fricon package plus reader APIs, not broad
-   report generation or legacy-system import.
+Success means a measurement user can launch Desktop or use Python without
+assembling mismatched pieces, and compatibility problems fail before mutating a
+library.
 
-The first success standard is reliability and easy reopen: Fricon is worth
-continuing to use if it can keep running, record measurement identity and
-produced data, preserve written partials, show the data in a browser/viewer,
-and provide copyable Python reader snippets for measurements and datasets.
-Fast stable-ID copy is the minimum copy affordance for first adoption.
+### Local Data Library
 
-## Backbone Implications From Interview
+Users need one normal lab-computer data library with durable identity, a
+remembered location, and compatibility checks before writes. Shared-folder
+multi-writer semantics, hosted service behavior, and account administration are
+not part of first adoption.
 
-- Dataset artifacts must cover trace-valued outputs, not only scalar dependent
-  columns. VNA frequency is often an inner trace coordinate, while bias, power,
-  or other settings may be outer sweep axes or run metadata.
-- Trace writing should be a dedicated product concept. A first-contact writer
-  should support explicit coordinate/value arrays and compact start/delta/value
-  forms where appropriate, and it should not rule out multiple different traces
-  in one outer sweep record.
-- Complex values should be first-class product data. Magnitude/phase and I/Q
-  views should be derived from known data semantics, not naming conventions
-  that users or plots must reverse-engineer.
-- IQ scatter is a native inspection need, especially for single-shot data and
-  readout classification work.
-- Optimizer or minimizer traces should be easy to record as irregular step
-  records. Legacy print-only optimizer evidence is a migration pain point.
-- Setup, wiring, and mutable configuration are useful context but weak truth
-  sources. The initial slice should preserve selected files and summaries, but
-  should not claim it can detect stale or ambiguous setup context unless it has
-  explicit evidence for that judgment.
-- The UI must treat stable-ID copy as a first-adoption product affordance, not
-  only a developer convenience. Richer reader, export, or plot snippets can be
-  advanced actions.
-- Reopen/read APIs should expose multiple analysis views when the dataset
-  shape calls for them, rather than forcing all trace, IQ, and minimizer data
-  into one table convention.
-- First adoption can keep context attachments as a plain list. Attachment role
-  taxonomy is not yet justified by the initial adoption journey.
+### Unmanaged Python Measurement
 
-## Initial Adoption Product Epics
+Users keep ordinary scripts and notebooks in control. Fricon provides a
+low-ceremony way to create a measurement and append data from unmanaged Python
+without adopting a managed runner, task queue, device framework, or visual
+sweep builder.
 
-The initial adoption route is the LabRAD Data Vault/Grapher replacement loop
-for new interactive measurements: write from Python, watch live monitor plots,
-recover partial data, reopen, and export for analysis on another machine. The
-epics below divide that route without making legacy import, LabRAD emulation,
-report generation, user plotting code, or managed automation part of the first
-adoption slice.
+The first concrete case is a VNA S21 measurement that sweeps DC voltage and VNA
+power while recording trace-valued outputs.
 
-- EPIC-001: Local setup and data-library adoption.
-- EPIC-002: New measurement logging replacement.
-- EPIC-003: Measurement console and inspection.
-- EPIC-004: Recovery, annotation, reopen, and export.
-- EPIC-005: Migration ergonomics and future lab scaling.
+### Dataset Shape And Recording
 
-Detailed epic notes live under `product/epics/`.
+Dataset artifacts must stay directly openable and searchable under a
+measurement. The recording path should cover:
 
-## Initial Adoption Story Index
+- regular one-, two-, and N-dimensional sweeps
+- trace-valued records with explicit coordinate/value arrays or compact
+  regular-coordinate descriptions
+- multiple traces in one outer sweep record
+- first-class complex values so magnitude/phase or I/Q views come from data
+  semantics
+- IQ averages, I/Q channels, single-shot arrays, or labels
+- generic irregular or ragged step records
 
-Ownership rules:
+Minimizer or optimizer output should start as ordinary irregular/step data, not
+as a special first-slice product model.
 
-- Epics own outcomes. A story may affect another epic, but it should have only
-  one primary owner.
-- Story persona wording follows `product/personas.md`; use the role that owns
-  the outcome instead of a broad lab identity.
-- Keep this index compact. Story-level success criteria live under
-  `product/user-stories/`.
-- Each expanded story file names its primary epic.
-- Put implementation acceptance detail in specs, not in this map.
+### Simple Live Inspection
 
-Foundation:
+Live inspection is a disposable consumer, not part of the write acknowledgement
+path. The first live monitor should emphasize simple current views:
 
-- US-001: Install and launch Fricon on a lab computer.
-- US-002: Create or open one local data library.
-- US-010: Update without corrupting measurement work.
+- recent one-dimensional line or scatter
+- simple two-dimensional heatmap
+- selected output or trace channel
+- simple magnitude/phase or I/Q view when semantics support it
+- IQ scatter for single-shot/readout work
 
-Measurement loop:
+The live monitor should not grow into a full analysis viewer. Row selection,
+coarse/fine overlays, rich comparison, fitting, classifier tuning, and
+publication plots can stay in the fuller viewer or user Python scripts.
 
-- US-003: Run an interactive unmanaged measurement from Python.
-- US-004: Produce dataset artifacts from a measurement.
-- US-005: Watch and inspect live data.
-- US-015: Declare common scan shapes quickly.
+### Checkpoint-Safe Readability
 
-Context and provenance:
+First adoption should protect already-written data from ordinary interruption
+cases such as user interrupt or notebook-kernel failure. It should not promise
+hard-crash or power-loss recovery beyond later durable-write architecture
+decisions.
 
-- US-007: Annotate at the right level.
-- US-011: Record code provenance honestly.
-- US-012: Register a sample and sample session when useful.
-- US-014: Record passive setup context.
-- US-016: Record passive procedure context.
-- US-019: Capture run-bound local configuration.
+Partial or interrupted measurements should be visible as incomplete; Fricon
+should not hide partial state to make data look complete.
 
-Recovery and analysis:
+### Reopen By Stable ID
 
-- US-006: Recover a partial measurement.
-- US-008: Reopen measurement outputs from Python.
-- US-009: Export a measurement for offline analysis.
-- US-013: Find and open a dataset artifact directly.
+The first analysis path is local reopen. Users should be able to copy a stable
+measurement or dataset ID, preferably from a right-click menu and keyboard
+shortcut, then use a predictable reader call from Python.
 
-Migration:
+Reader design should start from the actual analysis tasks:
 
-- US-017: Migrate a Data Vault-style script to Fricon writers.
-- US-018: Start new work in Fricon while old history stays in the old system.
+- plot several selected traces in one line plot
+- build basic heatmaps from sweep-plus-trace data
+- read IQ single-shot data as ndarray-like data when shape permits
+- inspect generic irregular step records
 
-Migration ownership:
+Early readers can be generic enough for users to wrap in experiment-specific
+helpers. Polished framework-specific views and portable export should follow
+observed use.
 
-- US-017 is owned by EPIC-005. It pressures EPIC-002 writer ergonomics but does
-  not make EPIC-002 responsible for old-system import.
-- US-018 is owned by EPIC-005. EPIC-004 owns reopen/export for Fricon data, not
-  the product migration posture.
+### Direct Dataset Browser
 
-Each initial adoption story has an expanded file under `product/user-stories/`.
-Keep those files concise: they own story-level success criteria, not
-implementation tasks.
+Even with a measurement-first Desktop, dataset artifacts must remain
+searchable and directly openable. A dataset view should show parent measurement
+context, basic table or plot previews, and fast stable-ID copy.
 
-## Sequencing
+### Notes, Attributes, And Attachments
 
-The earliest implementation slice should prove enough of US-001 through US-008
-and US-015 to record, inspect, recover, and reopen a Python measurement while
-preserving first-class dataset discovery. The milestone plan should be derived
-after the product baseline and required architecture or ADR inputs are accepted.
+Fricon should support lightweight notes, attributes, markers, favorites, pins,
+and small attachments at measurement or dataset level. A plain attachment list
+is enough for first adoption.
 
-The full initial adoption slice also needs US-009 for export, US-017/US-018 to
-validate the incremental adoption posture, and US-019 to make copied local
-configuration visible. Users should be able to translate new Data Vault-style
-scripts, keep old history in the old system, and bind the run-relevant files or
-summaries that old scripts currently leave in folders and operator memory. This
-means a small explicit rewrite of the recording section, not a built-in LabRAD
-compatibility layer.
+Physical setup, wiring, and lab-environment facts that Fricon does not
+understand should remain user-supplied notes, attributes, or attachments.
+Fricon should not imply that it can judge these facts as fresh, stale, trusted,
+or ambiguous unless a later model owns the evidence.
 
-Python SDK UX is part of the product story, not only implementation detail.
-The product-level SDK usage guideline lives in `product/python-sdk-ux.md`;
-detailed API signatures and capture mechanics belong in later ADRs/specs.
+### Honest Software-Visible Context
 
-Strategic follow-on work should turn initial adoption facts into local
-experiment memory and reviewed action. Those priorities are outside the initial
-adoption story index and live as draft backlog context in
-`product/future-concepts.md`.
+Initial adoption can record what Fricon can honestly know or what the user
+explicitly supplies:
 
-Export remains an initial adoption product promise. A portable Fricon package
-with a lightweight Python reader is the current baseline; reader APIs should
-load data into NumPy, pandas, Polars, or similar analysis objects where the
-dataset shape supports it. CSV, Parquet, or other generic file exports should
-be added when real user demand justifies them. Detailed export/offline-analysis
-requirements should be derived in a later spec after the product, architecture,
-and ADR boundaries are accepted.
+- unmanaged code label
+- optional script or source-folder reference
+- selected local configuration files, such as parameter or registry files
+- demod/readout setting files or summaries when supplied
+- environment labels or summaries where practical
+- unmanaged procedure summaries
+
+This is evidence, not a managed parameter system, code-deployment system, or
+physical setup truth model.
+
+### Migration Without Old-System Import
+
+Users should be able to translate a simple Data Vault-style new measurement
+script by rewriting the recording section, not by emulating LabRAD or importing
+old history first.
+
+Migration guidance should cover the hard shapes that appeared in the interview:
+VNA traces, coarse/fine trace collections, first-class complex values, IQ-like
+data, and generic irregular records. Old history can remain in old systems
+while new runs move to Fricon.
+
+## Deferred Backlog
+
+These are real product pressures, but they should not be first-slice blockers:
+
+- portable Fricon export packages and generic file exports
+- read-only offline bundle viewer
+- rich historical viewer, saved views, and comparison workflows
+- polished Polars, pandas, NumPy, or xarray-specific reader views
+- trace concatenation helpers and coarse/fine overlay polish
+- analysis, fitting, classifier-tuning, and report artifact records
+- parameter profiles, snapshots, diffs, and proposals
+- managed code sources, approved updates, and managed execution
+- calibration chains and reviewed automation
+- structured setup/device state, communication, reconciliation, and apply
+- rich sample maps and spatial visualization
+- remote or LAN monitoring
+
+## Next Product Step
+
+Derive `capability-map.md` from this ID-free story map, then separate first
+usable slice, follow-on backlog, ADR-gated directions, and rejected scope.
