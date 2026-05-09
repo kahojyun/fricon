@@ -198,5 +198,6 @@ These are real product pressures, but they should not be first-slice blockers:
 
 ## Next Product Step
 
-Derive `capability-map.md` from this rederived story map, then separate first
-usable slice, follow-on backlog, ADR-gated directions, and rejected scope.
+Use `capability-map.md` and `product-analysis-progress.md` to challenge and
+separate the first usable slice, follow-on backlog, ADR-gated directions, and
+rejected scope.
