@@ -53,7 +53,7 @@ Fricon is an S2 medium modular system:
 6. `product/capability-map.md`
 7. `product/story-map.md`
 8. `product/python-sdk-ux.md` for the Python SDK usage guideline
-9. `product/future-concepts.md` only for unnumbered strategic backlog context
+9. `product/future-concepts.md` only for strategic follow-on backlog context
 10. `domain/README.md`
 11. `architecture/README.md`
 12. `architecture/compatibility-policy.md`
@@ -90,15 +90,12 @@ Keep each idea in the narrowest durable owner:
 - `product/product-analysis-progress.md` owns product-analysis progress,
   document confidence, open questions, and the next analysis sequence.
 - `product/story-map.md` and `product/capability-map.md` own the current
-  unnumbered draft story/capability baseline derived from the latest
-  high-confidence inputs. They intentionally do not preserve older draft IDs.
-- `product/old-numbered-artifacts.md` records that older numbered epic, story,
-  capability, and story-module artifacts are deprecated and not active product
-  scope.
-- `product/future-concepts.md` is unnumbered strategic follow-on backlog
-  material until the initial adoption product baseline is stable.
-- `product/future-stories-and-requirements.md` is deprecated; do not use old
-  future-story IDs.
+  draft story/capability baseline derived from the latest high-confidence
+  inputs. They intentionally do not preserve older draft IDs; fresh stable IDs
+  can be introduced later after the new boundaries are accepted.
+- `product/future-concepts.md` is strategic follow-on backlog material until
+  the initial adoption product baseline is stable. It preserves future pressure
+  without preserving older draft IDs.
 - `product/glossary.md` is a provisional terminology helper until capability
   and story analysis settles the active product language.
 - `domain/README.md` owns the current domain-layer status.

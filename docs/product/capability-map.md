@@ -2,13 +2,15 @@
 
 ## Status
 
-Draft rederived from current story map; no stable capability IDs.
+Draft rederived from current story map; older capability IDs retired.
 
 ## Purpose
 
 Define the product capabilities implied by the current initial-adoption story
 backbone without preserving older draft capability IDs. Capability names here
-are planning labels, not implementation modules or stable requirements.
+are planning labels, not implementation modules or stable requirements. Fresh
+stable IDs can be added later when the rederived capability boundaries are
+accepted enough to need traceability.
 
 ## Capability Rule
 
@@ -21,8 +23,7 @@ Use high-confidence inputs first:
 
 Do not promote older draft capability, epic, or user-story IDs into specs or
 architecture. If a capability is not supported by the current story backbone,
-it belongs in the unnumbered backlog or should be rejected as old planning
-residue.
+it belongs in the backlog or should be rejected as old planning residue.
 
 ## First Usable Slice
 

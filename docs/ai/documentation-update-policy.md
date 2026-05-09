@@ -29,9 +29,14 @@ or ADR that actually needs the detail.
 
 ## Numbered ID Management
 
-The current product-analysis baseline intentionally uses no stable story,
-epic, or capability IDs. Do not reintroduce product-level IDs until the user
-asks for an accepted ID policy or a later spec needs stable traceability.
+The current product-analysis baseline does not preserve older draft story,
+epic, capability, or future-story IDs because those IDs encoded boundaries
+that are being rederived from higher-confidence inputs.
+
+This is not a ban on product-level IDs. Introduce fresh stable IDs when the
+new story, capability, backlog, or spec boundaries are accepted enough to need
+stable traceability. Do not reuse old IDs to avoid scanning churn or to keep
+continuity with an obsolete partition.
 
 Stable numbered IDs must be easy to allocate without scanning unrelated
 priority lists.

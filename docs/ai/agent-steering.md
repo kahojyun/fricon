@@ -33,16 +33,16 @@ Pause local implementation and update docs when:
   parallel device apply, readback semantics, or partial-failure handling
 - draft capabilities or stories would be used as implementation input
   before product-analysis revalidation
-- old numbered product story, epic, or capability IDs would be reintroduced or
-  treated as active scope
+- old numbered product story, epic, capability, or future-story IDs would be
+  reintroduced or treated as active scope
 - a spec or milestone draft introduces product scope, product terminology, or
   architecture decisions that are not already owned by upstream docs or ADRs
 - a spec contradicts an accepted ADR
 
 ## Review Questions Before Implementation
 
-- Which unnumbered story-map slice and capability-map capability does this
-  work support?
+- Which current story-map slice and capability-map capability does this work
+  support?
 - Which product terms or concepts does it touch?
 - Which future boundary would own each concept?
 - What data-library, local runtime/API, Python SDK, Desktop, CLI, and export

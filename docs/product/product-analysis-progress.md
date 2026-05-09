@@ -29,7 +29,7 @@ The most carefully reviewed current inputs are:
 - three interview passes on the initial adoption journey, using a simple VNA
   S21 scan and related readout/minimizer cases as redacted case evidence.
 - a cleanup pass that replaced older numbered epic, story, capability, and
-  future-story artifacts with unnumbered active maps and backlog categories.
+  future-story artifacts with rederived active maps and backlog categories.
 
 Other product documents should be treated as draft derived material until they
 are rederived or checked against the current greenfield analysis.
@@ -50,13 +50,10 @@ Draft derived product artifacts:
 
 - `product/capability-map.md`
 - `product/story-map.md`
-- `product/old-numbered-artifacts.md` for deprecation context only
 
 Strategic follow-on backlog material:
 
 - `product/future-concepts.md`
-- `product/future-stories-and-requirements.md` is deprecated and points to the
-  unnumbered future backlog
 
 Downstream material not ready for implementation use:
 
@@ -72,12 +69,12 @@ Downstream material not ready for implementation use:
 | --- | --- | --- |
 | Problem framing | Strong; sharpened around maintained Data Vault/Grapher replacement for new interactive work | Rebuild the initial adoption story backbone from this framing. |
 | User and role analysis | Strong current baseline with first-adoption emphasis on P-001 and P-003 | Keep refining only when new case evidence appears. |
-| Use case discovery | Candidate journey complete and old IDs removed | Use the ID-free story map and capability map as the next product-analysis baseline. |
+| Use case discovery | Candidate journey complete and old IDs retired | Use the rederived story map and capability map as the next product-analysis baseline. |
 | Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
 | Value proposition | Clear internally | Write a short external-facing value statement later. |
 | Core workflow | Candidate backbone strengthened and story-checked | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
 | Story map | Rewritten without old story or epic IDs | Challenge first-slice scope and validate against another concrete migration case before accepting. |
-| Capability map | Rewritten without old capability IDs | Cross-check for gaps and excess against the ID-free story map. |
+| Capability map | Rewritten without old capability IDs | Cross-check for gaps and excess against the rederived story map. |
 | Scope definition | Narrower but still draft | Separate first usable slice, follow-on backlog, ADR-gated, and rejected scope after capability review. |
 | Initial adoption definition | Draft with first success standard | Accept only after the journey, story map, and supporting capabilities cohere. |
 | Success metrics | Missing | Define measurable product and validation signals. |
@@ -99,13 +96,14 @@ The work should proceed from user work to product capabilities:
 4. Separate first usable slice, follow-on backlog, ADR-gated, and rejected scope.
 5. Add success signals, assumptions, and validation tasks.
 
-Steps 1 through 3 now have a candidate ID-free pass from the VNA/readout
+Steps 1 through 3 now have a candidate rederived pass from the VNA/readout
 interview backbone. Step 4 is the next active analysis step.
 
 Capability review should follow story analysis. A capability without story or
-journey support should be deferred, rewritten as an unnumbered backlog
-hypothesis, or rejected as old planning residue. Do not reintroduce old
-numbered product IDs.
+journey support should be deferred, rewritten as a backlog hypothesis, or
+rejected as old planning residue. Do not reintroduce old numbered product IDs.
+Fresh IDs can be introduced later when the rederived boundaries are accepted
+enough to need stable references.
 
 ## Future-Pressure Guardrail
 
@@ -236,7 +234,7 @@ Refined product expectations:
   keyboard shortcuts. Richer reader, export, or plot snippets can live behind
   advanced menus.
 
-Round 2 implications that were incorporated into the ID-free story map:
+Round 2 implications that were incorporated into the rederived story map:
 
 - trace-valued records and multiple traces per record are product pressure
   without accepting exact API syntax
@@ -324,7 +322,7 @@ Sample-code pressure check:
 - Optimizer analysis needs visible step records and selected best values more
   urgently than a heavy optimizer-specific product model.
 
-Round 3 implications that were incorporated into the ID-free story map:
+Round 3 implications that were incorporated into the rederived story map:
 
 - reader expectations should describe trace, IQ, and generic irregular data
   without committing the internal storage model to Polars, pandas, NumPy, or
@@ -350,23 +348,23 @@ Remaining open questions:
 Scope:
 
 - replaced older numbered epic, story, capability, and story-module artifacts
-  with unnumbered active maps
-- collapsed numbered strategic follow-on stories and requirements into an
-  unnumbered future backlog
-- kept a short deprecation note in `old-numbered-artifacts.md`
+  with rederived active maps
+- collapsed numbered strategic follow-on stories and requirements into the
+  strategic follow-on backlog
 
 Cleanup outcomes:
 
-- `story-map.md` now owns the current unnumbered story backbone.
-- `capability-map.md` now owns the current unnumbered capability baseline.
+- `story-map.md` now owns the current rederived story backbone.
+- `capability-map.md` now owns the current rederived capability baseline.
 - Older numbered files under product epics, user stories, and the story-module
   matrix are removed from the active docs path.
-- `future-concepts.md` now owns unnumbered strategic follow-on categories.
-- `future-stories-and-requirements.md` is deprecated.
+- `future-concepts.md` now owns strategic follow-on categories without
+  preserving old future-story IDs.
+- Deprecated placeholder files that only described old-ID cleanup were removed.
 
 Next analysis action:
 
-- challenge and validate the ID-free first usable slice, then add success
+- challenge and validate the rederived first usable slice, then add success
   signals, assumptions, and validation tasks.
 
 ## Downstream Guardrail

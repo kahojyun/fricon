@@ -2,16 +2,18 @@
 
 ## Status
 
-Draft unnumbered backlog; pending strategic follow-on revalidation.
+Draft strategic follow-on backlog; older future-story and concept IDs retired.
 
 ## Purpose
 
 Preserve strategic follow-on pressure without letting older numbered epics,
 stories, requirements, or capabilities inflate the initial adoption slice.
 
-This file intentionally uses no stable IDs. Items may be promoted only after
-the initial adoption baseline is accepted and the product owner confirms the
-story, scope, validation need, and any ADR boundary.
+This file does not preserve old stable IDs. Fresh stable IDs can be introduced
+later when a future concept is revalidated and needs durable traceability.
+Items may be promoted only after the initial adoption baseline is accepted and
+the product owner confirms the story, scope, validation need, and any ADR
+boundary.
 
 These concepts are future pressure, not dead backlog. During domain and
 architecture analysis, use this file to check that first-slice decisions keep
@@ -228,5 +230,6 @@ Boundaries:
 
 Earlier versions of this backlog used numbered future epics, stories,
 requirements, and concept IDs. Those identifiers are deprecated and should not
-be reused. Reintroduce any useful idea as current unnumbered product text or a
-new accepted spec item after revalidation.
+be reused. Reintroduce any useful idea as current product text or a new
+accepted spec item after revalidation. Add fresh IDs later only when the
+revalidated boundaries need stable references.

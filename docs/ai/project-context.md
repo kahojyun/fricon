@@ -16,7 +16,7 @@ easy to forget during AI-assisted work. Do not duplicate the README here.
 
 The current high-confidence product inputs are `product/vision.md` and
 `product/personas.md`. Use `product/product-analysis-progress.md` to understand
-which greenfield analysis steps are complete before relying on the unnumbered
+which greenfield analysis steps are complete before relying on the current
 story map, capability map, or strategic follow-on backlog material.
 
 Primary user model:
@@ -32,8 +32,9 @@ Fricon helps me monitor, inspect, and reopen them.
 - Do not preserve prior workspace/dataset compatibility by default.
 - Do not treat draft capabilities, stories, or backlog items as
   implementation-ready.
-- Do not reintroduce old product story, epic, or capability IDs; older numbered
-  artifacts were draft residue and are deprecated.
+- Do not reintroduce old product story, epic, capability, or future-story IDs.
+  Fresh IDs are allowed later only after the new boundaries are accepted enough
+  to need stable references.
 - Do not make datasets own measurement, sample, parameter, code, or lifecycle
   meaning.
 - Do not make Desktop the durable data backend.
@@ -67,8 +68,8 @@ Fricon helps me monitor, inspect, and reopen them.
   unless a later product decision requires it.
 - For strategic follow-on parameter, calibration, run-manifest,
   sample-visualizer, and setup/device reconciliation details, read
-  `product/future-concepts.md` and `product/glossary.md` as unnumbered draft
-  backlog and terminology context.
+  `product/future-concepts.md` and `product/glossary.md` as draft backlog and
+  terminology context.
 - Do not implement future concepts early, but do use them as pressure when
   shaping domain and architecture boundaries. Early measurement, dataset,
   identity, lifecycle, event, provenance, note, attachment, and API models

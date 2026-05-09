@@ -2,13 +2,16 @@
 
 ## Status
 
-Draft rederived from current high-confidence inputs; no stable story IDs.
+Draft rederived from current high-confidence inputs; older story and epic IDs
+retired.
 
 ## Purpose
 
 Keep the current initial-adoption route readable without preserving older draft
-story or epic IDs. Do not use this file as implementation requirements until
-the product baseline, capability map, and validation posture are accepted.
+story or epic IDs. Fresh stable IDs can be added later when the rederived story
+boundaries are accepted enough to need traceability. Do not use this file as
+implementation requirements until the product baseline, capability map, and
+validation posture are accepted.
 
 ## Current Evidence Basis
 
@@ -23,8 +26,8 @@ This map is based on:
   inspection, checkpoint-safe reads, and reopen
 
 Older numbered epics and user stories were draft derived material. They are no
-longer part of the active product route and should not be treated as stable
-IDs.
+longer part of the active product route and should not be reused. Future story
+IDs should be allocated from the accepted rederived boundaries.
 
 ## Initial Adoption Backbone
 
@@ -195,5 +198,5 @@ These are real product pressures, but they should not be first-slice blockers:
 
 ## Next Product Step
 
-Derive `capability-map.md` from this ID-free story map, then separate first
+Derive `capability-map.md` from this rederived story map, then separate first
 usable slice, follow-on backlog, ADR-gated directions, and rejected scope.
