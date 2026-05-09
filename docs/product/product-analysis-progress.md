@@ -6,33 +6,29 @@ Accepted as the product-analysis progress tracker.
 
 ## Purpose
 
-Track how far the greenfield product analysis has actually progressed, and
-which analysis questions still need work before downstream domain,
-architecture, spec, or implementation planning starts.
+Track analysis progress, confidence, open questions, and the next analysis
+sequence before downstream domain, architecture, spec, or implementation
+planning starts.
 
-This file does not define product scope. It records analysis progress,
-confidence, open questions, and the next analysis sequence.
+This file does not define product scope. Product promises belong in
+`vision.md`; role ownership belongs in `personas.md`; current story and
+capability structure belongs in `story-map.md` and `capability-map.md`.
 
 ## Current Situation
 
 Fricon restarted product analysis after earlier planning became difficult to
-continue from. Some current product documents were extracted from older
-planning material. They may contain useful lessons, but they were not all
-derived systematically from the current greenfield direction.
+continue from. Some current product documents still preserve useful lessons
+from older planning, but the active baseline is being rederived from current
+greenfield inputs.
 
-The most carefully reviewed current inputs are:
+Most reviewed inputs:
 
-- `product/vision.md`, refined from the current clean-reset direction and the
-  user-supplied sample codebase review.
-- `product/personas.md`, refined from the same case-study pressure and current
-  product-role thinking.
-- three interview passes on the initial adoption journey, using a simple VNA
-  S21 scan and related readout/minimizer cases as redacted case evidence.
-- a cleanup pass that replaced older numbered epic, story, capability, and
-  future-story artifacts with rederived active maps and backlog categories.
-
-Other product documents should be treated as draft derived material until they
-are rederived or checked against the current greenfield analysis.
+- `vision.md`
+- `personas.md`
+- three initial-adoption interview passes using a VNA S21 scan, IQ/readout
+  data, generic irregular/minimizer records, and selected legacy-code pressure
+- cleanup of older numbered epic, story, capability, and future-story artifacts
+  into rederived maps and backlog categories
 
 ## Document Confidence
 
@@ -41,69 +37,47 @@ High-confidence product inputs:
 - `product/vision.md`
 - `product/personas.md`
 
-Provisional product helpers:
+Current draft product structure:
 
-- `product/glossary.md`
-- `product/python-sdk-ux.md`
-
-Draft derived product artifacts:
-
-- `product/capability-map.md`
 - `product/story-map.md`
-
-Strategic follow-on backlog material:
-
+- `product/capability-map.md`
+- `product/python-sdk-ux.md`
+- `product/glossary.md`
 - `product/future-concepts.md`
 
-Downstream material not ready for implementation use:
+Not ready for implementation use:
 
 - `domain/`
-- `architecture/`, except the accepted reset constraints and compatibility
-  policy
+- `architecture/`, except accepted reset constraints and compatibility policy
 - `specs/`
 - `implementation-plans/`
 
-## Greenfield Analysis Progress
+## Progress Snapshot
 
-| Step | Current State | Next Analysis Action |
+| Area | Current State | Next Action |
 | --- | --- | --- |
-| Problem framing | Strong; sharpened around maintained Data Vault/Grapher replacement for new interactive work | Rebuild the initial adoption story backbone from this framing. |
-| User and role analysis | Strong current baseline with first-adoption emphasis on P-001 and P-003 | Keep refining only when new case evidence appears. |
-| Use case discovery | Candidate journey complete and old IDs retired | Use the rederived story map and capability map as the next product-analysis baseline. |
-| Alternatives and market analysis | Draft research synthesis exists | Use only for focused pressure, not product authority. |
-| Value proposition | Clear internally | Write a short external-facing value statement later. |
-| Core workflow | Candidate backbone strengthened and story-checked | Validate whether the VNA/readout backbone is general enough for the first adoption story. |
-| Story map | Rewritten without old story or epic IDs | Challenge first-slice scope and validate against another concrete migration case before accepting. |
-| Capability map | Rewritten without old capability IDs | Cross-check for gaps and excess against the rederived story map. |
-| Scope definition | Narrower but still draft | Separate first usable slice, follow-on backlog, ADR-gated, and rejected scope after capability review. |
-| Initial adoption definition | Draft with first success standard | Accept only after the journey, story map, and supporting capabilities cohere. |
-| Success metrics | Missing | Define measurable product and validation signals. |
-| Risks and assumptions | Partial | Add an explicit assumption and validation register. |
-| Validation plan | Missing | Define interviews, prototype checks, and migration-script trials. |
-| Product requirements | Not implementation-ready | Derive later from accepted journeys, stories, capabilities, and validation results. |
-| Older backlog review | Partial | Keep strategic follow-on docs as backlog only; revalidate managed run, calibration, Git-heavy provenance, report artifacts, and generic export formats before promoting them. |
-| Domain analysis | Deferred | Start only after the product analysis baseline is stable. |
-| Architecture inputs | Deferred | Start only after product and domain baselines are stable. |
+| Problem framing | Strong; centered on replacing the Data Vault/Grapher loop for new interactive work | Keep as product thesis unless new evidence contradicts it. |
+| Personas | Strong current role model | Refine only when new durable role pressure appears. |
+| Initial adoption journey | Candidate journey complete from VNA/readout interview evidence | Validate against another concrete migration case. |
+| Story map | Rewritten from current evidence; old IDs retired | Challenge first-slice boundaries. |
+| Capability map | Rewritten from current story map; old IDs retired | Cross-check for gaps and excess against the first usable slice. |
+| Scope definition | Narrower but still draft | Separate first usable slice, follow-on backlog, ADR-gated, and rejected scope. |
+| Success signals | Missing | Define measurable product and validation signals. |
+| Assumptions and risks | Partial | Add an explicit assumption and validation register. |
+| Validation plan | Missing | Define interview, prototype, and migration-script checks. |
+| Domain and architecture inputs | Deferred | Start only after product baseline and validation posture stabilize. |
 
-## Next Analysis Sequence
+## Current Next Action
 
-Use the current product documents as input evidence, not as the analysis order.
-The work should proceed from user work to product capabilities:
+The next active analysis step is scope separation:
 
-1. Define the initial adoption journey and story backbone.
-2. Rebuild `product/story-map.md` from that backbone.
-3. Rebuild `product/capability-map.md` from the story map.
-4. Separate first usable slice, follow-on backlog, ADR-gated, and rejected scope.
-5. Add success signals, assumptions, and validation tasks.
+1. Challenge the rederived first usable slice.
+2. Separate first usable slice, follow-on backlog, ADR-gated directions, and
+   rejected scope.
+3. Add success signals, assumptions, risks, and validation tasks.
 
-Steps 1 through 3 now have a candidate rederived pass from the VNA/readout
-interview backbone. Step 4 is the next active analysis step.
-
-Capability review should follow story analysis. A capability without story or
-journey support should be deferred, rewritten as a backlog hypothesis, or
-rejected as old planning residue. Do not reintroduce old numbered product IDs.
-Fresh IDs can be introduced later when the rederived boundaries are accepted
-enough to need stable references.
+Do not reintroduce old numbered product IDs. Fresh IDs can be introduced later
+when the rederived boundaries are accepted enough to need stable references.
 
 ## Future-Pressure Guardrail
 
@@ -113,7 +87,7 @@ product thesis. Strategic follow-on concepts are not implementation-ready
 requirements, but domain and architecture analysis must treat them as pressure
 that early models should not foreclose.
 
-Keep these future pressures visible during domain and architecture work:
+Keep these future pressures visible:
 
 - parameter profiles, effective snapshots, diffs, proposals, and reviewed
   promotion
@@ -133,239 +107,122 @@ design focuses on write/watch/reopen. It is not acceptable for the first
 domain model, storage model, identity model, event model, or API boundary to
 make these later systems impossible without a large conceptual rewrite.
 
-## Interview Evidence Log
+## Interview Evidence Summary
 
-### 2026-05-09: Initial Adoption Journey, Round 1
+### Round 1: Initial Adoption Case
 
-Evidence type:
-
-- user interview as a physical experimentalist migrating a legacy measurement
-  workflow gradually
-- redacted sample-code pressure check over legacy VNA, readout, optimizer, and
-  local configuration patterns
+Evidence came from a physical experimentalist migrating a legacy measurement
+workflow, plus a redacted sample-code pressure check over VNA, readout,
+optimizer, and local configuration patterns.
 
 Candidate first adoption case:
 
-- a simple VNA S21 measurement where existing Python code sweeps DC voltage and
-  VNA power while recording VNA-returned S21 traces
-- Fricon replaces the measurement record, dataset artifact, live inspection,
-  checkpoint-safe partial-read, and reopen loop while instrument calls,
-  waveform generation, LabRAD-era services, notebooks, plotting utilities,
-  parameter files, and calibration helpers can remain outside Fricon. Export
-  follows local reopen rather than defining the first adoption path.
+- sweep DC voltage and VNA power from existing Python code
+- record VNA-returned S21 traces
+- let Fricon own measurement identity, dataset artifacts, simple live
+  inspection, checkpoint-safe partial reads, and local reopen
+- keep instrument calls, waveform generation, notebooks, plotting utilities,
+  parameter files, and calibration helpers outside Fricon
 
-Observed data-shape pressure:
+Key data-shape pressure:
 
-- regular 1D, 2D, and N-D scans remain the dominant path
-- VNA traces need an inner coordinate axis, commonly frequency, while outer
-  sweep axes such as bias or power describe each trace record
-- trace length and trace coordinate values may vary across records
-- IQ readout may appear as averaged complex-like values, explicit I/Q channels,
-  single-shot arrays, or classified labels
-- IQ scatter inspection is a first-slice live and historical view need
-- minimizer or optimizer work should have an easy irregular step-record shape
-  so candidate parameters, objective values, status, and best-so-far state do
-  not remain print-only evidence
+- regular 1D, 2D, and N-D scans are dominant
+- traces have inner coordinates, and trace length or coordinate values may vary
+  across records
+- one record may carry multiple traces
+- complex values should be first-class for magnitude/phase and I/Q views
+- IQ data may appear as averages, explicit I/Q channels, single-shot arrays, or
+  classified labels
+- minimizer and optimizer output should start as generic irregular or ragged
+  step records
 
-Observed context pressure:
+Key context pressure:
 
 - selected parameter, registry, wiring, demod/readout, sidecar, script, and
-  notebook artifacts are useful evidence around a run
-- first adoption should bind selected local configuration as original files,
-  summaries, or opaque evidence, not claim that Fricon can keep physical setup,
-  wiring, or external environment facts accurate and current
-- setup and wiring context is especially likely to be incomplete, stale, or
-  reported later in slides or notes; this should surface as ambiguity rather
-  than become a false reproducibility promise
+  notebook artifacts can be useful evidence
+- Fricon should preserve selected files or summaries without claiming it can
+  keep physical setup, wiring, or opaque external facts accurate
+- setup and wiring context should remain notes, attributes, attachments, or
+  opaque evidence unless a later model owns the semantics
 
 Candidate success standard:
 
-- Fricon is worth continuing to use for new runs when it runs reliably, records
-  measurement identity and produced data, preserves written partial results,
-  makes the data easy to inspect in the browser/viewer, and lets the user copy
-  a measurement or dataset reader snippet for later Python analysis.
+- Fricon is worth continuing when it runs reliably, records measurement
+  identity and produced data, preserves written checkpoints after ordinary
+  interruption, supports simple inspection, and lets users copy stable IDs or
+  reader snippets for later Python analysis.
 
-Questions carried into Round 2:
+### Round 2: Trace Writing And Reopen UX
 
-- Which exact first-contact writer shape is acceptable for a VNA trace inside
-  an outer voltage/power sweep?
-- Should the product model expose complex values directly, or mainly expose
-  I/Q plus optional magnitude/phase views?
-- What is the minimum useful table returned by the Python reader for trace
-  datasets, IQ arrays, and irregular minimizer records?
-- Which attached files should be shown as trusted run evidence, and which
-  should be shown only as possibly relevant context?
-- What should the browser show when setup context is missing, stale, or
-  ambiguous, without turning everything into unstructured notes?
-- Which UI copy actions are required for first adoption: copy measurement
-  reader snippet, copy dataset reader snippet, copy stable ID, or copy export
-  reader snippet?
+Refined expectations:
 
-### 2026-05-09: Initial Adoption Journey, Round 2
+- prefer a dedicated trace-writing path, Labber-like in spirit, over forcing
+  every trace into flat row appends
+- support explicit coordinate/value arrays and compact regular-coordinate
+  forms such as start/delta/value
+- support multiple different traces within one outer sweep record
+- expose complex data directly rather than reconstructing relationships from
+  channel names
+- make stable ID copy the fastest reopen path; richer reader, export, or plot
+  snippets can live behind advanced menus
+- treat whole-notebook capture as low-value for initial adoption because output
+  cleanup, folder size, and variable-state recovery are poor
+- avoid automatic stale/fresh/trusted judgments for opaque setup context
 
-Evidence type:
+### Round 3: Reader Views And Analysis Tasks
 
-- follow-up user interview focused on trace writing, complex values, reader
-  ergonomics, context evidence, browser display, and copy actions
+Refined expectations:
 
-Refined product expectations:
-
-- A dedicated trace-writing path is preferred over forcing all trace data into
-  flat row appends. The user expects a Labber-like trace concept where a record
-  can carry trace data as explicit coordinate/value arrays or as compact
-  start/delta/value data.
-- The writer shape should handle multiple different traces within the same
-  outer sweep record.
-- Complex values should be first-class product data so Fricon can provide
-  targeted magnitude/phase views without asking users or plots to infer
-  relationships from channel naming conventions.
-- The fastest reopen path may only need a stable ID, or a small open-reader
-  snippet with the ID as the input that users edit later. After analysis code
-  stabilizes, users mostly change the input ID rather than the reopen code.
-- The most realistic run-bound context attachments are mutable parameter files
-  and instrument information. Whole-notebook capture is low-value for initial
-  adoption because outputs can bloat measurement folders, cleaning outputs is
-  hard, and the saved notebook still may not recover the variable state users
-  actually need.
-- First adoption should be skeptical about Fricon detecting stale or ambiguous
-  setup/configuration facts. If Fricon does not understand user-provided setup
-  context, it should avoid pretending it can judge freshness or correctness.
-- Fast-path UI copy should prioritize copying stable IDs, preferably with
-  keyboard shortcuts. Richer reader, export, or plot snippets can live behind
-  advanced menus.
-
-Round 2 implications that were incorporated into the rederived story map:
-
-- trace-valued records and multiple traces per record are product pressure
-  without accepting exact API syntax
-- complex-aware magnitude/phase views and IQ scatter are native inspection
-  expectations
-- stable ID copy is a first-path action, while reader snippets can be advanced
-  actions
-- automatic stale/ambiguous setup judgments are out of scope unless Fricon has
-  explicit evidence to support them
-
-Remaining open questions:
-
-- Which concrete trace-reader views are needed first for VNA traces: nested
-  trace objects, table with array columns, xarray-like data, or all of these as
-  alternate views?
-- What is the minimum acceptable reader shape for IQ single-shot arrays and
-  minimizer step records?
-- Should first adoption include a lightweight context role label such as
-  trusted run evidence, user-provided context, or opaque attachment, or is a
-  plain attachment list enough?
-- Which keyboard shortcuts and browser locations should expose fast stable-ID
-  copy?
-
-### 2026-05-09: Initial Adoption Journey, Round 3
-
-Evidence type:
-
-- follow-up user interview focused on reader views, IQ/minimizer read shapes,
-  attachment roles, and browser copy UX
-- focused framework pressure check over common Python analysis libraries
-- redacted sample-code pressure check over legacy trace plotting,
-  heatmap-building, IQ analysis, classifier tuning, and optimizer analysis
-
-Refined product expectations:
-
-- VNA trace reading should start from user analysis tasks, not from cloning the
-  old pipeline. Important tasks include plotting selected sweep traces in one
-  line plot, combining or comparing coarse/fine trace ranges, and building 2D
-  heatmaps from sweep-plus-trace data.
-- The reader should support a natural query path for trace-bearing tables.
-  Nested table views are promising for Polars-like workflows, while pandas and
-  NumPy users may need expanded table or array-oriented views.
-- Reader APIs should expose alternate views rather than force one shape for
-  every analysis: record-centric nested trace tables, exploded trace tables,
-  sample-level long tables, ndarray-oriented views, and xarray-like views when
-  the data is rectangular enough.
-- IQ single-shot data should be easy to read as ndarray-like data with sweep
-  dimensions first and the shot dimension last where shape permits. This
-  supports SNR analysis, error-rate estimation, and classifier-parameter
-  improvement with NumPy-style processing.
-- Minimizer records can stay simpler than measurement traces. The first useful
-  read shape is a generic step table for plotting parameter and objective
-  evolution. Best-parameter summaries by outer sweep condition can stay as
-  later helper logic unless a broader reader need validates them.
-- A plain attachment list is enough for first adoption. Lightweight attachment
-  role labels can wait until evidence shows users need them.
-- Labber-like right-click menu actions plus keyboard shortcuts are a good model
-  for fast stable-ID copy in the browser.
-
-Framework pressure check:
-
-- Polars-style nested list, array, and struct data is a plausible fit for
-  record-centric trace tables with queryable nested payloads.
-- pandas is better treated as an interoperability view, often expanded or
-  indexed, rather than as the only natural home for ragged nested traces.
+- trace readers should start from analysis tasks: selected-trace line plots,
+  coarse/fine comparison, and sweep-plus-trace heatmaps
+- reader APIs should allow alternate views without committing internal storage
+  to Polars, pandas, NumPy, or xarray
+- Polars-like nested tables are plausible for record-centric trace tables
+- pandas often works better as expanded/indexed interoperability output
 - NumPy is most useful for dense arrays such as IQ shot tensors or regularized
-  trace cubes, not for all reader-facing tabular metadata.
-- xarray-like labeled data is useful when traces form rectangular
-  multidimensional arrays with shared coordinates, but it should not be the
-  only view for ragged or per-record trace axes.
+  trace cubes
+- xarray-like views are useful when axes are rectangular enough
+- IQ single-shot reads should be ndarray-like where shape permits, with sweep
+  dimensions first and shot dimension last
+- minimizer output should remain generic step-table data first; best-parameter
+  summaries can stay as later helper logic unless broader need validates them
+- first adoption can keep attachments as a plain list
+- Labber-like right-click menu actions plus keyboard shortcuts are a good model
+  for fast stable-ID copy
 
-Sample-code pressure check:
+Sample-code pressure:
 
-- Existing VNA analysis rebuilds heatmaps by sorting tabular rows, deriving
-  unique axes, and reshaping measured values; Fricon should make this easier
-  when schema supports it and should expose missing, duplicate, ragged, or
-  incomplete cells explicitly.
-- Coarse/fine trace use is a reader workflow: combine, compare, crop, fit, or
-  overlay trace ranges while preserving segment provenance.
-- IQ analysis often rotates and projects complex shot clouds, builds
-  histograms, fits lobes, estimates SNR/error/fidelity, and adjusts classifier
-  parameters. First adoption should make the raw shaped shot arrays and
-  scatter/histogram inspection easy; durable classifier-tuning workflows can
-  remain later analysis or derived-artifact pressure.
-- Optimizer analysis needs visible step records and selected best values more
-  urgently than a heavy optimizer-specific product model.
+- existing VNA analysis rebuilds heatmaps by sorting rows, deriving axes, and
+  reshaping values; Fricon should make this easier when schema supports it and
+  expose missing, duplicate, ragged, or incomplete cells
+- coarse/fine trace use is a reader workflow that should preserve segment
+  provenance
+- IQ analysis needs raw shaped shot arrays and scatter/histogram inspection;
+  durable classifier-tuning workflows can remain later derived-artifact
+  pressure
+- optimizer analysis needs visible step records more urgently than a special
+  optimizer product model
 
-Round 3 implications that were incorporated into the rederived story map:
+## Open Questions
 
-- reader expectations should describe trace, IQ, and generic irregular data
-  without committing the internal storage model to Polars, pandas, NumPy, or
-  xarray
-- right-click menu and keyboard shortcut copy actions are good browser UX for
-  stable measurement and dataset IDs
-- first adoption should keep attachments as a plain list rather than
-  introducing attachment role taxonomy
-
-Remaining open questions:
-
-- Which reader views must be first-contact defaults, and which can be
+- Which reader view should be the first-contact default, and which should be
   alternate conversion methods?
-- Should trace concatenation/coarse-fine overlay be a reader helper, a Desktop
-  historical inspection action, or both?
+- Should trace concatenation or coarse/fine overlay be a reader helper, a
+  Desktop historical-inspection action, or both?
 - Is any minimizer best-value summary general enough to promote later, or
   should this remain user helper code over generic step tables?
+- Which validation case should challenge the VNA/readout first-slice
+  boundaries?
+- Which success signals prove that first adoption is good enough to support
+  domain analysis?
 
-## Story And Capability Cleanup Log
+## Cleanup Log
 
-### 2026-05-09: Remove Older Draft IDs
-
-Scope:
-
-- replaced older numbered epic, story, capability, and story-module artifacts
-  with rederived active maps
-- collapsed numbered strategic follow-on stories and requirements into the
-  strategic follow-on backlog
-
-Cleanup outcomes:
-
-- `story-map.md` now owns the current rederived story backbone.
-- `capability-map.md` now owns the current rederived capability baseline.
-- Older numbered files under product epics, user stories, and the story-module
-  matrix are removed from the active docs path.
-- `future-concepts.md` now owns strategic follow-on categories without
-  preserving old future-story IDs.
-- Deprecated placeholder files that only described old-ID cleanup were removed.
-
-Next analysis action:
-
-- challenge and validate the rederived first usable slice, then add success
-  signals, assumptions, and validation tasks.
+On 2026-05-09, older numbered epic, story, capability, story-module, and
+future-story artifacts were removed from the active docs path. `story-map.md`
+and `capability-map.md` now own the rederived story and capability baseline;
+`future-concepts.md` owns strategic follow-on pressure without preserving old
+future-story IDs.
 
 ## Downstream Guardrail
 

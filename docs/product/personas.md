@@ -6,273 +6,214 @@ Accepted.
 
 ## Purpose
 
-These personas are lightweight product-role archetypes for Fricon planning.
-They are not fictional biographies, job titles, a permission model, or a
-replacement for story-map and capability-map work.
+Define durable product-role archetypes for Fricon planning. Personas route
+ownership of goals, risks, and decisions; they are not fictional biographies,
+permissions, feature requirements, or replacements for stories and specs.
 
-Use this document to decide whose goal, risk, or decision a product slice
-serves. Put concrete capabilities, success criteria, and edge cases in the
-story map, capability map, future backlog, specs, or domain documents.
+Use `story-map.md`, `capability-map.md`, specs, ADRs, or domain docs for
+concrete behavior and acceptance criteria.
 
 ## Grounding
 
-These archetypes were refined against a representative local lab workspace,
-which shows current practice built around Windows lab folders, Jupyter
-notebooks, LabRAD Data Vault, mutable `parameters.json`/`registry.json` files,
-wiring spreadsheets, generated sidecars, calibration scripts, hardware
+These roles were refined against representative lab practice: Windows lab
+folders, Jupyter notebooks, LabRAD Data Vault, mutable parameter and registry
+files, wiring spreadsheets, generated sidecars, calibration scripts, hardware
 bring-up helpers, backups, and report artifacts.
 
-They are responsibility views, not fixed people. One person may move between
-roles during a single day.
+They are responsibility views. One person may move between several roles in
+one day.
 
-## Writing Rules
+## Routing Rules
 
-- Keep each persona short, research-backed, and easy to remember.
-- Describe stable goals, behavior patterns, context, and decision pressure.
-- Do not repeat feature requirements that belong in story maps, capability
-  maps, specs, or ADRs.
-- Use story modifiers for temporary contexts such as first-time use, offline
-  operation, locked-down machines, interrupted runs, or migration work.
-- Add a new persona only when research shows a durable product responsibility
-  that the existing roles cannot explain.
+Choose the persona that owns the main outcome:
 
-## Story Routing
-
-Choose the persona that owns the story's main outcome:
-
-- P-001 Measurement Run Operator: ordinary measurement-run operation and
-  checkpoint-safe data readability after ordinary interruptions.
-- P-002 Local Measurement System Maintainer: Fricon deployment, local runtime
-  health, data libraries, Python/package environments, code-source setup,
+- P-001 Measurement Run Operator owns ordinary measurement operation and
+  checkpoint-safe access to already-written data after ordinary interruptions.
+- P-002 Local Measurement System Maintainer owns Fricon deployment, local
+  runtime health, data-library readiness, Python/package environment support,
   diagnostics, migration support, and technical readiness.
-- P-003 Experimental Data Analyst: reopening, analysis, reports, derived
-  artifacts, downstream handoff, and interpretation provenance.
-- P-004 Effective Configuration Steward: effective configuration, calibration
-  evidence, parameter state, fitted values, and rollback decisions.
-- P-005 Measurement Method Author: measurement-method code, script and routine
-  shape, SDK usage, scan helpers, runner integration, plotting utilities, and
-  report/export recipes.
+- P-003 Experimental Data Analyst owns reopening, analysis, derived artifacts,
+  downstream handoff, and interpretation provenance.
+- P-004 Effective Configuration Steward owns effective configuration,
+  calibration evidence, parameter state, fitted values, and rollback decisions.
+- P-005 Measurement Method Author owns measurement-method code, SDK usage, scan
+  helpers, runner integration, plotting utilities, and export/report recipes.
 
-When several roles participate, use the accountable role as the story's
-primary persona and mention supporting roles in notes or acceptance criteria.
-
-If a story asks Fricon to mutate durable lab state, the accountable role is
-never only P-001. Route the decision to the state owner: P-004 for parameter
-or effective-configuration proposals, P-005 for managed-routine or
-measurement-code proposal shape, and P-003 for durable analysis or
-interpretation records. P-002 contributes technical guardrails when runtime,
-update, library, or environment safety matters.
+If a workflow mutates durable lab state, the accountable role is not only
+P-001. Route parameter or effective-configuration decisions to P-004, managed
+routine or measurement-code shape to P-005, durable analysis or interpretation
+records to P-003, and runtime/update/library safety to P-002.
 
 Physical setup, instrument, wiring, and device-state ownership is a distinct
-future boundary. Initial adoption records those facts as passive setup context,
-user-supplied attributes, notes, attachments, or run-bound local configuration
-files. If later workflows review or mutate setup or device state, route that
-decision to an explicit setup/device owner rather than to P-002 by default;
-P-002 owns software-system readiness.
+future boundary. Initial adoption records those facts as notes, attributes,
+attachments, or run-bound local configuration evidence. Later workflows that
+review or mutate setup/device state need an explicit setup/device owner rather
+than defaulting to P-002.
 
-## First Adoption Role Emphasis
+## First Adoption Emphasis
 
 The first adoption slice is primarily for P-001 and P-003: an experimenter
-running interactive scripts or notebooks, then reopening the result for later
-analysis through stable IDs and public reader APIs. Portable export and remote
-handoff remain follow-on pressure after local reopen is reliable.
-
-P-005 and P-002 are supporting pressures for initial adoption. Fricon should be
-easy for a method author or AI-assisted migration guide to apply to existing
-recording sections, and it should be installable on constrained lab computers,
-but the first slice should not try to standardize lab-wide code deployment,
-manage Conda environments, or replace waveform and analysis utility stacks.
+runs an interactive script or notebook, then reopens the result by stable ID
+for later analysis. P-005 and P-002 are supporting roles for migration
+ergonomics and local-system readiness.
 
 P-004 remains strategically important, but first adoption treats calibration
-notebooks as ordinary measurement work unless product evidence shows that a
-minimal calibration-specific record removes user code burden.
-
-Route-level planning should carry these first-slice boundaries. Individual
-persona definitions remain broader responsibility archetypes so they can guide
-later product analysis without repeating every first-slice non-goal.
+notebooks as ordinary measurement work unless later evidence shows a minimal
+calibration-specific record removes real user burden.
 
 ## P-001 Measurement Run Operator
 
-The role active when a lab user runs a measurement script or notebook on a lab
-computer. The person may be an experimentalist, student, or senior researcher,
-but the product responsibility is operating and understanding a measurement
-run, not every decision in the experiment.
+The role active when a lab user runs and monitors a measurement script or
+notebook on a lab computer.
 
 Goals:
 
 - start, watch, annotate, preserve, and later hand off measurement runs
-- choose or adjust run-specific inputs such as scan ranges, selected targets,
-  and context labels
-- understand the active measurement name, scan shape, units, and selected local
-  context without learning Fricon internals
-- preserve already-written data when users interrupt a run or a notebook kernel
-  fails
+- choose run-specific inputs such as scan ranges, selected targets, and context
+  labels
+- understand measurement identity, scan shape, units, and selected context
+  without learning Fricon internals
+- keep already-written data readable after user interruption or notebook-kernel
+  failure
 
-Context and pressure:
+Context:
 
-- often works on Windows, offline, locked-down, or slow-to-update lab machines
-- may depend on Jupyter, Conda or `uv`, LabRAD/Data Vault services, copied
+- often works on Windows, offline, locked-down, or slow-to-update machines
+- depends on Jupyter, package environments, LabRAD/Data Vault services, copied
   folders, dated backups, and mutable local configuration during migration
-- needs Fricon to make ordinary measurement work safer without forcing managed
+- needs ordinary measurement work to become safer without adopting managed
   execution first
-- should be able to run multiple independent measurements without accidental
-  global-session interference or one monitor window assuming there is only one
-  active experiment
+- may run multiple independent measurements at once
 
 Common switches:
 
-- switches to P-004 when calibration evidence or fitted values are being judged
-  for working effective configuration or parameter state
-- switches to P-003 when the main work is analysis, reporting, or interpreting
-  derived artifacts after acquisition
-- switches to P-005 when changing measurement-method code, scan-helper
-  semantics, procedure summaries, or dataset schema
-- depends on P-002 when setup or update problems block measurement work
+- P-003 for analysis and interpretation after acquisition
+- P-004 for judging calibration evidence or fitted values
+- P-005 for changing measurement-method code or dataset schema
+- P-002 when setup, update, or runtime problems block work
 
 ## P-002 Local Measurement System Maintainer
 
-The role active when someone makes the local Fricon-backed measurement software
-system runnable on lab computers. This includes Fricon, local runtime
-components, data libraries, Python/package environments, configured code
-sources, update paths, diagnostics, and migration support. Its expertise is
-system readiness, not experiment design.
+The role active when someone makes the local Fricon-backed measurement
+software system runnable on lab computers. Its expertise is system readiness,
+not experiment design.
 
 Goals:
 
-- keep the local measurement software system runnable, including Fricon,
-  runtime components, data libraries, Python/package environments, configured
-  code sources, and update paths
-- make setup, compatibility, migration, and support problems diagnosable
-  before users read raw logs
-- help labs adopt Fricon gradually while old LabRAD/Data Vault, folder, and
+- keep Fricon, local runtime components, data libraries, Python environments,
+  configured code sources, and update paths runnable
+- make setup, compatibility, migration, and support problems diagnosable before
+  users read raw logs
+- support gradual adoption while old LabRAD/Data Vault, folder, and
   parameter-file history remains in place
 
-Context and pressure:
+Context:
 
-- supports machines that may be offline, locked down, slow to update, or
-  pinned to lab-specific Python environments
-- must handle sensitive local paths, machine names, IP addresses, environment
-  details, and setup files carefully
-- may diagnose OS, package, service, import, driver-path, and runner-launch
-  problems from a software-system perspective
-- contributes technical readiness checks when a proposal depends on runtime,
-  update timing, data-library compatibility, or environment state
+- handles machines that may be offline, locked down, pinned, or slow to update
+- must treat local paths, machine names, IP addresses, environment details, and
+  setup files as sensitive
+- diagnoses OS, package, service, import, driver-path, runner-launch, library,
+  and update-timing problems from a software-system perspective
 
 Common switches:
 
-- works with P-005 to make authored methods runnable through maintained local
-  code sources, package environments, and setup profiles
-- relies on P-004 or P-003 for scientific acceptance of calibration,
-  parameter, analysis, or interpretation outcomes
+- works with P-005 to make authored methods runnable through maintained code
+  sources, packages, environments, and setup profiles
+- relies on P-004 or P-003 for scientific acceptance of calibration, parameter,
+  analysis, or interpretation outcomes
 
 ## P-003 Experimental Data Analyst
 
-The person who reopens completed measurements for notebooks, local analysis, or
-HPC analysis. This role often produces secondary artifacts such as fit results,
-plots, `.npy` or `.json` derived data, spreadsheets, and later reports.
+The role active when someone reopens completed or interrupted measurements for
+notebooks, local analysis, HPC analysis, reports, or handoff.
 
 Goals:
 
-- reopen completed or interrupted measurements through stable IDs and APIs
-- later, read portable Fricon packages on another computer through a
-  lightweight Python reader without recreating the acquisition-time local
-  runtime
-- load measurement data into analysis-friendly Python objects such as NumPy,
-  pandas, or Polars where appropriate
+- reopen measurements through stable IDs and public APIs
+- load data into analysis-friendly Python objects where appropriate
 - preserve links from derived artifacts back to source measurements,
   parameters, code/procedure context, and manual judgment
-- keep mapping, readout-classification, shot-group, detector, or observable
-  context aligned for advanced analysis workflows
+- distinguish recorded measurement facts from notebook-local analysis state
+  and manually edited outputs
+- later, use portable exports without recreating the acquisition-time runtime
 
-Context and pressure:
+Context:
 
-- often works away from the acquisition computer or after the run has finished
+- often works away from the acquisition computer or after the run finished
 - needs privacy-aware handoff when exports contain local paths, setup details,
   code summaries, environment data, or sample context
-- must distinguish recorded measurement facts from notebook-local analysis
-  state and manually edited outputs
-- does not need first-slice report or presentation generation from Fricon;
-  screenshots, exported images, and custom plotting scripts can remain outside
-  the product until real demand requires more
+- can keep screenshots, exported images, and custom plotting scripts outside
+  Fricon until real demand justifies more
 
 Common switches:
 
 - consumes measurements produced by P-001
-- switches to P-004 when analysis output becomes evidence for accepting,
-  rejecting, or rolling back calibration-derived effective configuration or
-  parameter state
+- switches to P-004 when analysis output becomes calibration or parameter
+  evidence
 - uses report/export recipes maintained by P-005
 
 ## P-004 Effective Configuration Steward
 
 The role active when measurement evidence, analysis outputs, and calibration
-results are evaluated for working effective configuration or parameter state.
-This may happen before, during, or after calibration measurements, and the same
-person may also be the measurement run operator or experimental data analyst.
+results are evaluated for effective configuration or parameter state.
 
 Goals:
 
-- decide which effective configuration or prior-good state calibration work
-  depends on
+- decide which effective configuration or prior-good state future work depends
+  on
 - evaluate calibration evidence, fitted values, health gates, retry/pause
   needs, and manual inspection flags
 - mark calibration results as exploratory, accepted, rejected, superseded, or
-  needing review, with rollback context where practical
-- preserve the distinction between parameter/configuration decisions and
-  physical setup or device-state ownership
+  needing review
+- keep parameter/configuration decisions distinct from physical setup or
+  device-state ownership
 
-Context and pressure:
+Context:
 
 - works with mutable JSON files, lock files, dated backups, copied setting
   folders, generated temporary files, wiring sheets, and local database helpers
-- may run routines that update local parameters while also producing datasets,
-  so mutation and measurement facts must stay distinguishable
+- may run routines that update local parameters while producing datasets, so
+  mutation and measurement facts must stay distinguishable
 - may depend on physical instrument addresses and external device state that
   Fricon can record before it can control
 
 Common switches:
 
-- uses P-001 for the run-operation part of calibration work
-- uses P-003 when fitted outputs, plots, or derived artifacts need analysis
-  provenance before a calibration decision
+- uses P-001 for run operation
+- uses P-003 for fit, plot, and derived-artifact provenance
 - depends on P-005 for calibration routines and code provenance
-- uses P-002 technical readiness checks when calibration proposals affect
-  runtime, update, environment, or data-library compatibility
+- uses P-002 when proposals affect runtime, update, environment, or
+  data-library compatibility
 
 ## P-005 Measurement Method Author
 
-The role active when a lab user writes or maintains code that expresses a
-measurement method, from exploratory script blocks to reusable routines:
-scripts, scan helpers, pulse-generation rules, runner integrations, plotting
-utilities, or export/report recipes. This role understands how the experiment
-should be expressed in code, but may rely on P-002 for packaging,
-environments, deployment, and local system diagnostics.
+The role active when someone writes or maintains the code that expresses a
+measurement method: scripts, scan helpers, pulse-generation rules, runner
+integrations, plotting utilities, reusable routines, or export/report recipes.
 
 Goals:
 
-- integrate Fricon recording into exploratory scripts, notebooks, Data
-  Vault-style helpers, reusable routines, runners, and scan utilities
-- declare scan axes, dependencies, trace shapes, repeated shots, validity
-  masks, runner identifiers, and procedure summaries from code
-- preserve honest code provenance without claiming Fricon managed execution
-  guarantees it does not yet provide
+- integrate Fricon recording into existing exploratory scripts, notebooks,
+  Data Vault-style helpers, routines, runners, and scan utilities
+- declare scan axes, dependencies, trace shapes, repeated shots, validity masks,
+  runner identifiers, and procedure summaries from code
+- preserve honest code provenance without claiming managed execution guarantees
+  Fricon does not yet provide
 - help users migrate by rewriting recording sections with small, explicit
-  Fricon calls rather than depending on a built-in LabRAD compatibility layer
+  Fricon calls rather than a built-in LabRAD compatibility layer
 
-Context and pressure:
+Context:
 
 - may write quick internal script blocks or routines that other users later run
   without understanding every dependency
-- may rely on P-002 for runtime, package, deployment, or diagnostic support
-- needs migration ergonomics that do not require rewriting the whole
-  measurement stack at once
-- creates strategic follow-on pressure for approved code sources, managed
-  entry points, templates, and reviewed updates
+- may rely on P-002 for runtime, packaging, deployment, and diagnostics
+- creates strategic follow-on pressure for approved code sources, managed entry
+  points, templates, reviewed updates, and managed runs
 
 Common switches:
 
-- enables P-001 by making scripts and helpers easier to run and record
+- enables P-001 by making scripts easier to run and record
 - helps P-003 produce traceable analysis and report artifacts
 - helps P-004 produce calibration evidence and parameter-change proposals
-- works with P-002 when methods need maintained code sources, package
-  environments, setup profiles, or managed entry points
+- works with P-002 on maintained code sources, package environments, setup
+  profiles, and managed entry points
