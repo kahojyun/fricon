@@ -15,7 +15,7 @@ acceptance details.
 ```text
 Install and set up
   -> create/open data library
-  -> select optional sample/session context
+  -> optionally set sample/session context
   -> run Python measurement
   -> record dataset artifacts
   -> inspect live
@@ -125,7 +125,9 @@ adoption story index and live as draft backlog context in
 `product/future-concepts.md`.
 
 Export remains an initial adoption product promise. A portable Fricon package
-with a lightweight Python reader is the current baseline; CSV, Parquet, NumPy,
-or other generic export formats should be added when real user demand justifies
-them. Detailed export/offline-analysis requirements should be derived in a
-later spec after the product, architecture, and ADR boundaries are accepted.
+with a lightweight Python reader is the current baseline; reader APIs should
+load data into NumPy, pandas, Polars, or similar analysis objects where the
+dataset shape supports it. CSV, Parquet, or other generic file exports should
+be added when real user demand justifies them. Detailed export/offline-analysis
+requirements should be derived in a later spec after the product, architecture,
+and ADR boundaries are accepted.

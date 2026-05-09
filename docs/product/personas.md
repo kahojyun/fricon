@@ -84,6 +84,10 @@ P-004 remains strategically important, but first adoption treats calibration
 notebooks as ordinary measurement work unless product evidence shows that a
 minimal calibration-specific record removes user code burden.
 
+Route-level planning should carry these first-slice boundaries. Individual
+persona definitions remain broader responsibility archetypes so they can guide
+later product analysis without repeating every first-slice non-goal.
+
 ## P-001 Measurement Run Operator
 
 The role active when a lab user runs a measurement script or notebook on a lab

@@ -6,7 +6,7 @@ High-confidence product input; derived scope pending revalidation.
 
 ## Thesis
 
-Fricon is a local lab data library for scientific measurement work.
+Fricon is a local measurement data system for scientific experiment work.
 
 The first product target is a maintained replacement for the fragile
 Data Vault/Grapher-centered loop around new interactive measurements. The
@@ -143,11 +143,15 @@ Strategic follow-on slices can later help answer:
 ## Primary Mental Model
 
 ```text
-I selected an active sample/session when it mattered.
 I ran a measurement from Python.
 It produced datasets.
-Fricon helps me inspect, annotate, recover, reopen, and export them.
+Fricon helps me monitor, inspect, recover, reopen, and export them.
 ```
+
+Optional sample or session context can replace folder-path habits for grouping
+data by sample, cooldown, mount, or campaign. It should be settable once near
+the start of a notebook and useful in plots and browsing, but it is not the
+center of the first-slice workflow.
 
 Strategic follow-on slices should extend that model:
 
@@ -211,7 +215,7 @@ To meet the initial adoption goal, the first adoption slice should include:
 
 - one local data library per normal lab computer
 - explicit measurements
-- optional sample and sample-session context
+- optional sample and sample-session context for grouping and display
 - dataset artifacts that remain directly searchable and openable, even though
   the Desktop home is measurement-first
 - declared scan datasets for common 1D, 2D, and N-D sweeps
@@ -232,10 +236,12 @@ To meet the initial adoption goal, the first adoption slice should include:
 - light attachments
 - light contextual summaries for parameters, code provenance, setup,
   environment, and unmanaged procedure context
-- selected run-bound local configuration copies, snapshots, references, or
-  summaries, such as parameter files, registry files, wiring references,
-  line/chip info, or demod/readout settings, without turning initial adoption
-  into a full parameter registry
+- selected run-bound local configuration copies, such as parameter files,
+  registry files, wiring references, line/chip info, or demod/readout settings.
+  Fricon should preserve and return these files in their original user-supplied
+  form, with simple text preview or a way to open them in an external editor
+  where practical, without turning initial adoption into a parameter parser or
+  registry
 - Python reopen snippets through public APIs
 - a portable Fricon package readable by a lightweight Python reader without
   running the acquisition-time local runtime or Desktop
@@ -263,6 +269,9 @@ work starts:
   open a measurement bundle directly from Python, inspect a simple manifest or
   index preview, and choose whether sensitive paths, code, environment, setup,
   or sample details are included.
+- Generic export formats should be demand-driven. The first export promise is a
+  Fricon package plus reader APIs that load data into NumPy, pandas, Polars, or
+  similar analysis objects.
 - Dataset artifact semantics should be checked against real measurement shapes,
   including adaptive or instrument-tuned traces where each trace may have its
   own coordinate values, settings, and length.
