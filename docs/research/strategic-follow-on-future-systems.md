@@ -14,8 +14,8 @@ Capture background lessons for strategic follow-on parameter systems, managed
 code snapshots, runner capture, setup state, calibration history, and generated
 run history.
 
-This research informs `product/future-stories-and-requirements.md`; it does
-not change initial adoption scope.
+This research informs `product/future-concepts.md`; it does not change initial
+adoption scope.
 
 ## Sources
 

@@ -29,11 +29,21 @@ or ADR that actually needs the detail.
 
 ## Numbered ID Management
 
+The current product-analysis baseline does not preserve older draft story,
+epic, capability, or future-story IDs because those IDs encoded boundaries
+that are being rederived from higher-confidence inputs.
+
+This is not a ban on product-level IDs. Introduce fresh stable IDs when the
+new story, capability, backlog, or spec boundaries are accepted enough to need
+stable traceability. Do not reuse old IDs to avoid scanning churn or to keep
+continuity with an obsolete partition.
+
 Stable numbered IDs must be easy to allocate without scanning unrelated
 priority lists.
 
-- For substantial entries, prefer one file per ID in a directory whose filenames
-  sort numerically, like `product/user-stories/US-001-...md`.
+- For accepted numbered specs, ADRs, or future intentionally numbered product
+  artifacts, prefer one file per ID in a directory whose filenames sort
+  numerically.
 - For short entries kept in one file, keep the authoritative definitions in
   ascending ID order within that file.
 - Put unstable ordering concerns such as priority, release slice, or milestone

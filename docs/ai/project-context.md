@@ -16,22 +16,25 @@ easy to forget during AI-assisted work. Do not duplicate the README here.
 
 The current high-confidence product inputs are `product/vision.md` and
 `product/personas.md`. Use `product/product-analysis-progress.md` to understand
-which greenfield analysis steps are complete before relying on derived
-capabilities, stories, epics, or strategic follow-on backlog material.
+which greenfield analysis steps are complete before relying on the current
+story map, capability map, or strategic follow-on backlog material.
 
 Primary user model:
 
 ```text
 I ran an interactive measurement from Python.
 It produced datasets.
-Fricon helps me monitor, recover, reopen, and export them.
+Fricon helps me monitor, inspect, and reopen them.
 ```
 
 ## Hard Boundaries
 
 - Do not preserve prior workspace/dataset compatibility by default.
-- Do not treat draft capabilities, stories, epics, or backlog items as
+- Do not treat draft capabilities, stories, or backlog items as
   implementation-ready.
+- Do not reintroduce old product story, epic, capability, or future-story IDs.
+  Fresh IDs are allowed later only after the new boundaries are accepted enough
+  to need stable references.
 - Do not make datasets own measurement, sample, parameter, code, or lifecycle
   meaning.
 - Do not make Desktop the durable data backend.
@@ -67,6 +70,12 @@ Fricon helps me monitor, recover, reopen, and export them.
   sample-visualizer, and setup/device reconciliation details, read
   `product/future-concepts.md` and `product/glossary.md` as draft backlog and
   terminology context.
+- Do not implement future concepts early, but do use them as pressure when
+  shaping domain and architecture boundaries. Early measurement, dataset,
+  identity, lifecycle, event, provenance, note, attachment, and API models
+  should not make later parameter, managed-run, calibration, setup/device,
+  manifest, export, or reviewed-automation systems require a large conceptual
+  rewrite.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Treat Git metadata as optional context for initial adoption, not a

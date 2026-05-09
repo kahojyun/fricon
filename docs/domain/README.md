@@ -24,14 +24,12 @@ During the current phase:
   model.
 - `docs/product/product-analysis-progress.md` owns product-analysis progress,
   document confidence, open questions, and the next analysis sequence.
-- `docs/product/capability-map.md`, `docs/product/story-map.md`,
-  `docs/product/epics/`, and `docs/product/user-stories/` are draft derived
-  material pending greenfield analysis.
+- `docs/product/story-map.md` and `docs/product/capability-map.md` own the
+  current rederived draft story and capability baseline.
 - `docs/product/glossary.md` is draft terminology context pending product
   analysis.
-- `docs/product/future-concepts.md` and
-  `docs/product/future-stories-and-requirements.md` are backlog context pending
-  a stable initial adoption baseline.
+- `docs/product/future-concepts.md` owns strategic follow-on backlog context
+  pending a stable initial adoption baseline.
 - `docs/architecture/README.md` owns only accepted architecture constraints and
   deferred architecture questions.
 

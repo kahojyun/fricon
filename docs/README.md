@@ -53,7 +53,7 @@ Fricon is an S2 medium modular system:
 6. `product/capability-map.md`
 7. `product/story-map.md`
 8. `product/python-sdk-ux.md` for the Python SDK usage guideline
-9. relevant `product/epics/` and `product/user-stories/`
+9. `product/future-concepts.md` only for strategic follow-on backlog context
 10. `domain/README.md`
 11. `architecture/README.md`
 12. `architecture/compatibility-policy.md`
@@ -89,12 +89,13 @@ Keep each idea in the narrowest durable owner:
 - `product/personas.md` owns the current high-confidence product-role model.
 - `product/product-analysis-progress.md` owns product-analysis progress,
   document confidence, open questions, and the next analysis sequence.
-- `product/capability-map.md`, `product/story-map.md`, `product/epics/`, and
-  `product/user-stories/` are draft derived artifacts until they are rederived
-  or checked against the current greenfield analysis.
-- `product/future-concepts.md` and
-  `product/future-stories-and-requirements.md` are backlog material until the
-  initial adoption product baseline is stable.
+- `product/story-map.md` and `product/capability-map.md` own the current
+  draft story/capability baseline derived from the latest high-confidence
+  inputs. They intentionally do not preserve older draft IDs; fresh stable IDs
+  can be introduced later after the new boundaries are accepted.
+- `product/future-concepts.md` is strategic follow-on backlog material until
+  the initial adoption product baseline is stable. It preserves future pressure
+  without preserving older draft IDs.
 - `product/glossary.md` is a provisional terminology helper until capability
   and story analysis settles the active product language.
 - `domain/README.md` owns the current domain-layer status.
@@ -118,6 +119,7 @@ file only when authoring or reorganizing documentation.
 Future AI sessions should be able to read only the relevant files. Prefer:
 
 - compact bullets over large tables
-- epic-level maps over full cross-product matrices
-- separate user-story files for high-value stories only
+- slice-level maps over full cross-product matrices
+- separate story files only after the product baseline is accepted and an ID
+  policy is intentionally chosen
 - specs for detailed acceptance criteria and validation

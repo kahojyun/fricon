@@ -31,18 +31,24 @@ Pause local implementation and update docs when:
   or pause/review behavior
 - a managed routine introduces desired-state setup/device reconciliation,
   parallel device apply, readback semantics, or partial-failure handling
-- draft capabilities, epics, or stories would be used as implementation input
+- draft capabilities or stories would be used as implementation input
   before product-analysis revalidation
+- old numbered product story, epic, capability, or future-story IDs would be
+  reintroduced or treated as active scope
 - a spec or milestone draft introduces product scope, product terminology, or
   architecture decisions that are not already owned by upstream docs or ADRs
 - a spec contradicts an accepted ADR
 
 ## Review Questions Before Implementation
 
-- Which capability IDs and story IDs does this work support?
+- Which current story-map slice and capability-map capability does this work
+  support?
 - Which product terms or concepts does it touch?
 - Which future boundary would own each concept?
 - What data-library, local runtime/API, Python SDK, Desktop, CLI, and export
   effects exist?
+- Which strategic future pressure could this design close off, especially
+  parameter state, managed run, calibration/review, setup/device state, run
+  manifests, export, or reviewed automation?
 - What compatibility checks or migrations are needed?
 - What validation proves the behavior?
