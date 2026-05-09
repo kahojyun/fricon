@@ -74,7 +74,8 @@ CAP-004: Optional, visible, correctable sample/session context.
 - Promise: sample and sample-session context can explain a measurement when it
   matters, without blocking quick exploratory work.
 - Includes: optional active context, visible context on creation, and correction
-  after a run.
+  after a run. The first-slice role is mainly grouping and display, replacing
+  folder-path habits for sample, cooldown, mount, or campaign context.
 - Excludes: requiring a complete sample registry before recording data.
 
 CAP-005: Dataset artifact recording.
@@ -137,7 +138,9 @@ CAP-011: Measurement-centered export.
 - Includes: produced datasets, semantic metadata, selected provenance,
   integrity metadata, simple manifest or index preview, direct Python reading,
   privacy-aware provenance selection, and a lightweight Python reader that does
-  not require running the acquisition-time local runtime or Desktop.
+  not require running the acquisition-time local runtime or Desktop. Reader
+  APIs should load data into NumPy, pandas, Polars, or similar analysis
+  objects where the dataset shape supports it.
 - Excludes: importing old history, first-slice report generation, a fully
   polished offline Desktop viewer before the write/reopen loop is proven, and
   promising generic CSV, Parquet, or NumPy exports before real demand is
@@ -343,12 +346,14 @@ CAP-032: Routine recipes and reviewed replay.
 
 CAP-033: Run-bound local configuration snapshot.
 
-- Promise: a measurement can bind selected local configuration files,
-  references, hashes, or summaries so later analysis can identify the effective
-  lab-local state without reading copied folders by hand.
+- Promise: a measurement can bind selected local configuration files so later
+  analysis can identify the effective lab-local state without reading copied
+  folders by hand.
 - Includes: user-selected parameter files, registry files, wiring references,
   line/chip information, demod/readout settings, runner labels, source aliases,
-  privacy-aware export selection, and correction history.
-- Excludes: automatic tracing of every file read, global parameter profiles,
-  calibration promotion, device control, or claiming unmanaged execution was
-  fully reproducible.
+  privacy-aware export selection, correction history, original-file access,
+  simple text preview where practical, and a way to open files in an external
+  editor.
+- Excludes: automatic tracing of every file read, parsing or normalizing
+  arbitrary parameter files, global parameter profiles, calibration promotion,
+  device control, or claiming unmanaged execution was fully reproducible.
