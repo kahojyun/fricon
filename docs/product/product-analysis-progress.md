@@ -107,6 +107,34 @@ journey support should be deferred, rewritten as an unnumbered backlog
 hypothesis, or rejected as old planning residue. Do not reintroduce old
 numbered product IDs.
 
+## Future-Pressure Guardrail
+
+The current interview evidence is intentionally first-adoption-heavy. That
+focus should narrow the first usable slice, but it must not erase the long-term
+product thesis. Strategic follow-on concepts are not implementation-ready
+requirements, but domain and architecture analysis must treat them as pressure
+that early models should not foreclose.
+
+Keep these future pressures visible during domain and architecture work:
+
+- parameter profiles, effective snapshots, diffs, proposals, and reviewed
+  promotion
+- managed code sources, code provenance levels, run capture, and run manifests
+- analysis, fit, interpretation, handoff, and failure-investigation records
+- calibration evidence, calibration chains, health gates, working refs, and
+  reviewable automation proposals
+- setup/device identity, observed state, desired-state planning, reconciliation
+  diffs, and ADR-gated apply
+- routine recipes, reviewed replay, and read-only compare or triage workflows
+- portable export, bundle reading, richer historical viewer behavior, and
+  remote or LAN monitoring
+- sample-map views and AI-assisted reviewed actions
+
+It is acceptable for future detail to remain in backlog form while early
+design focuses on write/watch/reopen. It is not acceptable for the first
+domain model, storage model, identity model, event model, or API boundary to
+make these later systems impossible without a large conceptual rewrite.
+
 ## Interview Evidence Log
 
 ### 2026-05-09: Initial Adoption Journey, Round 1

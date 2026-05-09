@@ -13,6 +13,11 @@ This file intentionally uses no stable IDs. Items may be promoted only after
 the initial adoption baseline is accepted and the product owner confirms the
 story, scope, validation need, and any ADR boundary.
 
+These concepts are future pressure, not dead backlog. During domain and
+architecture analysis, use this file to check that first-slice decisions keep
+room for Fricon's differentiating long-term loops: explain, compare, review,
+repeat, and automate safely.
+
 ## Promotion Rule
 
 A future concept can move toward implementation only when:
@@ -23,6 +28,25 @@ A future concept can move toward implementation only when:
   ADR or later spec
 - it is derived from current product evidence, not from old numbered backlog
   residue
+
+## Use During Domain And Architecture Analysis
+
+Future concepts should not drive first-slice implementation by themselves, but
+they should constrain early abstractions. A first domain or architecture pass
+should explicitly ask whether its measurement, dataset artifact, identity,
+lifecycle, event, provenance, attachment, note, attribute, reader, and API
+models can later support:
+
+- records that cite source measurements and produced artifacts
+- effective parameter snapshots and reviewed proposal history
+- code provenance moving from unmanaged labels to managed sources and snapshots
+- run manifests assembled from recorded facts
+- calibration evidence and reviewable automation proposals
+- setup/device observed facts and ADR-gated apply plans
+- portable export and read-only bundle access
+
+If an early design cannot support these without a conceptual rewrite, either
+revise the design or record the tradeoff in an ADR before implementation.
 
 ## Strategic Follow-On Priorities
 

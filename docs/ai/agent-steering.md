@@ -47,5 +47,8 @@ Pause local implementation and update docs when:
 - Which future boundary would own each concept?
 - What data-library, local runtime/API, Python SDK, Desktop, CLI, and export
   effects exist?
+- Which strategic future pressure could this design close off, especially
+  parameter state, managed run, calibration/review, setup/device state, run
+  manifests, export, or reviewed automation?
 - What compatibility checks or migrations are needed?
 - What validation proves the behavior?

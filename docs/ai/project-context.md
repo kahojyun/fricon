@@ -69,6 +69,12 @@ Fricon helps me monitor, inspect, and reopen them.
   sample-visualizer, and setup/device reconciliation details, read
   `product/future-concepts.md` and `product/glossary.md` as unnumbered draft
   backlog and terminology context.
+- Do not implement future concepts early, but do use them as pressure when
+  shaping domain and architecture boundaries. Early measurement, dataset,
+  identity, lifecycle, event, provenance, note, attachment, and API models
+  should not make later parameter, managed-run, calibration, setup/device,
+  manifest, export, or reviewed-automation systems require a large conceptual
+  rewrite.
 - Make live views noncritical consumers.
 - Keep code provenance honest: unmanaged means unmanaged.
 - Treat Git metadata as optional context for initial adoption, not a
