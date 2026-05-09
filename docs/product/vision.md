@@ -6,7 +6,7 @@ High-confidence product input; derived scope pending revalidation.
 
 ## Thesis
 
-Fricon is a local lab data library for scientific measurement work.
+Fricon is a local measurement data system for scientific experiment work.
 
 The first product target is a maintained replacement for the fragile
 Data Vault/Grapher-centered loop around new interactive measurements. The
